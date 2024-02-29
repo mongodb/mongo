@@ -27,25 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
-#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+namespace mongo::classic_runtime_planner {
 
-namespace mongo::classic_runtime_planner_for_sbe {
-
-CachedPlanner::CachedPlanner(PlannerDataForSBE plannerData,
-                             std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder)
-    : PlannerBase(std::move(plannerData)), _cachedPlanHolder(std::move(cachedPlanHolder)) {}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
-    LOGV2_DEBUG(8523404, 5, "Recovering SBE plan from the cache");
-    _cachedPlanHolder->cachedPlan->planStageData.debugInfo = _cachedPlanHolder->debugInfo;
-    return prepareSbePlanExecutor(nullptr /*solution*/,
-                                  {std::move(_cachedPlanHolder->cachedPlan->root),
-                                   std::move(_cachedPlanHolder->cachedPlan->planStageData)},
-                                  true /*isFromPlanCache*/,
-                                  boost::none /*cachedPlanHash*/);
+SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::move(plannerData)) {
+    auto root = std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),
+                                               collections().getMainCollectionPtrOrAcquisition(),
+                                               ws(),
+                                               plannerParams(),
+                                               cq());
+    _subplanStage = root.get();
+    setRoot(std::move(root));
 }
-}  // namespace mongo::classic_runtime_planner_for_sbe
+
+Status SubPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
+    return _subplanStage->pickBestPlan(planYieldPolicy);
+}
+
+std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {
+    return nullptr;
+}
+}  // namespace mongo::classic_runtime_planner

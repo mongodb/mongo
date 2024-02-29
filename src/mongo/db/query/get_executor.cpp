@@ -106,6 +106,7 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -245,53 +246,6 @@ void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cache
 }
 
 /**
- * A class to hold the result of preparation of the query to be executed using classic engine. This
- * result stores and provides the following information:
- *     - A QuerySolutions for the query. May be null in certain circumstances, where the constructed
- *       execution tree does not have an associated query solution.
- *     - A root PlanStage of the constructed execution tree.
- */
-class ClassicPrepareExecutionResult {
-public:
-    void emplace(std::unique_ptr<PlanStage> root, std::unique_ptr<QuerySolution> solution) {
-        invariant(!_root);
-        invariant(!_solution);
-        _root = std::move(root);
-        _solution = std::move(solution);
-    }
-
-    std::tuple<std::unique_ptr<PlanStage>, std::unique_ptr<QuerySolution>> extractResultData() {
-        return std::make_tuple(std::move(_root), std::move(_solution));
-    }
-    void setRecoveredFromPlanCache(bool val) {
-        _fromPlanCache = val;
-    }
-    bool isRecoveredFromPlanCache() const {
-        return _fromPlanCache;
-    }
-
-    PlanCacheInfo& planCacheInfo() {
-        return _cacheInfo;
-    }
-
-    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
-        _cachedPlanHash = cachedPlanHash;
-    }
-
-    boost::optional<size_t> cachedPlanHash() const {
-        return _cachedPlanHash;
-    }
-
-private:
-    std::unique_ptr<PlanStage> _root;
-    std::unique_ptr<QuerySolution> _solution;
-    bool _fromPlanCache{false};
-    PlanCacheInfo _cacheInfo;
-    // If there is a matching cache entry, this is the hash of the cached plan.
-    boost::optional<size_t> _cachedPlanHash;
-};
-
-/**
  * A class to hold the result of preparation of the query to be executed using SBE engine. This
  * result stores and provides the following information:
  *     - A vector of QuerySolutions. Elements of the vector may be null, in certain circumstances
@@ -400,7 +354,25 @@ private:
 };
 
 // Shorter namespace alias to keep names from getting too long.
+namespace crp_classic = classic_runtime_planner;
 namespace crp_sbe = classic_runtime_planner_for_sbe;
+
+class ClassicRuntimePlannerResult {
+public:
+    PlanCacheInfo& planCacheInfo() {
+        return _cacheInfo;
+    }
+
+    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
+        // SbeWithClassicRuntimePlanningPrepareExecutionHelper passes cached plan hash to the
+        // runtime planner.
+    }
+
+    std::unique_ptr<crp_classic::ClassicPlannerInterface> runtimePlanner;
+
+private:
+    PlanCacheInfo _cacheInfo;
+};
 
 /**
  * A class to hold the result of preparation of the query to be executed using SBE engine with
@@ -681,26 +653,34 @@ protected:
     std::unique_ptr<ResultType> _result;
 };
 
-/**
- * A helper class to prepare a classic PlanStage tree for execution.
- */
 class ClassicPrepareExecutionHelper final
-    : public PrepareExecutionHelper<PlanCacheKey, ClassicPrepareExecutionResult> {
+    : public PrepareExecutionHelper<PlanCacheKey, ClassicRuntimePlannerResult> {
 public:
     ClassicPrepareExecutionHelper(OperationContext* opCtx,
                                   const MultipleCollectionAccessor& collections,
-                                  WorkingSet* ws,
+                                  std::unique_ptr<WorkingSet> ws,
                                   CanonicalQuery* cq,
+                                  PlanYieldPolicy::YieldPolicy yieldPolicy,
                                   const QueryPlannerParams& plannerParams)
-        : PrepareExecutionHelper{opCtx, collections, std::move(cq), plannerParams}, _ws{ws} {}
+        : PrepareExecutionHelper{opCtx, collections, cq, plannerParams},
+          _ws{std::move(ws)},
+          _yieldPolicy{yieldPolicy} {}
 
 private:
-    std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& solution) const {
-        return stage_builder::buildClassicExecutableTree(
-            _opCtx, getCollections().getMainCollectionPtrOrAcquisition(), *_cq, solution, _ws);
+    using CachedSolutionPair =
+        std::pair<std::unique_ptr<CachedSolution>, std::unique_ptr<QuerySolution>>;
+
+    PlannerData makePlannerData() {
+        return PlannerData{_opCtx,
+                           _cq,
+                           std::move(_ws),
+                           _collections,
+                           _plannerParams,
+                           _yieldPolicy,
+                           _cachedPlanHash};
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() final {
+    std::unique_ptr<ClassicRuntimePlannerResult> buildIdHackPlan() final {
         initializePlannerParamsIfNeeded();
 
         const auto& mainCollection = getCollections().getMainCollection();
@@ -720,76 +700,16 @@ private:
                     "canonicalQuery"_attr = redact(_cq->toStringShort()));
         planCacheCounters.incrementClassicSkippedCounter();
         auto result = releaseResult();
-        const auto& mainCollectionOrAcquisition =
-            getCollections().getMainCollectionPtrOrAcquisition();
-        std::unique_ptr<PlanStage> stage = std::make_unique<IDHackStage>(
-            _cq->getExpCtxRaw(), _cq, _ws, mainCollectionOrAcquisition, descriptor);
-
-        // Might have to filter out orphaned docs.
-        if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            auto shardFilterer = mainCollectionOrAcquisition.getShardingFilter(_opCtx);
-            invariant(shardFilterer,
-                      "Attempting to use shard filter when there's no shard filter available for "
-                      "the collection");
-
-            stage = std::make_unique<ShardFilterStage>(
-                _cq->getExpCtxRaw(), std::move(*shardFilterer), _ws, std::move(stage));
-        }
-
-        const auto* cqProjection = _cq->getProj();
-
-        // Add a SortKeyGeneratorStage if the query requested sortKey metadata.
-        if (_cq->metadataDeps()[DocumentMetadataFields::kSortKey]) {
-            stage = std::make_unique<SortKeyGeneratorStage>(
-                _cq->getExpCtxRaw(), std::move(stage), _ws, _cq->getFindCommandRequest().getSort());
-        }
-
-        if (_cq->getFindCommandRequest().getReturnKey()) {
-            // If returnKey was requested, add ReturnKeyStage to return only the index keys in
-            // the resulting documents. If a projection was also specified, it will be ignored,
-            // with the exception the $meta sortKey projection, which can be used along with the
-            // returnKey.
-            stage = std::make_unique<ReturnKeyStage>(
-                _cq->getExpCtxRaw(),
-                cqProjection
-                    ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*cqProjection)
-                    : std::vector<FieldPath>{},
-                _ws,
-                std::move(stage));
-        } else if (cqProjection) {
-            // There might be a projection. The idhack stage will always fetch the full
-            // document, so we don't support covered projections. However, we might use the
-            // simple inclusion fast path.
-            // Stuff the right data into the params depending on what proj impl we use.
-            if (!cqProjection->isSimple()) {
-                stage = std::make_unique<ProjectionStageDefault>(
-                    _cq->getExpCtxRaw(),
-                    _cq->getFindCommandRequest().getProjection(),
-                    _cq->getProj(),
-                    _ws,
-                    std::move(stage));
-            } else {
-                stage = std::make_unique<ProjectionStageSimple>(
-                    _cq->getExpCtxRaw(),
-                    _cq->getFindCommandRequest().getProjection(),
-                    _cq->getProj(),
-                    _ws,
-                    std::move(stage));
-            }
-        }
-
-        result->emplace(std::move(stage), nullptr /* solution */);
+        result->runtimePlanner =
+            std::make_unique<crp_classic::IdHackPlanner>(makePlannerData(), descriptor);
         return result;
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildSingleSolutionPlan(
+    std::unique_ptr<ClassicRuntimePlannerResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution) final {
         auto result = releaseResult();
-        auto root = buildExecutableTree(*solution);
-        result->emplace(std::move(root), std::move(solution));
-
-        LOGV2_DEBUG(
-            8523402, 2, "Only one plan is available", "query"_attr = redact(_cq->toStringShort()));
+        result->runtimePlanner = std::make_unique<crp_classic::SingleSolutionPassthroughPlanner>(
+            makePlannerData(), std::move(solution));
         return result;
     }
 
@@ -798,103 +718,90 @@ private:
                                                           getCollections().getMainCollection());
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildCachedPlan(
+    std::unique_ptr<ClassicRuntimePlannerResult> buildCachedPlan(
         const PlanCacheKey& planCacheKey) final {
         initializePlannerParamsIfNeeded();
 
-        if (shouldCacheQuery(*_cq)) {
-            const auto& collectionsAccessor = getCollections();
-            const auto& mainCollectionOrAcquisition =
-                collectionsAccessor.getMainCollectionPtrOrAcquisition();
-
-            // Try to look up a cached solution for the query.
-            if (auto cs = CollectionQueryInfo::get(collectionsAccessor.getMainCollection())
-                              .getPlanCache()
-                              ->getCacheEntryIfActive(planCacheKey)) {
-                planCacheCounters.incrementClassicHitsCounter();
-
-                // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-                auto statusWithQs =
-                    QueryPlanner::planFromCache(*_cq, _plannerParams, *cs->cachedPlan.get());
-
-                if (statusWithQs.isOK()) {
-                    auto querySolution = std::move(statusWithQs.getValue());
-                    if (_cq->isCountLike() && turnIxscanIntoCount(querySolution.get())) {
-                        LOGV2_DEBUG(5968201,
-                                    2,
-                                    "Using fast count",
-                                    "query"_attr = redact(_cq->toStringShort()));
-                    }
-
-                    auto result = releaseResult();
-                    auto&& root = buildExecutableTree(*querySolution);
-
-                    // Add a CachedPlanStage on top of the previous root.
-                    //
-                    // 'decisionWorks' is used to determine whether the existing cache entry should
-                    // be evicted, and the query replanned.
-                    result->emplace(std::make_unique<CachedPlanStage>(_cq->getExpCtxRaw(),
-                                                                      mainCollectionOrAcquisition,
-                                                                      _ws,
-                                                                      _cq,
-                                                                      _plannerParams,
-                                                                      cs->decisionWorks.value(),
-                                                                      std::move(root)),
-                                    std::move(querySolution));
-                    return result;
-                }
-            }
-            planCacheCounters.incrementClassicMissesCounter();
-        } else {
+        if (!shouldCacheQuery(*_cq)) {
             planCacheCounters.incrementClassicSkippedCounter();
+            return nullptr;
         }
 
-        return nullptr;
+        auto cachedSolutionPair = retrievePlanFromCache(planCacheKey);
+        if (!cachedSolutionPair.has_value()) {
+            planCacheCounters.incrementClassicMissesCounter();
+            return nullptr;
+        }
+
+        planCacheCounters.incrementClassicHitsCounter();
+        auto result = releaseResult();
+        auto [cachedSolution, querySolution] = std::move(*cachedSolutionPair);
+        result->runtimePlanner = std::make_unique<crp_classic::CachedPlanner>(
+            makePlannerData(), std::move(cachedSolution), std::move(querySolution));
+        return result;
     }
 
     boost::optional<size_t> getCachedPlanHash(const PlanCacheKey& planCacheKey) final {
+        if (_cachedPlanHash) {
+            return _cachedPlanHash;
+        }
         if (auto cs = CollectionQueryInfo::get(getCollections().getMainCollection())
                           .getPlanCache()
                           ->getCacheEntryIfActive(planCacheKey)) {
-            return cs->cachedPlan->solutionHash;
+            _cachedPlanHash = cs->cachedPlan->solutionHash;
+            return _cachedPlanHash;
         }
         return boost::none;
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildSubPlan() final {
+    std::unique_ptr<ClassicRuntimePlannerResult> buildSubPlan() final {
         auto result = releaseResult();
-        result->emplace(
-            std::make_unique<SubplanStage>(_cq->getExpCtxRaw(),
-                                           getCollections().getMainCollectionPtrOrAcquisition(),
-                                           _ws,
-                                           _plannerParams,
-                                           _cq),
-            nullptr /* solution */);
+        result->runtimePlanner = std::make_unique<crp_classic::SubPlanner>(makePlannerData());
         return result;
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildMultiPlan(
+    std::unique_ptr<ClassicRuntimePlannerResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions) final {
-        // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
-        // and so on. The working set will be shared by all candidate plans.
-        auto multiPlanStage = std::make_unique<MultiPlanStage>(
-            _cq->getExpCtxRaw(), getCollections().getMainCollectionPtrOrAcquisition(), _cq);
+        auto result = releaseResult();
+        result->runtimePlanner =
+            std::make_unique<crp_classic::MultiPlanner>(makePlannerData(), std::move(solutions));
+        return result;
+    }
 
-        for (auto&& solution : solutions) {
-            solution->indexFilterApplied = _plannerParams.indexFiltersApplied;
-
-            auto&& nextPlanRoot = buildExecutableTree(*solution);
-
-            // Takes ownership of 'nextPlanRoot'.
-            multiPlanStage->addPlan(std::move(solution), std::move(nextPlanRoot), _ws);
+    boost::optional<CachedSolutionPair> retrievePlanFromCache(const PlanCacheKey& planCacheKey) {
+        auto cs = CollectionQueryInfo::get(getCollections().getMainCollection())
+                      .getPlanCache()
+                      ->getCacheEntryIfActive(planCacheKey);
+        if (!cs) {
+            return boost::none;
         }
 
-        auto result = releaseResult();
-        result->emplace(std::move(multiPlanStage), nullptr /* solution */);
-        return result;
+        // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+        auto statusWithQs =
+            QueryPlanner::planFromCache(*_cq, _plannerParams, *cs->cachedPlan.get());
+        if (!statusWithQs.isOK()) {
+            return boost::none;
+        }
+
+        std::unique_ptr<QuerySolution> querySolution = std::move(statusWithQs.getValue());
+        if (_cq->isCountLike()) {
+            const bool usedFastCount = turnIxscanIntoCount(querySolution.get());
+            if (usedFastCount) {
+                if (_cq->isCountLike() && turnIxscanIntoCount(querySolution.get())) {
+                    LOGV2_DEBUG(5968201,
+                                2,
+                                "Using fast count",
+                                "query"_attr = redact(_cq->toStringShort()));
+                }
+            }
+        }
+
+        return {std::make_pair(std::move(cs), std::move(querySolution))};
     }
 
-    WorkingSet* _ws;
+    std::unique_ptr<WorkingSet> _ws;
+    PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    boost::optional<size_t> _cachedPlanHash;
 };
 
 /**
@@ -1016,13 +923,15 @@ public:
           _sbeYieldPolicy{std::move(sbeYieldPolicy)} {}
 
 private:
-    crp_sbe::PlannerData makePlannerData() {
-        return crp_sbe::PlannerData{.cq = std::move(_ownedCq),
-                                    .sbeYieldPolicy = std::move(_sbeYieldPolicy),
-                                    .workingSet = std::move(_ws),
-                                    .collections = _collections,
-                                    .plannerParams = std::move(_plannerParams),
-                                    .cachedPlanHash = _cachedPlanHash};
+    crp_sbe::PlannerDataForSBE makePlannerData() {
+        return crp_sbe::PlannerDataForSBE{_opCtx,
+                                          std::move(_ownedCq),
+                                          std::move(_ws),
+                                          _collections,
+                                          _plannerParams,
+                                          _yieldPolicy,
+                                          _cachedPlanHash,
+                                          std::move(_sbeYieldPolicy)};
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildIdHackPlan() final {
@@ -1039,7 +948,7 @@ private:
         std::unique_ptr<QuerySolution> solution) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
-            _opCtx, makePlannerData(), std::move(solution));
+            makePlannerData(), std::move(solution));
         return result;
     }
 
@@ -1055,8 +964,8 @@ private:
             planCacheCounters.incrementSbeHitsCounter();
 
             auto result = releaseResult();
-            result->runtimePlanner = std::make_unique<crp_sbe::CachedPlanner>(
-                _opCtx, makePlannerData(), std::move(cacheEntry));
+            result->runtimePlanner =
+                std::make_unique<crp_sbe::CachedPlanner>(makePlannerData(), std::move(cacheEntry));
             return result;
         }
 
@@ -1078,8 +987,7 @@ private:
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSubPlan() final {
         auto result = releaseResult();
-        result->runtimePlanner =
-            std::make_unique<crp_sbe::SubPlanner>(_opCtx, makePlannerData(), _yieldPolicy);
+        result->runtimePlanner = std::make_unique<crp_sbe::SubPlanner>(makePlannerData());
         return result;
     }
 
@@ -1091,8 +999,8 @@ private:
 
         if (solutions.size() > 1) {
             auto result = releaseResult();
-            result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
-                _opCtx, makePlannerData(), _yieldPolicy, std::move(solutions));
+            result->runtimePlanner =
+                std::make_unique<crp_sbe::MultiPlanner>(makePlannerData(), std::move(solutions));
             return result;
         } else {
             return buildSingleSolutionPlan(std::move(solutions[0]));
@@ -1116,31 +1024,25 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    QueryPlannerParams plannerParams) {
-    auto ws = std::make_unique<WorkingSet>();
+    const QueryPlannerParams& plannerParams) {
     ClassicPrepareExecutionHelper helper{
-        opCtx, collections, ws.get(), canonicalQuery.get(), plannerParams};
-    auto executionResult = helper.prepare();
-    if (!executionResult.isOK()) {
-        return executionResult.getStatus();
+        opCtx,
+        collections,
+        std::make_unique<WorkingSet>(),
+        canonicalQuery.get(),
+        yieldPolicy,
+        plannerParams,
+    };
+    auto planningResultWithStatus = helper.prepare();
+    if (!planningResultWithStatus.isOK()) {
+        return planningResultWithStatus.getStatus();
     }
-    auto&& result = executionResult.getValue();
-    auto&& [root, solution] = result->extractResultData();
-    invariant(root);
-
-    setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
-
-    // We must have a tree of stages in order to have a valid plan executor, but the query
-    // solution may be null.
-    return plan_executor_factory::make(std::move(canonicalQuery),
-                                       std::move(ws),
-                                       std::move(root),
-                                       collections.getMainCollectionPtrOrAcquisition(),
-                                       yieldPolicy,
-                                       plannerParams.options,
-                                       {},
-                                       std::move(solution),
-                                       result->cachedPlanHash());
+    setOpDebugPlanCacheInfo(opCtx, planningResultWithStatus.getValue()->planCacheInfo());
+    auto* planner = planningResultWithStatus.getValue()->runtimePlanner.get();
+    if (auto status = planner->plan(); !status.isOK()) {
+        return status;
+    }
+    return planner->makeExecutor(std::move(canonicalQuery));
 }
 
 /**
@@ -1715,7 +1617,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                                    std::move(root),
                                                    coll,
                                                    policy,
-                                                   false /* whether owned BSON must be returned */);
+                                                   false /* whether owned BSON must be returned */,
+                                                   nss);
             }
         }
 
@@ -1752,72 +1655,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
     cq->setForceGenerateRecordId(true);
-
-    MultipleCollectionAccessor collectionsAccessor(coll);
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collectionsAccessor, ws.get(), cq.get(), QueryPlannerParams::DEFAULT};
-    auto executionResult = helper.prepare();
-
-    if (!executionResult.isOK()) {
-        return executionResult.getStatus();
-    }
-    auto [root, querySolution] = executionResult.getValue()->extractResultData();
-    invariant(root);
-
     deleteStageParams->canonicalQuery = cq.get();
 
-    // TODO (SERVER-64506): support change streams' pre- and post-images.
-    // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
-    const bool batchDelete = gBatchUserMultiDeletes.load() &&
-        (shard_role_details::getRecoveryUnit(opCtx)->getState() == RecoveryUnit::State::kInactive ||
-         shard_role_details::getRecoveryUnit(opCtx)->getState() ==
-             RecoveryUnit::State::kActiveNotInUnitOfWork) &&
-        !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
-        !collectionPtr->isChangeStreamPreAndPostImagesEnabled() &&
-        !collectionPtr->ns().isConfigDB() && deleteStageParams->isMulti &&
-        !deleteStageParams->fromMigrate && !deleteStageParams->returnDeleted &&
-        deleteStageParams->sort.isEmpty() && !deleteStageParams->numStatsForDoc;
-
-    auto expCtxRaw = cq->getExpCtxRaw();
-    if (parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
-        // Checks if the delete is on a time-series collection and cannot run on bucket documents
-        // directly.
-        root = std::make_unique<TimeseriesModifyStage>(
-            expCtxRaw,
-            TimeseriesModifyParams(deleteStageParams.get()),
-            ws.get(),
-            std::move(root),
-            coll,
-            timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-            parsedDelete->releaseResidualExpr());
-    } else if (batchDelete) {
-        root = std::make_unique<BatchedDeleteStage>(expCtxRaw,
-                                                    std::move(deleteStageParams),
-                                                    std::make_unique<BatchedDeleteStageParams>(),
-                                                    ws.get(),
-                                                    coll,
-                                                    root.release());
-    } else {
-        root = std::make_unique<DeleteStage>(
-            expCtxRaw, std::move(deleteStageParams), ws.get(), coll, root.release());
+    MultipleCollectionAccessor collections{coll};
+    ClassicPrepareExecutionHelper helper{
+        opCtx, collections, std::move(ws), cq.get(), policy, QueryPlannerParams{}};
+    auto result = uassertStatusOK(helper.prepare());
+    result->runtimePlanner->addDeleteStage(
+        parsedDelete, projection.get(), std::move(deleteStageParams));
+    if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
+        return status;
     }
-
-    if (projection) {
-        root = std::make_unique<ProjectionStageDefault>(
-            cq->getExpCtx(), request->getProj(), projection.get(), ws.get(), std::move(root));
-    }
-
-    // We must have a tree of stages in order to have a valid plan executor, but the query
-    // solution may be null.
-    return plan_executor_factory::make(std::move(cq),
-                                       std::move(ws),
-                                       std::move(root),
-                                       coll,
-                                       policy,
-                                       QueryPlannerParams::DEFAULT,
-                                       NamespaceString::kEmpty,
-                                       std::move(querySolution),
-                                       executionResult.getValue()->cachedPlanHash());
+    return result->runtimePlanner->makeExecutor(std::move(cq));
 }
 
 //
@@ -1952,72 +1801,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
     cq->setForceGenerateRecordId(true);
-
-    MultipleCollectionAccessor collectionsAccessor(coll);
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collectionsAccessor, ws.get(), cq.get(), QueryPlannerParams::DEFAULT};
-    auto executionResult = helper.prepare();
-
-    if (!executionResult.isOK()) {
-        return executionResult.getStatus();
-    }
-    auto [root, querySolution] = executionResult.getValue()->extractResultData();
-    invariant(root);
-
     updateStageParams.canonicalQuery = cq.get();
-    const bool isUpsert = updateStageParams.request->isUpsert();
-    if (parsedUpdate->isEligibleForArbitraryTimeseriesUpdate()) {
-        if (request->isMulti()) {
-            // If this is a multi-update, we need to spool the data before beginning to apply
-            // updates, in order to avoid the Halloween problem.
-            root = std::make_unique<SpoolStage>(cq->getExpCtxRaw(), ws.get(), std::move(root));
-        }
-        if (isUpsert) {
-            root = std::make_unique<TimeseriesUpsertStage>(
-                cq->getExpCtxRaw(),
-                TimeseriesModifyParams(&updateStageParams),
-                ws.get(),
-                std::move(root),
-                coll,
-                timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-                parsedUpdate->releaseResidualExpr(),
-                parsedUpdate->releaseOriginalExpr(),
-                *request);
-        } else {
-            root = std::make_unique<TimeseriesModifyStage>(
-                cq->getExpCtxRaw(),
-                TimeseriesModifyParams(&updateStageParams),
-                ws.get(),
-                std::move(root),
-                coll,
-                timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-                parsedUpdate->releaseResidualExpr(),
-                parsedUpdate->releaseOriginalExpr());
-        }
-    } else if (isUpsert) {
-        root = std::make_unique<UpsertStage>(
-            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
-    } else {
-        root = std::make_unique<UpdateStage>(
-            cq->getExpCtxRaw(), updateStageParams, ws.get(), coll, root.release());
-    }
 
-    if (projection) {
-        root = std::make_unique<ProjectionStageDefault>(
-            cq->getExpCtx(), request->getProj(), projection.get(), ws.get(), std::move(root));
+    MultipleCollectionAccessor collections{coll};
+    ClassicPrepareExecutionHelper helper{
+        opCtx, collections, std::move(ws), cq.get(), policy, QueryPlannerParams{}};
+    auto result = uassertStatusOK(helper.prepare());
+    result->runtimePlanner->addUpdateStage(
+        parsedUpdate, projection.get(), std::move(updateStageParams));
+    if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
+        return status;
     }
-
-    // We must have a tree of stages in order to have a valid plan executor, but the query
-    // solution may be null. Takes ownership of all args other than 'collection' and 'opCtx'
-    return plan_executor_factory::make(std::move(cq),
-                                       std::move(ws),
-                                       std::move(root),
-                                       coll,
-                                       policy,
-                                       QueryPlannerParams::DEFAULT,
-                                       NamespaceString::kEmpty,
-                                       std::move(querySolution),
-                                       executionResult.getValue()->cachedPlanHash());
+    return result->runtimePlanner->makeExecutor(std::move(cq));
 }
 
 //
@@ -2349,32 +2144,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
-    MultipleCollectionAccessor collectionsAccessor(coll);
+    MultipleCollectionAccessor collections{coll};
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionsAccessor, ws.get(), cq.get(), plannerOptions};
-    auto executionResult = helper.prepare();
-    if (!executionResult.isOK()) {
-        return executionResult.getStatus();
+        opCtx, collections, std::move(ws), cq.get(), yieldPolicy, plannerOptions};
+    auto result = uassertStatusOK(helper.prepare());
+    result->runtimePlanner->addCountStage(limit, skip);
+    if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
+        return status;
     }
-
-    auto [root, querySolution] = executionResult.getValue()->extractResultData();
-    invariant(root);
-
-    // Make a CountStage to be the new root.
-    root = std::make_unique<CountStage>(
-        expCtx.get(), collection, limit, skip, ws.get(), root.release());
-    // We must have a tree of stages in order to have a valid plan executor, but the query
-    // solution may be NULL. Takes ownership of all args other than 'collection' and 'opCtx'
-
-    return plan_executor_factory::make(std::move(cq),
-                                       std::move(ws),
-                                       std::move(root),
-                                       coll,
-                                       yieldPolicy,
-                                       plannerOptions,
-                                       NamespaceString::kEmpty,
-                                       std::move(querySolution),
-                                       executionResult.getValue()->cachedPlanHash());
+    return result->runtimePlanner->makeExecutor(std::move(cq));
 }
 
 //
@@ -2655,22 +2433,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
     auto&& root = stage_builder::buildClassicExecutableTree(
         opCtx, collPtrOrAcq, canonicalQuery, *soln, ws.get());
 
-    auto exec = plan_executor_factory::make(canonicalDistinct.releaseQuery(),
-                                            std::move(ws),
-                                            std::move(root),
-                                            collPtrOrAcq,
-                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                            plannerOptions,
-                                            NamespaceString::kEmpty,
-                                            std::move(soln));
-    if (exec.isOK()) {
-        LOGV2_DEBUG(20932,
-                    2,
-                    "Using fast distinct",
-                    "query"_attr = redact(exec.getValue()->getCanonicalQuery()->toStringShort()));
-    }
-
-    return exec;
+    auto cq = canonicalDistinct.releaseQuery();
+    LOGV2_DEBUG(20932, 2, "Using fast distinct", "query"_attr = redact(cq->toStringShort()));
+    return plan_executor_factory::make(std::move(cq),
+                                       std::move(ws),
+                                       std::move(root),
+                                       collPtrOrAcq,
+                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                       plannerOptions,
+                                       collectionPtr->ns(),
+                                       std::move(soln));
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(

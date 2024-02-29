@@ -107,6 +107,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr);
 
+// TODO SERVER-81556 Remove the `StatusWith` type since this can no longer fail.
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<WorkingSet> ws,

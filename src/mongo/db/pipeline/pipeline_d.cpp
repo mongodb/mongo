@@ -116,6 +116,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/plan_yield_policy_remote_cursor.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
@@ -565,14 +566,16 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         trialStage = static_cast<TrialStage*>(root.get());
     }
 
-    auto execStatus = plan_executor_factory::make(expCtx,
-                                                  std::move(ws),
-                                                  std::move(root),
-                                                  &coll,
-                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                  QueryPlannerParams::RETURN_OWNED_DATA);
-    if (!execStatus.isOK()) {
-        return execStatus.getStatus();
+    constexpr auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
+    if (trialStage) {
+        auto classicTrialPolicy = makeClassicYieldPolicy(expCtx->opCtx,
+                                                         coll->ns(),
+                                                         static_cast<PlanStage*>(trialStage),
+                                                         yieldPolicy,
+                                                         VariantCollectionPtrOrAcquisition{&coll});
+        if (auto status = trialStage->pickBestPlan(classicTrialPolicy.get()); !status.isOK()) {
+            return status;
+        }
     }
 
     // For sharded collections, the root of the plan tree is a TrialStage that may have chosen
@@ -604,7 +607,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         }
     }
 
-    return std::move(execStatus.getValue());
+    return plan_executor_factory::make(expCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       &coll,
+                                       yieldPolicy,
+                                       QueryPlannerParams::RETURN_OWNED_DATA,
+                                       coll->ns());
 }
 
 PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(

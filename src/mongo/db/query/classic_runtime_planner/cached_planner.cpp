@@ -27,25 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
-#include "mongo/logv2/log.h"
+namespace mongo::classic_runtime_planner {
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-namespace mongo::classic_runtime_planner_for_sbe {
-
-CachedPlanner::CachedPlanner(PlannerDataForSBE plannerData,
-                             std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder)
-    : PlannerBase(std::move(plannerData)), _cachedPlanHolder(std::move(cachedPlanHolder)) {}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
-    LOGV2_DEBUG(8523404, 5, "Recovering SBE plan from the cache");
-    _cachedPlanHolder->cachedPlan->planStageData.debugInfo = _cachedPlanHolder->debugInfo;
-    return prepareSbePlanExecutor(nullptr /*solution*/,
-                                  {std::move(_cachedPlanHolder->cachedPlan->root),
-                                   std::move(_cachedPlanHolder->cachedPlan->planStageData)},
-                                  true /*isFromPlanCache*/,
-                                  boost::none /*cachedPlanHash*/);
+CachedPlanner::CachedPlanner(PlannerData plannerData,
+                             std::unique_ptr<CachedSolution> cachedSolution,
+                             std::unique_ptr<QuerySolution> querySolution)
+    : ClassicPlannerInterface(std::move(plannerData)), _querySolution(std::move(querySolution)) {
+    auto root = std::make_unique<CachedPlanStage>(cq()->getExpCtxRaw(),
+                                                  collections().getMainCollectionPtrOrAcquisition(),
+                                                  ws(),
+                                                  cq(),
+                                                  plannerParams(),
+                                                  cachedSolution->decisionWorks.value(),
+                                                  buildExecutableTree(*_querySolution));
+    _cachedPlanStage = root.get();
+    setRoot(std::move(root));
 }
-}  // namespace mongo::classic_runtime_planner_for_sbe
+
+Status CachedPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
+    return _cachedPlanStage->pickBestPlan(planYieldPolicy);
+}
+
+std::unique_ptr<QuerySolution> CachedPlanner::extractQuerySolution() {
+    return std::move(_querySolution);
+}
+}  // namespace mongo::classic_runtime_planner

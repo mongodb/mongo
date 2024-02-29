@@ -27,39 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
-#include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder_util.h"
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-namespace mongo::classic_runtime_planner_for_sbe {
+namespace mongo::classic_runtime_planner {
 
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
-    PlannerDataForSBE plannerData, std::unique_ptr<QuerySolution> solution)
-    : PlannerBase(std::move(plannerData)), _solution(std::move(solution)) {}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::plan() {
-    LOGV2_DEBUG(8523405, 5, "Using SBE single solution planner");
-    if (!cq()->cqPipeline().empty()) {
-        _solution = QueryPlanner::extendWithAggPipeline(
-            *cq(), std::move(_solution), plannerParams().secondaryCollectionsInfo);
-    }
-
-    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-        opCtx(), collections(), *cq(), *_solution, sbeYieldPolicy());
-
-    // Create a pinned plan cache entry.
-    plan_cache_util::updatePlanCache(
-        opCtx(), collections(), *cq(), *_solution, *sbePlanAndData.first, sbePlanAndData.second);
-
-    return prepareSbePlanExecutor(std::move(_solution),
-                                  std::move(sbePlanAndData),
-                                  false /*isFromPlanCache*/,
-                                  cachedPlanHash());
+    PlannerData plannerData, std::unique_ptr<QuerySolution> querySolution)
+    : ClassicPlannerInterface(std::move(plannerData)), _querySolution(std::move(querySolution)) {
+    auto root = buildExecutableTree(*_querySolution);
+    setRoot(std::move(root));
 }
-}  // namespace mongo::classic_runtime_planner_for_sbe
+
+Status SingleSolutionPassthroughPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
+    // Nothing to do.
+    return Status::OK();
+}
+
+std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extractQuerySolution() {
+    return std::move(_querySolution);
+}
+}  // namespace mongo::classic_runtime_planner

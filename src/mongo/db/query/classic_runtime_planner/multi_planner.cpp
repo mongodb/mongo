@@ -27,25 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
-#include "mongo/logv2/log.h"
+namespace mongo::classic_runtime_planner {
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-namespace mongo::classic_runtime_planner_for_sbe {
-
-CachedPlanner::CachedPlanner(PlannerDataForSBE plannerData,
-                             std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder)
-    : PlannerBase(std::move(plannerData)), _cachedPlanHolder(std::move(cachedPlanHolder)) {}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
-    LOGV2_DEBUG(8523404, 5, "Recovering SBE plan from the cache");
-    _cachedPlanHolder->cachedPlan->planStageData.debugInfo = _cachedPlanHolder->debugInfo;
-    return prepareSbePlanExecutor(nullptr /*solution*/,
-                                  {std::move(_cachedPlanHolder->cachedPlan->root),
-                                   std::move(_cachedPlanHolder->cachedPlan->planStageData)},
-                                  true /*isFromPlanCache*/,
-                                  boost::none /*cachedPlanHash*/);
+MultiPlanner::MultiPlanner(PlannerData plannerData,
+                           std::vector<std::unique_ptr<QuerySolution>> solutions)
+    : ClassicPlannerInterface(std::move(plannerData)) {
+    auto stage = std::make_unique<MultiPlanStage>(
+        cq()->getExpCtxRaw(), collections().getMainCollectionPtrOrAcquisition(), cq());
+    _multiplanStage = stage.get();
+    for (auto&& solution : solutions) {
+        solution->indexFilterApplied = plannerParams().indexFiltersApplied;
+        auto executableTree = buildExecutableTree(*solution);
+        stage->addPlan(std::move(solution), std::move(executableTree), ws());
+    }
+    setRoot(std::move(stage));
 }
-}  // namespace mongo::classic_runtime_planner_for_sbe
+
+Status MultiPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
+    return _multiplanStage->pickBestPlan(planYieldPolicy);
+}
+
+std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
+    // The query solutions are owned by the 'MultiPlan' stage.
+    return nullptr;
+}
+}  // namespace mongo::classic_runtime_planner

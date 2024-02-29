@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/planner_interface.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
@@ -47,13 +48,27 @@ namespace mongo::classic_runtime_planner_for_sbe {
 /**
  * Data that any runtime planner needs to perform the planning.
  */
-struct PlannerData {
-    std::unique_ptr<CanonicalQuery> cq;
+struct PlannerDataForSBE final : public PlannerData {
+    PlannerDataForSBE(OperationContext* opCtx,
+                      std::unique_ptr<CanonicalQuery> ownedCq,
+                      std::unique_ptr<WorkingSet> workingSet,
+                      const MultipleCollectionAccessor& collections,
+                      const QueryPlannerParams& plannerParams,
+                      PlanYieldPolicy::YieldPolicy yieldPolicy,
+                      boost::optional<size_t> cachedPlanHash,
+                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
+        : PlannerData(opCtx,
+                      ownedCq.get(),
+                      std::move(workingSet),
+                      collections,
+                      plannerParams,
+                      yieldPolicy,
+                      cachedPlanHash),
+          ownedCq(std::move(ownedCq)),
+          sbeYieldPolicy(std::move(sbeYieldPolicy)) {}
+
+    std::unique_ptr<CanonicalQuery> ownedCq;
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
-    std::unique_ptr<WorkingSet> workingSet;
-    const MultipleCollectionAccessor& collections;
-    QueryPlannerParams plannerParams;
-    boost::optional<size_t> cachedPlanHash;
 };
 
 class PlannerInterface {
@@ -69,7 +84,7 @@ public:
 
 class PlannerBase : public PlannerInterface {
 public:
-    PlannerBase(OperationContext* opCtx, PlannerData plannerData);
+    PlannerBase(PlannerDataForSBE plannerData);
 
 protected:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> prepareSbePlanExecutor(
@@ -79,23 +94,27 @@ protected:
         boost::optional<size_t> cachedPlanHash);
 
     OperationContext* opCtx() {
-        return _opCtx;
+        return _plannerData.opCtx;
     }
 
     CanonicalQuery* cq() {
-        return _plannerData.cq.get();
+        return _plannerData.cq;
     }
 
     const CanonicalQuery* cq() const {
-        return _plannerData.cq.get();
+        return _plannerData.cq;
     }
 
     std::unique_ptr<CanonicalQuery> extractCq() {
-        return std::move(_plannerData.cq);
+        return std::move(_plannerData.ownedCq);
     }
 
     const MultipleCollectionAccessor& collections() const {
         return _plannerData.collections;
+    }
+
+    PlanYieldPolicy::YieldPolicy yieldPolicy() const {
+        return _plannerData.yieldPolicy;
     }
 
     PlanYieldPolicySBE* sbeYieldPolicy() {
@@ -126,14 +145,8 @@ protected:
         return _plannerData.plannerParams;
     }
 
-    // TODO: Make QueryPlannerParams to only be filled out on construction.
-    QueryPlannerParams& plannerParams() {
-        return _plannerData.plannerParams;
-    }
-
 private:
-    OperationContext* _opCtx;
-    PlannerData _plannerData;
+    PlannerDataForSBE _plannerData;
 };
 
 /**
@@ -141,8 +154,7 @@ private:
  */
 class SingleSolutionPassthroughPlanner final : public PlannerBase {
 public:
-    SingleSolutionPassthroughPlanner(OperationContext* opCtx,
-                                     PlannerData plannerData,
+    SingleSolutionPassthroughPlanner(PlannerDataForSBE plannerData,
                                      std::unique_ptr<QuerySolution> solution);
 
     /**
@@ -156,8 +168,7 @@ private:
 
 class CachedPlanner final : public PlannerBase {
 public:
-    CachedPlanner(OperationContext* opCtx,
-                  PlannerData plannerData,
+    CachedPlanner(PlannerDataForSBE plannerData,
                   std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder);
 
     /**
@@ -172,9 +183,7 @@ private:
 
 class MultiPlanner final : public PlannerBase {
 public:
-    MultiPlanner(OperationContext* opCtx,
-                 PlannerData plannerData,
-                 PlanYieldPolicy::YieldPolicy yieldPolicy,
+    MultiPlanner(PlannerDataForSBE plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> candidatePlans);
 
     /**
@@ -190,15 +199,12 @@ private:
 
     bool _shouldUseEofOptimization() const;
 
-    PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
 };
 
 class SubPlanner final : public PlannerBase {
 public:
-    SubPlanner(OperationContext* opCtx,
-               PlannerData plannerData,
-               PlanYieldPolicy::YieldPolicy yieldPolicy);
+    SubPlanner(PlannerDataForSBE plannerData);
 
     /**
      * Picks the composite solution given by the classic engine subplanner, extends the composite
@@ -208,7 +214,6 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
 
 private:
-    PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<SubplanStage> _subplanStage;
 };
 

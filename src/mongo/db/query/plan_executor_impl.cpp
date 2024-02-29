@@ -141,8 +141,6 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
         collection);
 
-    uassertStatusOK(_pickBestPlan());
-
     if (_qs) {
         _planExplainer->setQuerySolution(_qs.get());
         _planExplainer->updateEnumeratorExplainInfo(_qs->_enumeratorExplainInfo);
@@ -162,46 +160,6 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
         _collScanStage = static_cast<CollectionScan*>(collectionScan);
     }
-}
-
-Status PlanExecutorImpl::_pickBestPlan() {
-    invariant(_currentState == kUsable);
-
-    // First check if we need to do subplanning.
-    PlanStage* foundStage = getStageByType(_root.get(), STAGE_SUBPLAN);
-    if (foundStage) {
-        SubplanStage* subplan = static_cast<SubplanStage*>(foundStage);
-        return subplan->pickBestPlan(_yieldPolicy.get());
-    }
-
-    // If we didn't have to do subplanning, we might still have to do regular
-    // multi plan selection...
-    foundStage = getStageByType(_root.get(), STAGE_MULTI_PLAN);
-    if (foundStage) {
-        MultiPlanStage* mps = static_cast<MultiPlanStage*>(foundStage);
-        return mps->pickBestPlan(_yieldPolicy.get());
-    }
-
-    // ...or, we might have to run a plan from the cache for a trial period, falling back on
-    // regular planning if the cached plan performs poorly.
-    foundStage = getStageByType(_root.get(), STAGE_CACHED_PLAN);
-    if (foundStage) {
-        CachedPlanStage* cachedPlan = static_cast<CachedPlanStage*>(foundStage);
-        return cachedPlan->pickBestPlan(_yieldPolicy.get());
-    }
-
-    // Finally, we might have an explicit TrialPhase. This specifies exactly two candidate
-    // plans, one of which is to be evaluated. If it fails the trial, then the backup plan is
-    // adopted.
-    foundStage = getStageByType(_root.get(), STAGE_TRIAL);
-    if (foundStage) {
-        TrialStage* trialStage = static_cast<TrialStage*>(foundStage);
-        return trialStage->pickBestPlan(_yieldPolicy.get());
-    }
-
-    // Either we chose a plan, or no plan selection was required. In both cases,
-    // our work has been successfully completed.
-    return Status::OK();
 }
 
 PlanExecutorImpl::~PlanExecutorImpl() {

@@ -207,21 +207,6 @@ private:
      */
     void _executePlan();
 
-    /**
-     * Called on construction in order to ensure that when callers receive a new instance of a
-     * 'PlanExecutorImpl', plan selection has already been completed.
-     *
-     * If the tree contains plan selection stages, such as MultiPlanStage or SubplanStage,
-     * this calls into their underlying plan selection facilities. Otherwise, does nothing.
-     *
-     * If a YIELD_AUTO policy is set then locks are yielded during plan selection.
-     *
-     * Returns a non-OK status if query planning fails. In particular, this function returns
-     * ErrorCodes::QueryPlanKilled if plan execution cannot proceed due to a concurrent write or
-     * catalog operation.
-     */
-    Status _pickBestPlan();
-
     ExecState _getNextImpl(Snapshotted<Document>* objOut, RecordId* dlOut);
 
     // The OperationContext that we're executing within. This can be updated if necessary by using

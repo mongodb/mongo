@@ -34,8 +34,7 @@
 
 namespace mongo::classic_runtime_planner_for_sbe {
 
-PlannerBase::PlannerBase(OperationContext* opCtx, PlannerData plannerData)
-    : _opCtx(opCtx), _plannerData(std::move(plannerData)) {}
+PlannerBase::PlannerBase(PlannerDataForSBE plannerData) : _plannerData(std::move(plannerData)) {}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlanExecutor(
     std::unique_ptr<QuerySolution> solution,
@@ -49,7 +48,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
         ? search_helpers::getSearchRemoteExplains(expCtx, cq()->cqPipeline())
         : nullptr;
 
-    stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+    stage_builder::prepareSlotBasedExecutableTree(opCtx(),
                                                   sbePlanAndData.first.get(),
                                                   &sbePlanAndData.second,
                                                   *cq(),
@@ -63,7 +62,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
             "Solution must be present if cachedPlanHash is present",
             solution != nullptr || !cachedPlanHash.has_value());
     return uassertStatusOK(
-        plan_executor_factory::make(_opCtx,
+        plan_executor_factory::make(opCtx(),
                                     extractCq(),
                                     nullptr /* pipeline - It is not nullptr only in Bonsai */,
                                     std::move(solution),
