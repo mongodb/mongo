@@ -13,6 +13,7 @@ buildvariants:
     burn_in_tag_include_all_required_and_suggested: true
     burn_in_tag_exclude_build_variants: >-
       macos-debug-suggested
+      enterprise-rhel-80-64-bit-dynamic-embedded-router
     burn_in_tag_include_build_variants: >-
       enterprise-rhel-80-64-bit-inmem
       enterprise-rhel-80-64-bit-multiversion

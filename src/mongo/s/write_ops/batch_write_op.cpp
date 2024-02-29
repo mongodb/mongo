@@ -291,6 +291,9 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     // previously have batched first (e.g. when !batchMap.empty()) or send out that single write in
     // its own batch.
 
+    // Returns WriteType::WriteWithoutShardKeyWithId if there is any write of that type in the
+    // batch. We send WriteType::WriteWithoutShardKeyWithId in batches of only such writes.
+
     WriteType writeType = WriteType::Ordinary;
 
     std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>> nsEndpointMap;
@@ -303,9 +306,10 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         if (writeOp.getWriteState() != WriteOpState_Ready)
             continue;
 
-        // If we got a non Ordinary write in the previous iteration, it should be sent in its own
-        // batch.
-        if (writeType != WriteType::Ordinary) {
+        // If we got a WithoutShardKeyOrId or TimeseriesRetryableUpdate write in the previous
+        // iteration, it should be sent in its own batch.
+        if (writeType == WriteType::WithoutShardKeyOrId ||
+            writeType == WriteType::TimeseriesRetryableUpdate) {
             break;
         }
 
@@ -444,10 +448,15 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                 }
             };
 
-            if (!isMultiWrite && isNonTargetedWriteWithoutShardKeyWithExactId &&
-                !TransactionRouter::get(opCtx) && batchMap.empty()) {
+            if (!isMultiWrite && isNonTargetedWriteWithoutShardKeyWithExactId) {
                 writeType = WriteType::WithoutShardKeyWithId;
                 writeOp.setWriteType(writeType);
+            }
+
+            if (writeOp.getWriteType() == WriteType::Ordinary &&
+                writeType == WriteType::WithoutShardKeyWithId) {
+                writeOp.resetWriteToReady();
+                break;
             }
         }
 
@@ -714,8 +723,19 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         return;
     }
 
-    // Increment stats for this batch
-    _incBatchStats(response);
+    int firstTargetedWriteOpIdx = targetedBatch.getWrites().front()->writeOpRef.first;
+    bool shouldDeferWriteWithoutShardKeyReponse =
+        _writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId &&
+        targetedBatch.getNumOps() > 1;
+    if (!shouldDeferWriteWithoutShardKeyReponse) {
+        // Increment stats for this batch
+        _incBatchStats(response);
+    } else {
+        if (!_deferredResponses) {
+            _deferredResponses.emplace();
+        }
+        _deferredResponses->push_back(std::make_pair(&targetedBatch, &response));
+    }
 
     //
     // Assign errors to particular items.
@@ -724,14 +744,14 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Special handling for write concern errors, save for later
     if (response.isWriteConcernErrorSet()) {
-        auto opIdx = targetedBatch.getWrites().front()->writeOpRef.first;
         auto wce = *response.getWriteConcernError();
         auto shardId = targetedBatch.getWrites()[0]->endpoint.shardName;
-        if (_writeOps[opIdx].getWriteType() == WriteType::WithoutShardKeyWithId) {
+        if (_writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId) {
             if (!_deferredWCErrors) {
-                _deferredWCErrors = std::make_pair(opIdx, std::vector{ShardWCError(shardId, wce)});
+                _deferredWCErrors = std::make_pair(firstTargetedWriteOpIdx,
+                                                   std::vector{ShardWCError(shardId, wce)});
             } else {
-                invariant(_deferredWCErrors->first == opIdx);
+                invariant(_deferredWCErrors->first == firstTargetedWriteOpIdx);
                 _deferredWCErrors->second.push_back(ShardWCError(shardId, wce));
             }
         } else {
@@ -768,6 +788,14 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     write_ops::WriteError* lastError = nullptr;
     for (auto&& write : targetedBatch.getWrites()) {
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
+        // A WriteWithoutShardKeyWithId batch of size 1 can be completed if it found n=1 from a
+        // previous shard.
+        if (targetedBatch.getNumOps() == 1 &&
+            writeOp.getWriteType() == WriteType::WithoutShardKeyWithId &&
+            writeOp.getWriteState() == WriteOpState_Completed) {
+            continue;
+        }
+
         invariant(writeOp.getWriteState() == WriteOpState_Pending);
 
         // See if we have an error for the write
@@ -784,7 +812,10 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             if (!ordered || !lastError) {
                 if (writeOp.getWriteType() == WriteType::WithoutShardKeyWithId) {
                     writeOp.noteWriteWithoutShardKeyWithIdResponse(
-                        *write, response.getN(), /* bulkWriteReplyItem */ boost::none);
+                        *write,
+                        response.getN(),
+                        targetedBatch.getNumOps(),
+                        /* bulkWriteReplyItem */ boost::none);
                 } else {
                     writeOp.noteWriteComplete(*write);
                 }
@@ -1026,6 +1057,32 @@ void BatchWriteOp::handleDeferredWriteConcernErrors() {
         _deferredWCErrors = boost::none;
     }
 }
+
+void BatchWriteOp::handleDeferredResponses(bool hasAnyStaleShardResponse) {
+    if (!_deferredResponses) {
+        return;
+    }
+
+    for (unsigned long idx = 0; idx < _deferredResponses->size(); idx++) {
+        auto [targetedWriteBatch, response] = _deferredResponses->at(idx);
+        for (auto& write : targetedWriteBatch->getWrites()) {
+            WriteOp& writeOp = _writeOps[write->writeOpRef.first];
+            if (hasAnyStaleShardResponse) {
+                if (writeOp.getWriteState() != WriteOpState_Ready) {
+                    writeOp.resetWriteToReady();
+                }
+            } else if (writeOp.getWriteState() != WriteOpState_Error) {
+                writeOp.noteWriteWithoutShardKeyWithIdResponse(
+                    *write, response->getN(), targetedWriteBatch->getNumOps(), boost::none);
+            }
+        }
+        if (!hasAnyStaleShardResponse) {
+            _incBatchStats(*response);
+        }
+    }
+    _deferredResponses = boost::none;
+}
+
 
 void TrackedErrors::startTracking(int errCode) {
     dassert(!isTracking(errCode));

@@ -51,15 +51,10 @@ assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updated: true
 var staleColl = st.s1.getCollection('foo.bar');
 assert.commandWorked(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {multi: false}));
 
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "UpdateOneWithIdWithoutShardKey")) {
-    // Ensure _id update goes to at least one shard
-    assert(st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
-           st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null)
-} else {
-    // Ensure _id update goes to all shards
-    assert.neq(null, st.shard0.getCollection(coll.toString()).findOne({updatedById: true}));
-    assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updatedById: true}));
-}
+// Ensure _id update goes to at least one shard
+assert(st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
+       st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null)
+
 jsTest.log("Testing multi-delete...");
 
 // Sharded deleteOnes that do not directly target a shard can now use the two phase write
@@ -85,14 +80,8 @@ assert.commandWorked(st.shard2.getCollection(coll.toString()).insert({_id: 0, sk
 
 assert.commandWorked(coll.remove({_id: 0}, {justOne: true}));
 
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "UpdateOneWithIdWithoutShardKey")) {
-    // Ensure _id deleteOne goes to at least one shard
-    assert(st.shard0.getCollection(coll.toString()).findOne({x: 1}) == null ||
-           st.shard2.getCollection(coll.toString()).findOne({x: 1}) == null)
-} else {
-    // Ensure _id update goes to all shards
-    assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({x: 1}));
-    assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({x: 1}));
-}
+// Ensure _id update goes to all shards
+assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({x: 1}));
+assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({x: 1}));
 
 st.stop();

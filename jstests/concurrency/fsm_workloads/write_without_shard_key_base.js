@@ -199,13 +199,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                   "updateType: " + updateType + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs);
 
+        const session = db.getMongo().startSession({retryWrites: true});
+        const collection = session.getDatabase(db.getName()).getCollection(collName);
+
         let res;
         if (updateType === 0 /* Update operator document */) {
             const update = {[this.secondaryDocField]: newValue};
-            res = db[collName].updateOne(query, {$set: update});
+            res = collection.updateOne(query, {$set: update});
         } else { /* Aggregation pipeline update */
             const update = {[this.secondaryDocField]: newValue};
-            res = db[collName].updateOne(query, [{$set: update}]);
+            res = collection.updateOne(query, [{$set: update}]);
         }
         assert.commandWorked(res);
 
@@ -504,17 +507,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             tid: this.tid
         };
 
+        const session = db.getMongo().startSession({retryWrites: true});
+        const collection = session.getDatabase(db.getName()).getCollection(collName);
+
         // Used for validation after running the write operation.
-        const containsMatchedDocs = db[collName].findOne(query) != null;
-        const numMatchedDocsBefore = db[collName].countDocuments(query);
+        const containsMatchedDocs = collection.findOne(query) != null;
+        const numMatchedDocsBefore = collection.countDocuments(query);
 
         jsTestLog("deleteOneWithId state running with query: " + tojson(query) + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs + "\n" +
                   "numMatchedDocsBefore: " + numMatchedDocsBefore);
 
-        let res = assert.commandWorked(db[collName].deleteOne(query));
+        let res = assert.commandWorked(collection.deleteOne(query));
 
-        const numMatchedDocsAfter = db[collName].countDocuments(query);
+        const numMatchedDocsAfter = collection.countDocuments(query);
 
         if (containsMatchedDocs) {
             assert.eq(res.deletedCount, 1, res);

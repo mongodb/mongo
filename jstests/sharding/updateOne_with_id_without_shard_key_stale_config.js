@@ -33,7 +33,9 @@ assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard1.shardName}));
 
 // This update via mongos1 should trigger a StaleConfigError as mongos1 is not aware of moved chunk.
-const res = st.s1.getDB(jsTestName()).coll.updateOne({_id: -1}, {$inc: {counter: 1}});
+const session = st.s1.startSession({retryWrites: true});
+const sessionColl = session.getDatabase(db.getName()).getCollection(db.coll.getName());
+const res = sessionColl.updateOne({_id: -1}, {$inc: {counter: 1}});
 assert.commandWorked(res);
 assert.eq(res.modifiedCount, 1);
 let mongosServerStatus =
