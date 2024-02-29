@@ -30,22 +30,10 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/db/pipeline/resume_token.h"
 
 imports:
     - "mongo/db/basic_types.idl"
-
-types:
-    # A resume token is an opaque document we return to the user that contains all the information
-    # needed to resume a stream where they left off.  It also provides the ordering of streams
-    # from multiple shards.
-    resumeToken:
-        bson_serialization_type: object
-        description: An object representing a resume token for a change stream
-        cpp_type: ResumeToken
-        serializer: ResumeToken::toBSON
-        deserializer: ResumeToken::parse
+    - "mongo/db/pipeline/resume_token.idl"
 
 enums:
     FullDocumentBeforeChangeMode:
@@ -95,7 +83,7 @@ structs:
                 description: An object representing the point at which we should resume reporting
                              changes from. Only one of resumeAfter, startAfter, and
                              startAtOperationTime should be specified.
-                query_shape: literal
+                query_shape: custom
 
             startAfter:
                 cpp_name: startAfter
@@ -105,7 +93,7 @@ structs:
                              changes from. This is allowed to be a token from an invalidating
                              command. Only one of resumeAfter, startAfter, and startAtOperationTime
                              should be specified.
-                query_shape: literal
+                query_shape: custom
 
             startAtOperationTime:
                 cpp_name: startAtOperationTime
@@ -220,7 +208,7 @@ structs:
             startAfterInvalidate:
                 type: resumeToken
                 optional: true
-                query_shape: literal
+                query_shape: custom
 
     DocumentSourceChangeStreamCheckResumabilitySpec:
         strict: true
@@ -231,7 +219,7 @@ structs:
             resumeToken:
                 type: resumeToken
                 optional: false
-                query_shape: literal
+                query_shape: custom
 
     DocumentSourceChangeStreamAddPreImageSpec:
         strict: true
@@ -252,3 +240,14 @@ structs:
             fullDocument:
                 type: FullDocumentMode
                 query_shape: parameter
+
+    DocumentSourceChangeStreamHandleTopologyChangeSpec:
+        strict: true
+        description: A document used to specify the $_internalChangeStreamHandleTopologyChange stage of
+                     an aggregation pipeline.
+        query_shape_component: true
+        fields:
+            originalAggregateCommand:
+                type: object
+                optional: true
+                query_shape: literal

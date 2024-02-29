@@ -10,7 +10,7 @@ load("jstests/libs/feature_flag_util.js");
 if (FeatureFlagUtil.isEnabled(db, "QueryStats") ||
     FeatureFlagUtil.isEnabled(db, "QueryStatsFindCommand")) {
     function testQueryStatsSetting(paramName, paramValue) {
-        // The feature flag is enabled - make sure the telemetry store can be configured.
+        // The feature flag is enabled - make sure the queryStats store can be configured.
         const original = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}));
         assert(original.hasOwnProperty(paramName), original);
         const originalValue = original[paramName];
@@ -29,6 +29,6 @@ if (FeatureFlagUtil.isEnabled(db, "QueryStats") ||
     assert.commandFailedWithCode(
         db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: '2MB'}), 7373500);
     assert.commandFailedWithCode(
-        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}), 7506200);
+        db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}), 7373500);
 }
 }());

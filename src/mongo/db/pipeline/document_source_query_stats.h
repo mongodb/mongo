@@ -84,7 +84,7 @@ public:
 
         bool _transformIdentifiers;
 
-        TransformAlgorithmEnum _algorithm;
+        const TransformAlgorithmEnum _algorithm;
 
         std::string _hmacKey;
     };
@@ -123,10 +123,45 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
+    /*
+     * CopiedPartition: This struct is representative of a copied ("materialized") partition
+     * which should be loaded from the QueryStatsStore. It is used to hold a copy of the
+     * QueryStatsEntries corresponding to the provided partitionId.
+     * Once a CopiedPartition has been loaded from QueryStatsStore, it provides access to the
+     * QueryStatsEntries of the partition without requiring holding the lock over the partition in
+     * the partitioned cache.
+     */
+    struct CopiedPartition {
+        CopiedPartition(QueryStatsStore::PartitionId partitionId)
+            : statsEntries(), _readTimestamp(), _partitionId(partitionId) {}
+
+        ~CopiedPartition() = default;
+
+        bool isLoaded() const;
+
+        void incrementPartitionId();
+
+        bool isValidPartitionId(QueryStatsStore::PartitionId maxNumPartitions) const;
+
+        const Date_t& getReadTimestamp() const;
+
+        bool empty() const;
+
+        void load(QueryStatsStore& queryStatsStore);
+
+        std::deque<QueryStatsEntry> statsEntries;
+
+    private:
+        Date_t _readTimestamp;
+        QueryStatsStore::PartitionId _partitionId;
+        bool _isLoaded{false};
+    };
+
     DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone,
                              std::string hmacKey = {})
         : DocumentSource(kStageName, expCtx),
+          _currentCopiedPartition(0),
           _transformIdentifiers(algorithm != TransformAlgorithmEnum::kNone),
           _algorithm(algorithm),
           _hmacKey(hmacKey) {}
@@ -135,17 +170,11 @@ private:
 
     GetNextResult doGetNext() final;
 
-    /**
-     * The current partition materialized as a set of Document instances. We pop from the queue
-     * and return DocumentSource results.
-     */
-    std::deque<Document> _materializedPartition;
+    boost::optional<Document> toDocument(const Date_t& partitionReadTime,
+                                         const QueryStatsEntry& queryStatsEntry) const;
 
-    /**
-     * Iterator over all queryStats partitions. This is incremented when we exhaust the current
-     * _materializedPartition.
-     */
-    QueryStatsStore::PartitionId _currentPartition = -1;
+    // The current partition copied from query stats store to avoid holding lock during reads.
+    CopiedPartition _currentCopiedPartition;
 
     // When true, apply hmac to field names from returned query shapes.
     bool _transformIdentifiers;
@@ -153,7 +182,7 @@ private:
     // The type of algorithm to use for transform identifiers as an enum, currently only
     // kHmacSha256
     // ("hmac-sha-256") is supported.
-    TransformAlgorithmEnum _algorithm;
+    const TransformAlgorithmEnum _algorithm;
 
     /**
      * Key used for SHA-256 HMAC application on field names.

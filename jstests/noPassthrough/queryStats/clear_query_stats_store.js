@@ -1,5 +1,5 @@
 /**
- * Test that the query stats store can be cleared when the cache size is reset to 0.
+ * Test that the queryStats store can be cleared when the cache size is reset to 0.
  * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQueryStats.
@@ -7,7 +7,7 @@ load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQuerySta
 (function() {
 "use strict";
 
-// Turn on the collecting of query stats metrics.
+// Turn on the collecting of queryStats metrics.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsCacheSize: "10MB"},
 };

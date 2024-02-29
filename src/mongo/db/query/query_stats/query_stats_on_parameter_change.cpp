@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/util.h"
+#include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -52,7 +52,7 @@ std::pair<ServiceContext*, OnParamChangeUpdater*> getUpdater(const Client& clien
     tassert(7106500, "ServiceContext must be non null", serviceCtx);
 
     auto updater = queryStatsStoreOnParamChangeUpdater(serviceCtx).get();
-    tassert(7106501, "Telemetry store size updater must be non null", updater);
+    tassert(7106501, "queryStats store size updater must be non null", updater);
     return {serviceCtx, updater};
 }
 }  // namespace

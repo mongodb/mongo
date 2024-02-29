@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats/find_key_generator.h"
+#include "mongo/db/query/query_stats/find_key.h"
 
 namespace mongo::query_stats {
 

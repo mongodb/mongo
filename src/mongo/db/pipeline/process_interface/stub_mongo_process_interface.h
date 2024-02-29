@@ -80,6 +80,10 @@ public:
         return std::make_unique<StubWriteSizeEstimator>();
     }
 
+    bool isExpectedToExecuteQueries() override {
+        return false;
+    }
+
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return false;
     }

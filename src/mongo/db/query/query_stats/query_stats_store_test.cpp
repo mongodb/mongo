@@ -33,9 +33,9 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_stats/agg_key_generator.h"
-#include "mongo/db/query/query_stats/find_key_generator.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/agg_key.h"
+#include "mongo/db/query/query_stats/find_key.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -252,14 +252,14 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_DOES_NOT_THROW(
         try {
-            opDebug.queryStatsKey =
+            opDebug.queryStatsInfo.key =
                 std::make_unique<query_stats::FindKey>(parsedFindPair.first,
                                                        *parsedFindPair.second,
                                                        query_shape::CollectionType::kCollection);
         } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) { return; })
 
-    opDebug.queryStatsKeyHash = absl::HashOf(*opDebug.queryStatsKey);
-    ASSERT_EQ(opDebug.queryStatsKeyHash, boost::none);
+    opDebug.queryStatsInfo.keyHash = absl::HashOf(*opDebug.queryStatsInfo.key);
+    ASSERT_EQ(opDebug.queryStatsInfo.keyHash, boost::none);
 
     // TODO SERVER-84011 backport. Below is the proper test using queryStats.
     // RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
@@ -284,7 +284,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     //     },
     //     /*requiresFullQueryStatsFeatureFlag*/ false));
     // auto& opDebug = CurOp::get(*opCtx)->debug();
-    // ASSERT_EQ(opDebug.queryStatsKeyHash, boost::none);
+    // ASSERT_EQ(opDebug.queryStatsInfo.keyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

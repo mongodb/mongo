@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_stats/find_key_generator.h"
+#include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"

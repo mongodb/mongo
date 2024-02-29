@@ -447,7 +447,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnPushWithRangeWindowWithUnit
                                 "unbounded",
                                 "?number"
                             ],
-                            "unit": "?string"
+                            "unit": "month"
                         }
                     }
                 }
@@ -455,5 +455,99 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnPushWithRangeWindowWithUnit
         })",
         redact(*docSource));
 }
+
+/**
+ * Helper function that parses the $setWindowFields aggregation stage from the input, serializes it
+ * to its representative shape, re-parses the representative shape, and compares to the original.
+ */
+void assertRepresentativeShapeIsStable(auto expCtx,
+                                       BSONObj inputStage,
+                                       BSONObj expectedRepresentativeStage) {
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(inputStage.firstElement(), expCtx);
+    std::vector<Value> serialization;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    parsedStage->serializeToArray(serialization, opts);
+
+    auto serializedStage = serialization[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(serializedStage, expectedRepresentativeStage);
+
+    auto roundTripped = DocumentSourceInternalSetWindowFields::createFromBson(
+        serializedStage.firstElement(), expCtx);
+
+    std::vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization, opts);
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RoundTripSerializationDocumentWindowBounds) {
+    assertRepresentativeShapeIsStable(getExpCtx(),
+                                      fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {documents: [-10, 10]}}}}})"),
+                                      fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {documents: [0, 1]}}}}})"));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RoundTripSerializationRangeWindowBounds) {
+    assertRepresentativeShapeIsStable(getExpCtx(),
+                                      fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {range: [-10, 10]}}}}})"),
+                                      fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {range: [0, 1]}}}}})"));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RoundTripSerializationRangeWindowBoundsWithUnit) {
+    assertRepresentativeShapeIsStable(getExpCtx(),
+                                      fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {range: [-10, 10], unit: 'second'}}}}})"),
+                                      fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {range: [0, 1], unit: 'second'}}}}})"));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RoundTripSerializationExpMovingAvg) {
+    assertRepresentativeShapeIsStable(getExpCtx(),
+                                      fromjson(
+                                          R"({
+            $setWindowFields: {
+                partitionBy: '$foo.bar',
+                sortBy: {
+                    bar: 1
+                },
+                output: {
+                    x: {
+                        $expMovingAvg: {
+                            alpha: 0.5,
+                            input: '$y'
+                        }
+                    }
+                }
+            }
+        })"),
+                                      fromjson(
+                                          R"({
+            $_internalSetWindowFields: {
+                partitionBy: '$foo.bar',
+                sortBy: {
+                    bar: 1
+                },
+                output: {
+                    x: {
+                        $expMovingAvg: {
+                            alpha: 0.1,
+                            input: '$y'
+                        }
+                    }
+                }
+            }
+        })"));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -19,8 +19,6 @@ selector:
   - jstests/noPassthrough/libs/*.js
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
-  # TODO SERVER-81313 re-enable this test
-  - jstests/noPassthrough/queryStats/query_stats_changeStreams.js
   exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.

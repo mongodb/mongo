@@ -36,7 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/service_context.h"
@@ -136,11 +136,18 @@ const auto queryStatsStoreDecoration =
 
 const auto queryStatsRateLimiter =
     ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
+
 /**
  * Acquire a reference to the global queryStats store.
  */
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
 
+/**
+ * Indicates whether or not query stats is enabled via the feature flags. If
+ * requiresFullQueryStatsFeatureFlag is true, it will only return true if featureFlagQueryStats is
+ * enabled. Otherwise, it will return true if either featureFlagQueryStats or
+ * featureFlagQueryStatsFindCommand is enabled.
+ */
 bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
 
 /**

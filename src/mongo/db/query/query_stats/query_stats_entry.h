@@ -35,7 +35,7 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
-#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/util/time_support.h"
 
