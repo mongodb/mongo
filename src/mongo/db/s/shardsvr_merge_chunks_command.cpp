@@ -225,8 +225,8 @@ public:
             return false;
         }
 
-        if (SimpleBSONObjComparator::kInstance.evaluate(minKey > maxKey)) {
-            errmsg = "the specified min bound is greater then the specified max bound";
+        if (SimpleBSONObjComparator::kInstance.evaluate(minKey >= maxKey)) {
+            errmsg = "the specified max bound must be greater than the specified min bound";
             return false;
         }
 
