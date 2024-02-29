@@ -4,7 +4,6 @@ import getpass
 import hashlib
 import json
 import os
-import distro
 import platform
 import queue
 import shlex
@@ -44,12 +43,6 @@ _SANITIZER_MAP = {
     "leak": "lsan",
     "thread": "tsan",
     "undefined": "ubsan",
-}
-
-_DISTRO_MAP = {
-    "Ubuntu 22.04": "ubuntu22",
-    "Amazon Linux 2": "amazon_linux_2",
-    "Amazon Linux 2023": "amazon_linux_2023",
 }
 
 _S3_HASH_MAPPING = {
@@ -606,11 +599,6 @@ def generate(env: SCons.Environment.Environment) -> None:
         else:
             allocator = env.GetOption("allocator")
 
-        if normalized_os == "linux" and f"{distro.name()} {distro.version()}" in _DISTRO_MAP:
-            distro_or_os = _DISTRO_MAP[f"{distro.name()} {distro.version()}"]
-        else:
-            distro_or_os = normalized_os
-
         bazel_internal_flags = [
             f'--//bazel/config:compiler_type={env.ToolchainName()}',
             f'--//bazel/config:build_mode={build_mode}',
@@ -635,8 +623,8 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:streams_release_build={env.GetOption("streams-release-build") is not None}',
             f'--//bazel/config:build_enterprise={env.GetOption("modules") == "enterprise"}',
             f'--//bazel/config:visibility_support={env.GetOption("visibility-support")}',
-            f'--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}',
-            f'--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}',
+            f'--platforms=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
+            f'--host_platform=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
         ]
 

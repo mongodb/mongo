@@ -1,5 +1,4 @@
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
-load("//bazel:utils.bzl", "get_host_distro")
 
 _OS_MAP = {
     "macos": "@platforms//os:osx",
@@ -39,19 +38,20 @@ def _setup_local_config_platform(ctx):
     # So Starlark doesn't throw an indentation error when this gets injected.
     constraints_str = ",\n        ".join(['"%s"' % c for c in constraints])
 
-    distro = get_host_distro(ctx)
-    if arch == "x86_64":
-        arch = "amd64"
-    elif arch == "aarch64":
-        arch = "arm64"
-
-    if distro != None and distro + "_" + arch in REMOTE_EXECUTION_CONTAINERS:
+    if os == "linux" and arch in ["aarch64"]:
         exec_props = """
     exec_properties = {
         "container-image": "%s",
         "dockerNetwork": "standard"
     },
-""" % REMOTE_EXECUTION_CONTAINERS[distro + "_" + arch]["container-image"]
+""" % REMOTE_EXECUTION_CONTAINERS["linux_arm64"]["container-image"]
+    elif os == "linux" and arch in ["amd64", "x86_64"]:
+        exec_props = """
+    exec_properties = {
+        "container-image": "%s",
+        "dockerNetwork": "standard"
+    },
+""" % REMOTE_EXECUTION_CONTAINERS["linux_amd64"]["container-image"]
     else:
         exec_props = ""
 
