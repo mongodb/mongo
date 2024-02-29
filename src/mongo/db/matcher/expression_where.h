@@ -71,6 +71,11 @@ public:
         return std::move(_jsFunction);
     }
 
+    void setPredicate(std::unique_ptr<JsFunction> jsFunction) {
+        tassert(8415200, "JsFunction must not be set", !_jsFunction);
+        _jsFunction = std::move(jsFunction);
+    }
+
 private:
     void validateState() const {
         tassert(6403600, "JsFunction is unavailable", _jsFunction);
