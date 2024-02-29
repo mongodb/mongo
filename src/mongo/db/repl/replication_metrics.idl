@@ -152,8 +152,11 @@ structs:
             lastCommittedOpTimeAtElection:
                 description: "Last OpTime the node committed before calling the election"
                 type: optime
+            lastSeenWrittenOpTimeAtElection:
+                description: "Latest written OpTime the node saw before calling the election"
+                type: optime
             lastSeenOpTimeAtElection:
-                description: "Last OpTime the node saw before calling the election"
+                description: "Latest applied OpTime the node saw before calling the election"
                 type: optime
             numVotesNeeded:
                 description: "Number of votes the node needed to win the election"
@@ -206,6 +209,13 @@ structs:
             voteReason:
                 description: "Reason why the node voted the way it did"
                 type: string
+            lastWrittenOpTimeAtElection:
+                description: "Latest written OpTime at the time of voting"
+                type: optime
+            maxWrittenOpTimeInSet:
+                description: "Highest written time of any node in this replica set, as currently
+                              known by this node"
+                type: optime
             lastAppliedOpTimeAtElection:
                 description: "Latest applied OpTime at the time of voting"
                 type: optime

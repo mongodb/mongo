@@ -41,6 +41,7 @@ const std::string kCommandName = "replSetRequestVotes";
 const std::string kConfigVersionFieldName = "configVersion";
 const std::string kConfigTermFieldName = "configTerm";
 const std::string kDryRunFieldName = "dryRun";
+const std::string kLastWrittenOpTimeFieldName = "lastWrittenOpTime";
 const std::string kLastAppliedOpTimeFieldName = "lastAppliedOpTime";
 const std::string kOkFieldName = "ok";
 const std::string kReasonFieldName = "reason";
@@ -82,6 +83,14 @@ Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
         return status;
     }
 
+    status = bsonExtractOpTimeField(argsObj, kLastWrittenOpTimeFieldName, &_lastWrittenOpTime);
+    if (status.code() == ErrorCodes::NoSuchKey) {
+        _lastWrittenOpTime = _lastAppliedOpTime;
+        status = Status::OK();
+    } else if (!status.isOK()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -109,6 +118,10 @@ ConfigVersionAndTerm ReplSetRequestVotesArgs::getConfigVersionAndTerm() const {
     return ConfigVersionAndTerm(_cfgVer, _cfgTerm);
 }
 
+OpTime ReplSetRequestVotesArgs::getLastWrittenOpTime() const {
+    return _lastWrittenOpTime;
+}
+
 OpTime ReplSetRequestVotesArgs::getLastAppliedOpTime() const {
     return _lastAppliedOpTime;
 }
@@ -125,6 +138,7 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     builder->appendNumber(kCandidateIndexFieldName, _candidateIndex);
     builder->appendNumber(kConfigVersionFieldName, _cfgVer);
     builder->appendNumber(kConfigTermFieldName, _cfgTerm);
+    _lastWrittenOpTime.append(builder, kLastWrittenOpTimeFieldName);
     _lastAppliedOpTime.append(builder, kLastAppliedOpTimeFieldName);
 }
 

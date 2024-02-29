@@ -2155,7 +2155,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             // The following is an optimization when we are checking for opTime, but not config.
             // For majority write concern, in addition to waiting for the committed snapshot to
             // advance past the write, it also waits for a majority of nodes to have their
-            // lasDurable (j: true) or lastApplied (j: false) to advance past the write.
+            // lasDurable (j: true) or lastWritten (j: false) to advance past the write.
             // Waiting for the committed snapshot is sufficient in most cases and so the additional
             // wait is usually a no-op and only needed
             // when writeConcernMajorityJournalDefault is false and j: true.
@@ -5801,8 +5801,10 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
             const int electionCandidateMemberId =
                 _rsConfig.getMemberAt(candidateIndex).getId().getData();
             const std::string voteReason = response->getReason();
+            const OpTime lastWrittenOpTime = _topCoord->getMyLastWrittenOpTime();
+            const OpTime maxWrittenOpTime = _topCoord->latestKnownWrittenOpTime();
             const OpTime lastAppliedOpTime = _topCoord->getMyLastAppliedOpTime();
-            const OpTime maxAppliedOpTime = _topCoord->latestKnownOpTime();
+            const OpTime maxAppliedOpTime = _topCoord->latestKnownAppliedOpTime();
             const double priorityAtElection = _rsConfig.getMemberAt(_selfIndex).getPriority();
             ReplicationMetrics::get(getServiceContext())
                 .setElectionParticipantMetrics(votedForCandidate,
@@ -5810,6 +5812,8 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
                                                lastVoteDate,
                                                electionCandidateMemberId,
                                                voteReason,
+                                               lastWrittenOpTime,
+                                               maxWrittenOpTime,
                                                lastAppliedOpTime,
                                                maxAppliedOpTime,
                                                priorityAtElection);

@@ -1715,7 +1715,7 @@ int TopologyCoordinator::_findHealthyPrimaryOfEqualOrGreaterPriority(
 }
 
 bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
-    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownAppliedOpTime();
 
     // Rules are:
     // - If the terms don't match, we don't call for priority takeover.
@@ -1746,7 +1746,7 @@ bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
 
 bool TopologyCoordinator::_amIFreshEnoughForCatchupTakeover() const {
 
-    const OpTime ourLatestKnownOpTime = latestKnownOpTime();
+    const OpTime ourLatestKnownOpTime = latestKnownAppliedOpTime();
 
     // Rules are:
     // - We must have the freshest optime of all the up nodes.
@@ -2499,8 +2499,9 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getUnelectableR
 TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getMyUnelectableReason(
     const Date_t now, StartElectionReasonEnum reason) const {
     UnelectableReasonMask result = None;
+    const OpTime lastWritten = getMyLastWrittenOpTime();
     const OpTime lastApplied = getMyLastAppliedOpTime();
-    if (lastApplied.isNull()) {
+    if (lastWritten.isNull() || lastApplied.isNull()) {
         result |= NoData;
     }
     if (!_aMajoritySeemsToBeUp()) {
@@ -3538,12 +3539,12 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         response->setVoteGranted(false);
         response->setReason("candidate's set name ({}) differs from mine ({})"_format(
             args.getSetName(), _rsConfig.getReplSetName()));
-    } else if (args.getLastAppliedOpTime() < getMyLastAppliedOpTime()) {
+    } else if (args.getLastWrittenOpTime() < getMyLastWrittenOpTime()) {
         response->setVoteGranted(false);
         response->setReason(
-            "candidate's data is staler than mine. candidate's last applied OpTime: {}, "
-            "my last applied OpTime: {}"_format(args.getLastAppliedOpTime().toString(),
-                                                getMyLastAppliedOpTime().toString()));
+            "candidate's data is staler than mine. candidate's last written OpTime: {}, "
+            "my last written OpTime: {}"_format(args.getLastWrittenOpTime().toString(),
+                                                getMyLastWrittenOpTime().toString()));
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);
         response->setReason("already voted for another candidate ({}) this term ({})"_format(
@@ -3637,7 +3638,34 @@ void TopologyCoordinator::incrementTopologyVersion() {
     _topologyVersion.setCounter(counter + 1);
 }
 
-OpTime TopologyCoordinator::latestKnownOpTime() const {
+OpTime TopologyCoordinator::latestKnownWrittenOpTime() const {
+    OpTime latest = getMyLastWrittenOpTime();
+    for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
+         ++it) {
+        // Ignore self
+        if (it->isSelf()) {
+            continue;
+        }
+        // Ignore down members
+        if (!it->up()) {
+            continue;
+        }
+        // Ignore removed nodes (not in config, so not valid).
+        if (it->getState().removed()) {
+            continue;
+        }
+
+        OpTime optime = it->getHeartbeatWrittenOpTime();
+
+        if (optime > latest) {
+            latest = optime;
+        }
+    }
+
+    return latest;
+}
+
+OpTime TopologyCoordinator::latestKnownAppliedOpTime() const {
     OpTime latest = getMyLastAppliedOpTime();
     for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
          ++it) {

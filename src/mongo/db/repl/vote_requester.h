@@ -71,6 +71,7 @@ public:
                   long long candidateIndex,
                   long long term,
                   bool dryRun,
+                  OpTime lastWrittenOpTime,
                   OpTime lastAppliedOpTime,
                   int primaryIndex);
         virtual ~Algorithm();
@@ -98,6 +99,7 @@ public:
         const long long _candidateIndex;
         const long long _term;
         bool _dryRun = false;  // this bool indicates this is a mock election when true
+        const OpTime _lastWrittenOpTime;
         const OpTime _lastAppliedOpTime;
         std::vector<HostAndPort> _targets;
         stdx::unordered_set<HostAndPort> _responders;
@@ -125,6 +127,7 @@ public:
                                                           long long candidateIndex,
                                                           long long term,
                                                           bool dryRun,
+                                                          OpTime lastWrittenOpTime,
                                                           OpTime lastAppliedOpTime,
                                                           int primaryIndex);
 

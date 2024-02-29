@@ -336,9 +336,9 @@ public:
     /**
      * Updates _lastCommittedOpTime to be 'committedOpTime' if it is more recent than the current
      * last committed OpTime.  Returns true if _lastCommittedOpTime is changed. We ignore
-     * 'committedOpTime' if it has a different term than our lastApplied, unless
+     * 'committedOpTime' if it has a different term than our lastWritten, unless
      * 'fromSyncSource'=true, which guarantees we are on the same branch of history as
-     * 'committedOpTime', so we update our commit point to min(committedOpTime, lastApplied).
+     * 'committedOpTime', so we update our commit point to min(committedOpTime, lastWritten).
      * The 'forInitiate' flag is to force-advance our committedOpTime during the execution of
      * the replSetInitiate command.
      */
@@ -506,14 +506,14 @@ public:
 
     /**
      *  Returns whether or not at least 'numNodes' have reached the given opTime with the same term.
-     * "durablyWritten" indicates whether the operation has to be durably applied.
+     * "durablyWritten" indicates whether the operation has to be durably written.
      */
     bool haveNumNodesReachedOpTime(const OpTime& opTime, int numNodes, bool durablyWritten);
 
     /**
      * Returns whether or not at least one node matching the tagPattern has reached the given opTime
      * with the same term.
-     * "durablyWritten" indicates whether the operation has to be durably applied.
+     * "durablyWritten" indicates whether the operation has to be durably written.
      */
     bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
                                       const ReplSetTagPattern& tagPattern,
@@ -605,13 +605,13 @@ public:
                                            bool isRollbackAllowed);
 
     /*
-     * Returns the last optime that this node has applied and journaled.
+     * Returns the last optime that this node has written and journaled.
      */
     OpTime getMyLastDurableOpTime() const;
     OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;
 
     /*
-     * Sets the last optime that this node has applied and journaled. Fails with an invariant if
+     * Sets the last optime that this node has written and journaled. Fails with an invariant if
      * 'isRollbackAllowed' is false and we're attempting to set the optime backwards. The Date_t
      * 'now' is used to track liveness; setting a node's durable optime updates its liveness
      * information.
@@ -625,7 +625,8 @@ public:
      * replSetUpdatePosition command.
      *
      * Returns a Status if the position could not be set, false if the last optimes for the node
-     * did not change, or true if either the last applied or last durable optime did change.
+     * did not change, or true if either the last written, last applied or last durable optime did
+     * change.
      */
     StatusWith<bool> setLastOptimeForMember(const UpdatePositionArgs::UpdateInfo& args, Date_t now);
 
@@ -692,7 +693,7 @@ public:
      *      C1. 'force' is true and now > waitUntil
      *
      *      C2. A majority set of nodes, M, in the replica set have optimes greater than or
-     *      equal to the last applied optime of the primary.
+     *      equal to the last written optime of the primary.
      *
      *      C3. There exists at least one electable secondary node in the majority set M.
      *
@@ -810,8 +811,11 @@ public:
      */
     void incrementTopologyVersion();
 
-    // Scans through all members that are 'up' and returns the latest known optime.
-    OpTime latestKnownOpTime() const;
+    // Scans through all members that are 'up' and returns the latest known written optime.
+    OpTime latestKnownWrittenOpTime() const;
+
+    // Scans through all members that are 'up' and returns the latest known applied optime.
+    OpTime latestKnownAppliedOpTime() const;
 
     /**
      * Scans through all members that are 'up' and return the latest known optime, if we have
@@ -1174,8 +1178,8 @@ private:
 
     ReplSetConfig _rsConfig;  // The current config, including a vector of MemberConfigs
 
-    // Heartbeat, current applied/durable optime, and other state data for each member.  It is
-    // guaranteed that this vector will be maintained in the same order as the MemberConfigs in
+    // Heartbeat, current written/applied/durable optime, and other state data for each member.  It
+    // is guaranteed that this vector will be maintained in the same order as the MemberConfigs in
     // _currentConfig, therefore the member config index can be used to index into this vector as
     // well.
     std::vector<MemberData> _memberData;

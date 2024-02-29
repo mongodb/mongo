@@ -122,6 +122,7 @@ public:
                                                       term,
                                                       false,  // not a dryRun
                                                       lastOplogEntry,
+                                                      lastOplogEntry,
                                                       -1));
     }
 
@@ -270,6 +271,7 @@ public:
                                                       term,
                                                       true,  // dryRun
                                                       lastOplogEntry,
+                                                      lastOplogEntry,
                                                       -1));
     }
 };
@@ -301,6 +303,7 @@ public:
                                                       candidateId,
                                                       term,
                                                       true,  // dryRun
+                                                      lastOplogEntry,
                                                       lastOplogEntry,
                                                       primaryIndex));
     }

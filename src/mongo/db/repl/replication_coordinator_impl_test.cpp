@@ -8032,12 +8032,13 @@ TEST_F(ReplCoordTest, NodeStoresElectionVotes) {
     auto opCtx = makeOperationContext();
 
     ReplSetRequestVotesArgs args;
-    ASSERT_OK(args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
-                                                         << "mySet"
-                                                         << "term" << 7LL << "candidateIndex" << 2LL
-                                                         << "configVersion" << 2LL << "dryRun"
-                                                         << false << "lastAppliedOpTime"
-                                                         << time.asOpTime().toBSON())));
+    ASSERT_OK(
+        args.initialize(BSON("replSetRequestVotes"
+                             << 1 << "setName"
+                             << "mySet"
+                             << "term" << 7LL << "candidateIndex" << 2LL << "configVersion" << 2LL
+                             << "dryRun" << false << "lastWrittenOpTime" << time.asOpTime().toBSON()
+                             << "lastAppliedOpTime" << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
     ASSERT_OK(getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response));
@@ -8074,12 +8075,12 @@ TEST_F(ReplCoordTest, NodeDoesNotStoreDryRunVotes) {
     auto opCtx = makeOperationContext();
 
     ReplSetRequestVotesArgs args;
-    ASSERT_OK(args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
-                                                         << "mySet"
-                                                         << "term" << 7LL << "candidateIndex" << 2LL
-                                                         << "configVersion" << 2LL << "dryRun"
-                                                         << true << "lastAppliedOpTime"
-                                                         << time.asOpTime().toBSON())));
+    ASSERT_OK(args.initialize(BSON(
+        "replSetRequestVotes" << 1 << "setName"
+                              << "mySet"
+                              << "term" << 7LL << "candidateIndex" << 2LL << "configVersion" << 2LL
+                              << "dryRun" << true << "lastWrittenOpTime" << time.asOpTime().toBSON()
+                              << "lastAppliedOpTime" << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
     ASSERT_OK(getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response));
@@ -8124,7 +8125,8 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfItFailsToStoreLastVote) {
                                    << "mySet"
                                    << "term" << initTerm + 1  // term of new candidate.
                                    << "candidateIndex" << 1LL << "configVersion" << 2LL << "dryRun"
-                                   << false << "lastAppliedOpTime" << time.asOpTime().toBSON())));
+                                   << false << "lastWrittenOpTime" << time.asOpTime().toBSON()
+                                   << "lastAppliedOpTime" << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
     // Simulate a failure to write the 'last vote' document. The specific error code isn't
@@ -8174,7 +8176,8 @@ TEST_F(ReplCoordTest, NodeDoesNotGrantVoteIfInTerminalShutdown) {
                                    << "mySet"
                                    << "term" << initTerm + 1  // term of new candidate.
                                    << "candidateIndex" << 1LL << "configVersion" << 2LL << "dryRun"
-                                   << false << "lastAppliedOpTime" << time.asOpTime().toBSON())));
+                                   << false << "lastWrittenOpTime" << time.asOpTime().toBSON()
+                                   << "lastAppliedOpTime" << time.asOpTime().toBSON())));
     ReplSetRequestVotesResponse response;
 
     getReplCoord()->enterTerminalShutdown();
@@ -8202,7 +8205,8 @@ TEST_F(ReplCoordTest, RemovedNodeDoesNotGrantVote) {
         "replSetRequestVotes" << 1 << "setName"
                               << "mySet"
                               << "term" << 2 << "candidateIndex" << 0LL << "configVersion" << 1LL
-                              << "dryRun" << false << "lastAppliedOpTime" << OpTime().toBSON())));
+                              << "dryRun" << false << "lastWrittenOpTime" << OpTime().toBSON()
+                              << "lastAppliedOpTime" << OpTime().toBSON())));
 
     ReplSetRequestVotesResponse response;
     auto opCtx = makeOperationContext();
@@ -8478,12 +8482,13 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfCandidateIndexIsInvalid) {
     // Invalid candidateIndex values.
     for (auto candidateIndex : std::vector<long long>{-1LL, 2LL}) {
         ReplSetRequestVotesArgs args;
-        ASSERT_OK(args.initialize(BSON(
-            "replSetRequestVotes" << 1 << "setName"
-                                  << "mySet"
-                                  << "term" << getReplCoord()->getTerm() << "candidateIndex"
-                                  << candidateIndex << "configVersion" << 2LL << "dryRun" << false
-                                  << "lastAppliedOpTime" << time.asOpTime().toBSON())));
+        ASSERT_OK(args.initialize(BSON("replSetRequestVotes"
+                                       << 1 << "setName"
+                                       << "mySet"
+                                       << "term" << getReplCoord()->getTerm() << "candidateIndex"
+                                       << candidateIndex << "configVersion" << 2LL << "dryRun"
+                                       << false << "lastWrittenOpTime" << time.asOpTime().toBSON()
+                                       << "lastAppliedOpTime" << time.asOpTime().toBSON())));
         ReplSetRequestVotesResponse response;
         auto r = getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response);
 

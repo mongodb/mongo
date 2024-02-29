@@ -967,7 +967,12 @@ private:
          * Starts the VoteRequester and requests votes from known members of the replica set.
          */
         StatusWith<executor::TaskExecutor::EventHandle> _startVoteRequester(
-            WithLock, long long term, bool dryRun, OpTime lastAppliedOpTime, int primaryIndex);
+            WithLock,
+            long long term,
+            bool dryRun,
+            OpTime lastWrittenOpTime,
+            OpTime lastAppliedOpTime,
+            int primaryIndex);
 
         /**
          * Starts VoteRequester to run the real election when last vote write has completed.

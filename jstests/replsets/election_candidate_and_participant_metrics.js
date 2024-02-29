@@ -5,6 +5,7 @@
  * after each handoff.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = jsTestName();
@@ -43,6 +44,13 @@ assert(
     () =>
         "Response should have an 'electionCandidateMetrics.lastCommittedOpTimeAtElection' field: " +
         tojson(originalPrimaryElectionCandidateMetrics));
+if (FeatureFlagUtil.isPresentAndEnabled(originalPrimary, "featureFlagReduceMajorityWriteLatency")) {
+    assert(
+        originalPrimaryElectionCandidateMetrics.lastSeenWrittenOpTimeAtElection,
+        () =>
+            "Response should have an 'electionCandidateMetrics.lastSeenWrittenOpTimeAtElection' field: " +
+            tojson(originalPrimaryElectionCandidateMetrics));
+}
 assert(originalPrimaryElectionCandidateMetrics.lastSeenOpTimeAtElection,
        () => "Response should have an 'electionCandidateMetrics.lastSeenOpTimeAtElection' field: " +
            tojson(originalPrimaryElectionCandidateMetrics));
@@ -145,6 +153,17 @@ assert.eq(originalPrimaryElectionParticipantMetrics.electionCandidateMemberId, 1
 // Since the node voted for the new primary, we directly assert that its voteReason is equal to
 // empty string.
 assert.eq(originalPrimaryElectionParticipantMetrics.voteReason, "");
+if (FeatureFlagUtil.isPresentAndEnabled(originalPrimary, "featureFlagReduceMajorityWriteLatency")) {
+    assert(
+        originalPrimaryElectionParticipantMetrics.lastWrittenOpTimeAtElection,
+        () =>
+            "Response should have an 'electionParticipantMetrics.lastWrittenOpTimeAtElection' field: " +
+            tojson(originalPrimaryElectionParticipantMetrics));
+    assert(
+        originalPrimaryElectionParticipantMetrics.maxWrittenOpTimeInSet,
+        () => "Response should have an 'electionParticipantMetrics.maxWrittenOpTimeInSet' field: " +
+            tojson(originalPrimaryElectionParticipantMetrics));
+}
 assert(
     originalPrimaryElectionParticipantMetrics.lastAppliedOpTimeAtElection,
     () =>

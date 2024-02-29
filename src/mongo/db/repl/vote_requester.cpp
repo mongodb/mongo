@@ -70,12 +70,14 @@ VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                     long long candidateIndex,
                                     long long term,
                                     bool dryRun,
+                                    OpTime lastWrittenOpTime,
                                     OpTime lastAppliedOpTime,
                                     int primaryIndex)
     : _rsConfig(rsConfig),
       _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
+      _lastWrittenOpTime(lastWrittenOpTime),
       _lastAppliedOpTime(lastAppliedOpTime) {
     // populate targets with all voting members that aren't this node
     long long index = 0;
@@ -105,6 +107,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
         requestVotesCmdBuilder.append("configTerm", _rsConfig.getConfigTerm());
     }
 
+    _lastWrittenOpTime.append(&requestVotesCmdBuilder, "lastWrittenOpTime");
     _lastAppliedOpTime.append(&requestVotesCmdBuilder, "lastAppliedOpTime");
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
@@ -224,10 +227,11 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
     long long candidateIndex,
     long long term,
     bool dryRun,
+    OpTime lastWrittenOpTime,
     OpTime lastAppliedOpTime,
     int primaryIndex) {
     _algorithm = std::make_shared<Algorithm>(
-        rsConfig, candidateIndex, term, dryRun, lastAppliedOpTime, primaryIndex);
+        rsConfig, candidateIndex, term, dryRun, lastWrittenOpTime, lastAppliedOpTime, primaryIndex);
     _runner = std::make_unique<ScatterGatherRunner>(_algorithm, executor, "vote request");
     return _runner->start();
 }

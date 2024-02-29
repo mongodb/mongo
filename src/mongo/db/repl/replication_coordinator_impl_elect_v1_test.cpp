@@ -688,6 +688,7 @@ TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
                                                  1 /* term */,
                                                  dryRun,
                                                  lastOplogEntry,
+                                                 lastOplogEntry,
                                                  -1 /* primaryIndex */
         );
 

@@ -278,7 +278,8 @@ void ReplicationMetrics::setElectionCandidateMetrics(
     const Date_t lastElectionDate,
     const long long electionTerm,
     const OpTime lastCommittedOpTime,
-    const OpTime lastSeenOpTime,
+    const OpTime latestWrittenOpTime,
+    const OpTime latestAppliedOpTime,
     const int numVotesNeeded,
     const double priorityAtElection,
     const Milliseconds electionTimeout,
@@ -291,7 +292,8 @@ void ReplicationMetrics::setElectionCandidateMetrics(
     _electionCandidateMetrics.setLastElectionDate(lastElectionDate);
     _electionCandidateMetrics.setElectionTerm(electionTerm);
     _electionCandidateMetrics.setLastCommittedOpTimeAtElection(lastCommittedOpTime);
-    _electionCandidateMetrics.setLastSeenOpTimeAtElection(lastSeenOpTime);
+    _electionCandidateMetrics.setLastSeenWrittenOpTimeAtElection(latestWrittenOpTime);
+    _electionCandidateMetrics.setLastSeenOpTimeAtElection(latestAppliedOpTime);
     _electionCandidateMetrics.setNumVotesNeeded(numVotesNeeded);
     _electionCandidateMetrics.setPriorityAtElection(priorityAtElection);
     long long electionTimeoutMillis = durationCount<Milliseconds>(electionTimeout);
@@ -354,6 +356,8 @@ void ReplicationMetrics::setElectionParticipantMetrics(const bool votedForCandid
                                                        const Date_t lastVoteDate,
                                                        const int electionCandidateMemberId,
                                                        const std::string voteReason,
+                                                       const OpTime lastWrittenOpTime,
+                                                       const OpTime maxWrittenOpTimeInSet,
                                                        const OpTime lastAppliedOpTime,
                                                        const OpTime maxAppliedOpTimeInSet,
                                                        const double priorityAtElection) {
@@ -367,6 +371,8 @@ void ReplicationMetrics::setElectionParticipantMetrics(const bool votedForCandid
     _electionParticipantMetrics.setVoteReason(voteReason);
     _electionParticipantMetrics.setLastAppliedOpTimeAtElection(lastAppliedOpTime);
     _electionParticipantMetrics.setMaxAppliedOpTimeInSet(maxAppliedOpTimeInSet);
+    _electionParticipantMetrics.setLastWrittenOpTimeAtElection(lastWrittenOpTime);
+    _electionParticipantMetrics.setMaxWrittenOpTimeInSet(maxWrittenOpTimeInSet);
     _electionParticipantMetrics.setPriorityAtElection(priorityAtElection);
 }
 
