@@ -9,7 +9,8 @@ include:
   - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
   - filename: etc/evergreen_yml_components/perf_tasks.yml
-  - filename: etc/evergreen_yml_components/variants/perf.yml
+  - filename: etc/evergreen_yml_components/variants/perf/perf.yml
+  - filename: etc/evergreen_yml_components/variants/perf/perf_branching.yml
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
@@ -348,9 +349,9 @@ functions:
         # generation in a patch.
         script: |
           if [ "${is_patch|false}" = "true" ]; then
-            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf.yml --no-activate
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf_branching.yml --no-activate
           else
-            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf.yml
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf.yml --project-file ./src/mongo/etc/evergreen_yml_components/variants/perf/perf_branching.yml
           fi
     - command: generate.tasks
       params:
@@ -2077,33 +2078,6 @@ buildvariants:
   #     - name: tpch_10_normalized
   #     - name: tpch_10_denormalized
 
-  # # Variant which runs a single shard cluster with a config
-  # # shard and mongos process processes co-located on the
-  # # same machine as the mongod.
-  # # This variant is a performance comparison point between
-  # # a traditional single node replica set as defined in the
-  # # 'Linux 1-Node ReplSet 2022-11' variant and fully embedded
-  # # single shard clusters.
-  # - name: linux-1-node-replSet-default-sharding.2022-11
-  #   display_name: Linux 1-Node ReplSet Default Sharding 2022-11
-  #   cron: *linux-1-node-repl-cron
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup_release: 2022-11
-  #     mongodb_setup: shard-one-node-default-sharding
-  #     infrastructure_provisioning_release: 2022-11
-  #     infrastructure_provisioning: single
-  #     workload_setup: 2022-11
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #     compile_variant: "-arm64"
-  #   run_on:
-  #     - "rhel70-perf-single"
-  #   depends_on: *_compile_amazon_linux2_arm64
-  #   tasks: *1nodetasks
-
   # - name: linux-1-node-replSet-test-commands.2022-11
   #   display_name: Linux 1-Node ReplSet With Test Commands 2022-11
   #   cron: *linux-1-node-repl-cron
@@ -2723,84 +2697,6 @@ buildvariants:
   #       cron: *high-value-workload-cron
   #     - name: time_series_sort_high_value
   #       cron: *high-value-workload-cron
-
-  # # Variant which runs a single shard cluster with a config
-  # # shard and mongos processes processes co-located on the
-  # # same machine as the mongods.
-  # # This variant is a performance comparison point between
-  # # a traditional replica set as defined in the
-  # # 'Linux 3-Node ReplSet 2022-11' variant and fully embedded
-  # # single shard clusters.
-  # - name: linux-3-node-replSet-default-sharding.2022-11
-  #   display_name: Linux 3-Node ReplSet Default Sharding 2022-11
-  #   cron: "0 0 * * *" # Everyday at 00:00
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup_release: 2022-11
-  #     mongodb_setup: shard-default-sharding
-  #     infrastructure_provisioning_release: 2022-11
-  #     infrastructure_provisioning: replica
-  #     workload_setup: 2022-11
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #     compile_variant: "-arm64"
-  #   run_on:
-  #     - "rhel70-perf-replset"
-  #   depends_on: *_compile_amazon_linux2_arm64
-  #   tasks:
-  #     - *schedule_patch_auto_tasks_task
-  #     - *schedule_variant_auto_tasks_task
-  #     - name: industry_benchmarks
-  #     - name: industry_benchmarks_w1
-  #     - name: ycsb_60GB
-  #     - name: ycsb_60GB.long
-  #     - name: industry_benchmarks_secondary_reads
-  #     - name: crud_workloads_majority
-  #     - name: crud_workloads_w1
-  #     - name: misc_workloads
-  #     - name: map_reduce_workloads
-  #     - name: smoke_test
-  #     - name: secondary_performance # Uses a special 2 node mongodb setup
-  #     - name: non_sharded_workloads
-  #     - name: bestbuy_agg
-  #     - name: bestbuy_agg_merge_different_db
-  #     - name: bestbuy_agg_merge_same_db
-  #     - name: bestbuy_agg_merge_wordcount
-  #     - name: bestbuy_query
-  #     - name: change_streams_preimage_throughput
-  #     - name: change_streams_latency
-  #     - name: change_streams_preimage_latency
-  #     - name: change_streams_listen_throughput
-  #     - name: snapshot_reads
-  #     - name: secondary_reads
-  #     - name: tpcc
-  #     - name: tpcc_majority
-  #     - name: tpch_1_normalized
-  #     - name: tpch_1_denormalized
-  #     # TODO: Enable in SERVER-66572.
-  #     # - name: tpch_10_normalized
-  #     # - name: tpch_10_denormalized
-  #     - name: linkbench
-  #     - name: linkbench2
-  #     - name: tsbs_load
-  #     - name: tsbs_query
-  #     - name: tsbs_query_finance
-  #     - name: tsbs_query_manual_bucketing
-  #     - name: tsbs_query_fixed_bucketing
-  #     - name: tsbs-query-genny
-  #     - name: tsbs-query-optimizations
-  #     - name: big_update_10k
-  #     - name: mixed_workloads_genny_rate_limited_high_value
-  #     - name: load_test_high_value
-  #     - name: majority_reads10_k_threads_high_value
-  #     - name: large_indexed_ins_high_value
-  #     - name: expressive_queries_high_value
-  #     - name: time_series_sort_high_value
-  #     - name: array_traversal_high_value
-  #     - name: filter_with_complex_logical_expression_high_value
-  #     - name: mongos_workloads
 
   # - name: linux-3-node-replSet-intel.2022-11
   #   display_name: Linux 3-Node ReplSet Intel 2022-11

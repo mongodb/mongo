@@ -31,7 +31,8 @@ variables:
     --use-diagnostic-latches=on
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/perf.yml
+# - etc/evergreen_yml_components/variants/perf/perf.yml
+# - etc/evergreen_yml_components/variants/perf/perf_branching.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
