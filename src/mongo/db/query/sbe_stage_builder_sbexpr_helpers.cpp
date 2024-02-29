@@ -487,7 +487,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     const SbSlotVector& blockAccArgSbSlots,
     const SbSlotVector& blockAccInternalArgSbSlots,
     SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot) {
+    SbSlot accInternalSlot,
+    bool allowDiskUse) {
     using BlockAggExprPair = sbe::BlockHashAggStage::BlockRowAccumulators;
 
     tassert(8448607, "Expected exactly one group by slot to be provided", gbs.size() == 1);
@@ -524,6 +525,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
         blockAccInternalArgSlots.push_back(sbSlot.getId());
     }
 
+    const bool forceIncreasedSpilling = allowDiskUse &&
+        (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
     stage = sbe::makeS<sbe::BlockHashAggStage>(std::move(stage),
                                                groupBySlots,
                                                selectivityBitmapSlotId,
@@ -533,7 +536,9 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
                                                std::move(blockAccInternalArgSlots),
                                                std::move(aggExprsMap),
                                                _nodeId,
-                                               true /* participateInTrialRunTracking */);
+                                               allowDiskUse,
+                                               true /* participateInTrialRunTracking */,
+                                               forceIncreasedSpilling);
 
     // For BlockHashAggStage, the group by "out" slot is the same as the incoming group by slot,
     // except that the "out" slot will always be a block even if the incoming group by slot was

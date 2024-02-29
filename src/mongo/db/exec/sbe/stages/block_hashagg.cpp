@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/values/block_interface.h"
-#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/stages/block_hashagg.h"
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/stages/block_hashagg.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/hashagg_base.h"
+#include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo {
 namespace sbe {
@@ -158,8 +159,15 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotVector accumulatorDataSlotIds,
                                      BlockAndRowAggs aggs,
                                      PlanNodeId planNodeId,
-                                     bool participateInTrialRunTracking)
-    : PlanStage("block_hashagg"_sd, planNodeId, participateInTrialRunTracking),
+                                     bool allowDiskUse,
+                                     bool participateInTrialRunTracking,
+                                     bool forceIncreasedSpilling)
+    : HashAggBaseStage("block_group"_sd,
+                       planNodeId,
+                       nullptr,
+                       participateInTrialRunTracking,
+                       allowDiskUse,
+                       forceIncreasedSpilling),
       _groupSlots(groupSlotIds),
       _blockBitsetInSlotId(blockBitsetInSlotId),
       _blockDataInSlotIds(std::move(blockDataInSlotIds)),
@@ -192,16 +200,10 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
                                                _accumulatorDataSlotIds,
                                                std::move(blockRowAggs),
                                                _commonStats.nodeId,
-                                               _participateInTrialRunTracking);
+                                               _allowDiskUse,
+                                               _participateInTrialRunTracking,
+                                               _forceIncreasedSpilling);
 }
-
-void BlockHashAggStage::doSaveState(bool relinquishCursor) {}
-
-void BlockHashAggStage::doRestoreState(bool relinquishCursor) {}
-
-void BlockHashAggStage::doDetachFromOperationContext() {}
-
-void BlockHashAggStage::doAttachToOperationContext(OperationContext* opCtx) {}
 
 void BlockHashAggStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
@@ -256,11 +258,15 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
         throwIfDupSlot(slot);
 
         _rowAggHtAccessors.emplace_back(std::make_unique<HashAggAccessor>(_htIt, i));
+        _rowAggRSAccessors.emplace_back(std::make_unique<value::OwnedValueAccessor>());
+        _rowAggAccessors.emplace_back(
+            std::make_unique<value::SwitchAccessor>(std::vector<value::SlotAccessor*>{
+                _rowAggHtAccessors.back().get(), _rowAggRSAccessors.back().get()}));
         _outAccessorsMap[slot] = &_outAggBlockAccessors[i];
 
         ctx.root = this;
         ctx.aggExpression = true;
-        ctx.accumulator = _rowAggHtAccessors.back().get();
+        ctx.accumulator = _rowAggAccessors.back().get();
         _aggCodes.emplace_back(aggs.rowAgg->compile(ctx));
         ctx.aggExpression = false;
 
@@ -296,13 +302,13 @@ void BlockHashAggStage::executeAccumulatorCode(value::MaterializedRow key) {
         return;
     }
 
-    _htIt = _ht.find(key);
-    if (_htIt == _ht.end()) {
+    _htIt = _ht->find(key);
+    if (_htIt == _ht->end()) {
         // New key we haven't seen before.
         key.makeOwned();
-        auto [it, _] = _ht.emplace(std::move(key), value::MaterializedRow{0});
+        auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
         // Initialize accumulators.
-        it->second.resize(_rowAggHtAccessors.size());
+        it->second.resize(_rowAggAccessors.size());
         _htIt = it;
     }
 
@@ -414,7 +420,7 @@ void BlockHashAggStage::runAccumulatorsElementWise(size_t blockSize) {
             value::bitcastFrom<value::ValueBlock*>(&singletonDataBlocks[i]));
     }
 
-    for (size_t blockIndex = 0; blockIndex < extractedBitmap->count(); ++blockIndex) {
+    for (size_t blockIndex = 0; blockIndex < blockSize; ++blockIndex) {
         value::MaterializedRow key{extractedGbInputs.size()};
         for (size_t i = 0; i < extractedGbInputs.size(); ++i) {
             auto [idTag, idVal] = extractedGbInputs[i][blockIndex];
@@ -501,9 +507,20 @@ void BlockHashAggStage::open(bool reOpen) {
     _children[0]->open(reOpen);
     _commonStats.opens++;
 
+    _ht.emplace();
+
+    for (auto& aggAccessor : _rowAggAccessors) {
+        aggAccessor->setIndex(0);
+    }
+    if (_recordStore) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
+    }
+
     if (reOpen) {
         _done = false;
     }
+
+    MemoryCheckData memoryCheckData;
 
     while (PlanState::ADVANCED == _children[0]->getNext()) {
         std::vector<value::TokenizedBlock> tokenInfos;
@@ -546,6 +563,18 @@ void BlockHashAggStage::open(bool reOpen) {
             runAccumulatorsElementWise(blockSize);
         }
 
+        if (!_ht->empty()) {
+            if (_forceIncreasedSpilling) {
+                // Spill for every row that appears in the hash table.
+                spill(memoryCheckData);
+            } else {
+                // Estimates how much memory is being used. If we estimate that the hash table
+                // exceeds the allotted memory budget, its contents are spilled to the
+                // '_recordStore' and '_ht' is cleared.
+                checkMemoryUsageAndSpillIfNecessary(memoryCheckData, false);
+            }
+        }
+
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
             // During trial runs, we want to limit the amount of work done by opening a blocking
             // stage, like this one. The blocking stage tracks the number of documents it has
@@ -557,8 +586,116 @@ void BlockHashAggStage::open(bool reOpen) {
         }
     }
 
+    // If we spilled at any point while consuming the input, then do one final spill to write
+    // any leftover contents of '_ht' to the record store. That way, when recovering the input
+    // from the record store and merging partial aggregates we don't have to worry about the
+    // possibility of some of the data being in the hash table and some being in the record
+    // store.
+    if (_recordStore) {
+        if (!_ht->empty()) {
+            spill(memoryCheckData);
+        }
+
+        _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(_opCtx);
+
+        // Establish a cursor, positioned at the beginning of the record store.
+        _rsCursor = _recordStore->getCursor(_opCtx);
+    }
+
     _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
-    _htIt = _ht.end();
+    _htIt = _ht->end();
+
+    for (auto&& aggAccessor : _rowAggAccessors) {
+        if (_recordStore) {
+            aggAccessor->setIndex(1);
+        } else {
+            aggAccessor->setIndex(0);
+        }
+    }
+}
+
+boost::optional<value::MaterializedRow> BlockHashAggStage::getNextSpilledHelper() {
+    auto recoverSpilledRecord = [&](const Record& record) {
+        return deserializeSpilledRecord(record, _groupSlots.size(), _stashedBuffer);
+    };
+
+    for (size_t idx = 0; idx < _aggCodes.size(); ++idx) {
+        _rowAggRSAccessors[idx]->reset(false, value::TypeTags::Nothing, 0);
+    }
+
+    // Take a spilled row and merge it with the current accumulated value.
+    auto processRow = [&](const value::MaterializedRow& spilledAggRow) {
+        invariant(spilledAggRow.size() == _outAggBlocks.size());
+        for (size_t idx = 0; idx < _aggCodes.size(); ++idx) {
+            auto [spilledTag, spilledVal] = spilledAggRow.getViewOfValue(idx);
+            _rowAccAccessor.reset(false, spilledTag, spilledVal);
+            auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[idx].get());
+            _rowAggRSAccessors[idx]->reset(rowOwned, rowTag, rowVal);
+        }
+    };
+
+    value::MaterializedRow firstKey{0};
+    // If we have a stashed row from last time, use that first. Otherwise ask the record store for
+    // the next value and process all the data for that key.
+    if (_stashedNextRow) {
+        firstKey = std::move(_stashedNextRow->first);
+        processRow(_stashedNextRow->second);
+        _stashedNextRow = boost::none;
+    } else {
+        auto nextRecord = _rsCursor->next();
+        if (!nextRecord) {
+            return boost::none;
+        }
+        // We are just starting the process of merging the spilled file segments.
+        auto firstRecoveredRow = recoverSpilledRecord(*nextRecord);
+        firstKey = std::move(firstRecoveredRow.first);
+        processRow(firstRecoveredRow.second);
+    }
+
+    // Find additional partial aggregates for the same key and merge them in order to compute the
+    // final output.
+    _currentBuffer = std::move(_stashedBuffer);
+    for (auto nextRecord = _rsCursor->next(); nextRecord; nextRecord = _rsCursor->next()) {
+        auto recoveredRow = recoverSpilledRecord(*nextRecord);
+        // If we found a different key, then we're done accumulating the current key. Since there's
+        // no peek API, we have to stash `recoveredRow` for next time.
+        if (!value::MaterializedRowEq()(recoveredRow.first, firstKey)) {
+            _stashedNextRow = std::move(recoveredRow);
+            return {std::move(firstKey)};
+        }
+
+        // Merge in the new partial aggregate values.
+        processRow(recoveredRow.second);
+    }
+
+    return {std::move(firstKey)};
+}
+
+PlanState BlockHashAggStage::getNextSpilled() {
+    for (size_t resultIdx = 0; resultIdx < kBlockOutSize; resultIdx++) {
+        auto nextKey = getNextSpilledHelper();
+        // If we have a key, add the value to our result. If not, break because we won't get anymore
+        // values from the record store.
+        if (nextKey) {
+            invariant(nextKey->size() == _outIdBlocks.size());
+            for (size_t i = 0; i < nextKey->size(); i++) {
+                auto [keyComponentTag, keyComponentVal] = nextKey->getViewOfValue(i);
+                _outIdBlocks[i].push_back(value::copyValue(keyComponentTag, keyComponentVal));
+            }
+            for (size_t i = 0; i < _outAggBlocks.size(); ++i) {
+                auto [accTag, accVal] = _rowAggRSAccessors[i]->getViewOfValue();
+                _outAggBlocks[i].push_back(value::copyValue(accTag, accVal));
+            }
+        } else {
+            break;
+        }
+    }
+
+    // If we didn't put any new values in the blocks, we must have no more spilled values.
+    if (_outIdBlocks[0].size() == 0) {
+        return trackPlanState(PlanState::IS_EOF);
+    }
+    return trackPlanState(PlanState::ADVANCED);
 }
 
 PlanState BlockHashAggStage::getNext() {
@@ -577,10 +714,16 @@ PlanState BlockHashAggStage::getNext() {
         b.reserve(kBlockOutSize);
     }
 
+    // If we've spilled, then we need to produce the output by merging the spilled segments from the
+    // spill file.
+    if (_recordStore) {
+        return getNextSpilled();
+    }
+
     size_t numRows = 0;
     while (numRows < kBlockOutSize) {
-        if (_htIt == _ht.end()) {
-            _htIt = _ht.begin();
+        if (_htIt == _ht->end()) {
+            _htIt = _ht->begin();
         } else {
             ++_htIt;
         }
@@ -589,7 +732,7 @@ PlanState BlockHashAggStage::getNext() {
             return trackPlanState(PlanState::IS_EOF);
         }
 
-        if (_htIt == _ht.end()) {
+        if (_htIt == _ht->end()) {
             _done = true;
             if (numRows == 0) {
                 return trackPlanState(PlanState::IS_EOF);
@@ -599,7 +742,7 @@ PlanState BlockHashAggStage::getNext() {
         }
 
         invariant(_outAggBlocks.size() == _outAggBlockAccessors.size());
-        invariant(_outAggBlocks.size() == _rowAggHtAccessors.size());
+        invariant(_outAggBlocks.size() == _rowAggAccessors.size());
 
         // Copy the key from the current element in the HT into the out blocks.
         idx = 0;
@@ -652,10 +795,24 @@ const SpecificStats* BlockHashAggStage::getSpecificStats() const {
     return &_specificStats;
 }
 
+HashAggStats* BlockHashAggStage::getHashAggStats() {
+    return &_specificStats;
+}
+
 void BlockHashAggStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
+    _children[0]->close();
+
+    _ht = boost::none;
+    if (_recordStore && _opCtx) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
+    }
+    _rsCursor.reset();
+    _recordStore.reset();
+    _stashedNextRow = boost::none;
+
     _children[0]->close();
 }
 
@@ -706,23 +863,6 @@ size_t BlockHashAggStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_blockRowAggs);
     size += size_estimator::estimate(_outAccessorsMap);
     return size;
-}
-
-void BlockHashAggStage::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-PlanStage::TrialRunTrackerAttachResultMask BlockHashAggStage::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    // The BlockHashAggStage only tracks the "numResults" metric when it is the most deeply nested
-    // blocking stage.
-    if (!(childrenAttachResult & TrialRunTrackerAttachResultFlags::AttachedToBlockingStage)) {
-        _tracker = tracker;
-    }
-
-    // Return true to indicate that the tracker is attached to a blocking stage: either this stage
-    // or one of its descendent stages.
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToBlockingStage;
 }
 
 }  // namespace sbe
