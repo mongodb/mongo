@@ -2,6 +2,9 @@
  * Utility test functions for FTDC
  */
 
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 export function getParameter(adminDb, field) {
     var q = {getParameter: 1};
     q[field] = 1;
@@ -69,7 +72,15 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Verify the defaults are as we documented them
     assert.eq(getparam("diagnosticDataCollectionEnabled"), isEnabled);
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 1000);
-    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 200);
+
+    const topology = DiscoverTopology.findConnectedNodes(adminDb.getMongo());
+    if (topology.type === Topology.kShardedCluster &&
+        FeatureFlagUtil.isPresentAndEnabled(adminDb, "EmbeddedRouter") && !isMongos) {
+        assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 400);
+    } else {
+        assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 200);
+    }
+
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerChunk"), 300);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
