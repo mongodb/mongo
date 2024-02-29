@@ -5,14 +5,14 @@ package(default_visibility = ["//visibility:public"])
 
 [
     platform(
-        name = "linux_arm64_" + compiler,
+        name = distro_or_os + "_" + arch + "_" + compiler,
         constraint_values = [
             "@platforms//os:linux",
-            "@platforms//cpu:arm64",
+            "@platforms//cpu:arm64" if arch == "arm64" else "@platforms//cpu:x86_64",
             "@bazel_tools//tools/cpp:" + compiler,
         ],
         exec_properties = {
-            "container-image": REMOTE_EXECUTION_CONTAINERS["linux_arm64"]["container-image"],
+            "container-image": REMOTE_EXECUTION_CONTAINERS[distro_or_os + "_" + arch]["container-image"],
             "dockerNetwork": "standard",
         },
     )
@@ -20,24 +20,15 @@ package(default_visibility = ["//visibility:public"])
         "clang",
         "gcc",
     ]
-]
-
-[
-    platform(
-        name = "linux_amd64_" + compiler,
-        constraint_values = [
-            "@platforms//os:linux",
-            "@platforms//cpu:x86_64",
-            "@bazel_tools//tools/cpp:" + compiler,
-        ],
-        exec_properties = {
-            "container-image": REMOTE_EXECUTION_CONTAINERS["linux_amd64"]["container-image"],
-            "dockerNetwork": "standard",
-        },
-    )
-    for compiler in [
-        "clang",
-        "gcc",
+    for arch in [
+        "arm64",
+        "amd64",
+    ]
+    for distro_or_os in [
+        "linux",
+        "ubuntu22",
+        "amazon_linux_2",
+        "amazon_linux_2023",
     ]
 ]
 
