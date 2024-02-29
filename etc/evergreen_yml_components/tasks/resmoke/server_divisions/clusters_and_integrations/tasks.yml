@@ -305,6 +305,12 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: embedded_router_sharded_collections_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: embedded_router_sharded_collections_jscore_txns_gen
   tags: ["assigned_to_jira_team_server_servicearch", "default"]
   commands:
