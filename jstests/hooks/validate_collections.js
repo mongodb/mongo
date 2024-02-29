@@ -85,8 +85,15 @@ function validateCollectionsImpl(db, obj) {
     // the validate command and instead are subject to failing with a ObjectIsBusy error. Since
     // this is a transient state, we shoud retry.
     let collInfo;
-    assert.soonNoExcept(() => {
-        collInfo = db.getCollectionInfos(filter);
+    assert.soon(() => {
+        try {
+            collInfo = db.getCollectionInfos(filter);
+        } catch (ex) {
+            if (ex.code === ErrorCodes.ObjectIsBusy) {
+                return false;
+            }
+            throw ex;
+        }
         return true;
     });
 
