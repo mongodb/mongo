@@ -52,6 +52,7 @@ a notice will be included in
 | [schemastore.org]          | Apache-2.0                                                     | 6847cfc3a1                                         |                      |                                 |
 | [scons]                    | MIT                                                            | 3.1.2                                              |                      |                                 |
 | [Snappy]                   | BSD-3-Clause                                                   | 1.1.10                                             |          ✗           |                ✗                |
+| [TCMalloc]                 | Apache-2.0                                                     | 093ba93 + changes                                  |                      |                ✗                |
 | [timelib]                  | MIT                                                            | 2022.04                                            |                      |                ✗                |
 | [TomCrypt]                 | Public Domain                                                  | 1.18.2                                             |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015                                               | 8.0.0                                              |          ✗           |                ✗                |
@@ -90,6 +91,7 @@ a notice will be included in
 [schemastore.org]: https://www.schemastore.org/json/
 [scons]: https://github.com/SCons/scons
 [Snappy]: https://github.com/google/snappy/releases
+[TCMalloc]: https://github.com/google/tcmalloc
 [timelib]: https://github.com/derickr/timelib
 [TomCrypt]: https://github.com/libtom/libtomcrypt/releases
 [Unicode]: http://www.unicode.org/versions/enumeratedversions.html

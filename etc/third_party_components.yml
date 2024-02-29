@@ -390,6 +390,13 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
+  tcmalloc:
+    homepage_url: https://github.com/google/tcmalloc
+    open_hub_url: https://openhub.net/p/tcmalloc
+    release_monitoring_id: -1 # (371589) but there are no version numbers
+    local_directory_path: src/third_party/tcmalloc
+    team_owner: "Service Architecture"
+
   zlib:
     homepage_url: https://www.zlib.net/
     open_hub_url: https://www.openhub.net/p/zlib
