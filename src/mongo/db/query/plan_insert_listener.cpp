@@ -118,13 +118,12 @@ void waitForInserts(OperationContext* opCtx,
     // of the notifier at the time of the previous EOF, we require two EOFs in a row with no
     // notifier version change in order to wait.  This is sufficient to ensure we never wait
     // when data is available.
-    auto curOp = CurOp::get(opCtx);
-    curOp->pauseTimer();
-    ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
-
     notifier->prepareForWait(opCtx);
     auto yieldResult = yieldPolicy->yieldOrInterrupt(opCtx, [opCtx, &notifier] {
         const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
+        auto curOp = CurOp::get(opCtx);
+        curOp->pauseTimer();
+        ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
         notifier->waitUntil(opCtx, deadline);
         if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
             LOGV2(4452903,
