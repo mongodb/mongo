@@ -546,6 +546,13 @@ void ObjectWrapper::rename(Key from, const char* to) {
     setValue(from, undefValue);
 }
 
+void ObjectWrapper::renameAndDeleteProperty(Key from, const char* to) {
+    JS::RootedValue value(_context);
+    getValue(from, &value);
+    setValue(to, value);
+    from.del(_context, _object);
+}
+
 bool ObjectWrapper::hasField(Key key) {
     return key.has(_context, _object);
 }

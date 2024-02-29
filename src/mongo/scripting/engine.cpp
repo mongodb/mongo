@@ -96,10 +96,7 @@ static std::unique_ptr<ScriptEngine> globalScriptEngine;
 
 }  // namespace
 
-ScriptEngine::ScriptEngine(bool disableLoadStored)
-    : _disableLoadStored(disableLoadStored), _scopeInitCallback() {}
-
-ScriptEngine::~ScriptEngine() {}
+ScriptEngine::ScriptEngine() : _scopeInitCallback() {}
 
 Scope::Scope()
     : _localDBName(DatabaseName::kEmpty),
@@ -257,8 +254,6 @@ void Scope::validateObjectIdString(const string& str) {
 }
 
 void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
-    if (!getGlobalScriptEngine()->_disableLoadStored)
-        return;
     if (_localDBName.isEmpty()) {
         if (ignoreNotConnected)
             return;

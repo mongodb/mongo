@@ -45,7 +45,7 @@ namespace mongo {
 namespace mozjs {
 
 TEST(ModuleLoaderTest, ImportBaseSpecifierFails) {
-    mongo::ScriptEngine::setup();
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
 
     auto code = "import * as test from \"base_specifier\""_sd;
@@ -61,7 +61,7 @@ TEST(ModuleLoaderTest, ImportBaseSpecifierFails) {
 
 #if !defined(_WIN32)
 TEST(ModuleLoaderTest, ImportDirectoryFails) {
-    mongo::ScriptEngine::setup();
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
 
     auto code = fmt::format("import * as test from \"{}\"",
@@ -78,7 +78,7 @@ TEST(ModuleLoaderTest, ImportDirectoryFails) {
 #endif
 
 TEST(ModuleLoaderTest, ImportInInteractiveFails) {
-    mongo::ScriptEngine::setup();
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
 
     auto code = "import * as test from \"some_module\""_sd;
@@ -96,7 +96,7 @@ TEST(ModuleLoaderTest, ImportInInteractiveFails) {
 }
 
 TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
-    mongo::ScriptEngine::setup();
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
     std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
     auto code = "async function test() { return 42; } await test();"_sd;
     ASSERT_DOES_NOT_THROW(scope->exec(code,

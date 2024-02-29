@@ -79,7 +79,7 @@ private:
 
 void MapReduceFixture::setUp() {
     ServiceContextMongoDTest::setUp();
-    ScriptEngine::setup(false);
+    ScriptEngine::setup(ExecutionEnvironment::Server);
 }
 
 void MapReduceFixture::tearDown() {

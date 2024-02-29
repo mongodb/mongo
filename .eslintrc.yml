@@ -46,6 +46,7 @@ globals:
   SessionOptions: true
   CollInfos: true
   CountDownLatch: true
+  BSONAwareMap: true
 
   # FCV-related
   latestFCV: true

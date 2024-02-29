@@ -447,7 +447,7 @@ const NamespaceString MapReduceCommandTest::outputNss =
 
 void MapReduceCommandTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    ScriptEngine::setup();
+    ScriptEngine::setup(ExecutionEnvironment::Server);
     auto service = getServiceContext();
     DBDirectClientFactory::get(service).registerImplementation(
         [](OperationContext* opCtx) { return std::make_unique<DBDirectClient>(opCtx); });

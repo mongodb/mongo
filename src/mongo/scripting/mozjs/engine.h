@@ -37,7 +37,6 @@
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 namespace mozjs {
@@ -50,21 +49,14 @@ class MozJSImplScope;
  */
 class MozJSScriptEngine final : public mongo::ScriptEngine {
 public:
-    MozJSScriptEngine(bool disableLoadStored);
+    MozJSScriptEngine(ExecutionEnvironment env);
     ~MozJSScriptEngine() override;
-
-    mongo::Scope* createScope() override;
-    mongo::Scope* createScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) override;
 
     void runTest() override {}
 
     bool utf8Ok() const override {
         return true;
     }
-
-    void interrupt(unsigned opId) override;
-
-    void interruptAll() override;
 
     void enableJIT(bool value) override;
     bool isJITEnabled() const override;
@@ -81,14 +73,20 @@ public:
     void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
     void unregisterOperation(unsigned int opId);
 
-    using ScopeCallback = void (*)(Scope&);
-    ScopeCallback getScopeInitCallback() {
-        return _scopeInitCallback;
-    };
+    void interrupt(unsigned opId) override;
+    void interruptAll() override;
 
     DeadlineMonitor<MozJSImplScope>& getDeadlineMonitor() {
         return _deadlineMonitor;
     }
+
+    ExecutionEnvironment executionEnvironment() const {
+        return _executionEnvironment;
+    }
+
+protected:
+    mongo::Scope* createScope() override;
+    mongo::Scope* createScopeForCurrentThread(boost::optional<int> jsHeapLimitMB) override;
 
 private:
     /**
@@ -101,6 +99,7 @@ private:
                                    // _globalInterruptLock).
 
     DeadlineMonitor<MozJSImplScope> _deadlineMonitor;
+    ExecutionEnvironment _executionEnvironment;
     std::string _loadPath;
 };
 

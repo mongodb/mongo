@@ -78,7 +78,7 @@ export const $config = (function() {
     }
 
     function checkNumUpdatedByEachTransaction(documents) {
-        const updateCounts = new Map();
+        const updateCounts = new BSONAwareMap();
 
         for (let doc of documents) {
             for (let op of doc.order) {

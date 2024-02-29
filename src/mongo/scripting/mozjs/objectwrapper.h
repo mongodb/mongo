@@ -164,6 +164,9 @@ public:
 
     void rename(Key key, const char* to);
 
+    // Rename key and delete the original property
+    void renameAndDeleteProperty(Key key, const char* to);
+
     // has field walks the prototype heirarchy
     bool hasField(Key key);
 

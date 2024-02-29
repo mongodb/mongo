@@ -57,8 +57,7 @@ public:
     /**
      * Create or get a pointer to a JsExecution instance, capable of invoking Javascript functions
      * and reading the return value. If `loadStoredProcedures` is true, this will load all stored
-     * procedures from database unless 'disableLoadStored' is set on the global ScriptEngine. The
-     * JsExecution* returned is owned by 'opCtx'.
+     * procedures from database. The JsExecution* returned is owned by 'opCtx'.
      */
     static JsExecution* get(OperationContext* opCtx,
                             const BSONObj& scope,

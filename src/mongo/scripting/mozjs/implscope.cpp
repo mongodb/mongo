@@ -526,6 +526,13 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
         execSetup(JSFiles::assert);
         execSetup(JSFiles::types);
 
+        if (_engine->executionEnvironment() == ExecutionEnvironment::Server) {
+            // For legacy support in server-side javascript execution, delete the ECMAScript defined
+            // `Map` type and replace it with our `BSONAwareMap` implementation.
+            ObjectWrapper(_context, _global).deleteProperty("Map");
+            ObjectWrapper(_context, _global).renameAndDeleteProperty("BSONAwareMap", "Map");
+        }
+
         // install global utility functions
         installGlobalUtils(*this);
         _mongoHelpersProto.install(_global);
@@ -1110,10 +1117,6 @@ void MozJSImplScope::installBSONTypes() {
     _timestampProto.install(_global);
     _uriProto.install(_global);
     _statusProto.install(_global);
-
-    // This builtin map is a javascript 6 thing.  We want our version.  so
-    // take theirs out
-    ObjectWrapper(_context, _global).deleteProperty("Map");
 }
 
 void MozJSImplScope::installDBAccess() {

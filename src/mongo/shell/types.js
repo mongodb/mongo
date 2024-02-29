@@ -546,15 +546,12 @@ if (typeof (BinData) != "undefined") {
     print("warning: no BinData class");
 }
 
-// Map
-if (typeof (Map) == "undefined") {
-    // eslint-disable-next-line
-    Map = function() {
-        this._data = {};
-    };
-}
+// BSONAwareMap
+BSONAwareMap = function() {
+    this._data = {};
+};
 
-Map.hash = function(val) {
+BSONAwareMap.hash = function(val) {
     if (!val)
         return val;
 
@@ -575,19 +572,19 @@ Map.hash = function(val) {
     throw Error("can't hash : " + typeof (val));
 };
 
-Map.prototype.put = function(key, value) {
+BSONAwareMap.prototype.put = function(key, value) {
     var o = this._get(key);
     var old = o.value;
     o.value = value;
     return old;
 };
 
-Map.prototype.get = function(key) {
+BSONAwareMap.prototype.get = function(key) {
     return this._get(key).value;
 };
 
-Map.prototype._get = function(key) {
-    var h = Map.hash(key);
+BSONAwareMap.prototype._get = function(key) {
+    var h = BSONAwareMap.hash(key);
     var a = this._data[h];
     if (!a) {
         a = [];
@@ -603,7 +600,7 @@ Map.prototype._get = function(key) {
     return o;
 };
 
-Map.prototype.values = function() {
+BSONAwareMap.prototype.values = function() {
     var all = [];
     for (var k in this._data) {
         this._data[k].forEach(function(z) {

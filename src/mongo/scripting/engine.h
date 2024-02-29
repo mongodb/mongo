@@ -231,13 +231,15 @@ protected:
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
 };
 
+enum class ExecutionEnvironment { Server, TestRunner };
+
 class ScriptEngine : public KillOpListenerInterface {
     ScriptEngine(const ScriptEngine&) = delete;
     ScriptEngine& operator=(const ScriptEngine&) = delete;
 
 public:
-    ScriptEngine(bool disableLoadStored);
-    virtual ~ScriptEngine();
+    ScriptEngine();
+    virtual ~ScriptEngine() = default;
 
     virtual Scope* newScope() {
         return createScope();
@@ -268,11 +270,9 @@ public:
     virtual void setLoadPath(const std::string& loadPath) = 0;
 
     /**
-     * Calls the constructor for the Global ScriptEngine. 'disableLoadStored' causes future calls to
-     * the function Scope::loadStored(), which would otherwise load stored procedures, to be
-     * ignored.
+     * Calls the constructor for the Global ScriptEngine.
      */
-    static void setup(bool disableLoadStored = true);
+    static void setup(ExecutionEnvironment environment);
     static void dropScopeCache();
 
     /** gets a scope from the pool or a new one if pool is empty
@@ -285,6 +285,10 @@ public:
                                           const DatabaseName& db,
                                           const std::string& scopeType);
 
+    using ScopeCallback = void (*)(Scope&);
+    ScopeCallback getScopeInitCallback() {
+        return _scopeInitCallback;
+    };
     void setScopeInitCallback(void (*func)(Scope&)) {
         _scopeInitCallback = func;
     }
@@ -302,7 +306,6 @@ public:
     virtual void interruptAll() {}
 
     static std::string getInterpreterVersionString();
-    const bool _disableLoadStored;
 
 protected:
     virtual Scope* createScope() = 0;

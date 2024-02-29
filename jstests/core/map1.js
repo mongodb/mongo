@@ -1,6 +1,6 @@
 
 function basic1(key, lookup, shouldFail) {
-    var m = new Map();
+    var m = new BSONAwareMap();
     m.put(key, 17);
 
     var out = m.get(lookup || key);

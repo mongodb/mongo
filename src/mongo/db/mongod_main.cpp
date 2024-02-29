@@ -731,7 +731,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     startMongoDFTDC(serviceContext);
 
     if (mongodGlobalParams.scriptingEnabled) {
-        ScriptEngine::setup();
+        ScriptEngine::setup(ExecutionEnvironment::Server);
     }
 
     const auto isStandalone =
