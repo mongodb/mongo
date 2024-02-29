@@ -33,7 +33,7 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
     try:
         # Wait for activation code input box and next button to load and click.
         activationCode_input_box = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@name='userCode']"))
+            EC.presence_of_element_located((By.XPATH, "//input[@id='user-code']"))
         )
         next_button = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//input[@class='button button-primary'][@value='Next']"))
@@ -47,13 +47,13 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
         username_input_box = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//input[@name='username']"))
         )
-        next_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@class='button button-primary'][@value='Next']"))
+        next_button_username = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@id='idp-discovery-submit'][@value='Next']"))
         )
         
         # Enter username.
         username_input_box.send_keys(username)
-        next_button.click()
+        next_button_username.click()
 
         # Wait for the password prompt and next button to load.
         password_input_box = WebDriverWait(driver, 30).until(
