@@ -195,6 +195,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    std::unique_ptr<RemoteCursorMap> remoteCursors,
+    std::unique_ptr<RemoteExplainVector> remoteExplains,
     boost::optional<size_t> cachedPlanHash) {
     LOGV2_DEBUG(4822861,
                 5,
@@ -212,7 +214,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  true, /*isOpen*/
                                  std::move(yieldPolicy),
                                  false /*generatedByBonsai*/,
-                                 cachedPlanHash),
+                                 cachedPlanHash,
+                                 {} /* optCounterInfo */,
+                                 std::move(remoteCursors),
+                                 std::move(remoteExplains)),
              PlanExecutor::Deleter{opCtx}}};
 }
 

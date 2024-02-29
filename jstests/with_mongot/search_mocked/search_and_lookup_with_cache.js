@@ -15,15 +15,6 @@ const mongotConn = mongotmock.getConnection();
 const conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host}});
 const db = conn.getDB("test");
 
-// TODO SERVER-86409: Remove this check. Currently, the test only works if the pipeline does not
-// fully run in SBE or if it uses the classic engine.
-if (!(checkSbeRestricted(db) || checkSbeCompletelyDisabled(db))) {
-    jsTest.log("Skipping test because trySbeRestricted or forceClassicEngine is not enabled.");
-    MongoRunner.stopMongod(conn);
-    mongotmock.stop();
-    quit();
-}
-
 const coll = db.search;
 coll.drop();
 db.search2.insertOne({name: "foo"});

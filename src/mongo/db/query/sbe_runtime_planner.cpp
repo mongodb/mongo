@@ -86,12 +86,15 @@ bool BaseRuntimePlanner::fetchNextDocument(plan_ranker::CandidatePlan* candidate
 }
 
 std::pair<value::SlotAccessor*, value::SlotAccessor*> BaseRuntimePlanner::prepareExecutionPlan(
-    PlanStage* root, stage_builder::PlanStageData* data, const bool preparingFromCache) const {
+    PlanStage* root,
+    stage_builder::PlanStageData* data,
+    const bool preparingFromCache,
+    RemoteCursorMap* remoteCursors) const {
     invariant(root);
     invariant(data);
 
     stage_builder::prepareSlotBasedExecutableTree(
-        _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache);
+        _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache, remoteCursors);
 
     value::SlotAccessor* resultSlot{nullptr};
     if (auto slot = data->staticData->resultSlot) {

@@ -61,9 +61,11 @@ public:
                           CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
                           boost::optional<size_t> decisionReads,
-                          PlanYieldPolicySBE* yieldPolicy)
+                          PlanYieldPolicySBE* yieldPolicy,
+                          RemoteCursorMap* remoteCursors)
         : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy},
-          _decisionReads{decisionReads} {}
+          _decisionReads{decisionReads},
+          _remoteCursors(remoteCursors) {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -105,10 +107,13 @@ private:
      * indicate the reason for replanning, which can be included, for example, into plan stats
      * summary.
      */
-    CandidatePlans replan(bool shouldCache, std::string reason) const;
+    CandidatePlans replan(bool shouldCache,
+                          std::string reason,
+                          RemoteCursorMap* remoteCursors = nullptr) const;
 
     // The number of physical reads taken to decide on a winning plan when the plan was first
     // cached. boost::none in case planing will not be based on the trial run logic.
     const boost::optional<size_t> _decisionReads;
+    RemoteCursorMap* _remoteCursors;
 };
 }  // namespace mongo::sbe

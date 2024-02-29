@@ -1157,7 +1157,8 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     bool needsSubplanning,
     PlanYieldPolicySBE* yieldPolicy,
     QueryPlannerParams plannerParams,
-    boost::optional<const stage_builder::PlanStageData&> planStageData) {
+    boost::optional<const stage_builder::PlanStageData&> planStageData,
+    RemoteCursorMap* remoteCursors) {
     // If we have multiple solutions, we always need to do the runtime planning.
     if (numSolutions > 1) {
         invariant(!needsSubplanning && !decisionWorks);
@@ -1200,8 +1201,13 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     tassert(6693503, "PlanStageData must be present", planStageData);
     const bool hasHashLookup = !planStageData->staticData->foreignHashJoinCollections.empty();
     if (decisionWorks || hasHashLookup) {
-        return std::make_unique<sbe::CachedSolutionPlanner>(
-            opCtx, collections, *canonicalQuery, plannerParams, decisionWorks, yieldPolicy);
+        return std::make_unique<sbe::CachedSolutionPlanner>(opCtx,
+                                                            collections,
+                                                            *canonicalQuery,
+                                                            plannerParams,
+                                                            decisionWorks,
+                                                            yieldPolicy,
+                                                            remoteCursors);
     }
 
     // Runtime planning is not required.
@@ -1271,6 +1277,13 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
         ? boost::none
         : boost::optional<const stage_builder::PlanStageData&>(roots[0].second);
 
+    auto remoteCursors = cq->getExpCtx()->explain
+        ? nullptr
+        : search_helpers::getSearchRemoteCursors(cq->cqPipeline());
+    auto remoteExplains = cq->getExpCtx()->explain
+        ? search_helpers::getSearchRemoteExplains(cq->getExpCtxRaw(), cq->cqPipeline())
+        : nullptr;
+
     // In some circumstances (e.g. when have multiple candidate plans or using a cached one), we
     // might need to execute the plan(s) to pick the best one or to confirm the choice.
     if (auto runTimePlanner = makeRuntimePlannerIfNeeded(opCtx,
@@ -1281,7 +1294,8 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                                          planningResult->needsSubplanning(),
                                                          yieldPolicy.get(),
                                                          plannerParams,
-                                                         planStageData)) {
+                                                         planStageData,
+                                                         remoteCursors.get())) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
         return plan_executor_factory::make(opCtx,
@@ -1291,6 +1305,8 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                            plannerParams.options,
                                            std::move(nss),
                                            std::move(yieldPolicy),
+                                           std::move(remoteCursors),
+                                           std::move(remoteExplains),
                                            planningResult->cachedPlanHash());
     }
 
@@ -1314,13 +1330,6 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
 
         plan_cache_util::updatePlanCache(opCtx, collections, *cq, *solutions[0], *root, data);
     }
-
-    auto remoteCursors = cq->getExpCtx()->explain
-        ? nullptr
-        : search_helpers::getSearchRemoteCursors(cq->cqPipeline());
-    auto remoteExplains = cq->getExpCtx()->explain
-        ? search_helpers::getSearchRemoteExplains(cq->getExpCtxRaw(), cq->cqPipeline())
-        : nullptr;
 
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(opCtx,

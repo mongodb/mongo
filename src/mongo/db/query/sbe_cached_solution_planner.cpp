@@ -96,14 +96,16 @@ CandidatePlans CachedSolutionPlanner::plan(
                 return replan(/* shouldCache */ true,
                               str::stream() << "Foreign collection "
                                             << foreignCollection.toStringForErrorMsg()
-                                            << " is not eligible for hash join anymore");
+                                            << " is not eligible for hash join anymore",
+                              _remoteCursors);
             }
         }
     }
     // If the '_decisionReads' is not present then we do not run a trial period, keeping the current
     // plan.
     if (!_decisionReads) {
-        prepareExecutionPlan(roots[0].first.get(), &roots[0].second, true /* preparingFromCache */);
+        prepareExecutionPlan(
+            roots[0].first.get(), &roots[0].second, true /* preparingFromCache */, _remoteCursors);
         roots[0].first->open(false /* reOpen */);
         return {makeVector(plan_ranker::CandidatePlan{
                     std::move(solutions[0]),
@@ -219,7 +221,9 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
     return candidate;
 }
 
-CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reason) const {
+CandidatePlans CachedSolutionPlanner::replan(bool shouldCache,
+                                             std::string reason,
+                                             RemoteCursorMap* remoteCursors) const {
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
     // yield policy.
     _yieldPolicy->clearRegisteredPlans();
@@ -256,7 +260,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
 
         // Only one possible plan. Build the stages from the solution.
         auto [root, data] = buildExecutableTree(*solutions[0]);
-        prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
+        prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/, remoteCursors);
         root->open(false /* reOpen */);
 
         auto explainer = plan_explainer_factory::make(root.get(), &data, solutions[0].get());
