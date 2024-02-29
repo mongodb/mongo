@@ -1,5 +1,6 @@
 """Fixture with multiple clusters for running magic restore."""
 
+import copy
 import os.path
 import shutil
 
@@ -24,15 +25,11 @@ class MagicRestoreFixture(interface.MultiClusterFixture):
             or cluster_options["settings"]["preserve_dbpath"] is None:
             cluster_options["settings"]["preserve_dbpath"] = preserve_dbpath
 
-        # The "dbpath_prefix" needs to be under "settings" for replicasets
-        # but also under "mongod_options" for sharded clusters.
         cluster_options["settings"]["dbpath_prefix"] = os.path.join(self._dbpath_prefix,
                                                                     "normalCluster")
 
         if cluster_options["class"] == "ReplicaSetFixture":
             cluster_options["settings"]["replicaset_logging_prefix"] = "rs"
-            cluster_options["settings"]["dbpath_prefix"] = os.path.join(
-                self._dbpath_prefix, "normalCluster")
         elif cluster_options["class"] == "ShardedClusterFixture":
             cluster_options["settings"]["cluster_logging_prefix"] = "sc"
         else:
@@ -42,19 +39,23 @@ class MagicRestoreFixture(interface.MultiClusterFixture):
             self.fixturelib.make_fixture(cluster_options["class"], self.logger, self.job_num,
                                          **cluster_options["settings"]))
 
-        # save the cluster options off to create magic restore clusters later
-        self.magic_restore_options = cluster_options
-        self.magic_restore_options["settings"]["dbpath_prefix"] = os.path.join(
+        # Start the fixture that will be used for magic restore.
+        # This needs to be the same type as the source cluster but with a different name.
+        magic_restore_options = copy.deepcopy(cluster_options)
+
+        magic_restore_options["settings"]["dbpath_prefix"] = os.path.join(
             self._dbpath_prefix, "magicRestoreCluster")
 
-        if self.magic_restore_options["class"] == "ReplicaSetFixture":
-            self.magic_restore_options["settings"]["replicaset_logging_prefix"] = "mr"
-            self.magic_restore_options["settings"]["dbpath_prefix"] = os.path.join(
-                self._dbpath_prefix, "magicRestoreCluster")
-        elif self.magic_restore_options["class"] == "ShardedClusterFixture":
-            self.magic_restore_options["settings"]["cluster_logging_prefix"] = "mr"
+        if magic_restore_options["class"] == "ReplicaSetFixture":
+            magic_restore_options["settings"]["replicaset_logging_prefix"] = "mr"
+        elif magic_restore_options["class"] == "ShardedClusterFixture":
+            magic_restore_options["settings"]["cluster_logging_prefix"] = "mr"
         else:
-            raise ValueError(f"Illegal fixture class: {self.magic_restore_options['class']}")
+            raise ValueError(f"Illegal fixture class: {magic_restore_options['class']}")
+
+        self.clusters.append(
+            self.fixturelib.make_fixture(magic_restore_options["class"], self.logger, self.job_num,
+                                         **magic_restore_options["settings"]))
 
     def pids(self):
         """Return: pids owned by this fixture if any."""
@@ -62,11 +63,11 @@ class MagicRestoreFixture(interface.MultiClusterFixture):
         for cluster in self.clusters:
             out.extend(cluster.pids())
         if not out:
-            self.logger.debug('No clusters when gathering multi replicaset fixture pids.')
+            self.logger.debug('No fixture when gathering multi replicaset fixture pids.')
         return out
 
     def setup(self):
-        """Set up the clusters."""
+        """Set up the fixtures."""
         for cluster in self.clusters:
             cluster.setup()
         self.setup_complete = True
@@ -123,21 +124,3 @@ class MagicRestoreFixture(interface.MultiClusterFixture):
     def get_independent_clusters(self):
         """Return the clusters we want to be modified by hooks."""
         return self.clusters
-
-    def create_magic_restore_cluster(self):
-        """Create a new cluster to be used for magic restore."""
-        self.clusters.append(
-            self.fixturelib.make_fixture(self.magic_restore_options["class"], self.logger,
-                                         self.job_num, **self.magic_restore_options["settings"]))
-
-        fixture = self.clusters[-1]
-        fixture.setup()
-        fixture.await_ready()
-
-    def remove_magic_restore_cluster(self):
-        """Remove the cluster used for magic restore."""
-        fixture = self.clusters.pop()
-        fixture.teardown(finished=True)
-
-        # Remove the data directory for the node to prevent unbounded disk space utilization.
-        shutil.rmtree(fixture.get_dbpath_prefix(), ignore_errors=False)

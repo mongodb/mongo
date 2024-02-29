@@ -54,9 +54,8 @@ executor:
     shell_options:
       eval: "globalThis.testingReplication = true;"
   hooks:
-  # - class: MagicRestoreBackup
-  # - class: MagicRestore
-  - class: CheckReplDBHash
+  - class: MagicRestoreEveryN
+    n: 20
   fixture:
     class: MagicRestoreFixture
     cluster_options:
@@ -65,5 +64,5 @@ executor:
         mongod_options:
           set_parameters:
             enableTestCommands: 1
-        num_nodes: 2
+        num_nodes: 1
         use_replica_set_connection_string: true
