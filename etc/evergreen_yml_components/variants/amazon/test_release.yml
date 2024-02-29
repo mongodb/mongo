@@ -235,6 +235,9 @@ buildvariants:
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2023
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: x86_64

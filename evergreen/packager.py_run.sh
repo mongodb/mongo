@@ -14,6 +14,11 @@ if [ "${has_packages}" != "true" ]; then
   # exit 1
 fi
 
+if [ -z ${packager_script+x} ]; then
+  echo "Error: packager run when packager_script is not set, please remove the package task from this variant (or variant task group) or set packager_script if this variant is intended to run the packager."
+  exit 1
+fi
+
 cd buildscripts
 $python ${packager_script} --prefix $(pwd)/.. --distros ${packager_distro} --tarball $(pwd)/../mongodb-dist.tgz -s ${version} -m HEAD -a ${packager_arch}
 cd ..
