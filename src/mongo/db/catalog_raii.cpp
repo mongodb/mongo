@@ -633,13 +633,20 @@ ReadSourceScope::~ReadSourceScope() {
     }
 }
 
-AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline) {
+AutoGetOplog::AutoGetOplog(OperationContext* opCtx,
+                           OplogAccessMode mode,
+                           Date_t deadline,
+                           const AutoGetOplogOptions& options) {
     auto lockMode = (mode == OplogAccessMode::kRead) ? MODE_IS : MODE_IX;
     if (mode == OplogAccessMode::kLogOp) {
         // Invariant that global lock is already held for kLogOp mode.
         invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
     } else {
-        _globalLock.emplace(opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow);
+        _globalLock.emplace(opCtx,
+                            lockMode,
+                            deadline,
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLockSkipOptions{.skipRSTLLock = options.skipRSTLLock});
     }
 
     _oplogInfo = LocalOplogInfo::get(opCtx);

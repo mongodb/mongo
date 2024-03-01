@@ -503,12 +503,20 @@ private:
  * collection reference returned by this class should not be retained.
  */
 enum class OplogAccessMode { kRead, kWrite, kLogOp };
+
+struct AutoGetOplogOptions {
+    bool skipRSTLLock = false;
+};
+
 class AutoGetOplog {
     AutoGetOplog(const AutoGetOplog&) = delete;
     AutoGetOplog& operator=(const AutoGetOplog&) = delete;
 
 public:
-    AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline = Date_t::max());
+    AutoGetOplog(OperationContext* opCtx,
+                 OplogAccessMode mode,
+                 Date_t deadline = Date_t::max(),
+                 const AutoGetOplogOptions& options = AutoGetOplogOptions());
 
     /**
      * Return a pointer to the per-service-context LocalOplogInfo.
