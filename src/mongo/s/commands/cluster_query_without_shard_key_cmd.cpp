@@ -397,10 +397,6 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::IllegalOperation,
-                    "_clusterQueryWithoutShardKey can only be run on Mongos",
-                    serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
-
             LOGV2_DEBUG(6962300,
                         2,
                         "Running read phase for a write without a shard key.",

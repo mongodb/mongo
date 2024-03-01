@@ -395,10 +395,6 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "_clusterWriteWithoutShardKey can only be run on Mongos",
-                    serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
-
-            uassert(ErrorCodes::IllegalOperation,
                     "_clusterWriteWithoutShardKey must be run in a transaction.",
                     opCtx->inMultiDocumentTransaction());
 
