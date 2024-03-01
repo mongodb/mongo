@@ -238,12 +238,12 @@ DEATH_TEST_REGEX(ThreadPoolTest,
     // destructor should trigger a fatal error due to double-join.
     auto mutex = MONGO_MAKE_LATCH();
     ThreadPool::Options options;
-    options.minThreads = 2;
+    options.minThreads = 1;
     options.poolName = "DoubleJoinPool";
     boost::optional<ThreadPool> pool;
     pool.emplace(options);
     pool->startup();
-    while (pool->getStats().numThreads < 2U) {
+    while (pool->getStats().numThreads < 1U) {
         sleepmillis(50);
     }
     stdx::unique_lock<Latch> lk(mutex);

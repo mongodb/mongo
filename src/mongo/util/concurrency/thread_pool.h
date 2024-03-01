@@ -120,7 +120,9 @@ public:
         // The options for the instance of the pool returning these stats.
         Options options;
 
-        // The number of threads currently in the pool, idle or active.
+        // The count includes both regular worker threads and the cleanup thread,
+        // whether idle or active, in the pool. So, this count can be greater than
+        // options.maxThreads.
         size_t numThreads;
 
         // The number of idle threads currently in the pool.
@@ -165,8 +167,6 @@ public:
      *
      * May be called multiple times, by multiple threads. May not be called by a task in the thread
      * pool.
-     *
-     * Not safe to use when shutdown can be called concurrently.
      */
     void waitForIdle();
 

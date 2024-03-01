@@ -160,13 +160,24 @@ private:
     /**
      * Implementation of join once _mutex is owned by "lk".
      */
-    void _join_inlock(stdx::unique_lock<Latch>* lk);
+    void _join_inlock(stdx::unique_lock<Latch>& lk);
+
+    /**
+     * Implementation of waitForIdle once _mutex is locked
+     */
+    void _waitForIdle(stdx::unique_lock<Latch>& lk);
+
+    /**
+     * Returns true when there are no _pendingTasks and all _threads are idle, including
+     * _cleanUpThread.
+     */
+    bool _isPoolIdle(WithLock);
 
     /**
      * Runs the remaining tasks on a new thread as part of the join process, blocking until
-     * complete. Caller must not hold the mutex!
+     * complete.
      */
-    void _drainPendingTasks();
+    void _drainPendingTasks(stdx::unique_lock<Latch>& lk);
 
     /**
      * Executes one task from _pendingTasks. "lk" must own _mutex, and _pendingTasks must have at
@@ -219,6 +230,9 @@ private:
     // List of threads that are retired and pending join
     std::list<stdx::thread> _retiredThreads;
 
+    // Optional thread to drain the pending tasks upon join().
+    boost::optional<stdx::thread> _cleanUpThread;
+
     // Count of idle threads.
     size_t _numIdleThreads = 0;
 
@@ -235,7 +249,7 @@ ThreadPool::Impl::~Impl() {
     stdx::unique_lock<Latch> lk(_mutex);
     _shutdown_inlock();
     if (_state != shutdownComplete) {
-        _join_inlock(&lk);
+        _join_inlock(lk);
     }
 
     if (_state != shutdownComplete) {
@@ -282,7 +296,7 @@ void ThreadPool::Impl::_shutdown_inlock() {
 
 void ThreadPool::Impl::join() {
     stdx::unique_lock<Latch> lk(_mutex);
-    _join_inlock(&lk);
+    _join_inlock(lk);
 }
 
 void ThreadPool::Impl::_joinRetired_inlock() {
@@ -295,36 +309,35 @@ void ThreadPool::Impl::_joinRetired_inlock() {
     }
 }
 
-void ThreadPool::Impl::_join_inlock(stdx::unique_lock<Latch>* lk) {
-    _stateChange.wait(*lk, [this] { return _state != preStart && _state != running; });
+void ThreadPool::Impl::_join_inlock(stdx::unique_lock<Latch>& lk) {
+    _stateChange.wait(lk, [this] { return _state != preStart && _state != running; });
     if (_state != joinRequired) {
         LOGV2_FATAL(
             28700, "Attempted to join pool more than once", "poolName"_attr = _options.poolName);
     }
 
     _setState_inlock(joining);
-    ++_numIdleThreads;
     if (!_pendingTasks.empty()) {
-        lk->unlock();
-        _drainPendingTasks();
-        lk->lock();
+        _drainPendingTasks(lk);
     }
-    --_numIdleThreads;
     _joinRetired_inlock();
+    _waitForIdle(lk);
     auto threadsToJoin = std::exchange(_threads, {});
-    lk->unlock();
+    _numIdleThreads = 0;
+    lk.unlock();
     for (auto& t : threadsToJoin) {
         t.join();
     }
-    lk->lock();
+    lk.lock();
     invariant(_state == joining);
     _setState_inlock(shutdownComplete);
 }
 
-void ThreadPool::Impl::_drainPendingTasks() {
+void ThreadPool::Impl::_drainPendingTasks(stdx::unique_lock<Latch>& lk) {
     // Tasks cannot be run inline because they can create OperationContexts and the join() caller
     // may already have one associated with the thread.
-    stdx::thread cleanThread = stdx::thread([&] {
+    ++_numIdleThreads;
+    _cleanUpThread = stdx::thread([&] {
         const std::string threadName = "{}{}"_format(_options.threadNamePrefix, _nextThreadId++);
         setThreadName(threadName);
         if (_options.onCreateThread)
@@ -334,7 +347,13 @@ void ThreadPool::Impl::_drainPendingTasks() {
             _doOneTask(&lock);
         }
     });
-    cleanThread.join();
+    lk.unlock();
+
+    _cleanUpThread->join();
+
+    lk.lock();
+    --_numIdleThreads;
+    _cleanUpThread.reset();
 }
 
 void ThreadPool::Impl::schedule(Task task) {
@@ -374,22 +393,23 @@ void ThreadPool::Impl::schedule(Task task) {
 
 void ThreadPool::Impl::waitForIdle() {
     stdx::unique_lock<Latch> lk(_mutex);
-    // True when there are no `_pendingTasks` and all `_threads` are idle, or when the ThreadPool
-    // has been shutdown but not yet joined. As mentioned in the header, if waitForIdle() is called
-    // before shutdown(), there is no guarantee that there will still be no pending tasks when the
-    // function returns.
-    auto isIdle = [this] {
-        return (_pendingTasks.empty() && _numIdleThreads >= _threads.size()) ||
-            _state == joinRequired;
-    };
-    _poolIsIdle.wait(lk, isIdle);
+    _waitForIdle(lk);
+}
+
+void ThreadPool::Impl::_waitForIdle(stdx::unique_lock<Latch>& lk) {
+    _poolIsIdle.wait(lk, [&] { return _isPoolIdle(lk); });
+}
+
+bool ThreadPool::Impl::_isPoolIdle(WithLock) {
+    return (_pendingTasks.empty() &&
+            (_numIdleThreads >= _threads.size() + (_cleanUpThread ? 1 : 0)));
 }
 
 ThreadPool::Stats ThreadPool::Impl::getStats() const {
     stdx::lock_guard<Latch> lk(_mutex);
     Stats result;
     result.options = _options;
-    result.numThreads = _threads.size();
+    result.numThreads = _threads.size() + (_cleanUpThread ? 1 : 0);
     result.numIdleThreads = _numIdleThreads;
     result.numPendingTasks = _pendingTasks.size();
     result.lastFullUtilizationDate = _lastFullUtilizationDate;
@@ -481,7 +501,6 @@ void ThreadPool::Impl::_consumeTasks() {
         while (!_pendingTasks.empty()) {
             _doOneTask(&lk);
         }
-        --_numIdleThreads;
         return;
     }
     --_numIdleThreads;
@@ -526,7 +545,7 @@ void ThreadPool::Impl::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {
     lk->lock();
 
     ++_numIdleThreads;
-    if (_pendingTasks.empty() && _threads.size() == _numIdleThreads) {
+    if (_isPoolIdle(*lk)) {
         _poolIsIdle.notify_all();
     }
 }
