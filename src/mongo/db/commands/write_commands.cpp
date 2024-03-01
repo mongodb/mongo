@@ -323,11 +323,10 @@ public:
                 }
             }
 
-            boost::optional<ScopedAdmissionPriorityForLock> priority;
+            boost::optional<ScopedAdmissionPriority> priority;
             if (request().getNamespace() == NamespaceString::kConfigSampledQueriesNamespace ||
                 request().getNamespace() == NamespaceString::kConfigSampledQueriesDiffNamespace) {
-                priority.emplace(shard_role_details::getLocker(opCtx),
-                                 AdmissionContext::Priority::kLow);
+                priority.emplace(opCtx, AdmissionContext::Priority::kLow);
             }
 
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {

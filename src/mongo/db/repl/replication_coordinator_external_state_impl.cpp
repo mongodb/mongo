@@ -507,8 +507,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
-                  AdmissionContext::Priority::kImmediate,
+    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
     // TODO(SERVER-85698): Also exit drain mode for the writer buffer.
     if (_oplogBuffer) {
@@ -518,8 +517,7 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
 
 OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isRSTLExclusive());
-    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
-                  AdmissionContext::Priority::kImmediate,
+    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -761,8 +759,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     OperationContext* opCtx, const LastVote& lastVote) {
     BSONObj lastVoteObj = lastVote.toBSON();
 
-    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
-                  AdmissionContext::Priority::kImmediate,
+    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kImmediate,
               "Writes that are part of elections should not be throttled");
 
     try {
@@ -940,8 +937,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
     // operation as having Immediate priority. This will skip flow control and ticket acquisition.
     // It is fine to do this since the system is essentially shutting down at this point.
-    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
-                                            AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kImmediate);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
     // back to using last applied to update repl's durable timestamp instead of the truncate

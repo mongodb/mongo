@@ -359,8 +359,8 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
         OplogApplierBatch ops;
         try {
             auto opCtx = cc().makeOperationContext();
-            shard_role_details::getLocker(opCtx.get())
-                ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriority admissionPriority(opCtx.get(),
+                                                      AdmissionContext::Priority::kImmediate);
 
             // During storage change operations, we may shut down storage under a global lock
             // and wait for any storage-using opCtxs to exit.  This results in a deadlock with

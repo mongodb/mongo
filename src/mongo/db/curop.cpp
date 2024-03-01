@@ -600,8 +600,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                 // acquisition. Slow queries can happen for various reasons; however, if queries
                 // are slower due to ticket exhaustion, queueing in order to log can compound
                 // the issue.
-                ScopedAdmissionPriorityForLock skipAdmissionControl(
-                    shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
+                ScopedAdmissionPriority skipAdmissionControl(
+                    opCtx, AdmissionContext::Priority::kImmediate);
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
@@ -909,7 +909,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
     // FCV to keep consistent behavior.
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = shard_role_details::getLocker(opCtx)->getAdmissionPriority();
+        auto admissionPriority = AdmissionContext::get(opCtx).getPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             builder->append("admissionPriority", toString(admissionPriority));
         }
@@ -1146,7 +1146,7 @@ void OpDebug::report(OperationContext* opCtx,
     // FCV to keep consistent behavior.
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = shard_role_details::getLocker(opCtx)->getAdmissionPriority();
+        auto admissionPriority = AdmissionContext::get(opCtx).getPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             pAttrs->add("admissionPriority", admissionPriority);
         }

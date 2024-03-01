@@ -208,8 +208,7 @@ void MigrationBatchInserter::run(Status status) const try {
         _migrationProgress->incNumBytes(batchClonedBytes);
 
         if (_writeConcern.needToWaitForOtherNodes() && _threadCount == 1) {
-            AdmissionContext admissionContext;
-            if (auto ticket = _secondaryThrottleTicket->tryAcquire(&admissionContext)) {
+            if (auto ticket = _secondaryThrottleTicket->tryAcquire(&AdmissionContext::get(opCtx))) {
                 runWithoutSession(_outerOpCtx, [&] {
                     repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::ReplicationCoordinator::get(opCtx)->awaitReplication(

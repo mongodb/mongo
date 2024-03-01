@@ -78,8 +78,8 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // batches that are taking a long time.
     auto opCtx = client->makeOperationContext();
     opCtx->setEnforceConstraints(false);
-    shard_role_details::getLocker(opCtx.get())
-        ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+
+    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kImmediate);
 
     for (auto r : roles) {
         for (auto& collector : _collectors[r]) {

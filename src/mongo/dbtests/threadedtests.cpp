@@ -303,14 +303,15 @@ private:
         Microseconds timeInQueue;
 
         for (int i = 0; i < checkIns; i++) {
-            AdmissionContext admCtx;
+            boost::optional<ScopedAdmissionPriority> admissionPriority;
             if ((i % 3) == 0) {
                 // One of every three admissions is low priority.
-                admCtx.setPriority(AdmissionContext::Priority::kLow);
+                admissionPriority.emplace(opCtx.get(), AdmissionContext::Priority::kLow);
             }
 
-            auto ticket =
-                _tickets->waitForTicket(*Interruptible::notInterruptible(), &admCtx, timeInQueue);
+            auto ticket = _tickets->waitForTicket(*Interruptible::notInterruptible(),
+                                                  &AdmissionContext::get(opCtx.get()),
+                                                  timeInQueue);
 
             _hotel.checkIn();
 

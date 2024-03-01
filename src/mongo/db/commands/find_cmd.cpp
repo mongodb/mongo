@@ -526,13 +526,13 @@ public:
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
+            boost::optional<ScopedAdmissionPriority> admissionPriority;
             if (term && isOplogNss) {
                 // We do not want to wait to take tickets for internal (replication) oplog reads.
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
-                shard_role_details::getLocker(opCtx)->setAdmissionPriority(
-                    AdmissionContext::Priority::kImmediate);
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kImmediate);
             }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility

@@ -117,8 +117,7 @@ void OplogWriterImpl::_run() {
 
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
-    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
-                                            AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kImmediate);
 
     while (true) {
         // For pausing replication in tests.
@@ -232,8 +231,7 @@ void OplogWriterImpl::_writeOplogBatchImpl(OperationContext* opCtx,
                                            writeDocsFn&& writeDocsFn) {
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
-    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
-                                            AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kImmediate);
     UnreplicatedWritesBlock uwb(opCtx);
 
     fassert(8352101,

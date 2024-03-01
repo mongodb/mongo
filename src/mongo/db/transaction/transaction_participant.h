@@ -240,6 +240,10 @@ public:
             return _recoveryUnit.get();
         }
 
+        AdmissionContext admissionContext() const {
+            return _admCtx;
+        }
+
         /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          * Ephemerally holds the Client lock associated with opCtx.
@@ -270,6 +274,7 @@ public:
         APIParameters _apiParameters;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
+        AdmissionContext _admCtx;
     };  // class TxnResources
 
     /**

@@ -201,7 +201,7 @@ protected:
     IndexScanStats _specificStats;
 
     bool _lowPriority;
-    boost::optional<ScopedAdmissionPriorityForLock> _priority;
+    boost::optional<ScopedAdmissionPriority> _priority;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.

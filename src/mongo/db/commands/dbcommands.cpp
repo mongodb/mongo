@@ -491,8 +491,8 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
             // Critical to monitoring and observability, categorize the command as immediate
             // priority.
-            ScopedAdmissionPriorityForLock skipAdmissionControl(
-                shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriority skipAdmissionControl(opCtx,
+                                                         AdmissionContext::Priority::kImmediate);
 
             if (_collStatsSampler.tick())
                 LOGV2_WARNING(7024600,
@@ -673,8 +673,8 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             // Critical to monitoring and observability, categorize the command as immediate
             // priority.
-            ScopedAdmissionPriorityForLock skipAdmissionControl(
-                shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriority skipAdmissionControl(opCtx,
+                                                         AdmissionContext::Priority::kImmediate);
 
             const auto& cmd = request();
             const auto& dbname = cmd.getDbName();
@@ -761,8 +761,8 @@ public:
 
     Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(
-            shard_role_details::getLocker(rec->getOpCtx()), AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority skipAdmissionControl(rec->getOpCtx(),
+                                                     AdmissionContext::Priority::kImmediate);
 
         auto result = rec->getReplyBuilder()->getBodyBuilder();
         VersionInfoInterface::instance().appendBuildInfo(&result);
@@ -826,8 +826,7 @@ public:
              BSONObjBuilder& result) final {
         // Critical to monitoring and observability, categorize the command as immediate
         // priority.
-        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
-                                                            AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;

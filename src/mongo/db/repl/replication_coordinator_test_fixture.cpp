@@ -468,8 +468,7 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date
 void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) noexcept {
     // Writes that occur in code paths that call signalDrainComplete are expected to have Immediate
     // priority.
-    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
-                                            AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kImmediate);
     getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(1, 1), getReplCoord()->getTerm()));
     getReplCoord()->signalDrainComplete(opCtx, getReplCoord()->getTerm());
 }

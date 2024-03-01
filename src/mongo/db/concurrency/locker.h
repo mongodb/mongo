@@ -110,19 +110,8 @@ public:
      */
     ClientState getClientState() const;
 
-    /**
-     * This will set the admission priority for the ticket mechanism.
-     */
-    void setAdmissionPriority(AdmissionContext::Priority priority) {
-        _admCtx.setPriority(priority);
-    }
-
-    AdmissionContext::Priority getAdmissionPriority() const {
-        return _admCtx.getPriority();
-    }
-
-    bool shouldWaitForTicket() const {
-        return _admCtx.getPriority() != AdmissionContext::Priority::kImmediate;
+    bool shouldWaitForTicket(OperationContext* opCtx) const {
+        return AdmissionContext::get(opCtx).getPriority() != AdmissionContext::Priority::kImmediate;
     }
 
     /**
@@ -599,7 +588,6 @@ protected:
     friend class UninterruptibleLockGuard;
     friend class InterruptibleLockGuard;
     friend class AllowLockAcquisitionOnTimestampedUnitOfWork;
-    friend class ScopedAdmissionPriorityForLock;
 
     /**
      * Allows for lock requests to be requested in a non-blocking way. There can be only one
@@ -759,9 +747,6 @@ protected:
     // oplog hole cannot try to acquire subsequent locks.
     bool _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = false;
 
-    // Keeps state and statistics related to admission control.
-    AdmissionContext _admCtx;
-
     /**
      * The number of LockRequests to unlock at the end of this WUOW. This is used for locks
      * participating in two-phase locking.
@@ -908,34 +893,6 @@ public:
 private:
     Locker* const _locker;
     bool _originalValue;
-};
-
-/**
- * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
- * lock.
- */
-class ScopedAdmissionPriorityForLock {
-public:
-    explicit ScopedAdmissionPriorityForLock(Locker* locker, AdmissionContext::Priority priority)
-        : _locker(locker), _originalPriority(_locker->getAdmissionPriority()) {
-        uassert(ErrorCodes::IllegalOperation,
-                "It is illegal for an operation to demote a high priority to a lower priority "
-                "operation",
-                _originalPriority != AdmissionContext::Priority::kImmediate ||
-                    priority == AdmissionContext::Priority::kImmediate);
-        _locker->_admCtx.setPriority(priority);
-    }
-
-    ScopedAdmissionPriorityForLock(const ScopedAdmissionPriorityForLock&) = delete;
-    ScopedAdmissionPriorityForLock& operator=(const ScopedAdmissionPriorityForLock&) = delete;
-
-    ~ScopedAdmissionPriorityForLock() {
-        _locker->_admCtx.setPriority(_originalPriority);
-    }
-
-private:
-    Locker* const _locker;
-    AdmissionContext::Priority _originalPriority;
 };
 
 }  // namespace mongo
