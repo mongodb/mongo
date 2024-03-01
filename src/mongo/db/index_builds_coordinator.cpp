@@ -2682,7 +2682,8 @@ void IndexBuildsCoordinator::_runIndexBuild(
         if (!oldLockerDebugInfo.empty()) {
             ss << "; " << oldLockerDebugInfo;
         }
-        locker->setDebugInfo(ss);
+        std::string debugStr = ss;
+        locker->setDebugInfo(std::move(debugStr));
     }
 
     auto status = [&]() {
@@ -2694,7 +2695,7 @@ void IndexBuildsCoordinator::_runIndexBuild(
         return Status::OK();
     }();
 
-    locker->setDebugInfo(oldLockerDebugInfo);
+    locker->setDebugInfo(std::move(oldLockerDebugInfo));
 
     // Ensure the index build is unregistered from the Coordinator and the Promise is set with
     // the build's result so that callers are notified of the outcome.

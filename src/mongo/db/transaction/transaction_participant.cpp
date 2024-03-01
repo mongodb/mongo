@@ -1377,7 +1377,11 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     _locker->releaseTicket();
     _locker->unsetThreadId();
     if (opCtx->getLogicalSessionId()) {
-        _locker->setDebugInfo("lsid: " + opCtx->getLogicalSessionId()->toBSON().toString());
+        auto& lsid = opCtx->getLogicalSessionId();
+        std::string debugInfo = str::stream()
+            << "lsid: "_sd << lsid->getId() << ", " << lsid->getUid().toString() << ", "
+            << lsid->getTxnNumber() << ", " << lsid->getTxnUUID();
+        _locker->setDebugInfo(std::move(debugInfo));
     }
 
     // On secondaries, we yield the locks for transactions.

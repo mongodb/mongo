@@ -97,7 +97,7 @@ public:
     void unsetThreadId();
 
     std::string getDebugInfo() const;
-    void setDebugInfo(const std::string& info);
+    void setDebugInfo(std::string info);
 
     /**
      * State for reporting the number of active and queued reader and writer clients.

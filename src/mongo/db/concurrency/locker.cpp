@@ -181,8 +181,8 @@ std::string Locker::getDebugInfo() const {
     return _debugInfo;
 }
 
-void Locker::setDebugInfo(const std::string& info) {
-    _debugInfo = info;
+void Locker::setDebugInfo(std::string info) {
+    _debugInfo = std::move(info);
 }
 
 Locker::ClientState Locker::getClientState() const {
