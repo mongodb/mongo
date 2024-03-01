@@ -110,7 +110,8 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
     return MatchExpression::OR == expr->matchType() && expr->numChildren() > 0;
 }
 
-Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
+Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy,
+                                          bool shouldConstructClassicExecutableTree) {
     // Clear out the working set. We'll start with a fresh working set.
     _ws->clear();
 
@@ -125,11 +126,12 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
 
     if (1 == solutions.size()) {
         // Only one possible plan.  Run it.  Build the stages from the solution.
-        auto&& root = stage_builder::buildClassicExecutableTree(
-            expCtx()->opCtx, collection(), *_query, *solutions[0], _ws);
-        invariant(_children.empty());
-        _children.emplace_back(std::move(root));
-
+        if (shouldConstructClassicExecutableTree) {
+            auto&& root = stage_builder::buildClassicExecutableTree(
+                expCtx()->opCtx, collection(), *_query, *solutions[0], _ws);
+            invariant(_children.empty());
+            _children.emplace_back(std::move(root));
+        }
         // This SubplanStage takes ownership of the query solution.
         _compositeSolution = std::move(solutions.back());
         solutions.pop_back();
@@ -165,7 +167,8 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     }
 }
 
-Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy,
+                                  bool shouldConstructClassicExecutableTree) {
     // Adds the amount of time taken by pickBestPlan() to executionTime. There's lots of work that
     // happens here, so this is needed for the time accounting to make sense.
     auto optTimer = getOptTimer();
@@ -199,7 +202,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     auto subplanningStatus = QueryPlanner::planSubqueries(
         expCtx()->opCtx, getSolutionCachedData, collectionPtr(), *_query, _plannerParams);
     if (!subplanningStatus.isOK()) {
-        return choosePlanWholeQuery(yieldPolicy);
+        return choosePlanWholeQuery(yieldPolicy, shouldConstructClassicExecutableTree);
     }
 
     // Remember whether each branch of the $or was planned from a cached solution.
@@ -267,15 +270,19 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // (and index may have been dropped, we may have exceeded the time limit, etc).
             return subplanSelectStat.getStatus();
         }
-        return choosePlanWholeQuery(yieldPolicy);
+        return choosePlanWholeQuery(yieldPolicy, shouldConstructClassicExecutableTree);
     }
 
     // Build a plan stage tree from the the composite solution and add it as our child stage.
     _compositeSolution = std::move(subplanSelectStat.getValue());
-    invariant(_children.empty());
-    auto&& root = stage_builder::buildClassicExecutableTree(
-        expCtx()->opCtx, collection(), *_query, *_compositeSolution, _ws);
-    _children.emplace_back(std::move(root));
+
+    if (shouldConstructClassicExecutableTree) {
+        invariant(_children.empty());
+        auto&& root = stage_builder::buildClassicExecutableTree(
+            expCtx()->opCtx, collection(), *_query, *_compositeSolution, _ws);
+        _children.emplace_back(std::move(root));
+    }
+
     _ws->clear();
 
     return Status::OK();

@@ -114,6 +114,11 @@ public:
      * If this effort fails, then falls back on planning the whole query normally rather
      * then planning $or branches independently.
      *
+     * If 'shouldConstructClassicExecutableTree' is true, builds a classic executable tree and
+     * appends it to the stage's children. If 'shouldConstructClassicExecutableTree' is false, it
+     * means we are using the sub planner for SBE queries, and do not need to build a classic
+     * executable tree. 'shouldConstructClassicExecutableTree' is true by default.
+     *
      * If 'yieldPolicy' is non-NULL, then all locks may be yielded in between round-robin
      * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
      * take place.
@@ -122,7 +127,8 @@ public:
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield, or
      * ErrorCodes::MaxTimeMSExpired if the operation has exceeded its time limit.
      */
-    Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+    Status pickBestPlan(PlanYieldPolicy* yieldPolicy,
+                        bool shouldConstructClassicExecutableTree = true);
 
     //
     // For testing.
@@ -178,7 +184,8 @@ private:
     /**
      * Used as a fallback if subplanning fails. Helper for pickBestPlan().
      */
-    Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
+    Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy,
+                                bool shouldConstructClassicExecutableTree);
 
     // Not owned here.
     WorkingSet* _ws;

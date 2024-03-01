@@ -2,9 +2,6 @@
  * Some more tests $and/$or being nested in various ways.
  */
 
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const coll = db.jstests_and_or_index_sort;
 coll.drop();
 
@@ -126,21 +123,14 @@ runWithDifferentIndexes(
         }),
                   [{c: null}, {c: null}, {c: 4}, {c: 5}, {c: 5.5}, {c: 6}]);
 
-        // TODO SERVER-86816: Remove this constraint.
-        // When running in any CSI passthrough suite with all feature flags enabled, this test will
-        // run with featureFlagClassicRuntimePlanningForSbe. This fails when we sub-plan a query and
-        // try to build a classic executable tree since CSI is not supported in the classic engine.
-        if (!setUpServerForColumnStoreIndexTest(db) &&
-            !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-            assert.docEq([{c: null}, {c: null}, {c: 4}, {c: 4.5}, {c: 5}, {c: 5.5}, {c: 6}],
-                         coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}, {c: 1, _id: 0})
-                             .sort({c: 1})
-                             .toArray()
-                             .map(obj => {
-                                 if (!obj.hasOwnProperty('c')) {
-                                     obj.c = null;
-                                 }
-                                 return obj;
-                             }));
-        }
+        assert.docEq([{c: null}, {c: null}, {c: 4}, {c: 4.5}, {c: 5}, {c: 5.5}, {c: 6}],
+                     coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}, {c: 1, _id: 0})
+                         .sort({c: 1})
+                         .toArray()
+                         .map(obj => {
+                             if (!obj.hasOwnProperty('c')) {
+                                 obj.c = null;
+                             }
+                             return obj;
+                         }));
     });

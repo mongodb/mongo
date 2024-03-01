@@ -85,11 +85,6 @@ export function setUpServerForColumnStoreIndexTest(db) {
         return false;
     }
 
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-        jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-        return false;
-    }
-
     let nodes = DiscoverTopology.findNonConfigNodes(db.getMongo());
     if (!safeToCreateColumnStoreIndexInCluster(nodes)) {
         jsTestLog(

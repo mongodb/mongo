@@ -59,7 +59,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::plan() {
                                yieldPolicy(),
                                collections().getMainCollectionPtrOrAcquisition());
 
-    uassertStatusOK(_subplanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
+    uassertStatusOK(_subplanStage->pickBestPlan(trialPeriodYieldPolicy.get(),
+                                                false /* shouldConstructClassicExecutableTree */));
 
     std::unique_ptr<QuerySolution> solution;
 

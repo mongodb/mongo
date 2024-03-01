@@ -2,8 +2,6 @@
 // - Filtering behavior equivalent to a mongo query.
 // - $where and geo operators are not allowed
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.jstests_aggregation_match;
 coll.drop();
@@ -159,14 +157,7 @@ function checkMatchResults(indexed) {
                   {$and: [{$or: [{_id: 1}, {a: 3}]}, {$or: [{_id: 2}, {a: 2}]}]});
 
     // $or
-    // TODO SERVER-86816: Remove this constraint.
-    // When running in any CSI passthrough suite with all feature flags enabled, this test will run
-    // with featureFlagClassicRuntimePlanningForSbe. This fails when we sub-plan a query and try to
-    // build a classic executable tree since CSI is not supported in the classic engine.
-    if (!setUpServerForColumnStoreIndexTest(db) &&
-        !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-        assertResults([{_id: 0, a: 1}, {_id: 2, a: 3}], {$or: [{_id: 0}, {a: 3}]});
-    }
+    assertResults([{_id: 0, a: 1}, {_id: 2, a: 3}], {$or: [{_id: 0}, {a: 3}]});
 }
 
 checkMatchResults(false);
