@@ -160,19 +160,10 @@ void CollectionCloner::preStage() {
     stdx::lock_guard<Latch> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 
-    boost::optional<auth::ValidatedTenancyScope> vts = boost::none;
     BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
-    if (gMultitenancySupport &&
-        gFeatureFlagRequireTenantID.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        _sourceNss.tenantId()) {
-        vts = auth::ValidatedTenancyScopeFactory::create(
-            _sourceNss.tenantId().get(),
-            auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
-    }
 
     BSONObj res;
-    getClient()->runCommand(_sourceNss.dbName(), b.obj(), res, 0, vts);
+    getClient()->runCommand(_sourceNss.dbName(), b.obj(), res);
     if (auto status = getStatusFromCommandResult(res); status.isOK()) {
         _stats.bytesToCopy = res.getField("size").safeNumberLong();
         if (_stats.bytesToCopy > 0) {

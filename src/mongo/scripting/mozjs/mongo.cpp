@@ -434,7 +434,10 @@ void MongoBase::Functions::_runCommandImpl::call(JSContext* cx, JS::CallArgs arg
                 args.get(2).isNumber());
         auto options = ValueWriter(cx, args.get(2)).toInt32();
         return rpc::upconvertRequest(
-            DatabaseName::createDatabaseName_forTest(boost::none, database), cmd, options);
+            DatabaseName::createDatabaseName_forTest(boost::none, database),
+            cmd,
+            options,
+            mongo::auth::ValidatedTenancyScope::kNotRequired);
     });
 }
 

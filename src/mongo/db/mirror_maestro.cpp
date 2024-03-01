@@ -425,10 +425,6 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         // Limit the maxTimeMS
         bob.append("maxTimeMS", params.getMaxTimeMS());
 
-        if (invocation->ns().tenantId()) {
-            invocation->ns().tenantId()->serializeToBSON("$tenant", &bob);
-        }
-
         // Indicate that this is a mirrored read.
         bob.append("mirrored", true);
 
@@ -497,7 +493,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         };
 
         auto newRequest = executor::RemoteCommandRequest(
-            host, invocation->getDBForReadMirroring(), payload, nullptr);
+            host, invocation->getDBForReadMirroring(), payload, nullptr /* opCtx */);
 
         newRequest.options.fireAndForget = true;
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail()))

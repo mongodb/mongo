@@ -198,6 +198,15 @@ void appendMetadata(OperationContext* opCtx,
 }
 }  // namespace
 
+auth::ValidatedTenancyScope DBClientBase::_createInnerRequestVTS(
+    const boost::optional<TenantId>& tenantId) const {
+    if (tenantId) {
+        return auth::ValidatedTenancyScopeFactory::create(
+            tenantId.get(), auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
+    }
+    return auth::ValidatedTenancyScope::kNotRequired;
+}
+
 DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request.
     ensureConnection();
@@ -251,41 +260,23 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientBase::runComm
     return {std::move(out.first), std::move(me)};
 }
 
-std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(
-    const DatabaseName& dbName,
-    BSONObj cmd,
-    BSONObj& info,
-    int options,
-    boost::optional<auth::ValidatedTenancyScope> vts) {
+std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const DatabaseName& dbName,
+                                                                   BSONObj cmd,
+                                                                   BSONObj& info,
+                                                                   int options) {
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
-    auto request = _upconvertRequest(dbName, cmd, options, vts);
+    auto request =
+        rpc::upconvertRequest(dbName, cmd, options, _createInnerRequestVTS(dbName.tenantId()));
     auto result = runCommandWithTarget(std::move(request));
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);
 }
 
-std::tuple<bool, std::shared_ptr<DBClientBase>> DBClientBase::runCommandWithTarget(
-    const DatabaseName& dbName,
-    BSONObj cmd,
-    BSONObj& info,
-    std::shared_ptr<DBClientBase> me,
-    int options) {
-    auto request = _upconvertRequest(dbName, cmd, options);
-    auto result = runCommandWithTarget(std::move(request), std::move(me));
-
-    info = result.first->getCommandReply().getOwned();
-    return std::make_tuple(isOk(info), result.second);
-}
-
-bool DBClientBase::runCommand(const DatabaseName& dbName,
-                              BSONObj cmd,
-                              BSONObj& info,
-                              int options,
-                              boost::optional<auth::ValidatedTenancyScope> vts) {
-    auto res = runCommandWithTarget(dbName, std::move(cmd), info, options, vts);
+bool DBClientBase::runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options) {
+    auto res = runCommandWithTarget(dbName, std::move(cmd), info, options);
     return std::get<0>(res);
 }
 
@@ -932,20 +923,6 @@ void DBClientBase::createIndexes(const NamespaceString& nss,
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);
     }
-}
-
-OpMsgRequest DBClientBase::_upconvertRequest(const DatabaseName& dbName,
-                                             BSONObj legacyCmdObj,
-                                             int options,
-                                             boost::optional<auth::ValidatedTenancyScope> vts) {
-    if (isAttachSecurityToken_forTest() && dbName.tenantId()) {
-        vts = auth::ValidatedTenancyScopeFactory::create(
-            dbName.tenantId().get(),
-            auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-            auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
-    }
-
-    return rpc::upconvertRequest(dbName, std::move(legacyCmdObj), options, vts);
 }
 
 BSONElement getErrField(const BSONObj& o) {

@@ -41,7 +41,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/hedge_options_util.h"
@@ -89,9 +88,6 @@ struct RemoteCommandRequestBase {
     DatabaseName dbname;
     BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
-    const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope() const {
-        return _validatedTenancyScope;
-    }
 
     /**
      * Conversion function that performs the RemoteCommandRequest conversion into OpMsgRequest
@@ -135,8 +131,6 @@ private:
      * than NetworkInterfaceExceededTimeLimit.
      */
     void _updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx);
-
-    boost::optional<auth::ValidatedTenancyScope> _validatedTenancyScope;
 };
 
 /**

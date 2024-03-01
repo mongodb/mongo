@@ -158,6 +158,18 @@ Message DBDirectClient::_call(Message& toSend, string* actualServer) {
     return std::move(dbResponse.response);
 }
 
+auth::ValidatedTenancyScope DBDirectClient::_createInnerRequestVTS(
+    const boost::optional<TenantId>& tenantId) const {
+    const auto vtsOnOpCtx = auth::ValidatedTenancyScope::get(_opCtx);
+    if (tenantId && vtsOnOpCtx && vtsOnOpCtx->hasTenantId()) {
+        invariant(vtsOnOpCtx->tenantId() == tenantId,
+                  str::stream() << "The tenant id '" << vtsOnOpCtx->tenantId()
+                                << "' on opCtx does not match the requested tenant id "
+                                << tenantId);
+    }
+    return DBClientBase::_createInnerRequestVTS(tenantId);
+}
+
 void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
     auto dbResponse = loopbackBuildResponse(_opCtx, toSend);
     invariant(dbResponse.response.empty());
@@ -175,9 +187,7 @@ std::unique_ptr<DBClientCursor> DBDirectClient::find(FindCommandRequest findRequ
 write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
     const write_ops::FindAndModifyCommandRequest& findAndModify) {
     auto request = findAndModify.serialize({});
-    if (const auto& tenant = findAndModify.getDbName().tenantId()) {
-        request.setDollarTenant(tenant.value());
-    }
+    request.validatedTenancyScope = _createInnerRequestVTS(findAndModify.getDbName().tenantId());
     auto response = runCommand(std::move(request));
     return FindAndModifyOp::parseResponse(response->getCommandReply());
 }
@@ -185,9 +195,7 @@ write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
 write_ops::InsertCommandReply DBDirectClient::insert(
     const write_ops::InsertCommandRequest& insert) {
     auto request = insert.serialize({});
-    if (const auto& tenant = insert.getDbName().tenantId()) {
-        request.setDollarTenant(tenant.value());
-    }
+    request.validatedTenancyScope = _createInnerRequestVTS(insert.getDbName().tenantId());
     auto response = runCommand(request);
     return InsertOp::parseResponse(response->getCommandReply());
 }
@@ -195,9 +203,8 @@ write_ops::InsertCommandReply DBDirectClient::insert(
 write_ops::UpdateCommandReply DBDirectClient::update(
     const write_ops::UpdateCommandRequest& update) {
     auto request = update.serialize({});
-    if (const auto& tenant = update.getDbName().tenantId()) {
-        request.setDollarTenant(tenant.value());
-    }
+    request.validatedTenancyScope = _createInnerRequestVTS(update.getDbName().tenantId());
+
     auto response = runCommand(request);
     return UpdateOp::parseResponse(response->getCommandReply());
 }
@@ -205,9 +212,8 @@ write_ops::UpdateCommandReply DBDirectClient::update(
 write_ops::DeleteCommandReply DBDirectClient::remove(
     const write_ops::DeleteCommandRequest& remove) {
     auto request = remove.serialize({});
-    if (const auto& tenant = remove.getDbName().tenantId()) {
-        request.setDollarTenant(tenant.value());
-    }
+    request.validatedTenancyScope = _createInnerRequestVTS(remove.getDbName().tenantId());
+
     auto response = runCommand(request);
     return DeleteOp::parseResponse(response->getCommandReply());
 }
@@ -222,7 +228,8 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
               "passing readConcern to DBDirectClient functions is not supported as it has to use "
               "the parent operation's readConcern");
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);
-    auto request = OpMsgRequestBuilder::create(nsOrUuid.dbName(), cmdObj);
+    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        nsOrUuid.dbName(), _createInnerRequestVTS(nsOrUuid.dbName().tenantId()), cmdObj);
 
     // Calls runCommand instead of runCommandDirectly to ensure the tenant inforamtion of this
     // command gets validated and is used for parsing the command request.

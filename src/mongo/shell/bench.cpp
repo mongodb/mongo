@@ -816,9 +816,7 @@ std::unique_ptr<DBClientBase> BenchRunConfig::createConnectionImpl(
 }
 
 std::unique_ptr<DBClientBase> BenchRunConfig::createConnection() const {
-    auto conn = BenchRunConfig::createConnectionImpl(*this);
-    conn->setAttachSecurityToken_forTest();
-    return conn;
+    return BenchRunConfig::createConnectionImpl(*this);
 }
 
 BenchRunState::BenchRunState(unsigned numWorkers)

@@ -108,6 +108,10 @@ public:
     write_ops::FindAndModifyCommandReply findAndModify(
         const write_ops::FindAndModifyCommandRequest& findAndModify);
 
+protected:
+    auth::ValidatedTenancyScope _createInnerRequestVTS(
+        const boost::optional<TenantId>& tenantId) const override;
+
 private:
     bool isFailed() const override;
 

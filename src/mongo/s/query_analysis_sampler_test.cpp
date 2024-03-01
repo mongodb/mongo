@@ -474,9 +474,7 @@ protected:
         double expectedNumQueriesExecutedPerSecond,
         std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                request.dbname, request.validatedTenancyScope(), request.cmdObj);
-
+            auto opMsg = static_cast<OpMsgRequest>(request);
             auto refreshRequest = RefreshQueryAnalyzerConfiguration::parse(
                 IDLParserContext("QueryAnalysisSamplerTest"), opMsg.body);
             ASSERT_EQ(refreshRequest.getNumQueriesExecutedPerSecond(),

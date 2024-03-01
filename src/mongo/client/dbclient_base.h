@@ -262,11 +262,7 @@ public:
      *
      *  Returns true if the command returned "ok".
      */
-    bool runCommand(const DatabaseName& dbName,
-                    BSONObj cmd,
-                    BSONObj& info,
-                    int options = 0,
-                    boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
+    bool runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options = 0);
 
     /*
      * Wraps up the runCommand function avove, but returns the DBClient that actually ran the
@@ -275,22 +271,10 @@ public:
      *
      * This is used in the shell so that cursors can send getMore through the correct connection.
      */
-    std::tuple<bool, DBClientBase*> runCommandWithTarget(
-        const DatabaseName& dbName,
-        BSONObj cmd,
-        BSONObj& info,
-        int options = 0,
-        boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
-
-    /**
-     * See the opMsg overload comment for why this function takes a shared_ptr ostensibly to this.
-     */
-    std::tuple<bool, std::shared_ptr<DBClientBase>> runCommandWithTarget(
-        const DatabaseName& dbName,
-        BSONObj cmd,
-        BSONObj& info,
-        std::shared_ptr<DBClientBase> me,
-        int options = 0);
+    std::tuple<bool, DBClientBase*> runCommandWithTarget(const DatabaseName& dbName,
+                                                         BSONObj cmd,
+                                                         BSONObj& info,
+                                                         int options = 0);
 
     /**
      * Authenticates to another cluster member using appropriate authentication data.
@@ -701,17 +685,17 @@ public:
         return _apiParameters;
     }
 
-    void setAttachSecurityToken_forTest() {
-        _attachSecurityToken = true;
-    }
-
-    bool isAttachSecurityToken_forTest() const {
-        return _attachSecurityToken;
-    }
-
     void setShouldThrowOnStaleConfigError(bool value) {
         _shouldThrowOnStaleConfigError = value;
     }
+
+protected:
+    /**
+     * Generates the validated tenancy scope for internal requests utilized within the server or
+     * across servers.
+     */
+    virtual auth::ValidatedTenancyScope _createInnerRequestVTS(
+        const boost::optional<TenantId>& tenantId) const;
 
 protected:
     /**
@@ -755,17 +739,10 @@ private:
 
     auth::RunCommandHook _makeAuthRunCommandHook();
 
-    OpMsgRequest _upconvertRequest(const DatabaseName& dbName,
-                                   BSONObj legacyCmdObj,
-                                   int queryFlags = 0,
-                                   boost::optional<auth::ValidatedTenancyScope> vts = boost::none);
-
     // Unless explicitly opted out, a DBClientBase should throw on a StaleConfig error so that the
     // error can be handled internally if applicable rather than propagated to the external client
     // right away.
     bool _shouldThrowOnStaleConfigError = true;
-
-    bool _attachSecurityToken = false;
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;

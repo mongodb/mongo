@@ -42,6 +42,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/security_token_auth',
         '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
