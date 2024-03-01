@@ -81,10 +81,6 @@ jsTest.log("Test collmod over an unsplittable collection living on the DBPrimary
     const res = assert.commandWorked(db.runCommand(
         {collMod: coll.getName(), index: {keyPattern: kIndexKey, expireAfterSeconds: 1111}}));
 
-    assert.eq(1, res.raw[shard0_ps.host].ok, tojson(res));
-    assert.eq(undefined, res.raw[shard1.host], tojson(res));
-    assert.eq(undefined, res.raw[shard2.host], tojson(res));
-
     assertIndexExists(coll, kIndexKey, {expireAfterSeconds: 1111}, [mongos, shard0_ps]);
     assertIndexDoesntExist(coll, kIndexKey, {expireAfterSeconds: 1111}, [shard1, shard2]);
 }
@@ -101,10 +97,6 @@ jsTest.log("Test collmod over an unsplittable collection living outside the DBPr
     // Update index options calling collmod
     const res = assert.commandWorked(db.runCommand(
         {collMod: coll.getName(), index: {keyPattern: kIndexKey, expireAfterSeconds: 1111}}));
-
-    assert.eq(undefined, res.raw[shard0_ps.host], tojson(res));
-    assert.eq(1, res.raw[shard1.host].ok, tojson(res));
-    assert.eq(undefined, res.raw[shard2.host], tojson(res));
 
     assertIndexExists(coll, kIndexKey, {expireAfterSeconds: 1111}, [mongos, shard1]);
     assertIndexDoesntExist(coll, kIndexKey, {expireAfterSeconds: 1111}, [shard0_ps, shard2]);

@@ -36,6 +36,8 @@ selector:
   # within it from being read by the dbcheck process. Therefore, if the test keeps the transaction
   # in a prepared state for an extended period, it will result in a timeout for the dbcheck process.
   - jstests/core/txns/prepare_conflict.js
+    # TODO (SERVER-86917): Index DDL operations have concurrency issues with validate command
+  - jstests/core/ddl/collmod_convert_index_uniqueness.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

@@ -14,12 +14,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-// TODO SERVER-84560: remove once collMod will have the same output for tracked/untracked
-// collections
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-
 const collName = 'collmod_convert_to_unique';
 const coll = db.getCollection(collName);
 coll.drop();
@@ -32,13 +26,9 @@ function countUnique(key) {
     return all.length;
 }
 
-// TODO SERVER-84560: remove once collMod will have the same output for tracked/untracked
-// collections
-const unpackRawResponse = function(result) {
-    if (result.hasOwnProperty('raw')) {
-        return Object.values(result.raw)[0];
-    }
-    return result;
+const assertUniqueNew = function(result) {
+    assert(result.hasOwnProperty('unique_new'), tojson(result));
+    assert(result.unique_new, tojson(result));
 };
 
 // Creates a regular index and use collMod to convert it to a unique index.
@@ -142,7 +132,7 @@ let result = assert.commandWorked(
 
 // New index state should be reflected in 'unique_new' field in collMod response.
 
-assert(unpackRawResponse(result).unique_new, tojson(result));
+assertUniqueNew(result);
 
 // Look up index details in listIndexes output.
 assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.getIndexes()));
@@ -171,7 +161,7 @@ const assertForceNonUniqueNew = function(result) {
     assert(result.forceNonUnique_new, tojson(result));
 };
 
-assertForceNonUniqueNew(unpackRawResponse(result));
+assertForceNonUniqueNew(result);
 
 // Tests the index now accepts duplicate keys.
 assert.commandWorked(coll.insert({_id: 100, a: 100}));

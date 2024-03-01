@@ -138,6 +138,13 @@ const tests = [
                     index: {keyPattern: {type: 1}, hidden: true},
                 },
             },
+            {
+                shortDescription: "Set a new expiration for entries with collMod.",
+                command: {
+                    collMod: "x",
+                    index: {keyPattern: {type: 1}, expireAfterSeconds: 5},
+                },
+            },
         ]
     },
     {
@@ -308,6 +315,67 @@ const tests = [
     },
 ];
 
+// Test parity between the collMod API of unsharded, unsplitable collections and
+// sharded collections
+function collModParity(db, collModCommand) {
+    // Run collmod on a unsplitable collection
+    db.runCommand({createUnsplittableCollection: "x"});
+    db.runCommand({createIndexes: "x", indexes: [{key: {"age": 1}, name: "ageIndex"}]});
+    collModCommand.command.collMod = "x"
+    const unsplitableResultKeys = Object.keys(runAndAssertTestCase(collModCommand, db));
+
+    // Run collmod on an unsharded collection
+    db.runCommand({create: "y"});
+    db.runCommand({createIndexes: "y", indexes: [{key: {"age": 1}, name: "ageIndex"}]});
+    collModCommand.command.collMod = "y"
+    const unshardedResultKeys = Object.keys(runAndAssertTestCase(collModCommand, db));
+
+    // Run collmod on an sharded collection
+    db.runCommand({create: "z"});
+    db.runCommand({createIndexes: "z", indexes: [{key: {"age": 1}, name: "ageIndex"}]});
+    collModCommand.command.collMod = "z"
+    const shardedResultKeys = Object.keys(runAndAssertTestCase(collModCommand, db));
+
+    assert(isSubset(unsplitableResultKeys, unshardedResultKeys) &&
+               isSubset(unshardedResultKeys, shardedResultKeys) &&
+               isSubset(shardedResultKeys, unsplitableResultKeys),
+           "Missing fields in the response" +
+               "\nKeys in unsplitable (sharded) collection response: " + unsplitableResultKeys +
+               "\nKeys in unshardedResultKeys collection response: " + unshardedResultKeys +
+               "\nKeys in sharded collection response: " + shardedResultKeys);
+
+    db.x.drop();
+    db.y.drop();
+    db.z.drop();
+}
+
+function collModParityTests(db) {
+    collModParity(db, {
+        command: {
+            collMod: "",  // Filled by collModParity
+            index: {name: "ageIndex", hidden: true}
+        }
+    });
+    collModParity(db, {
+        command: {
+            collMod: "",  // Filled by collModParity
+            index: {name: "ageIndex", expireAfterSeconds: NumberLong(5)}
+        }
+    });
+    collModParity(db, {
+        command: {
+            collMod: "",  // Filled by collModParity
+            index: {name: "ageIndex", expireAfterSeconds: 5}
+        }
+    });
+    collModParity(db, {
+        command: {
+            collMod: "",  // Filled by collModParity
+            index: {name: "ageIndex", prepareUnique: true}
+        }
+    });
+}
+
 function runAndAssertTestCaseWithForcedWriteConcern(testCase, testFixture) {
     testFixture.stopReplication(testFixture.mongoConfig)
     testCase.command.writeConcern = {w: "majority", wtimeout: 1};
@@ -365,14 +433,6 @@ function isSubset(superset, subset) {
 function assertMongosAndReplicaSetInterfaceParity(test, testCase, forceWriteConcernError, st, rst) {
     const mongosDb = st.getDB(test.database);
     const replicaSetDb = rst.getPrimary().getDB(test.database);
-    // TODO SERVER-84560: removed once replica-set parity with sharded cluster is fixed for collmod
-    // on unsplittable collections
-    if (test.name == "collMod") {
-        const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-            st.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-        if (isTrackUnshardedEnabled)
-            return;
-    }
 
     const replicaSetTestFixture = {
         db: replicaSetDb,
@@ -433,6 +493,9 @@ rst.initiate();
 
 runTestCases(st, rst, false);
 runTestCases(st, rst, true);
+
+collModParityTests(st.s.getDB("test"));
+collModParityTests(rst.getPrimary().getDB("test"));
 
 st.stop();
 rst.stopSet();

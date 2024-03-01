@@ -152,9 +152,6 @@ res = st.s.getDB(dbName).runCommand({
     validationAction: "warn"
 });
 assert.commandWorked(res);
-assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-assert.eq(1, res.raw[st.shard1.host].ok, tojson(res));
-assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 checkShardCollOption("validator", validationOption2, [st.shard0, st.shard1], [st.shard2]);
 
 // Check that errors from shards are aggregated correctly.

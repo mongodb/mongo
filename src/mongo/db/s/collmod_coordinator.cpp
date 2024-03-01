@@ -112,6 +112,18 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShar
         opCtx, opts, shardIds, ignoreResponses);
 }
 
+// Extract the first response from the list of shardResponses, and propagate to the global level of
+// the response
+void _appendResponseCollModIndexChanges(
+    const std::vector<AsyncRequestsSender::Response>& shardResponses, BSONObjBuilder& result) {
+    if (shardResponses.empty() || !shardResponses[0].swResponse.isOK()) {
+        return;
+    }
+
+    auto& firstShardResponse = shardResponses[0].swResponse.getValue().data;
+    result.appendElements(CommandHelpers::filterCommandReplyForPassthrough(firstShardResponse));
+}
+
 }  // namespace
 
 CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
@@ -439,11 +451,23 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                         BSONObjBuilder builder;
                         std::string errmsg;
-                        auto ok =
-                            appendRawResponses(opCtx, &errmsg, &builder, responses).responseOK;
+                        bool ok = [&]() {
+                            BSONObjBuilder rawBuilder;
+                            bool ok = appendRawResponses(opCtx, &errmsg, &rawBuilder, responses)
+                                          .responseOK;
+                            BSONObj extractedObjFromRaw = rawBuilder.obj();
+                            if (ok) {
+                                extractedObjFromRaw = extractedObjFromRaw.removeField("raw");
+                                _appendResponseCollModIndexChanges(responses, builder);
+                            }
+                            builder.appendElements(extractedObjFromRaw);
+                            return ok;
+                        }();
+
                         if (!errmsg.empty()) {
                             CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
                         }
+
                         _result = builder.obj();
 
                         const auto collUUID = _doc.getCollUUID();
@@ -469,9 +493,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         opCtx, ShardingState::get(opCtx)->shardId()));
                     BSONObjBuilder builder;
                     builder.appendElements(collModRes);
-                    BSONObjBuilder subBuilder(builder.subobjStart("raw"));
-                    subBuilder.append(shard->getConnString().toString(), collModRes);
-                    subBuilder.doneFast();
                     _result = builder.obj();
                 }
             }));
