@@ -22,17 +22,18 @@ const coll = db.plan_cache_replan_where;
 coll.drop();
 
 // Create two indexes to ensure the plan gets cached when the classic engine is used.
-assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({b: 1, a: 1}));
 const docs = Array.from({length: 20}, (_, i) => ({a: 1, b: i}));
 assert.commandWorked(coll.insert(docs));
 // Insert an extra document such that the initial query has a single document to return.
-assert.commandWorked(coll.insert({a: 2, y: 1}));
+assert.commandWorked(coll.insert({a: 2, b: 1}));
 
 assert.eq(1,
           coll.find({
                   $and: [
                       {a: 2},
+                      {b: {$gte: 0}},
                       {
                           $where: function() {
                               return true
@@ -46,6 +47,7 @@ assert.eq(1,
           coll.find({
                   $and: [
                       {a: 2},
+                      {b: {$gte: 0}},
                       {
                           $where: function() {
                               return true
@@ -66,6 +68,7 @@ assert.eq(20,
           coll.find({
                   $and: [
                       {a: 1},
+                      {b: {$gte: 0}},
                       {
                           $where: function() {
                               return true
