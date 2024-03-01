@@ -1214,8 +1214,11 @@ private:
      * Takes in a unique lock, that must already be locked, on _mutex.
      *
      * Lock will be released after this method finishes.
+     *
+     * When prioritized is set to true, the reporter will try to schedule an updatePosition request
+     * even there is already one in flight.
      */
-    void _reportUpstream_inlock(stdx::unique_lock<Latch> lock);
+    void _reportUpstream_inlock(stdx::unique_lock<Latch> lock, bool prioritized);
 
     /**
      * Helpers to set the last written, applied and durable OpTime.

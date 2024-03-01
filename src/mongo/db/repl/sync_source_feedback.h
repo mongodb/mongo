@@ -57,7 +57,7 @@ public:
 
     /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of secondary
     /// replication progress.
-    void forwardSecondaryProgress();
+    void forwardSecondaryProgress(bool prioritized = false);
 
     /**
      * Loops continuously until shutdown() is called, passing updates when they are present. If no

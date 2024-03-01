@@ -107,13 +107,13 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
 
 }  // namespace
 
-void SyncSourceFeedback::forwardSecondaryProgress() {
+void SyncSourceFeedback::forwardSecondaryProgress(bool prioritized) {
     {
         stdx::unique_lock<Latch> lock(_mtx);
         _positionChanged = true;
         _cond.notify_all();
         if (_reporter) {
-            auto triggerStatus = _reporter->trigger();
+            auto triggerStatus = _reporter->trigger(prioritized);
             if (!triggerStatus.isOK()) {
                 LOGV2_WARNING(21764,
                               "Unable to forward progress",
@@ -235,7 +235,6 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
                             "oldKeepAliveInterval"_attr = oldKeepAliveInterval);
             }
         }
-
         Reporter reporter(executor,
                           makePrepareReplSetUpdatePositionCommandFn(replCoord, syncTarget, bgsync),
                           syncTarget,

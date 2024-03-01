@@ -739,4 +739,97 @@ TEST_F(ReporterTest, ShutdownImmediatelyAfterTriggerWhileKeepAliveTimeoutIsSched
     assertReporterDone();
 }
 
+// On Windows, the underlying NetworkInterfaceMock cannot provide FIFO for the request/response, and
+// will fail the following tests because these tests have more than one request in-flight and
+// depends on the response order.
+#ifndef _WIN32
+
+TEST_F(ReporterTest, AllowUsingBackupChannel) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger());
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_TRUE(reporter->isBackupActive());
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+    processNetworkResponse(BSON("ok" << 1), false);
+
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, BackupChannelFailureAlsoCauseReporterFailure) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    // This request will be sent using the main channel after the request in the backup channel and
+    // it should not overwrite the error code from the backup channel.
+    ASSERT_OK(reporter->trigger());
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_TRUE(reporter->isBackupActive());
+    processNetworkResponse({ErrorCodes::OperationFailed, "update failed", Milliseconds(0)}, true);
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+    processNetworkResponse(BSON("ok" << 1), false);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, reporter->getStatus_forTest().code());
+
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, BackupChannelSendAnotherOneAfterResponseIfReceiveTwo) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger());
+
+    // Until this point, we triggered on the main channel twice and on the backup channel once.
+    // The first request on the main channel responds, then it will schedule another one on the main
+    // channel immediately.
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_TRUE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+
+    // Trigger on the backup channel one more time so reporter will send another request on the
+    // backup channel after the previous one returns.
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isWaitingToSendReport());
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_TRUE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+    ASSERT_FALSE(reporter->isWaitingToSendReport());
+
+    // The second request on the main channel comes back, now the backup channel should still be
+    // active.
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_FALSE(reporter->isWaitingToSendReport());
+    ASSERT_TRUE(reporter->isBackupActive());
+    processNetworkResponse(BSON("ok" << 1), false);
+    ASSERT_FALSE(reporter->isWaitingToSendReport());
+
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+#endif
+
+TEST_F(ReporterTestNoTriggerAtSetUp, NotUsingBackupChannelWhenFree) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_FALSE(reporter->isActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
 }  // namespace
