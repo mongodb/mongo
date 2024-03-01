@@ -247,17 +247,20 @@ wtEnv.CppUnitTest(
 )
 
 wtEnv.Benchmark(
-    target='storage_wiredtiger_index_bm',
+    target='storage_wiredtiger_record_store_and_index_bm',
     source=[
         'wiredtiger_index_bm.cpp',
+        'wiredtiger_record_store_bm.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/durable_catalog',
+        '$BUILD_DIR/mongo/db/storage/record_store_bm',
         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_bm',
         'wiredtiger_index_test_harness',
+        'wiredtiger_record_store_test_harness',
     ],
 )
 

@@ -361,6 +361,17 @@ bmEnv.Library(
         'sorted_data_interface_test_harness',
     ],
 )
+bmEnv.Library(
+    target='record_store_bm',
+    source=[
+        'record_store_bm_cursor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/third_party/shim_benchmark',
+        'record_store_test_harness',
+    ],
+)
 
 env.Library(
     target='record_store_test_harness',
