@@ -1727,6 +1727,27 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
     verifyDecompression(binData, elems, true);
 }
 
+TEST_F(BSONColumnTest, DoubleIncreaseScaleNotPossible) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems = {createElementDouble(-153764908544737.4),
+                                      createElementDouble(-85827904635132.83)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, deltaDoubleMemory(elems[1], elems[0]));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems, true);
+}
+
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
     BSONColumnBuilder cb;
 

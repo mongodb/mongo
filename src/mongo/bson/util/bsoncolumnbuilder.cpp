@@ -1697,7 +1697,7 @@ bool EncodingState::Encoder64::_appendDouble(double value,
         uint8_t prevScaleIndex;
         std::tie(prevEncoded64, prevScaleIndex) = scaleAndEncodeDouble(previous, scale);
         if (scale != prevScaleIndex) {
-            std::tie(encoded, scaleIndex) = scaleAndEncodeDouble(value, prevScaleIndex);
+            std::tie(encoded, scale) = scaleAndEncodeDouble(value, prevScaleIndex);
             std::tie(prevEncoded64, prevScaleIndex) = scaleAndEncodeDouble(previous, scale);
         }
 
