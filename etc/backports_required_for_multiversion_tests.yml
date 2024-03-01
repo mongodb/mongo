@@ -396,7 +396,7 @@ last-continuous:
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-87061
+    ticket: SERVER-86583
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-73685
   - test_file: jstests/sharding/fsync_lock_ddl_lock.js
@@ -1031,7 +1031,7 @@ last-lts:
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-87061
+    ticket: SERVER-86583
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-73685
   - test_file: jstests/sharding/fsync_lock_ddl_lock.js

@@ -388,4 +388,45 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     }
 }
 
+// Tests non-transaction reads with readConcern snapshot + atClusterTime.
+{
+    const db = st.s.getDB('test');
+    const coll = db['sharded'];
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}))
+    assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
+    assert.commandWorked(st.s.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {x: -1},
+        to: st.shard0.shardName,
+        _waitForDelete: true
+    }));
+    assert.commandWorked(st.s.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {x: 1},
+        to: st.shard1.shardName,
+        _waitForDelete: true
+    }));
+
+    assert.commandWorked(coll.insertMany([{x: -1, a: 'sharded'}, {x: 1, a: 'sharded'}]));
+
+    // Get a clusterTime inclusive of the above inserts, but not inclusive of the drop-and-recreate
+    // operation that will follow.
+    const clusterTimeBeforeDropAndRecreateAsUnsharded = db.getMongo().getClusterTime().clusterTime;
+
+    // Drop and recreate
+    assert(coll.drop());
+    assert.commandWorked(coll.insert({x: 0, a: 'unsharded'}));
+
+    // Read with snapshot readConcern and atClusterTime set at that clusterTime. Expect a conflict
+    // to be thrown.
+    const findResponse = coll.runCommand({
+        find: coll.getName(),
+        readConcern: {level: 'snapshot', atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded}
+    });
+
+    assert.commandFailedWithCode(findResponse,
+                                 [ErrorCodes.SnapshotUnavailable, ErrorCodes.StaleChunkHistory]);
+}
+
 st.stop();
