@@ -1393,6 +1393,7 @@ var ShardingTest = function ShardingTest(params) {
                 name: testName + "-configRS",
                 seedRandomNumberGenerator: !randomSeedAlreadySet,
                 isConfigServer: true,
+                isRouterServer: isEmbeddedRouterMode,
             };
 
             // always use wiredTiger as the storage engine for CSRS
@@ -1540,11 +1541,6 @@ var ShardingTest = function ShardingTest(params) {
                 seedRandomNumberGenerator: !randomSeedAlreadySet,
                 isConfigServer: setIsConfigSvr,
                 isRouterServer: isEmbeddedRouterMode,
-                // We can have undefined configRS even in embedded router mode if we're the
-                // config-shard and are still starting up. That's OK because the configdb
-                // argument to embedded router isn't needed for mongods in a config shard.
-                configdb: (this.configRS && isEmbeddedRouterMode) ? this.configRS.getURL()
-                                                                  : undefined,
                 useAutoBootstrapProcedure: useAutoBootstrapProcedure,
             });
 
@@ -1840,14 +1836,32 @@ var ShardingTest = function ShardingTest(params) {
         if (isEmbeddedRouterMode) {
             print("Connecting to embedded routers...");
             let allShardNodes = this._rs.map(r => r.test.nodes).flat();
-            const numNodes = allShardNodes.length;
+            let configNodes = [];
+            if (!isConfigShardMode) {
+                configNodes = this.configRS.nodes;
+            }
+
+            const numNodes = allShardNodes.length + configNodes.length;
             assert(numNodes >= numMongos,
                    'Need at least numMongos total mongod nodes in the cluster');
 
             if (!randomSeedAlreadySet) {
                 Random.setRandomFixtureSeed();
             }
-            let shuffledNodes = Array.shuffle(allShardNodes);
+
+            let shuffledNodes = [];
+            if (isConfigShardMode) {
+                shuffledNodes = Array.shuffle(allShardNodes);
+            } else {
+                // Make sure to push one configsvr router port as the first one so it will be the
+                // one responsible to run the addShard commands.
+                let allNodes = configNodes.concat(allShardNodes);
+                let configNode = allNodes[0];
+                allNodes.shift();
+                shuffledNodes = Array.shuffle(allNodes);
+                shuffledNodes.unshift(configNode);
+            }
+
             let routerNodes = shuffledNodes.slice(0, numMongos);
             let i = 0;
 

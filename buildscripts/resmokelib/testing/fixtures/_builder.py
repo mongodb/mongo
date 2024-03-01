@@ -373,8 +373,9 @@ class ShardedClusterBuilder(FixtureBuilder):
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         is_multiversion = mixed_bin_versions is not None
+        is_config_shard = kwargs["config_shard"] is not None
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
-        self._validate_embedded_router_mode_options(kwargs, is_multiversion)
+        self._validate_embedded_router_mode_options(kwargs, is_config_shard, is_multiversion)
 
         mongos_class, mongos_executables = self._get_mongos_assets(kwargs, mixed_bin_versions,
                                                                    old_bin_version)
@@ -393,16 +394,21 @@ class ShardedClusterBuilder(FixtureBuilder):
                                             config_shard, kwargs["num_rs_nodes_per_shard"])
         sharded_cluster.install_configsvr(config_svr)
 
+        # Persist a list of all nodes from the cluster with a boolean that indicates if that node
+        # acts as a config server or not.
+        nodes = [(node, True) for node in config_svr._all_mongo_d_s_t()]
+
         for rs_shard_index in range(kwargs["num_shards"]):
             if rs_shard_index != config_shard:
                 rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
                                               rs_shard_index, kwargs["num_rs_nodes_per_shard"])
                 sharded_cluster.install_rs_shard(rs_shard)
+                # Extend the list of nodes to be sure configsvr nodes are placed at first places.
+                nodes.extend([(node, False) for node in rs_shard._all_mongo_d_s_t()])
             else:
                 sharded_cluster.install_rs_shard(config_svr)
 
         num_routers = kwargs["num_mongos"]
-        shardsvrs = sharded_cluster.get_shardsvrs()
 
         def install_router():
             if not kwargs.get("embedded_router", None):
@@ -410,8 +416,9 @@ class ShardedClusterBuilder(FixtureBuilder):
                                           mongos_index, num_routers, is_multiversion)
                 sharded_cluster.install_mongos(mongos)
             else:
+                node = nodes.pop(0)
                 router_view = self._new_router_view(sharded_cluster, mongos_index, num_routers,
-                                                    shardsvrs.pop())
+                                                    node[0], node[1])
                 sharded_cluster.install_mongos(router_view)
 
         for mongos_index in range(num_routers):
@@ -468,7 +475,7 @@ class ShardedClusterBuilder(FixtureBuilder):
                 raise errors.ServerFailure(msg)
 
     @staticmethod
-    def _validate_embedded_router_mode_options(kwargs: Dict[str, Any],
+    def _validate_embedded_router_mode_options(kwargs: Dict[str, Any], is_config_shard: bool,
                                                is_multiversion: bool) -> None:
         """Raise an exception if the configuration for the sharded cluster can't support embedded_router_mode.
 
@@ -480,7 +487,15 @@ class ShardedClusterBuilder(FixtureBuilder):
         embedded_router_mode = kwargs.get("embedded_router", None)
         num_routers = kwargs["num_mongos"]
         num_shardsvrs = kwargs["num_shards"] * kwargs["num_rs_nodes_per_shard"]
+
         if embedded_router_mode:
+            # Add the configsvr as a mongos if it is not already counted as a config shard.
+            if not is_config_shard:
+                num_configsvr_nodes = 1
+                if "configsvr_options" in kwargs and "num_nodes" in kwargs["configsvr_options"]:
+                    num_configsvr_nodes = kwargs["configsvr_options"]["num_nodes"]
+                num_routers += num_configsvr_nodes
+
             if num_routers > num_shardsvrs:
                 raise ValueError(
                     "When running in embedded router mode, num_mongos must be <= the total number of shardsvrs in the cluster."
@@ -606,12 +621,13 @@ class ShardedClusterBuilder(FixtureBuilder):
 
     @staticmethod
     def _new_router_view(sharded_cluster: ShardedClusterFixture, mongos_index: int, total: int,
-                         mongod: MongoDFixture) -> _RouterView:
+                         mongod: MongoDFixture, is_configsvr: bool) -> _RouterView:
         """Make a fixture that allows ShardedClusterFixture to treat a shardsvr as a router."""
 
         router_logger = sharded_cluster.get_mongos_logger(mongos_index, total)
         router_kwargs = {}
         router_kwargs["mongod"] = mongod
 
-        fix = make_fixture("_RouterView", router_logger, sharded_cluster.job_num, **router_kwargs)
+        fix = make_fixture("_RouterView", router_logger, sharded_cluster.job_num, is_configsvr,
+                           **router_kwargs)
         return fix

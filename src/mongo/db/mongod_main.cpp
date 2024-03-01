@@ -894,13 +894,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
         ResourceYielderFactory::initialize(serviceContext);
 
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-            serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             {
                 TimeElapsedBuilderScopedTimer scopedTimer(
                     serviceContext->getFastClockSource(),
-                    "Initialize the sharding components for a config server and/or an embedded "
-                    "router",
+                    "Initialize the sharding components for a config server",
                     &startupTimeElapsedBuilder);
 
                 initializeGlobalShardingStateForMongoD(startupOpCtx.get());

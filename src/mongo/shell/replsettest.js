@@ -3206,15 +3206,7 @@ var ReplSetTest = function ReplSetTest(opts) {
             dbpath: "$set-$node"
         };
         if (this.isRouterServer) {
-            assert(
-                this.configdb || this.isConfigServer,
-                "Mongod acting as a router requires configdb CLI argument or configsvr role in ShardingTest");
             defaults.routerPort = this.routerPorts[n];
-        }
-        if (this.configdb) {
-            assert(this.isRouterServer,
-                   "Configdb only supported with embedded router mode in ShardingTest");
-            defaults.configdb = this.configdb;
         }
 
         if (this.useAutoBootstrapProcedure) {
@@ -3770,7 +3762,6 @@ var ReplSetTest = function ReplSetTest(opts) {
             : true;
         rst.isConfigServer = opts.isConfigServer;
         rst.isRouterServer = opts.isRouterServer || false;
-        rst.configdb = opts.configdb;
 
         rst._useBridge = opts.useBridge || false;
         if (rst._useBridge) {

@@ -510,8 +510,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
         shardingState->setRecoveryFailed(ex.toStatus());
     }
 
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         Grid::get(opCtx)->setShardingInitialized();
     } else {
         // A config server always initializes sharding at startup.
@@ -616,24 +615,12 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
         return;
     }
 
-    // TODO SERVER-83059: Remove --configdb argument from mongod
-    if (!serverGlobalParams.configdbs &&
-        !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        uasserted(ErrorCodes::BadValue,
-                  "Embedded router requires --configdb if it is not the config shard");
-    }
-
     const auto service = opCtx->getServiceContext();
 
     auto configCS = []() -> boost::optional<ConnectionString> {
-        if (!serverGlobalParams.configdbs) {
-            // When the config server can operate as a shard, it sets up a ShardRemote for the
-            // config shard, which is created later after loading the local replica set config.
-            return boost::none;
-        }
-
-        invariant(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
-        return serverGlobalParams.configdbs;
+        // When the config server can operate as a shard, it sets up a ShardRemote for the
+        // config shard, which is created later after loading the local replica set config.
+        return boost::none;
     }();
 
     // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
@@ -672,11 +659,6 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
     }
 
     Grid::get(opCtx)->setShardingInitialized();
-
-    if (auto routerService = service->getService(ClusterRole::RouterServer); routerService) {
-        uassertStatusOK(AuthorizationManager::get(routerService)->initialize(opCtx));
-        UserCacheInvalidator::start(service, opCtx);
-    }
 }
 
 void ShardingInitializationMongoD::installReplicaSetChangeListener(ServiceContext* service) {
@@ -697,20 +679,18 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
 
     if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         // A config server added as a shard would have already set this up at startup.
-        if (!serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-            if (storageGlobalParams.queryableBackupMode) {
-                CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
-            } else {
-                CatalogCacheLoader::set(service,
-                                        std::make_unique<ShardServerCatalogCacheLoader>(
-                                            std::make_unique<ConfigServerCatalogCacheLoader>()));
-            }
-
-            CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-            _initializeGlobalShardingState(opCtx, {shardIdentity.getConfigsvrConnectionString()});
-
-            installReplicaSetChangeListener(service);
+        if (storageGlobalParams.queryableBackupMode) {
+            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
+        } else {
+            CatalogCacheLoader::set(service,
+                                    std::make_unique<ShardServerCatalogCacheLoader>(
+                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
         }
+
+        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+        _initializeGlobalShardingState(opCtx, {shardIdentity.getConfigsvrConnectionString()});
+
+        installReplicaSetChangeListener(service);
 
         // Reset the shard register config connection string in case it missed the replica set
         // monitor notification. Config server does not need to do this since it gets the connection
@@ -726,6 +706,11 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
                 ->shardRegistry()
                 ->updateReplSetHosts(rsMonitorConfigConnStr,
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
+        }
+
+        if (auto routerService = service->getService(ClusterRole::RouterServer); routerService) {
+            uassertStatusOK(AuthorizationManager::get(routerService)->initialize(opCtx));
+            UserCacheInvalidator::start(service, opCtx);
         }
     }
 

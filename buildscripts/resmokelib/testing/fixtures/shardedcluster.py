@@ -151,10 +151,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         all_nodes += self.shards
         return sum([node._all_mongo_d_s_t() for node in all_nodes], [])
 
-    def get_shardsvrs(self):
-        """Return a list of the `MongodFixture`s for all of the shardsvrs in the cluster."""
-        return sum([shard._all_mongo_d_s_t() for shard in self.shards], [])
-
     def refresh_logical_session_cache(self, target):
         """Refresh logical session cache with no timeout."""
         primary = target.get_primary().mongo_client()
@@ -335,6 +331,18 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
             return self.shards[0].get_driver_connection_url()
 
+        if self.embedded_router_mode:
+            # If the embedded router is enabled, we must have a mongos placed in a node acting as a
+            # configsvr.
+            config_mongos = next((mongos for mongos in self.mongos if mongos.is_from_configsvr()),
+                                 None)
+            if config_mongos:
+                return config_mongos.get_driver_connection_url()
+            else:
+                raise ValueError(
+                    "Cannot use the embedded router mode without opening the routerPort of the configsvr"
+                )
+
         return "mongodb://" + self.get_internal_connection_string()
 
     def get_node_info(self):
@@ -370,6 +378,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
         mongod_options["storageEngine"] = "wiredTiger"
+
+        if self.embedded_router_mode:
+            mongod_options["routerPort"] = ""
 
         return {
             "mongod_options": mongod_options, "mongod_executable": self.mongod_executable,
@@ -438,8 +449,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         if self.embedded_router_mode:
             mongod_options["routerPort"] = ""
-            if self.config_shard != index:
-                mongod_options["configdb"] = self.configsvr.get_internal_connection_string()
 
         shard_logging_prefix = self._get_rs_shard_logging_prefix(index)
 
@@ -571,16 +580,21 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
 class _RouterView(interface.Fixture):
     """A fixture that exposes the routing API of a routing-enabled shardsvr."""
 
-    def __init__(self, logger, job_num, fixturelib, mongod):
+    def __init__(self, logger, job_num, fixturelib, is_configsvr: bool, mongod):
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
         self.mongod = mongod
         self.port = self.mongod.router_port
+        self.is_configsvr = is_configsvr
         if not self.port:
             raise ValueError(
                 "Mongod must be started with the --routerPort flag to support a RouterView")
 
     def pids(self):
         return self.mongod.pids
+
+    def is_from_configsvr(self):
+        """Return true if the router is part of a mongod acting as a config server."""
+        return self.is_configsvr
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
@@ -687,6 +701,10 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         else:
             self.logger.debug('Mongos not running when gathering mongos fixture pids.')
         return []
+
+    def is_from_configsvr(self):
+        """Return false, because this router is not part of a mongod."""
+        return False
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
