@@ -806,6 +806,11 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
 
         checkCollectionUUIDMismatch(opCtx, catalog, _resolvedNss, _coll, options._expectedUUID);
 
+        if (receivedShardVersion) {
+            auto_get_collection::checkShardingAndLocalCatalogCollectionUUIDMatch(
+                opCtx, _resolvedNss, *receivedShardVersion, collDesc, _coll);
+        }
+
         return;
     }
 

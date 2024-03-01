@@ -90,6 +90,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeInitializing);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeBlockingWrites);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingParticipantsToCommit);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeRemovingStateDoc);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
@@ -2342,6 +2343,12 @@ void ReshardingCoordinator::_tellAllDonorsToRefresh(
 
 void ReshardingCoordinator::_tellAllParticipantsToCommit(
     const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        reshardingPauseBeforeTellingParticipantsToCommit.pauseWhileSetAndNotCanceled(
+            opCtx.get(), _ctHolder->getAbortToken());
+    }
+
     auto commitCmd =
         createShardsvrCommitReshardCollectionCmd(nss, _coordinatorDoc.getReshardingUUID());
     _sendCommandToAllParticipants(executor, commitCmd);

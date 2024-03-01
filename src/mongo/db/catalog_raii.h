@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/views/view.h"
 
 namespace mongo {
@@ -89,6 +90,17 @@ void checkLocalCatalogIsValidForUnshardedShardVersion(OperationContext* opCtx,
                                                       const CollectionCatalog& stashedCatalog,
                                                       const CollectionPtr& collectionPtr,
                                                       const NamespaceString& nss);
+
+/**
+ * Check that the collection uuid on the sharding catalog and the local catalog match.
+ */
+void checkShardingAndLocalCatalogCollectionUUIDMatch(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardVersion& requestedShardVersion,
+    const ScopedCollectionDescription& shardingCollectionDescription,
+    const CollectionPtr& collectionPtr);
+
 }  // namespace auto_get_collection
 
 /**

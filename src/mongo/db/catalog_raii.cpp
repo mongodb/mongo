@@ -363,6 +363,11 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                 opCtx, *catalog, _coll, _resolvedNss);
         }
 
+        if (receivedShardVersion) {
+            auto_get_collection::checkShardingAndLocalCatalogCollectionUUIDMatch(
+                opCtx, _resolvedNss, *receivedShardVersion, collDesc, _coll);
+        }
+
         return;
     }
 
@@ -766,6 +771,61 @@ void auto_get_collection::checkLocalCatalogIsValidForUnshardedShardVersion(
                     makeErrorMessage(),
                     !latestCatalog->lookupCollectionByNamespace(opCtx, nss) &&
                         !latestCatalog->lookupView(opCtx, nss));
+        }
+    }
+}
+
+void auto_get_collection::checkShardingAndLocalCatalogCollectionUUIDMatch(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardVersion& requestedShardVersion,
+    const ScopedCollectionDescription& shardingCollectionDescription,
+    const CollectionPtr& collectionPtr) {
+    // Skip the check if the requested shard version corresponds to an untracked collection or
+    // corresponds to this shard not own any chunk. Also skip the check if the router attached
+    // ShardVersion::IGNORED, since in this case the router broadcasts request to shards that may
+    // not even own the collection at all (so they won't have any uuid on their local catalog).
+    if (requestedShardVersion == ShardVersion::UNSHARDED() ||
+        !requestedShardVersion.placementVersion().isSet() ||
+        ShardVersion::isPlacementVersionIgnored(requestedShardVersion)) {
+        return;
+    }
+
+    // Skip checking resharding temporary collections. The reason is that resharding registers the
+    // temporary collections on the sharding catalog before creating them on the shards, without
+    // holding any critical section.
+    // TODO: SERVER-87235 Remove this when resharding creates the temporary collections under a
+    // critical section.
+    if (nss.isTemporaryReshardingCollection()) {
+        return;
+    }
+
+    // Check that the collection uuid in the sharding catalog and the one on the local catalog
+    // match.
+    if (shardingCollectionDescription.isSharded() &&
+        (!collectionPtr || !shardingCollectionDescription.uuidMatches(collectionPtr->uuid()))) {
+        if ((opCtx->inMultiDocumentTransaction() ||
+             repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime())) {
+            // If in multi-document transaction or snapshot read, throw SnapshotUnavailable so that
+            // the transaction can be retried. This situation is known to be possible when a
+            // collection undergoes resharding, due to the resharding commit protocol. See
+            // SERVER-87061.
+            // TODO: SERVER-87235: Remove this condition and leave only the tassert below also for
+            // transaction and snapshot reads.
+            uasserted(
+                ErrorCodes::SnapshotUnavailable,
+                "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
+                    nss.toStringForErrorMsg(),
+                    shardingCollectionDescription.getUUID().toString(),
+                    collectionPtr ? collectionPtr->uuid().toString() : ""));
+
+        } else {
+            tasserted(
+                8706100,
+                "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
+                    nss.toStringForErrorMsg(),
+                    shardingCollectionDescription.getUUID().toString(),
+                    collectionPtr ? collectionPtr->uuid().toString() : ""));
         }
     }
 }
