@@ -655,6 +655,11 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
     if (!gEnableAutoCompaction)
         return;
 
+    if (!TestingProctor::instance().isEnabled()) {
+        LOGV2_FATAL_NOTRACE(8730900, "enableAutoCompaction is a test-only parameter");
+    }
+
+    // TODO SERVER-84357: exclude the oplog table.
     StorageEngine::AutoCompactOptions options{/*enable=*/true,
                                               /*runOnce=*/false,
                                               /*freeSpaceTargetMB=*/boost::none,
@@ -676,10 +681,9 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
         return;
     }
 
-    // Proceed with startup if background compaction fails to start.
-    // In testing, crash if the command couldn't be executed and we get a non-EBUSY error.
-    if (TestingProctor::instance().isEnabled() && status != ErrorCodes::IllegalOperation &&
-        status != ErrorCodes::ObjectIsBusy) {
+    // Proceed with startup if background compaction fails to start. Crash for unexpected error
+    // codes.
+    if (status != ErrorCodes::IllegalOperation && status != ErrorCodes::ObjectIsBusy) {
         invariantStatusOK(
             status.withContext("Background compaction failed to start due to an unexpected error"));
     }
@@ -2816,12 +2820,9 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
                                        const StorageEngine::AutoCompactOptions& options) {
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
 
-    auto status = WiredTigerUtil::canRunAutoCompact(opCtx);
+    auto status = WiredTigerUtil::canRunAutoCompact(opCtx, isEphemeral());
     if (!status.isOK())
         return status;
-
-    WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     StringBuilder config;
     if (options.enable) {
@@ -2844,6 +2845,7 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
         config << "background=false";
     }
 
+    WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn()->getSession();
     int ret = s->compact(s, nullptr, config.str().c_str());
     status = wtRCToStatus(ret, s, "WiredTigerKVEngine::autoCompact()");
     if (!status.isOK())

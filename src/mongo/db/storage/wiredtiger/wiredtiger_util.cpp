@@ -1336,13 +1336,13 @@ BSONObj WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(const 
     return options;
 }
 
-Status WiredTigerUtil::canRunAutoCompact(OperationContext* opCtx) {
+Status WiredTigerUtil::canRunAutoCompact(OperationContext* opCtx, bool isEphemeral) {
     if (!gFeatureFlagAutoCompact.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact() requires its feature flag to be enabled");
     }
-    if (WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
+    if (isEphemeral) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact() cannot be executed for in-memory configurations");
     }

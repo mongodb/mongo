@@ -387,7 +387,7 @@ public:
      * - checkpoints are disabled or,
      * - user writes are not allowed.
      */
-    static Status canRunAutoCompact(OperationContext*);
+    static Status canRunAutoCompact(OperationContext* opCtx, bool isEphemeral);
 
 private:
     /**
