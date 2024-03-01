@@ -91,7 +91,7 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
  */
-std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
+std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     OperationContext* opCtx,
     const ShardId& shardId,
     const ShardId& primaryShardId,
@@ -99,15 +99,38 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     const std::vector<CollectionPtr>& localCatalogCollections);
 
 /**
+ * For every collection, check that all the shards currently owning chunks for that collection have
+ * exactly the same indexes.
+ * It is only safe to call this function under the database/collection DDL lock in 'S' mode.
+ *
+ * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
+ * there is no inconsistency, it is returned an empty vector.
+ */
+std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
+    OperationContext* opCtx, const std::vector<CollectionType>& collections);
+
+/**
+ * For every collection, check that all the shards currently owning chunks and the DBPrimary shard
+ * for that collection have exactly the same collection options.
+ * It is only safe to call this function under the database/collection DDL lock in 'S' mode.
+ *
+ * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
+ * there is no inconsistency, it is returned an empty vector.
+ */
+std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossShards(
+    OperationContext* opCtx,
+    const ShardId& primaryShardId,
+    const std::vector<CollectionType>& collections);
+
+/**
  * Check different types of inconsistencies from a given set of chunks owned by a collection.
  *
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
  */
-std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
-    OperationContext* opCtx,
-    const CollectionType& collection,
-    const std::vector<ChunkType>& chunks);
+std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* opCtx,
+                                                              const CollectionType& collection,
+                                                              const std::vector<ChunkType>& chunks);
 
 /**
  * Check different types of inconsistencies from a given set of zones owned by a collection.
@@ -115,8 +138,9 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
  */
-std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
-    OperationContext* opCtx, const CollectionType& collection, const std::vector<TagsType>& zones);
+std::vector<MetadataInconsistencyItem> checkZonesConsistency(OperationContext* opCtx,
+                                                             const CollectionType& collection,
+                                                             const std::vector<TagsType>& zones);
 
 /*
  * Return a list of inconsistencies within the sharding catalog collection metadata

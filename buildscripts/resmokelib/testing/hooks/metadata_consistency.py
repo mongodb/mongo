@@ -1,11 +1,14 @@
 """Test hook to check the sharding metadata consistency of a sharded cluster."""
 
 import os.path
+import sys
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import multi_sharded_cluster, shardedcluster
 from buildscripts.resmokelib.testing.hooks import jsfile
 from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob, _ContinuousDynamicJSTestCase
+
+_IS_WINDOWS = (sys.platform == "win32")
 
 
 class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook):
@@ -14,11 +17,18 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
     IS_BACKGROUND = True
 
     # The 'CheckMetadataConsistency' hook relies on the 'isMaster' command to asses if the fixture cluster is sharded.
-    # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
     SKIP_TESTS = [
-        "build/install/bin/executor_integration_test", "build/install/bin/rpc_integration_test",
-        "build/install/bin/transport_integration_test"
+        # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
+        "build/install/bin/executor_integration_test",
+        "build/install/bin/rpc_integration_test",
+        "build/install/bin/transport_integration_test",
+        # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
+        # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
+        "jstests/aggregation/sources/unionWith/unionWith.js"
     ]
+
+    if _IS_WINDOWS:
+        SKIP_TESTS = [path.replace('/', '\\') for path in SKIP_TESTS]
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
@@ -75,7 +85,8 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
         hook_test_case.configure(self.fixture)
 
         if test.test_name in self.SKIP_TESTS:
-            self.logger.info("Metadata consistency check explicitely disabled for {test.test_name}")
+            self.logger.info("Metadata consistency check explicitely disabled for %s",
+                             test.test_name)
             return
 
         self.logger.info("Resuming background metadata consistency checker thread")
