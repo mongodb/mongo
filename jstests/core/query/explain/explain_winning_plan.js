@@ -8,17 +8,9 @@
 // ]
 
 import {getExecutionStats, getOptimizer} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.explain_winning_plan;
 coll.drop();
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    quit();
-}
 
 // Create two indexes to ensure that the best plan will be picked by the multi-planner.
 assert.commandWorked(coll.createIndex({a: 1}));

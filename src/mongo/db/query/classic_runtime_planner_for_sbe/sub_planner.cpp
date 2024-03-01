@@ -84,6 +84,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::plan() {
     return prepareSbePlanExecutor(std::move(solution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
-                                  cachedPlanHash());
+                                  cachedPlanHash(),
+                                  nullptr /*classicRuntimePlannerStage*/);
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe

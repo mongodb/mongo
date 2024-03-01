@@ -3,7 +3,6 @@
  * a blocking scan operator.
  */
 import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 Random.setRandomSeed();
 
@@ -13,14 +12,6 @@ const testDb = testConnection.getDB('local');
 const collectionSize = 10;
 const clusteredCollName = "clustered_index_sorted_scan_coll";
 const clusterField = "_id";
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(testDb, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    MongoRunner.stopMongod(testConnection);
-    quit();
-}
 
 let nonClusteredCollName = clusteredCollName + "_nc";
 

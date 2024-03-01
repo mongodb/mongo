@@ -15,7 +15,7 @@ const coll = db.plan_cache_replan_group_lookup;
 const foreignCollName = "foreign";
 coll.drop();
 
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
+// TODO SERVER-85239: Remove this check when replanning is properly implemented for classic runtime
 // planning for SBE.
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
     jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");

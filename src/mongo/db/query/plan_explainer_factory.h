@@ -61,6 +61,11 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan);
 
+/**
+ * Factory function used to create and return a PlanExplainer for SBE execution. This overload is
+ * used when a plan has been selected using SBE runtime planners. Unlike the classic multiplanner +
+ * SBE PlanExplainer, it accepts a vector of rejected candidate plans from the SBE multi-planner.
+ */
 std::unique_ptr<PlanExplainer> make(
     sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,
@@ -72,5 +77,21 @@ std::unique_ptr<PlanExplainer> make(
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
     OptimizerCounterInfo optCounterInfo = {},
+    RemoteExplainVector* remoteExplains = nullptr);
+
+/**
+ * Factory function used to create a PlanExplainer for classic multiplanner + SBE execution. It
+ * requires a pointer to a classic multiplanner stage from which a classic PlanExplainer can be
+ * created.
+ */
+std::unique_ptr<PlanExplainer> make(
+    sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    bool isMultiPlan,
+    bool isFromPlanCache,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains = nullptr);
 }  // namespace mongo::plan_explainer_factory

@@ -1,8 +1,6 @@
 // This test checks that .explain() reports the correct trial period statistics for a winning plan
 // in the "allPlansExecution" section.
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const dbName = "test";
 const collName = jsTestName();
 
@@ -12,14 +10,6 @@ assert.neq(conn, null, "mongod failed to start up");
 const db = conn.getDB(dbName);
 const coll = db[collName];
 coll.drop();
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));

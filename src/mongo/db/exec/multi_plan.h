@@ -236,6 +236,9 @@ private:
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
     int _bestPlanIdx;
 
+    // Because best solution may be "extracted", we need to cache best plan score for explain.
+    boost::optional<double> _bestPlanScore;
+
     // index into _candidates, of the backup plan for sort
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
     int _backupPlanIdx;

@@ -20,15 +20,7 @@ import {
     getRejectedPlans,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    quit();
-}
 
 // Asserts that the given cursors produce identical result sets.
 function assertResultsEq(cursor1, cursor2) {

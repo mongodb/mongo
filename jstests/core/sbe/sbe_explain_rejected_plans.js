@@ -14,6 +14,7 @@ import {
     getWinningPlan,
 } from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSbeFullyEnabled(db);
@@ -76,8 +77,12 @@ for (let rejectedPlan of getRejectedPlans(explain)) {
         assert.contains(ixscan.indexName, [a1IndexName, b1IndexName], ixscan);
     }
 
-    assert(!rejectedPlan.slotBasedPlan.stages.includes("@\"a_1_b_1\""), explain);
-    assert(rejectedPlan.slotBasedPlan.stages.includes("@\"a_1\"") ||
-               rejectedPlan.slotBasedPlan.stages.includes("@\"b_1\""),
-           explain);
+    // TODO SERVER-83887: Delete this block when "featureFlagClassicRuntimePlanningForSbe" is
+    // deleted.
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
+        assert(!rejectedPlan.slotBasedPlan.stages.includes("@\"a_1_b_1\""), explain);
+        assert(rejectedPlan.slotBasedPlan.stages.includes("@\"a_1\"") ||
+                   rejectedPlan.slotBasedPlan.stages.includes("@\"b_1\""),
+               explain);
+    }
 }

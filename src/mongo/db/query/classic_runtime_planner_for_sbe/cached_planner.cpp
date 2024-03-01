@@ -46,6 +46,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
                                   {std::move(_cachedPlanHolder->cachedPlan->root),
                                    std::move(_cachedPlanHolder->cachedPlan->planStageData)},
                                   true /*isFromPlanCache*/,
-                                  boost::none /*cachedPlanHash*/);
+                                  boost::none /*cachedPlanHash*/,
+                                  nullptr /*classicRuntimePlannerStage*/);
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe

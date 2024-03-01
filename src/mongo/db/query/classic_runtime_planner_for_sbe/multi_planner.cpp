@@ -96,7 +96,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
     return prepareSbePlanExecutor(std::move(winningSolution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
-                                  cachedPlanHash());
+                                  cachedPlanHash(),
+                                  std::move(_multiPlanStage));
 }
 
 MultiPlanner::SbePlanAndData MultiPlanner::_buildSbePlanAndUpdatePlanCache(

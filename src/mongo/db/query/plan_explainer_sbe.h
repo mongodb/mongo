@@ -56,34 +56,19 @@
 #include "mongo/util/duration.h"
 
 namespace mongo {
-/**
- * A PlanExplainer implementation for SBE execution plans.
- */
-class PlanExplainerSBE final : public PlanExplainer {
+
+class PlanExplainerSBEBase : public PlanExplainer {
 public:
-    PlanExplainerSBE(const sbe::PlanStage* root,
-                     const stage_builder::PlanStageData* data,
-                     const QuerySolution* solution,
-                     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
-                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                     bool isMultiPlan,
-                     bool isCachedPlan,
-                     boost::optional<size_t> cachedPlanHash,
-                     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-                     OptimizerCounterInfo optCounterInfo = {},
-                     RemoteExplainVector* remoteExplains = nullptr)
-        : PlanExplainer{solution, boost::optional<OptimizerCounterInfo>(std::move(optCounterInfo))},
-          _root{root},
-          _rootData{data},
-          _optimizerData(std::move(optimizerData)),
-          _rejectedCandidates{std::move(rejectedCandidates)},
-          _isMultiPlan{isMultiPlan},
-          _isFromPlanCache{isCachedPlan},
-          _cachedPlanHash{cachedPlanHash},
-          _debugInfo{debugInfo},
-          _remoteExplains{remoteExplains} {
-        tassert(5968203, "_debugInfo should not be null", _debugInfo);
-    }
+    PlanExplainerSBEBase(const sbe::PlanStage* root,
+                         const stage_builder::PlanStageData* data,
+                         const QuerySolution* solution,
+                         std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
+                         bool isMultiPlan,
+                         bool isCachedPlan,
+                         boost::optional<size_t> cachedPlanHash,
+                         std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+                         OptimizerCounterInfo optCounterInfo,
+                         RemoteExplainVector* remoteExplains);
 
     bool isMultiPlan() const final {
         return _isMultiPlan;
@@ -99,11 +84,8 @@ public:
                                   PlanSummaryStats* statsOut) const override;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
     BSONObj getOptimizerDebugInfo() const final;
-    PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
 
-private:
+protected:
     static boost::optional<BSONObj> buildExecPlanDebugInfo(
         const sbe::PlanStage* root, const stage_builder::PlanStageData* data) {
         if (root && data) {
@@ -122,7 +104,6 @@ private:
 
     const std::unique_ptr<optimizer::AbstractABTPrinter> _optimizerData;
 
-    const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};
     const bool _isFromPlanCache{false};
     const boost::optional<size_t> _cachedPlanHash{boost::none};
@@ -130,5 +111,56 @@ private:
     // All plans recovered from the same cached entry share the same debug info.
     const std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> _debugInfo;
     const RemoteExplainVector* _remoteExplains;
+};
+
+/**
+ * A PlanExplainer implementation for SBE execution plans that were selected using the SBE
+ * multi-planner.
+ */
+class PlanExplainerSBE final : public PlanExplainerSBEBase {
+public:
+    PlanExplainerSBE(const sbe::PlanStage* root,
+                     const stage_builder::PlanStageData* data,
+                     const QuerySolution* solution,
+                     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
+                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+                     bool isMultiPlan,
+                     bool isCachedPlan,
+                     boost::optional<size_t> cachedPlanHash,
+                     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+                     OptimizerCounterInfo optCounterInfo = {},
+                     RemoteExplainVector* remoteExplains = nullptr);
+
+    PlanStatsDetails getWinningPlanTrialStats() const final;
+    std::vector<PlanStatsDetails> getRejectedPlansStats(
+        ExplainOptions::Verbosity verbosity) const final;
+
+private:
+    const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
+};
+
+class PlanExplainerClassicRuntimePlannerForSBE final : public PlanExplainerSBEBase {
+public:
+    PlanExplainerClassicRuntimePlannerForSBE(
+        const sbe::PlanStage* root,
+        const stage_builder::PlanStageData* data,
+        const QuerySolution* solution,
+        bool isMultiPlan,
+        bool isCachedPlan,
+        boost::optional<size_t> cachedPlanHash,
+        std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+        std::unique_ptr<PlanStage> classicRuntimePlannerStage,
+        RemoteExplainVector* remoteExplains);
+
+    PlanStatsDetails getWinningPlanTrialStats() const final;
+    std::vector<PlanStatsDetails> getRejectedPlansStats(
+        ExplainOptions::Verbosity verbosity) const final;
+
+private:
+    // Using a pointer to a MultiPlanStage, we can create a classic PlanExplainerImpl from which we
+    // can extract the necessary information regarding the classic multi-planner's trial period
+    // using the same format as we would for the classic engine.
+    const std::unique_ptr<PlanStage> _classicRuntimePlannerStage;
+    const std::unique_ptr<PlanExplainer> _classicRuntimePlannerExplainer;
 };
 }  // namespace mongo

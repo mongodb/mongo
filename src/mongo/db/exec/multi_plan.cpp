@@ -461,6 +461,7 @@ std::unique_ptr<QuerySolution> MultiPlanStage::extractBestSolution() {
     if (_bestPlanIdx == kNoSuchPlan)
         return nullptr;
 
+    _bestPlanScore = _candidates[_bestPlanIdx].solution->score;
     return std::move(_candidates[_bestPlanIdx].solution);
 }
 
@@ -501,6 +502,9 @@ boost::optional<double> MultiPlanStage::getCandidateScore(size_t candidateIdx) c
             str::stream() << "Invalid candidate plan index: " << candidateIdx
                           << ", size: " << _candidates.size(),
             candidateIdx < _candidates.size());
+    if (candidateIdx == static_cast<size_t>(_bestPlanIdx) && !_candidates[candidateIdx].solution) {
+        return _bestPlanScore;
+    }
     return _candidates[candidateIdx].solution->score;
 }
 

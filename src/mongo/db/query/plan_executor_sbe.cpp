@@ -93,7 +93,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  boost::optional<size_t> cachedPlanHash,
                                  OptimizerCounterInfo optCounterInfo,
                                  std::unique_ptr<RemoteCursorMap> remoteCursors,
-                                 std::unique_ptr<RemoteExplainVector> remoteExplains)
+                                 std::unique_ptr<RemoteExplainVector> remoteExplains,
+                                 std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -153,11 +154,12 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _yieldPolicy->clearRegisteredPlans();
         _yieldPolicy->registerPlan(_root.get());
     }
-    const auto isMultiPlan = candidates.plans.size() > 1;
+    const auto isMultiPlan = candidates.plans.size() > 1 || classicRuntimePlannerStage;
     const auto isCachedCandidate = candidates.winner().fromPlanCache;
     if (!_cq || !_cq->getExpCtx()->explain) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();
+        classicRuntimePlannerStage.reset();
     } else {
         // Keep only rejected candidate plans.
         candidates.plans.erase(candidates.plans.begin() + candidates.winnerIdx);
@@ -166,17 +168,30 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     if (_solution) {
         _secondaryNssVector = _solution->getAllSecondaryNamespaces(_nss);
     }
-    _planExplainer = plan_explainer_factory::make(_root.get(),
-                                                  &_rootData,
-                                                  _solution.get(),
-                                                  std::move(optimizerData),
-                                                  std::move(candidates.plans),
-                                                  isMultiPlan,
-                                                  isCachedCandidate,
-                                                  cachedPlanHash,
-                                                  _rootData.debugInfo,
-                                                  std::move(optCounterInfo),
-                                                  _remoteExplains.get());
+
+    _planExplainer = classicRuntimePlannerStage
+        // Classic multi-planner + SBE
+        ? plan_explainer_factory::make(_root.get(),
+                                       &_rootData,
+                                       _solution.get(),
+                                       isMultiPlan,
+                                       isCachedCandidate,
+                                       cachedPlanHash,
+                                       _rootData.debugInfo,
+                                       std::move(classicRuntimePlannerStage),
+                                       _remoteExplains.get())
+        // SBE runtime planner + SBE
+        : plan_explainer_factory::make(_root.get(),
+                                       &_rootData,
+                                       _solution.get(),
+                                       std::move(optimizerData),
+                                       std::move(candidates.plans),
+                                       isMultiPlan,
+                                       isCachedCandidate,
+                                       cachedPlanHash,
+                                       _rootData.debugInfo,
+                                       std::move(optCounterInfo),
+                                       _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 
     if (_remoteCursors) {

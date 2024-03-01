@@ -9,7 +9,6 @@
 //   references_foreign_collection,
 // ]
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
@@ -17,13 +16,6 @@ const testDB = db.getSiblingDB("profile_agg");
 assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();
 const coll = testDB.getCollection(collName);
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    quit();
-}
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.

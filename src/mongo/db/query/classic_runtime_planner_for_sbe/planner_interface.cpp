@@ -40,7 +40,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
     bool isFromPlanCache,
-    boost::optional<size_t> cachedPlanHash) {
+    boost::optional<size_t> cachedPlanHash,
+    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
     const auto* expCtx = cq()->getExpCtxRaw();
     auto remoteCursors =
         expCtx->explain ? nullptr : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
@@ -76,6 +77,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                     false /* generatedByBonsai */,
                                     OptimizerCounterInfo{} /* used for Bonsai */,
                                     std::move(remoteCursors),
-                                    std::move(remoteExplains)));
+                                    std::move(remoteExplains),
+                                    std::move(classicRuntimePlannerStage)));
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe

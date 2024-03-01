@@ -50,6 +50,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -528,7 +529,30 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 }
 }  // namespace
 
-const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
+PlanExplainerSBEBase::PlanExplainerSBEBase(
+    const sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
+    bool isMultiPlan,
+    bool isCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    OptimizerCounterInfo optCounterInfo,
+    RemoteExplainVector* remoteExplains)
+    : PlanExplainer{solution, boost::optional<OptimizerCounterInfo>(std::move(optCounterInfo))},
+      _root{root},
+      _rootData{data},
+      _optimizerData(std::move(optimizerData)),
+      _isMultiPlan{isMultiPlan},
+      _isFromPlanCache{isCachedPlan},
+      _cachedPlanHash{cachedPlanHash},
+      _debugInfo{debugInfo},
+      _remoteExplains{remoteExplains} {
+    tassert(5968203, "_debugInfo should not be null", _debugInfo);
+};
+
+const PlanExplainer::ExplainVersion& PlanExplainerSBEBase::getVersion() const {
     if (_optimizerData) {
         static const ExplainVersion kExplainVersionForCQF = "3";
         return kExplainVersionForCQF;
@@ -537,11 +561,11 @@ const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
     return kExplainVersionForStageBuilders;
 }
 
-bool PlanExplainerSBE::matchesCachedPlan() const {
+bool PlanExplainerSBEBase::matchesCachedPlan() const {
     return _cachedPlanHash && (*_cachedPlanHash == _solution->hash());
 };
 
-std::string PlanExplainerSBE::getPlanSummary() const {
+std::string PlanExplainerSBEBase::getPlanSummary() const {
     if (_optimizerData) {
         return _optimizerData->getPlanSummary();
     } else {
@@ -549,7 +573,7 @@ std::string PlanExplainerSBE::getPlanSummary() const {
     }
 }
 
-void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
+void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
     tassert(6466201, "statsOut should be a valid pointer", statsOut);
 
     if (!_root) {
@@ -579,8 +603,8 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->collectionScansNonTailable = _debugInfo->mainStats.collectionScansNonTailable;
 }
 
-void PlanExplainerSBE::getSecondarySummaryStats(const NamespaceString& secondaryColl,
-                                                PlanSummaryStats* statsOut) const {
+void PlanExplainerSBEBase::getSecondarySummaryStats(const NamespaceString& secondaryColl,
+                                                    PlanSummaryStats* statsOut) const {
     tassert(6466202, "statsOut should be a valid pointer", statsOut);
 
     // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
@@ -596,7 +620,7 @@ void PlanExplainerSBE::getSecondarySummaryStats(const NamespaceString& secondary
     }
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
+PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     invariant(_root);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
@@ -620,6 +644,55 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
                                  matchesCachedPlan());
 }
 
+BSONObj PlanExplainerSBEBase::getOptimizerDebugInfo() const {
+    if (_optimizerData) {
+        return _optimizerData->explainQueryPlannerDebug();
+    }
+    return {};
+}
+
+boost::optional<BSONObj> PlanExplainerSBEBase::buildCascadesPlan() const {
+    if (_optimizerData) {
+        return _optimizerData->explainBSON();
+    }
+    return {};
+}
+
+boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
+    if (!_remoteExplains) {
+        return boost::none;
+    }
+    BSONArrayBuilder arrBuilder;
+    for (const auto& explain : *_remoteExplains) {
+        arrBuilder << explain;
+    }
+    return arrBuilder.arr();
+}
+
+PlanExplainerSBE::PlanExplainerSBE(
+    const sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
+    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+    bool isMultiPlan,
+    bool isCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    OptimizerCounterInfo optCounterInfo,
+    RemoteExplainVector* remoteExplains)
+    : PlanExplainerSBEBase{root,
+                           data,
+                           solution,
+                           std::move(optimizerData),
+                           isMultiPlan,
+                           isCachedPlan,
+                           cachedPlanHash,
+                           std::move(debugInfo),
+                           std::move(optCounterInfo),
+                           remoteExplains},
+      _rejectedCandidates{std::move(rejectedCandidates)} {};
+
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
     invariant(_rootData);
     if (_rootData->savedStatsOnEarlyExit) {
@@ -638,13 +711,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             matchesCachedPlan());
     }
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
-}
-
-BSONObj PlanExplainerSBE::getOptimizerDebugInfo() const {
-    if (_optimizerData) {
-        return _optimizerData->explainQueryPlannerDebug();
-    }
-    return {};
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
@@ -678,21 +744,38 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
     return res;
 }
 
-boost::optional<BSONObj> PlanExplainerSBE::buildCascadesPlan() const {
-    if (_optimizerData) {
-        return _optimizerData->explainBSON();
-    }
-    return {};
+PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForSBE(
+    const sbe::PlanStage* root,
+    const stage_builder::PlanStageData* data,
+    const QuerySolution* solution,
+    bool isMultiPlan,
+    bool isCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    std::unique_ptr<PlanStage> classicRuntimePlannerStage,
+    RemoteExplainVector* remoteExplains)
+    : PlanExplainerSBEBase{root,
+                           data,
+                           solution,
+                           nullptr /*optimizerData*/,
+                           isMultiPlan,
+                           isCachedPlan,
+                           cachedPlanHash,
+                           std::move(debugInfo),
+                           {} /*optCounterInfo*/,
+                           remoteExplains},
+      _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
+      _classicRuntimePlannerExplainer{plan_explainer_factory::make(
+          _classicRuntimePlannerStage.get(), _solution->_enumeratorExplainInfo)} {}
+
+PlanExplainer::PlanStatsDetails PlanExplainerClassicRuntimePlannerForSBE::getWinningPlanTrialStats()
+    const {
+    return _classicRuntimePlannerExplainer->getWinningPlanTrialStats();
 }
 
-boost::optional<BSONArray> PlanExplainerSBE::buildRemotePlanInfo() const {
-    if (!_remoteExplains) {
-        return boost::none;
-    }
-    BSONArrayBuilder arrBuilder;
-    for (const auto& explain : *_remoteExplains) {
-        arrBuilder << explain;
-    }
-    return arrBuilder.arr();
+std::vector<PlanExplainer::PlanStatsDetails>
+PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
+    ExplainOptions::Verbosity verbosity) const {
+    return _classicRuntimePlannerExplainer->getRejectedPlansStats(verbosity);
 }
 }  // namespace mongo

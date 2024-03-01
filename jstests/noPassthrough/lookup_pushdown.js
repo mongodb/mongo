@@ -11,7 +11,6 @@ import {
     planHasStage,
 } from "jstests/libs/analyze_plan.js";
 import {assertEngine} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const JoinAlgorithm = {
@@ -121,14 +120,6 @@ const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 if (!sbeEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
     MongoRunner.stopMongod(conn);
     quit();
 }

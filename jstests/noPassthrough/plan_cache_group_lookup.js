@@ -6,7 +6,6 @@
  *   featureFlagSbeFull
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
@@ -15,14 +14,6 @@ const db = conn.getDB(jsTestName());
 const colName = jsTestName();
 const coll = db.getCollection(colName);
 const foreignColl = db.getCollection(colName + "_foreign");
-
-// TODO SERVER-85240: Remove this check when explain is properly implemented for classic runtime
-// planning for SBE.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, a1: 1}));

@@ -87,11 +87,18 @@ public:
     PlannerBase(PlannerDataForSBE plannerData);
 
 protected:
+    /**
+     * Function that prepares 'sbePlanAndData' for execution and passes the correct arguments to a
+     * new instance of PlanExecutorSBE and returns it. Note that the classicRuntimePlannerStage is
+     * only passed to PlanExecutorSBE so that it can be plumbed through to a PlanExplainer to
+     * generate the correct explain output when using the classic multiplanner with SBE.
+     */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> prepareSbePlanExecutor(
         std::unique_ptr<QuerySolution> solution,
         std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
         bool isFromPlanCache,
-        boost::optional<size_t> cachedPlanHash);
+        boost::optional<size_t> cachedPlanHash,
+        std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage);
 
     OperationContext* opCtx() {
         return _plannerData.opCtx;

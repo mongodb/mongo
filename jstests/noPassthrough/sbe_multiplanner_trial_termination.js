@@ -8,6 +8,8 @@
  *   featureFlagSbeFull,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const numDocs = 1000;
 const dbName = "sbe_multiplanner_db";
 const collName = "sbe_multiplanner_coll";
@@ -22,6 +24,13 @@ const trialLengthFromWorksKnob = 0.1 * numDocs;
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
+
+if (FeatureFlagUtil.isPresentAndEnabled(conn, "ClassicRuntimePlanningForSbe")) {
+    jsTestLog("Skipping the test because SBE multi planner won't be used");
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
 const db = conn.getDB(dbName);
 const coll = db[collName];
 
