@@ -2,6 +2,8 @@
  * Runs moveCollection and CRUD operations concurrently.
  *
  * @tags: [
+ *  # The balancer automatically running moveCollection conflicts with running moveCollection here.
+ *  assumes_balancer_off,
  *  requires_sharding,
  *  featureFlagUnshardCollection,
  *  featureFlagMoveCollection,
