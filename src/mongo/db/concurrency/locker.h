@@ -558,6 +558,11 @@ public:
         _timeQueuedForTicketMicros = duration_cast<Microseconds>(queueTime);
     }
 
+    void setFlowControlTicketQueueTime(Milliseconds queueTime) {
+        _flowControlStats.timeAcquiringMicros =
+            durationCount<Microseconds>(duration_cast<Microseconds>(queueTime));
+    }
+
     //
     // Below functions are for unit-testing only
     //

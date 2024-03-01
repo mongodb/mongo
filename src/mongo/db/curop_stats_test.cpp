@@ -43,9 +43,10 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     auto opCtx = makeOperationContext();
     auto curop = CurOp::get(*opCtx);
 
-    Milliseconds executionTime = Milliseconds(10);
+    Milliseconds executionTime = Milliseconds(16);
     Milliseconds waitForWriteConcern = Milliseconds(1);
     Milliseconds waitForTickets = Milliseconds(2);
+    Milliseconds waitForFlowControlTicket = Milliseconds(4);
 
     auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
     // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
@@ -71,6 +72,12 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     ASSERT_EQ(curop->debug().workingTimeMillis,
               executionTime - waitForWriteConcern - waitForTickets);
 
+    // Check that workintTimeMillis correctly account for time acquiring flow control tickets
+    locker->setFlowControlTicketQueueTime(waitForFlowControlTicket);
+    curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    ASSERT_EQ(curop->debug().workingTimeMillis,
+              executionTime - waitForWriteConcern - waitForTickets - waitForFlowControlTicket);
+
     // Check that workingTimeMillis correctly accounts for lock wait time
     const ResourceId resId(
         RESOURCE_COLLECTION,
@@ -86,7 +93,7 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
         locker->lockGlobal(opCtx.get(), MODE_IX);
         ON_BLOCK_EXIT([&] { locker->unlockGlobal(); });
         ASSERT_THROWS_CODE(
-            locker->lock(opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(3)),
+            locker->lock(opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(8)),
             AssertionException,
             ErrorCodes::LockTimeout);
     }
@@ -97,7 +104,8 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
 
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop->debug().workingTimeMillis,
-              executionTime - waitForWriteConcern - waitForTickets - waitForLocks);
+              executionTime - waitForWriteConcern - waitForTickets - waitForFlowControlTicket -
+                  waitForLocks);
 }
 }  // namespace
 }  // namespace mongo

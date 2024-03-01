@@ -474,14 +474,15 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
 }
 
 Milliseconds CurOp::_sumBlockedTimeTotal() {
+    auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(_lockStatsBase);
+    auto waitForTickets = _debug.waitForTicketDurationMillis +
+        duration_cast<Milliseconds>(Microseconds(
+            shard_role_details::getLocker(opCtx())->getFlowControlStats().timeAcquiringMicros));
     auto waitForLocks =
-        duration_cast<Milliseconds>(Microseconds(shard_role_details::getLocker(opCtx())
-                                                     ->getLockerInfo(_lockStatsBase)
-                                                     .stats.getCumulativeWaitTimeMicros()));
-    auto waitForTickets = _debug.waitForTicketDurationMillis;
+        duration_cast<Milliseconds>(Microseconds(lockerInfo.stats.getCumulativeWaitTimeMicros()));
     auto waitForWriteConcern = _debug.waitForWriteConcernDurationMillis;
 
-    return waitForLocks + waitForTickets + waitForWriteConcern;
+    return waitForTickets + waitForLocks + waitForWriteConcern;
 }
 
 void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
