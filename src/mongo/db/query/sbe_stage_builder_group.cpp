@@ -1059,7 +1059,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     SbExpr::Vector groupByExprs = generateGroupByKeyExprs(_state, idExpr.get(), childOutputs);
 
     auto idExprObj = dynamic_cast<ExpressionObject*>(idExpr.get());
-    bool idIsSingleKey = (idExprObj == nullptr);
+    bool idIsSingleKey = idExprObj == nullptr;
     bool vectorizedGroupByExprs = false;
 
     if (childOutputs.hasBlockOutput()) {
@@ -1115,15 +1115,19 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
         // Loop over 'accArgsVec' and try to vectorize each 'AccumulatorArgs' object.
         for (const AccumulatorArgs& accArgs : accArgsVec) {
             SbExpr blockAccArgExpr;
+            boost::optional<TypeSignature> typeSig;
+            bool isBlockType = false;
 
             if (holds_alternative<SbExpr>(accArgs)) {
                 const SbExpr& accArgExpr = get<SbExpr>(accArgs);
 
                 blockAccArgExpr =
                     buildVectorizedExpr(_state, accArgExpr.clone(), childOutputs, false);
+                typeSig = blockAccArgExpr.getTypeSignature();
+                isBlockType = typeSig && TypeSignature::kBlockType.isSubset(*typeSig);
             }
 
-            if (blockAccArgExpr) {
+            if (blockAccArgExpr && isBlockType) {
                 blockAccArgsVec.emplace_back(std::move(blockAccArgExpr));
             } else {
                 // If we couldn't vectorize one of the accumulator args, then we give up entirely
@@ -1162,17 +1166,9 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
 
             blockAccArgExprs.emplace_back(std::move(get<SbExpr>(blockAccArgs)));
 
-            auto internalSlot = SbSlot{_state.slotId(), blockAccArgExprs.back().getTypeSignature()};
+            auto internalSlot = SbSlot{_state.slotId()};
             blockAccInternalArgSlots.emplace_back(internalSlot);
-            // Rewrite the argument of the accumulator to be the internal slot filled with the
-            // computation of the expression, unless it's a constant, in which case we let the
-            // generator know that it's a constant. We keep generating a matching internal slot to
-            // have a simple mapping expr -> slots.
-            if (blockAccArgExprs.back().isConstantExpr()) {
-                blockAccArgs = blockAccArgExprs.back().clone();
-            } else {
-                blockAccArgs = SbExpr{internalSlot};
-            }
+            blockAccArgs = SbExpr{internalSlot};
         }
     }
 
