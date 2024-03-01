@@ -47,7 +47,7 @@ a notice will be included in
 | [pcre2]                    | BSD-3-Clause                                                   | 10.40                                              |                      |                ✗                |
 | [protobuf]                 | BSD-3-Clause                                                   | 4.25.0                                             |                      |                ✗                |
 | [re2]                      | BSD-3-Clause                                                   | 2021-09-01                                         |                      |                ✗                |
-| [S2]                       | Apache-2.0                                                     | Unknown                                            |          ✗           |                ✗                |
+| [S2]                       | Apache-2.0                                                     | c872048da5d1 + changes                             |          ✗           |                ✗                |
 | [SafeInt]                  | MIT                                                            | 3.0.26                                             |                      |                                 |
 | [schemastore.org]          | Apache-2.0                                                     | 6847cfc3a1                                         |                      |                                 |
 | [scons]                    | MIT                                                            | 3.1.2                                              |                      |                                 |
