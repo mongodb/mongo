@@ -869,7 +869,8 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
         buffer.appendBuf(control, 1 + (currIndex + 1) * sizeof(uint64_t));
 
         // Set binary offset to this control byte (the binary starts with it, see the copy above)
-        regular._controlByteOffset = control - scannedBinary;
+        regular._controlByteOffset = 0;
+        offset = control - scannedBinary;
 
         // Update count inside last control byte
         char* lastControlToUpdate = buffer.buf() + regular._controlByteOffset;

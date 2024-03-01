@@ -330,6 +330,16 @@ public:
         return deltas;
     }
 
+    template <typename It>
+    static std::vector<boost::optional<uint128_t>> deltaString(It begin, It end, BSONElement prev) {
+        std::vector<boost::optional<uint128_t>> deltas;
+        for (; begin != end; ++begin) {
+            deltas.push_back(deltaString(*begin, prev));
+            prev = *begin;
+        }
+        return deltas;
+    }
+
     static uint64_t deltaBool(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.Bool() - prev.Bool());
     }
@@ -1282,6 +1292,32 @@ TEST_F(BSONColumnTest, MultipleSimple8bBlocksAfterControl) {
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1000, 0b0100);
     appendSimple8bBlocks64(expected, deltaInt64(elems.begin() + 1, elems.end(), elems.front()), 5);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems, true);
+}
+
+TEST_F(BSONColumnTest, MultipleSimple8bBlocksAfterControl128) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems;
+    for (int i = 0; i < 100; ++i) {
+        // Generate strings from integer to make it easier to control the delta values
+        auto str = Simple8bTypeUtil::decodeString(i % 2);
+        elems.push_back(createElementString(StringData(str.str.data(), str.size)));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0100);
+    appendSimple8bBlocks128(
+        expected, deltaString(elems.begin() + 1, elems.end(), elems.front()), 5);
     appendEOO(expected);
 
     auto binData = cb.finalize();
