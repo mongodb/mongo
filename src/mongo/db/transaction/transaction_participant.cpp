@@ -456,16 +456,11 @@ TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
 }
 
 void updateSessionEntry(OperationContext* opCtx,
-                        const UpdateRequest& updateRequest,
                         const LogicalSessionId& sessionId,
+                        const BSONObj& doc,
                         TxnNumber txnNum) {
-    // Current code only supports replacement update.
-    dassert(updateRequest.getUpdateModification().type() ==
-            write_ops::UpdateModification::Type::kReplacement);
-    const auto updateMod = updateRequest.getUpdateModification().getUpdateReplacement();
-    auto idToFetch = updateRequest.getQuery().firstElement();
-    auto toUpdateIdDoc = idToFetch.wrap();
-    auto startingSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
+    auto sessionIdBSON = sessionId.toBSON();
+    auto toUpdateIdDoc = BSON("_id" << sessionIdBSON);
 
     // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
@@ -486,13 +481,15 @@ void updateSessionEntry(OperationContext* opCtx,
                       << " collection has been manually deleted.",
         collection.exists());
 
+    const CollectionPtr& collectionPtr = collection.getCollectionPtr();
+
     WriteUnitOfWork wuow(opCtx);
 
     RecordId recordId;
-    if (collection.getCollectionPtr()->isClustered()) {
+    if (collectionPtr->isClustered()) {
         recordId = record_id_helpers::keyForObj(toUpdateIdDoc);
     } else {
-        auto idIndex = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
+        auto idIndex = collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
 
         uassert(40672,
                 str::stream()
@@ -500,14 +497,11 @@ void updateSessionEntry(OperationContext* opCtx,
                     << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg(),
                 idIndex);
 
-        const IndexCatalogEntry* entry =
-            collection.getCollectionPtr()->getIndexCatalog()->getEntry(idIndex);
+        const IndexCatalogEntry* entry = collectionPtr->getIndexCatalog()->getEntry(idIndex);
         auto indexAccess = entry->accessMethod()->asSortedData();
         // Since we are looking up a key inside the _id index, create a key object consisting of
         // only the _id field.
-        dassert(idToFetch.fieldNameStringData() == "_id"_sd);
-        recordId =
-            indexAccess->findSingle(opCtx, collection.getCollectionPtr(), entry, toUpdateIdDoc);
+        recordId = indexAccess->findSingle(opCtx, collectionPtr, entry, toUpdateIdDoc);
     }
 
     RecordData originalRecordData;
@@ -515,7 +509,7 @@ void updateSessionEntry(OperationContext* opCtx,
             opCtx, recordId, &originalRecordData)) {
         // Upsert case.
         auto status = collection_internal::insertDocument(
-            opCtx, collection.getCollectionPtr(), InsertStatement(updateMod), nullptr, false);
+            opCtx, collectionPtr, InsertStatement(doc), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
             throwWriteConflictException(
@@ -536,37 +530,15 @@ void updateSessionEntry(OperationContext* opCtx,
         str::stream() << "Cannot modify the '" << parentLsidFieldName << "' field of "
                       << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
                       << " entries",
-        updateMod.getObjectField(parentLsidFieldName)
+        doc.getObjectField(parentLsidFieldName)
                 .woCompare(originalDoc.getObjectField(parentLsidFieldName)) == 0);
 
-    invariant(collection.getCollectionPtr()->getDefaultCollator() == nullptr);
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, nullptr, updateRequest.getNamespaceString()));
-
-    auto matcher =
-        fassert(40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));
-    if (!matcher->matchesBSON(originalDoc)) {
-        // Document no longer match what we expect so throw WCE to make the caller re-examine.
-        throwWriteConflictException(
-            str::stream() << "Updating session entry failed as document no longer matches, "_sd
-                          << "session "_sd << sessionId << ", transaction "_sd << txnNum);
-    }
-
-    CollectionUpdateArgs args{originalDoc};
-    args.criteria = toUpdateIdDoc;
-    args.update = updateMod;
-
-    // Specify kUpdateNoIndexes because the sessions collection has two indexes: {_id: 1} and
+    // The sessions collection has two indexes: {_id: 1} and
     // {parentLsid: 1, _id.txnNumber: 1, _id: 1}, and none of the fields are mutable.
-    collection_internal::updateDocument(opCtx,
-                                        collection.getCollectionPtr(),
-                                        recordId,
-                                        Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
-                                        updateMod,
-                                        collection_internal::kUpdateNoIndexes,
-                                        nullptr /* indexesAffected */,
-                                        nullptr /* opDebug */,
-                                        &args);
+    // Use the storage engine API directly to bypass the OpObservers which only apply to replicated
+    // collections.
+    uassertStatusOK(collectionPtr->getRecordStore()->updateRecord(
+        opCtx, recordId, doc.objdata(), doc.objsize()));
 
     wuow.commit();
 }
@@ -3480,15 +3452,14 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
         }
     }
 
-    const auto updateRequest = _makeUpdateRequest(sessionTxnRecord);
-
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     {
         // Do not increase consumption metrics during updating session entry, as this
         // will cause a tenant to be billed for reading or writing on session transactions table.
         ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
-        updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
+        updateSessionEntry(
+            opCtx, _sessionId(), sessionTxnRecord.toBSON(), sessionTxnRecord.getTxnNum());
     }
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
@@ -3508,15 +3479,14 @@ void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
     invariant(sessionTxnRecord.getSessionId() == _sessionId());
     invariant(sessionTxnRecord.getTxnNum() == o().activeTxnNumberAndRetryCounter.getTxnNumber());
 
-    const auto updateRequest = _makeUpdateRequest(sessionTxnRecord);
-
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
     {
         // Do not increase consumption metrics during updating session entry, as this
         // will cause a tenant to be billed for reading or writing on session transactions table.
         ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
-        updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
+        updateSessionEntry(
+            opCtx, _sessionId(), sessionTxnRecord.toBSON(), sessionTxnRecord.getTxnNum());
     }
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
@@ -3689,19 +3659,6 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
     }
 
     return it->second;
-}
-
-UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
-    const SessionTxnRecord& sessionTxnRecord) const {
-    auto updateRequest = UpdateRequest();
-    updateRequest.setNamespaceString(NamespaceString::kSessionTransactionsTableNamespace);
-
-    updateRequest.setUpdateModification(
-        write_ops::UpdateModification::parseFromClassicUpdate(sessionTxnRecord.toBSON()));
-    updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName << _sessionId().toBSON()));
-    updateRequest.setUpsert(true);
-
-    return updateRequest;
 }
 
 void TransactionParticipant::Participant::addCommittedStmtIds(
