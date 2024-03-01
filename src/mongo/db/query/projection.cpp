@@ -252,8 +252,11 @@ Projection::Projection(ProjectionPathASTNode root, ProjectType type)
     : _root(std::move(root)), _type(type), _deps(analyzeProjection(&_root, type)) {}
 
 void Projection::optimize() {
-    optimizeProjection(&_root);
-    _deps = analyzeProjection(&_root, _type);
+    if (!_projOptimized) {
+        optimizeProjection(&_root);
+        _deps = analyzeProjection(&_root, _type);
+        _projOptimized = true;
+    }
 }
 namespace {
 
