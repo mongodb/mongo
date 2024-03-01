@@ -63,27 +63,6 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
             false,  // bypassDocumentValidation
             false,  // isMapReduce
             NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
-            {},  // runtime constants
-            {},  // collator
-            std::make_shared<StubMongoProcessInterface>(),
-            {},  // resolvedNamespaces
-            {},  // collUUID
-            {},  // let
-            false};
-        ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
-        ASSERT_DOES_NOT_THROW(
-            static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
-    }
-    {
-        const auto expCtx = ExpressionContext{
-            opCtx.get(),
-            {},     // explain
-            false,  // fromMongos
-            false,  // needsMerge
-            false,  // allowDiskUse
-            false,  // bypassDocumentValidation
-            false,  // isMapReduce
-            NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
             LegacyRuntimeConstants{Date_t::now(), {}},
             {},  // collator
             std::make_shared<StubMongoProcessInterface>(),
@@ -91,6 +70,8 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
             {},  // collUUID
             {},  // let
             false};
+        // LegacyRuntimeConstants is passed to the constructor of ExpressionContext and should make
+        // $$NOW and $$CLUSTER_TIME available to be referenced.
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
             static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
@@ -112,6 +93,8 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
             {},  // collUUID
             {},  // let
             false};
+        // LegacyRuntimeConstants is passed to the constructor of ExpressionContext and should make
+        // $$NOW and $$CLUSTER_TIME available to be referenced.
         ASSERT_DOES_NOT_THROW(static_cast<void>(expCtx.variables.getValue(Variables::kNowId)));
         ASSERT_DOES_NOT_THROW(
             static_cast<void>(expCtx.variables.getValue(Variables::kClusterTimeId)));
@@ -234,5 +217,25 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
         DBException,
         ErrorCodes::FailedToParse);
 }
+
+TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
+    auto opCtx = makeOperationContext();
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSON("a" << 1)));
+    AggregateCommandRequest acr({} /*nss*/, pipeline);
+    StringMap<ExpressionContext::ResolvedNamespace> sm;
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx.get(),
+                                                    acr,
+                                                    nullptr /*collator*/,
+                                                    nullptr /*mongoProcessInterface*/,
+                                                    sm,
+                                                    boost::none /*collUUID*/);
+    Pipeline::parse(pipeline, expCtx);
+    expCtx->initializeReferencedSystemVariables();
+    ASSERT_FALSE(expCtx->variables.hasValue(Variables::kNowId));
+    ASSERT_FALSE(expCtx->variables.hasValue(Variables::kClusterTimeId));
+    ASSERT_FALSE(expCtx->variables.hasValue(Variables::kUserRolesId));
+}
+
 }  // namespace
 }  // namespace mongo

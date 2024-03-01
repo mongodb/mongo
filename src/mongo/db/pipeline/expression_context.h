@@ -495,18 +495,22 @@ public:
     }
 
     /**
-     * Sets the value of the $$USER_ROLES system variable.
+     * Initializes the value of system variables that are referenced by the query. This allows for
+     * lazy initialization of resources which may be expensive to construct (e.g. constructing
+     * cluster timestamp invokes taking a mutex). This function should be invoked after the parsing
+     * of all aggregation expressions in the query.
      */
-    void setUserRoles();
+    void initializeReferencedSystemVariables();
 
     /**
-     * Record that we have seen the given system variable in the query.
+     * Record that we have seen the given system variable in the query. Used for lazy initialization
+     * of variables.
      */
     void setSystemVarReferencedInQuery(Variables::Id var) {
         tassert(7612600,
                 "Cannot track references to user-defined variables.",
                 !Variables::isUserDefinedVariable(var));
-        _varsReferencedInQuery.insert(var);
+        _systemVarsReferencedInQuery.insert(var);
     }
 
     /**
@@ -517,7 +521,7 @@ public:
             7612601,
             "Cannot access whether a variable is referenced to or not for a user-defined variable.",
             !Variables::isUserDefinedVariable(var));
-        return _varsReferencedInQuery.count(var);
+        return _systemVarsReferencedInQuery.count(var);
     }
 
     /**
@@ -796,7 +800,7 @@ private:
 
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).
-    stdx::unordered_set<Variables::Id> _varsReferencedInQuery;
+    stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
 
     query_settings::QuerySettings _querySettings = query_settings::QuerySettings();
 };

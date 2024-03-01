@@ -209,9 +209,7 @@ Status ParsedUpdateBase::parseRequest() {
     parseUpdate();
     Status status = parseQuery();
 
-    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-    // $$USER_ROLES for the update.
-    _expCtx->setUserRoles();
+    _expCtx->initializeReferencedSystemVariables();
 
     return status;
 }

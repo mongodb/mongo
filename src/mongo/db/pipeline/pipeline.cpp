@@ -884,9 +884,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
             pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
     }
 
-    // After parsing the pipeline to detect if $$USER_ROLES is referenced, set the value of
-    // $$USER_ROLES for the pipeline.
-    expCtx->setUserRoles();
+    expCtx->initializeReferencedSystemVariables();
 
     return pipeline;
 }

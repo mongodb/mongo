@@ -236,6 +236,17 @@ public:
      */
     void defineUserRoles(OperationContext* opCtx);
 
+    /**
+     * Define the value of the $$NOW variable by reading the current time.
+     */
+    void defineLocalNow();
+
+    /**
+     * Define the value of the $$CLUSTER_TIME variable by consulting the VectorClock (may be
+     * expensive due to mutex).
+     */
+    void defineClusterTime(OperationContext* opCtx);
+
 private:
     struct ValueAndState {
         ValueAndState() = default;

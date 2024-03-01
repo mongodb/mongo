@@ -320,19 +320,35 @@ BSONObj Variables::toBSON(const VariablesParseState& vps, const BSONObj& varsToS
     return result.obj();
 }
 
-LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
+mongo::Timestamp generateClusterTimestamp(OperationContext* opCtx) {
     // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the
-    // logical clock is available, set the clusterTime in the runtime constants. Otherwise, the
-    // clusterTime is set to the null Timestamp.
+    // logical clock is available, return it. Otherwise, return a null Timestamp.
     if (opCtx->getClient()) {
         if (const auto vectorClock = VectorClock::get(opCtx)) {
             const auto now = vectorClock->getTime();
             if (VectorClock::isValidComponentTime(now.clusterTime())) {
-                return {Date_t::now(), now.clusterTime().asTimestamp()};
+                return now.clusterTime().asTimestamp();
             }
         }
     }
-    return {Date_t::now(), Timestamp()};
+    return Timestamp();
+}
+
+LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
+    return {Date_t::now(), generateClusterTimestamp(opCtx)};
+}
+
+void Variables::defineLocalNow() {
+    _definitions[kNowId] = {Value(Date_t::now()), true};
+}
+
+void Variables::defineClusterTime(OperationContext* opCtx) {
+    // Only initialize $$CLUSTER_TIME when it exists, since we want to show the user an error if
+    // they try to access it in context where it doesn't exist (i.e. standalone).
+    auto ts = generateClusterTimestamp(opCtx);
+    if (!ts.isNull()) {
+        _definitions[kClusterTimeId] = {Value(generateClusterTimestamp(opCtx)), true};
+    }
 }
 
 void Variables::copyToExpCtx(const VariablesParseState& vps, ExpressionContext* expCtx) const {
@@ -341,7 +357,9 @@ void Variables::copyToExpCtx(const VariablesParseState& vps, ExpressionContext* 
 }
 
 LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
-    LegacyRuntimeConstants extracted;
+    // Ensure both NOW and CLUSTER_TIME are initialized since they are required fields of
+    // LegacyRuntimeConstants.
+    LegacyRuntimeConstants extracted({}, {});
     for (auto&& [builtinName, ignoredValidator] : kSystemVarValidators) {
         const auto builtinId = kBuiltinVarNameToId.at(builtinName);
         if (auto it = _definitions.find(builtinId); it != _definitions.end()) {

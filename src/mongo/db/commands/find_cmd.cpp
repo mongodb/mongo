@@ -226,9 +226,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
          .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
          .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-    // $$USER_ROLES for the find command.
-    expCtx->setUserRoles();
+    expCtx->initializeReferencedSystemVariables();
     // Register query stats collection. Exclude queries against collections with encrypted fields.
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
@@ -441,9 +439,7 @@ public:
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
 
-            // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-            // $$USER_ROLES for the find command.
-            cq->getExpCtx()->setUserRoles();
+            cq->getExpCtx()->initializeReferencedSystemVariables();
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.

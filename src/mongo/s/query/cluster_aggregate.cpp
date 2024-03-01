@@ -501,6 +501,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
+        expCtx->initializeReferencedSystemVariables();
+
         // Optimize the pipeline if:
         // - We have a valid routing table.
         // - We know the collection's collation.

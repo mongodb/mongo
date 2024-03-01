@@ -196,6 +196,9 @@ ExpressionContext::ExpressionContext(
       _valueComparator(_collator.getCollator()),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
+    // Only initialize 'variables' if we are given a runtimeConstants object. We delay initializing
+    // variables and expect callers to invoke 'initializeReferencedSystemVariables()' after query
+    // parsing. This allows us to only initialize variables which are used in the query.
     if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
         // Try to get a default value for clusterTime if a logical clock exists.
         auto genConsts = variables.generateRuntimeConstants(opCtx);
@@ -205,8 +208,6 @@ ExpressionContext::ExpressionContext(
         variables.setLegacyRuntimeConstants(genConsts);
     } else if (runtimeConstants) {
         variables.setLegacyRuntimeConstants(*runtimeConstants);
-    } else {
-        variables.setDefaultRuntimeConstants(opCtx);
     }
 
     if (!isMapReduce) {
@@ -414,9 +415,17 @@ void ExpressionContext::stopExpressionCounters() {
     _expressionCounters.reset();
 }
 
-void ExpressionContext::setUserRoles() {
-    // Only set the value of $$USER_ROLES if it is referenced in the query.
-    if (isSystemVarReferencedInQuery(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
+void ExpressionContext::initializeReferencedSystemVariables() {
+    if (_systemVarsReferencedInQuery.contains(Variables::kNowId) &&
+        !variables.hasValue(Variables::kNowId)) {
+        variables.defineLocalNow();
+    }
+    if (_systemVarsReferencedInQuery.contains(Variables::kClusterTimeId) &&
+        !variables.hasValue(Variables::kClusterTimeId)) {
+        variables.defineClusterTime(opCtx);
+    }
+    if (_systemVarsReferencedInQuery.contains(Variables::kUserRolesId) &&
+        !variables.hasValue(Variables::kUserRolesId) && enableAccessToUserRoles.load()) {
         variables.defineUserRoles(opCtx);
     }
 }

@@ -1200,9 +1200,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         expCtx->stopExpressionCounters();
     }
 
-    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-    // $$USER_ROLES for the aggregation.
-    expCtx->setUserRoles();
+    expCtx->initializeReferencedSystemVariables();
 
     // Lookup the query settings and attach it to the 'expCtx'.
     // TODO: SERVER-73632 Remove feature flag for PM-635.
