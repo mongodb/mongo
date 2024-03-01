@@ -9511,6 +9511,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggLinearFillFinalize(arity);
         case Builtin::valueBlockExists:
             return builtinValueBlockExists(arity);
+        case Builtin::valueBlockTypeMatch:
+            return builtinValueBlockTypeMatch(arity);
+        case Builtin::valueBlockIsTimezone:
+            return builtinValueBlockIsTimezone(arity);
         case Builtin::valueBlockFillEmpty:
             return builtinValueBlockFillEmpty(arity);
         case Builtin::valueBlockFillEmptyBlock:
@@ -10021,6 +10025,10 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableBottomNRemove";
         case Builtin::aggRemovableBottomNFinalize:
             return "aggRemovableBottomNFinalize";
+        case Builtin::valueBlockTypeMatch:
+            return "valueBlockTypeMatch";
+        case Builtin::valueBlockIsTimezone:
+            return "valueBlockIsTimezone";
         case Builtin::valueBlockExists:
             return "valueBlockExists";
         case Builtin::valueBlockFillEmpty:

@@ -200,7 +200,7 @@ TimeseriesTest.run((insert) => {
             ids: [0],
             usesBlockProcessing: false
         },
-        {pred: {$expr: {$lt: [101, "$topLevelScalar"]}}, ids: [0, 1], usesBlockProcessing: false},
+        {pred: {$expr: {$lt: [101, "$topLevelScalar"]}}, ids: [0, 1], usesBlockProcessing: true},
         {
             pred: {$expr: {$lt: [new Date(datePrefix + 300), "$time"]}},
             ids: [3, 4],
@@ -302,7 +302,7 @@ TimeseriesTest.run((insert) => {
         {pred: {"emptyArray": null}, ids: [2, 3, 4], usesBlockProcessing: false},
         {pred: {"emptyArray": []}, ids: [0, 1], usesBlockProcessing: false},
         {pred: {"emptyArray": "foobar"}, ids: [], usesBlockProcessing: true},
-        {pred: {"emptyArray": {$type: "array"}}, ids: [0, 1], usesBlockProcessing: false},
+        {pred: {"emptyArray": {$type: "array"}}, ids: [0, 1], usesBlockProcessing: true},
         // Case where there's a predicate which always returns the same value.
         {pred: {"emptyArray": {$lt: NaN}}, ids: [], usesBlockProcessing: true},
 
@@ -311,7 +311,7 @@ TimeseriesTest.run((insert) => {
         {pred: {"nestedArray": null}, ids: [2, 3], usesBlockProcessing: false},
         {pred: {"nestedArray": []}, ids: [], usesBlockProcessing: false},
         {pred: {"nestedArray": "foobar"}, ids: [], usesBlockProcessing: true},
-        {pred: {"nestedArray": {$type: "array"}}, ids: [0, 1, 4], usesBlockProcessing: false},
+        {pred: {"nestedArray": {$type: "array"}}, ids: [0, 1, 4], usesBlockProcessing: true},
 
         {
             pred: {"nestedArray.subField": {$exists: true}},
@@ -351,7 +351,7 @@ TimeseriesTest.run((insert) => {
         {
             pred: {"sometimesDoublyNestedArray": {$type: "array"}},
             ids: [0, 1, 4],
-            usesBlockProcessing: false
+            usesBlockProcessing: true
         },
         {pred: {"sometimesDoublyNestedArray": [101]}, ids: [1], usesBlockProcessing: false},
     ];

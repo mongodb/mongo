@@ -141,6 +141,299 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     assertBlockOfBool(runTag, runVal, std::vector{true, true, true, false, true});
 }
 
+TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto typeMatchExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockTypeMatch",
+        sbe::makeEs(makeE<EVariable>(blockSlot),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
+                                               value::bitcastFrom<double>(13.8))));
+
+    auto compiledExpr = compileExpression(*typeMatchExpr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeDouble(42.5));
+    block.push_back(makeNothing());
+    block.push_back(value::makeNewString("45"_sd));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeNothing(), makeNothing(), makeNothing(), makeNothing()});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockTypeMatchHeterogeneousTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto typeMatchExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockTypeMatch",
+        sbe::makeEs(makeE<EVariable>(blockSlot),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                               getBSONTypeMask(BSONType::NumberInt))));
+
+    auto compiledExpr = compileExpression(*typeMatchExpr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeDouble(42.5));
+    block.push_back(makeInt64(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(value::makeNewString("45"_sd));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{makeBool(true),
+                                                                        makeBool(false),
+                                                                        makeBool(false),
+                                                                        makeBool(true),
+                                                                        makeNothing(),
+                                                                        makeBool(false)});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockTypeMatchHomogeneousTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto typeMatchExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockTypeMatch",
+        sbe::makeEs(makeE<EVariable>(blockSlot),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                               getBSONTypeMask(BSONType::NumberInt))));
+
+    auto compiledExpr = compileExpression(*typeMatchExpr);
+
+    {
+        value::Int32Block block;
+        block.push_back(42);
+        block.push_back(43);
+        block.push_back(44);
+        block.pushNothing();
+        block.push_back(46);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector<std::pair<value::TypeTags, value::Value>>{
+                makeBool(true), makeBool(true), makeBool(true), makeNothing(), makeBool(true)});
+    }
+
+    {
+        value::Int32Block denseBlock;
+        denseBlock.push_back(1);
+        denseBlock.push_back(2);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&denseBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{true, true});
+    }
+
+    {
+        value::Int32Block sparseBlock;
+        sparseBlock.pushNothing();
+        sparseBlock.pushNothing();
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&sparseBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector<std::pair<value::TypeTags, value::Value>>{makeNothing(), makeNothing()});
+    }
+
+    {
+        value::MonoBlock monoBlock(2, value::TypeTags::NumberInt32, value::bitcastFrom<int>(10));
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{true, true});
+    }
+
+    {
+        value::MonoBlock monoBlock(
+            2, value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.3));
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+
+    {
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        value::ValueGuard blockInputGuard(blockTag, blockVal);
+        value::MonoBlock monoBlock(2, blockTag, blockVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+
+    {
+        value::MonoBlock monoBlock(2, value::TypeTags::Nothing, value::Value{0u});
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector<std::pair<value::TypeTags, value::Value>>{makeNothing(), makeNothing()});
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockIsTimezoneNoTimezoneDBTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto isTimezoneExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockIsTimezone",
+        sbe::makeEs(sbe::makeE<sbe::EConstant>(value::TypeTags::NumberInt32, 0),
+                    makeE<EVariable>(blockSlot)));
+
+    auto compiledExpr = compileExpression(*isTimezoneExpr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeDouble(42.5));
+    block.push_back(value::makeNewString("UTC"_sd));
+    block.push_back(makeNothing());
+    block.push_back(value::makeNewString("45"_sd));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeNothing(), makeNothing(), makeNothing(), makeNothing(), makeNothing()});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHeterogeneousTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    TimeZoneDatabase* tzdb = new TimeZoneDatabase();
+    auto isTimezoneExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockIsTimezone",
+        sbe::makeEs(sbe::makeE<sbe::EConstant>(value::TypeTags::timeZoneDB,
+                                               value::bitcastFrom<TimeZoneDatabase*>(tzdb)),
+                    makeE<EVariable>(blockSlot)));
+
+    auto compiledExpr = compileExpression(*isTimezoneExpr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeDouble(42.5));
+    block.push_back(value::makeNewString("UTC"_sd));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(value::makeNewString("45"_sd));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockOfBool(runTag, runVal, std::vector{false, false, true, false, false, false});
+    delete tzdb;
+}
+
+TEST_F(SBEBlockExpressionTest, BlockIsTimezoneHomogeneousTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    TimeZoneDatabase* tzdb = new TimeZoneDatabase();
+    auto isTimezoneExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockIsTimezone",
+        sbe::makeEs(sbe::makeE<sbe::EConstant>(value::TypeTags::timeZoneDB,
+                                               value::bitcastFrom<TimeZoneDatabase*>(tzdb)),
+                    makeE<EVariable>(blockSlot)));
+
+    auto compiledExpr = compileExpression(*isTimezoneExpr);
+
+    {
+        auto [blockTag, blockVal] = value::makeNewString("GMT"_sd);
+        value::ValueGuard blockInputGuard(blockTag, blockVal);
+        value::MonoBlock monoBlock(2, blockTag, blockVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{true, true});
+    }
+
+    {
+        value::MonoBlock monoBlock(
+            2, value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.3));
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+
+    {
+        auto [blockTag, blockVal] = value::makeNewString("MonoBlock string"_sd);
+        value::ValueGuard blockInputGuard(blockTag, blockVal);
+        value::MonoBlock monoBlock(2, blockTag, blockVal);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+
+    {
+        value::MonoBlock monoBlock(2, value::TypeTags::Nothing, value::Value{0u});
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&monoBlock));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, std::vector{false, false});
+    }
+    delete tzdb;
+}
+
 TEST_F(SBEBlockExpressionTest, BlockExistsMonoHomogeneousTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);

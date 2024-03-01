@@ -804,6 +804,439 @@ TEST(VectorizerTest, ConvertFilter) {
         *processed.expr);
 }
 
+TEST(VectorizerTest, ConvertTypeMatch) {
+    auto tree1 =
+        make<FunctionCall>("typeMatch", makeSeq(make<Variable>("inputVar"), Constant::int32(1088)));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 1088\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsNumber) {
+    auto tree1 = make<FunctionCall>("isNumber", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 851970\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsDate) {
+    auto tree1 = make<FunctionCall>("isDate", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 512\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsString) {
+    auto tree1 = make<FunctionCall>("isString", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 4\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsTimestamp) {
+    auto tree1 = make<FunctionCall>("isTimestamp", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 131072\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsArray) {
+    auto tree1 = make<FunctionCall>("isArray", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 16\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsObject) {
+    auto tree1 = make<FunctionCall>("isObject", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 8\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsNull) {
+    auto tree1 = make<FunctionCall>("isNull", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockTypeMatch\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 1024\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsTimezone) {
+    auto tree1 = make<FunctionCall>(
+        "isTimezone", makeSeq(make<Variable>("timezoneDB"), make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockIsTimezone\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"timezoneDB\"\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
 TEST(VectorizerTest, ConvertBlockIf) {
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;

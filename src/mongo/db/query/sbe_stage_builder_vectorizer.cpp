@@ -486,6 +486,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
 
 Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                                         const optimizer::FunctionCall& op) {
+
     size_t arity = op.nodes().size();
 
     if (arity == 2 && op.name() == "blockTraverseFPlaceholder"s) {
@@ -723,7 +724,62 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                         .include(TypeSignature::kNothingType),
                     args[0].sourceCell};
         }
+
+        if (arity == 2 && op.name() == "typeMatch"s &&
+            TypeSignature::kBlockType.isSubset(args.front().typeSignature)) {
+            optimizer::ABTVector functionArgs;
+            functionArgs.reserve(arity);
+            for (auto& functionArg : args) {
+                functionArgs.emplace_back(std::move(*functionArg.expr));
+            }
+
+            return {makeABTFunction("valueBlockTypeMatch"_sd, std::move(functionArgs)),
+                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                        .include(TypeSignature::kNothingType),
+                    args.front().sourceCell};
+        }
+
+        if (arity == 2 && op.name() == "isTimezone"s &&
+            TypeSignature::kBlockType.isSubset(args.back().typeSignature)) {
+            optimizer::ABTVector functionArgs;
+            functionArgs.reserve(arity);
+            for (auto& functionArg : args) {
+                functionArgs.emplace_back(std::move(*functionArg.expr));
+            }
+
+            return {makeABTFunction("valueBlockIsTimezone"_sd, std::move(functionArgs)),
+                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                        .include(TypeSignature::kNothingType),
+                    args.back().sourceCell};
+        }
+
+        static const stdx::unordered_map<std::string, uint32_t> kTypeMask = {
+            {"isNumber",
+             getBSONTypeMask(BSONType::NumberInt) | getBSONTypeMask(BSONType::NumberLong) |
+                 getBSONTypeMask(BSONType::NumberDouble) |
+                 getBSONTypeMask(BSONType::NumberDecimal)},
+            {"isDate", getBSONTypeMask(BSONType::Date)},
+            {"isString", getBSONTypeMask(BSONType::String)},
+            {"isTimestamp", getBSONTypeMask(BSONType::bsonTimestamp)},
+            {"isArray", getBSONTypeMask(BSONType::Array)},
+            {"isObject", getBSONTypeMask(BSONType::Object)},
+            {"isNull", getBSONTypeMask(BSONType::jstNULL)},
+        };
+
+        if (arity == 1 && kTypeMask.count(op.name()) > 0 &&
+            TypeSignature::kBlockType.isSubset(args.front().typeSignature)) {
+            optimizer::ABTVector functionArgs;
+            functionArgs.reserve(2);
+            functionArgs.emplace_back(std::move(*args.front().expr));
+            functionArgs.emplace_back(optimizer::Constant::int32(kTypeMask.at(op.name())));
+
+            return {makeABTFunction("valueBlockTypeMatch"_sd, std::move(functionArgs)),
+                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                        .include(TypeSignature::kNothingType),
+                    args.front().sourceCell};
+        }
     }
+
     // We don't support this function applied to multiple blocks at the same time.
     logUnsupportedConversion(n);
     return {{}, TypeSignature::kAnyScalarType, {}};

@@ -84,6 +84,89 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
 
+/* This instruction takes as input a ValueBlock and a type mask and returns a ValueBlock indicating
+ * whether each value in the ValueBlock is of the type defined by the type mask. If the value is
+ * Nothing then Nothing is returned. If no type mask is provided, it returns a MonoBlock with
+ * Nothing.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockTypeMatch(
+    ArityType arity) {
+    invariant(arity == 2);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+    tassert(8300800,
+            "First argument of valueBlockTypeMatch must be block of values",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [typeMaskOwned, typeMaskTag, typeMaskVal] = getFromStack(1);
+    if (typeMaskTag != value::TypeTags::NumberInt32) {
+        auto nothingBlock =
+            std::make_unique<value::MonoBlock>(valueBlockIn->count(), value::TypeTags::Nothing, 0);
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(nothingBlock.release())};
+    }
+
+    auto typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskVal));
+
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
+        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
+            if (tag == value::TypeTags::Nothing) {
+                return {value::TypeTags::Nothing, 0};
+            }
+            return {value::TypeTags::Boolean,
+                    value::bitcastFrom<bool>(static_cast<bool>(getBSONTypeMask(tag) & typeMask))};
+        });
+
+    auto valueBlockOut = valueBlockIn->map(cmpOp);
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(valueBlockOut.release())};
+}
+
+/* This instruction takes as input a timezoneDB and a ValueBlock and returns a ValueBlock indicating
+ * whether each value in the ValueBlock is a valid timezone. If no timezoneDB is provided, it
+ * returns a MonoBlock with Nothing.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsTimezone(
+    ArityType arity) {
+    invariant(arity == 2);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    tassert(8300801,
+            "Second argument of valueBlockIsTimezone must be block of values",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [timezoneDBOwned, timezoneDBTag, timezoneDBVal] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        auto nothingBlock =
+            std::make_unique<value::MonoBlock>(valueBlockIn->count(), value::TypeTags::Nothing, 0);
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(nothingBlock.release())};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
+        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
+            if (!value::isString(tag)) {
+                return {value::TypeTags::Boolean, false};
+            }
+            auto timezoneStr = value::getStringView(tag, val);
+            return {value::TypeTags::Boolean,
+                    value::bitcastFrom<bool>(timezoneDB->isTimeZoneIdentifier(timezoneStr))};
+        });
+
+    auto valueBlockOut = valueBlockIn->map(cmpOp);
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(valueBlockOut.release())};
+}
+
 /**
  * Implementation of the valueBlockFillEmpty builtin. This instruction takes a block and an
  * SBE value, and produces a new block where all missing values in the block have been replaced

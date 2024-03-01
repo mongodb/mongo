@@ -398,9 +398,11 @@ void generatePredicate(MatchExpressionVisitorContext* context,
         // navigation of the full path has been made available via the dedicated slot type; in this
         // case generate a special version of traverseF that doesn't have a runtime counterpart and
         // can only be processed by the block vectorizer.
+
+        // TODO : Remove "&& !matchesNothing" when SERVER-87238 and SERVER-87243 have been resolved.
         if (auto slot = slots->getIfExists(
                 std::make_pair(PlanStageSlots::kFilterCellField, path.dottedField()));
-            slot && mode == LeafTraversalMode::kArrayElementsOnly) {
+            slot && mode == LeafTraversalMode::kArrayElementsOnly && !matchesNothing) {
             SbExprBuilder b(context->state);
             auto lambdaFrameId = context->state.frameIdGenerator->generate();
             auto traverseFExpr = b.makeFunction(
