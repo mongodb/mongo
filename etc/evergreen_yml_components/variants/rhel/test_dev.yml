@@ -366,7 +366,7 @@ buildvariants:
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
   tasks:
-  - name: .aggfuzzer !.sbe_only !.cqf_only
+  - name: .aggfuzzer !.sbe_only
   - name: .aggregation !.sbe_only
   - name: .auth
   - name: .causally_consistent !.sharding
@@ -381,7 +381,7 @@ buildvariants:
   - name: .jstestfuzz !.feature_flag_guarded !.flow_control
   - name: .misc_js
   - name: .multi_shard
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: query_golden_classic
   - name: .random_multiversion_ds
   - name: .read_only
@@ -500,7 +500,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .multi_shard .common
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog

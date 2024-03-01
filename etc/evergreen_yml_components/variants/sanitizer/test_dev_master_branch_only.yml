@@ -539,7 +539,6 @@ buildvariants:
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: .config_fuzzer
   - name: .config_fuzzer_stress
-  - name: .cqf
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
@@ -573,7 +572,7 @@ buildvariants:
   - name: move_collection_fuzzer_gen
   - name: .multi_shard .common
   - name: query_golden_classic
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: .read_write_concern
   - name: .recordids_replicated
   - name: replica_sets_large_txns_format_jscore_passthrough
@@ -665,12 +664,6 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   # - name: .config_fuzzer # Not passing
   - name: config_fuzzer_jsCore
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
-  - name: query_golden_cqf
-  - name: cqf_experimental_jscore_passthrough
-  - name: cqf_experimental_aggregation_passthrough
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer

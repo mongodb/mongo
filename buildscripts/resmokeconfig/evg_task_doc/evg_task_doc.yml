@@ -20,23 +20,3 @@ noPassthrough: |-
   parameters. Most tests by default are able to run in "passthrough" suites.
   NoPassthrough is an exception, where tests here only run in the exact
   configuration predefined in the tests themselves.
-
-cqf: |-
-  Tests in jstests/cqf/ which stress the new query framework, often with a focus
-  on the new optimizer. These are similar in spirit to the tests in the jscore
-  suite. Tests in this suite are _forced_ to use the new query optimizer by
-  using the server parameter 'internalQueryFrameworkControl': "forceBonsai".
-
-cqf_disabled_pipeline_opt: |-
-  A passthrough suite of the tests in the cqf suite with a failpoint used to
-  disable the optimization pass that happens over the Pipeline structure before
-  the query enters the new optimization framework. Tests in this suite are
-  _forced_ to use the new query optimizer by using the server parameter
-  'internalQueryFrameworkControl': "forceBonsai".
-
-cqf_parallel: |-
-  A passthrough suite of the tests in the cqf suite with parallelism enabled in
-  the optimizer - meaning it can produce plans capable of being executed in
-  parallel. The optimizer will use a default degree of parallelism of 5. Tests
-  in this suite are _forced_ to use the new query optimizer by using the server
-  parameter 'internalQueryFrameworkControl': "forceBonsai".

@@ -143,7 +143,6 @@ buildvariants:
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
-  - name: .cqf
   - name: .misc_js
   - name: .clustered_collections
   - name: .concurrency !.large !.no_txns
@@ -239,9 +238,9 @@ buildvariants:
   name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
   display_name: "*| Amazon Linux 2 arm64 (all feature flags) Fuzzers"
   tasks:
-  - name: .aggfuzzer !.cqf_only
+  - name: .aggfuzzer
   - name: .change_stream_fuzzer
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: .updatefuzzer
 
 - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
@@ -268,7 +267,7 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer !.cqf_only !.feature_flag_guarded
+  - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
   - name: audit
@@ -282,9 +281,6 @@ buildvariants:
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
   - name: .misc_js
   - name: .clustered_collections
   - name: .concurrency !.large !.no_txns

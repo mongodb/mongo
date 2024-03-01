@@ -304,7 +304,7 @@ buildvariants:
   #     variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer !.cqf_only
+  - name: .aggfuzzer
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
@@ -357,7 +357,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -931,141 +931,6 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
     patch_only: true
 
-# The CQF feature flag is currently part of the always-disabled feature flags list, so it is not
-# enabled in all-feature-flags variants besides this one. This variant allows us to get some initial
-# coverage for CQF without disrupting coverage for other feature flags (in particular, SBE). Once
-# CQF is enabled by default, it will be tested in the release variants and all-feature-flags
-# variants, and we will no longer need this dedicated variant to test it. At that point, we will
-# replace this variant with a dedicated variant for SBE stage builders, similar in spirit to the
-# Classic Engine variant above.
-# TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
-# feature flag is not always-disabled.
-- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
-  <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled
-  display_name: "Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled)"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter.
-  expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
-    test_flags: >-
-      --runAllFeatureFlagTests
-      --excludeWithAnyTags=cqf_incompatible
-      --mongosSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
-      --mongodSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
-  tasks:
-  - name: analyze_shard_key_jscore_passthrough_gen
-  - name: .cqf
-  - name: lint_fuzzer_sanity_patch
-  - name: test_api_version_compatibility
-  # - name: burn_in_tasks_gen
-  #   depends_on:
-  #   - name: version_burn_in_gen
-  #     variant: generate-tasks-for-version
-  #     omit_generated_tasks: true
-  #   - name: archive_dist_test_debug
-  #     variant: *linux_x86_dynamic_compile_variant_name
-  - name: check_feature_flag_tags
-  - name: check_for_todos
-  - name: .aggregation
-  - name: aggregation_repeat_queries
-  - name: audit
-  - name: .auth
-  - name: buildscripts_test
-  - name: .bulk_write
-  - name: resmoke_end2end_tests
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
-  - name: change_streams_multitenant_passthrough
-  - name: change_streams_multitenant_sharded_collections_passthrough
-  - name: .misc_js
-  - name: .clustered_collections
-  - name: .concurrency !.large !.no_txns
-  - name: .concurrency .large !.no_txns
-    distros:
-    - rhel80-medium
-  - name: .config_fuzzer !.large
-  - name: .config_fuzzer .large
-    distros:
-    - rhel80-medium
-  - name: .config_fuzzer_stress
-    distros:
-    - rhel80-large
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: feature_flag_multiversion_gen
-  - name: idl_tests
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common
-  - name: jsCore_column_store_indexes
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: jsCore_wildcard_indexes
-  - name: json_schema
-  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
-  - name: libunwind_tests
-  - name: .multiversion_sanity_check
-  - name: .multi_shard
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion_gen
-  - name: powercycle_smoke
-  - name: .random_multiversion_ds
-  - name: .read_write_concern .large
-    distros:
-    - rhel80-medium
-  - name: .read_write_concern !.large
-  - name: .recordids_replicated
-  - name: .replica_sets !.encrypt !.auth
-    distros:
-    - rhel80-medium
-  - name: replica_sets_api_version_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: sharding_api_version_jscore_passthrough_gen
-  - name: sharding_api_strict_passthrough_gen
-  - name: .sharding .txns
-  - name: .sharding .common
-  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-  - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: .serverless
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  - name: .unsplittable_collections
-  - name: secondary_reads_passthrough_gen
-  - name: .shard_split
-  - name: streams
-  - name: query_stats_aggregation_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
-  - name: query_stats_mongos_passthrough
-  - name: query_stats_passthrough
-
-# TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
-# feature flag is not always-disabled.
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
-  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-and-cqf-enabled-fuzzers
-  display_name: "*| Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled) Fuzzers"
-  tasks:
-  - name: .aggfuzzer .cqf_only
-  - name: .query_fuzzer .cqf_only
-
 ### QO & QE Patch-Specific Build Variants ###
 
 - name: &enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
@@ -1094,7 +959,7 @@ buildvariants:
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
   tasks:
-  - name: .aggfuzzer !.sbe_only !.cqf_only
+  - name: .aggfuzzer !.sbe_only
   - name: .aggregation !.sbe_only
   - name: .auth
   - name: .causally_consistent !.sharding
@@ -1109,7 +974,7 @@ buildvariants:
   - name: .jstestfuzz !.feature_flag_guarded !.flow_control
   - name: .misc_js
   - name: .multi_shard
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: query_golden_classic
   - name: .random_multiversion_ds
   - name: .read_only
@@ -1317,9 +1182,9 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
   display_name: "*| Shared Library Enterprise RHEL 8.0 (Classic Engine all feature flags) Fuzzers"
   tasks:
-  - name: .aggfuzzer !.cqf_only
+  - name: .aggfuzzer
   - name: .change_stream_fuzzer
-  - name: .query_fuzzer !.cqf_only
+  - name: .query_fuzzer
   - name: .updatefuzzer
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template

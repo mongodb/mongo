@@ -657,36 +657,6 @@ tasks:
 #           Query Optimization tasks           #
 ################################################
 
-## Standalone fuzzer for checking Bonsai optimizations correctness vs Classic ##
-- <<: *jstestfuzz_template
-  name: aggregation_bonsai_m2_vs_classic_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_classic
-      npm_command: agg-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## Standalone fuzzer for checking Bonsai optimizations correctness vs SBE stage-builders ##
-- <<: *jstestfuzz_template
-  name: aggregation_bonsai_m2_vs_sbe_stagebuilders_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_sbe_stagebuilders
-      npm_command: agg-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
 - <<: *task_template
   name: aggregation_disabled_optimization
   tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggregation", "common"]
@@ -835,68 +805,6 @@ tasks:
         resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 - <<: *task_template
-  name: cqf
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: cqf_disabled_pipeline_opt
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: cqf_experimental_aggregation_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: cqf_experimental_jscore_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: cqf_experimental_no_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", "cqf"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: cqf_experimental_no_passthrough
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: cqf_experimental_sharded_collections_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: cqf_experimental_sharded_collections_jscore_passthrough
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: cqf_experimental_sharding_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: cqf_experimental_sharding_passthrough
-      use_large_distro: "true"
-
-- <<: *task_template
-  name: cqf_parallel
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
   name: jsCore_wildcard_indexes
   depends_on:
   - name: jsCore
@@ -916,36 +824,6 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
-## Standalone fuzzer comparing find query results of Bonsai optimizations vs Classic ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_bonsai_m2_vs_classic_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_classic
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## Standalone fuzzer comparing find query results of Bonsai optimizations vs SBE stage-builders ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_bonsai_m2_vs_sbe_stagebuilders_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_sbe_stagebuilders
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
 - <<: *task_template
   name: query_golden_classic
   tags: ["assigned_to_jira_team_server_query_optimization", "default"]
@@ -954,15 +832,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: query_golden_classic
-
-- <<: *task_template
-  name: query_golden_cqf
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: query_golden_cqf
 
 ################################################
 #           Query Integration tasks            #

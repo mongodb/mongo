@@ -185,7 +185,6 @@ buildvariants:
     # run too long and hit execution timeouts.
     # burn_in_task_name: jsCore
   tasks:
-  - name: .cqf
   - name: query_golden_classic
   # - name: burn_in_tasks_gen
   #   depends_on:
