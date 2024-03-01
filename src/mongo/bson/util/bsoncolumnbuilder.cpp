@@ -64,6 +64,7 @@ static constexpr uint8_t kCountMask = 0x0F;
 static constexpr uint8_t kControlMask = 0xF0;
 static constexpr std::ptrdiff_t kNoSimple8bControl = -1;
 static constexpr int kFinalizedOffset = -1;
+static constexpr size_t kDefaultBufferSize = 32;
 
 static constexpr std::array<uint8_t, Simple8bTypeUtil::kMemoryAsInteger + 1>
     kControlByteForScaleIndex = {0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0x80};
@@ -1008,14 +1009,14 @@ int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& ov
 
 BSONColumnBuilder::InternalState::InternalState() : lastControl(bsoncolumn::kInvalidControlByte) {}
 
-BSONColumnBuilder::BSONColumnBuilder() : BSONColumnBuilder(BufBuilder()) {}
+BSONColumnBuilder::BSONColumnBuilder() : BSONColumnBuilder(BufBuilder(kDefaultBufferSize)) {}
 
 BSONColumnBuilder::BSONColumnBuilder(BufBuilder builder) : _bufBuilder(std::move(builder)) {
     _bufBuilder.reset();
 }
 
 BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
-    : BSONColumnBuilder(BufBuilder()) {
+    : BSONColumnBuilder(BufBuilder(kDefaultBufferSize)) {
     using namespace bsoncolumn;
 
     // Handle empty case
@@ -1209,15 +1210,18 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
     // Copy data into new buffer that we need to keep in the builder. If we have no control byte in
     // regular mode we're currently writing on, then we can consume the entire binary. Otherwise we
     // can only consume up to this control byte as it may change in the future.
-    BufBuilder buffer;
-    if (controlOffset == kNoSimple8bControl) {
-        newState.offset += length;
-        newState.lastControl = kInvalidControlByte;
-        newState.lastBufLength = 0;
-    } else {
+    BufBuilder buffer = [&]() {
+        if (controlOffset == kNoSimple8bControl) {
+            newState.offset += length;
+            newState.lastControl = kInvalidControlByte;
+            newState.lastBufLength = 0;
+            return BufBuilder(/*initsize=*/0);
+        }
+
         // After calling intermediate, the control byte we're currently working on need to be the
         // first byte in the new binary going forward. This is the first byte that may change when
         // more data is appended.
+        BufBuilder buffer(length - controlOffset);
         buffer.appendChar(lastControlByte);
         buffer.appendBuf(_bufBuilder.buf() + controlOffset + 1, length - controlOffset - 1);
         newState.regular._controlByteOffset = 0;
@@ -1240,7 +1244,9 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
         } else {
             newState.lastControl = *(_bufBuilder.buf() + controlOffset);
         }
-    }
+
+        return buffer;
+    }();
 
     // Swap buffers so we return the finalized one and keep the data we need to keep in this
     // builder.
@@ -1920,10 +1926,10 @@ EncodingState::CloneableBuffer& EncodingState::CloneableBuffer::operator=(
 }
 }  // namespace bsoncolumn
 
-BSONColumnBuilder::InternalState::SubObjState::SubObjState() {}
+BSONColumnBuilder::InternalState::SubObjState::SubObjState() : buffer(kDefaultBufferSize) {}
 
 BSONColumnBuilder::InternalState::SubObjState::SubObjState(const SubObjState& other)
-    : state(other.state), controlBlocks(other.controlBlocks) {
+    : state(other.state), buffer(other.buffer.capacity()), controlBlocks(other.controlBlocks) {
     buffer.appendBuf(other.buffer.buf(), other.buffer.len());
 }
 
@@ -2130,7 +2136,9 @@ void BSONColumnBuilder::_flushSubObjMode() {
 void BSONColumnBuilder::assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const {
     // Verify that buffers are identical
     invariant(_bufBuilder.len() == other._bufBuilder.len());
-    invariant(memcmp(_bufBuilder.buf(), other._bufBuilder.buf(), _bufBuilder.len()) == 0);
+    if (_bufBuilder.len() > 0) {
+        invariant(memcmp(_bufBuilder.buf(), other._bufBuilder.buf(), _bufBuilder.len()) == 0);
+    }
 
     // Validate internal state of regular mode
     invariant(_is.mode == other._is.mode);
