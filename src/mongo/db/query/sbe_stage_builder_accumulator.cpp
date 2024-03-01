@@ -98,9 +98,11 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMin(
     SbExprBuilder b(state);
     std::vector<BlockAggAndRowAgg> pairs;
 
-    pairs.emplace_back(
-        BlockAggAndRowAgg{b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, std::move(arg)),
-                          b.makeFunction("min"_sd, accInternalSlot)});
+    if (arg.hasTypeSignature() && TypeSignature::kBlockType.isSubset(*arg.getTypeSignature())) {
+        pairs.emplace_back(BlockAggAndRowAgg{
+            b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, std::move(arg)),
+            b.makeFunction("min"_sd, accInternalSlot)});
+    }
 
     return pairs;
 }
@@ -156,9 +158,49 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMax(
     SbExprBuilder b(state);
     std::vector<BlockAggAndRowAgg> pairs;
 
-    pairs.emplace_back(
-        BlockAggAndRowAgg{b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, std::move(arg)),
-                          b.makeFunction("max"_sd, accInternalSlot)});
+    if (arg.hasTypeSignature() && TypeSignature::kBlockType.isSubset(*arg.getTypeSignature())) {
+        pairs.emplace_back(BlockAggAndRowAgg{
+            b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, std::move(arg)),
+            b.makeFunction("max"_sd, accInternalSlot)});
+    }
+
+    return pairs;
+}
+
+std::vector<BlockAggAndRowAgg> buildBlockAccumulatorSum(
+    const AccumulationExpression& expr,
+    SbExpr arg,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state) {
+    SbExprBuilder b(state);
+    std::vector<BlockAggAndRowAgg> pairs;
+
+    // Only count-style aggregators are supported in block mode.
+    if (arg.isConstantExpr()) {
+        auto [cTag, cVal] = arg.getConstantValue();
+        if ((cTag == sbe::value::TypeTags::NumberInt32 &&
+             sbe::value::bitcastTo<int32_t>(cVal) == 1) ||
+            (cTag == sbe::value::TypeTags::NumberInt64 &&
+             sbe::value::bitcastTo<int64_t>(cVal) == 1) ||
+            (cTag == sbe::value::TypeTags::NumberDouble &&
+             sbe::value::bitcastTo<double>(cVal) == 1)) {
+            pairs.emplace_back(
+                BlockAggAndRowAgg{b.makeFunction("valueBlockAggCount"_sd, bitmapInternalSlot),
+                                  b.makeFunction("sum"_sd, accInternalSlot)});
+        } else {
+            // Convert into a block and use valueBlockAggSum.
+            pairs.emplace_back(BlockAggAndRowAgg{
+                b.makeFunction("valueBlockAggSum"_sd,
+                               bitmapInternalSlot,
+                               b.makeFunction("valueBlockNewFill"_sd,
+                                              std::move(arg),
+                                              b.makeFunction("valueBlockSize"_sd,
+                                                             SbSlot{bitmapInternalSlot}))),
+                b.makeFunction("sum"_sd, accInternalSlot)});
+        }
+    }
 
     return pairs;
 }
@@ -1333,6 +1375,7 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
     static const StringDataMap<BuildBlockAccumulatorFn> kBlockAccumulatorBuilders = {
         {AccumulatorMin::kName, &buildBlockAccumulatorMin},
         {AccumulatorMax::kName, &buildBlockAccumulatorMax},
+        {AccumulatorSum::kName, &buildBlockAccumulatorSum},
     };
 
     auto accExprName = acc.expr.name;

@@ -344,7 +344,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMax
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCount(
     ArityType arity) {
-    // TODO SERVER-83450 add monoblock fast path.
     invariant(arity == 1);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
@@ -353,15 +352,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCou
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
+    // Fast path to avoid expanding the blocks for easy cases.
+    if (bitsetBlock->allTrue().get_value_or(false)) {
+        return {
+            false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(bitsetBlock->count())};
+    } else if (bitsetBlock->allFalse().get_value_or(false)) {
+        return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0)};
+    }
+
     auto bitset = bitsetBlock->extract();
 
     tassert(8151800, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
 
     size_t count = 0;
     for (size_t i = 0; i < bitset.count(); ++i) {
-        if (value::bitcastTo<bool>(bitset[i].second)) {
-            count++;
-        }
+        count += value::bitcastTo<bool>(bitset[i].second);
     }
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(count)};
 }
@@ -373,7 +378,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCou
  * we return Nothing.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum(ArityType arity) {
-    // TODO SERVER-83450 add monoblock fast path.
     invariant(arity == 2);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
@@ -388,6 +392,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
+    // Fast path to avoid expanding the blocks for easy cases.
+    if (bitsetBlock->allFalse().get_value_or(false)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
     auto block = inputBlock->extract();
     auto bitset = bitsetBlock->extract();
 
@@ -398,19 +407,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
     value::TypeTags resultTag = value::TypeTags::Nothing;
     value::Value resultVal = 0;
     for (size_t i = 0; i < bitset.count(); ++i) {
-        // If we find a non-Nothing value and our current result is nothing, set the result to be
-        // this value.
-        if (value::bitcastTo<bool>(bitset[i].second) && resultTag == value::TypeTags::Nothing &&
-            block.tags()[i] != value::TypeTags::Nothing) {
-            // We do not own the value in the block, so make a copy.
-            auto [copyTag, copyVal] = value::copyValue(block.tags()[i], block.vals()[i]);
-            resultTag = copyTag, resultVal = copyVal;
-        } else if (value::bitcastTo<bool>(bitset[i].second) &&
-                   block[i].first != value::TypeTags::Nothing) {
-            auto [sumOwned, sumTag, sumVal] =
-                genericAdd(resultTag, resultVal, block[i].first, block[i].second);
-            value::releaseValue(resultTag, resultVal);
-            resultTag = sumTag, resultVal = sumVal;
+        if (!value::bitcastTo<bool>(bitset[i].second)) {
+            continue;
+        }
+        if (block.tags()[i] != value::TypeTags::Nothing) {
+            // If we find a non-Nothing value and our current result is nothing, set the result
+            // to be this value.
+            if (resultTag == value::TypeTags::Nothing) {
+                // We do not own the value in the block, so make a copy.
+                auto [copyTag, copyVal] = value::copyValue(block.tags()[i], block.vals()[i]);
+                resultTag = copyTag, resultVal = copyVal;
+            } else {
+                auto [sumOwned, sumTag, sumVal] =
+                    genericAdd(resultTag, resultVal, block.tags()[i], block.vals()[i]);
+                value::releaseValue(resultTag, resultVal);
+                resultTag = sumTag, resultVal = sumVal;
+            }
         }
     }
     return {true, resultTag, resultVal};

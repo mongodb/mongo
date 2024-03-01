@@ -93,6 +93,52 @@ TimeseriesTest.run((insert) => {
                 usesBlockProcessing: false
             },
             {
+                name: "Count",
+                pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$count: 'cnt'}],
+                expectedResults: [{cnt: 4}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "CountViaGroup",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null, cnt: {$count: {}}}},
+                    {$project: {_id: 0, cnt: 1}}
+                ],
+                expectedResults: [{cnt: 4}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "CountViaSum",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null, cnt: {$sum: 1}}},
+                    {$project: {_id: 0, cnt: 1}}
+                ],
+                expectedResults: [{cnt: 4}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "DoubleCountViaSum",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null, cnt: {$sum: 2}}},
+                    {$project: {_id: 0, cnt: 1}}
+                ],
+                expectedResults: [{cnt: 8}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "Sum_GroupByNull",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null, sum_z: {$sum: '$z'}}},
+                    {$project: {_id: 0, sum_z: 1}}
+                ],
+                expectedResults: [{sum_z: 22}],
+                usesBlockProcessing: false
+            },
+            {
                 name: "Min_GroupByNull",
                 pipeline: [
                     {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
@@ -225,6 +271,46 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: '$x', a: {$max: '$y'}}}
                 ],
                 expectedResults: [{_id: 123, a: 73}, {_id: 456, a: 99}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "Count_GroupByX",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: '$x', a: {$count: {}}}},
+                    {$project: {_id: 0, a: 1}}
+                ],
+                expectedResults: [{a: 2}, {a: 2}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "CountWithId_GroupByX",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: '$x', a: {$count: {}}}},
+                    {$project: {_id: 1, a: 1}}
+                ],
+                expectedResults: [{_id: 123, a: 2}, {_id: 456, a: 2}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "CountOnNull_GroupByX",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$gte: dateUpperBound}}},
+                    {$group: {_id: '$x', a: {$count: {}}}},
+                    {$project: {_id: 0, a: 1}}
+                ],
+                expectedResults: [{a: 1}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "CountOnNullWithId_GroupByX",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$gte: dateUpperBound}}},
+                    {$group: {_id: '$x', a: {$count: {}}}},
+                    {$project: {_id: 1, a: 1}}
+                ],
+                expectedResults: [{_id: null, a: 1}],
                 usesBlockProcessing: sbeFullEnabled && !allowDiskUse
             },
             {
