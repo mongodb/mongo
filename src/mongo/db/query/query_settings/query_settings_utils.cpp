@@ -276,27 +276,19 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
 
     auto* opCtx = expCtx->opCtx;
     const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryShapeHash = [&]() -> boost::optional<QueryShapeHash> {
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
         if (opDebug.queryStatsInfo.key) {
             return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
-        try {
-            query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
-            return findCmdShape.sha256Hash(expCtx->opCtx, serializationContext);
-        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-            return boost::none;
-        }
-    }();
-    if (!opDebug.queryShapeHash) {
-        return query_settings::QuerySettings();
-    }
+
+        query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
+        return findCmdShape.sha256Hash(expCtx->opCtx, serializationContext);
+    };
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager
-                        .getQuerySettingsForQueryShapeHash(
-                            opCtx, *opDebug.queryShapeHash, nss.dbName().tenantId())
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
                         .get_value_or({})
                         .first;
 
@@ -335,29 +327,20 @@ QuerySettings lookupQuerySettingsForAgg(
 
     auto* opCtx = expCtx->opCtx;
     const auto& serializationContext = aggregateCommandRequest.getSerializationContext();
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryShapeHash = [&]() -> boost::optional<QueryShapeHash> {
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
         if (opDebug.queryStatsInfo.key) {
             return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
 
-        try {
-            query_shape::AggCmdShape shape(
-                aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
-            return shape.sha256Hash(opCtx, serializationContext);
-        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-            return boost::none;
-        }
-    }();
-    if (!opDebug.queryShapeHash) {
-        return query_settings::QuerySettings();
-    }
+        query_shape::AggCmdShape shape(
+            aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
+        return shape.sha256Hash(opCtx, serializationContext);
+    };
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager
-                        .getQuerySettingsForQueryShapeHash(
-                            opCtx, *opDebug.queryShapeHash, nss.dbName().tenantId())
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
                         .get_value_or({})
                         .first;
 
@@ -394,27 +377,19 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
     auto* opCtx = expCtx->opCtx;
     const auto& serializationContext =
         parsedDistinct.distinctCommandRequest->getSerializationContext();
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryShapeHash = [&]() -> boost::optional<QueryShapeHash> {
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
         if (opDebug.queryStatsInfo.key) {
             return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
-        try {
-            query_shape::DistinctCmdShape shape(parsedDistinct, expCtx);
-            return shape.sha256Hash(expCtx->opCtx, serializationContext);
-        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-            return boost::none;
-        }
-    }();
-    if (!opDebug.queryShapeHash) {
-        return query_settings::QuerySettings();
-    }
+
+        query_shape::DistinctCmdShape shape(parsedDistinct, expCtx);
+        return shape.sha256Hash(expCtx->opCtx, serializationContext);
+    };
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager
-                        .getQuerySettingsForQueryShapeHash(
-                            opCtx, *opDebug.queryShapeHash, nss.dbName().tenantId())
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
                         .get_value_or({})
                         .first;
 

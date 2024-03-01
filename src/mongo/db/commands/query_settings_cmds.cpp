@@ -290,8 +290,8 @@ public:
             // an update, otherwise insert.
             if (auto lookupResult = querySettingsManager.getQuerySettingsForQueryShapeHash(
                     opCtx,
-                    queryShapeHash,
-                    representativeQueryInfo.namespaceString.dbName().tenantId())) {
+                    [&]() { return queryShapeHash; },
+                    representativeQueryInfo.namespaceString)) {
                 return updateQuerySettings(
                     opCtx,
                     request().getSettings(),
