@@ -252,10 +252,11 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
             // If we do not have hugepages enabled, we don't need to warn about its features
             shouldWarnAboutDefragAlways = true;
 
-            LOGV2_WARNING_OPTIONS(22178,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  TRANSPARENT_HUGE_PAGES_DIR
-                                  "/enabled is 'always'. We suggest setting it to 'never'");
+            LOGV2_WARNING_OPTIONS(
+                22178,
+                {logv2::LogTag::kStartupWarnings},
+                TRANSPARENT_HUGE_PAGES_DIR
+                "/enabled is 'always'. We suggest setting it to 'never' in this binary version");
         }
     } else if (transparentHugePagesEnabledResult.getStatus().code() !=
                ErrorCodes::NonExistentPath) {
@@ -271,10 +272,11 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
     if (transparentHugePagesDefragResult.isOK()) {
         if (shouldWarnAboutDefragAlways &&
             transparentHugePagesDefragResult.getValue() == "always") {
-            LOGV2_WARNING_OPTIONS(22181,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  TRANSPARENT_HUGE_PAGES_DIR
-                                  "/defrag is 'always'. We suggest setting it to 'never'");
+            LOGV2_WARNING_OPTIONS(
+                22181,
+                {logv2::LogTag::kStartupWarnings},
+                TRANSPARENT_HUGE_PAGES_DIR
+                "/defrag is 'always'. We suggest setting it to 'never' in this binary version");
         }
     } else if (transparentHugePagesDefragResult.getStatus().code() != ErrorCodes::NonExistentPath) {
         LOGV2_WARNING_OPTIONS(22204,
