@@ -275,7 +275,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 if (res.code === ErrorCodes.LockTimeout || res.code === ErrorCodes.StaleConfig ||
                     res.code === ErrorCodes.ConflictingOperationInProgress ||
                     res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld ||
-                    res.code == ErrorCodes.WriteConflict) {
+                    res.code == ErrorCodes.WriteConflict ||
+                    res.code == ErrorCodes.SnapshotUnavailable) {
                     if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
                         return false;
                     }
