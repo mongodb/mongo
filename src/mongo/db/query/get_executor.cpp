@@ -149,6 +149,7 @@
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/query/sbe_planner_interfaces.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_sub_planner.h"
@@ -1198,18 +1199,19 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                                          plannerParams,
                                                          planStageData,
                                                          remoteCursors.get())) {
-        // Do the runtime planning and pick the best candidate plan.
-        auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
-        return plan_executor_factory::make(opCtx,
-                                           std::move(cq),
-                                           std::move(candidates),
-                                           collections,
-                                           plannerParams.options,
-                                           std::move(nss),
-                                           std::move(yieldPolicy),
-                                           std::move(remoteCursors),
-                                           std::move(remoteExplains),
-                                           planningResult->cachedPlanHash());
+        auto plannerInterface =
+            std::make_unique<SbeRuntimePlanner>(opCtx,
+                                                collections,
+                                                std::move(yieldPolicy),
+                                                std::move(plannerParams),
+                                                planningResult->cachedPlanHash(),
+                                                std::move(runTimePlanner),
+                                                std::move(solutions),
+                                                std::move(roots),
+                                                std::move(remoteCursors),
+                                                std::move(remoteExplains));
+        // TODO SERVER-87054: Return 'plannerInterface' directly instead of creating the executor.
+        return plannerInterface->makeExecutor(std::move(cq));
     }
 
     // No need for runtime planning, just use the constructed plan stage tree.
