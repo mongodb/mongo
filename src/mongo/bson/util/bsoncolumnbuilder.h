@@ -483,6 +483,8 @@ private:
         // Current offset of the binary relative to previous intermediate() calls.
         int offset = 0;
 
+        // Buffer length at previous intermediate() call.
+        int lastBufLength = 0;
         // Finalized state of last control byte written out by the previous intermediate() call.
         uint8_t lastControl;
     };

@@ -568,6 +568,8 @@ void BSONColumnBuilder::BinaryReopen::reopen(BSONColumnBuilder& builder) const {
                            builder._is.offset,
                            builder._is.lastControl);
     }
+
+    builder._is.lastBufLength = builder._bufBuilder.len();
 }
 
 void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
@@ -1211,6 +1213,7 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
     if (controlOffset == kNoSimple8bControl) {
         newState.offset += length;
         newState.lastControl = kInvalidControlByte;
+        newState.lastBufLength = 0;
     } else {
         // After calling intermediate, the control byte we're currently working on need to be the
         // first byte in the new binary going forward. This is the first byte that may change when
@@ -1219,6 +1222,7 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
         buffer.appendBuf(_bufBuilder.buf() + controlOffset + 1, length - controlOffset - 1);
         newState.regular._controlByteOffset = 0;
         newState.offset += controlOffset;
+        newState.lastBufLength = length - controlOffset;
 
         // Compare the control byte at the beginning of the finalized binary against state of last
         // finalized binary. If they are the same we can advance the point of the first byte that
@@ -1228,8 +1232,9 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
             // When lastControl has been set, the control byte we're working on is always at the
             // beginning of the binary.
             uint8_t controlByteThisBinary = *_bufBuilder.buf();
-            if (prevOffset != 0 && _is.lastControl == controlByteThisBinary) {
-                identicalBytes = length - controlOffset;
+            if (prevOffset != 0 && _is.lastControl == controlByteThisBinary &&
+                _is.lastBufLength > controlOffset) {
+                identicalBytes = _is.lastBufLength - controlOffset;
             }
             newState.lastControl = controlByteThisBinary;
         } else {
@@ -2174,6 +2179,7 @@ void BSONColumnBuilder::assertInternalStateIdentical_forTest(const BSONColumnBui
 
     // Validate intermediate data
     invariant(_is.offset == other._is.offset);
+    invariant(_is.lastBufLength == other._is.lastBufLength);
     invariant(_is.lastControl == other._is.lastControl);
 }
 
