@@ -413,6 +413,7 @@ def mongo_cc_library(
         tags = [],
         copts = [],
         linkopts = [],
+        includes = [],
         linkstatic = False,
         local_defines = [],
         mongo_api_name = None):
@@ -429,6 +430,7 @@ def mongo_cc_library(
       tags: Tags to add to the rule.
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
+      includes: Any directory which should be exported to dependents, will be prefixed with the package path
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
         is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
         configured via //config/bazel:linkstatic.
@@ -495,7 +497,7 @@ def mongo_cc_library(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
-        includes = [],
+        includes = includes,
         features = ["supports_pic", "pic"],
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled_linux": [],
@@ -517,7 +519,7 @@ def mongo_cc_library(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
-        includes = [],
+        includes = includes,
         features = ["supports_pic", "pic"],
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled_windows": [],
@@ -544,7 +546,7 @@ def mongo_cc_library(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
-        includes = [],
+        includes = includes,
         features = select({
             "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
             "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
@@ -590,6 +592,7 @@ def mongo_cc_binary(
         tags = [],
         copts = [],
         linkopts = [],
+        includes = [],
         linkstatic = False,
         local_defines = []):
     """Wrapper around cc_binary.
@@ -604,6 +607,7 @@ def mongo_cc_binary(
       tags: Tags to add to the rule.
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
+      includes: Any directory which should be exported to dependents, will be prefixed with the package path
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
         is currently not supported. The mongo build must link entirely statically or entirely dynamically. This can be
         configured via //config/bazel:linkstatic.
@@ -645,7 +649,7 @@ def mongo_cc_binary(
         linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
         linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
-        includes = [],
+        includes = includes,
         features = ["pie"],
         dynamic_deps = select({
             "//bazel/config:linkstatic_disabled": deps,

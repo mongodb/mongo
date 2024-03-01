@@ -1,9 +1,9 @@
 # TODO(SERVER-81039): Remove once these can be compiled from the root directory.
-src/third_party/grpc
-src/third_party/abseil-cpp
-src/third_party/protobuf
-src/third_party/re2
-src/third_party/tcmalloc
+src/third_party/grpc/dist
+src/third_party/abseil-cpp/dist
+src/third_party/protobuf/dist
+src/third_party/re2/dist
+src/third_party/tcmalloc/dist
 
 # Ignore node_modules due to the following error
 # ERROR: in verify_node_modules_ignored:

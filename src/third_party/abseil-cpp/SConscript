@@ -1,4 +1,5 @@
-# Generated from parse_lib_from_ninja.py
+# AUTO-GENERATED FILE DO NOT MANUALLY EDIT
+# generated from the parse_libs_from_ninja.py script in scripts directory via `python ./parse_libs_from_ninja.py`
 Import("env")
 env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 env.InjectThirdParty(libraries=['abseil-cpp'])
@@ -14,18 +15,16 @@ if env.ToolchainIs('gcc'):
     env.Append(CCFLAGS=[
         '-Wno-error=ignored-attributes',
     ], )
-
 # absl_strerror added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_strerror',
     source=[
         'dist/absl/base/internal/strerror.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_scoped_set_env added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_scoped_set_env',
     source=[
         'dist/absl/base/internal/scoped_set_env.cc',
@@ -35,27 +34,24 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_spinlock_wait is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_spinlock_wait',
     source=[
         'dist/absl/base/internal/spinlock_wait.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_log_severity is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_log_severity',
     source=[
         'dist/absl/base/log_severity.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_base is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_base',
     source=[
         'dist/absl/base/internal/cycleclock.cc',
@@ -70,9 +66,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_raw_logging_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_raw_logging_internal',
     source=[
         'dist/absl/base/internal/raw_logging.cc',
@@ -81,9 +76,8 @@ env.Library(
         'absl_log_severity',
     ],
 )
-
 # absl_malloc_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_malloc_internal',
     source=[
         'dist/absl/base/internal/low_level_alloc.cc',
@@ -95,9 +89,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_throw_delegate is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_throw_delegate',
     source=[
         'dist/absl/base/internal/throw_delegate.cc',
@@ -107,9 +100,8 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_raw_hash_set is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_raw_hash_set',
     source=[
         'dist/absl/container/internal/raw_hash_set.cc',
@@ -144,9 +136,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_hashtablez_sampler is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_hashtablez_sampler',
     source=[
         'dist/absl/container/internal/hashtablez_sampler.cc',
@@ -176,9 +167,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_crc_cord_state added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_crc_cord_state',
     source=[
         'dist/absl/crc/internal/crc_cord_state.cc',
@@ -199,9 +189,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_crc32c added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_crc32c',
     source=[
         'dist/absl/crc/crc32c.cc',
@@ -224,9 +213,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_crc_internal added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_crc_internal',
     source=[
         'dist/absl/crc/internal/crc.cc',
@@ -240,9 +228,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_crc_cpu_detect added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_crc_cpu_detect',
     source=[
         'dist/absl/crc/internal/cpu_detect.cc',
@@ -254,9 +241,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_stacktrace is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_stacktrace',
     source=[
         'dist/absl/debugging/stacktrace.cc',
@@ -267,9 +253,8 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_examine_stack added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_examine_stack',
     source=[
         'dist/absl/debugging/internal/examine_stack.cc',
@@ -291,9 +276,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_symbolize is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_symbolize',
     source=[
         'dist/absl/debugging/symbolize.cc',
@@ -313,9 +297,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_debugging_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_debugging_internal',
     source=[
         'dist/absl/debugging/internal/address_is_readable.cc',
@@ -327,9 +310,8 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_demangle_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_demangle_internal',
     source=[
         'dist/absl/debugging/internal/demangle.cc',
@@ -341,18 +323,16 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_leak_check added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_leak_check',
     source=[
         'dist/absl/debugging/leak_check.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_failure_signal_handler added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_failure_signal_handler',
     source=[
         'dist/absl/debugging/failure_signal_handler.cc',
@@ -375,9 +355,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_flags_config added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_config',
     source=[
         'dist/absl/flags/usage_config.cc',
@@ -406,9 +385,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_marshalling added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_marshalling',
     source=[
         'dist/absl/flags/marshalling.cc',
@@ -427,9 +405,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_flags is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_flags',
     source=[
         'dist/absl/flags/flag.cc',
@@ -483,9 +460,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_private_handle_accessor added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_private_handle_accessor',
     source=[
         'dist/absl/flags/internal/private_handle_accessor.cc',
@@ -505,18 +481,16 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_flags_commandlineflag_internal added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_commandlineflag_internal',
     source=[
         'dist/absl/flags/internal/commandlineflag.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_flags_commandlineflag added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_commandlineflag',
     source=[
         'dist/absl/flags/commandlineflag.cc',
@@ -535,9 +509,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_flags_program_name added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_program_name',
     source=[
         'dist/absl/flags/internal/program_name.cc',
@@ -565,9 +538,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_reflection added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_reflection',
     source=[
         'dist/absl/flags/reflection.cc',
@@ -618,9 +590,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_internal added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_internal',
     source=[
         'dist/absl/flags/internal/flag.cc',
@@ -655,9 +626,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_usage added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_usage',
     source=[
         'dist/absl/flags/usage.cc',
@@ -713,9 +683,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_usage_internal added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_usage_internal',
     source=[
         'dist/absl/flags/internal/usage.cc',
@@ -770,9 +739,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_flags_parse added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_flags_parse',
     source=[
         'dist/absl/flags/parse.cc',
@@ -829,9 +797,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_low_level_hash is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_low_level_hash',
     source=[
         'dist/absl/hash/internal/low_level_hash.cc',
@@ -844,9 +811,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_city is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_city',
     source=[
         'dist/absl/hash/internal/city.cc',
@@ -858,9 +824,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_hash is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_hash',
     source=[
         'dist/absl/hash/internal/hash.cc',
@@ -881,9 +846,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_die_if_null added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_die_if_null',
     source=[
         'dist/absl/log/die_if_null.cc',
@@ -929,9 +893,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_message added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_message',
     source=[
         'dist/absl/log/internal/log_message.cc',
@@ -975,18 +938,16 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_nullguard added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_nullguard',
     source=[
         'dist/absl/log/internal/nullguard.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_log_internal_globals added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_globals',
     source=[
         'dist/absl/log/internal/globals.cc',
@@ -1006,9 +967,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_log_sink_set added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_log_sink_set',
     source=[
         'dist/absl/log/internal/log_sink_set.cc',
@@ -1045,9 +1005,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_proto added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_proto',
     source=[
         'dist/absl/log/internal/proto.cc',
@@ -1064,9 +1023,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_log_entry added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_entry',
     source=[
         'dist/absl/log/log_entry.cc',
@@ -1086,9 +1044,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_format added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_format',
     source=[
         'dist/absl/log/internal/log_format.cc',
@@ -1110,9 +1067,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_check_op added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_check_op',
     source=[
         'dist/absl/log/internal/check_op.cc',
@@ -1157,9 +1113,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_internal_conditions added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_internal_conditions',
     source=[
         'dist/absl/log/internal/conditions.cc',
@@ -1171,9 +1126,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_log_initialize added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_initialize',
     source=[
         'dist/absl/log/initialize.cc',
@@ -1200,9 +1154,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_sink added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_sink',
     source=[
         'dist/absl/log/log_sink.cc',
@@ -1223,9 +1176,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_log_globals added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_globals',
     source=[
         'dist/absl/log/globals.cc',
@@ -1247,9 +1199,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_log_flags added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_log_flags',
     source=[
         'dist/absl/log/flags.cc',
@@ -1305,18 +1256,16 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_int128 is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_int128',
     source=[
         'dist/absl/numeric/int128.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_periodic_sampler added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_periodic_sampler',
     source=[
         'dist/absl/profiling/internal/periodic_sampler.cc',
@@ -1325,18 +1274,16 @@ env.Library(
         'absl_exponential_biased',
     ],
 )
-
 # absl_exponential_biased is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_exponential_biased',
     source=[
         'dist/absl/profiling/internal/exponential_biased.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_random_internal_randen_hwaes is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_randen_hwaes',
     source=[
         'dist/absl/random/internal/randen_detect.cc',
@@ -1346,9 +1293,8 @@ env.Library(
         'absl_random_internal_randen_hwaes_impl',
     ],
 )
-
 # absl_random_internal_seed_material is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_seed_material',
     source=[
         'dist/absl/random/internal/seed_material.cc',
@@ -1366,9 +1312,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_random_internal_randen_slow is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_randen_slow',
     source=[
         'dist/absl/random/internal/randen_slow.cc',
@@ -1377,18 +1322,16 @@ env.Library(
         'absl_random_internal_platform',
     ],
 )
-
 # absl_random_seed_gen_exception is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_seed_gen_exception',
     source=[
         'dist/absl/random/seed_gen_exception.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_random_internal_pool_urbg is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_pool_urbg',
     source=[
         'dist/absl/random/internal/pool_urbg.cc',
@@ -1413,9 +1356,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_random_distributions is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_distributions',
     source=[
         'dist/absl/random/discrete_distribution.cc',
@@ -1433,9 +1375,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_random_internal_randen_hwaes_impl is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_randen_hwaes_impl',
     source=[
         'dist/absl/random/internal/randen_hwaes.cc',
@@ -1444,9 +1385,8 @@ env.Library(
         'absl_random_internal_platform',
     ],
 )
-
 # absl_random_seed_sequences is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_seed_sequences',
     source=[
         'dist/absl/random/seed_sequences.cc',
@@ -1472,9 +1412,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_random_internal_randen is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_randen',
     source=[
         'dist/absl/random/internal/randen.cc',
@@ -1486,9 +1425,8 @@ env.Library(
         'absl_random_internal_randen_slow',
     ],
 )
-
 # absl_random_internal_distribution_test_util added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_distribution_test_util',
     source=[
         'dist/absl/random/internal/chi_square.cc',
@@ -1507,18 +1445,16 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_random_internal_platform is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_random_internal_platform',
     source=[
         'dist/absl/random/internal/randen_round_keys.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_statusor is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_statusor',
     source=[
         'dist/absl/status/statusor.cc',
@@ -1561,9 +1497,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_status is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_status',
     source=[
         'dist/absl/status/status.cc',
@@ -1605,9 +1540,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_cord is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_cord',
     source=[
         'dist/absl/strings/cord.cc',
@@ -1648,9 +1582,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_string_view added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_string_view',
     source=[
         'dist/absl/strings/string_view.cc',
@@ -1663,9 +1596,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_strings is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_strings',
     source=[
         'dist/absl/strings/ascii.cc',
@@ -1694,9 +1626,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_strings_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_strings_internal',
     source=[
         'dist/absl/strings/internal/ostringstream.cc',
@@ -1710,9 +1641,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_cordz_functions is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_cordz_functions',
     source=[
         'dist/absl/strings/internal/cordz_functions.cc',
@@ -1723,9 +1653,8 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_cordz_info is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_cordz_info',
     source=[
         'dist/absl/strings/internal/cordz_info.cc',
@@ -1762,9 +1691,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_cord_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_cord_internal',
     source=[
         'dist/absl/strings/internal/cord_internal.cc',
@@ -1792,9 +1720,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_str_format_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_str_format_internal',
     source=[
         'dist/absl/strings/internal/str_format/arg.cc',
@@ -1816,9 +1743,8 @@ env.Library(
         'absl_throw_delegate',
     ],
 )
-
 # absl_cordz_sample_token added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_cordz_sample_token',
     source=[
         'dist/absl/strings/internal/cordz_sample_token.cc',
@@ -1856,9 +1782,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_cordz_handle is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_cordz_handle',
     source=[
         'dist/absl/strings/internal/cordz_handle.cc',
@@ -1886,9 +1811,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_synchronization is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_synchronization',
     source=[
         'dist/absl/synchronization/barrier.cc',
@@ -1926,9 +1850,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_kernel_timeout_internal added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_kernel_timeout_internal',
     source=[
         'dist/absl/synchronization/internal/kernel_timeout.cc',
@@ -1948,9 +1871,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_graphcycles_internal is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_graphcycles_internal',
     source=[
         'dist/absl/synchronization/internal/graphcycles.cc',
@@ -1963,9 +1885,8 @@ env.Library(
         'absl_spinlock_wait',
     ],
 )
-
 # absl_time_zone is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_time_zone',
     source=[
         'dist/absl/time/internal/cctz/src/time_zone_fixed.cc',
@@ -1980,18 +1901,16 @@ env.Library(
     ],
     LIBDEPS=[],
 )
-
 # absl_civil_time is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_civil_time',
     source=[
         'dist/absl/time/internal/cctz/src/civil_time_detail.cc',
     ],
     LIBDEPS=[],
 )
-
 # absl_time is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_time',
     source=[
         'dist/absl/time/civil_time.cc',
@@ -2014,9 +1933,8 @@ env.Library(
         'absl_time_zone',
     ],
 )
-
 # absl_bad_any_cast_impl added as a dependency of other abseil libraries
-env.Library(
+env.BazelLibrary(
     target='absl_bad_any_cast_impl',
     source=[
         'dist/absl/types/bad_any_cast.cc',
@@ -2026,9 +1944,8 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_bad_optional_access is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_bad_optional_access',
     source=[
         'dist/absl/types/bad_optional_access.cc',
@@ -2038,9 +1955,8 @@ env.Library(
         'absl_raw_logging_internal',
     ],
 )
-
 # absl_bad_variant_access is an explicit dependency to the server build
-env.Library(
+env.BazelLibrary(
     target='absl_bad_variant_access',
     source=[
         'dist/absl/types/bad_variant_access.cc',
