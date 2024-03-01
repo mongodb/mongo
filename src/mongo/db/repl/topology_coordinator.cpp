@@ -1930,6 +1930,8 @@ std::string TopologyCoordinator::_getReplSetStatusString() {
 void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
                                                 BSONObjBuilder* response,
                                                 Status* result) {
+    auto featureFlagMajorityWriteLatency = feature_flags::gReduceMajorityWriteLatency.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     // output for each member
     std::vector<BSONObj> membersOut;
     const MemberState myState = getMemberState();
@@ -1938,6 +1940,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const Date_t lastOpAppliedWall = getMyLastAppliedOpTimeAndWallTime().wallTime;
     const OpTime lastOpDurable = getMyLastDurableOpTime();
     const Date_t lastOpDurableWall = getMyLastDurableOpTimeAndWallTime().wallTime;
+    const OpTime lastOpWritten = getMyLastWrittenOpTime();
+    const Date_t lastOpWrittenWall = getMyLastWrittenOpTimeAndWallTime().wallTime;
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
     const BSONObj& electionCandidateMetrics = rsStatusArgs.electionCandidateMetrics;
     const BSONObj& electionParticipantMetrics = rsStatusArgs.electionParticipantMetrics;
@@ -1951,9 +1955,16 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         response->append("uptime", static_cast<int>(rsStatusArgs.selfUptime));
 
         appendOpTime(response, "optime", lastOpApplied);
+        if (featureFlagMajorityWriteLatency) {
+            appendOpTime(response, "optimeWritten", lastOpWritten);
+        }
 
         response->appendDate("optimeDate",
                              Date_t::fromDurationSinceEpoch(Seconds(lastOpApplied.getSecs())));
+        if (featureFlagMajorityWriteLatency) {
+            response->appendDate("optimeWrittenDate",
+                                 Date_t::fromDurationSinceEpoch(Seconds(lastOpWritten.getSecs())));
+        }
         if (_maintenanceModeCalls) {
             response->append("maintenanceMode", _maintenanceModeCalls);
         }
@@ -1983,8 +1994,16 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 appendOpTime(&bb, "optime", lastOpApplied);
                 bb.appendDate("optimeDate",
                               Date_t::fromDurationSinceEpoch(Seconds(lastOpApplied.getSecs())));
+                if (featureFlagMajorityWriteLatency) {
+                    appendOpTime(&bb, "optimeWritten", lastOpWritten);
+                    bb.appendDate("optimeWrittenDate",
+                                  Date_t::fromDurationSinceEpoch(Seconds(lastOpWritten.getSecs())));
+                }
                 bb.appendDate("lastAppliedWallTime", it->getLastAppliedWallTime());
                 bb.appendDate("lastDurableWallTime", it->getLastDurableWallTime());
+                if (featureFlagMajorityWriteLatency) {
+                    bb.appendDate("lastWrittenWallTime", it->getLastWrittenWallTime());
+                }
             }
 
             if (!_syncSource.empty() && !_iAmPrimary()) {
@@ -2036,6 +2055,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             if (!itConfig.isArbiter()) {
                 appendOpTime(&bb, "optime", it->getHeartbeatAppliedOpTime());
                 appendOpTime(&bb, "optimeDurable", it->getHeartbeatDurableOpTime());
+                if (featureFlagMajorityWriteLatency) {
+                    appendOpTime(&bb, "optimeWritten", it->getHeartbeatWrittenOpTime());
+                }
 
                 bb.appendDate("optimeDate",
                               Date_t::fromDurationSinceEpoch(
@@ -2043,9 +2065,17 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.appendDate("optimeDurableDate",
                               Date_t::fromDurationSinceEpoch(
                                   Seconds(it->getHeartbeatDurableOpTime().getSecs())));
+                if (featureFlagMajorityWriteLatency) {
+                    bb.appendDate("optimeWrittenDate",
+                                  Date_t::fromDurationSinceEpoch(
+                                      Seconds(it->getHeartbeatWrittenOpTime().getSecs())));
+                }
 
                 bb.appendDate("lastAppliedWallTime", it->getLastAppliedWallTime());
                 bb.appendDate("lastDurableWallTime", it->getLastDurableWallTime());
+                if (featureFlagMajorityWriteLatency) {
+                    bb.appendDate("lastWrittenWallTime", it->getLastWrittenWallTime());
+                }
             }
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
@@ -2126,9 +2156,15 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied);
     appendOpTime(&optimes, "durableOpTime", lastOpDurable);
+    if (featureFlagMajorityWriteLatency) {
+        appendOpTime(&optimes, "writtenOpTime", lastOpWritten);
+    }
 
     optimes.appendDate("lastAppliedWallTime", lastOpAppliedWall);
     optimes.appendDate("lastDurableWallTime", lastOpDurableWall);
+    if (featureFlagMajorityWriteLatency) {
+        optimes.appendDate("lastWrittenWallTime", lastOpWrittenWall);
+    }
 
     response->append("optimes", optimes.obj());
     if (lastStableRecoveryTimestamp) {

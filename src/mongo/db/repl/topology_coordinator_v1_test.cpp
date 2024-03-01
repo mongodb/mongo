@@ -1927,14 +1927,18 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // information for replSetGetStatus from a different source than the nodes that aren't
     // ourself.  After this setup, we call prepareStatusResponse and make sure that the fields
     // returned for each member match our expectations.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", true);
     Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
     Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
     Seconds uptimeSecs(10);
     Date_t curTime = heartbeatTime + uptimeSecs;
     Timestamp electionTime(1, 2);
-    OpTime oplogProgress(Timestamp(3, 1), 20);
-    Date_t appliedWallTime = Date_t() + Seconds(oplogProgress.getSecs());
-    Date_t writtenWallTime = appliedWallTime;
+    OpTime oplogApplied(Timestamp(3, 1), 20);
+    Date_t appliedWallTime = Date_t() + Seconds(oplogApplied.getSecs());
+    OpTime oplogWritten(Timestamp(3, 2),
+                        20);  // written is (0, 1) ahead of applied in the same term.
+    Date_t writtenWallTime = Date_t() + Seconds(oplogWritten.getSecs());
     OpTime oplogDurable(Timestamp(1, 1), 19);
     Date_t durableWallTime = Date_t() + Seconds(oplogDurable.getSecs());
     OpTime lastCommittedOpTime(Timestamp(5, 1), 20);
@@ -1953,8 +1957,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setState(MemberState::RS_SECONDARY);
     hb.setElectionTime(electionTime);
     hb.setDurableOpTimeAndWallTime({oplogDurable, durableWallTime});
-    hb.setAppliedOpTimeAndWallTime({oplogProgress, appliedWallTime});
-    hb.setWrittenOpTimeAndWallTime({oplogProgress, writtenWallTime});
+    hb.setAppliedOpTimeAndWallTime({oplogApplied, appliedWallTime});
+    hb.setWrittenOpTimeAndWallTime({oplogWritten, writtenWallTime});
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
     updateConfig(BSON("_id" << setName << "version" << 1 << "members"
@@ -1989,7 +1993,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     getTopoCoord().processHeartbeatResponse(
         heartbeatTime, Milliseconds(4000), member, hbResponseGood);
     makeSelfPrimary(electionTime);
-    topoCoordSetMyLastWrittenOpTime(oplogProgress, startupTime, false, writtenWallTime);
+    topoCoordSetMyLastAppliedOpTime(oplogApplied, startupTime, false, appliedWallTime);
+    topoCoordSetMyLastWrittenOpTime(oplogWritten, startupTime, false, writtenWallTime);
     topoCoordSetMyLastDurableOpTime(oplogDurable, startupTime, false, durableWallTime);
     topoCoordAdvanceLastCommittedOpTime(lastCommittedOpTime, lastCommittedWallTime, false);
 
@@ -2025,6 +2030,10 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
         ASSERT_EQUALS(durableWallTime, optimes["lastDurableWallTime"].Date());
         ASSERT_BSONOBJ_EQ(lastCommittedOpTime.toBSON(), optimes["lastCommittedOpTime"].Obj());
         ASSERT_EQUALS(lastCommittedWallTime, optimes["lastCommittedWallTime"].Date());
+        ASSERT_BSONOBJ_EQ(oplogApplied.toBSON(), optimes["appliedOpTime"].Obj());
+        ASSERT_EQUALS(appliedWallTime, optimes["lastAppliedWallTime"].Date());
+        ASSERT_BSONOBJ_EQ(oplogWritten.toBSON(), optimes["writtenOpTime"].Obj());
+        ASSERT_EQUALS(writtenWallTime, optimes["lastWrittenWallTime"].Date());
     }
     std::vector<BSONElement> memberArray = rsStatus["members"].Array();
     ASSERT_EQUALS(4U, memberArray.size());
@@ -2039,11 +2048,21 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_DOWN, member0Status["state"].numberInt());
     ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].str());
     ASSERT_EQUALS(0, member0Status["uptime"].numberInt());
+    ASSERT_TRUE(member0Status.hasField("optime"));
     ASSERT_EQUALS(Timestamp(), Timestamp(member0Status["optime"]["ts"].timestampValue()));
     ASSERT_EQUALS(-1LL, member0Status["optime"]["t"].numberLong());
     ASSERT_TRUE(member0Status.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(Timestamp().getSecs() * 1000ULL),
                   member0Status["optimeDate"].Date());
+    ASSERT_TRUE(member0Status.hasField("optimeDurableDate"));
+    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(Timestamp().getSecs() * 1000ULL),
+                  member0Status["optimeDurableDate"].Date());
+    ASSERT_TRUE(member0Status.hasField("optimeWritten"));
+    ASSERT_EQUALS(Timestamp(), Timestamp(member0Status["optimeWritten"]["ts"].timestampValue()));
+    ASSERT_EQUALS(-1LL, member0Status["optimeWritten"]["t"].numberLong());
+    ASSERT_TRUE(member0Status.hasField("optimeWrittenDate"));
+    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(Timestamp().getSecs() * 1000ULL),
+                  member0Status["optimeWrittenDate"].Date());
     ASSERT_EQUALS(timeoutTime, member0Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
     ASSERT_FALSE(member0Status.hasField("lastStableRecoveryTimestamp"));
@@ -2058,10 +2077,16 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                   member1Status["stateStr"].String());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), member1Status["uptime"].numberInt());
-    ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), member1Status["optime"].Obj());
+    ASSERT_BSONOBJ_EQ(oplogApplied.toBSON(), member1Status["optime"].Obj());
     ASSERT_TRUE(member1Status.hasField("optimeDate"));
-    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
+    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogApplied.getSecs() * 1000ULL),
                   member1Status["optimeDate"].Date());
+    ASSERT_TRUE(member1Status.hasField("optimeDurableDate"));
+    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogDurable.getSecs() * 1000ULL),
+                  member1Status["optimeDurableDate"].Date());
+    ASSERT_TRUE(member1Status.hasField("optimeWrittenDate"));
+    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogWritten.getSecs() * 1000ULL),
+                  member1Status["optimeWrittenDate"].Date());
     ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
     ASSERT_EQUALS("", member1Status["lastHeartbeatMessage"].str());
@@ -2078,6 +2103,10 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_TRUE(member2Status.hasField("uptime"));
     ASSERT_TRUE(member2Status.hasField("optime"));
     ASSERT_TRUE(member2Status.hasField("optimeDate"));
+    ASSERT_TRUE(member2Status.hasField("optimeDurable"));
+    ASSERT_TRUE(member2Status.hasField("optimeDurableDate"));
+    ASSERT_TRUE(member2Status.hasField("optimeWritten"));
+    ASSERT_TRUE(member2Status.hasField("optimeWrittenDate"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
     ASSERT_FALSE(member2Status.hasField("lastStableRecoveryTimestamp"));
@@ -2094,7 +2123,12 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
     ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(), selfStatus["stateStr"].str());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), selfStatus["uptime"].numberInt());
+    ASSERT_TRUE(member2Status.hasField("optime"));
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
+    ASSERT_TRUE(member2Status.hasField("optimeDurable"));
+    ASSERT_TRUE(member2Status.hasField("optimeDurableDate"));
+    ASSERT_TRUE(member2Status.hasField("optimeWritten"));
+    ASSERT_TRUE(selfStatus.hasField("optimeWrittenDate"));
     ASSERT_FALSE(selfStatus.hasField("lastStableRecoveryTimestamp"));
     ASSERT_EQUALS(electionTime, selfStatus["electionTime"].timestamp());
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
@@ -2208,6 +2242,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembers
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {
     // This test starts by configuring a TopologyCoordinator to NOT be a member of a 3 node
     // replica set. Then running prepareStatusResponse should fail.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", true);
     Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
     Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
     Seconds uptimeSecs(10);
@@ -2237,6 +2273,11 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhe
         &resultStatus);
     ASSERT_NOT_OK(resultStatus);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, resultStatus);
+    BSONObj rsStatus = statusBuilder.obj();
+    ASSERT_TRUE(rsStatus.hasField("optime"));
+    ASSERT_TRUE(rsStatus.hasField("optimeWritten"));
+    ASSERT_TRUE(rsStatus.hasField("optimeDate"));
+    ASSERT_TRUE(rsStatus.hasField("optimeWrittenDate"));
 }
 
 TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) {
