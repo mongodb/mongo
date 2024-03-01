@@ -15,6 +15,9 @@ selector:
   # cluster.
   - jstests/aggregation/sources/unionWith/unionWith_explain.js
 
+  # TODO SERVER-87318: Remove once it is fixed.
+  - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+
   # Embedded Router Exclusions:
   # Explicit auth is not supported in embedded router mode yet.
 
@@ -50,4 +53,5 @@ executor:
         enableTestCommands: 1
         featureFlagEmbeddedRouter: 1
     num_rs_nodes_per_shard: 2
+    num_shards: 2
     embedded_router: 1

@@ -50,6 +50,24 @@ selector:
   - jstests/core/**/list_indexes_non_existent_ns.js
   - jstests/core/**/mr_preserve_indexes.js
 
+  # TODO SERVER-29449: Re-enable once 'executionStats.nReturned' is correct for sharded queries
+  # with a limit or for distinct commands.
+  - jstests/core/**/distinct_index1.js
+  - jstests/core/**/explain1.js
+  - jstests/core/**/explain4.js
+  - jstests/core/**/sortk.js
+
+  # TODO SERVER-32563: The implementation of explain for the count command is incorrect on sharded
+  # collections.
+  - jstests/core/**/explain_count.js
+  - jstests/core/**/explain_server_params.js
+
+  # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+  - jstests/core/**/expr_index_use.js
+  - jstests/core/**/index_multikey.js
+  - jstests/core/**/optimized_match_explain.js
+  - jstests/core/**/sort_array.js
+
   # Embedded router doesn't support correct UpdateMetrics yet.
   # TODO SERVER-82303 Remove this once we have role-aware metrics.
   - jstests/core/write/update/update_metrics.js
@@ -103,4 +121,5 @@ executor:
         enableTestCommands: 1
         featureFlagEmbeddedRouter: 1
     num_rs_nodes_per_shard: 2
+    num_shards: 2
     embedded_router: 1

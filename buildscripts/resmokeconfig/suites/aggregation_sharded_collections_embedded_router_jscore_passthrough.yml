@@ -17,6 +17,8 @@ selector:
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   - jstests/aggregation/sources/graphLookup/variables.js
+  # TODO SERVER-87318: Remove once it is fixed.
+  - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
   exclude_with_any_tags:
   # This passthrough implicitly shards the accessed collections. Do not run tests where collections
   # can't be created on `getCollection` call.
@@ -52,9 +54,9 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    num_shards: 1
     mongod_options:
       set_parameters:
         enableTestCommands: 1
     num_rs_nodes_per_shard: 2
+    num_shards: 2
     embedded_router: 1
