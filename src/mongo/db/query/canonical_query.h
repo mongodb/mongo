@@ -393,6 +393,12 @@ public:
         return getExplain() && !getExpCtxRaw()->inLookup;
     }
 
+    void optimizeProjection() {
+        if (_proj) {
+            _proj->optimize();
+        }
+    }
+
 private:
     void initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<ParsedFindCommand> parsedFind,

@@ -183,6 +183,7 @@ private:
     ProjectionPathASTNode _root;
     ProjectType _type;
     ProjectionDependencies _deps;
+    bool _projOptimized = false;
 };
 
 /**
