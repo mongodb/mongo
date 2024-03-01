@@ -82,7 +82,6 @@ sbeEnv.Library(
         'stages/block_to_row.cpp',
         'stages/co_scan.cpp',
         'stages/exchange.cpp',
-        'stages/hashagg_base.cpp',
         'stages/hash_agg.cpp',
         'stages/hash_join.cpp',
         'stages/hash_lookup.cpp',

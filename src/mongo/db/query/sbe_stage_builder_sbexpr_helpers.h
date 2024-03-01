@@ -329,8 +329,7 @@ public:
         const SbSlotVector& blockAccArgSlots,
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot,
-        bool allowDiskUse) {
+        SbSlot accInternalSlot) {
         return makeBlockHashAgg(std::move(stage),
                                 nullptr,
                                 groupBySlots,
@@ -339,8 +338,7 @@ public:
                                 blockAccArgSlots,
                                 blockAccInternalArgSlots,
                                 bitmapInternalSlot,
-                                accInternalSlot,
-                                allowDiskUse);
+                                accInternalSlot);
     }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
@@ -352,8 +350,7 @@ public:
         const SbSlotVector& blockAccArgSlots,
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot,
-        bool allowDiskUse) {
+        SbSlot accInternalSlot) {
         return makeBlockHashAgg(std::move(stage),
                                 &varTypes,
                                 groupBySlots,
@@ -362,8 +359,7 @@ public:
                                 blockAccArgSlots,
                                 blockAccInternalArgSlots,
                                 bitmapInternalSlot,
-                                accInternalSlot,
-                                allowDiskUse);
+                                accInternalSlot);
     }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
@@ -375,8 +371,7 @@ public:
         const SbSlotVector& blockAccArgSlots,
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot,
-        bool allowDiskUse);
+        SbSlot accInternalSlot);
 
     PlanNodeId _nodeId;
 };

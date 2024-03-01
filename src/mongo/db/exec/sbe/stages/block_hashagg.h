@@ -32,7 +32,6 @@
 #include <absl/hash/hash.h>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/hashagg_base.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -51,7 +50,7 @@ namespace sbe {
  *     [slot_1 = row_expr_1, ..., slot_n = row_expr_n] [_rowAccSlotId]
  * childStage
  */
-class BlockHashAggStage final : public HashAggBaseStage<BlockHashAggStage> {
+class BlockHashAggStage final : public PlanStage {
 public:
     struct BlockRowAccumulators {
         std::unique_ptr<EExpression> blockAgg;
@@ -70,9 +69,7 @@ public:
                       value::SlotVector accumulatorDataSlotIds,
                       BlockAndRowAggs aggs,
                       PlanNodeId planNodeId,
-                      bool allowDiskUse,
-                      bool participateInTrialRunTracking = true,
-                      bool forceIncreasedSpilling = false);
+                      bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -84,7 +81,6 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
-    HashAggStats* getHashAggStats();
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
@@ -98,7 +94,16 @@ public:
      */
     static const size_t kMaxNumPartitionsForTokenizedPath = 5;
     // TODO SERVER-85731: Determine what block size is optimal.
-    static constexpr size_t kBlockOutSize = 128;
+    static const size_t kBlockOutSize = 128;
+
+protected:
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) override;
+    void doDetachFromOperationContext() override;
+    void doAttachToOperationContext(OperationContext* opCtx) override;
+    void doDetachFromTrialRunTracker() override;
+    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
     /*
@@ -137,9 +142,13 @@ private:
      */
     void runAccumulatorsElementWise(size_t blockSize);
 
-    // Returns the next accumulator key or boost::none if we've run out of spilled keys.
-    boost::optional<value::MaterializedRow> getNextSpilledHelper();
-    PlanState getNextSpilled();
+    using TableType = stdx::unordered_map<value::MaterializedRow,
+                                          value::MaterializedRow,
+                                          value::MaterializedRowHasher,
+                                          value::MaterializedRowEq>;
+
+    using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
+    using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
 
     // Groupby key slots.
     const value::SlotVector _groupSlots;
@@ -173,8 +182,6 @@ private:
      */
     BlockAndRowAggs _blockRowAggs;
 
-    HashAggStats _specificStats;
-
     value::SlotAccessorMap _outAccessorsMap;
 
     std::vector<value::OwnedValueAccessor> _outIdBlockAccessors;
@@ -187,24 +194,22 @@ private:
     std::vector<std::unique_ptr<vm::CodeFragment>> _blockLevelAggCodes;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
-    std::vector<std::unique_ptr<HashAggAccessor>> _rowAggHtAccessors;
-    std::vector<std::unique_ptr<value::OwnedValueAccessor>> _rowAggRSAccessors;
-    std::vector<std::unique_ptr<value::SwitchAccessor>> _rowAggAccessors;
-
     // Hash table where we'll map groupby key to the accumulators.
+    TableType _ht;
+    TableType::iterator _htIt;
+    std::vector<std::unique_ptr<HashAggAccessor>> _rowAggHtAccessors;
     std::vector<std::unique_ptr<HashKeyAccessor>> _idHtAccessors;
+
+    HashAggStats _specificStats;
 
     vm::ByteCode _bytecode;
     bool _compiled = false;
 
-    bool _done = false;
+    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
+    // run is complete, this pointer is reset to nullptr.
+    TrialRunTracker* _tracker{nullptr};
 
-    // Place to stash the next keys and values during the streaming phase. The record store cursor
-    // doesn't offer a "peek" API, so we need to hold onto the next row between getNext() calls when
-    // the key value advances.
-    BufBuilder _stashedBuffer;
-    BufBuilder _currentBuffer;
-    boost::optional<SpilledRow> _stashedNextRow;
+    bool _done = false;
 };
 
 }  // namespace sbe

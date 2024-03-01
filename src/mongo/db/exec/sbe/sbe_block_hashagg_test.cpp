@@ -176,13 +176,14 @@ public:
         return {arrTag, arrVal};
     }
 
-    void runBlockHashAggTestHelper(TypedValue inputData,
-                                   size_t keySize,
-                                   size_t numScanSlots,
-                                   std::vector<std::pair<std::string, std::string>> accNames,
-                                   TestResultType expected,
-                                   std::vector<size_t> expectedBlockSizes,
-                                   bool spill) {
+    // Given the data input, the number of slots the stage requires, accumulators used, and
+    // expected output, runs the BlockHashAgg stage and asserts that we get correct results.
+    void runBlockHashAggTest(TypedValue inputData,
+                             size_t keySize,
+                             size_t numScanSlots,
+                             std::vector<std::pair<std::string, std::string>> accNames,
+                             TestResultType expected,
+                             std::vector<size_t> expectedBlockSizes) {
         auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             value::SlotVector idSlots;
             value::SlotVector outputSlots;
@@ -231,34 +232,13 @@ public:
                                                      accDataSlots,
                                                      std::move(aggs),
                                                      kEmptyPlanNodeId,
-                                                     spill,
-                                                     true,
-                                                     spill);
+                                                     true);
             return std::make_pair(outputSlots, std::move(outStage));
         };
 
         auto result = runTestMulti(numScanSlots, inputData.first, inputData.second, makeFn);
         value::ValueGuard resultGuard{result};
         assertResultMatchesMap(result, expected, expectedBlockSizes);
-    }
-
-    // Given the data input, the number of slots the stage requires, accumulators used, and
-    // expected output, runs the BlockHashAgg stage and asserts that we get correct results.
-    void runBlockHashAggTest(TypedValue inputData,
-                             size_t keySize,
-                             size_t numScanSlots,
-                             std::vector<std::pair<std::string, std::string>> accNames,
-                             TestResultType expected,
-                             std::vector<size_t> expectedBlockSizes) {
-        runBlockHashAggTestHelper(value::copyValue(inputData.first, inputData.second),
-                                  keySize,
-                                  numScanSlots,
-                                  accNames,
-                                  expected,
-                                  expectedBlockSizes,
-                                  false);
-        runBlockHashAggTestHelper(
-            inputData, keySize, numScanSlots, accNames, expected, expectedBlockSizes, true);
     }
 
 private:

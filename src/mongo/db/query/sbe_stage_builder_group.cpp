@@ -787,8 +787,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
                                       blockAccArgSlots,
                                       blockAccInternalArgSlots,
                                       *bitmapInternalSlot,
-                                      *accInternalSlot,
-                                      allowDiskUse);
+                                      *accInternalSlot);
         } else {
             return b.makeHashAgg(std::move(stage),
                                  buildVariableTypes(childOutputs, individualSlots),
@@ -1104,7 +1103,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
 
     // These are the conditions for attempting to vectorize the expressions in 'accArgsVec'.
     bool tryToVectorizeAccumulatorArgs = sbeFullEnabled && childOutputs.hasBlockOutput() &&
-        idIsSingleKey && !hasVariableGroupInit && !collatorSlot;
+        !_cq.getExpCtx()->allowDiskUse && idIsSingleKey && !hasVariableGroupInit && !collatorSlot;
 
     // If the necessary conditions are met, try to vectorize 'accArgsVec'.
     if (tryToVectorizeAccumulatorArgs) {
