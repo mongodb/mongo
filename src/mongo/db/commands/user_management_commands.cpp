@@ -707,6 +707,19 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
     auto password = cmd.getPwd().get();
     const bool digestPassword = cmd.getDigestPassword();
 
+        // Validate Password complexity
+
+    std::string pwd = password.toString();
+    if (pwd.length() < 12 ||
+        !std::any_of(pwd.begin(), pwd.end(), ::isdigit) ||
+        !std::any_of(pwd.begin(), pwd.end(), ::islower) ||
+        !std::any_of(pwd.begin(), pwd.end(), ::isupper) ||
+        !std::any_of(pwd.begin(), pwd.end(), ::ispunct)) {
+        std::cerr << "Error: Password does not meet complexity requirements\n";
+        uassert(ErrorCodes::BadValue, "Password does not meet complexity requirements", false);
+ 
+    }
+    
     if (buildSCRAMSHA1) {
         // Add SCRAM-SHA-1 credentials.
         std::string hashedPwd;
