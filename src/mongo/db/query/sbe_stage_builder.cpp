@@ -2148,6 +2148,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sn->limit ? buildLimitSkipSumExpression(sn->canBeParameterized, sn->limit) : nullptr,
         sn->maxMemoryUsageBytes,
         _cq.getExpCtx()->allowDiskUse,
+        _yieldPolicy,
         root->nodeId());
 
     if (reqs.getHasLimit()) {
@@ -2256,6 +2257,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sn->limit ? buildLimitSkipSumExpression(sn->canBeParameterized, sn->limit) : nullptr,
         sn->maxMemoryUsageBytes,
         _cq.getExpCtx()->allowDiskUse,
+        _yieldPolicy,
         root->nodeId());
 
     return {std::move(stage), std::move(outputs)};
@@ -4177,6 +4179,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                 innerCondSlots,
                                                 innerProjectSlots,
                                                 collatorSlot,
+                                                _yieldPolicy,
                                                 root->nodeId());
 
     // If there are more than 2 children, iterate all remaining children and hash
@@ -4198,6 +4201,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                innerCondSlots,
                                                innerProjectSlots,
                                                collatorSlot,
+                                               _yieldPolicy,
                                                root->nodeId());
     }
 

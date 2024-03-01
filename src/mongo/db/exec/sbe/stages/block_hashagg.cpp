@@ -157,9 +157,10 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotId accumulatorBitsetSlotId,
                                      value::SlotVector accumulatorDataSlotIds,
                                      BlockAndRowAggs aggs,
+                                     PlanYieldPolicy* yieldPolicy,
                                      PlanNodeId planNodeId,
                                      bool participateInTrialRunTracking)
-    : PlanStage("block_hashagg"_sd, planNodeId, participateInTrialRunTracking),
+    : PlanStage("block_hashagg"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _groupSlots(groupSlotIds),
       _blockBitsetInSlotId(blockBitsetInSlotId),
       _blockDataInSlotIds(std::move(blockDataInSlotIds)),
@@ -191,6 +192,7 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
                                                _accumulatorBitsetSlotId,
                                                _accumulatorDataSlotIds,
                                                std::move(blockRowAggs),
+                                               _yieldPolicy,
                                                _commonStats.nodeId,
                                                _participateInTrialRunTracking);
 }
@@ -563,6 +565,7 @@ void BlockHashAggStage::open(bool reOpen) {
 
 PlanState BlockHashAggStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+    checkForInterruptAndYield(_opCtx);
 
     size_t idx = 0;
     for (auto& b : _outIdBlocks) {

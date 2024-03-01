@@ -285,14 +285,16 @@ public:
         SbAggExprVector sbAggExprs,
         boost::optional<sbe::value::SlotId> collatorSlot,
         bool allowDiskUse,
-        SbExprSbSlotVector mergingExprs) {
+        SbExprSbSlotVector mergingExprs,
+        PlanYieldPolicy* yieldPolicy) {
         return makeHashAgg(std::move(stage),
                            nullptr,
                            groupBySlots,
                            std::move(sbAggExprs),
                            collatorSlot,
                            allowDiskUse,
-                           std::move(mergingExprs));
+                           std::move(mergingExprs),
+                           yieldPolicy);
     }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
@@ -302,14 +304,16 @@ public:
         SbAggExprVector sbAggExprs,
         boost::optional<sbe::value::SlotId> collatorSlot,
         bool allowDiskUse,
-        SbExprSbSlotVector mergingExprs) {
+        SbExprSbSlotVector mergingExprs,
+        PlanYieldPolicy* yieldPolicy) {
         return makeHashAgg(std::move(stage),
                            &varTypes,
                            groupBySlots,
                            std::move(sbAggExprs),
                            collatorSlot,
                            allowDiskUse,
-                           std::move(mergingExprs));
+                           std::move(mergingExprs),
+                           yieldPolicy);
     }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
@@ -319,7 +323,8 @@ public:
         SbAggExprVector sbAggExprs,
         boost::optional<sbe::value::SlotId> collatorSlot,
         bool allowDiskUse,
-        SbExprSbSlotVector mergingExprs);
+        SbExprSbSlotVector mergingExprs,
+        PlanYieldPolicy* yieldPolicy);
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
         SbStage stage,
@@ -329,7 +334,8 @@ public:
         const SbSlotVector& blockAccArgSlots,
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot) {
+        SbSlot accInternalSlot,
+        PlanYieldPolicy* yieldPolicy) {
         return makeBlockHashAgg(std::move(stage),
                                 nullptr,
                                 groupBySlots,
@@ -338,7 +344,8 @@ public:
                                 blockAccArgSlots,
                                 blockAccInternalArgSlots,
                                 bitmapInternalSlot,
-                                accInternalSlot);
+                                accInternalSlot,
+                                yieldPolicy);
     }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
@@ -350,7 +357,8 @@ public:
         const SbSlotVector& blockAccArgSlots,
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot) {
+        SbSlot accInternalSlot,
+        PlanYieldPolicy* yieldPolicy) {
         return makeBlockHashAgg(std::move(stage),
                                 &varTypes,
                                 groupBySlots,
@@ -359,7 +367,8 @@ public:
                                 blockAccArgSlots,
                                 blockAccInternalArgSlots,
                                 bitmapInternalSlot,
-                                accInternalSlot);
+                                accInternalSlot,
+                                yieldPolicy);
     }
 
     std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
@@ -371,7 +380,8 @@ public:
         const SbSlotVector& blockAccArgSlots,
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot);
+        SbSlot accInternalSlot,
+        PlanYieldPolicy* yieldPolicy);
 
     PlanNodeId _nodeId;
 };

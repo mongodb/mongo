@@ -946,6 +946,7 @@ value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::Slot
 
 void ParallelScanStage::doSaveState(bool relinquishCursor) {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
+    _lastReturned.clear();
     if (slotsAccessible()) {
         if (_recordSlot && _recordAccessor.getViewOfValue().first != value::TypeTags::Nothing) {
             auto [tag, val] = _recordAccessor.getViewOfValue();
@@ -972,12 +973,6 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
     for (auto& accessor : _scanFieldAccessors) {
         prepareForYielding(accessor, slotsAccessible());
     }
-
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
-    if (!_recordSlot || !slotsAccessible()) {
-        _lastReturned.clear();
-    }
-#endif
 
     if (_cursor) {
         _cursor->save();

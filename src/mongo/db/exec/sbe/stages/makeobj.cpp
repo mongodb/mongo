@@ -59,7 +59,7 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
                                       bool returnOldObject,
                                       PlanNodeId planNodeId,
                                       bool participateInTrialRunTracking)
-    : PlanStage(O::stageName, planNodeId, participateInTrialRunTracking),
+    : PlanStage(O::stageName, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _objSlot(objSlot),
       _rootSlot(rootSlot),
       _fieldBehavior(fieldBehavior),

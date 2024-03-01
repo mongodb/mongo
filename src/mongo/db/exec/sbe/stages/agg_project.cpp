@@ -39,7 +39,7 @@ AggProjectStage::AggProjectStage(std::unique_ptr<PlanStage> input,
                                  value::SlotMap<AggExprPair> aggExprPairs,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage("agg_project"_sd, nodeId, participateInTrialRunTracking),
+    : PlanStage("agg_project"_sd, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
       _projects(std::move(aggExprPairs)) {
     _children.emplace_back(std::move(input));
 }

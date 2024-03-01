@@ -49,7 +49,7 @@ ProjectStage::ProjectStage(std::unique_ptr<PlanStage> input,
                            SlotExprPairVector projects,
                            PlanNodeId nodeId,
                            bool participateInTrialRunTracking)
-    : PlanStage("project"_sd, nodeId, participateInTrialRunTracking),
+    : PlanStage("project"_sd, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
       _projects(std::move(projects)) {
     _children.emplace_back(std::move(input));
 }

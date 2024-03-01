@@ -336,6 +336,7 @@ SbStage makeHashAgg(SbStage stage,
                     boost::optional<sbe::value::SlotId> collatorSlot,
                     bool allowDiskUse,
                     sbe::SlotExprPairVector mergingExprs,
+                    PlanYieldPolicy* yieldPolicy,
                     PlanNodeId planNodeId) {
     // In debug builds or when we explicitly set the query knob, we artificially force frequent
     // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
@@ -351,6 +352,7 @@ SbStage makeHashAgg(SbStage stage,
                                          collatorSlot,
                                          allowDiskUse,
                                          std::move(mergingExprs),
+                                         yieldPolicy,
                                          planNodeId,
                                          true /* participateInTrialRunTracking */,
                                          forceIncreasedSpilling);

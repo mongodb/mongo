@@ -109,6 +109,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
                          nullptr /*limit*/,
                          204857600,
                          false,
+                         nullptr /* yieldPolicy */,
                          kEmptyPlanNodeId);
 
     auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
@@ -145,6 +146,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                           nullptr /*limit*/,
                                           204857600,
                                           false,
+                                          nullptr /* yieldPolicy */,
                                           kEmptyPlanNodeId);
 
     auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
@@ -183,6 +185,7 @@ TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
         boost::none,
         false /* allowDiskUse */,
         makeSlotExprPairVec(), /* mergingExprs */
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     auto tracker = std::make_unique<TrialRunTracker>(numResultsLimit, size_t{0});
@@ -228,6 +231,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
                              nullptr /*limit*/,
                              204857600,
                              false,
+                             nullptr /* yieldPolicy */,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(sortStage));
@@ -255,6 +259,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
         boost::none,
         false /* allowDiskUse */,
         makeSlotExprPairVec(), /* mergingExprs */
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     hashAggStage->prepare(*ctx);
@@ -325,6 +330,7 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
             boost::none,
             false /* allowDiskUse */,
             makeSlotExprPairVec(), /* mergingExprs */
+            nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -351,6 +357,7 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
                          nullptr /*limit*/,
                          204857600,
                          false,
+                         nullptr /* yieldPolicy */,
                          kEmptyPlanNodeId);
 
     // We expect the TrialRunTracker to attach to _both_ HashAgg stages but not to the SortStage.
@@ -427,6 +434,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                                           nullptr /*limit*/,
                                           204857600,
                                           false,
+                                          nullptr /* yieldPolicy */,
                                           kEmptyPlanNodeId);
 
 
@@ -462,6 +470,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
             boost::none,
             false /* allowDiskUse */,
             makeSlotExprPairVec(), /* mergingExprs */
+            nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -489,6 +498,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                          nullptr /*limit*/,
                          204857600,
                          false,
+                         nullptr /* yieldPolicy */,
                          kEmptyPlanNodeId);
 
     // We expect the TrialRunTracker to attach to _only_ the left child.

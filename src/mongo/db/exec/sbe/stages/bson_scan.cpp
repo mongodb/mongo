@@ -53,7 +53,8 @@ BSONScanStage::BSONScanStage(std::vector<BSONObj> bsons,
                              std::vector<std::string> scanFieldNames,
                              value::SlotVector scanFieldSlots,
                              bool participateInTrialRunTracking)
-    : PlanStage("bsonscan"_sd, planNodeId, participateInTrialRunTracking),
+    : PlanStage(
+          "bsonscan"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _bsons(std::move(bsons)),
       _recordSlot(recordSlot),
       _scanFieldNames(std::move(scanFieldNames)),

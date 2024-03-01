@@ -384,6 +384,7 @@ SbStage makeHashAgg(SbStage stage,
                     boost::optional<sbe::value::SlotId> collatorSlot,
                     bool allowDiskUse,
                     sbe::SlotExprPairVector mergingExprs,
+                    PlanYieldPolicy* yieldPolicy,
                     PlanNodeId planNodeId);
 
 std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,

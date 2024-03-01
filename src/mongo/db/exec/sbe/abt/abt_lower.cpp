@@ -812,6 +812,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                       std::move(limit),
                                       memoryLimit,
                                       allowDiskUse,
+                                      _yieldPolicy,
                                       nodeProps._planNodeId);
 }
 
@@ -858,7 +859,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     switch (n.getType()) {
         case SpoolProducerType::Eager:
             return sbe::makeS<sbe::SpoolEagerProducerStage>(
-                std::move(input), n.getSpoolId(), std::move(vals), planNodeId);
+                std::move(input), n.getSpoolId(), std::move(vals), _yieldPolicy, planNodeId);
 
         case SpoolProducerType::Lazy: {
             auto expr = lowerExpression(filter, slotMap, &_nodeToGroupPropsMap.at(&n));
@@ -886,11 +887,11 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     switch (n.getType()) {
         case SpoolConsumerType::Stack:
             return sbe::makeS<sbe::SpoolConsumerStage<true /*isStack*/>>(
-                n.getSpoolId(), std::move(vals), planNodeId);
+                n.getSpoolId(), std::move(vals), _yieldPolicy, planNodeId);
 
         case SpoolConsumerType::Regular:
             return sbe::makeS<sbe::SpoolConsumerStage<false /*isStack*/>>(
-                n.getSpoolId(), std::move(vals), planNodeId);
+                n.getSpoolId(), std::move(vals), _yieldPolicy, planNodeId);
     }
 
     MONGO_UNREACHABLE;
@@ -961,6 +962,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                          // is permitted here, we will need to generate merging
                                          // expressions during lowering.
                                          sbe::makeSlotExprPairVec() /*mergingExprs*/,
+                                         _yieldPolicy,
                                          groupProps._planNodeId);
 }
 
@@ -1047,6 +1049,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                           std::move(innerKeys),
                                           std::move(innerProjects),
                                           collatorSlot,
+                                          _yieldPolicy,
                                           getPlanNodeId(n));
 }
 

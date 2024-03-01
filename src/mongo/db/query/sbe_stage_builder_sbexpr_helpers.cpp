@@ -421,7 +421,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     SbAggExprVector sbAggExprs,
     boost::optional<sbe::value::SlotId> collatorSlot,
     bool allowDiskUse,
-    SbExprSbSlotVector mergingExprs) {
+    SbExprSbSlotVector mergingExprs,
+    PlanYieldPolicy* yieldPolicy) {
     // In debug builds or when we explicitly set the query knob, we artificially force frequent
     // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
     // logic for merging partial aggregates which otherwise would require large data sizes to
@@ -471,6 +472,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                                           collatorSlot,
                                           allowDiskUse,
                                           std::move(mergingExprsVec),
+                                          yieldPolicy,
                                           _nodeId,
                                           true /* participateInTrialRunTracking */,
                                           forceIncreasedSpilling);
@@ -487,7 +489,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     const SbSlotVector& blockAccArgSbSlots,
     const SbSlotVector& blockAccInternalArgSbSlots,
     SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot) {
+    SbSlot accInternalSlot,
+    PlanYieldPolicy* yieldPolicy) {
     using BlockAggExprPair = sbe::BlockHashAggStage::BlockRowAccumulators;
 
     tassert(8448607, "Expected exactly one group by slot to be provided", gbs.size() == 1);
@@ -532,6 +535,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
                                                bitmapInternalSlot.getId(),
                                                std::move(blockAccInternalArgSlots),
                                                std::move(aggExprsMap),
+                                               yieldPolicy,
                                                _nodeId,
                                                true /* participateInTrialRunTracking */);
 

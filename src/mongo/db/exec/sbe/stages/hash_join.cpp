@@ -53,9 +53,10 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector innerCond,
                              value::SlotVector innerProjects,
                              boost::optional<value::SlotId> collatorSlot,
+                             PlanYieldPolicy* yieldPolicy,
                              PlanNodeId planNodeId,
                              bool participateInTrialRunTracking)
-    : PlanStage("hj"_sd, planNodeId, participateInTrialRunTracking),
+    : PlanStage("hj"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outerCond(std::move(outerCond)),
       _outerProjects(std::move(outerProjects)),
       _innerCond(std::move(innerCond)),
@@ -78,6 +79,7 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _innerCond,
                                            _innerProjects,
                                            _collatorSlot,
+                                           _yieldPolicy,
                                            _commonStats.nodeId,
                                            _participateInTrialRunTracking);
 }
@@ -181,6 +183,7 @@ void HashJoinStage::open(bool reOpen) {
 
 PlanState HashJoinStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+    checkForInterruptAndYield(_opCtx);
 
     if (_htIt != _htItEnd) {
         ++_htIt;

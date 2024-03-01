@@ -735,6 +735,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     const SbSlotVector& blockAccInternalArgSlots,
     boost::optional<SbSlot> bitmapInternalSlot,
     boost::optional<SbSlot> accInternalSlot,
+    PlanYieldPolicy* yieldPolicy,
     PlanNodeId nodeId) {
     constexpr auto kBlockSelectivityBitmap = PlanStageSlots::kBlockSelectivityBitmap;
 
@@ -787,7 +788,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
                                       blockAccArgSlots,
                                       blockAccInternalArgSlots,
                                       *bitmapInternalSlot,
-                                      *accInternalSlot);
+                                      *accInternalSlot,
+                                      yieldPolicy);
         } else {
             return b.makeHashAgg(std::move(stage),
                                  buildVariableTypes(childOutputs, individualSlots),
@@ -795,7 +797,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
                                  std::move(sbAggExprs),
                                  state.getCollatorSlot(),
                                  allowDiskUse,
-                                 std::move(mergingExprs));
+                                 std::move(mergingExprs),
+                                 yieldPolicy);
         }
     }();
 
@@ -1294,6 +1297,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                               blockAccInternalArgSlots,
                               bitmapInternalSlot,
                               accInternalSlot,
+                              _yieldPolicy,
                               nodeId);
     stage = std::move(outStage);
 

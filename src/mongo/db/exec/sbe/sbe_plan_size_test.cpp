@@ -159,6 +159,7 @@ TEST_F(PlanSizeTest, HashAgg) {
                                      generateSlotId(),
                                      false,
                                      makeSlotExprPairVec(),
+                                     nullptr /* yieldPolicy */,
                                      kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
@@ -171,6 +172,7 @@ TEST_F(PlanSizeTest, HashJoin) {
                                       mockSV(),
                                       makeSV(),
                                       generateSlotId(),
+                                      nullptr /* yieldPolicy */,
                                       kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
@@ -292,6 +294,7 @@ TEST_F(PlanSizeTest, Sort) {
                          nullptr /*limit*/,
                          204857600,
                          false,
+                         nullptr /* yieldPolicy */,
                          kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
@@ -320,12 +323,14 @@ TEST_F(PlanSizeTest, SortedMerge) {
 }
 
 TEST_F(PlanSizeTest, SpoolLazyProducer) {
-    auto stage = makeS<SpoolLazyProducerStage>(mockS(), 1, mockSV(), nullptr, kEmptyPlanNodeId);
+    auto stage = makeS<SpoolLazyProducerStage>(
+        mockS(), 1, mockSV(), nullptr /* yieldPolicy */, kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 
 TEST_F(PlanSizeTest, SpoolConsumer) {
-    auto stage = makeS<SpoolConsumerStage<true>>(1, mockSV(), kEmptyPlanNodeId);
+    auto stage =
+        makeS<SpoolConsumerStage<true>>(1, mockSV(), nullptr /* yieldPolicy */, kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
 
