@@ -61,12 +61,12 @@ public:
 
     T* allocate(size_t n) {
         const size_t allocation = n * sizeof(T);
-        _stats->bytesAllocated.fetchAndAdd(allocation);
+        _stats->bytesAllocated.fetchAndAddRelaxed(allocation);
         return static_cast<T*>(::operator new(allocation));
     }
 
     void deallocate(T* p, size_t n) {
-        _stats->bytesAllocated.fetchAndSubtract(n * sizeof(T));
+        _stats->bytesAllocated.fetchAndSubtractRelaxed(n * sizeof(T));
         ::operator delete(p);
     }
 
