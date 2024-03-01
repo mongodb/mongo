@@ -924,8 +924,7 @@ public:
         if (isNamespaceString()) {
             return nss().asDataRange();
         }
-        auto nss = uuid().toString();
-        return ConstDataRange(nss.data(), nss.size());
+        return uuid().asDataRange();
     }
 
 private:

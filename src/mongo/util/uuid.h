@@ -139,6 +139,10 @@ public:
      */
     std::string toString() const;
 
+    ConstDataRange asDataRange() const {
+        return ConstDataRange(_uuid.data(), _uuid.size());
+    }
+
     inline int compare(const UUID& rhs) const {
         return memcmp(&_uuid, &rhs._uuid, sizeof(_uuid));
     }
