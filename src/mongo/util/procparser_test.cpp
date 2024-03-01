@@ -49,224 +49,153 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/procparser.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 
 using namespace fmt::literals;
 
-namespace procparser {
-Status parseProcSelfMountStatsImpl(StringData data,
-                                   BSONObjBuilder* builder,
-                                   boost::filesystem::space_info (*getSpace)(
-                                       const boost::filesystem::path&, boost::system::error_code&));
-}
-
-
 namespace {
-using StringMap = std::map<std::string, uint64_t>;
 
-StringMap toStringMap(BSONObj& obj) {
-    StringMap map;
+class BaseProcTest : public unittest::Test {
+public:
+    StringMap<uint64_t> toStringMap(BSONObj obj) {
+        StringMap<uint64_t> map;
 
-    for (const auto& e : obj) {
-        map[e.fieldName()] = e.numberLong();
-    }
+        for (const auto& e : obj) {
+            if (e.isABSONObj()) {
+                std::string prefix = std::string(e.fieldName()) + ".";
 
-    return map;
-}
-
-StringMap toNestedStringMap(BSONObj& obj) {
-    StringMap map;
-
-    for (const auto& e : obj) {
-        if (e.isABSONObj()) {
-            std::string prefix = std::string(e.fieldName()) + ".";
-
-            for (const auto& child : e.Obj()) {
-                map[prefix + child.fieldName()] = child.numberLong();
+                for (const auto& child : e.Obj()) {
+                    map[prefix + child.fieldName()] = child.numberLong();
+                }
+            } else {
+                map[e.fieldName()] = e.numberLong();
             }
         }
+
+        return map;
     }
 
-    return map;
-}
-
-bool isPSISupported(StringData filename) {
-    int fd = open(filename.toString().c_str(), 0);
-    if (fd == -1) {
-        return false;
+    template <typename T>
+    bool contains(const StringMap<T>& container, StringData key) {
+        return container.find(key) != container.end();
     }
-    ScopeGuard scopedGuard([fd] { close(fd); });
 
-    std::array<char, 1> buf;
+    StringMap<uint64_t> uint64Map;
+};
 
-    while (read(fd, buf.data(), buf.size()) == -1) {
-        auto ec = lastPosixError();
-        if (ec == posixError(EOPNOTSUPP)) {
-            return false;
-        }
-        ASSERT_EQ(ec, posixError(EINTR));
+class FTDCProcStat : public BaseProcTest {
+public:
+    void parseStat(const std::vector<StringData>& keys, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcStat(keys, input, 1000, &builder));
+        uint64Map = toStringMap(builder.done());
     }
-    return true;
-}
-
-#define ASSERT_KEY(_key) ASSERT_TRUE(stringMap.find(_key) != stringMap.end());
-#define ASSERT_NO_KEY(_key) ASSERT_TRUE(stringMap.find(_key) == stringMap.end());
-#define ASSERT_KEY_AND_VALUE(_key, _value) ASSERT_EQUALS(stringMap.at(_key), _value);
-
-#define ASSERT_PARSE_STAT(_keys, _x)                                 \
-    BSONObjBuilder builder;                                          \
-    ASSERT_OK(procparser::parseProcStat(_keys, _x, 1000, &builder)); \
-    auto obj = builder.obj();                                        \
-    auto stringMap = toStringMap(obj);
-#define ASSERT_PARSE_MEMINFO(_keys, _x)                           \
-    BSONObjBuilder builder;                                       \
-    ASSERT_OK(procparser::parseProcMemInfo(_keys, _x, &builder)); \
-    auto obj = builder.obj();                                     \
-    auto stringMap = toStringMap(obj);
-#define ASSERT_PARSE_NETSTAT(_keys, _x)                           \
-    BSONObjBuilder builder;                                       \
-    ASSERT_OK(procparser::parseProcNetstat(_keys, _x, &builder)); \
-    auto obj = builder.obj();                                     \
-    auto stringMap = toStringMap(obj);
-#define ASSERT_PARSE_DISKSTATS(_disks, _x)                           \
-    BSONObjBuilder builder;                                          \
-    ASSERT_OK(procparser::parseProcDiskStats(_disks, _x, &builder)); \
-    auto obj = builder.obj();                                        \
-    auto stringMap = toNestedStringMap(obj);
-#define ASSERT_PARSE_MOUNTSTAT(x)                                                   \
-    BSONObjBuilder builder;                                                         \
-    ASSERT_OK(procparser::parseProcSelfMountStatsImpl(x, &builder, &mockGetSpace)); \
-    auto obj = builder.obj();
-#define ASSERT_PARSE_VMSTAT(_keys, _x)                           \
-    BSONObjBuilder builder;                                      \
-    ASSERT_OK(procparser::parseProcVMStat(_keys, _x, &builder)); \
-    auto obj = builder.obj();                                    \
-    auto stringMap = toStringMap(obj);
-#define ASSERT_PARSE_SYS_FS_FILENR(_key, _x)                         \
-    BSONObjBuilder builder;                                          \
-    ASSERT_OK(procparser::parseProcSysFsFileNr(_key, _x, &builder)); \
-    auto obj = builder.obj();                                        \
-    auto stringMap = toStringMap(obj);
-#define ASSERT_PARSE_PRESSURE(_x)                           \
-    BSONObjBuilder builder;                                 \
-    ASSERT_OK(procparser::parseProcPressure(_x, &builder)); \
-    auto obj = builder.obj();                               \
-    auto stringMap = toStringMap(obj);
-
-TEST(FTDCProcStat, TestStat) {
 
     std::vector<StringData> keys{"cpu", "ctxt", "processes"};
+};
 
-    // Normal case
-    {
-        ASSERT_PARSE_STAT(
-            keys,
-            "cpu  41801 9179 32206 831134223 34279 0 947 0 0 0\n"
-            "cpu0 2977 450 2475 69253074 1959 0 116 0 0 0\n"
-            "cpu1 6213 4261 9400 69177349 845 0 539 0 0 0\n"
-            "cpu2 1949 831 3699 69261035 645 0 0 0 0 0\n"
-            "cpu3 2222 644 3283 69264801 783 0 0 0 0 0\n"
-            "cpu4 16576 607 4757 69232589 8195 0 291 0 0 0\n"
-            "cpu5 3742 391 4571 69257332 2322 0 0 0 0 0\n"
-            "cpu6 2173 376 743 69284308 400 0 0 0 0 0\n"
-            "cpu7 1232 375 704 69285753 218 0 0 0 0 0\n"
-            "cpu8 960 127 576 69262851 18107 0 0 0 0 0\n"
-            "cpu9 1755 227 744 69283938 362 0 0 0 0 0\n"
-            "cpu10 1380 641 678 69285193 219 0 0 0 0 0\n"
-            "cpu11 618 244 572 69285995 218 0 0 0 0 0\n"
-            "intr 54084718 135 2 ....\n"
-            "ctxt 190305514\n"
-            "btime 1463584038\n"
-            "processes 47438\n"
-            "procs_running 1\n"
-            "procs_blocked 0\n"
-            "softirq 102690251 8 26697410 115481 23345078 816026 0 2296 26068778 0 25645174\n");
-        ASSERT_KEY_AND_VALUE("user_ms", 41801UL);
-        ASSERT_KEY_AND_VALUE("nice_ms", 9179UL);
-        ASSERT_KEY_AND_VALUE("system_ms", 32206UL);
-        ASSERT_KEY_AND_VALUE("idle_ms", 831134223UL);
-        ASSERT_KEY_AND_VALUE("iowait_ms", 34279UL);
-        ASSERT_KEY_AND_VALUE("irq_ms", 0UL);
-        ASSERT_KEY_AND_VALUE("softirq_ms", 947UL);
-        ASSERT_KEY_AND_VALUE("steal_ms", 0UL);
-        ASSERT_KEY_AND_VALUE("guest_ms", 0UL);
-        ASSERT_KEY_AND_VALUE("guest_nice_ms", 0UL);
-        ASSERT_KEY_AND_VALUE("ctxt", 190305514UL);
-        ASSERT_KEY_AND_VALUE("processes", 47438UL);
-    }
+TEST_F(FTDCProcStat, TestStat) {
 
-    // Missing fields in cpu and others
-    {
-        ASSERT_PARSE_STAT(keys,
-                          "cpu  41801 9179 32206\n"
-                          "ctxt 190305514\n");
-        ASSERT_KEY_AND_VALUE("user_ms", 41801UL);
-        ASSERT_KEY_AND_VALUE("nice_ms", 9179UL);
-        ASSERT_KEY_AND_VALUE("system_ms", 32206UL);
-        ASSERT_NO_KEY("idle_ms");
-        ASSERT_KEY_AND_VALUE("ctxt", 190305514UL);
-        ASSERT_NO_KEY("processes");
-    }
-
-    // Missing fields in cpu and others
-    {
-        ASSERT_PARSE_STAT(keys,
-                          "cpu  41801\n"
-                          "ctxt 190305514\n");
-        ASSERT_KEY_AND_VALUE("user_ms", 41801UL);
-        ASSERT_NO_KEY("nice_ms");
-        ASSERT_KEY_AND_VALUE("ctxt", 190305514UL);
-        ASSERT_NO_KEY("processes");
-    }
-
-    // Missing fields in cpu
-    {
-        ASSERT_PARSE_STAT(keys,
-                          "cpu  \n"
-                          "ctxt 190305514\n");
-        ASSERT_KEY_AND_VALUE("ctxt", 190305514UL);
-        ASSERT_NO_KEY("processes");
-    }
-
-    // Single string with only cpu and numbers
-    {
-        ASSERT_PARSE_STAT(keys, "cpu 41801 9179 32206");
-        ASSERT_KEY_AND_VALUE("user_ms", 41801UL);
-        ASSERT_KEY_AND_VALUE("nice_ms", 9179UL);
-        ASSERT_KEY_AND_VALUE("system_ms", 32206UL);
-        ASSERT_NO_KEY("idle_ms");
-    }
-
-    // Single string with only cpu
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcStat(keys, "cpu", 1000, &builder));
-    }
-
-    // Single string with only cpu and a number, and empty ctxt
-    {
-        ASSERT_PARSE_STAT(keys,
-                          "cpu  123\n"
-                          "ctxt");
-        ASSERT_KEY_AND_VALUE("user_ms", 123UL);
-    }
-
-    // Empty String
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcStat(keys, "", 1000, &builder));
-    }
+    parseStat(keys,
+              "cpu  41801 9179 32206 831134223 34279 0 947 0 0 0\n"
+              "cpu0 2977 450 2475 69253074 1959 0 116 0 0 0\n"
+              "cpu1 6213 4261 9400 69177349 845 0 539 0 0 0\n"
+              "cpu2 1949 831 3699 69261035 645 0 0 0 0 0\n"
+              "cpu3 2222 644 3283 69264801 783 0 0 0 0 0\n"
+              "cpu4 16576 607 4757 69232589 8195 0 291 0 0 0\n"
+              "cpu5 3742 391 4571 69257332 2322 0 0 0 0 0\n"
+              "cpu6 2173 376 743 69284308 400 0 0 0 0 0\n"
+              "cpu7 1232 375 704 69285753 218 0 0 0 0 0\n"
+              "cpu8 960 127 576 69262851 18107 0 0 0 0 0\n"
+              "cpu9 1755 227 744 69283938 362 0 0 0 0 0\n"
+              "cpu10 1380 641 678 69285193 219 0 0 0 0 0\n"
+              "cpu11 618 244 572 69285995 218 0 0 0 0 0\n"
+              "intr 54084718 135 2 ....\n"
+              "ctxt 190305514\n"
+              "btime 1463584038\n"
+              "processes 47438\n"
+              "procs_running 1\n"
+              "procs_blocked 0\n"
+              "softirq 102690251 8 26697410 115481 23345078 816026 0 2296 26068778 0 25645174\n");
+    ASSERT_EQ(uint64Map.at("user_ms"), 41801UL);
+    ASSERT_EQ(uint64Map.at("nice_ms"), 9179UL);
+    ASSERT_EQ(uint64Map.at("system_ms"), 32206UL);
+    ASSERT_EQ(uint64Map.at("idle_ms"), 831134223UL);
+    ASSERT_EQ(uint64Map.at("iowait_ms"), 34279UL);
+    ASSERT_EQ(uint64Map.at("irq_ms"), 0UL);
+    ASSERT_EQ(uint64Map.at("softirq_ms"), 947UL);
+    ASSERT_EQ(uint64Map.at("steal_ms"), 0UL);
+    ASSERT_EQ(uint64Map.at("guest_ms"), 0UL);
+    ASSERT_EQ(uint64Map.at("guest_nice_ms"), 0UL);
+    ASSERT_EQ(uint64Map.at("ctxt"), 190305514UL);
+    ASSERT_EQ(uint64Map.at("processes"), 47438UL);
 }
+
+TEST_F(FTDCProcStat, TestMissingField) {
+    parseStat(keys,
+              "cpu  41801 9179 32206\n"
+              "ctxt 190305514\n");
+    ASSERT_EQ(uint64Map.at("user_ms"), 41801UL);
+    ASSERT_EQ(uint64Map.at("nice_ms"), 9179UL);
+    ASSERT_EQ(uint64Map.at("system_ms"), 32206UL);
+    ASSERT(!contains(uint64Map, "idle_ms"));
+    ASSERT_EQ(uint64Map.at("ctxt"), 190305514UL);
+    ASSERT(!contains(uint64Map, "processes"));
+}
+
+TEST_F(FTDCProcStat, TestMoreMissingFields) {
+    parseStat(keys,
+              "cpu  41801\n"
+              "ctxt 190305514\n");
+    ASSERT_EQ(uint64Map.at("user_ms"), 41801UL);
+    ASSERT(!contains(uint64Map, "nice_ms"));
+    ASSERT_EQ(uint64Map.at("ctxt"), 190305514UL);
+    ASSERT(!contains(uint64Map, "processes"));
+}
+
+TEST_F(FTDCProcStat, TestMissingCpuField) {
+    parseStat(keys,
+              "cpu  \n"
+              "ctxt 190305514\n");
+    ASSERT_EQ(uint64Map.at("ctxt"), 190305514UL);
+    ASSERT(!contains(uint64Map, "processes"));
+}
+
+TEST_F(FTDCProcStat, TestWithLessFields) {
+    parseStat(keys, "cpu 41801 9179 32206");
+    ASSERT_EQ(uint64Map.at("user_ms"), 41801UL);
+    ASSERT_EQ(uint64Map.at("nice_ms"), 9179UL);
+    ASSERT_EQ(uint64Map.at("system_ms"), 32206UL);
+    ASSERT(!contains(uint64Map, "idle_ms"));
+}
+
+TEST_F(FTDCProcStat, TestWithOnlyCpu) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcStat(keys, "cpu", 1000, &builder));
+}
+
+TEST_F(FTDCProcStat, TestWithEvenLessFields) {
+    parseStat(keys,
+              "cpu  123\n"
+              "ctxt");
+    ASSERT_EQ(uint64Map.at("user_ms"), 123UL);
+}
+
+TEST_F(FTDCProcStat, TestEmpty) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcStat(keys, "", 1000, &builder));
+}
+
 
 // Test we can parse the /proc/stat on this machine. Also assert we have the expected fields
 // This tests is designed to exercise our parsing code on various Linuxes and fail
 // Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
 // otherwise.
-TEST(FTDCProcStat, TestLocalStat) {
+TEST_F(FTDCProcStat, TestLocalStat) {
     std::vector<StringData> keys{
         "btime",
         "cpu",
@@ -281,26 +210,26 @@ TEST(FTDCProcStat, TestLocalStat) {
     ASSERT_OK(procparser::parseProcStatFile("/proc/stat", keys, &builder));
 
     BSONObj obj = builder.obj();
-    auto stringMap = toStringMap(obj);
+    auto uint64Map = toStringMap(obj);
     LOGV2(23364, "OBJ:{obj}", "obj"_attr = obj);
-    ASSERT_KEY("user_ms");
-    ASSERT_KEY("nice_ms");
-    ASSERT_KEY("idle_ms");
-    ASSERT_KEY("system_ms");
-    ASSERT_KEY("iowait_ms");
-    ASSERT_KEY("irq_ms");
-    ASSERT_KEY("softirq_ms");
-    ASSERT_KEY("steal_ms");
-    // Needs 2.6.24 - ASSERT_KEY("guest_ms");
-    // Needs 2.6.33 - ASSERT_KEY("guest_nice_ms");
-    ASSERT_KEY("ctxt");
-    ASSERT_KEY("btime");
-    ASSERT_KEY("processes");
-    ASSERT_KEY("procs_running");
-    ASSERT_KEY("procs_blocked");
+    ASSERT(contains(uint64Map, "user_ms"));
+    ASSERT(contains(uint64Map, "nice_ms"));
+    ASSERT(contains(uint64Map, "idle_ms"));
+    ASSERT(contains(uint64Map, "system_ms"));
+    ASSERT(contains(uint64Map, "iowait_ms"));
+    ASSERT(contains(uint64Map, "irq_ms"));
+    ASSERT(contains(uint64Map, "softirq_ms"));
+    ASSERT(contains(uint64Map, "steal_ms"));
+    // Needs 2.6.24 - ASSERT(contains(uint64Map, "guest_ms"));
+    // Needs 2.6.33 - ASSERT(contains(uint64Map, "guest_nice_ms"));
+    ASSERT(contains(uint64Map, "ctxt"));
+    ASSERT(contains(uint64Map, "btime"));
+    ASSERT(contains(uint64Map, "processes"));
+    ASSERT(contains(uint64Map, "procs_running"));
+    ASSERT(contains(uint64Map, "procs_blocked"));
 }
 
-TEST(FTDCProcStat, TestLocalNonExistentStat) {
+TEST_F(FTDCProcStat, TestLocalNonExistentStat) {
     std::vector<StringData> keys{
         "btime",
         "cpu",
@@ -314,59 +243,60 @@ TEST(FTDCProcStat, TestLocalNonExistentStat) {
     ASSERT_NOT_OK(procparser::parseProcStatFile("/proc/does_not_exist", keys, &builder));
 }
 
-TEST(FTDCProcMemInfo, TestMemInfo) {
+class FTDCProcMemInfo : public BaseProcTest {
+public:
+    void parseMeminfo(const std::vector<StringData>& keys, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcMemInfo(keys, input, &builder));
+        uint64Map = toStringMap(builder.done());
+    }
 
     std::vector<StringData> keys{"Key1", "Key2", "Key3"};
+};
 
-    // Normal case
-    {
-        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB\nKey2: 456 kB");
-        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
-        ASSERT_KEY_AND_VALUE("Key2_kb", 456UL);
-    }
-
-    // Space in key name
-    {
-        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB\nKey 2: 456 kB");
-        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
-        ASSERT_NO_KEY("Key2_kb");
-    }
-
-    // No newline
-    {
-        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB Key2: 456 kB");
-        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
-        ASSERT_NO_KEY("Key2_kb");
-    }
-
-    // Missing colon on first key
-    {
-        ASSERT_PARSE_MEMINFO(keys, "Key1 123 kB\nKey2: 456 kB");
-        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
-        ASSERT_KEY_AND_VALUE("Key2_kb", 456UL);
-    }
-
-    // One token missing kB, HugePages is not size in kB
-    {
-        ASSERT_PARSE_MEMINFO(keys, "Key1: 123 kB\nKey2: 456\nKey3: 789 kB\nKey4: 789 kB");
-        ASSERT_KEY_AND_VALUE("Key1_kb", 123UL);
-        ASSERT_KEY_AND_VALUE("Key2", 456UL);
-        ASSERT_KEY_AND_VALUE("Key3_kb", 789UL);
-        ASSERT_NO_KEY("Key4_kb");
-    }
-
-    // Empty string
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcMemInfo(keys, "", &builder));
-    }
+TEST_F(FTDCProcMemInfo, TestMemInfo) {
+    parseMeminfo(keys, "Key1: 123 kB\nKey2: 456 kB");
+    ASSERT_EQ(uint64Map.at("Key1_kb"), 123UL);
+    ASSERT_EQ(uint64Map.at("Key2_kb"), 456UL);
 }
+
+TEST_F(FTDCProcMemInfo, TestSpaceInKey) {
+    parseMeminfo(keys, "Key1: 123 kB\nKey 2: 456 kB");
+    ASSERT_EQ(uint64Map.at("Key1_kb"), 123UL);
+    ASSERT(!contains(uint64Map, "Key2_kb"));
+}
+
+TEST_F(FTDCProcMemInfo, TestNoNewline) {
+    parseMeminfo(keys, "Key1: 123 kB Key2: 456 kB");
+    ASSERT_EQ(uint64Map.at("Key1_kb"), 123UL);
+    ASSERT(!contains(uint64Map, "Key2_kb"));
+}
+
+TEST_F(FTDCProcMemInfo, TestMissingColon) {
+    parseMeminfo(keys, "Key1 123 kB\nKey2: 456 kB");
+    ASSERT_EQ(uint64Map.at("Key1_kb"), 123UL);
+    ASSERT_EQ(uint64Map.at("Key2_kb"), 456UL);
+}
+
+TEST_F(FTDCProcMemInfo, TestMissingKb) {
+    parseMeminfo(keys, "Key1: 123 kB\nKey2: 456\nKey3: 789 kB\nKey4: 789 kB");
+    ASSERT_EQ(uint64Map.at("Key1_kb"), 123UL);
+    ASSERT_EQ(uint64Map.at("Key2"), 456UL);
+    ASSERT_EQ(uint64Map.at("Key3_kb"), 789UL);
+    ASSERT(!contains(uint64Map, "Key4_kb"));
+}
+
+TEST_F(FTDCProcMemInfo, TestEmptyString) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcMemInfo(keys, "", &builder));
+}
+
 
 // Test we can parse the /proc/meminfo on this machine. Also assert we have the expected fields
 // This tests is designed to exercise our parsing code on various Linuxes and fail
 // Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
 // otherwise.
-TEST(FTDCProcMemInfo, TestLocalMemInfo) {
+TEST_F(FTDCProcMemInfo, TestLocalMemInfo) {
     std::vector<StringData> keys{
         "Active",         "Active(anon)",
         "Active(file)",   "AnonHugePages",
@@ -394,137 +324,136 @@ TEST(FTDCProcMemInfo, TestLocalMemInfo) {
     ASSERT_OK(procparser::parseProcMemInfoFile("/proc/meminfo", keys, &builder));
 
     BSONObj obj = builder.obj();
-    auto stringMap = toStringMap(obj);
+    auto uint64Map = toStringMap(obj);
     LOGV2(23365, "OBJ:{obj}", "obj"_attr = obj);
-    ASSERT_KEY("MemTotal_kb");
-    ASSERT_KEY("MemFree_kb");
-    // Needs in 3.15+ - ASSERT_KEY("MemAvailable_kb");
-    ASSERT_KEY("Buffers_kb");
-    ASSERT_KEY("Cached_kb");
-    ASSERT_KEY("SwapCached_kb");
-    ASSERT_KEY("Active_kb");
-    ASSERT_KEY("Inactive_kb");
-    // Needs 2.6.28+ - ASSERT_KEY("Active(anon)_kb");
-    // Needs 2.6.28+ - ASSERT_KEY("Inactive(anon)_kb");
-    // Needs 2.6.28+ - ASSERT_KEY("Active(file)_kb");
-    // Needs 2.6.28+ - ASSERT_KEY("Inactive(file)_kb");
-    // Needs 2.6.28+ - ASSERT_KEY("Unevictable_kb");
-    // Needs 2.6.28+ - ASSERT_KEY("Mlocked_kb");
-    ASSERT_KEY("SwapTotal_kb");
-    ASSERT_KEY("SwapFree_kb");
-    ASSERT_KEY("Dirty_kb");
-    ASSERT_KEY("Writeback_kb");
-    ASSERT_KEY("AnonPages_kb");
-    ASSERT_KEY("Mapped_kb");
-    // Needs 2.6.32+ - ASSERT_KEY("Shmem_kb");
-    ASSERT_KEY("Slab_kb");
-    // Needs 2.6.19+ - ASSERT_KEY("SReclaimable_kb");
-    // Needs 2.6.19+ - ASSERT_KEY("SUnreclaim_kb");
-    // Needs 2.6.32+ - ASSERT_KEY("KernelStack_kb");
-    ASSERT_KEY("PageTables_kb");
-    ASSERT_KEY("NFS_Unstable_kb");
-    ASSERT_KEY("Bounce_kb");
-    // Needs 2.6.19+ - ASSERT_KEY("WritebackTmp_kb");
-    ASSERT_KEY("CommitLimit_kb");
-    ASSERT_KEY("Committed_AS_kb");
-    ASSERT_KEY("VmallocTotal_kb");
-    ASSERT_KEY("VmallocUsed_kb");
-    ASSERT_KEY("VmallocChunk_kb");
-    // Needs CONFIG_MEMORY_FAILURE & 2.6.32+ ASSERT_KEY("HardwareCorrupted_kb");
-    // Needs CONFIG_TRANSPARENT_HUGEPAGE - ASSERT_KEY("AnonHugePages_kb");
-    // Needs CONFIG_CMA & 3.19+ - ASSERT_KEY("CmaTotal_kb");
-    // Needs CONFIG_CMA & 3.19+ - ASSERT_KEY("CmaFree_kb");
+    ASSERT(contains(uint64Map, "MemTotal_kb"));
+    ASSERT(contains(uint64Map, "MemFree_kb"));
+    // Needs in 3.15+ - ASSERT(contains(uint64Map, "MemAvailable_kb");
+    ASSERT(contains(uint64Map, "Buffers_kb"));
+    ASSERT(contains(uint64Map, "Cached_kb"));
+    ASSERT(contains(uint64Map, "SwapCached_kb"));
+    ASSERT(contains(uint64Map, "Active_kb"));
+    ASSERT(contains(uint64Map, "Inactive_kb"));
+    // Needs 2.6.28+ - ASSERT(contains(uint64Map, "Active(anon)_kb"));
+    // Needs 2.6.28+ - ASSERT(contains(uint64Map, "Inactive(anon)_kb"));
+    // Needs 2.6.28+ - ASSERT(contains(uint64Map, "Active(file)_kb"));
+    // Needs 2.6.28+ - ASSERT(contains(uint64Map, "Inactive(file)_kb"));
+    // Needs 2.6.28+ - ASSERT(contains(uint64Map, "Unevictable_kb"));
+    // Needs 2.6.28+ - ASSERT(contains(uint64Map, "Mlocked_kb"));
+    ASSERT(contains(uint64Map, "SwapTotal_kb"));
+    ASSERT(contains(uint64Map, "SwapFree_kb"));
+    ASSERT(contains(uint64Map, "Dirty_kb"));
+    ASSERT(contains(uint64Map, "Writeback_kb"));
+    ASSERT(contains(uint64Map, "AnonPages_kb"));
+    ASSERT(contains(uint64Map, "Mapped_kb"));
+    // Needs 2.6.32+ - ASSERT(contains(uint64Map, "Shmem_kb"));
+    ASSERT(contains(uint64Map, "Slab_kb"));
+    // Needs 2.6.19+ - ASSERT(contains(uint64Map, "SReclaimable_kb"));
+    // Needs 2.6.19+ - ASSERT(contains(uint64Map, "SUnreclaim_kb"));
+    // Needs 2.6.32+ - ASSERT(contains(uint64Map, "KernelStack_kb"));
+    ASSERT(contains(uint64Map, "PageTables_kb"));
+    ASSERT(contains(uint64Map, "NFS_Unstable_kb"));
+    ASSERT(contains(uint64Map, "Bounce_kb"));
+    // Needs 2.6.19+ - ASSERT(contains(uint64Map, "WritebackTmp_kb"));
+    ASSERT(contains(uint64Map, "CommitLimit_kb"));
+    ASSERT(contains(uint64Map, "Committed_AS_kb"));
+    ASSERT(contains(uint64Map, "VmallocTotal_kb"));
+    ASSERT(contains(uint64Map, "VmallocUsed_kb"));
+    ASSERT(contains(uint64Map, "VmallocChunk_kb"));
+    // Needs CONFIG_MEMORY_FAILURE & 2.6.32+ ASSERT(contains(uint64Map,
+    // "HardwareCorrupted_kb")); Needs CONFIG_TRANSPARENT_HUGEPAGE -
+    // ASSERT(contains(uint64Map, "AnonHugePages_kb")); Needs CONFIG_CMA & 3.19+ -
+    // ASSERT(contains(uint64Map, "CmaTotal_kb")); Needs CONFIG_CMA & 3.19+ -
+    // ASSERT(contains(uint64Map, "CmaFree_kb"));
 }
 
-
-TEST(FTDCProcMemInfo, TestLocalNonExistentMemInfo) {
+TEST_F(FTDCProcMemInfo, TestLocalNonExistentMemInfo) {
     std::vector<StringData> keys{};
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcMemInfoFile("/proc/does_not_exist", keys, &builder));
 }
 
-TEST(FTDCProcNetstat, TestNetstat) {
+class FTDCProcNetstat : public BaseProcTest {
+public:
+    void parseNetstat(const std::vector<StringData>& keys, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcNetstat(keys, input, &builder));
+        uint64Map = toStringMap(builder.done());
+    }
 
-    // test keys
     std::vector<StringData> keys{"pfx1", "pfx2", "pfx3"};
+};
 
-    // Normal case
-    {
-        ASSERT_PARSE_NETSTAT(keys,
-                             "pfx1 key1 key2 key3\n"
-                             "pfx1 1 2 3\n"
-                             "pfxX key1 key2\n"
-                             "pfxX key1 key2\n"
-                             "pfx2 key4 key5\n"
-                             "pfx2 4 5\n");
-        ASSERT_KEY_AND_VALUE("pfx1key1", 1UL);
-        ASSERT_KEY_AND_VALUE("pfx1key2", 2UL);
-        ASSERT_NO_KEY("pfxXkey1");
-        ASSERT_NO_KEY("pfxXkey2");
-        ASSERT_KEY_AND_VALUE("pfx1key3", 3UL)
-        ASSERT_KEY_AND_VALUE("pfx2key4", 4UL);
-        ASSERT_KEY_AND_VALUE("pfx2key5", 5UL);
-    }
+TEST_F(FTDCProcNetstat, TestNetstat) {
+    parseNetstat(keys,
+                 "pfx1 key1 key2 key3\n"
+                 "pfx1 1 2 3\n"
+                 "pfxX key1 key2\n"
+                 "pfxX key1 key2\n"
+                 "pfx2 key4 key5\n"
+                 "pfx2 4 5\n");
+    ASSERT_EQ(uint64Map.at("pfx1key1"), 1UL);
+    ASSERT_EQ(uint64Map.at("pfx1key2"), 2UL);
+    ASSERT(!contains(uint64Map, "pfxXkey1"));
+    ASSERT(!contains(uint64Map, "pfxXkey2"));
+    ASSERT_EQ(uint64Map.at("pfx1key3"), 3UL);
+    ASSERT_EQ(uint64Map.at("pfx2key4"), 4UL);
+    ASSERT_EQ(uint64Map.at("pfx2key5"), 5UL);
+}
 
-    // Mismatched keys and values
-    {
-        ASSERT_PARSE_NETSTAT(keys,
-                             "pfx1 key1 key2 key3\n"
-                             "pfx1 1 2 3 4\n"
-                             "pfx2 key4 key5\n"
-                             "pfx2 4\n"
-                             "pfx3 key6 key7\n");
-        ASSERT_KEY_AND_VALUE("pfx1key1", 1UL);
-        ASSERT_KEY_AND_VALUE("pfx1key2", 2UL);
-        ASSERT_KEY_AND_VALUE("pfx1key3", 3UL);
-        ASSERT_NO_KEY("pfx1key4");
-        ASSERT_KEY_AND_VALUE("pfx2key4", 4UL);
-        ASSERT_NO_KEY("pfx2key5");
-        ASSERT_NO_KEY("pfx3key6");
-        ASSERT_NO_KEY("pfx3key7");
-    }
+TEST_F(FTDCProcNetstat, TestMismatchedKeysAndValues) {
+    parseNetstat(keys,
+                 "pfx1 key1 key2 key3\n"
+                 "pfx1 1 2 3 4\n"
+                 "pfx2 key4 key5\n"
+                 "pfx2 4\n"
+                 "pfx3 key6 key7\n");
+    ASSERT_EQ(uint64Map.at("pfx1key1"), 1UL);
+    ASSERT_EQ(uint64Map.at("pfx1key2"), 2UL);
+    ASSERT_EQ(uint64Map.at("pfx1key3"), 3UL);
+    ASSERT(!contains(uint64Map, "pfx1key4"));
+    ASSERT_EQ(uint64Map.at("pfx2key4"), 4UL);
+    ASSERT(!contains(uint64Map, "pfx2key5"));
+    ASSERT(!contains(uint64Map, "pfx3key6"));
+    ASSERT(!contains(uint64Map, "pfx3key7"));
+}
 
-    // Non-numeric value
-    {
-        ASSERT_PARSE_NETSTAT(keys,
-                             "pfx1 key1 key2 key3\n"
-                             "pfx1 1 foo 3\n");
-        ASSERT_KEY_AND_VALUE("pfx1key1", 1UL);
-        ASSERT_NO_KEY("pfx1key2");
-        ASSERT_KEY_AND_VALUE("pfx1key3", 3UL)
-    }
+TEST_F(FTDCProcNetstat, TestNonNumericValues) {
+    parseNetstat(keys,
+                 "pfx1 key1 key2 key3\n"
+                 "pfx1 1 foo 3\n");
+    ASSERT_EQ(uint64Map.at("pfx1key1"), 1UL);
+    ASSERT(!contains(uint64Map, "pfx1key2"));
+    ASSERT_EQ(uint64Map.at("pfx1key3"), 3UL);
+}
 
-    // No newline
-    {
-        ASSERT_PARSE_NETSTAT(keys,
-                             "pfx1 key1 key2 key3\n"
-                             "pfx1 1 2 3\n"
-                             "pfx2 key4 key5\n"
-                             "pfx2 4 5");
-        ASSERT_KEY_AND_VALUE("pfx1key1", 1UL);
-        ASSERT_KEY_AND_VALUE("pfx1key2", 2UL);
-        ASSERT_KEY_AND_VALUE("pfx1key3", 3UL)
-        ASSERT_KEY_AND_VALUE("pfx2key4", 4UL);
-        ASSERT_KEY_AND_VALUE("pfx2key5", 5UL);
-    }
+TEST_F(FTDCProcNetstat, TestNoNewline) {
+    parseNetstat(keys,
+                 "pfx1 key1 key2 key3\n"
+                 "pfx1 1 2 3\n"
+                 "pfx2 key4 key5\n"
+                 "pfx2 4 5");
+    ASSERT_EQ(uint64Map.at("pfx1key1"), 1UL);
+    ASSERT_EQ(uint64Map.at("pfx1key2"), 2UL);
+    ASSERT_EQ(uint64Map.at("pfx1key3"), 3UL);
+    ASSERT_EQ(uint64Map.at("pfx2key4"), 4UL);
+    ASSERT_EQ(uint64Map.at("pfx2key5"), 5UL);
+}
 
-    // Single line only
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcNetstat(keys, "pfx1 key1 key2 key3\n", &builder));
-    }
+TEST_F(FTDCProcNetstat, TestSingleLine) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcNetstat(keys, "pfx1 key1 key2 key3\n", &builder));
+}
 
-    // Empty string
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcNetstat(keys, "", &builder));
-    }
+TEST_F(FTDCProcNetstat, TestEmptyString) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcNetstat(keys, "", &builder));
 }
 
 // Test we can parse the /proc/net/netstat on this machine and assert we have some expected fields
 // Some keys can vary between distros, so we test only for the existence of a few basic ones
-TEST(FTDCProcNetstat, TestLocalNetstat) {
+TEST_F(FTDCProcNetstat, TestLocalNetstat) {
 
     BSONObjBuilder builder;
 
@@ -533,22 +462,22 @@ TEST(FTDCProcNetstat, TestLocalNetstat) {
     ASSERT_OK(procparser::parseProcNetstatFile(keys, "/proc/net/netstat", &builder));
 
     BSONObj obj = builder.obj();
-    auto stringMap = toStringMap(obj);
+    auto uint64Map = toStringMap(obj);
     LOGV2(23366, "OBJ:{obj}", "obj"_attr = obj);
-    ASSERT_KEY("TcpExt:TCPTimeouts");
-    ASSERT_KEY("TcpExt:TCPPureAcks");
-    ASSERT_KEY("TcpExt:TCPAbortOnTimeout");
-    ASSERT_KEY("TcpExt:EmbryonicRsts");
-    ASSERT_KEY("TcpExt:ListenDrops");
-    ASSERT_KEY("TcpExt:ListenOverflows");
-    ASSERT_KEY("TcpExt:DelayedACKs");
-    ASSERT_KEY("IpExt:OutOctets");
-    ASSERT_KEY("IpExt:InOctets");
+    ASSERT(contains(uint64Map, "TcpExt:TCPTimeouts"));
+    ASSERT(contains(uint64Map, "TcpExt:TCPPureAcks"));
+    ASSERT(contains(uint64Map, "TcpExt:TCPAbortOnTimeout"));
+    ASSERT(contains(uint64Map, "TcpExt:EmbryonicRsts"));
+    ASSERT(contains(uint64Map, "TcpExt:ListenDrops"));
+    ASSERT(contains(uint64Map, "TcpExt:ListenOverflows"));
+    ASSERT(contains(uint64Map, "TcpExt:DelayedACKs"));
+    ASSERT(contains(uint64Map, "IpExt:OutOctets"));
+    ASSERT(contains(uint64Map, "IpExt:InOctets"));
 }
 
 // Test we can parse the /proc/net/snmp on this machine and assert we have some expected fields
 // Some keys can vary between distros, so we test only for the existence of a few basic ones
-TEST(FTDCProcNetstat, TestLocalNetSnmp) {
+TEST_F(FTDCProcNetstat, TestLocalNetSnmp) {
 
     BSONObjBuilder builder;
 
@@ -557,117 +486,116 @@ TEST(FTDCProcNetstat, TestLocalNetSnmp) {
     ASSERT_OK(procparser::parseProcNetstatFile(keys, "/proc/net/snmp", &builder));
 
     BSONObj obj = builder.obj();
-    auto stringMap = toStringMap(obj);
+    auto uint64Map = toStringMap(obj);
     LOGV2(23367, "OBJ:{obj}", "obj"_attr = obj);
-    ASSERT_KEY("Ip:InReceives");
-    ASSERT_KEY("Ip:OutRequests");
-    ASSERT_KEY("Tcp:InSegs");
-    ASSERT_KEY("Tcp:OutSegs");
+    ASSERT(contains(uint64Map, "Ip:InReceives"));
+    ASSERT(contains(uint64Map, "Ip:OutRequests"));
+    ASSERT(contains(uint64Map, "Tcp:InSegs"));
+    ASSERT(contains(uint64Map, "Tcp:OutSegs"));
 }
 
-TEST(FTDCProcNetstat, TestLocalNonExistentNetstat) {
+TEST_F(FTDCProcNetstat, TestLocalNonExistentNetstat) {
     std::vector<StringData> keys{};
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcNetstatFile(keys, "/proc/does_not_exist", &builder));
 }
 
-TEST(FTDCProcDiskStats, TestDiskStats) {
+class FTDCProcDiskStats : public BaseProcTest {
+public:
+    void parseDiskStat(const std::vector<StringData>& disks, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcDiskStats(disks, input, &builder));
+        uint64Map = toStringMap(builder.done());
+    }
 
     std::vector<StringData> disks{"dm-1", "sda", "sdb"};
+};
 
-    // Normal case including high device major numbers.
-    {
-        ASSERT_PARSE_DISKSTATS(
-            disks,
-            "   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 "
-            "2554160\n"
-            "   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329\n"
-            "   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 "
-            "2550739\n"
-            "   8      16 sdb 12707 3876 1525418 57507 997 3561 297576 97976 0 37870 155619\n"
-            "   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468\n"
-            "  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0\n"
-            "2253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275\n"
-            "2253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226");
-        ASSERT_KEY_AND_VALUE("sda.reads", 120611UL);
-        ASSERT_KEY_AND_VALUE("sda.writes", 349797UL);
-        ASSERT_KEY_AND_VALUE("sda.io_queued_ms", 2554160UL);
-        ASSERT_KEY_AND_VALUE("sdb.reads", 12707UL);
-        ASSERT_KEY_AND_VALUE("sdb.writes", 997UL);
-        ASSERT_KEY_AND_VALUE("sdb.io_queued_ms", 155619UL);
-        ASSERT_KEY_AND_VALUE("dm-1.reads", 109UL);
-        ASSERT_KEY_AND_VALUE("dm-1.writes", 0UL);
-        ASSERT_KEY_AND_VALUE("dm-1.io_queued_ms", 226UL);
-    }
-
-    // Exclude a block device without any activity
-    {
-        ASSERT_PARSE_DISKSTATS(
-            disks,
-            "   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 "
-            "2554160\n"
-            "   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329\n"
-            "   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 "
-            "2550739\n"
-            "   8      16 sdb 0 0 0 0 0 0 0 0 0 0 0\n"
-            "   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468\n"
-            "  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0\n"
-            "2253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275\n"
-            "2253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226");
-        ASSERT_KEY_AND_VALUE("sda.reads", 120611UL);
-        ASSERT_KEY_AND_VALUE("sda.writes", 349797UL);
-        ASSERT_KEY_AND_VALUE("sda.io_queued_ms", 2554160UL);
-        ASSERT_NO_KEY("sdb.reads");
-        ASSERT_NO_KEY("sdb.writes");
-        ASSERT_NO_KEY("sdb.io_queued_ms");
-        ASSERT_KEY_AND_VALUE("dm-1.reads", 109UL);
-        ASSERT_KEY_AND_VALUE("dm-1.writes", 0UL);
-        ASSERT_KEY_AND_VALUE("dm-1.io_queued_ms", 226UL);
-    }
-
-
-    // Strings with less numbers
-    { ASSERT_PARSE_DISKSTATS(disks, "8       0 sda 120611 33630 6297628 96550 349797 "); }
-
-    // Strings with no numbers
-    { ASSERT_PARSE_DISKSTATS(disks, "8       0 sda"); }
-
-    // Strings that are too short
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8       0", &builder));
-        ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8", &builder));
-        ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "", &builder));
-    }
+TEST_F(FTDCProcDiskStats, TestDiskStats) {
+    parseDiskStat(
+        disks,
+        "   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 "
+        "2554160\n"
+        "   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329\n"
+        "   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 "
+        "2550739\n"
+        "   8      16 sdb 12707 3876 1525418 57507 997 3561 297576 97976 0 37870 155619\n"
+        "   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468\n"
+        "  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0\n"
+        "2253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275\n"
+        "2253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226");
+    ASSERT_EQ(uint64Map.at("sda.reads"), 120611UL);
+    ASSERT_EQ(uint64Map.at("sda.writes"), 349797UL);
+    ASSERT_EQ(uint64Map.at("sda.io_queued_ms"), 2554160UL);
+    ASSERT_EQ(uint64Map.at("sdb.reads"), 12707UL);
+    ASSERT_EQ(uint64Map.at("sdb.writes"), 997UL);
+    ASSERT_EQ(uint64Map.at("sdb.io_queued_ms"), 155619UL);
+    ASSERT_EQ(uint64Map.at("dm-1.reads"), 109UL);
+    ASSERT_EQ(uint64Map.at("dm-1.writes"), 0UL);
+    ASSERT_EQ(uint64Map.at("dm-1.io_queued_ms"), 226UL);
 }
 
-TEST(FTDCProcDiskStats, TestLocalNonExistentStat) {
-    std::vector<StringData> disks{"dm-1", "sda", "sdb"};
+TEST_F(FTDCProcDiskStats, TestDiskStatsNoActivity) {
+    parseDiskStat(
+        disks,
+        "   8       0 sda 120611 33630 6297628 96550 349797 167398 11311562 2453603 0 117514 "
+        "2554160\n"
+        "   8       1 sda1 138 37 8642 315 3 0 18 14 0 292 329\n"
+        "   8       2 sda2 120409 33593 6285754 96158 329029 167398 11311544 2450573 0 115611 "
+        "2550739\n"
+        "   8      16 sdb 0 0 0 0 0 0 0 0 0 0 0\n"
+        "   8      17 sdb1 12601 3876 1521090 57424 992 3561 297576 97912 0 37738 155468\n"
+        "  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0\n"
+        "2253       0 dm-0 154910 0 6279522 177681 506513 0 11311544 5674418 0 117752 5852275\n"
+        "2253       1 dm-1 109 0 4584 226 0 0 0 0 0 172 226");
+    ASSERT_EQ(uint64Map.at("sda.reads"), 120611UL);
+    ASSERT_EQ(uint64Map.at("sda.writes"), 349797UL);
+    ASSERT_EQ(uint64Map.at("sda.io_queued_ms"), 2554160UL);
+    ASSERT(!contains(uint64Map, "sdb.reads"));
+    ASSERT(!contains(uint64Map, "sdb.writes"));
+    ASSERT(!contains(uint64Map, "sdb.io_queued_ms"));
+    ASSERT_EQ(uint64Map.at("dm-1.reads"), 109UL);
+    ASSERT_EQ(uint64Map.at("dm-1.writes"), 0UL);
+    ASSERT_EQ(uint64Map.at("dm-1.io_queued_ms"), 226UL);
+}
+
+TEST_F(FTDCProcDiskStats, TestDiskStatsLessNumbers) {
+    parseDiskStat(disks, "8       0 sda 120611 33630 6297628 96550 349797 ");
+}
+
+TEST_F(FTDCProcDiskStats, TestDiskStatsNoNumbers) {
+    parseDiskStat(disks, "8       0 sda");
+}
+
+TEST_F(FTDCProcDiskStats, TestDiskStatsShortStrings) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8       0", &builder));
+    ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "8", &builder));
+    ASSERT_NOT_OK(procparser::parseProcDiskStats(disks, "", &builder));
+}
+
+TEST_F(FTDCProcDiskStats, TestLocalNonExistentStat) {
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcDiskStatsFile("/proc/does_not_exist", disks, &builder));
 }
 
-TEST(FTDCProcDiskStats, TestFindBadPhysicalDiskPaths) {
-    // Validate nothing goes wrong when we check a non-existent path.
-    {
-        auto disks = procparser::findPhysicalDisks("/proc/does_not_exist");
-        ASSERT_EQUALS(0UL, disks.size());
-    }
+TEST_F(FTDCProcDiskStats, TestFindNonExistentPath) {
+    auto disks = procparser::findPhysicalDisks("/proc/does_not_exist");
+    ASSERT_EQUALS(0UL, disks.size());
+}
 
-    // Validate nothing goes wrong when we check a path we do not have permission.
-    {
-        auto disks = procparser::findPhysicalDisks("/sys/kernel/debug");
-        ASSERT_EQUALS(0UL, disks.size());
-    }
+TEST_F(FTDCProcDiskStats, TestFindPathNoPermission) {
+    auto disks = procparser::findPhysicalDisks("/sys/kernel/debug");
+    ASSERT_EQUALS(0UL, disks.size());
 }
 
 // Test we can parse the /proc/diskstats on this machine. Also assert we have the expected fields
 // This tests is designed to exercise our parsing code on various Linuxes and fail
 // Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
 // otherwise.
-TEST(FTDCProcDiskStats, TestLocalDiskStats) {
+TEST_F(FTDCProcDiskStats, TestLocalDiskStats) {
     auto disks = procparser::findPhysicalDisks("/sys/block");
 
     std::vector<StringData> disks2;
@@ -683,7 +611,7 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
     ASSERT_OK(procparser::parseProcDiskStatsFile("/proc/diskstats", disks2, &builder));
 
     BSONObj obj = builder.obj();
-    auto stringMap = toNestedStringMap(obj);
+    auto uint64Map = toStringMap(obj);
     LOGV2(23369, "OBJ:{obj}", "obj"_attr = obj);
 
     bool foundDisk = false;
@@ -696,9 +624,9 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
         auto io_queued_ms = prefix + "io_queued_ms";
 
         // Make sure that if have the first field, then we have the last field.
-        if (stringMap.find(reads) != stringMap.end()) {
+        if (uint64Map.find(reads) != uint64Map.end()) {
             foundDisk = true;
-            if (stringMap.find(io_queued_ms) == stringMap.end()) {
+            if (uint64Map.find(io_queued_ms) == uint64Map.end()) {
                 FAIL(std::string("Inconsistency for ") + disk);
             }
         }
@@ -709,31 +637,42 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
     }
 }
 
-boost::filesystem::space_info mockGetSpace(const boost::filesystem::path& p,
-                                           boost::system::error_code& ec) {
-    ec = boost::system::error_code();
-    auto result = boost::filesystem::space_info();
-    if (p.string() == "/") {
-        result.available = 11213234231;
-        result.capacity = 23432543255;
-        result.free = 12387912837;
-    } else if (p.string() == "/boot") {
-        result.available = result.free = 777;
-        result.capacity = 888;
-    } else if (p.string() == "/home/ubuntu") {
-        result.available = result.free = 0;
-        result.capacity = 999;
-    } else if (p.string() == "/opt") {
-        result.available = result.free = result.capacity = 0;
-    } else if (p.string() == "/var") {
-        ec.assign(1, ec.category());
+class FTDCProcMountStats : public BaseProcTest {
+public:
+    static boost::filesystem::space_info mockGetSpace(const boost::filesystem::path& p,
+                                                      boost::system::error_code& ec) {
+        ec = boost::system::error_code();
+        auto result = boost::filesystem::space_info();
+        if (p.string() == "/") {
+            result.available = 11213234231;
+            result.capacity = 23432543255;
+            result.free = 12387912837;
+        } else if (p.string() == "/boot") {
+            result.available = result.free = 777;
+            result.capacity = 888;
+        } else if (p.string() == "/home/ubuntu") {
+            result.available = result.free = 0;
+            result.capacity = 999;
+        } else if (p.string() == "/opt") {
+            result.available = result.free = result.capacity = 0;
+        } else if (p.string() == "/var") {
+            ec.assign(1, ec.category());
+        }
+        return result;
     }
-    return result;
-}
 
-TEST(FTDCProcMountStats, TestMountStatsHappyPath) {
+    void parseNetstat(StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcSelfMountStatsImpl(input, &builder, &mockGetSpace));
+        obj = builder.obj();
+    }
+
+    BSONObj obj;
+};
+
+TEST_F(FTDCProcMountStats, TestMountStatsHappyPath) {
     // clang-format off
-    ASSERT_PARSE_MOUNTSTAT("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
+    parseNetstat("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
         "26 30 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw\n"
         "27 30 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=8033308k,nr_inodes=2008327,mode=755\n"
         "28 27 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000\n"
@@ -789,9 +728,9 @@ TEST(FTDCProcMountStats, TestMountStatsHappyPath) {
     ASSERT(obj["/home/ubuntu"]["free"].number() == 0);
 }
 
-TEST(FTDCProcMountStats, TestMountStatsZeroCapacity) {
+TEST_F(FTDCProcMountStats, TestMountStatsZeroCapacity) {
     // clang-format off
-    ASSERT_PARSE_MOUNTSTAT("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
+    parseNetstat("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
         "26 30 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw\n"
         "27 30 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=8033308k,nr_inodes=2008327,mode=755\n"
         "28 27 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000\n"
@@ -803,9 +742,9 @@ TEST(FTDCProcMountStats, TestMountStatsZeroCapacity) {
     ASSERT(!obj.hasElement("/opt"));
 }
 
-TEST(FTDCProcMountStats, TestMountStatsError) {
+TEST_F(FTDCProcMountStats, TestMountStatsError) {
     // clang-format off
-    ASSERT_PARSE_MOUNTSTAT("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
+    parseNetstat("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
         "26 30 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw\n"
         "27 30 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=8033308k,nr_inodes=2008327,mode=755\n"
         "28 27 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000\n"
@@ -817,14 +756,13 @@ TEST(FTDCProcMountStats, TestMountStatsError) {
     ASSERT(!obj.hasElement("/var"));
 }
 
-TEST(FTDCProcMountStats, TestMountStatsGarbageInput) {
-    ASSERT_PARSE_MOUNTSTAT(
-        "sadjlkyfgs odyfg\x01$fgeairsufg oireasfgrysudvfbg \n\n\t\t\t34756gusf\r342");
+TEST_F(FTDCProcMountStats, TestMountStatsGarbageInput) {
+    parseNetstat("sadjlkyfgs odyfg\x01$fgeairsufg oireasfgrysudvfbg \n\n\t\t\t34756gusf\r342");
 }
 
-TEST(FTDCProcMountStats, TestMountStatsSomewhatGarbageInput) {
+TEST_F(FTDCProcMountStats, TestMountStatsSomewhatGarbageInput) {
     // clang-format off
-    ASSERT_PARSE_MOUNTSTAT("11 11 11 11 11 11 11 11 11 11 11 11 11\n"
+    parseNetstat("11 11 11 11 11 11 11 11 11 11 11 11 11\n"
         "\n"
         "            \n"
         "asidhsif gsys gfuwe esuf usfg 755\n"
@@ -845,50 +783,149 @@ TEST(FTDCProcMountStats, TestMountStatsSomewhatGarbageInput) {
 
 // Test we can parse the /proc/self/mountinfo on this machine.
 // This tests is designed to exercise our parsing code on various Linuxes and never fail
-TEST(FTDCProcMountStats, TestLocalMountStats) {
+TEST_F(FTDCProcMountStats, TestLocalMountStats) {
     BSONObjBuilder bb;
     ASSERT_OK(procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo", &bb));
     auto obj = bb.obj();
     ASSERT(obj.hasElement("/"));
 }
 
-TEST(FTDCProcVMStat, TestVMStat) {
+class FTDCProcSelfStatus : public BaseProcTest {
+public:
+    void setMaps(StringMap<StringData>& strMap, BSONObj& obj) {
+        for (const auto& e : obj) {
+            if (e.isNumber()) {
+                uint64Map[e.fieldName()] = e.numberLong();
+            } else {
+                strMap[e.fieldName()] = e.valueStringData();
+            }
+        }
+    }
+
+    void parseSelfStatus(const std::vector<StringData>& keys,
+                         StringMap<StringData>& strMap,
+                         StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcSelfStatus(keys, input, &builder));
+        obj = builder.obj();
+        setMaps(strMap, obj);
+    }
+
+    BSONObj obj;
+    std::vector<StringData> statusKeys{"key1", "key2", "key3", "key4", "key5", "key6"};
+};
+
+
+TEST_F(FTDCProcSelfStatus, TestSelfStatus) {
+    StringMap<StringData> strMap;
+    parseSelfStatus(statusKeys,
+                    strMap,
+                    "key1: a\n"
+                    "Key2: b\n"
+                    "key3: 12\n"
+                    "key4: ab cd 1\n"
+                    "key5: 12 34\n"
+                    " key6: 12345");
+    ASSERT_EQUALS(strMap.at("key1"), "a");
+    ASSERT_FALSE(contains(strMap, "key2") || contains(uint64Map, "key2"));
+    ASSERT_EQ(uint64Map.at("key3"), 12);
+    ASSERT_EQUALS(strMap.at("key4"), "ab cd 1");
+    ASSERT_EQUALS(strMap.at("key5"), "12 34");
+    ASSERT_FALSE(contains(strMap, "key6") || contains(uint64Map, "key6"));
+}
+
+TEST_F(FTDCProcSelfStatus, NoNewline) {
+    StringMap<StringData> strMap;
+    parseSelfStatus(
+        statusKeys, strMap, "key1: a Key2: b key3: 12 key4: ab cd 1 key5: 12 34 key6: 12345");
+    ASSERT_EQUALS(strMap.at("key1"), "a Key2");
+}
+
+TEST_F(FTDCProcSelfStatus, MissingColon) {
+    StringMap<StringData> strMap;
+    parseSelfStatus(
+        statusKeys, strMap, "key1 a\nKey2: b\nkey3: 12\nkey4: ab cd 1\nkey5: 12 34\n key6: 12345");
+    ASSERT_FALSE(contains(strMap, "key1") || contains(uint64Map, "key1"));
+    ASSERT_FALSE(contains(strMap, "key2") || contains(uint64Map, "key2"));
+    ASSERT_EQ(uint64Map.at("key3"), 12);
+    ASSERT_EQUALS(strMap.at("key4"), "ab cd 1");
+    ASSERT_EQUALS(strMap.at("key5"), "12 34");
+    ASSERT_FALSE(contains(strMap, "key6") || contains(uint64Map, "key6"));
+}
+
+TEST_F(FTDCProcSelfStatus, EmptyData) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcSelfStatus(statusKeys, "", &builder));
+}
+
+TEST_F(FTDCProcSelfStatus, FileNotFound) {
+    BSONObjBuilder builder;
+    ASSERT_EQ(ErrorCodes::FileOpenFailed,
+              procparser::parseProcSelfStatusFile(
+                  "/proc/self/file_that_does_not_exist", statusKeys, &builder)
+                  .code());
+}
+
+// Test we can parse the /proc/self/status on this machine. Also assert we have the expected fields
+// This tests is designed to exercise our parsing code on various Linuxes and fail
+// Normally when run in the FTDC loop we return a non-fatal error so we may not notice the
+// failure otherwise.
+TEST_F(FTDCProcSelfStatus, TestLocalSelfStatus) {
+    std::vector<StringData> keys{};
+
+    BSONObjBuilder builder;
+
+    ASSERT_OK(procparser::parseProcMemInfoFile("/proc/self/status", keys, &builder));
+
+    BSONObj obj = builder.obj();
+    StringMap<StringData> strMap;
+    setMaps(strMap, obj);
+
+    ASSERT(contains(strMap, "HugetlbPages") || contains(uint64Map, "HugetlbPages"));
+    ASSERT(contains(strMap, "Threads") || contains(uint64Map, "Threads"));
+    ASSERT(contains(strMap, "Cpus_allowed") || contains(uint64Map, "Cpus_allowed"));
+    ASSERT(contains(strMap, "Mems_allowed") || contains(uint64Map, "Mems_allowed"));
+}
+
+class FTDCProcVMStat : public BaseProcTest {
+public:
+    void parseVMStat(const std::vector<StringData>& keys, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcVMStat(keys, input, &builder));
+        uint64Map = toStringMap(builder.done());
+    }
 
     std::vector<StringData> keys{"Key1", "Key2", "Key3"};
+};
 
-    // Normal case
-    {
-        ASSERT_PARSE_VMSTAT(keys, "Key1 123\nKey2 456");
-        ASSERT_KEY_AND_VALUE("Key1", 123UL);
-        ASSERT_KEY_AND_VALUE("Key2", 456UL);
-    }
+TEST_F(FTDCProcVMStat, TestVMStat) {
+    parseVMStat(keys, "Key1 123\nKey2 456");
+    ASSERT_EQ(uint64Map.at("Key1"), 123UL);
+    ASSERT_EQ(uint64Map.at("Key2"), 456UL);
+}
 
-    // No newline
-    {
-        ASSERT_PARSE_VMSTAT(keys, "Key1 123 Key2 456");
-        ASSERT_KEY_AND_VALUE("Key1", 123UL);
-        ASSERT_NO_KEY("Key2");
-    }
+TEST_F(FTDCProcVMStat, TestNoNewline) {
+    parseVMStat(keys, "Key1 123 Key2 456");
+    ASSERT_EQ(uint64Map.at("Key1"), 123UL);
+    ASSERT(!contains(uint64Map, "Key2"));
+}
 
-    // Key without value
-    {
-        ASSERT_PARSE_VMSTAT(keys, "Key1 123\nKey2");
-        ASSERT_KEY_AND_VALUE("Key1", 123UL);
-        ASSERT_NO_KEY("Key2");
-    }
+TEST_F(FTDCProcVMStat, TestNoValue) {
+    parseVMStat(keys, "Key1 123\nKey2");
+    ASSERT_EQ(uint64Map.at("Key1"), 123UL);
+    ASSERT(!contains(uint64Map, "Key2"));
+}
 
-    // Empty string
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcVMStat(keys, "", &builder));
-    }
+TEST_F(FTDCProcVMStat, TestEmptyString) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcVMStat(keys, "", &builder));
 }
 
 // Test we can parse the /proc/vmstat on this machine. Also assert we have the expected fields
 // This tests is designed to exercise our parsing code on various Linuxes and fail
 // Normally when run in the FTDC loop we return a non-fatal error so we may not notice the failure
 // otherwise.
-TEST(FTDCProcVMStat, TestLocalVMStat) {
+TEST_F(FTDCProcVMStat, TestLocalVMStat) {
     std::vector<StringData> keys{
         "balloon_deflate"_sd,
         "balloon_inflate"_sd,
@@ -906,47 +943,55 @@ TEST(FTDCProcVMStat, TestLocalVMStat) {
     ASSERT_OK(procparser::parseProcVMStatFile("/proc/vmstat", keys, &builder));
 
     BSONObj obj = builder.obj();
-    auto stringMap = toStringMap(obj);
-    ASSERT_KEY("nr_mlock");
-    ASSERT_KEY("pgmajfault");
-    ASSERT_KEY("pswpin");
-    ASSERT_KEY("pswpout");
+    auto uint64Map = toStringMap(obj);
+    ASSERT(contains(uint64Map, "nr_mlock"));
+    ASSERT(contains(uint64Map, "pgmajfault"));
+    ASSERT(contains(uint64Map, "pswpin"));
+    ASSERT(contains(uint64Map, "pswpout"));
 }
 
 
-TEST(FTDCProcVMStat, TestLocalNonExistentVMStat) {
+TEST_F(FTDCProcVMStat, TestLocalNonExistentVMStat) {
     std::vector<StringData> keys{};
     BSONObjBuilder builder;
 
     ASSERT_NOT_OK(procparser::parseProcVMStatFile("/proc/does_not_exist", keys, &builder));
 }
 
-TEST(FTDCProcSysFsFileNr, TestSuccess) {
-    // Normal cases
-    {
-        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kMaxFileHandles, "1 0 2\n");
-        ASSERT_KEY_AND_VALUE(procparser::kMaxFileHandlesKey.toString(), 2);
-        ASSERT_NO_KEY(procparser::kFileHandlesInUseKey.toString());
+class FTDCProcSysFsFileNr : public BaseProcTest {
+public:
+    void parseSysFsFileNr(procparser::FileNrKey key, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcSysFsFileNr(key, input, &builder));
+        uint64Map = toStringMap(builder.done());
     }
-    {
-        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kFileHandlesInUse, "1 0 2\n");
-        ASSERT_KEY_AND_VALUE(procparser::kFileHandlesInUseKey.toString(), 1);
-        ASSERT_NO_KEY(procparser::kMaxFileHandlesKey.toString());
-    }
-    // Test that we only parse up to where we need
-    {
-        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kFileHandlesInUse, "1 0\n");
-        ASSERT_KEY_AND_VALUE(procparser::kFileHandlesInUseKey.toString(), 1);
-        ASSERT_NO_KEY(procparser::kMaxFileHandlesKey.toString());
-    }
-    {
-        ASSERT_PARSE_SYS_FS_FILENR(procparser::FileNrKey::kFileHandlesInUse, "1\n");
-        ASSERT_KEY_AND_VALUE(procparser::kFileHandlesInUseKey.toString(), 1);
-        ASSERT_NO_KEY(procparser::kMaxFileHandlesKey.toString());
-    }
+};
+
+TEST_F(FTDCProcSysFsFileNr, TestSuccess) {
+    parseSysFsFileNr(procparser::FileNrKey::kMaxFileHandles, "1 0 2\n");
+    ASSERT_EQ(uint64Map.at(procparser::kMaxFileHandlesKey.toString()), 2);
+    ASSERT(!contains(uint64Map, procparser::kFileHandlesInUseKey.toString()));
 }
 
-TEST(FTDCProcSysFsFileNr, TestFailure) {
+TEST_F(FTDCProcSysFsFileNr, TestSuccess2) {
+    parseSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "1 0 2\n");
+    ASSERT_EQ(uint64Map.at(procparser::kFileHandlesInUseKey.toString()), 1);
+    ASSERT(!contains(uint64Map, procparser::kMaxFileHandlesKey.toString()));
+}
+
+TEST_F(FTDCProcSysFsFileNr, TestOnlyParseUpToWhatWeNeed) {
+    parseSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "1 0\n");
+    ASSERT_EQ(uint64Map.at(procparser::kFileHandlesInUseKey.toString()), 1);
+    ASSERT(!contains(uint64Map, procparser::kMaxFileHandlesKey.toString()));
+}
+
+TEST_F(FTDCProcSysFsFileNr, TestOnlyParseUpToWhatWeNeed2) {
+    parseSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "1\n");
+    ASSERT_EQ(uint64Map.at(procparser::kFileHandlesInUseKey.toString()), 1);
+    ASSERT(!contains(uint64Map, procparser::kMaxFileHandlesKey.toString()));
+}
+
+TEST_F(FTDCProcSysFsFileNr, TestFailure) {
     // Failure cases
     BSONObjBuilder builder;
     ASSERT_NOT_OK(
@@ -957,7 +1002,7 @@ TEST(FTDCProcSysFsFileNr, TestFailure) {
         procparser::FileNrKey::kMaxFileHandles, "1 2\n", &builder));
 }
 
-TEST(FTDCProcSysFsFileNr, TestFile) {
+TEST_F(FTDCProcSysFsFileNr, TestFile) {
     BSONObjBuilder builder;
     // Normal cases
     ASSERT_OK(procparser::parseProcSysFsFileNrFile(
@@ -970,70 +1015,91 @@ TEST(FTDCProcSysFsFileNr, TestFile) {
         "/proc/non-existent-file", procparser::FileNrKey::kFileHandlesInUse, &builder));
 }
 
-TEST(FTDCProcPressure, TestSuccess) {
-    // Normal cases
-    {
-        ASSERT_PARSE_PRESSURE(
-            "some avg10=0.10 avg60=6.50 avg300=1.00 total=14\nfull avg10=2.30 "
-            "avg60=0.00 avg300=0.14 total=10");
-        ASSERT(obj["some"]["totalMicros"].Double() == 14);
+class FTDCProcPressure : public BaseProcTest {
+public:
+    bool isPSISupported(StringData filename) {
+        int fd = open(filename.toString().c_str(), 0);
+        if (fd == -1) {
+            return false;
+        }
+        ScopeGuard scopedGuard([fd] { close(fd); });
 
-        ASSERT(obj["full"]["totalMicros"].Double() == 10);
-    }
-    {
-        ASSERT_PARSE_PRESSURE("some avg10=0.10 avg60=6.50 avg300=1.00 total=14");
-        ASSERT(obj["some"]["totalMicros"].Double() == 14);
+        std::array<char, 1> buf;
 
-        ASSERT(!obj["full"]);
+        while (read(fd, buf.data(), buf.size()) == -1) {
+            auto ec = lastPosixError();
+            if (ec == posixError(EOPNOTSUPP)) {
+                return false;
+            }
+            ASSERT_EQ(ec, posixError(EINTR));
+        }
+        return true;
     }
-    {
-        ASSERT_PARSE_PRESSURE(
-            "some avg10=0.10    avg60=6.50      avg300=1.00 total=14\nfull avg10=2.30 "
-            "avg60=0.00 avg300=0.14        total=10");
-        ASSERT(obj["some"]["totalMicros"].Double() == 14);
 
-        ASSERT(obj["full"]["totalMicros"].Double() == 10);
+    void parsePressure(StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcPressure(input, &builder));
+        obj = builder.obj();
+        uint64Map = toStringMap(obj);
     }
+
+    BSONObj obj;
+};
+
+TEST_F(FTDCProcPressure, TestSuccess) {
+    parsePressure(
+        "some avg10=0.10 avg60=6.50 avg300=1.00 total=14\nfull avg10=2.30 "
+        "avg60=0.00 avg300=0.14 total=10");
+    ASSERT(obj["some"]["totalMicros"].Double() == 14);
+
+    ASSERT(obj["full"]["totalMicros"].Double() == 10);
+}
+TEST_F(FTDCProcPressure, TestSuccess2) {
+    parsePressure("some avg10=0.10 avg60=6.50 avg300=1.00 total=14");
+    ASSERT(obj["some"]["totalMicros"].Double() == 14);
+
+    ASSERT(!obj["full"]);
+}
+TEST_F(FTDCProcPressure, TestSuccess3) {
+    parsePressure(
+        "some avg10=0.10    avg60=6.50      avg300=1.00 total=14\nfull avg10=2.30 "
+        "avg60=0.00 avg300=0.14        total=10");
+    ASSERT(obj["some"]["totalMicros"].Double() == 14);
+
+    ASSERT(obj["full"]["totalMicros"].Double() == 10);
 }
 
-TEST(FTDCProcPressure, TestFailure) {
-    // Failure cases
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcPressureFile("", "", &builder));
-    }
-
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(
-            procparser::parseProcPressureFile("cpu", "/proc/non-existent-file", &builder));
-    }
-
-    // 'total' is not found in the data given.
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(
-            procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00", &builder));
-    }
-
-    // 'total' is not found in one of the rows.
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(
-            procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00\nfull avg10=2.30 "
-                                          "avg60=0.00 avg300=0.14 total=10",
-                                          &builder));
-    }
-
-    // 'total' is not given a valid number value.
-    {
-        BSONObjBuilder builder;
-        ASSERT_NOT_OK(procparser::parseProcPressure(
-            "some avg10=0.10 avg60=6.50 avg300=1.00 total=invalid", &builder));
-    }
+TEST_F(FTDCProcPressure, TestEmptyFile) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcPressureFile("", "", &builder));
 }
 
-TEST(FTDCProcPressure, TestLocalPressureInfo) {
+TEST_F(FTDCProcPressure, TestNonExistentFile) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcPressureFile("cpu", "/proc/non-existent-file", &builder));
+}
+
+TEST_F(FTDCProcPressure, TestTotalNotFound) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(
+        procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00", &builder));
+}
+
+TEST_F(FTDCProcPressure, TestTotalNotInARow) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(
+        procparser::parseProcPressure("some avg10=0.10 avg60=6.50 avg300=1.00\nfull avg10=2.30 "
+                                      "avg60=0.00 avg300=0.14 total=10",
+                                      &builder));
+}
+
+TEST_F(FTDCProcPressure, TestTotalNotValid) {
+    BSONObjBuilder builder;
+    ASSERT_NOT_OK(procparser::parseProcPressure(
+        "some avg10=0.10 avg60=6.50 avg300=1.00 total=invalid", &builder));
+}
+
+TEST_F(FTDCProcPressure, TestLocalPressureInfo) {
     if (isPSISupported("/proc/pressure/cpu")) {
         BSONObjBuilder builder;
 
@@ -1077,21 +1143,24 @@ TEST(FTDCProcPressure, TestLocalPressureInfo) {
     }
 }
 
-// Parse "keys" out of "input", which should be a string matching the format of a /proc/net/sockstat
-// file. Asserts that we can parse the keys successfully and returns a BSONObj of the parsed data.
-BSONObj assertParseSockstat(std::map<StringData, std::set<StringData>> keys, StringData input) {
-    BSONObjBuilder builder;
-    ASSERT_OK(procparser::parseProcSockstat(keys, input, &builder));
-    return builder.obj();
-}
-
-TEST(FTDCProcSockstat, TestSockstatSuccess) {
+class FTDCProcSockstat : public unittest::Test {
+public:
+    // Parse "keys" out of "input", which should be a string matching the format of a
+    // /proc/net/sockstat file. Asserts that we can parse the keys successfully and returns a
+    // BSONObj of the parsed data.
+    BSONObj assertParseSockstat(std::map<StringData, std::set<StringData>> keys, StringData input) {
+        BSONObjBuilder builder;
+        ASSERT_OK(procparser::parseProcSockstat(keys, input, &builder));
+        return builder.obj();
+    }
 
     std::map<StringData, std::set<StringData>> testKeys{
         {"sockets", {"used"}},
         {"TCP", {"inuse", "tw", "mem"}},
     };
+};
 
+TEST_F(FTDCProcSockstat, TestSockstatSuccess) {
     auto obj = assertParseSockstat(testKeys,
                                    "sockets: used 290\n"
                                    "TCP: inuse 8 orphan 0 tw 0 alloc 12 mem 1\n"
@@ -1109,53 +1178,45 @@ TEST(FTDCProcSockstat, TestSockstatSuccess) {
     ASSERT(obj["UDP"].eoo());
 }
 
-TEST(FTDCProcSockstat, TestSockstatFailure) {
+TEST_F(FTDCProcSockstat, TestBadSocketString) {
+    StringData badString = "I'm not in the right format";
+    BSONObjBuilder bob;
+    auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
+    // No desired keys found so error.
+    ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
+}
 
-    std::map<StringData, std::set<StringData>> testKeys{
-        {"sockets", {"used"}},
-        {"TCP", {"inuse", "tw", "mem"}},
-    };
-    {
-        // Garbage sockstat string.
-        StringData badString = "I'm not in the right format";
-        BSONObjBuilder bob;
-        auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
-        // No desired keys found so error.
-        ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
-    }
-    {
-        // Ditto for empty string.
-        StringData badString = "";
-        BSONObjBuilder bob;
-        auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
-        // No desired keys found so error.
-        ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
-    }
-    {
-        // Nan for any key gives a parse error.
-        StringData badString = "sockets: used alot";
-        BSONObjBuilder bob;
-        auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
-        ASSERT_EQ(s.code(), ErrorCodes::FailedToParse);
-    }
-    {
-        // OK if string doesn't terminate with newline.
-        auto obj = assertParseSockstat(testKeys,
-                                       "sockets: used 290\n"
-                                       "TCP: inuse 8 orphan 0 tw 0 alloc 12 mem 1\n"
-                                       "UDP: inuse 6 mem 4");
+TEST_F(FTDCProcSockstat, TestEmptyString) {
+    StringData badString = "";
+    BSONObjBuilder bob;
+    auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
+    // No desired keys found so error.
+    ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
+}
 
-        // Requested keys present with correct values.
-        ASSERT_EQ(obj["sockets"]["used"].Int(), 290);
-        ASSERT_EQ(obj["TCP"]["inuse"].Int(), 8);
-        ASSERT_EQ(obj["TCP"]["tw"].Int(), 0);
-        ASSERT_EQ(obj["TCP"]["mem"].Int(), 1);
-    }
+TEST_F(FTDCProcSockstat, TestStringWithNoNumber) {
+    StringData badString = "sockets: used alot";
+    BSONObjBuilder bob;
+    auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
+    ASSERT_EQ(s.code(), ErrorCodes::FailedToParse);
+}
+TEST_F(FTDCProcSockstat, TestGoodSocketString) {
+    // OK if string doesn't terminate with newline.
+    auto obj = assertParseSockstat(testKeys,
+                                   "sockets: used 290\n"
+                                   "TCP: inuse 8 orphan 0 tw 0 alloc 12 mem 1\n"
+                                   "UDP: inuse 6 mem 4");
+
+    // Requested keys present with correct values.
+    ASSERT_EQ(obj["sockets"]["used"].Int(), 290);
+    ASSERT_EQ(obj["TCP"]["inuse"].Int(), 8);
+    ASSERT_EQ(obj["TCP"]["tw"].Int(), 0);
+    ASSERT_EQ(obj["TCP"]["mem"].Int(), 1);
 }
 
 // Test we can parse the /proc/net/sockset on this machine and assert we have some expected fields.
 // Can't test values because they vary at runtime.
-TEST(FTDCProcNetstat, TestLocalSockstat) {
+TEST_F(FTDCProcNetstat, TestLocalSockstat) {
 
     BSONObjBuilder builder;
 

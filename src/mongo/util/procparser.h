@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -175,9 +179,41 @@ Status parseProcDiskStatsFile(StringData filename,
                               BSONObjBuilder* builder);
 
 /**
+ * Read a string matching /proc/self/mountinfo format and parse for any existing mounts.
+ *
+ * data - The string to parse.
+ * builder - BSON output that the disk information is written to.
+ * getSpace - A function that takes in a filesystem path to search for mounts on and an error_code
+ * argument to return any errors. Disk space information is returned
+ */
+Status parseProcSelfMountStatsImpl(
+    StringData data,
+    BSONObjBuilder* builder,
+    std::function<boost::filesystem::space_info(const boost::filesystem::path&,
+                                                boost::system::error_code&)> getSpace);
+
+/**
  * Read from file, and write the used/free space data for available mounts.
  */
 Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder);
+
+/**
+ * Read a string matching /proc/self/status format and parse for any matching keys.
+ *
+ * keys - list of keys to output in BSON. If keys is empty, all keys are outputed.
+ * data - string to parse
+ * builder - BSON output
+ */
+Status parseProcSelfStatus(const std::vector<StringData>& keys,
+                           StringData data,
+                           BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the specified list of keys in builder.
+ */
+Status parseProcSelfStatusFile(StringData filename,
+                               const std::vector<StringData>& keys,
+                               BSONObjBuilder* builder);
 
 /**
  * Get a vector of disks to monitor by enumerating the specified directory.

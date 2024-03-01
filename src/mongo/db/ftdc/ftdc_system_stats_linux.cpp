@@ -70,6 +70,10 @@ static const std::vector<StringData> kMemKeys{
     "Inactive(file)"_sd,
 };
 
+static const std::vector<StringData> kStatusKeys{
+    "THP_enabled"_sd,
+};
+
 static const std::vector<StringData> kNetstatKeys{
     "Tcp:"_sd,
     "Ip:"_sd,
@@ -131,6 +135,13 @@ public:
                 procparser::parseProcMemInfoFile("/proc/meminfo"_sd, kMemKeys, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
+        }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("status"));
+            processStatusErrors(procparser::parseProcSelfStatusFile(
+                                    "/proc/self/status", kStatusKeys, &subObjBuilder),
+                                &subObjBuilder);
         }
 
         {
