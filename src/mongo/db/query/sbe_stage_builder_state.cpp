@@ -110,6 +110,50 @@ InListData* StageBuilderState::prepareOwnedInList(const std::shared_ptr<InListDa
     return l;
 }
 
+sbe::value::SlotId StageBuilderState::getSortSpecSlot(const AccumulationStatement* acc) {
+    tassert(8679706, "Expected non-null AccumulationStatement", acc != nullptr);
+    const void* key = static_cast<const void*>(acc);
+
+    auto it = sortSpecMap->find(key);
+    if (it != sortSpecMap->end()) {
+        auto slot = it->second;
+        return slot;
+    }
+
+    // If we don't have a SortSpec for this AccumulationStatement yet, create one and
+    // add it the map and return it.
+    auto sortSpec = makeSortSpecFromSortPattern(getSortPattern(*acc));
+
+    auto tag = sbe::value::TypeTags::sortSpec;
+    auto val = sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release());
+    auto slot = env->registerSlot(tag, val, true, slotIdGenerator);
+
+    (*sortSpecMap)[key] = slot;
+    return slot;
+}
+
+sbe::value::SlotId StageBuilderState::getSortSpecSlot(const WindowFunctionStatement* wf) {
+    tassert(8679707, "Expected non-null WindowFunctionStatement", wf != nullptr);
+    const void* key = static_cast<const void*>(wf);
+
+    auto it = sortSpecMap->find(key);
+    if (it != sortSpecMap->end()) {
+        auto slot = it->second;
+        return slot;
+    }
+
+    // If we don't have a SortSpec for this WindowFunctionStatement yet, create one
+    // and add it the map and return it.
+    auto sortSpec = makeSortSpecFromSortPattern(getSortPattern(*wf));
+
+    auto tag = sbe::value::TypeTags::sortSpec;
+    auto val = sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release());
+    auto slot = env->registerSlot(tag, val, true, slotIdGenerator);
+
+    (*sortSpecMap)[key] = slot;
+    return slot;
+}
+
 sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     MatchExpression::InputParamId paramId) {
     auto it = data->inputParamToSlotMap.find(paramId);

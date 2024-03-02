@@ -309,7 +309,8 @@ protected:
             } catch (const DBException& e) {
                 // The accumulator or the _id expression is unsupported in SBE, so we expect that
                 // the sbeCompatible flag should be false.
-                ASSERT(e.code() == 5754701 || e.code() == 5851602) << "group spec: " << groupSpec;
+                ASSERT(e.code() == 5754701 || e.code() == 8679701 || e.code() == 8679702)
+                    << "group spec: " << groupSpec;
                 sbeGroupCompatible = false;
                 break;
             }
@@ -2159,6 +2160,7 @@ public:
                  nullptr /* spoolIdGenerator */,
                  nullptr /* inListsSet */,
                  nullptr /* collatorsMap */,
+                 nullptr /* sortSpecMap */,
                  _expCtx,
                  false /* needsMerge */,
                  false /* allowDiskUse */} {}

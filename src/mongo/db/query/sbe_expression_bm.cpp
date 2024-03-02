@@ -137,6 +137,7 @@ public:
             &_spoolIdGenerator,
             &_inListsSet,
             &_collatorsMap,
+            &_sortSpecMap,
             _expCtx,
             false /* needsMerge */,
             false /* allowDiskUse */
@@ -204,6 +205,7 @@ private:
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
     stage_builder::StageBuilderState::InListsSet _inListsSet;
     stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
+    stage_builder::StageBuilderState::SortSpecMap _sortSpecMap;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     sbe::value::SlotId _inputSlotId;

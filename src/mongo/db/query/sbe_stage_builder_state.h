@@ -40,6 +40,8 @@ namespace mongo {
 class InListData;
 class StringListSet;
 class PlanYieldPolicySBE;
+class AccumulationStatement;
+struct WindowFunctionStatement;
 
 namespace stage_builder {
 struct Environment;
@@ -54,6 +56,7 @@ static constexpr auto kNothingEnvSlotName = "nothing"_sd;
 struct StageBuilderState {
     using InListsSet = absl::flat_hash_set<InListData*>;
     using CollatorsMap = absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>;
+    using SortSpecMap = absl::flat_hash_map<const void*, sbe::value::SlotId>;
 
     StageBuilderState(OperationContext* opCtx,
                       Environment& env,
@@ -65,6 +68,7 @@ struct StageBuilderState {
                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
                       InListsSet* inListsSet,
                       CollatorsMap* collatorsMap,
+                      SortSpecMap* sortSpecMap,
                       boost::intrusive_ptr<ExpressionContext> expCtx,
                       bool needsMerge,
                       bool allowDiskUse)
@@ -73,6 +77,7 @@ struct StageBuilderState {
           spoolIdGenerator{spoolIdGenerator},
           inListsSet{inListsSet},
           collatorsMap{collatorsMap},
+          sortSpecMap{sortSpecMap},
           opCtx{opCtx},
           env{env},
           data{data},
@@ -99,6 +104,9 @@ struct StageBuilderState {
     }
 
     sbe::value::SlotId getNothingSlot();
+    sbe::value::SlotId getSortSpecSlot(const AccumulationStatement* sortPattern);
+    sbe::value::SlotId getSortSpecSlot(const WindowFunctionStatement* sortPattern);
+
     boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
     boost::optional<sbe::value::SlotId> getCollatorSlot();
     boost::optional<sbe::value::SlotId> getOplogTsSlot();
@@ -132,8 +140,9 @@ struct StageBuilderState {
     sbe::value::FrameIdGenerator* const frameIdGenerator;
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
 
-    absl::flat_hash_set<InListData*>* const inListsSet;
-    absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>* const collatorsMap;
+    InListsSet* const inListsSet;
+    CollatorsMap* const collatorsMap;
+    SortSpecMap* const sortSpecMap;
 
     OperationContext* const opCtx;
     Environment& env;

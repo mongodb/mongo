@@ -87,6 +87,11 @@ namespace mongo::projection_ast {
 class Projection;
 }
 
+namespace mongo {
+class AccumulationStatement;
+struct WindowFunctionStatement;
+}  // namespace mongo
+
 namespace mongo::stage_builder {
 
 class PlanStageSlots;
@@ -452,6 +457,44 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba
  * Returns a BSON type mask of all data types coercible to date.
  */
 uint32_t dateTypeMask();
+
+/**
+ * Retrieves the accumulation op name from 'accStmt' and returns it.
+ */
+StringData getAccumulationOpName(const AccumulationStatement& accStmt);
+
+/**
+ * Retrieves the window function op name from 'accStmt' and returns it.
+ */
+StringData getWindowFunctionOpName(const WindowFunctionStatement& wfStmt);
+
+/**
+ * Return true iff 'name', 'accStmt', or 'wfStmt' is one of $topN, $bottomN, $minN, $maxN,
+ * $firstN, or $lastN.
+ */
+bool isAccumulatorN(StringData name);
+bool isAccumulatorN(const AccumulationStatement& accStmt);
+bool isAccumulatorN(const WindowFunctionStatement& wfStmt);
+
+/**
+ * Return true iff 'name', 'accStmt', or 'wfStmt' is $topN or $bottomN.
+ */
+bool isTopBottomN(StringData name);
+bool isTopBottomN(const AccumulationStatement& accStmt);
+bool isTopBottomN(const WindowFunctionStatement& wfStmt);
+
+/**
+ * Gets the internal pointer to the SortPattern (if there is one) inside 'accStmt' or 'wfStmt'.
+ */
+boost::optional<SortPattern> getSortPattern(const AccumulationStatement& accStmt);
+boost::optional<SortPattern> getSortPattern(const WindowFunctionStatement& wfStmt);
+
+/**
+ * Creates a SortSpec object from a SortPattern.
+ */
+std::unique_ptr<sbe::SortSpec> makeSortSpecFromSortPattern(const SortPattern& sortPattern);
+std::unique_ptr<sbe::SortSpec> makeSortSpecFromSortPattern(
+    const boost::optional<SortPattern>& sortPattern);
 
 /**
  * Constructs local binding with inner expression built by 'innerExprFunc' and variables assigned

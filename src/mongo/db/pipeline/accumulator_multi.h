@@ -358,7 +358,7 @@ public:
      */
     void remove(const Value& val);
 
-    SortPattern getSortPattern() const {
+    const SortPattern& getSortPattern() const {
         return _sortPattern;
     }
 
@@ -402,5 +402,11 @@ extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, false>;
 extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, true>;
 extern template class AccumulatorTopBottomN<TopBottomSense::kTop, false>;
 extern template class AccumulatorTopBottomN<TopBottomSense::kTop, true>;
+
+using AccumulatorTop = AccumulatorTopBottomN<TopBottomSense::kTop, true>;
+using AccumulatorBottom = AccumulatorTopBottomN<TopBottomSense::kBottom, true>;
+
+using AccumulatorTopN = AccumulatorTopBottomN<TopBottomSense::kTop, false>;
+using AccumulatorBottomN = AccumulatorTopBottomN<TopBottomSense::kBottom, false>;
 
 }  // namespace mongo

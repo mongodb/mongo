@@ -46,77 +46,126 @@
 namespace mongo::stage_builder {
 class PlanStageSlots;
 
+using AccumulatorArgs = std::pair<SbExpr::Vector, std::vector<std::string>>;
+
 namespace AccArgs {
-const StringData kTopBottomNSortSpec = "sortSpec"_sd;
-const StringData kTopBottomNKey = "key"_sd;
-const StringData kTopBottomNValue = "value"_sd;
+extern const StringData kCount;
+extern const StringData kCovarianceX;
+extern const StringData kCovarianceY;
+extern const StringData kDefaultVal;
+extern const StringData kInput;
+extern const StringData kInputFirst;
+extern const StringData kInputLast;
+extern const StringData kIsAscending;
+extern const StringData kIsGroupAccum;
+extern const StringData kMaxSize;
+extern const StringData kSortBy;
+extern const StringData kSortByFirst;
+extern const StringData kSortByLast;
+extern const StringData kSortSpec;
+extern const StringData kUnit;
+extern const StringData kValue;
 
-const StringData kMaxSize = "maxSize"_sd;
-const StringData kIsGroupAccum = "isGroupAccum"_sd;
-
-const StringData kCovarianceX = "x"_sd;
-const StringData kCovarianceY = "y"_sd;
-
-const StringData kUnit = "unit"_sd;
-const StringData kInput = "input"_sd;
-const StringData kSortBy = "sortBy"_sd;
-
-const StringData kDerivativeInputFirst = "inputFirst"_sd;
-const StringData kDerivativeInputLast = "inputLast"_sd;
-const StringData kDerivativeSortByFirst = "sortByFirst"_sd;
-const StringData kDerivativeSortByLast = "sortByLast"_sd;
-
-const StringData kRankIsAscending = "isAscending"_sd;
-
-const StringData kDefaultVal = "defaultVal"_sd;
+extern const std::vector<std::string> kAccumulatorSingleParam;
+extern const std::vector<std::string> kAccumulatorAvgParams;
+extern const std::vector<std::string> kAccumulatorCovarianceParams;
+extern const std::vector<std::string> kAccumulatorDenseRankParams;
+extern const std::vector<std::string> kAccumulatorIntegralParams;
+extern const std::vector<std::string> kAccumulatorLinearFillParams;
+extern const std::vector<std::string> kAccumulatorRankParams;
+extern const std::vector<std::string> kAccumulatorTopBottomNParams;
 }  // namespace AccArgs
 
-/**
- * Translates an input AccumulationStatement into an SBE EExpression for accumulation expressions.
- */
-SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
-                                SbExpr argExpr,
-                                boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state);
+class AccumulationOp {
+public:
+    AccumulationOp(std::string opName) : _opName(std::move(opName)) {}
+
+    AccumulationOp(StringData opName) : _opName(opName.toString()) {}
+
+    AccumulationOp(const AccumulationStatement& acc);
+
+    const std::string& getOpName() const {
+        return _opName;
+    }
+
+    bool countAddendIsIntegerOrDouble() const {
+        return _countAddendIsIntegerOrDouble;
+    }
+
+private:
+    std::string _opName;
+    bool _countAddendIsIntegerOrDouble = false;
+};
 
 struct BlockAggAndRowAgg {
     SbExpr blockAgg;
     SbExpr rowAgg;
 };
 
+/**
+ * Given an AccumulationOp ('acc') and one or more input expressions ('input' / 'inputs'), these
+ * functions generate the arg expressions needed for the op specified by 'acc'.
+ */
+AccumulatorArgs buildAccumulatorArgs(StageBuilderState& state,
+                                     const AccumulationOp& acc,
+                                     SbExpr input,
+                                     boost::optional<sbe::value::SlotId> collatorSlot);
+
+AccumulatorArgs buildAccumulatorArgs(StageBuilderState& state,
+                                     const AccumulationOp& acc,
+                                     StringDataMap<SbExpr> inputs,
+                                     boost::optional<sbe::value::SlotId> collatorSlot);
+
+/**
+ * Given an AccumulationOp ('acc') and vector of named arg expressions ('args' / 'argNames'),
+ * this function generates the accumulate expressions for 'acc'.
+ */
+SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
+                                SbExpr::Vector args,
+                                const std::vector<std::string>& argNames,
+                                boost::optional<sbe::value::SlotId> collatorSlot,
+                                StageBuilderState& state);
+
+/**
+ * Given an AccumulationOp ('acc') and vector of named arg expressions ('args' / 'argNames'),
+ * this function generates the "block" versions of the accumulate expressions for 'acc'.
+ */
 std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
-    const AccumulationStatement& acc,
-    SbExpr argExpr,
+    const AccumulationOp& acc,
+    SbExpr::Vector args,
+    const std::vector<std::string>& argNames,
     SbSlot bitmapInternalSlot,
     SbSlot accInternalSlot,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state);
-
-std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    const AccumulationStatement& acc,
-    std::unique_ptr<sbe::EExpression> argExpr,
     boost::optional<sbe::value::SlotId> collatorSlot,
     StageBuilderState& state);
 
 /**
- * Similar to above but takes multiple arguments.
+ * Given an AccumulationOp 'acc' and a single input expression ('input'), these functions
+ * generate the accumulate expressions for 'acc'.
  */
-SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
-                                StringDataMap<SbExpr> argExprs,
+SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
+                                SbExpr input,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
                                 StageBuilderState& state);
 
-std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
-    const AccumulationStatement& acc,
-    StringDataMap<SbExpr> argExprs,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot,
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
+    const AccumulationOp& acc,
+    std::unique_ptr<sbe::EExpression> input,
     boost::optional<sbe::value::SlotId> collatorSlot,
     StageBuilderState& state);
 
+/**
+ * Given an AccumulationOp 'acc' and a set of input expressions ('inputs'), these functions
+ * generate the accumulate expressions for 'acc'.
+ */
+SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
+                                StringDataMap<SbExpr> inputs,
+                                boost::optional<sbe::value::SlotId> collatorSlot,
+                                StageBuilderState& state);
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    const AccumulationStatement& acc,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    const AccumulationOp& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> inputs,
     boost::optional<sbe::value::SlotId> collatorSlot,
     StageBuilderState& state);
 
@@ -127,7 +176,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
  * hash agg stage, while the new partial aggregates to combine can be read from the given
  * 'inputSlots'.
  */
-SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
+SbExpr::Vector buildCombinePartialAggregates(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState&);
@@ -135,24 +184,24 @@ SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
 /**
  * Similar to above but takes multiple arguments.
  */
-SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
+SbExpr::Vector buildCombinePartialAggregates(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              StringDataMap<SbExpr> argExprs,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState&);
 
 /**
- * Translates an input AccumulationStatement into an SBE EExpression that represents an
- * AccumulationStatement's finalization step. The 'stage' parameter provides the input subtree to
+ * Translates an input AccumulationOp into an SBE EExpression that represents an
+ * AccumulationOp's finalization step. The 'stage' parameter provides the input subtree to
  * build on top of.
  */
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const SbSlotVector& aggSlots,
                      boost::optional<sbe::value::SlotId> collatorSlot);
 
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const sbe::value::SlotVector& aggSlots,
                      boost::optional<sbe::value::SlotId> collatorSlot);
 
@@ -160,39 +209,35 @@ SbExpr buildFinalize(StageBuilderState& state,
  * Similar to above but takes multiple arguments.
  */
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const SbSlotVector& aggSlots,
                      StringDataMap<SbExpr> argExprs,
                      boost::optional<sbe::value::SlotId> collatorSlot);
 
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const sbe::value::SlotVector& aggSlots,
                      StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
                      boost::optional<sbe::value::SlotId> collatorSlot);
 
 /**
- * Translates an input AccumulationStatement into an SBE EExpression for the initialization of the
+ * Translates an input AccumulationOp into an SBE EExpression for the initialization of the
  * accumulator state.
  */
-SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
-                               SbExpr initExpr,
-                               StageBuilderState&);
+SbExpr::Vector buildInitialize(const AccumulationOp& acc, SbExpr initExpr, StageBuilderState&);
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationStatement& acc,
-    std::unique_ptr<sbe::EExpression> initExpr,
-    StageBuilderState&);
+    const AccumulationOp& acc, std::unique_ptr<sbe::EExpression> initExpr, StageBuilderState&);
 
 /**
  * Similar to above but takes multiple arguments
  */
-SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
+SbExpr::Vector buildInitialize(const AccumulationOp& acc,
                                StringDataMap<SbExpr> argExprs,
                                StageBuilderState&);
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationStatement& acc,
+    const AccumulationOp& acc,
     StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
     StageBuilderState&);
 

@@ -1158,7 +1158,11 @@ private:
     absl::flat_hash_set<InListData*> _inListsSet;
 
     // Hash set tracking the Collators used by the SBE plan being built.
-    absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*> _collatorMap;
+    absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*> _collatorsMap;
+
+    // Maintains a mapping from AccumulationStatements / WindowFunctionStatements to their
+    // corresponding SortSpecs (stored in slots).
+    absl::flat_hash_map<const void*, sbe::value::SlotId> _sortSpecMap;
 
     const MultipleCollectionAccessor& _collections;
 

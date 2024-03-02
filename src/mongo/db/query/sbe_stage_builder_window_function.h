@@ -107,11 +107,4 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(
     sbe::value::SlotVector values,
     StringDataMap<std::unique_ptr<sbe::EExpression>> arg,
     boost::optional<sbe::value::SlotId> collatorSlots);
-
-/**
- * Create a fake AccumulationStatement from the WindowFunctionStatement in order to invoke
- * accumulator stage builder.
- */
-AccumulationStatement createFakeAccumulationStatement(StageBuilderState& state,
-                                                      const WindowFunctionStatement& stmt);
 }  // namespace mongo::stage_builder

@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_sbexpr_helpers.h"
@@ -60,7 +61,91 @@
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
+namespace AccArgs {
+const StringData kCount = "count"_sd;
+const StringData kCovarianceX = "covarianceX"_sd;
+const StringData kCovarianceY = "covarianceY"_sd;
+const StringData kDefaultVal = "defaultVal"_sd;
+const StringData kInput = "input"_sd;
+const StringData kInputFirst = "inputFirst"_sd;
+const StringData kInputLast = "inputLast"_sd;
+const StringData kIsAscending = "isAscending"_sd;
+const StringData kIsGroupAccum = "isGroupAccum"_sd;
+const StringData kMaxSize = "maxSize"_sd;
+const StringData kSortBy = "sortBy"_sd;
+const StringData kSortByFirst = "sortByFirst"_sd;
+const StringData kSortByLast = "sortByLast"_sd;
+const StringData kSortSpec = "sortSpec"_sd;
+const StringData kUnit = "unit"_sd;
+const StringData kValue = "value"_sd;
+
+const std::vector<std::string> kAccumulatorSingleParam = {kInput.toString()};
+
+const std::vector<std::string> kAccumulatorAvgParams = {kInput.toString(), kCount.toString()};
+
+const std::vector<std::string> kAccumulatorCovarianceParams = {kCovarianceX.toString(),
+                                                               kCovarianceY.toString()};
+
+const std::vector<std::string> kAccumulatorDenseRankParams = {kInput.toString(),
+                                                              kIsAscending.toString()};
+
+const std::vector<std::string> kAccumulatorIntegralParams = {kInput.toString(), kSortBy.toString()};
+
+const std::vector<std::string> kAccumulatorLinearFillParams = {kInput.toString(),
+                                                               kSortBy.toString()};
+
+const std::vector<std::string> kAccumulatorRankParams = {kInput.toString(),
+                                                         kIsAscending.toString()};
+
+const std::vector<std::string> kAccumulatorTopBottomNParams = {
+    kValue.toString(), kSortBy.toString(), kSortSpec.toString()};
+}  // namespace AccArgs
+
+AccumulationOp::AccumulationOp(const AccumulationStatement& accStmt)
+    : _opName(getAccumulationOpName(accStmt)) {
+    if (accStmt.expr.name == AccumulatorSum::kName) {
+        auto constArg = dynamic_cast<ExpressionConstant*>(accStmt.expr.argument.get());
+        if (constArg) {
+            auto value = constArg->getValue();
+            switch (value.getType()) {
+                case BSONType::NumberInt:
+                case BSONType::NumberLong:
+                case BSONType::NumberDouble:
+                    _countAddendIsIntegerOrDouble = true;
+                    break;
+                default:
+                    // 'value' is NumberDecimal type in which case, 'sum' function may not be
+                    // efficient due to decimal data copying which involves memory allocation.
+                    // To avoid such inefficiency, does not support NumberDecimal type for this
+                    // optimization.
+                    break;
+            }
+        }
+    }
+}
+
 namespace {
+SbExpr::Vector decodeParams(SbExpr::Vector args,
+                            const std::vector<std::string>& argNames,
+                            const std::vector<std::string>& expectedParams) {
+    StringDataMap<size_t> nameToArgIdx;
+    for (size_t i = 0; i < argNames.size(); ++i) {
+        nameToArgIdx[argNames[i]] = i;
+    }
+
+    SbExpr::Vector params;
+    for (const auto& paramName : expectedParams) {
+        auto it = nameToArgIdx.find(paramName);
+        tassert(8679700,
+                str::stream() << "Expected parameter not found: " << paramName,
+                it != nameToArgIdx.end());
+
+        size_t argIdx = it->second;
+        params.emplace_back(std::move(args[argIdx]));
+    }
+
+    return params;
+}
 
 SbExpr wrapMinMaxArg(SbExpr arg, StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -74,23 +159,42 @@ SbExpr wrapMinMaxArg(SbExpr arg, StageBuilderState& state) {
     return b.makeLet(frameId, std::move(binds), std::move(e));
 }
 
-SbExpr::Vector buildAccumulatorMin(const AccumulationExpression& expr,
-                                   SbExpr arg,
+AccumulatorArgs buildAccumulatorArgsFromSingleArg(
+    StageBuilderState& state,
+    const AccumulationOp& acc,
+    SbExpr input,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    return AccumulatorArgs{SbExpr::makeSeq(std::move(input)), AccArgs::kAccumulatorSingleParam};
+}
+
+AccumulatorArgs buildAccumulatorArgsMinMax(StageBuilderState& state,
+                                           const AccumulationOp& acc,
+                                           SbExpr arg,
+                                           boost::optional<sbe::value::SlotId> collatorSlot) {
+    // Call wrapMinMaxArg() to prepare the arg.
+    return AccumulatorArgs{SbExpr::makeSeq(wrapMinMaxArg(std::move(arg), state)),
+                           AccArgs::kAccumulatorSingleParam};
+}
+
+SbExpr::Vector buildAccumulatorMin(const AccumulationOp& acc,
+                                   SbExpr::Vector args,
+                                   const std::vector<std::string>& argNames,
                                    boost::optional<sbe::value::SlotId> collatorSlot,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
 
     if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction(
-            "collMin"_sd, SbVar{*collatorSlot}, wrapMinMaxArg(std::move(arg), state)));
+        return SbExpr::makeSeq(
+            b.makeFunction("collMin"_sd, SbVar{*collatorSlot}, std::move(args[0])));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("min"_sd, wrapMinMaxArg(std::move(arg), state)));
+        return SbExpr::makeSeq(b.makeFunction("min"_sd, std::move(args[0])));
     }
 }
 
 std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMin(
-    const AccumulationExpression& expr,
-    SbExpr arg,
+    const AccumulationOp& acc,
+    SbExpr::Vector args,
+    const std::vector<std::string>& argNames,
     SbSlot bitmapInternalSlot,
     SbSlot accInternalSlot,
     boost::optional<sbe::value::SlotId> collatorSlot,
@@ -98,26 +202,34 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMin(
     SbExprBuilder b(state);
     std::vector<BlockAggAndRowAgg> pairs;
 
-    pairs.emplace_back(
-        BlockAggAndRowAgg{b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, std::move(arg)),
-                          b.makeFunction("min"_sd, accInternalSlot)});
+    pairs.emplace_back(BlockAggAndRowAgg{
+        b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, std::move(args[0])),
+        b.makeFunction("min"_sd, accInternalSlot)});
 
     return pairs;
 }
 
-SbExpr::Vector buildCombinePartialAggsMin(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsMin(const AccumulationOp& acc,
                                           const SbSlotVector& inputSlots,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
     tassert(7039501,
             "partial agg combiner for $min should have exactly one input slot",
             inputSlots.size() == 1);
-    auto arg = inputSlots[0];
-    return buildAccumulatorMin(expr, std::move(arg), collatorSlot, state);
+
+    SbExprBuilder b(state);
+
+    auto arg = wrapMinMaxArg(SbExpr{inputSlots[0]}, state);
+
+    if (collatorSlot) {
+        return SbExpr::makeSeq(b.makeFunction("collMin"_sd, SbVar{*collatorSlot}, std::move(arg)));
+    } else {
+        return SbExpr::makeSeq(b.makeFunction("min"_sd, std::move(arg)));
+    }
 }
 
 SbExpr buildFinalizeMin(StageBuilderState& state,
-                        const AccumulationExpression& expr,
+                        const AccumulationOp& acc,
                         const SbSlotVector& minSlots,
                         boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -132,23 +244,25 @@ SbExpr buildFinalizeMin(StageBuilderState& state,
     return b.makeFillEmptyNull(minSlots[0]);
 }
 
-SbExpr::Vector buildAccumulatorMax(const AccumulationExpression& expr,
-                                   SbExpr arg,
+SbExpr::Vector buildAccumulatorMax(const AccumulationOp& acc,
+                                   SbExpr::Vector args,
+                                   const std::vector<std::string>& argNames,
                                    boost::optional<sbe::value::SlotId> collatorSlot,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
 
     if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction(
-            "collMax"_sd, SbVar{*collatorSlot}, wrapMinMaxArg(std::move(arg), state)));
+        return SbExpr::makeSeq(
+            b.makeFunction("collMax"_sd, SbVar{*collatorSlot}, std::move(args[0])));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("max"_sd, wrapMinMaxArg(std::move(arg), state)));
+        return SbExpr::makeSeq(b.makeFunction("max"_sd, std::move(args[0])));
     }
 }
 
 std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMax(
-    const AccumulationExpression& expr,
-    SbExpr arg,
+    const AccumulationOp& acc,
+    SbExpr::Vector args,
+    const std::vector<std::string>& argNames,
     SbSlot bitmapInternalSlot,
     SbSlot accInternalSlot,
     boost::optional<sbe::value::SlotId> collatorSlot,
@@ -156,26 +270,34 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMax(
     SbExprBuilder b(state);
     std::vector<BlockAggAndRowAgg> pairs;
 
-    pairs.emplace_back(
-        BlockAggAndRowAgg{b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, std::move(arg)),
-                          b.makeFunction("max"_sd, accInternalSlot)});
+    pairs.emplace_back(BlockAggAndRowAgg{
+        b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, std::move(args[0])),
+        b.makeFunction("max"_sd, accInternalSlot)});
 
     return pairs;
 }
 
-SbExpr::Vector buildCombinePartialAggsMax(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsMax(const AccumulationOp& acc,
                                           const SbSlotVector& inputSlots,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
     tassert(7039502,
             "partial agg combiner for $max should have exactly one input slot",
             inputSlots.size() == 1);
-    auto arg = inputSlots[0];
-    return buildAccumulatorMax(expr, std::move(arg), collatorSlot, state);
+
+    SbExprBuilder b(state);
+
+    auto arg = wrapMinMaxArg(SbExpr{inputSlots[0]}, state);
+
+    if (collatorSlot) {
+        return SbExpr::makeSeq(b.makeFunction("collMax"_sd, SbVar{*collatorSlot}, std::move(arg)));
+    } else {
+        return SbExpr::makeSeq(b.makeFunction("max"_sd, std::move(arg)));
+    }
 }
 
 SbExpr buildFinalizeMax(StageBuilderState& state,
-                        const AccumulationExpression& expr,
+                        const AccumulationOp& acc,
                         const SbSlotVector& maxSlots,
                         boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -187,58 +309,75 @@ SbExpr buildFinalizeMax(StageBuilderState& state,
     return b.makeFillEmptyNull(maxSlots[0]);
 }
 
+AccumulatorArgs buildAccumulatorArgsFirstLast(StageBuilderState& state,
+                                              const AccumulationOp& acc,
+                                              SbExpr input,
+                                              boost::optional<sbe::value::SlotId> collatorSlot) {
+    SbExprBuilder b(state);
+    return AccumulatorArgs{SbExpr::makeSeq(b.makeFillEmptyNull(std::move(input))),
+                           AccArgs::kAccumulatorSingleParam};
+}
 
-SbExpr::Vector buildAccumulatorFirst(const AccumulationExpression& expr,
-                                     SbExpr arg,
+SbExpr::Vector buildAccumulatorFirst(const AccumulationOp& acc,
+                                     SbExpr::Vector args,
+                                     const std::vector<std::string>& argNames,
                                      boost::optional<sbe::value::SlotId> collatorSlot,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("first", b.makeFillEmptyNull(std::move(arg))));
+    return SbExpr::makeSeq(b.makeFunction("first", std::move(args[0])));
 }
 
-SbExpr::Vector buildCombinePartialAggsFirst(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsFirst(const AccumulationOp& acc,
                                             const SbSlotVector& inputSlots,
                                             boost::optional<sbe::value::SlotId> collatorSlot,
                                             StageBuilderState& state) {
     tassert(7039503,
             "partial agg combiner for $first should have exactly one input slot",
             inputSlots.size() == 1);
-    auto arg = inputSlots[0];
-    return buildAccumulatorFirst(expr, std::move(arg), collatorSlot, state);
+
+    SbExprBuilder b(state);
+
+    auto arg = b.makeFillEmptyNull(SbExpr{inputSlots[0]});
+    return SbExpr::makeSeq(b.makeFunction("first", std::move(arg)));
 }
 
-SbExpr::Vector buildAccumulatorLast(const AccumulationExpression& expr,
-                                    SbExpr arg,
+SbExpr::Vector buildAccumulatorLast(const AccumulationOp& acc,
+                                    SbExpr::Vector args,
+                                    const std::vector<std::string>& argNames,
                                     boost::optional<sbe::value::SlotId> collatorSlot,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("last", b.makeFillEmptyNull(std::move(arg))));
+    return SbExpr::makeSeq(b.makeFunction("last", std::move(args[0])));
 }
 
-SbExpr::Vector buildCombinePartialAggsLast(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsLast(const AccumulationOp& acc,
                                            const SbSlotVector& inputSlots,
                                            boost::optional<sbe::value::SlotId> collatorSlot,
                                            StageBuilderState& state) {
     tassert(7039504,
             "partial agg combiner for $last should have exactly one input slot",
             inputSlots.size() == 1);
-    auto arg = inputSlots[0];
-    return buildAccumulatorLast(expr, std::move(arg), collatorSlot, state);
-}
 
-SbExpr::Vector buildAccumulatorAvg(const AccumulationExpression& expr,
-                                   SbExpr arg,
-                                   boost::optional<sbe::value::SlotId> collatorSlot,
-                                   StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    SbExpr::Vector aggs;
+    auto arg = b.makeFillEmptyNull(SbExpr{inputSlots[0]});
+    return SbExpr::makeSeq(b.makeFunction("last", std::move(arg)));
+}
 
-    // 'aggDoubleDoubleSum' will ignore non-numeric values automatically.
-    aggs.push_back(b.makeFunction("aggDoubleDoubleSum", arg.clone()));
+AccumulatorArgs buildAccumulatorArgsAvg(StageBuilderState& state,
+                                        const AccumulationOp& acc,
+                                        SbExpr input,
+                                        boost::optional<sbe::value::SlotId> collatorSlot) {
+    SbExprBuilder b(state);
 
+    SbExpr::Vector aggArgs;
+
+    // Use 'input' as the input for "aggDoubleDoubleSum()".
+    aggArgs.push_back(input.clone());
+
+    // Generate the addend expression.
     auto frameId = state.frameIdGenerator->generate();
-    auto binds = SbExpr::makeSeq(std::move(arg));
+    auto binds = SbExpr::makeSeq(std::move(input));
     auto var = SbVar{frameId, 0};
 
     auto e = b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicOr,
@@ -250,13 +389,30 @@ SbExpr::Vector buildAccumulatorAvg(const AccumulationExpression& expr,
     // For the counter we need to skip non-numeric values ourselves.
     auto addend = b.makeLet(frameId, std::move(binds), std::move(e));
 
-    auto counterExpr = b.makeFunction("sum", std::move(addend));
-    aggs.push_back(std::move(counterExpr));
+    // Use 'addend' as the input for "sum()".
+    aggArgs.push_back(std::move(addend));
+
+    return AccumulatorArgs{std::move(aggArgs), AccArgs::kAccumulatorAvgParams};
+}
+
+SbExpr::Vector buildAccumulatorAvg(const AccumulationOp& acc,
+                                   SbExpr::Vector argsIn,
+                                   const std::vector<std::string>& argNamesIn,
+                                   boost::optional<sbe::value::SlotId> collatorSlot,
+                                   StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorAvgParams);
+
+    SbExpr::Vector aggs;
+    aggs.push_back(b.makeFunction("aggDoubleDoubleSum", std::move(args[0])));
+    aggs.push_back(b.makeFunction("sum", std::move(args[1])));
 
     return aggs;
 }
 
-SbExpr::Vector buildCombinePartialAggsAvg(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsAvg(const AccumulationOp& acc,
                                           const SbSlotVector& inputSlots,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
@@ -271,7 +427,7 @@ SbExpr::Vector buildCombinePartialAggsAvg(const AccumulationExpression& expr,
 }
 
 SbExpr buildFinalizeAvg(StageBuilderState& state,
-                        const AccumulationExpression& expr,
+                        const AccumulationOp& acc,
                         const SbSlotVector& aggSlots,
                         boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -312,50 +468,22 @@ SbExpr buildFinalizeAvg(StageBuilderState& state,
     }
 }
 
-std::tuple<bool, sbe::value::TypeTags, sbe::value::Value> getCountAddend(
-    const AccumulationExpression& expr) {
-    auto constArg = dynamic_cast<ExpressionConstant*>(expr.argument.get());
-    if (!constArg) {
-        return {false, sbe::value::TypeTags::Nothing, 0};
-    }
-
-    auto value = constArg->getValue();
-    switch (value.getType()) {
-        case BSONType::NumberInt:
-            return {true,
-                    sbe::value::TypeTags::NumberInt32,
-                    sbe::value::bitcastFrom<int>(value.getInt())};
-        case BSONType::NumberLong:
-            return {true,
-                    sbe::value::TypeTags::NumberInt64,
-                    sbe::value::bitcastFrom<long long>(value.getLong())};
-        case BSONType::NumberDouble:
-            return {true,
-                    sbe::value::TypeTags::NumberDouble,
-                    sbe::value::bitcastFrom<double>(value.getDouble())};
-        default:
-            // 'value' is NumberDecimal type in which case, 'sum' function may not be efficient
-            // due to decimal data copying which involves memory allocation. To avoid such
-            // inefficiency, does not support NumberDecimal type for this optimization.
-            return {false, sbe::value::TypeTags::Nothing, 0};
-    }
-}
-
-SbExpr::Vector buildAccumulatorSum(const AccumulationExpression& expr,
-                                   SbExpr arg,
+SbExpr::Vector buildAccumulatorSum(const AccumulationOp& acc,
+                                   SbExpr::Vector args,
+                                   const std::vector<std::string>& argNames,
                                    boost::optional<sbe::value::SlotId> collatorSlot,
                                    StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    // Optimize for a count-like accumulator like {$sum: 1}.
-    if (auto [isCount, addendTag, addendVal] = getCountAddend(expr); isCount) {
-        return SbExpr::makeSeq(b.makeFunction("sum", b.makeConstant(addendTag, addendVal)));
+    if (acc.countAddendIsIntegerOrDouble()) {
+        // Optimize for a count-like accumulator like {$sum: 1}.
+        return SbExpr::makeSeq(b.makeFunction("sum", std::move(args[0])));
+    } else {
+        return SbExpr::makeSeq(b.makeFunction("aggDoubleDoubleSum", std::move(args[0])));
     }
-
-    return SbExpr::makeSeq(b.makeFunction("aggDoubleDoubleSum", std::move(arg)));
 }
 
-SbExpr::Vector buildCombinePartialAggsSum(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsSum(const AccumulationOp& acc,
                                           const SbSlotVector& inputSlots,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
@@ -369,14 +497,15 @@ SbExpr::Vector buildCombinePartialAggsSum(const AccumulationExpression& expr,
     // Optimize for a count-like accumulator like {$sum: 1}. In particular, we will spill the
     // constant sum, and we need to convert it to a 4 element array that can be used to initialize a
     // DoubleDoubleSummation.
-    if (auto [isCount, _1, _2] = getCountAddend(expr); isCount) {
+    if (acc.countAddendIsIntegerOrDouble()) {
         return SbExpr::makeSeq(b.makeFunction("convertSimpleSumToDoubleDoubleSum", std::move(arg)));
+    } else {
+        return SbExpr::makeSeq(b.makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
     }
-    return SbExpr::makeSeq(b.makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
 }
 
 SbExpr buildFinalizeSum(StageBuilderState& state,
-                        const AccumulationExpression& expr,
+                        const AccumulationOp& acc,
                         const SbSlotVector& sumSlots,
                         boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -403,14 +532,14 @@ SbExpr buildFinalizeSum(StageBuilderState& state,
         return b.makeFunction("doubleDoublePartialSumFinalize", sumSlots[0]);
     }
 
-    if (auto [isCount, tag, val] = getCountAddend(expr); isCount) {
+    if (acc.countAddendIsIntegerOrDouble()) {
         auto var = makeVariable(sumSlots[0]);
         return sbe::makeE<sbe::EIf>(makeFunction("isNumber", var->clone()),
                                     var->clone(),
                                     makeFunction("doubleDoubleSumFinalize", var->clone()));
+    } else {
+        return b.makeFunction("doubleDoubleSumFinalize", sumSlots[0]);
     }
-
-    return b.makeFunction("doubleDoubleSumFinalize", sumSlots[0]);
 }
 
 SbExpr::Vector buildAccumulatorAddToSetHelper(SbExpr arg,
@@ -429,15 +558,16 @@ SbExpr::Vector buildAccumulatorAddToSetHelper(SbExpr arg,
     }
 }
 
-SbExpr::Vector buildAccumulatorAddToSet(const AccumulationExpression& expr,
-                                        SbExpr arg,
+SbExpr::Vector buildAccumulatorAddToSet(const AccumulationOp& acc,
+                                        SbExpr::Vector args,
+                                        const std::vector<std::string>& argNames,
                                         boost::optional<sbe::value::SlotId> collatorSlot,
                                         StageBuilderState& state) {
     return buildAccumulatorAddToSetHelper(
-        std::move(arg), "addToSetCapped"_sd, collatorSlot, "collAddToSetCapped"_sd, state);
+        std::move(args[0]), "addToSetCapped"_sd, collatorSlot, "collAddToSetCapped"_sd, state);
 }
 
-SbExpr::Vector buildCombinePartialAggsAddToSet(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsAddToSet(const AccumulationOp& acc,
                                                const SbSlotVector& inputSlots,
                                                boost::optional<sbe::value::SlotId> collatorSlot,
                                                StageBuilderState& state) {
@@ -450,7 +580,7 @@ SbExpr::Vector buildCombinePartialAggsAddToSet(const AccumulationExpression& exp
 }
 
 SbExpr buildFinalizeCappedAccumulator(StageBuilderState& state,
-                                      const AccumulationExpression& expr,
+                                      const AccumulationOp& acc,
                                       const SbSlotVector& accSlots,
                                       boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -480,14 +610,15 @@ SbExpr::Vector buildAccumulatorPushHelper(SbExpr arg,
     return SbExpr::makeSeq(b.makeFunction(aggFuncName, std::move(arg), b.makeInt32Constant(cap)));
 }
 
-SbExpr::Vector buildAccumulatorPush(const AccumulationExpression& expr,
-                                    SbExpr arg,
+SbExpr::Vector buildAccumulatorPush(const AccumulationOp& acc,
+                                    SbExpr::Vector args,
+                                    const std::vector<std::string>& argNames,
                                     boost::optional<sbe::value::SlotId> collatorSlot,
                                     StageBuilderState& state) {
-    return buildAccumulatorPushHelper(std::move(arg), "addToArrayCapped"_sd, state);
+    return buildAccumulatorPushHelper(std::move(args[0]), "addToArrayCapped"_sd, state);
 }
 
-SbExpr::Vector buildCombinePartialAggsPush(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsPush(const AccumulationOp& acc,
                                            const SbSlotVector& inputSlots,
                                            boost::optional<sbe::value::SlotId> collatorSlot,
                                            StageBuilderState& state) {
@@ -498,15 +629,16 @@ SbExpr::Vector buildCombinePartialAggsPush(const AccumulationExpression& expr,
     return buildAccumulatorPushHelper(std::move(arg), "aggConcatArraysCapped"_sd, state);
 }
 
-SbExpr::Vector buildAccumulatorStdDev(const AccumulationExpression& expr,
-                                      SbExpr arg,
+SbExpr::Vector buildAccumulatorStdDev(const AccumulationOp& acc,
+                                      SbExpr::Vector args,
+                                      const std::vector<std::string>& argNames,
                                       boost::optional<sbe::value::SlotId> collatorSlot,
                                       StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggStdDev", std::move(arg)));
+    return SbExpr::makeSeq(b.makeFunction("aggStdDev", std::move(args[0])));
 }
 
-SbExpr::Vector buildCombinePartialAggsStdDev(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsStdDev(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState& state) {
@@ -553,7 +685,7 @@ SbExpr buildFinalizePartialStdDev(SbSlot stdDevSlot, StageBuilderState& state) {
 }
 
 SbExpr buildFinalizeStdDevPop(StageBuilderState& state,
-                              const AccumulationExpression& expr,
+                              const AccumulationOp& acc,
                               const SbSlotVector& stdDevSlots,
                               boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -572,7 +704,7 @@ SbExpr buildFinalizeStdDevPop(StageBuilderState& state,
 }
 
 SbExpr buildFinalizeStdDevSamp(StageBuilderState& state,
-                               const AccumulationExpression& expr,
+                               const AccumulationOp& acc,
                                const SbSlotVector& stdDevSlots,
                                boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -589,43 +721,56 @@ SbExpr buildFinalizeStdDevSamp(StageBuilderState& state,
     }
 }
 
-SbExpr::Vector buildAccumulatorMergeObjects(const AccumulationExpression& expr,
-                                            SbExpr arg,
-                                            boost::optional<sbe::value::SlotId> collatorSlot,
-                                            StageBuilderState& state) {
+SbExpr wrapMergeObjectsArg(SbExpr arg, StageBuilderState& state) {
     SbExprBuilder b(state);
 
     auto frameId = state.frameIdGenerator->generate();
     auto binds = SbExpr::makeSeq(std::move(arg));
     auto var = SbVar{frameId, 0};
 
-    auto typeCheckExpr = b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                        b.generateNullMissingOrUndefined(var),
-                                        b.makeFunction("isObject", var));
-
-    auto e =
-        b.makeIf(std::move(typeCheckExpr),
-                 b.makeFunction("mergeObjects", var),
+    auto expr =
+        b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                b.generateNullMissingOrUndefined(var),
+                                b.makeFunction("isObject", var)),
+                 SbExpr{var},
                  b.makeFail(ErrorCodes::Error{5911200}, "$mergeObjects only supports objects"));
 
-    auto filterExpr = b.makeLet(frameId, std::move(binds), std::move(e));
-
-    return SbExpr::makeSeq(std::move(filterExpr));
+    return b.makeLet(frameId, std::move(binds), std::move(expr));
 }
 
-SbExpr::Vector buildCombinePartialAggsMergeObjects(const AccumulationExpression& expr,
+AccumulatorArgs buildAccumulatorArgsMergeObjects(StageBuilderState& state,
+                                                 const AccumulationOp& acc,
+                                                 SbExpr input,
+                                                 boost::optional<sbe::value::SlotId> collatorSlot) {
+    return AccumulatorArgs{SbExpr::makeSeq(wrapMergeObjectsArg(std::move(input), state)),
+                           AccArgs::kAccumulatorSingleParam};
+}
+
+SbExpr::Vector buildAccumulatorMergeObjects(const AccumulationOp& acc,
+                                            SbExpr::Vector args,
+                                            const std::vector<std::string>& argNames,
+                                            boost::optional<sbe::value::SlotId> collatorSlot,
+                                            StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    return SbExpr::makeSeq(b.makeFunction("mergeObjects", std::move(args[0])));
+}
+
+SbExpr::Vector buildCombinePartialAggsMergeObjects(const AccumulationOp& acc,
                                                    const SbSlotVector& inputSlots,
                                                    boost::optional<sbe::value::SlotId> collatorSlot,
                                                    StageBuilderState& state) {
     tassert(7039507,
             "partial agg combiner for $mergeObjects should have exactly one input slot",
             inputSlots.size() == 1);
-    auto arg = inputSlots[0];
-    return buildAccumulatorMergeObjects(expr, std::move(arg), collatorSlot, state);
+
+    SbExprBuilder b(state);
+
+    return SbExpr::makeSeq(
+        b.makeFunction("mergeObjects", wrapMergeObjectsArg(SbExpr{inputSlots[0]}, state)));
 }
 
-SbExpr::Vector buildInitializeAccumulatorMulti(StringDataMap<SbExpr> argExprs,
-                                               StageBuilderState& state) {
+SbExpr::Vector buildInitializeAccumN(StringDataMap<SbExpr> argExprs, StageBuilderState& state) {
     SbExprBuilder b(state);
 
     auto it = argExprs.find(AccArgs::kMaxSize);
@@ -684,8 +829,9 @@ SbExpr::Vector buildInitializeAccumulatorMulti(StringDataMap<SbExpr> argExprs,
     }
 }
 
-SbExpr::Vector buildAccumulatorFirstN(const AccumulationExpression& expr,
-                                      SbExpr arg,
+SbExpr::Vector buildAccumulatorFirstN(const AccumulationOp& acc,
+                                      SbExpr::Vector args,
+                                      const std::vector<std::string>& argNames,
                                       boost::optional<sbe::value::SlotId> collatorSlot,
                                       StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -697,14 +843,14 @@ SbExpr::Vector buildAccumulatorFirstN(const AccumulationExpression& expr,
     auto moveVarExpr = SbExpr{makeMoveVariable(frameId, 0)};
 
     auto e = b.makeIf(
-        b.makeFunction("aggFirstNNeedsMoreInput", varExpr.clone()),
-        b.makeFunction("aggFirstN", moveVarExpr.clone(), b.makeFillEmptyNull(std::move(arg))),
+        b.makeFunction("aggFirstNNeedsMoreInput", std::move(varExpr)),
+        b.makeFunction("aggFirstN", moveVarExpr.clone(), b.makeFillEmptyNull(std::move(args[0]))),
         moveVarExpr.clone());
 
     return SbExpr::makeSeq(b.makeLet(frameId, std::move(binds), std::move(e)));
 }
 
-SbExpr::Vector buildCombinePartialAggsFirstN(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsFirstN(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState& state) {
@@ -719,7 +865,7 @@ SbExpr::Vector buildCombinePartialAggsFirstN(const AccumulationExpression& expr,
 }
 
 SbExpr buildFinalizeFirstN(StageBuilderState& state,
-                           const AccumulationExpression& expr,
+                           const AccumulationOp& acc,
                            const SbSlotVector& inputSlots,
                            boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -731,15 +877,25 @@ SbExpr buildFinalizeFirstN(StageBuilderState& state,
     return b.makeFunction("aggFirstNFinalize", inputSlots[0]);
 }
 
-SbExpr::Vector buildAccumulatorLastN(const AccumulationExpression& expr,
-                                     SbExpr arg,
+AccumulatorArgs buildAccumulatorArgsLastN(StageBuilderState& state,
+                                          const AccumulationOp& acc,
+                                          SbExpr input,
+                                          boost::optional<sbe::value::SlotId> collatorSlot) {
+    SbExprBuilder b(state);
+    return AccumulatorArgs{SbExpr::makeSeq(b.makeFillEmptyNull(std::move(input))),
+                           AccArgs::kAccumulatorSingleParam};
+}
+
+SbExpr::Vector buildAccumulatorLastN(const AccumulationOp& acc,
+                                     SbExpr::Vector args,
+                                     const std::vector<std::string>& argNames,
                                      boost::optional<sbe::value::SlotId> collatorSlot,
                                      StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggLastN", b.makeFillEmptyNull(std::move(arg))));
+    return SbExpr::makeSeq(b.makeFunction("aggLastN", std::move(args[0])));
 }
 
-SbExpr::Vector buildCombinePartialAggsLastN(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsLastN(const AccumulationOp& acc,
                                             const SbSlotVector& inputSlots,
                                             boost::optional<sbe::value::SlotId> collatorSlot,
                                             StageBuilderState& state) {
@@ -754,7 +910,7 @@ SbExpr::Vector buildCombinePartialAggsLastN(const AccumulationExpression& expr,
 }
 
 SbExpr buildFinalizeLastN(StageBuilderState& state,
-                          const AccumulationExpression& expr,
+                          const AccumulationOp& acc,
                           const SbSlotVector& inputSlots,
                           boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -766,45 +922,45 @@ SbExpr buildFinalizeLastN(StageBuilderState& state,
     return b.makeFunction("aggLastNFinalize", inputSlots[0]);
 }
 
-bool isAccumulatorTopN(const AccumulationExpression& expr) {
-    return expr.name == AccumulatorTopBottomN<kTop, false /* single */>::getName() ||
-        expr.name == AccumulatorTopBottomN<kTop, true /* single */>::getName();
+bool isAccumulatorTopN(const AccumulationOp& acc) {
+    const auto& name = acc.getOpName();
+    return name == AccumulatorTopN::getName() || name == AccumulatorTop::getName();
 }
 
-SbExpr::Vector buildAccumulatorTopBottomN(const AccumulationExpression& expr,
-                                          StringDataMap<SbExpr> args,
+AccumulatorArgs buildAccumulatorArgsFromMap(StageBuilderState& state,
+                                            const AccumulationOp& acc,
+                                            StringDataMap<SbExpr> inputs,
+                                            boost::optional<sbe::value::SlotId> collatorSlot) {
+    SbExpr::Vector argsVector;
+    std::vector<std::string> names;
+    for (auto& arg : inputs) {
+        argsVector.emplace_back(std::move(arg.second));
+        names.emplace_back(arg.first.toString());
+    }
+
+    return AccumulatorArgs{std::move(argsVector), std::move(names)};
+}
+
+SbExpr::Vector buildAccumulatorTopBottomN(const AccumulationOp& acc,
+                                          SbExpr::Vector argsIn,
+                                          const std::vector<std::string>& argNamesIn,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    auto it = args.find(AccArgs::kTopBottomNKey);
-    tassert(5807009,
-            str::stream() << "Accumulator " << expr.name << " expects a '"
-                          << AccArgs::kTopBottomNKey << "' argument",
-            it != args.end());
-    auto key = std::move(it->second);
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorTopBottomNParams);
+    auto value = std::move(args[0]);
+    auto key = std::move(args[1]);
+    auto sortSpec = std::move(args[2]);
 
-    it = args.find(AccArgs::kTopBottomNValue);
-    tassert(5807010,
-            str::stream() << "Accumulator " << expr.name << " expects a '"
-                          << AccArgs::kTopBottomNValue << "' argument",
-            it != args.end());
-    auto value = std::move(it->second);
-
-    it = args.find(AccArgs::kTopBottomNSortSpec);
-    tassert(5807021,
-            str::stream() << "Accumulator " << expr.name << " expects a '"
-                          << AccArgs::kTopBottomNSortSpec << "' argument",
-            it != args.end());
-    auto sortSpec = std::move(it->second);
-
-    return SbExpr::makeSeq(b.makeFunction(isAccumulatorTopN(expr) ? "aggTopN" : "aggBottomN",
+    return SbExpr::makeSeq(b.makeFunction(isAccumulatorTopN(acc) ? "aggTopN" : "aggBottomN",
                                           std::move(key),
                                           std::move(value),
                                           std::move(sortSpec)));
 }
 
-SbExpr::Vector buildCombinePartialTopBottomN(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialTopBottomN(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              StringDataMap<SbExpr> args,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
@@ -812,25 +968,25 @@ SbExpr::Vector buildCombinePartialTopBottomN(const AccumulationExpression& expr,
     SbExprBuilder b(state);
 
     tassert(5807011,
-            str::stream() << "Expected one input slot for merging " << expr.name
+            str::stream() << "Expected one input slot for merging " << acc.getOpName()
                           << ", got: " << inputSlots.size(),
             inputSlots.size() == 1);
 
-    auto it = args.find(AccArgs::kTopBottomNSortSpec);
+    auto it = args.find(AccArgs::kSortSpec);
     tassert(5807022,
-            str::stream() << "Accumulator " << expr.name << " expects a '"
-                          << AccArgs::kTopBottomNSortSpec << "' argument",
+            str::stream() << "Accumulator " << acc.getOpName() << " expects a '"
+                          << AccArgs::kSortSpec << "' argument",
             it != args.end());
     auto sortSpec = std::move(it->second);
 
     return SbExpr::makeSeq(
-        b.makeFunction(isAccumulatorTopN(expr) ? "aggTopNMerge" : "aggBottomNMerge",
+        b.makeFunction(isAccumulatorTopN(acc) ? "aggTopNMerge" : "aggBottomNMerge",
                        inputSlots[0],
                        std::move(sortSpec)));
 }
 
 SbExpr buildFinalizeTopBottomNImpl(StageBuilderState& state,
-                                   const AccumulationExpression& expr,
+                                   const AccumulationOp& acc,
                                    const SbSlotVector& inputSlots,
                                    StringDataMap<SbExpr> args,
                                    boost::optional<sbe::value::SlotId> collatorSlot,
@@ -838,15 +994,15 @@ SbExpr buildFinalizeTopBottomNImpl(StageBuilderState& state,
     SbExprBuilder b(state);
 
     tassert(5807012,
-            str::stream() << "Expected one input slot for finalization of " << expr.name
+            str::stream() << "Expected one input slot for finalization of " << acc.getOpName()
                           << ", got: " << inputSlots.size(),
             inputSlots.size() == 1);
     auto inputVar = inputSlots[0];
 
-    auto it = args.find(AccArgs::kTopBottomNSortSpec);
+    auto it = args.find(AccArgs::kSortSpec);
     tassert(5807023,
-            str::stream() << "Accumulator " << expr.name << " expects a '"
-                          << AccArgs::kTopBottomNSortSpec << "' argument",
+            str::stream() << "Accumulator " << acc.getOpName() << " expects a '"
+                          << AccArgs::kSortSpec << "' argument",
             it != args.end());
     auto sortSpec = std::move(it->second);
 
@@ -872,7 +1028,7 @@ SbExpr buildFinalizeTopBottomNImpl(StageBuilderState& state,
             "traverseP", std::move(heapExpr), std::move(lambdaExpr), b.makeInt32Constant(1));
     } else {
         auto finalExpr =
-            b.makeFunction(isAccumulatorTopN(expr) ? "aggTopNFinalize" : "aggBottomNFinalize",
+            b.makeFunction(isAccumulatorTopN(acc) ? "aggTopNFinalize" : "aggBottomNFinalize",
                            inputVar,
                            std::move(sortSpec));
         if (single) {
@@ -883,42 +1039,49 @@ SbExpr buildFinalizeTopBottomNImpl(StageBuilderState& state,
 }
 
 SbExpr buildFinalizeTopBottomN(StageBuilderState& state,
-                               const AccumulationExpression& expr,
+                               const AccumulationOp& acc,
                                const SbSlotVector& inputSlots,
                                StringDataMap<SbExpr> args,
                                boost::optional<sbe::value::SlotId> collatorSlot) {
     return buildFinalizeTopBottomNImpl(
-        state, expr, inputSlots, std::move(args), collatorSlot, false /* single */);
+        state, acc, inputSlots, std::move(args), collatorSlot, false);
 }
 
 SbExpr buildFinalizeTopBottom(StageBuilderState& state,
-                              const AccumulationExpression& expr,
+                              const AccumulationOp& acc,
                               const SbSlotVector& inputSlots,
                               StringDataMap<SbExpr> args,
                               boost::optional<sbe::value::SlotId> collatorSlot) {
-    return buildFinalizeTopBottomNImpl(
-        state, expr, inputSlots, std::move(args), collatorSlot, true /* single */);
+    return buildFinalizeTopBottomNImpl(state, acc, inputSlots, std::move(args), collatorSlot, true);
 }
 
-SbExpr::Vector buildAccumulatorMinMaxN(const AccumulationExpression& expr,
-                                       SbExpr arg,
+AccumulatorArgs buildAccumulatorArgsMinMaxN(StageBuilderState& state,
+                                            const AccumulationOp& acc,
+                                            SbExpr input,
+                                            boost::optional<sbe::value::SlotId> collatorSlot) {
+    SbExprBuilder b(state);
+    return AccumulatorArgs{SbExpr::makeSeq(b.makeFunction("setToArray", std::move(input))),
+                           AccArgs::kAccumulatorSingleParam};
+}
+
+SbExpr::Vector buildAccumulatorMinMaxN(const AccumulationOp& acc,
+                                       SbExpr::Vector args,
+                                       const std::vector<std::string>& argNames,
                                        boost::optional<sbe::value::SlotId> collatorSlot,
                                        StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxN" : "aggMinN";
-    if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction(std::move(aggExprName),
-                                              b.makeFunction("setToArray", std::move(arg)),
-                                              SbVar{*collatorSlot}));
+    auto aggExprName = acc.getOpName() == AccumulatorMaxN::kName ? "aggMaxN" : "aggMinN";
 
-    } else {
+    if (collatorSlot) {
         return SbExpr::makeSeq(
-            b.makeFunction(std::move(aggExprName), b.makeFunction("setToArray", std::move(arg))));
+            b.makeFunction(std::move(aggExprName), std::move(args[0]), SbVar{*collatorSlot}));
+    } else {
+        return SbExpr::makeSeq(b.makeFunction(std::move(aggExprName), std::move(args[0])));
     }
 }
 
-SbExpr::Vector buildCombinePartialAggsMinMaxN(const AccumulationExpression& expr,
+SbExpr::Vector buildCombinePartialAggsMinMaxN(const AccumulationOp& acc,
                                               const SbSlotVector& inputSlots,
                                               boost::optional<sbe::value::SlotId> collatorSlot,
                                               StageBuilderState& state) {
@@ -928,7 +1091,7 @@ SbExpr::Vector buildCombinePartialAggsMinMaxN(const AccumulationExpression& expr
             str::stream() << "Expected one input slot for merging, got: " << inputSlots.size(),
             inputSlots.size() == 1);
 
-    auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxNMerge" : "aggMinNMerge";
+    auto aggExprName = acc.getOpName() == AccumulatorMaxN::kName ? "aggMaxNMerge" : "aggMinNMerge";
     if (collatorSlot) {
         return SbExpr::makeSeq(
             b.makeFunction(std::move(aggExprName), inputSlots[0], SbVar{*collatorSlot}));
@@ -938,7 +1101,7 @@ SbExpr::Vector buildCombinePartialAggsMinMaxN(const AccumulationExpression& expr
 }
 
 SbExpr buildFinalizeMinMaxN(StageBuilderState& state,
-                            const AccumulationExpression& expr,
+                            const AccumulationOp& acc,
                             const SbSlotVector& inputSlots,
                             boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -946,7 +1109,8 @@ SbExpr buildFinalizeMinMaxN(StageBuilderState& state,
     uassert(7548809,
             str::stream() << "Expected one input slot for finalization, got: " << inputSlots.size(),
             inputSlots.size() == 1);
-    auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxNFinalize" : "aggMinNFinalize";
+    auto aggExprName =
+        acc.getOpName() == AccumulatorMaxN::kName ? "aggMaxNFinalize" : "aggMinNFinalize";
     if (collatorSlot) {
         return b.makeFunction(std::move(aggExprName), inputSlots[0], SbVar{*collatorSlot});
     } else {
@@ -954,31 +1118,23 @@ SbExpr buildFinalizeMinMaxN(StageBuilderState& state,
     }
 }
 
-SbExpr::Vector buildAccumulatorCovariance(const AccumulationExpression& expr,
-                                          StringDataMap<SbExpr> args,
+SbExpr::Vector buildAccumulatorCovariance(const AccumulationOp& acc,
+                                          SbExpr::Vector argsIn,
+                                          const std::vector<std::string>& argNamesIn,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorCovarianceParams);
+    auto argX = std::move(args[0]);
+    auto argY = std::move(args[1]);
+
     SbExprBuilder b(state);
-
-    tassert(7820808, "Incorrect number of arguments", args.size() == 2);
-
-    auto it = args.find(AccArgs::kCovarianceX);
-    tassert(7820809,
-            str::stream() << "Window function expects '" << AccArgs::kCovarianceX << "' argument",
-            it != args.end());
-    auto argX = std::move(it->second);
-
-    it = args.find(AccArgs::kCovarianceY);
-    tassert(7820810,
-            str::stream() << "Window function expects '" << AccArgs::kCovarianceY << "' argument",
-            it != args.end());
-    auto argY = std::move(it->second);
 
     return SbExpr::makeSeq(b.makeFunction("aggCovarianceAdd", std::move(argX), std::move(argY)));
 }
 
 SbExpr buildFinalizeCovarianceSamp(StageBuilderState& state,
-                                   const AccumulationExpression& expr,
+                                   const AccumulationOp& acc,
                                    const SbSlotVector& slots,
                                    boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -992,7 +1148,7 @@ SbExpr buildFinalizeCovarianceSamp(StageBuilderState& state,
 }
 
 SbExpr buildFinalizeCovariancePop(StageBuilderState& state,
-                                  const AccumulationExpression& expr,
+                                  const AccumulationOp& acc,
                                   const SbSlotVector& slots,
                                   boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -1011,16 +1167,17 @@ SbExpr::Vector buildInitializeExpMovingAvg(SbExpr alphaExpr, StageBuilderState& 
         "newArray", b.makeNullConstant(), std::move(alphaExpr), b.makeBoolConstant(false)));
 }
 
-SbExpr::Vector buildAccumulatorExpMovingAvg(const AccumulationExpression& expr,
-                                            SbExpr arg,
+SbExpr::Vector buildAccumulatorExpMovingAvg(const AccumulationOp& acc,
+                                            SbExpr::Vector args,
+                                            const std::vector<std::string>& argNames,
                                             boost::optional<sbe::value::SlotId> collatorSlot,
                                             StageBuilderState& state) {
     SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction("aggExpMovingAvg", std::move(arg)));
+    return SbExpr::makeSeq(b.makeFunction("aggExpMovingAvg", std::move(args[0])));
 }
 
 SbExpr buildFinalizeExpMovingAvg(StageBuilderState& state,
-                                 const AccumulationExpression& expr,
+                                 const AccumulationOp& acc,
                                  const SbSlotVector& slots,
                                  boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -1028,14 +1185,15 @@ SbExpr buildFinalizeExpMovingAvg(StageBuilderState& state,
     return b.makeFunction("aggExpMovingAvgFinalize", slots[0]);
 }
 
-SbExpr::Vector buildAccumulatorLocf(const AccumulationExpression& expr,
-                                    SbExpr arg,
+SbExpr::Vector buildAccumulatorLocf(const AccumulationOp& acc,
+                                    SbExpr::Vector args,
+                                    const std::vector<std::string>& argNames,
                                     boost::optional<sbe::value::SlotId> collatorSlot,
                                     StageBuilderState& state) {
     SbExprBuilder b(state);
 
     auto frameId = state.frameIdGenerator->generate();
-    auto binds = SbExpr::makeSeq(std::move(arg));
+    auto binds = SbExpr::makeSeq(std::move(args[0]));
     auto var = SbVar{frameId, 0};
 
     auto e = b.makeIf(b.generateNullMissingOrUndefined(var), b.makeFunction("aggState"), var);
@@ -1045,8 +1203,9 @@ SbExpr::Vector buildAccumulatorLocf(const AccumulationExpression& expr,
     return SbExpr::makeSeq(std::move(localBind));
 }
 
-SbExpr::Vector buildAccumulatorDocumentNumber(const AccumulationExpression& expr,
-                                              SbExpr arg,
+SbExpr::Vector buildAccumulatorDocumentNumber(const AccumulationOp& acc,
+                                              SbExpr::Vector args,
+                                              const std::vector<std::string>& argNames,
                                               boost::optional<sbe::value::SlotId> collatorSlot,
                                               StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -1055,25 +1214,12 @@ SbExpr::Vector buildAccumulatorDocumentNumber(const AccumulationExpression& expr
 
 SbExpr::Vector buildAccumulatorRankImpl(const StringData rankFuncName,
                                         const StringData collRankFuncName,
-                                        const AccumulationExpression& expr,
-                                        StringDataMap<SbExpr> args,
+                                        const AccumulationOp& acc,
+                                        SbExpr input,
+                                        SbExpr sortOrder,
                                         boost::optional<sbe::value::SlotId> collatorSlot,
                                         StageBuilderState& state) {
     SbExprBuilder b(state);
-
-    auto it = args.find(AccArgs::kInput);
-    tassert(8216801,
-            str::stream() << "Accumulator " << expr.name << " expects a '" << AccArgs::kInput
-                          << "' argument",
-            it != args.end());
-    auto input = std::move(it->second);
-
-    it = args.find(AccArgs::kRankIsAscending);
-    tassert(8216802,
-            str::stream() << "Accumulator " << expr.name << " expects a '"
-                          << AccArgs::kRankIsAscending << "' argument",
-            it != args.end());
-    auto sortOrder = std::move(it->second);
 
     if (collatorSlot) {
         return SbExpr::makeSeq(b.makeFunction(
@@ -1084,16 +1230,22 @@ SbExpr::Vector buildAccumulatorRankImpl(const StringData rankFuncName,
     }
 }
 
-SbExpr::Vector buildAccumulatorRank(const AccumulationExpression& expr,
-                                    StringDataMap<SbExpr> args,
+SbExpr::Vector buildAccumulatorRank(const AccumulationOp& acc,
+                                    SbExpr::Vector argsIn,
+                                    const std::vector<std::string>& argNamesIn,
                                     boost::optional<sbe::value::SlotId> collatorSlot,
                                     StageBuilderState& state) {
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorRankParams);
+    auto input = std::move(args[0]);
+    auto sortOrder = std::move(args[1]);
+
     return buildAccumulatorRankImpl(
-        "aggRank", "aggRankColl", expr, std::move(args), collatorSlot, state);
+        "aggRank", "aggRankColl", acc, std::move(input), std::move(sortOrder), collatorSlot, state);
 }
 
 SbExpr buildFinalizeRank(StageBuilderState& state,
-                         const AccumulationExpression& expr,
+                         const AccumulationOp& acc,
                          const SbSlotVector& slots,
                          boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -1102,12 +1254,23 @@ SbExpr buildFinalizeRank(StageBuilderState& state,
     return b.makeFunction("aggRankFinalize", slots[0]);
 }
 
-SbExpr::Vector buildAccumulatorDenseRank(const AccumulationExpression& expr,
-                                         StringDataMap<SbExpr> args,
+SbExpr::Vector buildAccumulatorDenseRank(const AccumulationOp& acc,
+                                         SbExpr::Vector argsIn,
+                                         const std::vector<std::string>& argNamesIn,
                                          boost::optional<sbe::value::SlotId> collatorSlot,
                                          StageBuilderState& state) {
-    return buildAccumulatorRankImpl(
-        "aggDenseRank", "aggDenseRankColl", expr, std::move(args), collatorSlot, state);
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorDenseRankParams);
+    auto input = std::move(args[0]);
+    auto sortOrder = std::move(args[1]);
+
+    return buildAccumulatorRankImpl("aggDenseRank",
+                                    "aggDenseRankColl",
+                                    acc,
+                                    std::move(input),
+                                    std::move(sortOrder),
+                                    collatorSlot,
+                                    state);
 }
 
 SbExpr::Vector buildInitializeIntegral(SbExpr unitExpr, StageBuilderState& state) {
@@ -1116,31 +1279,23 @@ SbExpr::Vector buildInitializeIntegral(SbExpr unitExpr, StageBuilderState& state
         b.makeFunction("aggIntegralInit", std::move(unitExpr), b.makeBoolConstant(true)));
 }
 
-SbExpr::Vector buildAccumulatorIntegral(const AccumulationExpression& expr,
-                                        StringDataMap<SbExpr> args,
+SbExpr::Vector buildAccumulatorIntegral(const AccumulationOp& acc,
+                                        SbExpr::Vector argsIn,
+                                        const std::vector<std::string>& argNamesIn,
                                         boost::optional<sbe::value::SlotId> collatorSlot,
                                         StageBuilderState& state) {
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorIntegralParams);
+    auto input = std::move(args[0]);
+    auto sortBy = std::move(args[1]);
+
     SbExprBuilder b(state);
-
-    tassert(7996806, "Incorrect number of arguments", args.size() == 2);
-
-    auto it = args.find(AccArgs::kInput);
-    tassert(7996807,
-            str::stream() << "Window function expects '" << AccArgs::kInput << "' argument",
-            it != args.end());
-    auto input = std::move(it->second);
-
-    it = args.find(AccArgs::kSortBy);
-    tassert(7996808,
-            str::stream() << "Window function expects '" << AccArgs::kSortBy << "' argument",
-            it != args.end());
-    auto sortBy = std::move(it->second);
 
     return SbExpr::makeSeq(b.makeFunction("aggIntegralAdd", std::move(input), std::move(sortBy)));
 }
 
 SbExpr buildFinalizeIntegral(StageBuilderState& state,
-                             const AccumulationExpression& expr,
+                             const AccumulationOp& acc,
                              const SbSlotVector& slots,
                              boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
@@ -1149,8 +1304,9 @@ SbExpr buildFinalizeIntegral(StageBuilderState& state,
     return b.makeFunction("aggIntegralFinalize", slots[0]);
 }
 
-SbExpr::Vector buildAccumulatorDerivative(const AccumulationExpression& expr,
-                                          StringDataMap<SbExpr> args,
+SbExpr::Vector buildAccumulatorDerivative(const AccumulationOp& acc,
+                                          SbExpr::Vector argsIn,
+                                          const std::vector<std::string>& argNamesIn,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
                                           StageBuilderState& state) {
     SbExprBuilder b(state);
@@ -1158,7 +1314,7 @@ SbExpr::Vector buildAccumulatorDerivative(const AccumulationExpression& expr,
 }
 
 SbExpr buildFinalizeDerivative(StageBuilderState& state,
-                               const AccumulationExpression& expr,
+                               const AccumulationOp& acc,
                                const SbSlotVector& slots,
                                StringDataMap<SbExpr> args,
                                boost::optional<sbe::value::SlotId> collatorSlot) {
@@ -1171,31 +1327,27 @@ SbExpr buildFinalizeDerivative(StageBuilderState& state,
             it != args.end());
     auto unit = std::move(it->second);
 
-    it = args.find(AccArgs::kDerivativeInputFirst);
+    it = args.find(AccArgs::kInputFirst);
     tassert(7993404,
-            str::stream() << "Window function expects '" << AccArgs::kDerivativeInputFirst
-                          << "' argument",
+            str::stream() << "Window function expects '" << AccArgs::kInputFirst << "' argument",
             it != args.end());
     auto inputFirst = std::move(it->second);
 
-    it = args.find(AccArgs::kDerivativeSortByFirst);
+    it = args.find(AccArgs::kSortByFirst);
     tassert(7993405,
-            str::stream() << "Window function expects '" << AccArgs::kDerivativeSortByFirst
-                          << "' argument",
+            str::stream() << "Window function expects '" << AccArgs::kSortByFirst << "' argument",
             it != args.end());
     auto sortByFirst = std::move(it->second);
 
-    it = args.find(AccArgs::kDerivativeInputLast);
+    it = args.find(AccArgs::kInputLast);
     tassert(7993406,
-            str::stream() << "Window function expects '" << AccArgs::kDerivativeInputLast
-                          << "' argument",
+            str::stream() << "Window function expects '" << AccArgs::kInputLast << "' argument",
             it != args.end());
     auto inputLast = std::move(it->second);
 
-    it = args.find(AccArgs::kDerivativeSortByLast);
+    it = args.find(AccArgs::kSortByLast);
     tassert(7993407,
-            str::stream() << "Window function expects '" << AccArgs::kDerivativeSortByLast
-                          << "' argument",
+            str::stream() << "Window function expects '" << AccArgs::kSortByLast << "' argument",
             it != args.end());
     auto sortByLast = std::move(it->second);
 
@@ -1223,39 +1375,54 @@ SbExpr::Vector buildInitializeLinearFill(SbExpr unitExpr, StageBuilderState& sta
                                           b.makeInt64Constant(0)));
 }
 
-SbExpr::Vector buildAccumulatorLinearFill(const AccumulationExpression& expr,
-                                          StringDataMap<SbExpr> args,
-                                          boost::optional<sbe::value::SlotId> collatorSlot,
-                                          StageBuilderState& state) {
+AccumulatorArgs buildAccumulatorArgsLinearFill(StageBuilderState& state,
+                                               const AccumulationOp& acc,
+                                               StringDataMap<SbExpr> inputs,
+                                               boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
 
-    tassert(7971210, "Incorrect number of arguments", args.size() == 2);
+    SbExpr::Vector argsVector;
+    std::vector<std::string> names;
 
-    auto it = args.find(AccArgs::kInput);
-    tassert(7971211,
-            str::stream() << "Window function expects '" << AccArgs::kInput << "' argument",
-            it != args.end());
-    auto input = std::move(it->second);
+    for (auto& arg : inputs) {
+        auto& expr = arg.second;
+        std::string name = arg.first.toString();
 
-    it = args.find(AccArgs::kSortBy);
-    tassert(7971212,
-            str::stream() << "Window function expects '" << AccArgs::kSortBy << "' argument",
-            it != args.end());
-    auto sortBy = std::move(it->second);
+        if (name == AccArgs::kInput) {
+            expr = b.makeFillEmptyNull(std::move(expr));
+        }
 
-    return SbExpr::makeSeq(b.makeFunction(
-        "aggLinearFillAdd", b.makeFillEmptyNull(std::move(input)), std::move(sortBy)));
+        argsVector.emplace_back(std::move(expr));
+        names.emplace_back(std::move(name));
+    }
+
+    return AccumulatorArgs{std::move(argsVector), std::move(names)};
+}
+
+SbExpr::Vector buildAccumulatorLinearFill(const AccumulationOp& acc,
+                                          SbExpr::Vector argsIn,
+                                          const std::vector<std::string>& argNamesIn,
+                                          boost::optional<sbe::value::SlotId> collatorSlot,
+                                          StageBuilderState& state) {
+    SbExpr::Vector args =
+        decodeParams(std::move(argsIn), argNamesIn, AccArgs::kAccumulatorLinearFillParams);
+    auto input = std::move(args[0]);
+    auto sortBy = std::move(args[1]);
+
+    SbExprBuilder b(state);
+
+    return SbExpr::makeSeq(b.makeFunction("aggLinearFillAdd", std::move(input), std::move(sortBy)));
 }
 
 SbExpr buildFinalizeLinearFill(StageBuilderState& state,
-                               const AccumulationExpression& expr,
+                               const AccumulationOp& acc,
                                const SbSlotVector& inputSlots,
                                StringDataMap<SbExpr> args,
                                boost::optional<sbe::value::SlotId> collatorSlot) {
     SbExprBuilder b(state);
 
     tassert(7971213,
-            str::stream() << "Expected one input slot for finalization of " << expr.name
+            str::stream() << "Expected one input slot for finalization of " << acc.getOpName()
                           << ", got: " << inputSlots.size(),
             inputSlots.size() == 1);
     auto inputVar = inputSlots[0];
@@ -1277,12 +1444,88 @@ SbExpr::Vector emptyInitializer(SbExpr maxSizeExpr, StageBuilderState& state) {
 }
 }  // namespace
 
-SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
-                                SbExpr argExpr,
+AccumulatorArgs buildAccumulatorArgs(StageBuilderState& state,
+                                     const AccumulationOp& acc,
+                                     SbExpr input,
+                                     boost::optional<sbe::value::SlotId> collatorSlot) {
+    using BuildAccumulatorArgsFunc = std::function<AccumulatorArgs(
+        StageBuilderState&, const AccumulationOp&, SbExpr, boost::optional<sbe::value::SlotId>)>;
+
+    static const StringDataMap<BuildAccumulatorArgsFunc> kAccumulatorArgsBuilders = {
+        {AccumulatorMin::kName, &buildAccumulatorArgsMinMax},
+        {AccumulatorMax::kName, &buildAccumulatorArgsMinMax},
+        {AccumulatorFirst::kName, &buildAccumulatorArgsFirstLast},
+        {AccumulatorLast::kName, &buildAccumulatorArgsFirstLast},
+        {AccumulatorAvg::kName, &buildAccumulatorArgsAvg},
+        {AccumulatorSum::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorStdDevPop::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorStdDevSamp::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorAddToSet::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorPush::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorMergeObjects::kName, &buildAccumulatorArgsMergeObjects},
+        {AccumulatorFirstN::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorLastN::kName, &buildAccumulatorArgsLastN},
+        {AccumulatorMinN::kName, &buildAccumulatorArgsMinMaxN},
+        {AccumulatorMaxN::kName, &buildAccumulatorArgsMinMaxN},
+        {AccumulatorExpMovingAvg::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorLocf::kName, &buildAccumulatorArgsFromSingleArg},
+        {AccumulatorDocumentNumber::kName, &buildAccumulatorArgsFromSingleArg},
+    };
+
+    auto accExprName = acc.getOpName();
+    auto it = kAccumulatorArgsBuilders.find(accExprName);
+
+    uassert(8679701,
+            str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
+            it != kAccumulatorArgsBuilders.end());
+
+    auto& fn = it->second;
+    return std::invoke(fn, state, acc, std::move(input), collatorSlot);
+}
+
+AccumulatorArgs buildAccumulatorArgs(StageBuilderState& state,
+                                     const AccumulationOp& acc,
+                                     StringDataMap<SbExpr> inputs,
+                                     boost::optional<sbe::value::SlotId> collatorSlot) {
+    using BuildAccumulatorArgsFunc =
+        std::function<AccumulatorArgs(StageBuilderState&,
+                                      const AccumulationOp&,
+                                      StringDataMap<SbExpr>,
+                                      boost::optional<sbe::value::SlotId>)>;
+
+    static const StringDataMap<BuildAccumulatorArgsFunc> kAccumulatorArgsBuilders = {
+        {AccumulatorTop::getName(), &buildAccumulatorArgsFromMap},
+        {AccumulatorBottom::getName(), &buildAccumulatorArgsFromMap},
+        {AccumulatorTopN::getName(), &buildAccumulatorArgsFromMap},
+        {AccumulatorBottomN::getName(), &buildAccumulatorArgsFromMap},
+        {AccumulatorCovarianceSamp::kName, &buildAccumulatorArgsFromMap},
+        {AccumulatorCovariancePop::kName, &buildAccumulatorArgsFromMap},
+        {AccumulatorIntegral::kName, &buildAccumulatorArgsFromMap},
+        {window_function::ExpressionDerivative::kName, &buildAccumulatorArgsFromMap},
+        {window_function::ExpressionLinearFill::kName, &buildAccumulatorArgsLinearFill},
+        {AccumulatorRank::kName, &buildAccumulatorArgsFromMap},
+        {AccumulatorDenseRank::kName, &buildAccumulatorArgsFromMap},
+    };
+
+    auto accExprName = acc.getOpName();
+    auto it = kAccumulatorArgsBuilders.find(accExprName);
+
+    uassert(8679702,
+            str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
+            it != kAccumulatorArgsBuilders.end());
+
+    auto& fn = it->second;
+    return std::invoke(fn, state, acc, std::move(inputs), collatorSlot);
+}
+
+SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
+                                SbExpr::Vector preparedArgs,
+                                const std::vector<std::string>& argNames,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
                                 StageBuilderState& state) {
-    using BuildAccumulatorFn = std::function<SbExpr::Vector(const AccumulationExpression&,
-                                                            SbExpr,
+    using BuildAccumulatorFn = std::function<SbExpr::Vector(const AccumulationOp&,
+                                                            SbExpr::Vector,
+                                                            const std::vector<std::string>&,
                                                             boost::optional<sbe::value::SlotId>,
                                                             StageBuilderState&)>;
 
@@ -1305,61 +1548,58 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
         {AccumulatorExpMovingAvg::kName, &buildAccumulatorExpMovingAvg},
         {AccumulatorLocf::kName, &buildAccumulatorLocf},
         {AccumulatorDocumentNumber::kName, &buildAccumulatorDocumentNumber},
+        {AccumulatorTop::getName(), &buildAccumulatorTopBottomN},
+        {AccumulatorBottom::getName(), &buildAccumulatorTopBottomN},
+        {AccumulatorTopN::getName(), &buildAccumulatorTopBottomN},
+        {AccumulatorBottomN::getName(), &buildAccumulatorTopBottomN},
+        {AccumulatorCovarianceSamp::kName, &buildAccumulatorCovariance},
+        {AccumulatorCovariancePop::kName, &buildAccumulatorCovariance},
+        {AccumulatorIntegral::kName, &buildAccumulatorIntegral},
+        {window_function::ExpressionDerivative::kName, &buildAccumulatorDerivative},
+        {window_function::ExpressionLinearFill::kName, &buildAccumulatorLinearFill},
+        {AccumulatorRank::kName, &buildAccumulatorRank},
+        {AccumulatorDenseRank::kName, &buildAccumulatorDenseRank},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
+
+    auto it = kAccumulatorBuilders.find(accExprName);
+
     uassert(5754701,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
-            kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
+            it != kAccumulatorBuilders.end());
 
-    auto& fn = kAccumulatorBuilders.at(accExprName);
-    return std::invoke(fn, acc.expr, std::move(argExpr), collatorSlot, state);
+    auto& fn = it->second;
+    return std::invoke(fn, acc, std::move(preparedArgs), argNames, collatorSlot, state);
 }
 
-std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
-    const AccumulationStatement& acc,
-    SbExpr argExpr,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state) {
-    using BuildBlockAccumulatorFn =
-        std::function<std::vector<BlockAggAndRowAgg>(const AccumulationExpression&,
-                                                     SbExpr,
-                                                     SbSlot,
-                                                     SbSlot,
-                                                     boost::optional<sbe::value::SlotId>,
-                                                     StageBuilderState&)>;
+SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
+                                SbExpr input,
+                                boost::optional<sbe::value::SlotId> collatorSlot,
+                                StageBuilderState& state) {
+    auto accArgs = buildAccumulatorArgs(state, acc, std::move(input), collatorSlot);
 
-    static const StringDataMap<BuildBlockAccumulatorFn> kBlockAccumulatorBuilders = {
-        {AccumulatorMin::kName, &buildBlockAccumulatorMin},
-        {AccumulatorMax::kName, &buildBlockAccumulatorMax},
-    };
+    return stage_builder::buildAccumulator(
+        acc, std::move(accArgs.first), std::move(accArgs.second), collatorSlot, state);
+}
 
-    auto accExprName = acc.expr.name;
+SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
+                                StringDataMap<SbExpr> inputs,
+                                boost::optional<sbe::value::SlotId> collatorSlot,
+                                StageBuilderState& state) {
+    auto accArgs = buildAccumulatorArgs(state, acc, std::move(inputs), collatorSlot);
 
-    auto it = kBlockAccumulatorBuilders.find(accExprName);
-    if (it != kBlockAccumulatorBuilders.end()) {
-        auto& fn = it->second;
-        return std::invoke(fn,
-                           acc.expr,
-                           std::move(argExpr),
-                           bitmapInternalSlot,
-                           accInternalSlot,
-                           collatorSlot,
-                           state);
-    }
-
-    return {};
+    return stage_builder::buildAccumulator(
+        acc, std::move(accArgs.first), std::move(accArgs.second), collatorSlot, state);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    const AccumulationStatement& acc,
-    std::unique_ptr<sbe::EExpression> argExpr,
+    const AccumulationOp& acc,
+    std::unique_ptr<sbe::EExpression> input,
     boost::optional<sbe::value::SlotId> collatorSlot,
     StageBuilderState& state) {
     // Call the other overload of buildAccumulator().
-    auto sbExprs = buildAccumulator(acc, SbExpr{std::move(argExpr)}, collatorSlot, state);
+    auto sbExprs = buildAccumulator(acc, SbExpr{std::move(input)}, collatorSlot, state);
 
     // Convert 'sbExprs' to a vector of sbe::EExpressions and return it.
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
@@ -1370,81 +1610,14 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     return exprs;
 }
 
-SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
-                                StringDataMap<SbExpr> argExprs,
-                                boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state) {
-    using BuildAccumulatorFn = std::function<SbExpr::Vector(const AccumulationExpression&,
-                                                            StringDataMap<SbExpr>,
-                                                            boost::optional<sbe::value::SlotId>,
-                                                            StageBuilderState&)>;
-
-    static const StringDataMap<BuildAccumulatorFn> kAccumulatorBuilders = {
-        {AccumulatorTopBottomN<kTop, true /* single */>::getName(), &buildAccumulatorTopBottomN},
-        {AccumulatorTopBottomN<kBottom, true /* single */>::getName(), &buildAccumulatorTopBottomN},
-        {AccumulatorTopBottomN<kTop, false /* single */>::getName(), &buildAccumulatorTopBottomN},
-        {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
-         &buildAccumulatorTopBottomN},
-        {AccumulatorCovarianceSamp::kName, &buildAccumulatorCovariance},
-        {AccumulatorCovariancePop::kName, &buildAccumulatorCovariance},
-        {AccumulatorIntegral::kName, &buildAccumulatorIntegral},
-        {window_function::ExpressionDerivative::kName, &buildAccumulatorDerivative},
-        {window_function::ExpressionLinearFill::kName, &buildAccumulatorLinearFill},
-        {AccumulatorRank::kName, &buildAccumulatorRank},
-        {AccumulatorDenseRank::kName, &buildAccumulatorDenseRank},
-    };
-
-    auto accExprName = acc.expr.name;
-    uassert(5807017,
-            str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
-            kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
-
-    auto& fn = kAccumulatorBuilders.at(accExprName);
-    return std::invoke(fn, acc.expr, std::move(argExprs), collatorSlot, state);
-}
-
-std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
-    const AccumulationStatement& acc,
-    StringDataMap<SbExpr> argExprs,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state) {
-    using BuildBlockAccumulatorFn =
-        std::function<std::vector<BlockAggAndRowAgg>(const AccumulationExpression&,
-                                                     StringDataMap<SbExpr>,
-                                                     SbSlot,
-                                                     SbSlot,
-                                                     boost::optional<sbe::value::SlotId>,
-                                                     StageBuilderState&)>;
-
-    static const StringDataMap<BuildBlockAccumulatorFn> kBlockAccumulatorBuilders = {};
-
-    auto accExprName = acc.expr.name;
-
-    auto it = kBlockAccumulatorBuilders.find(accExprName);
-    if (it != kBlockAccumulatorBuilders.end()) {
-        auto& fn = it->second;
-        return std::invoke(fn,
-                           acc.expr,
-                           std::move(argExprs),
-                           bitmapInternalSlot,
-                           accInternalSlot,
-                           collatorSlot,
-                           state);
-    }
-
-    return {};
-}
-
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    const AccumulationStatement& acc,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    const AccumulationOp& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> inputs,
     boost::optional<sbe::value::SlotId> collatorSlot,
     StageBuilderState& state) {
-    // Convert 'argExprs' into a StringDataMap of SbExprs.
+    // Convert 'inputs' into a StringDataMap of SbExprs.
     StringDataMap<SbExpr> argSbExprs;
-    for (auto&& [k, v] : argExprs) {
+    for (auto&& [k, v] : inputs) {
         argSbExprs.emplace(k, SbExpr{v->clone()});
     }
 
@@ -1460,11 +1633,52 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     return exprs;
 }
 
-SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
+std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
+    const AccumulationOp& acc,
+    SbExpr::Vector args,
+    const std::vector<std::string>& argNames,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state) {
+    using BuildBlockAccumulatorFn =
+        std::function<std::vector<BlockAggAndRowAgg>(const AccumulationOp&,
+                                                     SbExpr::Vector,
+                                                     const std::vector<std::string>&,
+                                                     SbSlot,
+                                                     SbSlot,
+                                                     boost::optional<sbe::value::SlotId>,
+                                                     StageBuilderState&)>;
+
+    static const StringDataMap<BuildBlockAccumulatorFn> kBlockAccumulatorBuilders = {
+        {AccumulatorMin::kName, &buildBlockAccumulatorMin},
+        {AccumulatorMax::kName, &buildBlockAccumulatorMax},
+    };
+
+    auto accExprName = acc.getOpName();
+
+    auto it = kBlockAccumulatorBuilders.find(accExprName);
+
+    if (it != kBlockAccumulatorBuilders.end()) {
+        auto& fn = it->second;
+        return std::invoke(fn,
+                           acc,
+                           std::move(args),
+                           argNames,
+                           bitmapInternalSlot,
+                           accInternalSlot,
+                           collatorSlot,
+                           state);
+    }
+
+    return {};
+}
+
+SbExpr::Vector buildCombinePartialAggregates(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState& state) {
-    using BuildAggCombinerFn = std::function<SbExpr::Vector(const AccumulationExpression&,
+    using BuildAggCombinerFn = std::function<SbExpr::Vector(const AccumulationOp&,
                                                             const SbSlotVector&,
                                                             boost::optional<sbe::value::SlotId>,
                                                             StageBuilderState&)>;
@@ -1487,21 +1701,20 @@ SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
         {AccumulatorMinN::kName, &buildCombinePartialAggsMinMaxN},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
     uassert(7039500,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAggCombinerBuilders.find(accExprName) != kAggCombinerBuilders.end());
 
-    return std::invoke(
-        kAggCombinerBuilders.at(accExprName), acc.expr, inputSlots, collatorSlot, state);
+    return std::invoke(kAggCombinerBuilders.at(accExprName), acc, inputSlots, collatorSlot, state);
 }
 
-SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
+SbExpr::Vector buildCombinePartialAggregates(const AccumulationOp& acc,
                                              const SbSlotVector& inputSlots,
                                              StringDataMap<SbExpr> argExprs,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState& state) {
-    using BuildAggCombinerFn = std::function<SbExpr::Vector(const AccumulationExpression&,
+    using BuildAggCombinerFn = std::function<SbExpr::Vector(const AccumulationOp&,
                                                             const SbSlotVector&,
                                                             StringDataMap<SbExpr>,
                                                             boost::optional<sbe::value::SlotId>,
@@ -1517,13 +1730,13 @@ SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
          &buildCombinePartialTopBottomN},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
     uassert(5807019,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAggCombinerBuilders.find(accExprName) != kAggCombinerBuilders.end());
 
     return std::invoke(kAggCombinerBuilders.at(accExprName),
-                       acc.expr,
+                       acc,
                        inputSlots,
                        std::move(argExprs),
                        collatorSlot,
@@ -1531,7 +1744,7 @@ SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
 }
 
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const sbe::value::SlotVector& aggSlots,
                      boost::optional<sbe::value::SlotId> collatorSlot) {
     SbSlotVector aggSlotsVec;
@@ -1543,11 +1756,11 @@ SbExpr buildFinalize(StageBuilderState& state,
 }
 
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const SbSlotVector& aggSlots,
                      boost::optional<sbe::value::SlotId> collatorSlot) {
     using BuildFinalizeFn = std::function<SbExpr(StageBuilderState&,
-                                                 const AccumulationExpression&,
+                                                 const AccumulationOp&,
                                                  const SbSlotVector&,
                                                  boost::optional<sbe::value::SlotId>)>;
 
@@ -1577,13 +1790,13 @@ SbExpr buildFinalize(StageBuilderState& state,
         {AccumulatorDocumentNumber::kName, nullptr},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
     uassert(5754700,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
 
     if (auto fn = kAccumulatorBuilders.at(accExprName); fn) {
-        return std::invoke(fn, state, acc.expr, aggSlots, collatorSlot);
+        return std::invoke(fn, state, acc, aggSlots, collatorSlot);
     } else {
         // Returning a null SbExpr signifies that no final project is necessary.
         return {};
@@ -1591,12 +1804,12 @@ SbExpr buildFinalize(StageBuilderState& state,
 }
 
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const SbSlotVector& aggSlots,
                      StringDataMap<SbExpr> argExprs,
                      boost::optional<sbe::value::SlotId> collatorSlot) {
     using BuildFinalizeFn = std::function<SbExpr(StageBuilderState&,
-                                                 const AccumulationExpression&,
+                                                 const AccumulationOp&,
                                                  const SbSlotVector&,
                                                  StringDataMap<SbExpr>,
                                                  boost::optional<sbe::value::SlotId>)>;
@@ -1610,21 +1823,21 @@ SbExpr buildFinalize(StageBuilderState& state,
         {window_function::ExpressionLinearFill::kName, &buildFinalizeLinearFill},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
     uassert(5807020,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
 
     return std::invoke(kAccumulatorBuilders.at(accExprName),
                        state,
-                       acc.expr,
+                       acc,
                        aggSlots,
                        std::move(argExprs),
                        collatorSlot);
 }
 
 SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
+                     const AccumulationOp& acc,
                      const sbe::value::SlotVector& aggSlots,
                      StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
                      boost::optional<sbe::value::SlotId> collatorSlot) {
@@ -1643,7 +1856,7 @@ SbExpr buildFinalize(StageBuilderState& state,
     return buildFinalize(state, acc, aggSlotsVec, std::move(argSbExprs), collatorSlot);
 }
 
-SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
+SbExpr::Vector buildInitialize(const AccumulationOp& acc,
                                SbExpr initExpr,
                                StageBuilderState& state) {
     using BuildInitializeFn = std::function<SbExpr::Vector(SbExpr, StageBuilderState&)>;
@@ -1672,7 +1885,7 @@ SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
         {window_function::ExpressionLinearFill::kName, &buildInitializeLinearFill},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
     uassert(7567300,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
@@ -1681,7 +1894,7 @@ SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationStatement& acc,
+    const AccumulationOp& acc,
     std::unique_ptr<sbe::EExpression> initExpr,
     StageBuilderState& state) {
     // Call the other overload of buildAccumulator().
@@ -1695,28 +1908,24 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
     return exprs;
 }
 
-SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
+SbExpr::Vector buildInitialize(const AccumulationOp& acc,
                                StringDataMap<SbExpr> argExprs,
                                StageBuilderState& state) {
     using BuildInitializeFn =
         std::function<SbExpr::Vector(StringDataMap<SbExpr>, StageBuilderState&)>;
 
     static const StringDataMap<BuildInitializeFn> kAccumulatorBuilders = {
-        {AccumulatorFirstN::kName, &buildInitializeAccumulatorMulti},
-        {AccumulatorLastN::kName, &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kTop, true /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kBottom, true /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kTop, false /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorMaxN::kName, &buildInitializeAccumulatorMulti},
-        {AccumulatorMinN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorFirstN::kName, &buildInitializeAccumN},
+        {AccumulatorLastN::kName, &buildInitializeAccumN},
+        {AccumulatorTop::getName(), &buildInitializeAccumN},
+        {AccumulatorBottom::getName(), &buildInitializeAccumN},
+        {AccumulatorTopN::getName(), &buildInitializeAccumN},
+        {AccumulatorBottomN::getName(), &buildInitializeAccumN},
+        {AccumulatorMaxN::kName, &buildInitializeAccumN},
+        {AccumulatorMinN::kName, &buildInitializeAccumN},
     };
 
-    auto accExprName = acc.expr.name;
+    auto accExprName = acc.getOpName();
     uassert(8070614,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
@@ -1725,7 +1934,7 @@ SbExpr::Vector buildInitialize(const AccumulationStatement& acc,
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationStatement& acc,
+    const AccumulationOp& acc,
     StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
     StageBuilderState& state) {
     // Convert 'argExprs' into a StringDataMap of SbExprs.
