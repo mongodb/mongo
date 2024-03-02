@@ -1225,7 +1225,7 @@ void BulkWriteOp::noteWriteOpResponse(const std::unique_ptr<TargetedWrite>& targ
         // Since the write is either an update or a delete, summing these two values gives us the
         // correct value of 'n'.
         auto n = commandReply.getNMatched() + commandReply.getNDeleted();
-        op.noteWriteWithoutShardKeyWithIdResponse(*targetedWrite, n, 1, replyItem);
+        op.noteWriteWithoutShardKeyWithIdResponse(*targetedWrite, n, replyItem);
         if (op.getWriteState() == WriteOpState_Completed) {
             _shouldStopCurrentRound = true;
         }
@@ -1754,6 +1754,21 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId(TargetedBatchMap& ch
     }
     // See _shouldStopCurrentRound for details.
     _shouldStopCurrentRound = false;
+    auto& opIdx = childBatches.begin()->second->getWrites()[0]->writeOpRef.first;
+    auto& writeOp = _writeOps[opIdx];
+    invariant(writeOp.getWriteType() == WriteType::WithoutShardKeyWithId);
+    if (writeOp.getWriteState() == WriteOpState_Ready) {
+        // The writeOp state "Ready" indicates that the current round of braodcasting the write has
+        // failed and must be retried.
+        auto opType = writeOp.getWriteItem().getOpType();
+        if (opType == BatchedCommandRequest::BatchType_Update) {
+            updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+        } else if (opType == BatchedCommandRequest::BatchType_Delete) {
+            deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
 }
 
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {

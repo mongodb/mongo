@@ -138,13 +138,11 @@ public:
      *
      * Any stale responses noted here will be taken into account on the next refresh.
      *
-     * If stale responses are noted, we must not have noted that we cannot target.
+     * If stale responses are is noted, we must not have noted that we cannot target.
      */
     virtual void noteStaleDbResponse(OperationContext* optCtx,
                                      const ShardEndpoint& endpoint,
                                      const StaleDbRoutingVersion& staleInfo) = 0;
-
-    virtual bool hasStaleShardResponse() = 0;
 
     /**
      * Informs the targeter of CannotImplicitlyCreateCollection responses for this collection from

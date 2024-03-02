@@ -29,7 +29,6 @@
 
 #include "mongo/s/collection_routing_info_targeter.h"
 
-#include "mongo/s/transaction_router.h"
 #include <fmt/format.h>
 #include <memory>
 #include <string>
@@ -642,8 +641,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 *useTwoPhaseWriteProtocol = true;
             } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
                        feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                       opCtx->isRetryableWrite() && !TransactionRouter::get(opCtx)) {
+                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             }
         } else {
@@ -750,8 +748,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         if (isExactId) {
             if (isNonTargetedWriteWithoutShardKeyWithExactId &&
                 feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                opCtx->isRetryableWrite() && !TransactionRouter::get(opCtx)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 *isNonTargetedWriteWithoutShardKeyWithExactId = true;
                 deleteOneWithoutShardKeyWithIdCount.increment(1);
             }
@@ -885,12 +882,6 @@ void CollectionRoutingInfoTargeter::noteStaleDbResponse(OperationContext* opCtx,
     Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.dbName(),
                                                              staleInfo.getVersionWanted());
     _lastError = LastErrorType::kStaleDbVersion;
-}
-
-bool CollectionRoutingInfoTargeter::hasStaleShardResponse() {
-    return _lastError &&
-        (_lastError.value() == LastErrorType::kStaleShardVersion ||
-         _lastError.value() == LastErrorType::kStaleDbVersion);
 }
 
 void CollectionRoutingInfoTargeter::noteCannotImplicitlyCreateCollectionResponse(

@@ -1,6 +1,6 @@
 /**
  * Tests updateOne with id without shard key uses PM-3190 for retryable
- * writes and doesn't for transactions or non-retryable writes.
+ * writes and doesn't for transactions.
  *
  * @tags: [featureFlagUpdateOneWithIdWithoutShardKey, requires_fcv_73]
  */
@@ -71,22 +71,6 @@ updateCmd = {
 
 assert.commandWorked(sessionColl.runCommand("update", updateCmd));
 session.commitTransaction();
-session.endSession();
-
-// Test that non-retryable writes do not use broadcast protocol per PM-3190.
-assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {counter: 1}}));
-
-// Test that non-retryable write sessions do not use broadcast protocol per PM-3190.
-session = st.s.startSession({retryWrites: false});
-
-sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
-updateCmd = {
-    updates: [
-        {q: {_id: 1}, u: {$inc: {counter: 1}}},
-    ]
-};
-
-assert.commandWorked(sessionColl.runCommand("update", updateCmd));
 session.endSession();
 
 // Test that retryable writes use broadcast protocol per PM-3190
