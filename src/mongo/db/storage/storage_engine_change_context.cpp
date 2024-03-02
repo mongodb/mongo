@@ -96,11 +96,11 @@ void StorageEngineChangeOperationContextDoneNotifier::setNotifyWhenDone(ServiceC
     _service = service;
 }
 
-StorageChangeLock::Token StorageEngineChangeContext::killOpsForStorageEngineChange(
-    ServiceContext* service) {
+stdx::unique_lock<ServiceContext::StorageChangeMutexType>
+StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* service) {
     invariant(this == StorageEngineChangeContext::get(service));
     // Prevent new operations from being created.
-    auto storageChangeLk = service->getStorageChangeLock().acquireExclusiveStorageChangeToken();
+    stdx::unique_lock storageChangeLk(service->getStorageChangeMutex());
     stdx::unique_lock lk(_mutex);
     {
         ServiceContext::LockedClientsCursor clientCursor(service);
@@ -137,13 +137,13 @@ StorageChangeLock::Token StorageEngineChangeContext::killOpsForStorageEngineChan
     return storageChangeLk;
 }
 
-void StorageEngineChangeContext::changeStorageEngine(ServiceContext* service,
-                                                     StorageChangeLock::Token token,
-                                                     std::unique_ptr<StorageEngine> engine) {
+void StorageEngineChangeContext::changeStorageEngine(
+    ServiceContext* service,
+    stdx::unique_lock<ServiceContext::StorageChangeMutexType> lk,
+    std::unique_ptr<StorageEngine> engine) {
     invariant(this == StorageEngineChangeContext::get(service));
     service->setStorageEngine(std::move(engine));
-    // Token -- which is a lock -- is released at end of scope, allowing OperationContexts to be
-    // created again.
+    // The lock is released at end of scope, allowing OperationContexts to be created again.
 }
 
 void StorageEngineChangeContext::notifyOpCtxDestroyed() noexcept {

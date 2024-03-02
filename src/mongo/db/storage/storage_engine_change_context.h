@@ -36,8 +36,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -50,16 +50,17 @@ public:
      * Start to change the storage engine for the associated ServiceContext.  This will kill all
      * OperationContexts that have a non-noop Recovery Unit with an InterruptedDueToStorageChange
      * code, free the existing storage engine, and block any new operation contexts from being
-     * created while the returned StorageChangeToken is in scope.
+     * created while the returned lock is in scope.
      */
-    StorageChangeLock::Token killOpsForStorageEngineChange(ServiceContext* service);
+    stdx::unique_lock<ServiceContext::StorageChangeMutexType> killOpsForStorageEngineChange(
+        ServiceContext* service);
 
     /**
      * Finish changing the storage engine for the associated ServiceContext.  This will change the
      * storage engine and allow operation contexts to again be created.
      */
     void changeStorageEngine(ServiceContext* service,
-                             StorageChangeLock::Token token,
+                             stdx::unique_lock<ServiceContext::StorageChangeMutexType>,
                              std::unique_ptr<StorageEngine> engine);
 
     /**

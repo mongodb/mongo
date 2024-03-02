@@ -36,6 +36,7 @@
 #include <exception>
 #include <list>
 #include <memory>
+#include <shared_mutex>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -291,7 +292,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         client, OperationIdManager::get(this).issueForClient(client));
 
     // We must prevent changing the storage engine while setting a new opCtx on the client.
-    auto sharedStorageChangeToken = _storageChangeLk.acquireSharedStorageChangeToken();
+    std::shared_lock lk(_storageChangeMutex);  // NOLINT
 
     onCreate(opCtx.get(), _clientObservers);
     ScopeGuard onCreateGuard([&] { onDestroy(opCtx.get(), _clientObservers); });

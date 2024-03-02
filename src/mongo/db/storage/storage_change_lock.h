@@ -30,37 +30,11 @@
 #pragma once
 
 #include <cstdint>
-#include <mutex>
-#include <shared_mutex>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 class StorageChangeLock {
-    /**
-     * Token to be held by caller while changing the storage engine on the context.
-     */
-private:
-    class SharedSpinLock;
-
-public:
-    using Token = stdx::unique_lock<SharedSpinLock>;
-
-    /**
-     * Acquires the storage change lock in shared mode and returns an RAII lock object to it.
-     */
-    auto acquireSharedStorageChangeToken() {
-        // TODO(SERVER-59157): Replace use of std::shared_lock with stdx::shared_lock or remove
-        // NOLINT according to resolution of this ticket.
-        return std::shared_lock(_storageChangeSpinlock);  // NOLINT
-    }
-
-    Token acquireExclusiveStorageChangeToken() {
-        return stdx::unique_lock(_storageChangeSpinlock);  // NOLINT
-    }
-
-private:
     // Spin lock for storage change.  Needs to be fast for lock_shared and unlock_shared,
     // not for the exclusive lock.  This lock has no fairness guarantees and is not re-entrant
     // from shared -> exclusive (i.e. it cannot be upgraded), exclusive -> shared,
@@ -74,10 +48,28 @@ private:
 
     private:
         AtomicWord<uint32_t> _lockWord;
-        static const uint32_t kExclusiveLock = 1 << 31;
-        static const int kLockPollIntervalMillis = 100;
+        static constexpr uint32_t kExclusiveLock = 1 << 31;
+        static constexpr int kLockPollIntervalMillis = 100;
     };
 
+public:
+    void lock() {
+        _storageChangeSpinlock.lock();
+    }
+
+    void unlock() {
+        _storageChangeSpinlock.unlock();
+    }
+
+    void lock_shared() {
+        _storageChangeSpinlock.lock_shared();
+    }
+
+    void unlock_shared() {
+        _storageChangeSpinlock.unlock_shared();
+    }
+
+private:
     SharedSpinLock _storageChangeSpinlock;
 };
 }  // namespace mongo

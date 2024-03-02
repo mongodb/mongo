@@ -501,11 +501,12 @@ public:
         _storageEngine = nullptr;
     }
 
-    /**
-     * Return the storage change lock.
-     */
-    StorageChangeLock& getStorageChangeLock() {
-        return _storageChangeLk;
+    // TODO SERVER-86656: replace this with the reader-optimized `rwmutex`. Also, remove source
+    // files and the build target for `StorageChangeLock`.
+    using StorageChangeMutexType = StorageChangeLock;
+
+    StorageChangeMutexType& getStorageChangeMutex() {
+        return _storageChangeMutex;
     }
 
     //
@@ -775,9 +776,9 @@ private:
     SyncUnique<StorageEngine> _storageEngine;
 
     /**
-     * The lock that protects changing out the storage engine.
+     * The mutex that protects changing out the storage engine.
      */
-    StorageChangeLock _storageChangeLk;
+    StorageChangeMutexType _storageChangeMutex;
 
     /**
      * Vector of registered observers.

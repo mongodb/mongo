@@ -271,11 +271,11 @@ StorageEngine::LastShutdownState initializeStorageEngine(
             service->setStorageEngine(std::move(storageEngine));
         } else {
             auto storageEngineChangeContext = StorageEngineChangeContext::get(service);
-            auto token = storageEngineChangeContext->killOpsForStorageEngineChange(service);
+            auto lk = storageEngineChangeContext->killOpsForStorageEngineChange(service);
             auto storageEngine = std::unique_ptr<StorageEngine>(
                 factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
             storageEngineChangeContext->changeStorageEngine(
-                service, std::move(token), std::move(storageEngine));
+                service, std::move(lk), std::move(storageEngine));
         }
     }
 

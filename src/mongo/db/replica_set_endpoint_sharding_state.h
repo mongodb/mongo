@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <shared_mutex>
+
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
