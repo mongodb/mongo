@@ -330,7 +330,7 @@ tasks:
   - func: "scons compile"
     vars:
       targets: >-
-        +visibility_test1
+        +visibility_test1 +visibility_test2
       separate_debug: on
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
@@ -353,7 +353,7 @@ tasks:
   - func: "scons compile"
     vars:
       targets: >-
-        +visibility_test1
+        +visibility_test1 +visibility_test2
       separate_debug: on
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1

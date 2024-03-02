@@ -92,7 +92,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
                     feature_configuration = feature_configuration,
                     cc_toolchain = cc_toolchain,
                     dynamic_library = shared_lib,
-                    static_library = static_lib,
+                    static_library = static_lib if cc_shared_library == None else None,
                 ),
             ]),
             user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags,
@@ -133,7 +133,7 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
     for dep in ctx.attr.deps:
         for input in dep[CcInfo].linking_context.linker_inputs.to_list():
             for library in input.libraries:
-                dep_libraries.append(library.dynamic_library)
+                dep_libraries.append(library)
 
     linker_input = cc_common.create_linker_input(
         owner = ctx.label,
@@ -146,9 +146,9 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
                 dynamic_library = output_shared_lib,
                 # Omit reference to static library
             ),
-        ]),
+        ], transitive = [depset(dep_libraries)]),
         user_link_flags = original_info.linker_input.user_link_flags,
-        additional_inputs = depset(original_info.linker_input.additional_inputs + dep_libraries),
+        additional_inputs = depset(original_info.linker_input.additional_inputs),
     )
 
     return CcSharedLibraryInfo(
