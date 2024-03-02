@@ -33,6 +33,7 @@ build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
+common --remote_upload_local_results=False
 
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.

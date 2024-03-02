@@ -18,5 +18,6 @@ if bazel_rbe_supported; then
   echo "build --bes_keywords=engflow:CiCdJobName=${task_name:?}" >> .bazelrc.evergreen_engflow_creds
   echo "build --bes_keywords=engflow:CiCdUri=${uri:?}" >> .bazelrc.evergreen_engflow_creds
   echo "build --bes_keywords=evg:project=${project:?}" >> .bazelrc.evergreen_engflow_creds
+  echo "build --remote_upload_local_results=True" >> .bazelrc.evergreen_engflow_creds
   echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
 fi
