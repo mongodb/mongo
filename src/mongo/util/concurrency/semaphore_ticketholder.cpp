@@ -53,7 +53,11 @@ int64_t SemaphoreTicketHolder::numFinishedProcessing() const {
 }
 
 void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
-    _appendCommonQueueImplStats(b, _semaphoreStats);
+    {
+        BSONObjBuilder bb(b.subobjStart("normalPriority"));
+        _appendCommonQueueImplStats(bb, _semaphoreStats);
+        bb.done();
+    }
 }
 #if defined(__linux__)
 namespace {

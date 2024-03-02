@@ -37,7 +37,7 @@ namespace mongo {
 namespace {
 static constexpr StringData kLowString = "low"_sd;
 static constexpr StringData kNormalString = "normal"_sd;
-static constexpr StringData kImmediateString = "immediate"_sd;
+static constexpr StringData kExemptString = "exempt"_sd;
 
 const auto admissionContextDecoration = OperationContext::declareDecoration<AdmissionContext>();
 }  // namespace
@@ -48,9 +48,10 @@ AdmissionContext& AdmissionContext::get(OperationContext* opCtx) {
 
 void AdmissionContext::copyTo(OperationContext* opCtx,
                               boost::optional<AdmissionContext::Priority> newPriority) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     if (newPriority) {
         AdmissionContext newContext(*this);
-        newContext._priority.swap(*newPriority);
+        newContext._priority = *newPriority;
         admissionContextDecoration(opCtx) = newContext;
         return;
     }
@@ -64,13 +65,16 @@ ScopedAdmissionPriority::ScopedAdmissionPriority(OperationContext* opCtx,
     uassert(ErrorCodes::IllegalOperation,
             "It is illegal for an operation to demote a high priority to a lower priority "
             "operation",
-            _originalPriority != AdmissionContext::Priority::kImmediate ||
-                priority == AdmissionContext::Priority::kImmediate);
-    admissionContextDecoration(opCtx)._priority.swap(priority);
+            _originalPriority != AdmissionContext::Priority::kExempt ||
+                priority == AdmissionContext::Priority::kExempt);
+
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    admissionContextDecoration(opCtx)._priority = priority;
 }
 
 ScopedAdmissionPriority::~ScopedAdmissionPriority() {
-    admissionContextDecoration(_opCtx)._priority.swap(_originalPriority);
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    admissionContextDecoration(_opCtx)._priority = _originalPriority;
 }
 
 StringData toString(AdmissionContext::Priority priority) {
@@ -79,8 +83,8 @@ StringData toString(AdmissionContext::Priority priority) {
             return kLowString;
         case AdmissionContext::Priority::kNormal:
             return kNormalString;
-        case AdmissionContext::Priority::kImmediate:
-            return kImmediateString;
+        case AdmissionContext::Priority::kExempt:
+            return kExemptString;
     }
     MONGO_UNREACHABLE;
 }

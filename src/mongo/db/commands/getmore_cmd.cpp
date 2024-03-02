@@ -836,7 +836,7 @@ public:
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
-                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kImmediate);
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 
             // Perform validation checks which don't cause the cursor to be deleted on failure.

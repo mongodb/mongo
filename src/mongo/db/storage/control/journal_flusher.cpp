@@ -112,7 +112,7 @@ void JournalFlusher::run() {
         // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
         // As this operation is critical for data durability we mark it as having Immediate priority
         // to skip ticket and flow control.
-        admissionPriority.emplace(_uniqueCtx->get(), AdmissionContext::Priority::kImmediate);
+        admissionPriority.emplace(_uniqueCtx->get(), AdmissionContext::Priority::kExempt);
     };
 
     auto tearDownOpCtx = [&](WithLock lk) {

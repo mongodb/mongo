@@ -601,8 +601,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                 // acquisition. Slow queries can happen for various reasons; however, if queries
                 // are slower due to ticket exhaustion, queueing in order to log can compound
                 // the issue.
-                ScopedAdmissionPriority skipAdmissionControl(
-                    opCtx, AdmissionContext::Priority::kImmediate);
+                ScopedAdmissionPriority skipAdmissionControl(opCtx,
+                                                             AdmissionContext::Priority::kExempt);
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),

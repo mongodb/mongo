@@ -300,7 +300,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
             // acquisition in order to prevent possible deadlock when participants are in the
             // prepared state. See SERVER-82883 and SERVER-60682.
             ScopedAdmissionPriority skipTicketAcquisition(opCtx,
-                                                          AdmissionContext::Priority::kImmediate);
+                                                          AdmissionContext::Priority::kExempt);
 
             if (mustRecoverDurableTime) {
                 return recoverDirect(opCtx);

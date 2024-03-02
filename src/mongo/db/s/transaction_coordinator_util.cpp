@@ -248,7 +248,7 @@ Future<repl::OpTime> persistParticipantsList(
                     // Skip ticket acquisition in order to prevent possible deadlock when
                     // participants are in the prepared state. See SERVER-82883 and SERVER-60682.
                     ScopedAdmissionPriority skipTicketAcquisition(
-                        opCtx, AdmissionContext::Priority::kImmediate);
+                        opCtx, AdmissionContext::Priority::kExempt);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
                         lsid,
@@ -493,7 +493,7 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.
                     ScopedAdmissionPriority setTicketAquisition(
-                        opCtx, AdmissionContext::Priority::kImmediate);
+                        opCtx, AdmissionContext::Priority::kExempt);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);
                     return persistDecisionBlocking(opCtx,

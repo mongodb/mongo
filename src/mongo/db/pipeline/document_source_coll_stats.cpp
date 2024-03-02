@@ -101,7 +101,7 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     // The $collStats stage is critical to observability and diagnosability, categorize as immediate
     // priority.
     ScopedAdmissionPriority skipAdmissionControl(expCtx->opCtx,
-                                                 AdmissionContext::Priority::kImmediate);
+                                                 AdmissionContext::Priority::kExempt);
 
     BSONObjBuilder builder;
 

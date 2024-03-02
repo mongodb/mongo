@@ -134,7 +134,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     }
 
     const auto rangeDeleterPriority = rangeDeleterHighPriority.load()
-        ? AdmissionContext::Priority::kImmediate
+        ? AdmissionContext::Priority::kExempt
         : AdmissionContext::Priority::kLow;
 
     ScopedAdmissionPriority priority{opCtx, rangeDeleterPriority};

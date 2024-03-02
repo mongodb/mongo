@@ -89,7 +89,7 @@ public:
              const mongo::BSONObj& cmdObj,
              mongo::BSONObjBuilder& result) override {
         // Critical to observability and diagnosability, categorize as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
 
         executor::ConnectionPoolStats stats{};
 

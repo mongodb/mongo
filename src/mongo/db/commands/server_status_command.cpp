@@ -126,7 +126,7 @@ public:
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
 
-        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kExempt);
 
         // --- basic fields that are global
 

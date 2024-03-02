@@ -360,7 +360,7 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
         try {
             auto opCtx = cc().makeOperationContext();
             ScopedAdmissionPriority admissionPriority(opCtx.get(),
-                                                      AdmissionContext::Priority::kImmediate);
+                                                      AdmissionContext::Priority::kExempt);
 
             // During storage change operations, we may shut down storage under a global lock
             // and wait for any storage-using opCtxs to exit.  This results in a deadlock with

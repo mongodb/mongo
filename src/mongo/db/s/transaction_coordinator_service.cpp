@@ -241,7 +241,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     // Skip ticket acquisition in order to prevent possible deadlock when
                     // participants are in the prepared state. See SERVER-82883 and SERVER-60682.
                     ScopedAdmissionPriority skipTicketAcquisition(
-                        opCtx, AdmissionContext::Priority::kImmediate);
+                        opCtx, AdmissionContext::Priority::kExempt);
 
                     auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
                     replClientInfo.setLastOpToSystemLastOpTime(opCtx);

@@ -179,7 +179,7 @@ private:
 
     Mutex _resizeMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
-    AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount{0};
+    QueueStats _exemptQueueStats;
 
 protected:
     /**

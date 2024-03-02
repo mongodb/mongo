@@ -199,7 +199,7 @@ Locker::ClientState Locker::getClientState() const {
 void Locker::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
     auto ticketholder = FlowControlTicketholder::get(opCtx);
     if (ticketholder && lockMode == LockMode::MODE_IX && _clientState.load() == kInactive &&
-        AdmissionContext::get(opCtx).getPriority() != AdmissionContext::Priority::kImmediate &&
+        AdmissionContext::get(opCtx).getPriority() != AdmissionContext::Priority::kExempt &&
         !_uninterruptibleLocksRequested) {
         // FlowControl only acts when a MODE_IX global lock is being taken. The clientState is only
         // being modified here to change serverStatus' `globalLock.currentQueue` metrics. This

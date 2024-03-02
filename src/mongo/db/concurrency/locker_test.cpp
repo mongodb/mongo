@@ -1245,18 +1245,18 @@ TEST_F(LockerTest, SetTicketAcquisitionForLockRAIIType) {
 
     {
         ScopedAdmissionPriority setTicketAquisition(opCtx.get(),
-                                                    AdmissionContext::Priority::kImmediate);
+                                                    AdmissionContext::Priority::kExempt);
         ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
     }
 
     ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
-    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kExempt);
     ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
     {
         ScopedAdmissionPriority setTicketAquisition(opCtx.get(),
-                                                    AdmissionContext::Priority::kImmediate);
+                                                    AdmissionContext::Priority::kExempt);
         ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
     }
 

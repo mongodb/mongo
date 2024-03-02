@@ -111,7 +111,7 @@ public:
     ClientState getClientState() const;
 
     bool shouldWaitForTicket(OperationContext* opCtx) const {
-        return AdmissionContext::get(opCtx).getPriority() != AdmissionContext::Priority::kImmediate;
+        return AdmissionContext::get(opCtx).getPriority() != AdmissionContext::Priority::kExempt;
     }
 
     /**

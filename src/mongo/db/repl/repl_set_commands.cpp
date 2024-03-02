@@ -169,7 +169,7 @@ public:
         } else if (cmdObj.hasElement("getLastStableRecoveryTimestamp")) {
             try {
                 ScopedAdmissionPriority admissionPriority(opCtx,
-                                                          AdmissionContext::Priority::kImmediate);
+                                                          AdmissionContext::Priority::kExempt);
                 // We need to hold the lock so that we don't run when storage is being shutdown.
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,

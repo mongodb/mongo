@@ -79,7 +79,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     auto opCtx = client->makeOperationContext();
     opCtx->setEnforceConstraints(false);
 
-    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kExempt);
 
     for (auto r : roles) {
         for (auto& collector : _collectors[r]) {

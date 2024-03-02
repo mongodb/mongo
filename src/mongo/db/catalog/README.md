@@ -1704,8 +1704,8 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 
 **AdmissionContext::Priority**
 
--   `kImmediate` - Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
--   `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
+-   `kExempt` - Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
+-   `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kExempt' priority.
 -   `kLow` - Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Control.
 
 [See AdmissionContext::Priority for more details](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/util/concurrency/admission_context.h#L45-L67).

@@ -119,7 +119,7 @@ void removeExpiredDocuments(Client* client) {
             // on each node. It is imperative that removal is prioritized so it can keep up with
             // inserts and prevent users from running out of disk space.
             ScopedAdmissionPriority skipAdmissionControl(opCtx.get(),
-                                                         AdmissionContext::Priority::kImmediate);
+                                                         AdmissionContext::Priority::kExempt);
 
             auto expiredAfterSeconds =
                 change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);

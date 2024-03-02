@@ -554,7 +554,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         // The oplog applier is crucial for stability of the replica set. As a result we mark it as
         // having Immediate priority. This makes the operation skip waiting for ticket acquisition
         // and flow control.
-        ScopedAdmissionPriority priority(&opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority priority(&opCtx, AdmissionContext::Priority::kExempt);
 
         // For pausing replication in tests.
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
@@ -669,7 +669,7 @@ void OplogApplierImpl::scheduleWritesToOplogAndChangeCollection(OperationContext
             // Oplog writes are crucial to the stability of the replica set. We mark the operations
             // as having Immediate priority so that it skips waiting for ticket acquisition and flow
             // control.
-            ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
 
             UnreplicatedWritesBlock uwb(opCtx.get());
 
@@ -1097,7 +1097,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
     // Applying an Oplog batch is crucial to the stability of the Replica Set. We
     // mark it as having Immediate priority so that it skips waiting for ticket
     // acquisition and flow control.
-    ScopedAdmissionPriority skipTicketAcquisition(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority skipTicketAcquisition(opCtx, AdmissionContext::Priority::kExempt);
 
     // Certain operations like prepareTransaction might reset the recovery unit or lock state
     // due to doing things like stashTransactionResources. So we restore the necessary states
@@ -1155,7 +1155,7 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
     // Applying an Oplog batch is crucial to the stability of the Replica Set. We
     // mark it as having Immediate priority so that it skips waiting for ticket
     // acquisition and flow control.
-    ScopedAdmissionPriority skipTicketAcquisition(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority skipTicketAcquisition(opCtx, AdmissionContext::Priority::kExempt);
 
     UnreplicatedWritesBlock uwb(opCtx);
     _setOplogApplicationWorkerOpCtxStates(opCtx);

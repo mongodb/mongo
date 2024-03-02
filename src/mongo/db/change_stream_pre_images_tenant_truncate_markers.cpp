@@ -493,7 +493,7 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     // Truncates are untimestamped. Allow multiple truncates to occur.
     shard_role_details::getRecoveryUnit(opCtx)->allowAllUntimestampedWrites();
 
-    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kImmediate,
+    invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kExempt,
               "Pre-image truncation is critical to cluster health and should not be throttled");
 
     // Acquire locks before iterating the truncate markers to prevent repeated locking and

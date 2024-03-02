@@ -492,7 +492,7 @@ public:
             // Critical to monitoring and observability, categorize the command as immediate
             // priority.
             ScopedAdmissionPriority skipAdmissionControl(opCtx,
-                                                         AdmissionContext::Priority::kImmediate);
+                                                         AdmissionContext::Priority::kExempt);
 
             if (_collStatsSampler.tick())
                 LOGV2_WARNING(7024600,
@@ -674,7 +674,7 @@ public:
             // Critical to monitoring and observability, categorize the command as immediate
             // priority.
             ScopedAdmissionPriority skipAdmissionControl(opCtx,
-                                                         AdmissionContext::Priority::kImmediate);
+                                                         AdmissionContext::Priority::kExempt);
 
             const auto& cmd = request();
             const auto& dbname = cmd.getDbName();
@@ -762,7 +762,7 @@ public:
     Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) {
         // Critical to observability and diagnosability, categorize as immediate priority.
         ScopedAdmissionPriority skipAdmissionControl(rec->getOpCtx(),
-                                                     AdmissionContext::Priority::kImmediate);
+                                                     AdmissionContext::Priority::kExempt);
 
         auto result = rec->getReplyBuilder()->getBodyBuilder();
         VersionInfoInterface::instance().appendBuildInfo(&result);
@@ -826,7 +826,7 @@ public:
              BSONObjBuilder& result) final {
         // Critical to monitoring and observability, categorize the command as immediate
         // priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;

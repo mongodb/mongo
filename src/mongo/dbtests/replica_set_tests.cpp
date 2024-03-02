@@ -108,7 +108,7 @@ private:
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -131,7 +131,7 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})
@@ -154,7 +154,7 @@ TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithOldTerm) {
 TEST_F(ReplicaSetTest, ReplCoordExternalStateDoesNotStoreLastVoteWithEqualTerm) {
     auto opCtx = makeOpCtx();
     // Methods that do writes as part of elections expect the admission priority to be Immediate.
-    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kExempt);
     auto replCoordExternalState = getReplCoordExternalState();
 
     replCoordExternalState->storeLocalLastVoteDocument(opCtx.get(), repl::LastVote{2, 1})

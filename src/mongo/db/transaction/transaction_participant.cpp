@@ -1608,8 +1608,7 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     }
 
     if (acquireTicket == AcquireTicket::kSkip) {
-        tempTxnResourceStash->admissionContext().copyTo(opCtx,
-                                                        AdmissionContext::Priority::kImmediate);
+        tempTxnResourceStash->admissionContext().copyTo(opCtx, AdmissionContext::Priority::kExempt);
     } else {
         tempTxnResourceStash->admissionContext().copyTo(opCtx);
     }

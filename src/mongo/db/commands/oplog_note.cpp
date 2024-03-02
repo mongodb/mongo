@@ -77,7 +77,7 @@ MONGO_FAIL_POINT_DEFINE(hangInAppendOplogNote);
 
 namespace {
 Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData note) {
-    ScopedAdmissionPriority priority{opCtx, AdmissionContext::Priority::kImmediate};
+    ScopedAdmissionPriority priority{opCtx, AdmissionContext::Priority::kExempt};
 
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Use GlobalLock instead of DBLock to allow return when the lock is not available. It may

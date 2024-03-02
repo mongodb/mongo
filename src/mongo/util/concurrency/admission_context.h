@@ -48,19 +48,6 @@ class AdmissionContext {
 public:
     AdmissionContext() {}
 
-    // TODO(SERVER-87157): Remove copy ctor/assignment operator when refactoring metrics to remove
-    // atomics.
-    AdmissionContext(const AdmissionContext& other)
-        : _startProcessingTime(other._startProcessingTime.loadRelaxed()),
-          _admissions(other._admissions.loadRelaxed()),
-          _priority(other._priority.loadRelaxed()) {}
-    AdmissionContext& operator=(const AdmissionContext& other) {
-        _startProcessingTime.swap(other._startProcessingTime.loadRelaxed());
-        _admissions.swap(other._admissions.loadRelaxed());
-        _priority.swap(other._priority.loadRelaxed());
-        return *this;
-    }
-
     /**
      * Classifies the priority that an operation acquires a ticket when the system is under high
      * load (operations are throttled waiting for a ticket). Only applicable when there are no
@@ -73,17 +60,17 @@ public:
      *
      * 'kNormal': It's important that the operation be throttled under load. If this operation is
      * throttled, it will not affect system availability or observability. Most operations, both
-     * user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate'
+     * user and internal, should use this priority unless they qualify as 'kLow' or 'kExempt'
      * priority.
      *
-     * 'kImmediate': It's crucial that the operation makes forward progress - bypasses the ticketing
+     * 'kExempt': It's crucial that the operation makes forward progress - bypasses the ticketing
      * mechanism.
      *
      * Reserved for operations critical to availability (e.g. replication workers) or observability
      * (e.g. FTDC), and any operation that is releasing resources (e.g. committing or aborting
      * prepared transactions). Should be used sparingly.
      */
-    enum class Priority { kLow = 0, kNormal, kImmediate };
+    enum class Priority { kExempt = 0, kLow, kNormal };
 
     /**
      * Retrieve the AdmissionContext decoration the provided OperationContext
@@ -98,38 +85,33 @@ public:
                 boost::optional<AdmissionContext::Priority> newPriority = boost::none);
 
     void start(TickSource* tickSource) {
-        _admissions.fetchAndAdd(1);
+        _admissions += 1;
         if (tickSource) {
-            _startProcessingTime.store(tickSource->getTicks());
+            _startProcessingTime = tickSource->getTicks();
         }
     }
 
     TickSource::Tick getStartProcessingTime() const {
-        return _startProcessingTime.loadRelaxed();
+        return _startProcessingTime;
     }
 
     /**
      * Returns the number of times this context has taken a ticket.
      */
     int getAdmissions() const {
-        return _admissions.loadRelaxed();
+        return _admissions;
     }
 
     Priority getPriority() const {
-        return _priority.loadRelaxed();
+        return _priority;
     }
 
 private:
     friend class ScopedAdmissionPriority;
 
-    // We wrap these types in AtomicWord to avoid race conditions between reporting metrics and
-    // setting the values.
-    //
-    // Only a single writer thread will modify these variables and the readers allow relaxed memory
-    // semantics.
-    AtomicWord<TickSource::Tick> _startProcessingTime{0};
-    AtomicWord<int32_t> _admissions{0};
-    AtomicWord<Priority> _priority{Priority::kNormal};
+    TickSource::Tick _startProcessingTime{0};
+    int32_t _admissions{0};
+    Priority _priority{Priority::kNormal};
 };
 
 /**

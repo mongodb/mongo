@@ -592,7 +592,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
 
             // Avoid ticket acquisition during step up.
             ScopedAdmissionPriority admissionPriority(newOpCtx.get(),
-                                                      AdmissionContext::Priority::kImmediate);
+                                                      AdmissionContext::Priority::kExempt);
 
             // Synchronize with killOps to make this unkillable.
             {

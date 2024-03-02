@@ -3421,7 +3421,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     boost::optional<Timestamp> lastStableRecoveryTimestamp = boost::none;
     try {
-        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kExempt);
         // We need to hold the lock so that we don't run when storage is being shutdown.
         Lock::GlobalLock lk(opCtx,
                             MODE_IS,

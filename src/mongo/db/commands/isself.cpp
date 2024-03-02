@@ -83,7 +83,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         // Critical to observability and diagnosability, annotate as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
         result.append("id", repl::instanceId);
         return true;
     }

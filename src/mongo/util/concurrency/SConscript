@@ -49,6 +49,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'spin_lock',
     ],
 )
 

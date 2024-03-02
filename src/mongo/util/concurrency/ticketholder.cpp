@@ -106,12 +106,18 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
     b.append("out", used());
     b.append("available", available());
     b.append("totalTickets", outof());
-    b.append("immediatePriorityAdmissionsCount", _immediatePriorityAdmissionsCount.loadRelaxed());
+    {
+        BSONObjBuilder bb(b.subobjStart("exempt"));
+        _appendCommonQueueImplStats(bb, _exemptQueueStats);
+        bb.done();
+    }
+
     _appendImplStats(b);
 }
 
 void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
-    if (admCtx->getPriority() == AdmissionContext::Priority::kImmediate) {
+    if (admCtx->getPriority() == AdmissionContext::Priority::kExempt) {
+        updateQueueStatsOnRelease(_serviceContext, _exemptQueueStats, admCtx);
         return;
     }
 
@@ -136,8 +142,8 @@ Ticket TicketHolder::waitForTicket(Interruptible& interruptible,
 }
 
 boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
-    if (admCtx->getPriority() == AdmissionContext::Priority::kImmediate) {
-        _immediatePriorityAdmissionsCount.fetchAndAdd(1);
+    if (admCtx->getPriority() == AdmissionContext::Priority::kExempt) {
+        updateQueueStatsOnTicketAcquisition(_serviceContext, _exemptQueueStats, admCtx);
         return Ticket{this, admCtx};
     }
 

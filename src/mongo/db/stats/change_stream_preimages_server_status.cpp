@@ -78,7 +78,7 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
     //
     // Fields are omitted if it cannot be immediately acquired to prevent stalling 'serverStatus'
     // observability.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
     Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
         Lock::GlobalLockSkipOptions options;
         options.skipRSTLLock = true;
