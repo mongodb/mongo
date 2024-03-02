@@ -103,44 +103,32 @@ void Reporter::shutdown() {
 
     _status = Status(ErrorCodes::CallbackCanceled, "Reporter no longer valid");
 
-    _requestWaitingStatus = RequestWaitingStatus::kNoWaiting;
-
-    if (_isActive_inlock()) {
-        executor::TaskExecutor::CallbackHandle handle;
-        if (_remoteCommandCallbackHandle.isValid()) {
-            invariant(!_prepareAndSendCommandCallbackHandle.isValid());
-            handle = _remoteCommandCallbackHandle;
-        } else {
-            invariant(!_remoteCommandCallbackHandle.isValid());
-            invariant(_prepareAndSendCommandCallbackHandle.isValid());
-            handle = _prepareAndSendCommandCallbackHandle;
-        }
-
-        _executor->cancel(handle);
+    if (!_isActive_inlock()) {
+        return;
     }
 
-    if (_isBackupActive_inlock()) {
-        executor::TaskExecutor::CallbackHandle handle;
-        if (_backupRemoteCommandCallbackHandle.isValid()) {
-            invariant(!_backupPrepareAndSendCommandCallbackHandle.isValid());
-            handle = _backupRemoteCommandCallbackHandle;
-        } else {
-            invariant(!_backupRemoteCommandCallbackHandle.isValid());
-            invariant(_backupPrepareAndSendCommandCallbackHandle.isValid());
-            handle = _backupPrepareAndSendCommandCallbackHandle;
-        }
+    _isWaitingToSendReporter = false;
 
-        _executor->cancel(handle);
+    executor::TaskExecutor::CallbackHandle handle;
+    if (_remoteCommandCallbackHandle.isValid()) {
+        invariant(!_prepareAndSendCommandCallbackHandle.isValid());
+        handle = _remoteCommandCallbackHandle;
+    } else {
+        invariant(!_remoteCommandCallbackHandle.isValid());
+        invariant(_prepareAndSendCommandCallbackHandle.isValid());
+        handle = _prepareAndSendCommandCallbackHandle;
     }
+
+    _executor->cancel(handle);
 }
 
 Status Reporter::join() {
     stdx::unique_lock<Latch> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_isActive_inlock() && !_isBackupActive_inlock(); });
+    _condition.wait(lk, [this]() { return !_isActive_inlock(); });
     return _status;
 }
 
-Status Reporter::trigger(bool allowOneMore) {
+Status Reporter::trigger() {
     stdx::lock_guard<Latch> lk(_mutex);
 
     // If these was a previous error then the reporter is dead and return that error.
@@ -148,7 +136,6 @@ Status Reporter::trigger(bool allowOneMore) {
         return _status;
     }
 
-    bool useBackupChannel = false;
     if (_keepAliveTimeoutWhen != Date_t()) {
         // Reset keep alive expiration to signal handler that it was canceled internally.
         invariant(_prepareAndSendCommandCallbackHandle.isValid());
@@ -156,23 +143,13 @@ Status Reporter::trigger(bool allowOneMore) {
         _executor->cancel(_prepareAndSendCommandCallbackHandle);
         return Status::OK();
     } else if (_isActive_inlock()) {
-        if (!allowOneMore) {
-            // If it is already scheduled to be prioritized request, keep it as it is.
-            if (_requestWaitingStatus == RequestWaitingStatus::kNoWaiting) {
-                _requestWaitingStatus = RequestWaitingStatus::kNormalWaiting;
-            }
-            return Status::OK();
-        } else if (_isBackupActive_inlock()) {
-            _requestWaitingStatus = RequestWaitingStatus::kPrioritizedWaiting;
-            return Status::OK();
-        } else {
-            useBackupChannel = true;
-        }
+        _isWaitingToSendReporter = true;
+        return Status::OK();
     }
 
     auto scheduleResult =
         _executor->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& args) {
-            _prepareAndSendCommandCallback(args, true, useBackupChannel);
+            _prepareAndSendCommandCallback(args, true);
         });
 
     _status = scheduleResult.getStatus();
@@ -184,11 +161,7 @@ Status Reporter::trigger(bool allowOneMore) {
         return _status;
     }
 
-    if (!useBackupChannel) {
-        _prepareAndSendCommandCallbackHandle = scheduleResult.getValue();
-    } else {
-        _backupPrepareAndSendCommandCallbackHandle = scheduleResult.getValue();
-    }
+    _prepareAndSendCommandCallbackHandle = scheduleResult.getValue();
 
     return _status;
 }
@@ -216,9 +189,7 @@ StatusWith<BSONObj> Reporter::_prepareCommand() {
     return prepareResult.getValue();
 }
 
-void Reporter::_sendCommand_inlock(BSONObj commandRequest,
-                                   Milliseconds netTimeout,
-                                   bool useBackupChannel) {
+void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeout) {
     LOGV2_DEBUG(21587,
                 2,
                 "Reporter sending oplog progress to upstream updater",
@@ -228,8 +199,8 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest,
     auto scheduleResult = _executor->scheduleRemoteCommand(
         executor::RemoteCommandRequest(
             _target, DatabaseName::kAdmin, commandRequest, nullptr, netTimeout),
-        [this, useBackupChannel](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
-            _processResponseCallback(rcbd, useBackupChannel);
+        [this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
+            _processResponseCallback(rcbd);
         });
 
     _status = scheduleResult.getStatus();
@@ -243,28 +214,25 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest,
 
     numUpdatePosition.increment(1);
 
-    if (useBackupChannel) {
-        _backupRemoteCommandCallbackHandle = scheduleResult.getValue();
-    } else {
-        _remoteCommandCallbackHandle = scheduleResult.getValue();
-    }
+    _remoteCommandCallbackHandle = scheduleResult.getValue();
 }
 
 void Reporter::_processResponseCallback(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd, bool useBackupChannel) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
 
         // If the reporter was shut down before this callback is invoked,
         // return the canceled "_status".
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            invariant(_status == ErrorCodes::CallbackCanceled);
+            _onShutdown_inlock();
             return;
         }
 
         _status = rcbd.response.status;
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown_inlock();
             return;
         }
 
@@ -273,30 +241,22 @@ void Reporter::_processResponseCallback(
         _status = getStatusFromCommandResult(commandResult);
 
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown_inlock();
             return;
         }
 
-        if (useBackupChannel &&
-            _requestWaitingStatus != RequestWaitingStatus::kPrioritizedWaiting) {
-            _backupRemoteCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
-            return;
-        }
-
-
-        if (_requestWaitingStatus == RequestWaitingStatus::kNoWaiting) {
+        if (!_isWaitingToSendReporter) {
             // Since we are also on a timer, schedule a report for that interval, or until
             // triggered.
             auto when = _executor->now() + _keepAliveInterval;
             bool fromTrigger = false;
             auto scheduleResult = _executor->scheduleWorkAt(
                 when, [=, this](const executor::TaskExecutor::CallbackArgs& args) {
-                    _prepareAndSendCommandCallback(args, fromTrigger, false
-                                                   /*useBackupChannel*/);
+                    _prepareAndSendCommandCallback(args, fromTrigger);
                 });
             _status = scheduleResult.getStatus();
             if (!_status.isOK()) {
-                _onShutdown_inlock(useBackupChannel);
+                _onShutdown_inlock();
                 return;
             }
 
@@ -311,34 +271,28 @@ void Reporter::_processResponseCallback(
     // Must call without holding the lock.
     auto prepareResult = _prepareCommand();
 
-    // Since we unlock above, there is a chance that the main channel and backup channel reach this
-    // point at about the same time and the updatePosition request would be almost the same. We may
-    // save one request in that case but for now we leave it for future optimization.
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown_inlock();
         return;
     }
 
-    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout, useBackupChannel);
+    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown_inlock();
         return;
     }
 
-    auto& remoteCommandCallbackHandle =
-        useBackupChannel ? _backupRemoteCommandCallbackHandle : _remoteCommandCallbackHandle;
-    invariant(remoteCommandCallbackHandle.isValid());
-    _requestWaitingStatus = RequestWaitingStatus::kNoWaiting;
+    invariant(_remoteCommandCallbackHandle.isValid());
+    _isWaitingToSendReporter = false;
 }
 
 void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::CallbackArgs& args,
-                                              bool fromTrigger,
-                                              bool useBackupChannel) {
+                                              bool fromTrigger) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown_inlock();
             return;
         }
 
@@ -351,7 +305,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
         }
 
         if (!_status.isOK()) {
-            _onShutdown_inlock(useBackupChannel);
+            _onShutdown_inlock();
             return;
         }
     }
@@ -361,39 +315,26 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
 
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown_inlock();
         return;
     }
 
-    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout, useBackupChannel);
+    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout);
     if (!_status.isOK()) {
-        _onShutdown_inlock(useBackupChannel);
+        _onShutdown_inlock();
         return;
     }
 
-    auto& remoteCommandCallbackHandle =
-        useBackupChannel ? _backupRemoteCommandCallbackHandle : _remoteCommandCallbackHandle;
-    auto& prepareAndSendCommandCallbackHandle = useBackupChannel
-        ? _backupPrepareAndSendCommandCallbackHandle
-        : _prepareAndSendCommandCallbackHandle;
-    invariant(remoteCommandCallbackHandle.isValid());
-    prepareAndSendCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
-    if (!useBackupChannel) {
-        // Only reset keepAliveTimeout when it is triggered for the main channel.
-        _keepAliveTimeoutWhen = Date_t();
-    }
+    invariant(_remoteCommandCallbackHandle.isValid());
+    _prepareAndSendCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
+    _keepAliveTimeoutWhen = Date_t();
 }
 
-void Reporter::_onShutdown_inlock(bool useBackupChannel) {
-    _requestWaitingStatus = RequestWaitingStatus::kNoWaiting;
-    if (!useBackupChannel) {
-        _remoteCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
-        _prepareAndSendCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
-        _keepAliveTimeoutWhen = Date_t();
-    } else {
-        _backupRemoteCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
-        _backupPrepareAndSendCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
-    }
+void Reporter::_onShutdown_inlock() {
+    _isWaitingToSendReporter = false;
+    _remoteCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
+    _prepareAndSendCommandCallbackHandle = executor::TaskExecutor::CallbackHandle();
+    _keepAliveTimeoutWhen = Date_t();
     _condition.notify_all();
 }
 
@@ -402,23 +343,13 @@ bool Reporter::isActive() const {
     return _isActive_inlock();
 }
 
-bool Reporter::isBackupActive() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _isBackupActive_inlock();
-}
-
 bool Reporter::_isActive_inlock() const {
     return _remoteCommandCallbackHandle.isValid() || _prepareAndSendCommandCallbackHandle.isValid();
 }
 
-bool Reporter::_isBackupActive_inlock() const {
-    return _backupRemoteCommandCallbackHandle.isValid() ||
-        _backupPrepareAndSendCommandCallbackHandle.isValid();
-}
-
 bool Reporter::isWaitingToSendReport() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    return _requestWaitingStatus != RequestWaitingStatus::kNoWaiting;
+    return _isWaitingToSendReporter;
 }
 
 Date_t Reporter::getKeepAliveTimeoutWhen_forTest() const {

@@ -608,8 +608,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     return opTimeToReturn;
 }
 
-void ReplicationCoordinatorExternalStateImpl::forwardSecondaryProgress(bool prioritized) {
-    _syncSourceFeedback.forwardSecondaryProgress(prioritized);
+void ReplicationCoordinatorExternalStateImpl::forwardSecondaryProgress() {
+    _syncSourceFeedback.forwardSecondaryProgress();
 }
 
 StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocument(

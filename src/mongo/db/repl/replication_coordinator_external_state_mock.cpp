@@ -95,7 +95,7 @@ ThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const
     return nullptr;
 }
 
-void ReplicationCoordinatorExternalStateMock::forwardSecondaryProgress(bool prioritized) {}
+void ReplicationCoordinatorExternalStateMock::forwardSecondaryProgress() {}
 
 bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
                                                      ServiceContext* const service) {

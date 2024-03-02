@@ -138,7 +138,7 @@ public:
      * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
      * command upstream.
      */
-    virtual void forwardSecondaryProgress(bool prioritized = false) = 0;
+    virtual void forwardSecondaryProgress() = 0;
 
     /**
      * Returns true if "host" is one of the network identities of this node.
