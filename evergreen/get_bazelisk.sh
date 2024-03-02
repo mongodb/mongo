@@ -9,6 +9,8 @@ cd src
 set -o errexit
 set -o verbose
 
+mkdir -p $TMPDIR
+
 EXT=""
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" || "$OSTYPE" == "win64" ]]; then
   OS="windows"
@@ -35,6 +37,10 @@ if [[ $ARCH == "ppc64le" ]]; then
 else
   REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-${OS}-${ARCH}${EXT}
   LOCAL_PATH=$TMPDIR/bazelisk
+fi
+
+if [ -f "$LOCAL_PATH" ]; then
+  rm $LOCAL_PATH
 fi
 
 CURL_COMMAND="curl -L $REMOTE_PATH --output $LOCAL_PATH"
