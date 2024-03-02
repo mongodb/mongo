@@ -24,17 +24,21 @@ buildvariants:
 # Note that this task is currently optional;
 # This will eventually become suggested, then required.
 - name: &ubuntu2204-arm64-bazel-compile ubuntu2204-arm64-bazel-compile
-  display_name: "Ubuntu 22.04 arm64 Bazel Compile"
+  display_name: "! Ubuntu 22.04 arm64 Bazel Compile"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tags: ["bazel_check"]
   run_on:
   - ubuntu2204-arm64-small
   stepback: false
   expansions:
+    scons_cache_scope: shared
     compile_variant: *ubuntu2204-arm64-bazel-compile
   tasks:
     - name: compile_bazel_TG
     - name: compile_bazel_ninja_TG
+    - name: bazel_workstation_TG
+      distros:
+      - ubuntu2204-arm64-large
 
 - name: &ubuntu2204-x86-64-bazel-compile ubuntu2204-x86-64-bazel-compile
   display_name: "Ubuntu 22.04 x86_64 Bazel Compile"

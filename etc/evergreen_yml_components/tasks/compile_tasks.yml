@@ -209,6 +209,26 @@ tasks:
 ## compile - build bazel targets ##
 ## The bazel migration is in progress & this
 ## task ensures we can build with bazel.
+- name: bazel_workstation_unittests
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "get engflow creds"
+  - func: "scons compile"
+    vars:
+      targets: >-
+        install-all
+        prove-unittests
+      task_compile_flags: >-
+        BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
+        ICECC=
+        CCACHE=
+        --build-profile=opt
+        --ninja=disabled
+
 # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
 - name: compile_bazel_dist_test
   tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
@@ -2313,6 +2333,12 @@ task_groups:
   - run_bazel_scons_unittest
   - run_bazel_scons_unittest_sanitize
   - run_bazel_program
+
+- <<: *compile_task_group_template
+  name: bazel_workstation_TG
+  tags: []
+  tasks:
+  - bazel_workstation_unittests
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_ninja_TG
