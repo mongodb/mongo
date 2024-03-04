@@ -417,19 +417,12 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
     val->buf.data = data;
     val->buf.size = size;
 
-    /* Handle zero-length cells quickly. */
-    if (size != 0) {
-        /* Optionally compress the data using the Huffman engine. */
-        if (btree->huffman_value != NULL)
-            WT_RET(__wt_huffman_encode(session, btree->huffman_value,
-              (const uint8_t *)val->buf.data, (uint32_t)val->buf.size, &val->buf));
+    /* Create an overflow object if the data won't fit. */
+    WT_ASSERT(session, btree->maxleafvalue > 0);
+    if (val->buf.size > btree->maxleafvalue) {
+        WT_STAT_CONN_DATA_INCR(session, rec_overflow_value);
 
-        /* Create an overflow object if the data won't fit. */
-        if (val->buf.size > btree->maxleafvalue) {
-            WT_STAT_CONN_DATA_INCR(session, rec_overflow_value);
-
-            return (__wt_rec_cell_build_ovfl(session, r, val, WT_CELL_VALUE_OVFL, tw, rle));
-        }
+        return (__wt_rec_cell_build_ovfl(session, r, val, WT_CELL_VALUE_OVFL, tw, rle));
     }
     __rec_cell_tw_stats(r, tw);
 

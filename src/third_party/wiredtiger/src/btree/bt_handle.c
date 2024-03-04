@@ -32,9 +32,6 @@ __btree_clear(WT_SESSION_IMPL *session)
     if (!F_ISSET(btree, WT_BTREE_CLOSED))
         return (0);
 
-    /* Close the Huffman tree. */
-    __wt_btree_huffman_close(session);
-
     /* Terminate any associated collator. */
     if (btree->collator_owned && btree->collator->terminate != NULL)
         WT_TRET(btree->collator->terminate(btree->collator, &session->iface));
@@ -453,8 +450,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     else
         btree->checksum = CKSUM_UNENCRYPTED;
 
-    /* Huffman encoding */
-    WT_RET(__wt_btree_huffman_open(session));
+    ret = __wt_config_gets(session, cfg, "huffman_value", &cval);
+    if (ret == 0 && cval.len != 0)
+        WT_RET_MSG(session, ENOTSUP, "Huffman encoding for values is no longer supported.");
 
     /*
      * Reconciliation configuration:

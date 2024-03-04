@@ -121,8 +121,6 @@ struct __wt_btree {
     uint32_t maxmempage_image;      /* In-memory page image max size */
     uint64_t splitmempage;          /* In-memory split trigger size */
 
-    void *huffman_value; /* Value huffman encoding */
-
     WT_BTREE_CHECKSUM checksum; /* Checksum configuration */
 
     /*

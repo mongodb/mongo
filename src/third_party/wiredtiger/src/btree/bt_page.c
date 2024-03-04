@@ -975,7 +975,6 @@ __inmem_row_leaf_entries(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, ui
 static int
 __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp)
 {
-    WT_BTREE *btree;
     WT_CELL_UNPACK_KV unpack;
     WT_DECL_RET;
     WT_ROW *rip;
@@ -984,7 +983,6 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp)
     uint8_t smallest_prefix;
     bool prepare;
 
-    btree = S2BT(session);
     last_slot = 0;
     prepare = false;
 
@@ -1079,8 +1077,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp)
              * will be comprised of data that is globally visible, and so the reader thread which
              * attempts to read the page into cache can skip the visible all check.
              */
-            if (!btree->huffman_value &&
-              !(WT_READING_CHECKPOINT(session) && F_ISSET(session, WT_SESSION_PREFETCH_THREAD)) &&
+            if (!(WT_READING_CHECKPOINT(session) && F_ISSET(session, WT_SESSION_PREFETCH_THREAD)) &&
               (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw) ||
                 (!WT_TIME_WINDOW_HAS_STOP(&unpack.tw) &&
                   __wt_txn_tw_start_visible_all(session, &unpack.tw))))

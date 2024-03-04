@@ -302,10 +302,9 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         the file format''',
         choices=['btree']),
     Config('huffman_key', 'none', r'''
-        This option is no longer supported, retained for backward compatibility'''),
+        This option is no longer supported, retained for backward compatibility''', undoc=True),
     Config('huffman_value', 'none', r'''
-        configure Huffman encoding for values. Permitted values are \c "none", \c "english",
-        \c "utf8<file>" or \c "utf16<file>". See @ref huffman for more information'''),
+        This option is no longer supported, retained for backward compatibility''', undoc=True),
     Config('ignore_in_memory_cache_size', 'false', r'''
         allow update and insert operations to proceed even if the cache is already at
         capacity. Only valid in conjunction with in-memory databases. Should be used with caution -

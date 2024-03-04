@@ -1222,11 +1222,6 @@ struct __wt_session {
      * or an extractor name created with WT_CONNECTION::add_extractor., a string; default \c none.}
      * @config{format, the file format., a string\, chosen from the following options: \c "btree";
      * default \c btree.}
-     * @config{huffman_key, This option is no longer supported\, retained for backward
-     * compatibility., a string; default \c none.}
-     * @config{huffman_value, configure Huffman encoding for values.  Permitted values are \c
-     * "none"\, \c "english"\, \c "utf8<file>" or \c "utf16<file>". See @ref huffman for more
-     * information., a string; default \c none.}
      * @config{ignore_in_memory_cache_size, allow update and insert operations to proceed even if
      * the cache is already at capacity.  Only valid in conjunction with in-memory databases.
      * Should be used with caution - this configuration allows WiredTiger to consume memory over the

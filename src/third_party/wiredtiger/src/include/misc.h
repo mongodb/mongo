@@ -96,7 +96,6 @@
 #define WT_BLOCK_FITS(p, len, begin, maxlen)             \
     ((const uint8_t *)(p) >= (const uint8_t *)(begin) && \
       ((const uint8_t *)(p) + (len) <= (const uint8_t *)(begin) + (maxlen)))
-#define WT_PTR_IN_RANGE(p, begin, maxlen) WT_BLOCK_FITS((p), 1, (begin), (maxlen))
 
 /*
  * Align an unsigned value of any type to a specified power-of-2, including the offset result of a

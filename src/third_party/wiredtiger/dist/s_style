@@ -39,7 +39,6 @@ for f in "$@"; do
       ! expr "$f" : 'src/docs/' > /dev/null &&
       ! expr "$f" : 'src/tags' > /dev/null &&
       ! expr "$f" : 'src/.*/hash_city.*' > /dev/null &&
-      ! expr "$f" : 'src/.*/huffman.*' > /dev/null &&
       ! expr "$f" : 'src/checksum.*' > /dev/null; then
 
         # Camel case style is not allowed.

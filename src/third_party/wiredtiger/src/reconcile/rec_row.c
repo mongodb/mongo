@@ -640,8 +640,8 @@ err:
  *     Repack a cell.
  */
 static WT_INLINE int
-__rec_cell_repack(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_RECONCILE *r,
-  WT_CELL_UNPACK_KV *vpack, WT_TIME_WINDOW *tw)
+__rec_cell_repack(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_CELL_UNPACK_KV *vpack, WT_TIME_WINDOW *tw)
 {
     WT_DECL_ITEM(tmpval);
     WT_DECL_RET;
@@ -650,16 +650,8 @@ __rec_cell_repack(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_RECONCILE *r,
 
     WT_ERR(__wt_scr_alloc(session, 0, &tmpval));
 
-    /* If the item is Huffman encoded, decode it. */
-    if (btree->huffman_value == NULL) {
-        p = vpack->data;
-        size = vpack->size;
-    } else {
-        WT_ERR(
-          __wt_huffman_decode(session, btree->huffman_value, vpack->data, vpack->size, tmpval));
-        p = tmpval->data;
-        size = tmpval->size;
-    }
+    p = vpack->data;
+    size = vpack->size;
     WT_ERR(__wt_rec_cell_build_val(session, r, p, size, tw, 0));
 
 err:
@@ -796,7 +788,7 @@ __wt_rec_row_leaf(
              * Repack the cell if we clear the transaction ids in the cell.
              */
             if (vpack->raw == WT_CELL_VALUE_COPY) {
-                WT_ERR(__rec_cell_repack(session, btree, r, vpack, twp));
+                WT_ERR(__rec_cell_repack(session, r, vpack, twp));
 
                 dictionary = true;
             } else if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
@@ -815,7 +807,7 @@ __wt_rec_row_leaf(
                       __wt_cell_pack_ovfl(session, &val->cell, vpack->raw, twp, 0, val->buf.size);
                     val->len = val->cell_len + val->buf.size;
                 } else
-                    WT_ERR(__rec_cell_repack(session, btree, r, vpack, twp));
+                    WT_ERR(__rec_cell_repack(session, r, vpack, twp));
 
                 dictionary = true;
             } else {

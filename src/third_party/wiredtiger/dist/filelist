@@ -27,7 +27,6 @@ src/btree/bt_debug.c
 src/btree/bt_delete.c
 src/btree/bt_discard.c
 src/btree/bt_handle.c
-src/btree/bt_huffman.c
 src/btree/bt_import.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
@@ -222,7 +221,6 @@ src/support/hash_city.c
 src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
-src/support/huffman.c
 src/support/lock_ext.c
 src/support/modify.c
 src/support/mtx_rw.c

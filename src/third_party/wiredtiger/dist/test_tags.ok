@@ -13,7 +13,6 @@ flush_tier
 functional_correctness
 garbage_collection
 history_store
-huffman_encoding
 indexes
 isolation_levels
 log_files
