@@ -42,16 +42,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-openssl111-large
+  - name: crypt_build
+    distros:
+    - amazon2-openssl111-large
   - name: test_packages
     distros:
     - ubuntu2204-large
   - name: .development_critical
-  - name: .release_critical
-  - name: push
-  - name: .publish_crypt
-  - name: crypt_build
-    distros:
-    - amazon2-openssl111-large
+  - name: .release_critical !publish_packages
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
 
@@ -97,16 +95,14 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - amazon2-arm64-openssl111-large
+  - name: crypt_build
+    distros:
+    - amazon2-arm64-openssl111-large
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
   - name: .development_critical
-  - name: .release_critical
-  - name: push
-  - name: .publish_crypt
-  - name: crypt_build
-    distros:
-    - amazon2-arm64-openssl111-large
+  - name: .release_critical !publish_packages
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
 
@@ -143,7 +139,6 @@ buildvariants:
     - ubuntu2204-large
   - name: .development_critical !.incompatible_community
   - name: .release_critical !.incompatible_community
-  - name: .publish
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
 
@@ -181,14 +176,12 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023.0-large
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
   - name: .development_critical
   - name: .release_critical
-  - name: .publish
-  - name: .publish_crypt
-  - name: crypt_build
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
 
@@ -230,16 +223,16 @@ buildvariants:
   - name: compile_test_and_package_serial_lto_no_unittests_TG
     distros:
     - amazon2023.0-large
+  # TODO: SERVER-79886 Fix broken crypt_build task
+  # - name: crypt_build
+  #   distros:
+  #   - amazon2023.0-large
   # TODO: SERVER-79886 Fix broken test_packages task
   # - name: test_packages
   #   distros:
   #   - amazon2023.0-large
   - name: .development_critical
-  - name: .release_critical
-  # TODO: SERVER-79886 Fix broken crypt_build task
-  # - name: crypt_build
-  #   distros:
-  #   - amazon2023.0-large
+  - name: .release_critical !publish_packages !push !crypt_push
   # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_archive task
   # - name: stitch_support_lib_build_and_archive
   # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_test task
@@ -281,7 +274,6 @@ buildvariants:
     - ubuntu2204-arm64-large
   - name: .development_critical !.incompatible_community
   - name: .release_critical !.incompatible_community
-  - name: .publish
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
 
@@ -319,16 +311,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023.0-arm64-large
+  - name: crypt_build
+    distros:
+    - amazon2023.0-arm64-large
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
   - name: .development_critical
   - name: .release_critical
-  - name: .publish
-  - name: .publish_crypt
-  - name: crypt_build
-    distros:
-    - amazon2023.0-arm64-large
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
 
@@ -370,16 +360,16 @@ buildvariants:
   - name: compile_test_and_package_serial_lto_no_unittests_TG
     distros:
     - amazon2023.0-arm64-large
+  # TODO: SERVER-79886 Fix broken crypt_build task
+  # - name: crypt_build
+  #   distros:
+  #   - amazon2023.0-arm64-large
   # TODO: SERVER-79886 Fix broken test_packages task
   # - name: test_packages
   #   distros:
   #   - ubuntu2204-arm64-large
   - name: .development_critical
-  - name: .release_critical
-  # TODO: SERVER-79886 Fix broken crypt_build task
-  # - name: crypt_build
-  #   distros:
-  #   - amazon2023.0-arm64-large
+  - name: .release_critical !publish_packages !push !crypt_push
   # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_archive task
   # - name: stitch_support_lib_build_and_archive
   # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_test task

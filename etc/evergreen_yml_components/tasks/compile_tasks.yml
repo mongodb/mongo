@@ -1515,7 +1515,7 @@ tasks:
 
 - name: publish_packages
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_devprod_build", "publish"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "publish"]
   # This should prevent this task from running in patch builds, where we
   # don't want to publish packages.
   patchable: false
@@ -1565,7 +1565,7 @@ tasks:
 
 - name: push
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_devprod_build", "publish"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "publish"]
   patchable: false
   depends_on:
   - name: package
@@ -2116,7 +2116,7 @@ tasks:
 
 - name: crypt_push
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_server_security", "publish_crypt"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "publish_crypt"]
   patchable: false
   stepback: false
   depends_on:
