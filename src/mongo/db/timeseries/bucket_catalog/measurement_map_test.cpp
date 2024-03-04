@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/timeseries/bucket_catalog/insertion_ordered_column_map.h"
 
 #include <boost/optional/optional.hpp>
 #include <string>
@@ -37,26 +36,27 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::timeseries::bucket_catalog {
-const std::string testDbName = "db_timeseries_insertion_ordered_column_map_test";
+const std::string testDbName = "db_timeseries_measurement_map_test";
 const TimeseriesOptions kTimeseriesOptions("time");
 
-class InsertionOrderedColumnMapTest : public unittest::Test {
+class MeasurementMapTest : public unittest::Test {
 public:
-    InsertionOrderedColumnMapTest() : iocm(trackingContext) {}
+    MeasurementMapTest() : measurementMap(trackingContext) {}
 
 protected:
     void tearDown() override {
-        iocm._assertInternalStateIdentical_forTest();
+        measurementMap._assertInternalStateIdentical_forTest();
     }
 
     TrackingContext trackingContext;
-    InsertionOrderedColumnMap iocm;
+    MeasurementMap measurementMap;
 };
 
 BSONObj genBucketDoc(int timestampSecondsField) {
@@ -110,7 +110,7 @@ std::vector<BSONElement> genMessyMeasurements() {
     return elems;
 }
 
-TEST_F(InsertionOrderedColumnMapTest, IterationBasic) {
+TEST_F(MeasurementMapTest, IterationBasic) {
     std::vector<BSONElement> elems;
 
     // Insert measurement 1.
@@ -120,7 +120,7 @@ TEST_F(InsertionOrderedColumnMapTest, IterationBasic) {
     BSONObj m1_a = BSON("a" << BSON("0"
                                     << "1"));
     elems.emplace_back(m1_a.getField("a"));
-    iocm.insertOne(elems);
+    measurementMap.insertOne(elems);
 
     elems.clear();
 
@@ -131,17 +131,17 @@ TEST_F(InsertionOrderedColumnMapTest, IterationBasic) {
     BSONObj m2_a = BSON("a" << BSON("0"
                                     << "5"));
     elems.emplace_back(m2_a.getField("a"));
-    iocm.insertOne(elems);
+    measurementMap.insertOne(elems);
 
     // Check iteration works.
     size_t i = 0;
-    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
         ++i;
     }
     invariant(i == 2);
 }
 
-TEST_F(InsertionOrderedColumnMapTest, FillSkipsDifferentField) {
+TEST_F(MeasurementMapTest, FillSkipsDifferentField) {
     const BSONObj bucketDoc = fromjson(
         R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1},
@@ -156,18 +156,18 @@ TEST_F(InsertionOrderedColumnMapTest, FillSkipsDifferentField) {
         R"({"time":{"0":{"$date":"2022-06-06T15:34:32.000Z"}},
                     "c":{"4":5}})");
 
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDoc));
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDoc2));
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDocNewField));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc2));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocNewField));
 
     size_t i = 0;
-    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
         ++i;
     }
     invariant(i == 4);
 }
 
-TEST_F(InsertionOrderedColumnMapTest, FillSkipsAddField) {
+TEST_F(MeasurementMapTest, FillSkipsAddField) {
     const BSONObj bucketDoc = fromjson(
         R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1},
@@ -178,17 +178,17 @@ TEST_F(InsertionOrderedColumnMapTest, FillSkipsAddField) {
                     "a":{"0":4},
                     "b":{"0":1},
                     "c":{"0":1}})");
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDoc));
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDocWithField));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocWithField));
 
     size_t i = 0;
-    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
         ++i;
     }
     invariant(i == 4);
 }
 
-TEST_F(InsertionOrderedColumnMapTest, FillSkipsRemoveField) {
+TEST_F(MeasurementMapTest, FillSkipsRemoveField) {
     const BSONObj bucketDoc = fromjson(
         R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1},
@@ -197,17 +197,17 @@ TEST_F(InsertionOrderedColumnMapTest, FillSkipsRemoveField) {
     const BSONObj bucketDocWithoutField = fromjson(
         R"({"time":{"0":{"$date":"2022-06-06T15:34:35.000Z"}},
                     "a":{"0":4}})");
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDoc));
-    iocm.insertOne(genMeasurementFieldsFromObj(bucketDocWithoutField));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
+    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocWithoutField));
 
     size_t i = 0;
-    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
         ++i;
     }
     invariant(i == 3);
 }
 
-TEST_F(InsertionOrderedColumnMapTest, InitBuilders) {
+TEST_F(MeasurementMapTest, InitBuilders) {
     BSONObj bucketDataDoc;
     BSONObjBuilder bucket;
     BSONObjBuilder dataBuilder = bucket.subobjStart("data");
@@ -252,33 +252,31 @@ TEST_F(InsertionOrderedColumnMapTest, InitBuilders) {
     dataBuilder.append("a", f1Binary);
     dataBuilder.append("b", f2Binary);
 
-    iocm.initBuilders(dataBuilder.done(), 3);
+    measurementMap.initBuilders(dataBuilder.done(), 3);
 
     size_t i = 0;
-    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
         ++i;
     }
     invariant(i == 3);
 }
 
-TEST_F(InsertionOrderedColumnMapTest, GetBuilder) {
+TEST_F(MeasurementMapTest, GetBuilder) {
     std::vector<BSONElement> elems;
     BSONObj bucketDocDataFields = genBucketDoc().getOwned();
     for (auto dataField : bucketDocDataFields) {
         elems.push_back(dataField);
     }
 
-    iocm.insertOne(elems);
+    measurementMap.insertOne(elems);
 
-    ASSERT_EQ(iocm.getBuilder("time").numInterleavedStartWritten(), 0);
-    ASSERT_EQ(iocm.getBuilder("a").numInterleavedStartWritten(), 0);
-    ASSERT_EQ(iocm.getBuilder("b").numInterleavedStartWritten(), 0);
+    ASSERT_EQ(measurementMap.getBuilder("time").numInterleavedStartWritten(), 0);
+    ASSERT_EQ(measurementMap.getBuilder("a").numInterleavedStartWritten(), 0);
+    ASSERT_EQ(measurementMap.getBuilder("b").numInterleavedStartWritten(), 0);
 }
 
-DEATH_TEST_REGEX_F(InsertionOrderedColumnMapTest,
-                   GetBuilderForNonexistentField,
-                   "Invariant failure.*") {
-    iocm.getBuilder("time");
+DEATH_TEST_REGEX_F(MeasurementMapTest, GetBuilderForNonexistentField, "Invariant failure.*") {
+    measurementMap.getBuilder("time");
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

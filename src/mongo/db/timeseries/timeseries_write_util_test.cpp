@@ -410,7 +410,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
     ASSERT_EQ(updates.size(), 1);
     // The update command request should return the document diff of the batch applied on the pre
     // image.
-    ASSERT(updates[0].getU().getDiff().binaryEqual(expectedDiff));
+    UnorderedFieldsBSONObjComparator comparator;
+    ASSERT_EQ(0, comparator.compare(updates[0].getU().getDiff(), expectedDiff));
 }
 
 /**
@@ -482,7 +483,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
 
     // The update command request should return the document diff of the batch applied on the pre
     // image.
-    ASSERT(updates[0].getU().getDiff().binaryEqual(expectedDiff));
+    UnorderedFieldsBSONObjComparator comparator;
+    ASSERT_EQ(0, comparator.compare(updates[0].getU().getDiff(), expectedDiff));
 }
 
 TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {

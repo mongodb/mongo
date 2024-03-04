@@ -27,51 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/db/timeseries/bucket_catalog/insertion_ordered_column_map.h"
+#include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/bson/util/bsoncolumn.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
-InsertionOrderedColumnMap::InsertionOrderedColumnMap(TrackingContext& trackingContext)
+MeasurementMap::MeasurementMap(TrackingContext& trackingContext)
     : _trackingContext(trackingContext),
-      _builders(makeTrackedStringMap<MeasurementCountAndBuilder>(_trackingContext)),
-      _insertionOrder(make_tracked_vector<tracked_string>(_trackingContext)) {}
+      _builders(makeTrackedStringMap<std::pair<size_t, BSONColumnBuilder>>(_trackingContext)) {}
 
-void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
-                                             size_t numMeasurements) {
+void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
+                                  size_t numMeasurements) {
     for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
         int binLength = 0;
         const char* binData = columnValue.binData(binLength);
 
         _builders.emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
                           std::make_pair(numMeasurements, BSONColumnBuilder(binData, binLength)));
-
-        _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
-        _insertionOrderSize += key.size();
     }
     _measurementCount = numMeasurements;
 }
 
-void InsertionOrderedColumnMap::_insertNewKey(StringData key,
-                                              const BSONElement& elem,
-                                              BSONColumnBuilder builder,
-                                              size_t numMeasurements) {
+void MeasurementMap::_insertNewKey(StringData key,
+                                   const BSONElement& elem,
+                                   BSONColumnBuilder builder,
+                                   size_t numMeasurements) {
     builder.append(elem);
     _builders.try_emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
                           numMeasurements,
                           std::move(builder));
-    _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
-    _insertionOrderSize += key.size();
 }
 
 
-void InsertionOrderedColumnMap::_fillSkipsInMissingFields() {
+void MeasurementMap::_fillSkipsInMissingFields() {
     size_t numExpectedMeasurements = _measurementCount;
 
     // Fill in skips for any fields that existed in prior measurements in this bucket, but
     // weren't in this measurement.
-    for (auto& [key, pairValue] : _builders) {
-        auto& [numMeasurements, builder] = pairValue;
+    for (auto& entry : _builders) {
+        auto& [numMeasurements, builder] = entry.second;
         if (numMeasurements != numExpectedMeasurements) {
             invariant((numMeasurements + 1) == numExpectedMeasurements,
                       "Measurement count should only be off by one when inserting measurements.");
@@ -81,7 +75,7 @@ void InsertionOrderedColumnMap::_fillSkipsInMissingFields() {
     }
 }
 
-void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasurementDataFields) {
+void MeasurementMap::insertOne(std::vector<BSONElement> oneMeasurementDataFields) {
     for (const auto& elem : oneMeasurementDataFields) {
         StringData key = elem.fieldNameStringData();
 
@@ -102,56 +96,16 @@ void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasuremen
     _fillSkipsInMissingFields();
 }
 
-BSONColumnBuilder& InsertionOrderedColumnMap::getBuilder(StringData key) {
+BSONColumnBuilder& MeasurementMap::getBuilder(StringData key) {
     auto it = _builders.find(key);
     invariant(it != _builders.end());
-    return std::get<1>(it->second);
+    return it->second.second;
 }
 
-StringData InsertionOrderedColumnMap::_getDirect() {
-    invariant(_pos < _insertionOrder.size());
-    return StringData(_insertionOrder[_pos].c_str());
-}
-
-boost::optional<StringData> InsertionOrderedColumnMap::begin() {
-    _pos = 0;
-    return next();
-}
-
-boost::optional<StringData> InsertionOrderedColumnMap::next() {
-    if (_pos < _insertionOrder.size()) {
-        StringData result = _getDirect();
-        ++_pos;
-        return result;
+void MeasurementMap::_assertInternalStateIdentical_forTest() {
+    for (auto& entry : _builders) {
+        invariant(entry.second.first == _measurementCount);
     }
-    return boost::none;
 }
-
-void InsertionOrderedColumnMap::_assertInternalStateIdentical_forTest() {
-    size_t keySizes = 0;
-    for (auto& [key, pairValue] : _builders) {
-        keySizes += key.size();
-        auto& [numMeasurements, builder] = pairValue;
-        invariant(numMeasurements == _measurementCount);
-
-        // All keys in _builders should exist in _insertionOrder.
-        invariant(std::find(_insertionOrder.begin(), _insertionOrder.end(), key.c_str()) !=
-                  std::end(_insertionOrder));
-    }
-
-    // Number of keys in both structures should be the same.
-    invariant(_insertionOrder.size() == _builders.size());
-
-    // All keys in _insertionOrder should exist in _builders.
-    for (auto& key : _insertionOrder) {
-        invariant(_builders.find(key) != _builders.end());
-    }
-    invariant(keySizes == _insertionOrderSize);
-
-    // Current iterator position must be [0, N+1].
-    invariant(_pos >= 0);
-    invariant(_pos <= _insertionOrder.size() + 1);
-}
-
 
 }  // namespace mongo::timeseries::bucket_catalog

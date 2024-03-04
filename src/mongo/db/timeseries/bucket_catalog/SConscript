@@ -19,7 +19,7 @@ env.Library(
         'execution_stats.cpp',
         'flat_bson.cpp',
         'reopening.cpp',
-        'insertion_ordered_column_map.cpp',
+        'measurement_map.cpp',
         'write_batch.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -48,7 +48,7 @@ env.CppUnitTest(
         'bucket_metadata_test.cpp',
         'bucket_state_registry_test.cpp',
         'minmax_test.cpp',
-        'insertion_ordered_column_map_test.cpp',
+        'measurement_map_test.cpp',
         'schema_test.cpp',
     ],
     LIBDEPS=[

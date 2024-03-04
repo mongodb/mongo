@@ -48,7 +48,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
-#include "mongo/db/timeseries/bucket_catalog/insertion_ordered_column_map.h"
+#include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
@@ -171,10 +171,10 @@ public:
     const bool usingAlwaysCompressedBuckets;
 
     /**
-     * In-memory state of each committed data field, sorted by insertion order. Enables fewer
-     * complete round-trips of decompression + compression.
+     * In-memory state of each committed data field. Enables fewer complete round-trips of
+     * decompression + compression.
      */
-    InsertionOrderedColumnMap intermediateBuilders;
+    MeasurementMap intermediateBuilders;
 };
 
 /**

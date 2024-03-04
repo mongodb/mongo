@@ -250,23 +250,22 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
         BSONObjBuilder newDataFieldsBuilder;
         BSONObjBuilder updatedDataFieldsBuilder;
 
-        for (auto cName = batch->intermediateBuilders.begin(); cName.has_value();
-             cName = batch->intermediateBuilders.next()) {
-            auto& cBuilder = batch->intermediateBuilders.getBuilder(cName.value());
+        for (auto& entry : batch->intermediateBuilders.getBuilders()) {
+            auto& cBuilder = entry.second.second;
             auto cDiff = cBuilder.intermediate();
 
-            if (batch->newFieldNamesToBeInserted.count(cName.value())) {
+            if (batch->newFieldNamesToBeInserted.count(entry.first.c_str())) {
                 // Insert new column.
                 invariant(cDiff.offset() == 0);
                 auto binary = BSONBinData(cDiff.data(), cDiff.size(), BinDataType::Column);
-                newDataFieldsBuilder.append(cName.value(), binary);
+                newDataFieldsBuilder.append(entry.first.c_str(), binary);
             } else {
                 // Update existing column.
                 // TODO (SERVER-87384): Use helper function
                 BSONObj binaryObj = BSON(
                     "o" << cDiff.offset() << "d"
                         << BSONBinData(cDiff.data(), cDiff.size(), BinDataType::BinDataGeneral));
-                updatedDataFieldsBuilder.append(cName.value(), binaryObj);
+                updatedDataFieldsBuilder.append(entry.first.c_str(), binaryObj);
             }
         }
 

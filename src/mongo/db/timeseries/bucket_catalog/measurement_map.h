@@ -41,12 +41,12 @@
 namespace mongo::timeseries::bucket_catalog {
 
 /**
- * A map that stores keys to compressed column builders in insertion order, and fills in skips for
- * missing data fields.
+ * A map that stores measurements by field names to compressed column builders, and fills in skips
+ * for missing data fields.
  */
-class InsertionOrderedColumnMap {
+class MeasurementMap {
 public:
-    explicit InsertionOrderedColumnMap(TrackingContext& trackingContext);
+    explicit MeasurementMap(TrackingContext& trackingContext);
 
     /**
      * Inserts one measurement. Vector should contain every data field, including the time field,
@@ -68,11 +68,9 @@ public:
 
     BSONColumnBuilder& getBuilder(StringData key);
 
-    /**
-     * Iterates over keys, in insertion order.
-     */
-    boost::optional<StringData> begin();
-    boost::optional<StringData> next();
+    TrackedStringMap<std::pair<size_t, BSONColumnBuilder>>& getBuilders() {
+        return _builders;
+    }
 
 private:
     /**
@@ -81,11 +79,8 @@ private:
      */
     void _fillSkipsInMissingFields();
 
-    friend class InsertionOrderedColumnMapTest;
+    friend class MeasurementMapTest;
     void _assertInternalStateIdentical_forTest();
-
-    // Get current builder, checking invariants.
-    StringData _getDirect();
     void _insertNewKey(StringData key,
                        const BSONElement& elem,
                        BSONColumnBuilder builder,
@@ -93,12 +88,8 @@ private:
 
     std::reference_wrapper<TrackingContext> _trackingContext;
 
-    using MeasurementCountAndBuilder = std::tuple<size_t, BSONColumnBuilder>;
-    TrackedStringMap<MeasurementCountAndBuilder> _builders;
-    tracked_vector<tracked_string> _insertionOrder;  // keys, stored in insertion order
-    size_t _insertionOrderSize{0};
+    TrackedStringMap<std::pair<size_t, BSONColumnBuilder>> _builders;
     size_t _measurementCount{0};
-    size_t _pos{0};
 };
 
 }  // namespace mongo::timeseries::bucket_catalog
