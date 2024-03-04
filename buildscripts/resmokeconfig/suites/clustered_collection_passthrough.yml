@@ -69,6 +69,7 @@ selector:
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  - expects_explicit_underscore_id_index
 
 executor:
   archive:
