@@ -10,6 +10,7 @@ const st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 // Test index gets created with an empty range deletions collection
 let newPrimary = st.rs0.getSecondaries()[0];
+st.rs0.awaitReplication();
 assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
 st.rs0.waitForPrimary();
 const rangeDeletionColl = newPrimary.getDB("config").getCollection("rangeDeletions");
