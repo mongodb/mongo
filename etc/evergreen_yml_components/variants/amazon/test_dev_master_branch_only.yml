@@ -349,13 +349,13 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
 
-- name: &amazon-linux2-arm64-sep-benchmark amazon-linux2-arm64-sep-benchmark
-  display_name: "Amazon Linux 2 arm64 (SEP Benchmark)"
+- name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
+  display_name: "AL2023 arm64 (SEP Benchmark)"
   cron: "0 0,8,16 * * *" # Run this task every 8 hours
   modules:
   - enterprise
   run_on:
-  - amazon2-arm64-large
+  - amazon2023.0-arm64-large
   expansions:
     compile_flags: >-
       --ssl
@@ -363,7 +363,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     scons_cache_scope: shared
-    compile_variant: *amazon-linux2-arm64-sep-benchmark
+    compile_variant: *al2023-arm64-sep-benchmark
   tasks:
   - name: compile_upload_benchmarks_TG
   - name: .benchmarks_sep
