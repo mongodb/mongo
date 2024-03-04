@@ -260,3 +260,12 @@ dist-test/
 # node extra stuff (for someone installing eslint)
 node_modules/
 package-lock.json
+
+# Bazel-related work
+# (Note that each string does NOT terminate with a '/' so that gitignore works properly)
+bazel-*
+bazelisk
+buildifier
+.bazelrc.local
+.bazel_info_for_ninja.txt
+.ninja_last_command_line_targets.txt
