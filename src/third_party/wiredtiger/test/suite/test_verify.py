@@ -172,7 +172,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.verify('table:' + self.tablename, "read_corrupt"),
             "/WT_SESSION.verify/")
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
@@ -197,7 +197,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 75) as f:
             for i in range(0, 100):
                 f.write(b'\x01\xff\x80')
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
@@ -214,7 +214,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         # wt verify -d dump_address performs a depth-first traversal of the BTree. So the first
         # leaf page it prints is the first child of its parent. Grab the offset of this one so we
         # can corrupt it.
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump.out')
 
         # Grab the offset position of the first page.
@@ -256,11 +256,11 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 75) as f:
             for i in range(0, 4096):
                 f.write(struct.pack('B', 0))
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
-        self.runWt(["verify", "-c", "table:" + self.tablename],
+        self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
         self.assertEqual(self.count_file_contains("verifyerr.out",
@@ -277,11 +277,11 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 25) as f:
             for i in range(0, 100):
                 f.write(b'\x01\xff\x80')
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
-        self.runWt(["verify", "-c", "table:" + self.tablename],
+        self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         self.check_non_empty_file("verifyerr.out")
         self.assertEqual(self.count_file_contains("verifyerr.out",
@@ -305,10 +305,10 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         with self.open_and_position(self.tablename, 80) as f:
             for i in range(0, 100):
                 f.write(b'\x01\xff\x80')
-        self.runWt(["verify", "-c", "table:" + self.tablename],
+        self.runWt(["-p", "verify", "-c", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
 
-        self.runWt(['verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
+        self.runWt(['-p', 'verify', '-d', 'dump_address', 'table:' + self.tablename, '-d'],
             outfilename='dump_corrupt.out', errfilename="dump_corrupt.err", failure=True)
         self.assertEqual(self.count_file_contains("dump_corrupt.out",
             "Read failure while accessing a page from the "), 1)
@@ -332,7 +332,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self.tablename)
         with self.open_and_position(self.tablename, 75) as f:
             f.truncate(0)
-        self.runWt(["verify", "table:" + self.tablename],
+        self.runWt(["-p", "verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
         # The test may output the following error message while opening a file that
         # does not exist. Ignore that.
@@ -374,7 +374,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
                 for i in range(0, 4096):
                     f.write(struct.pack('B', 0))
 
-        self.runWt(["verify", "-a"], errfilename="verifyerr.out", failure=True)
+        self.runWt(["-p", "verify", "-a"], errfilename="verifyerr.out", failure=True)
         self.assertEqual(self.count_file_contains("verifyerr.out",
             "table:test_verify.a1: WT_ERROR"), 1)
         self.assertEqual(self.count_file_contains("verifyerr.out",

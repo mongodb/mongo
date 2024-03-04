@@ -11,7 +11,7 @@
 const char *home = "."; /* Home directory */
 const char *progname;   /* Program name */
                         /* Global arguments */
-const char *usage_prefix = "[-BLmRrSVv] [-C config] [-E secretkey] [-h home]";
+const char *usage_prefix = "[-BLmpRrSVv] [-C config] [-E secretkey] [-h home]";
 bool verbose = false; /* Verbose flag */
 
 static const char *command; /* Command name */
@@ -47,6 +47,9 @@ usage(void)
     static const char *options[] = {"-B", "maintain release 3.3 log file compatibility",
       "-C config", "wiredtiger_open configuration", "-E key", "secret encryption key", "-h home",
       "database directory", "-L", "turn logging off for debug-mode", "-m", "run verify on metadata",
+      "-p",
+      "disable pre-fetching on the connection (use this option when dumping/verifying corrupted "
+      "data",
       "-R", "run recovery (if recovery configured)", "-r",
       "access the database via a readonly connection", "-S",
       "run salvage recovery (if recovery configured)", "-V", "display library version and exit",
@@ -82,7 +85,7 @@ main(int argc, char *argv[])
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
     const char *cmd_config, *config, *p1, *p2, *p3, *readonly_config, *rec_config, *salvage_config;
-    bool backward_compatible, logoff, meta_verify, readonly, recover, salvage;
+    bool backward_compatible, disable_prefetch, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
     p = NULL;
@@ -110,10 +113,11 @@ main(int argc, char *argv[])
      * needed, the user can specify -R to run recovery.
      */
     rec_config = REC_ERROR;
-    backward_compatible = logoff = meta_verify = readonly = recover = salvage = false;
+    backward_compatible = disable_prefetch = logoff = meta_verify = readonly = recover = salvage =
+      false;
     /* Check for standard options. */
     __wt_optwt = 1; /* enable WT-specific behavior */
-    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:LmRrSVv?")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:LmpRrSVv?")) != EOF)
         switch (ch) {
         case 'B': /* backward compatibility */
             backward_compatible = true;
@@ -141,6 +145,9 @@ main(int argc, char *argv[])
         case 'm': /* verify metadata on connection open */
             cmd_config = "verify_metadata=true";
             meta_verify = true;
+            break;
+        case 'p':
+            disable_prefetch = true;
             break;
         case 'R': /* recovery */
             rec_config = REC_RECOVER;
@@ -258,8 +265,11 @@ main(int argc, char *argv[])
             func = util_upgrade;
         break;
     case 'v':
-        if (strcmp(command, "verify") == 0)
+        if (strcmp(command, "verify") == 0) {
             func = util_verify;
+            if (disable_prefetch)
+                config = "prefetch=(available=false,default=false)";
+        }
         break;
     case 'w':
         if (strcmp(command, "write") == 0)
