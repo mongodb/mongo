@@ -120,11 +120,8 @@ void prepareWriteBatchForCommit(TrackingContext& trackingContext,
     batch.intermediateBuilders = std::move(bucket.intermediateBuilders);
     batch.uncompressedBucketDoc = std::move(bucket.uncompressedBucketDoc);
     batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
-
-    if (bucket.compressedBucketDoc) {
-        batch.compressedBucketDoc = std::move(bucket.compressedBucketDoc);
-        bucket.compressedBucketDoc.reset();
-    }
+    batch.generateCompressedDiff =
+        bucket.usingAlwaysCompressedBuckets && batch.uncompressedBucketDoc.get().get().isEmpty();
 }
 
 /**
@@ -583,16 +580,6 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         bucket->bucketIsSortedByTime = batch->bucketIsSortedByTime;
         bucket->intermediateBuilders = std::move(batch->intermediateBuilders);
         bucket->preparedBatch.reset();
-
-        // The uncompressed and compressed images should have already been moved to the batch by
-        // this point.
-        invariant(!bucket->compressedBucketDoc);
-
-        // Take ownership of the committed batch's uncompressed and compressed images.
-        bucket->uncompressedBucketDoc = std::move(batch->uncompressedBucketDoc);
-        if (batch->compressedBucketDoc) {
-            bucket->compressedBucketDoc = std::move(batch->compressedBucketDoc);
-        }
     }
 
     auto& stats = batch->stats;

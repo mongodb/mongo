@@ -438,7 +438,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
             return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
         }
         bucket->size = decompressedBucketDoc.value().objsize();
-        bucket->compressedBucketDoc = bucketDoc;
     } else {
         bucket->size = bucketDoc.objsize();
         if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -1355,7 +1354,6 @@ void closeOpenBucket(OperationContext* opCtx,
         return;
     }
 
-    invariant(!bucket.compressedBucketDoc);
     bool error = false;
     try {
         closedBuckets.emplace_back(
@@ -1386,7 +1384,6 @@ void closeOpenBucket(OperationContext* opCtx,
         return;
     }
 
-    invariant(!bucket.compressedBucketDoc);
     bool error = false;
     try {
         closedBucket =

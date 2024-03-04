@@ -385,15 +385,14 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
     setUncompressedBucketDoc(*batch, uncompressedPreImage);
-    batch->compressedBucketDoc = *preImageCompressionResult.compressedBucket;
 
     batch->numPreviouslyCommittedMeasurements = 3;
     BSONObj bucketDataDoc =
-        batch->compressedBucketDoc->getObjectField(kBucketDataFieldName).getOwned();
+        preImageCompressionResult.compressedBucket->getObjectField(kBucketDataFieldName).getOwned();
     batch->intermediateBuilders.initBuilders(bucketDataDoc,
                                              batch->numPreviouslyCommittedMeasurements);
 
-    /*const BSONObj expectedDiff = fromjson(
+    const BSONObj expectedDiff = fromjson(
         R"({
         "scontrol":{"u":{"count":5,"version":3},
                     "smin":{"u":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0}},
@@ -402,7 +401,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
             "b":{"time":{"o":10,"d":{"$binary":"gAt9AAD8fGBtAA==","$type":"00"}},
                  "a":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}},
                  "b":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}}}}
-        })");*/
+        })");
 
     auto request = makeTimeseriesCompressedDiffUpdateOp(
         operationContext(), batch, ns.makeTimeseriesBucketsNamespace());
@@ -411,9 +410,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
     ASSERT_EQ(updates.size(), 1);
     // The update command request should return the document diff of the batch applied on the pre
     // image.
-    // TODO SERVER-79416: Re-enable this test. The expected offsets above are not correct with naive
-    // diff implementation.
-    // ASSERT(updates[0].getU().getDiff().binaryEqual(expectedDiff));
+    ASSERT(updates[0].getU().getDiff().binaryEqual(expectedDiff));
 }
 
 /**
@@ -459,15 +456,14 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
     setUncompressedBucketDoc(*batch, uncompressedPreImage);
-    batch->compressedBucketDoc = *preImageCompressionResult.compressedBucket;
 
     batch->numPreviouslyCommittedMeasurements = 3;
     BSONObj bucketDataDoc =
-        batch->compressedBucketDoc->getObjectField(kBucketDataFieldName).getOwned();
+        preImageCompressionResult.compressedBucket->getObjectField(kBucketDataFieldName).getOwned();
     batch->intermediateBuilders.initBuilders(bucketDataDoc,
                                              batch->numPreviouslyCommittedMeasurements);
 
-    /*const BSONObj expectedDiff = fromjson(
+    const BSONObj expectedDiff = fromjson(
         R"({
         "scontrol":{"u":{"count":5, "version":3},
                     "smin":{"u":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0}},
@@ -476,7 +472,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
             "b":{"time":{"o":10,"d":{"$binary":"gAt9AAD8fGBtAA==","$type":"00"}},
                  "a":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}},
                  "b":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}}}}
-        })");*/
+        })");
 
     auto request = makeTimeseriesCompressedDiffUpdateOp(
         operationContext(), batch, ns.makeTimeseriesBucketsNamespace());
@@ -486,9 +482,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
 
     // The update command request should return the document diff of the batch applied on the pre
     // image.
-    // TODO SERVER-79416: Re-enable this test. The expected offsets above are not correct with naive
-    // diff implementation.
-    // ASSERT(updates[0].getU().getDiff().binaryEqual(expectedDiff));
+    ASSERT(updates[0].getU().getDiff().binaryEqual(expectedDiff));
 }
 
 TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {

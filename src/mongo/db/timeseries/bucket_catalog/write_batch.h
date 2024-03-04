@@ -100,7 +100,7 @@ struct WriteBatch {
     uint32_t numPreviouslyCommittedMeasurements = 0;
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
     TrackedBSONObj uncompressedBucketDoc;
-    boost::optional<BSONObj> compressedBucketDoc;  // If set, bucket is compressed on-disk.
+    bool generateCompressedDiff = false;
 
     /**
      * In-memory data fields, sorted by insertion order. Allows for quick compression of bucket

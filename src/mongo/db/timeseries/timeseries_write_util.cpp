@@ -212,19 +212,12 @@ write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>
 }
 
 /**
- * Takes two compressed forms of the same bucket document, and generates a delta update oplog entry.
- *
- * - bucketDocBefore: Compressed form of the bucket document before the operation is performed. It
- *   only needs the data field. Any other top-level fields will be ignored.
- * - bucketDocAfter: Compressed form of the bucket document after the operation is performed. It
- *   only needs the data field. Any other top-level fields will be ignored.
+ * Generates the compressed diff using the BSONColumnBuilders stored in the batch and the
+ * intermediate() interface.
  */
 write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const BSONObj& bucketDocBefore,
-    const BSONObj& bucketDocAfter,
-    const StringMap<int>& offsets,
     bool changedToUnsorted) {
     BSONObjBuilder updateBuilder;
     {
@@ -252,51 +245,29 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
 
     {
         // Data builder.
-        const BSONObj& beforeData = bucketDocBefore.getObjectField(kBucketDataFieldName);
-        const BSONObj& afterData = bucketDocAfter.getObjectField(kBucketDataFieldName);
 
         BSONObjBuilder dataBuilder(updateBuilder.subobjStart(kDataFieldNameDocDiff));
         BSONObjBuilder newDataFieldsBuilder;
         BSONObjBuilder updatedDataFieldsBuilder;
-        auto beforeIt = beforeData.begin();
-        auto afterIt = afterData.begin();
 
-        while (beforeIt != beforeData.end()) {
-            invariant(afterIt != afterData.end());
-            invariant(beforeIt->fieldNameStringData() == afterIt->fieldNameStringData());
+        for (auto cName = batch->intermediateBuilders.begin(); cName.has_value();
+             cName = batch->intermediateBuilders.next()) {
+            auto& cBuilder = batch->intermediateBuilders.getBuilder(cName.value());
+            auto cDiff = cBuilder.intermediate();
 
-            if (beforeIt->binaryEqual(*afterIt)) {
-                // Contents are the same, nothing to diff.
-                beforeIt++;
-                afterIt++;
-                continue;
+            if (batch->newFieldNamesToBeInserted.count(cName.value())) {
+                // Insert new column.
+                invariant(cDiff.offset() == 0);
+                auto binary = BSONBinData(cDiff.data(), cDiff.size(), BinDataType::Column);
+                newDataFieldsBuilder.append(cName.value(), binary);
+            } else {
+                // Update existing column.
+                // TODO (SERVER-87384): Use helper function
+                BSONObj binaryObj = BSON(
+                    "o" << cDiff.offset() << "d"
+                        << BSONBinData(cDiff.data(), cDiff.size(), BinDataType::BinDataGeneral));
+                updatedDataFieldsBuilder.append(cName.value(), binaryObj);
             }
-
-            // Generate the binary diff.
-            int afterLen = 0;
-            const char* afterData = afterIt->binData(afterLen);
-
-            auto offsetsIt = offsets.find(beforeIt->fieldNameStringData());
-            invariant(offsetsIt != offsets.end());
-            int offset = offsetsIt->second;
-            invariant(afterLen >= offset);
-
-            BSONObj binaryObj = BSON("o" << offset << "d"
-                                         << BSONBinData(afterData + offset,
-                                                        afterLen - offset,
-                                                        BinDataType::BinDataGeneral));
-            updatedDataFieldsBuilder.append(beforeIt->fieldNameStringData(), binaryObj);
-            beforeIt++;
-            afterIt++;
-        }
-
-        // Finish consuming the after iterator, which should only contain new fields at this point
-        // as we've finished consuming the before iterator.
-        while (afterIt != afterData.end()) {
-            // Newly inserted fields are added as DocDiff inserts using the BSONColumn format.
-            invariant(batch->newFieldNamesToBeInserted.count(afterIt->fieldNameStringData()) == 1);
-            newDataFieldsBuilder.append(*afterIt);
-            afterIt++;
         }
 
         auto newDataFields = newDataFieldsBuilder.obj();
@@ -753,7 +724,6 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
             batch->measurements.size());  // i.e. number of to-insert measurements in bucketDataDoc
     }
     if (bucketDoc.compressedBucket) {
-        batch->compressedBucketDoc = bucketDoc.compressedBucket->getOwned();
         bucketToInsert = *bucketDoc.compressedBucket;
     }
 
@@ -793,15 +763,16 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
             compressionResult.compressedBucket);
 
     setUncompressedBucketDoc(*batch, updated);
-    batch->compressedBucketDoc = *compressionResult.compressedBucket;
 
     auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
     if (compressionResult.compressedBucket) {
         // Initialize BSONColumnBuilders which will later get transferred into the Bucket class.
         BSONObj bucketDataDoc =
             compressionResult.compressedBucket->getObjectField(kBucketDataFieldName);
-        batch->intermediateBuilders.initBuilders(bucketDataDoc,
-                                                 batch->numPreviouslyCommittedMeasurements);
+        BSONObj bucketControlDoc =
+            compressionResult.compressedBucket->getObjectField(kBucketControlFieldName);
+        int bucketCount = bucketControlDoc.getIntField(kBucketControlCountFieldName);
+        batch->intermediateBuilders.initBuilders(bucketDataDoc, bucketCount);
     }
 
     auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
@@ -825,54 +796,6 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     return op;
 }
 
-
-/**
- * Performs lightweight compression utilizing in-memory BSONColumnBuilders from WriteBatch and
- * returns the partial bucket document with data fields only.
- *
- * Output format of the partial bucket document that gets built:
- * {
- *   data: {
- *     <time field>: BinData(7, ...), // BinDataType 7 represents BSONColumn.
- *     <field0>:     BinData(7, ...),
- *     <field1>:     BinData(7, ...),
- *     ...
- *   }
- * }
- */
-BSONObj buildCompressedBucketDataFieldDocEfficiently(
-    std::shared_ptr<bucket_catalog::WriteBatch> batch, StringMap<int>& offsets) {
-    BSONObjBuilder bucketBuilder;
-
-    auto& batchBuilders = batch->intermediateBuilders;
-    BSONObjBuilder dataBuilder = bucketBuilder.subobjStart(kBucketDataFieldName);
-    for (boost::optional<StringData> key = batchBuilders.begin(); key != boost::none;
-         key = batchBuilders.next()) {
-        // TODO SERVER-79416: This is a naive implementation that simulates the old behavior
-        // when intermediate produced full binaries. Finalize is used to produce the binary and then
-        // the data is re-appended using a new BSONColumnBuilder so it is left in an appendable
-        // state.
-        BSONColumnBuilder& dataFieldColumnBuilder = batchBuilders.getBuilder(*key);
-        // Swap out the builders so the finalize data remain valid while we iterate over it and
-        // re-append.
-        BSONColumnBuilder oldBuilder;
-        std::swap(oldBuilder, dataFieldColumnBuilder);
-
-        BSONBinData columnBinary = oldBuilder.finalize();
-        dataBuilder.append(*key, columnBinary);
-
-        BSONColumn c(columnBinary);
-        for (auto&& elem : c) {
-            dataFieldColumnBuilder.append(elem);
-        }
-
-        offsets[*key] = 0;
-    }
-    dataBuilder.done();
-
-    return bucketBuilder.obj();
-}
-
 /**
  * Build the before and after data fields of the bucket documents efficiently with the column
  * builders, but do not build out the rest of the bucket document (control field, etc). Then
@@ -886,12 +809,6 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     using namespace details;
     invariant(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
-    // Holds the compressed bucket document that's currently on-disk
-    // prior to this write batch running.
-    StringMap<int> offsets;
-    BSONObj compressedBucketDataFieldDocBefore =
-        buildCompressedBucketDataFieldDocEfficiently(batch, offsets);
 
     auto& batchBuilders = batch->intermediateBuilders;
 
@@ -911,21 +828,10 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
         batchBuilders.insertOne(sortedMeasurementDoc.dataFields);
     }
 
-    StringMap<int> unused;
-    BSONObj compressedBucketDataFieldDocAfter =
-        buildCompressedBucketDataFieldDocEfficiently(batch, unused);
-    batch->compressedBucketDoc = compressedBucketDataFieldDocAfter;
-    setUncompressedBucketDoc(*batch, {});
-
     // Generates a delta update request using the before and after compressed bucket documents' data
     // fields. The only other items that will be different are the min, max, and count fields in the
     // control block, and the version field if it was promoted to a v3 bucket.
-    const auto updateEntry = makeTimeseriesCompressedDiffEntry(opCtx,
-                                                               batch,
-                                                               compressedBucketDataFieldDocBefore,
-                                                               compressedBucketDataFieldDocAfter,
-                                                               offsets,
-                                                               changedToUnsorted);
+    const auto updateEntry = makeTimeseriesCompressedDiffEntry(opCtx, batch, changedToUnsorted);
     write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
@@ -977,7 +883,7 @@ void makeWriteRequest(OperationContext* opCtx,
             batch, bucketsNs, metadata, std::move(stmtIds[batch->bucketHandle.bucketId.oid])));
         return;
     }
-    if (batch->compressedBucketDoc) {
+    if (batch->generateCompressedDiff) {
         updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
             opCtx, batch, bucketsNs, std::move(stmtIds[batch->bucketHandle.bucketId.oid])));
     } else {

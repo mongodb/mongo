@@ -2413,7 +2413,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                   str::stream() << "Expected 1 insertion of document with _id '" << docId
                                 << "', but found " << output.result.getValue().getN() << ".");
     } else {
-        auto op = batch->compressedBucketDoc
+        auto op = batch->generateCompressedDiff
             ? timeseries::makeTimeseriesCompressedDiffUpdateOp(
                   opCtx, batch, makeTimeseriesBucketsNamespace(ns(request)), std::move(stmtIds))
             : timeseries::makeTimeseriesUpdateOp(opCtx,

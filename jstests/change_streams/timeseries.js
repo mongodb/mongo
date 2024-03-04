@@ -1,12 +1,10 @@
 /**
  * Basic test to make sure events from timeseries buckets collections look normal and don't get
  * filtered.
- * TODO SERVER-79416: Re-enable test
  * @tags: [
  *     change_stream_does_not_expect_txns,
  *     assumes_unsharded_collection,
  *     requires_fcv_61,
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

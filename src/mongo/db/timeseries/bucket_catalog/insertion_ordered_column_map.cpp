@@ -42,17 +42,9 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
     for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
         int binLength = 0;
         const char* binData = columnValue.binData(binLength);
-        // TODO SERVER-79416: Use BSONColumnBuilder reopen constructor. It leaves the builder in a
-        // diff-producing state so this needs to be integrated together with the intermediate()
-        // call.
-        auto [it, inserted] =
-            _builders.try_emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
-                                  numMeasurements,
-                                  BSONColumnBuilder());
-        BSONColumn c(binData, binLength);
-        for (auto&& elem : c) {
-            std::get<1>(it->second).append(elem);
-        }
+
+        _builders.emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
+                          std::make_pair(numMeasurements, BSONColumnBuilder(binData, binLength)));
 
         _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
         _insertionOrderSize += key.size();
@@ -140,10 +132,6 @@ void InsertionOrderedColumnMap::_assertInternalStateIdentical_forTest() {
     for (auto& [key, pairValue] : _builders) {
         keySizes += key.size();
         auto& [numMeasurements, builder] = pairValue;
-        BSONBinData binData = builder.finalize();
-        BSONColumn col(binData);
-
-        invariant(col.size() == numMeasurements);
         invariant(numMeasurements == _measurementCount);
 
         // All keys in _builders should exist in _insertionOrder.

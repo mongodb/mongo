@@ -1236,10 +1236,11 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
             // When lastControl has been set, the control byte we're working on is always at the
             // beginning of the binary.
             uint8_t controlByteThisBinary = *_bufBuilder.buf();
+            /* TODO (SERVER-87383): Determine a safe optimization to minimize diffs
             if (prevOffset != 0 && _is.lastControl == controlByteThisBinary &&
                 _is.lastBufLength > controlOffset) {
                 identicalBytes = _is.lastBufLength - controlOffset;
-            }
+            }*/
             newState.lastControl = controlByteThisBinary;
         } else {
             newState.lastControl = *(_bufBuilder.buf() + controlOffset);
