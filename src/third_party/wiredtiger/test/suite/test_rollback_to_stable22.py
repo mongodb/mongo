@@ -28,6 +28,7 @@
 
 from rollback_to_stable_util import test_rollback_to_stable_base
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 # test_rollback_to_stable22
 # Test history store operations conflicting with rollback to stable. We're trying to trigger a
@@ -41,6 +42,14 @@ from wtdataset import SimpleDataSet
 class test_rollback_to_stable22(test_rollback_to_stable_base):
     conn_config = 'cache_size=100MB,verbose=(rts:5)'
     prepare = False
+
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(worker_thread_values)
 
     def test_rollback_to_stable(self):
         nrows = 1000
@@ -80,4 +89,4 @@ class test_rollback_to_stable22(test_rollback_to_stable_base):
                 # Put the timestamp backwards so we can rollback the updates we just did.
                 stable_ts = (i - 1) * 10
                 self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(stable_ts))
-                self.conn.rollback_to_stable()
+                self.conn.rollback_to_stable('threads=' + str(self.threads))

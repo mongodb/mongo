@@ -50,7 +50,13 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
         ('recovery', dict(crash=True)),
     ]
 
-    scenarios = make_scenarios(format_values, checkpoint_modes, rollback_modes)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, checkpoint_modes, rollback_modes, worker_thread_values)
 
     def conn_config(self):
         return 'verbose=(rts:5)'
@@ -91,7 +97,7 @@ class test_rollback_to_stable31(test_rollback_to_stable_base):
         if self.crash:
             simulate_crash_restart(self, ".", "RESTART")
         else:
-            self.conn.rollback_to_stable()
+            self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         if self.crash:
             if self.checkpoint:

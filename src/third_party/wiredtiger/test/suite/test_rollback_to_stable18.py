@@ -51,7 +51,13 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, prepare_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, prepare_values, worker_thread_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,in_memory=true,statistics=(all),' \
@@ -105,7 +111,7 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
                 ',stable_timestamp=' + self.timestamp_str(20))
 
         # Perform rollback to stable.
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Verify data is not visible.
         self.check(value_a, uri, nrows, None, 30)

@@ -68,7 +68,13 @@ class test_rollback_to_stable24(wttest.WiredTigerTestCase):
         ('row_integer', dict(key_format='i')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(key_format_values, worker_thread_values)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,7 +137,7 @@ class test_rollback_to_stable24(wttest.WiredTigerTestCase):
 
         # Roll back to 40.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(40))
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Now read at 40.
         cursor = s.open_cursor(uri)

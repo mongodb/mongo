@@ -34,13 +34,22 @@ from wtscenario import make_scenarios
 # test_rollback_to_stable30.py
 # Test RTS fails with active transactions and the subsequent transaction resolution succeeds.
 class test_rollback_to_stable30(wttest.WiredTigerTestCase):
-    scenarios = make_scenarios([
+
+    format_values = [
         ('table-f', dict(keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
         ('table-r', dict(keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
         ('table-S', dict(keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
         ('table-r-complex', dict(keyfmt='r', valfmt=None, dataset=ComplexDataSet)),
         ('table-S-complex', dict(keyfmt='S', valfmt=None, dataset=ComplexDataSet)),
-    ])
+    ]
+
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, worker_thread_values)
 
     # Don't raise errors for these, the expectation is that the RTS verifier will
     # run on the test output.
@@ -75,7 +84,7 @@ class test_rollback_to_stable30(wttest.WiredTigerTestCase):
         msg = '/rollback_to_stable.*active/'
         with self.expectedStdoutPattern('transaction state dump'):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda:self.conn.rollback_to_stable(), msg)
+                lambda:self.conn.rollback_to_stable('threads=' + str(self.threads)), msg)
 
         # Set commit, durable timestamps to 20.
         self.session.timestamp_transaction(
