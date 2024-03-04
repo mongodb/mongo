@@ -27,8 +27,6 @@ selector:
   - jstests/core/timeseries/timeseries_expire_collmod.js
   # Doesn't expect a failpoint to be enabled.
   - jstests/core/**/set_param1.js
-  # Expects a correct index count in dbStats.
-  - jstests/core/**/dbstats.js
   # Expects queries on _id to use IDHACK in explain.
   - jstests/core/**/agg_hint.js
   - jstests/core/**/explain_shell_helpers.js
