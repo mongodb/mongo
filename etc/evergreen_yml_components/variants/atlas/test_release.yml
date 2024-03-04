@@ -25,7 +25,7 @@ buildvariants:
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    multiversion_platform: rhel7.9-small
+    multiversion_platform: rhel79
     multiversion_edition: enterprise
     has_packages: true
     packager_script: packager_enterprise.py
