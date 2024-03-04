@@ -116,6 +116,68 @@ Compressed bucket (version 2 and version 3):
 }
 ```
 
+### Bucket Versions
+
+The versions that a bucket can take are V1, V2, and V3.
+
+V1 buckets are uncompressed and their measurements are not sorted on time, V2 buckets are compressed
+and have their measurements sorted on time, and V3 buckets are compressed but do not have their
+measurements sorted on time. When we say that a bucket is compressed, we mean that for each field
+in its data, the measurements for that field are stored in a BSONColumn [(More about BSONColumn and the binary data type, BinData7)](https://github.com/mongodb/mongo/blob/4e8319347d8ee243fa96fe186abd91bd6b4bbeb8/src/mongo/db/timeseries/README.md#bucket-collection-schema).
+
+Starting in 8.0, newly created buckets will be V2 by default. V2 and V3 buckets in the BucketCatalog maintain
+a BSONColumnBuilder for each data field. These builders are append-only, meaning that new measurements can only
+be added to the end of the builder." If measurements come out of order by time into the
+same bucket (which is more likely to happen during low cardinality concurrent bulk loads), we will promote
+a V2 bucket to a V3 bucket. The bucket will behave the same way, the only difference being that
+the measurements in a V3 bucket are not guaranteed to be in-order on time (and in fact, must have
+at least one out-of-order measurement). Queries can also be less performant on V3 buckets, since they
+cannot rely on the fact that V3 buckets have their measurements in order by time.
+
+New V1 buckets will no longer be created in 8.0+, but existing V1 buckets from upgrades will
+continue to be supported. Closed V1 buckets can be re-opened, and will be compressed when more
+measurements are inserted into them.
+
+### BSONColumnBuilder
+
+Each V2 and V3 bucket has a InsertionOrderedColumnMap, which is a map from each data field (excluding the meta field) in a bucket
+to a corresponding BSONColumnBuilder for that field. For example, if a bucket has a timefield `time`,
+there will be a mapping (`time` -> BSONColumnnBuilder for the BSONColumn of time data).
+
+BSONColumnBuilder stores binary data that can represent either the entire BSONColumn for a field or a partial
+BSONColumn. When we are adding the measurements for a new field, its binary data will represent the entire BSONColumn
+for that field. When we are appending measurements to existing fields, it will instead store the binary data
+representing a partial BSONColumn which only includes the new measurements that have been added - the binary data difference
+representing these new measurements can be retrieved by calling `intermediate()`. This binary data difference is used to generate
+a DocDiff for the BSONColumn.
+
+### DocDiff Support for BSONColumn
+
+In order to avoid replicating entire compressed bucket documents, we take advantage of the fact that
+adding elements to the BSONColumn is append-only and utilize DocDiff. Since with each addition only
+the last few bytes of a BSONColumn binary change, we construct a DocDiff that includes information about
+what the new binary data to be added is as well as at what offset to copy it into, for each field.
+This approach works better in terms of oplog size and oplog entry size as the write batch size increases.
+
+The DocDiff will take the form below:
+
+```
+{
+    b(inary): {
+        <field1>: {
+            o(ffset): Number,    // Offset into existing BSONColumn
+            d(ata):   BinData    // Binary data to copy to existing BSONColumn
+        },
+        ...,
+        <fieldN>: {
+            o(ffset): Number,    // Offset into existing BSONColumn
+            d(ata):   BinData    // Binary data to copy to existing BSONColumn
+        }
+    }
+}
+
+```
+
 ### Metadata Normalization
 
 If the value of a document's `metaField` field contains any object data, that data will be
@@ -228,18 +290,22 @@ If an initial attempt to insert a measurement finds no open bucket, or finds an 
 not suitable to house the incoming measurement, the `BucketCatalog` may return some information to
 the caller that can be used to retrieve a bucket from disk to reopen. In some cases, this will be
 the `_id` of an archived bucket (more details below). In other cases, this will be a set of filters
-to use for a query.
+to use for a query. Once we retrieve the bucket from disk, we recreate the in-memory bucket
+representation of the bucket.
 
 The filters will include an exact match on the `metaField`, a range match on the `timeField`, size
 filters on the `timeseriesBucketMaxCount` and `timeseriesBucketMaxSize` server parameters, and a
-missing or `false` value for `control.closed`. At least for v6.3, the filters will also specify
-`control.version: 1` to disallow selecting compressed buckets. The last restriction is for
-performance, and may be removed in the future if we improve decompression speed or deem the benefits
-to outweigh the cost.
+missing or `false` value for `control.closed`.
 
 The query-based reopening path relies on a `{<metaField>: 1, <timeField>: 1}` index to execute
 efficiently. This index is created by default for new time series collections created in v6.3+. If
 the index does not exist, then query-based reopening will not be used.
+
+When we reopen compressed buckets, in order to avoid fully decompressing and then fully re-compressing
+the bucket we instantiate the bucket's BSONColumnBuilders from the existing BSONColumn binaries. Currently
+this only supports scalar values; if the interleave mode (the mode where we are dealing with different types)
+is detected in the input BSONColumn binary, we will fully decompress and re-compressed the bucket we are
+reopening.
 
 ### Bucket Closure and Archival
 
@@ -345,6 +411,16 @@ time-series update/delete.
 
 Time-series deletes support retryable writes with the existing mechanisms. For time-series updates,
 they are run through the Internal Transaction API to make sure the two writes to storage are atomic.
+
+### Calculating Memory Usage
+
+Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals (Stripes, BucketMetadata, etc)
+is calculated using the [Timeseries Tracking Allocator](https://github.com/10gen/mongo/blob/f726b6db3a361122a87555dbea053d98b01685a3/src/mongo/db/timeseries/timeseries_tracking_allocator.h).
+
+### Freezing Buckets
+
+When bucket compression fails, we will fail the insert prompting the user to retry the write and "freeze"
+the bucket that we failed to compress. Once a bucket is frozen, we will no longer attempt to write to it.
 
 # References
 
