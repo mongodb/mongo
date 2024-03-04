@@ -133,11 +133,16 @@ restoreNode = rst.restart(restoreNode, {
 // We need to wait until the node has done enough initialization before waiting on the failpoint.
 rst.waitForState(restoreNode, ReplSetTest.State.ROLLBACK);
 
-assert.commandWorked(restoreNode.adminCommand({
-    waitForFailPoint: 'hangBeforeUnrecoverableRollbackError',
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+// It is possible that 'waitForFailPoint' is called as connections are being closed, triggering
+// an exception. In this case, retry until we are sure connections are finished closing.
+assert.soonNoExcept(function() {
+    assert.commandWorked(restoreNode.adminCommand({
+        waitForFailPoint: 'hangBeforeUnrecoverableRollbackError',
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
+    return true;
+});
 clearRawMongoProgramOutput();
 
 assert.commandWorked(restoreNode.adminCommand(
