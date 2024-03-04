@@ -1502,9 +1502,8 @@ buildvariants:
   #     - *schedule_variant_auto_tasks_task
   #     - name: industry_benchmarks
   #     - name: ycsb_60GB
-  #     # TODO: Turn on with Python3 py-tpcc support (PERF-4758)
-  #     # - name: tpcc
-  #     # - name: tpcc_majority
+  #     - name: tpcc
+  #     - name: tpcc_majority
   #     - name: linkbench
   #     - name: linkbench2
 
