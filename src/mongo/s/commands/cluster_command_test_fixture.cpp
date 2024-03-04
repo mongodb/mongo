@@ -136,10 +136,6 @@ void ClusterCommandTestFixture::expectReturnsError(ErrorCodes::Error code) {
 }
 
 DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
-    // TODO SERVER-48142 should remove the following fail-point usage.
-    // Skip appending required fields in unit-tests
-    FailPointEnableBlock skipAppendingReqFields("allowSkippingAppendRequiredFieldsToResponse");
-
     // Create a new client/operation context per command
     auto client = getServiceContext()->getService()->makeClient("ClusterCmdClient");
     auto opCtx = client->makeOperationContext();

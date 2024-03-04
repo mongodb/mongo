@@ -135,16 +135,6 @@ using namespace fmt::literals;
 MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;
 
-/**
- * Invoking `shouldGossipLogicalTime()` is expected to always return "true" during normal execution.
- * SERVER-48013 uses this property to avoid the cost of calling this function during normal
- * execution. However, it might be desired to do the validation for test purposes (e.g.,
- * unit-tests). This fail-point allows going through a code path that does the check and quick
- * returns from `appendRequiredFieldsToResponse()` if `shouldGossipLogicalTime()` returns "false".
- * TODO SERVER-48142 should remove the following fail-point.
- */
-MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
-
 Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
                                   std::shared_ptr<CommandInvocation> invocation) {
     static constexpr bool useDedicatedThread = true;
@@ -156,15 +146,6 @@ Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
-    // TODO SERVER-48142 should remove the following block.
-    if (MONGO_unlikely(allowSkippingAppendRequiredFieldsToResponse.shouldFail())) {
-        auto validator = LogicalTimeValidator::get(opCtx);
-        if (!validator->shouldGossipLogicalTime()) {
-            LOGV2_DEBUG(4801301, 3, "Skipped gossiping logical time");
-            return;
-        }
-    }
-
     // The appended operationTime must always be <= the appended $clusterTime, so in case we need to
     // use $clusterTime as the operationTime below, take a $clusterTime value which is guaranteed to
     // be <= the value output by gossipOut().

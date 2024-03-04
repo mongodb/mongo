@@ -243,17 +243,7 @@ private:
 };
 
 Status waitForSigningKeys(OperationContext* opCtx) {
-    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-
     while (true) {
-        auto configCS = shardRegistry->getConfigServerConnectionString();
-        auto rsm = ReplicaSetMonitor::get(configCS.getSetName());
-        // mongod will set minWireVersion == maxWireVersion for hello requests from
-        // internalClient.
-        if (rsm && (rsm->getMaxWireVersion() < WireVersion::SUPPORTS_OP_MSG)) {
-            LOGV2(22841, "Waiting for signing keys not supported by config shard");
-            return Status::OK();
-        }
         auto stopStatus = opCtx->checkForInterruptNoAssert();
         if (!stopStatus.isOK()) {
             return stopStatus;
