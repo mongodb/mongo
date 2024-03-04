@@ -8,7 +8,7 @@ import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 requireSSLProvider('windows', function() {
     if (_isWindows()) {
         // SChannel backed follows Windows rules and only trusts Root in LocalMachine
-        runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\ca.pem");
+        runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
         // Import a pfx file since it contains both a cert and private key and is easy to import
         // via command line.
         runProgram("certutil.exe",
@@ -58,7 +58,7 @@ requireSSLProvider('windows', function() {
         if (_isWindows()) {
             const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
             runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
-            const ca_thumbprint = cat('jstests/libs/ca.pem.digest.sha1');
+            const ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
             runProgram("certutil.exe", "-delstore", "-f", "Root", ca_thumbprint);
         }
     }

@@ -4,8 +4,6 @@
 // for details.
 // To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
-// TODO BUILD-17503 Remove this tag
-// @tags: [incompatible_with_macos]
 
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);
@@ -26,7 +24,7 @@ function testWithCerts(prefix) {
         tlsCertificateKeyFile: 'jstests/libs/' + prefix + 'server.pem',
         waitForConnect: false,
         setParameter: {tlsUseSystemCA: true},
-        env: {"SSL_CERT_FILE": "jstests/libs/" + prefix + "ca.pem"},
+        env: {"SSL_CERT_FILE": "jstests/libs/trusted-ca.pem"},
     };
     const conn = MongoRunner.runMongod(opts);
 

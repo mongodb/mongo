@@ -4,16 +4,14 @@
 // for details.
 // To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
-// TODO BUILD-17503 Remove this tag
-// @tags: [incompatible_with_macos]
 
 if (_isWindows()) {
     // OpenSSL backed imports Root CA and intermediate CA
-    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\ca.pem");
+    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
 
     // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
     // Current User.
-    runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\ca.pem");
+    runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
 }
 
 try {
@@ -22,7 +20,7 @@ try {
         nodes: 1,
         nodeOptions: {
             tlsMode: "requireTLS",
-            tlsCertificateKeyFile: "jstests/libs/server.pem",
+            tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
             setParameter: {tlsUseSystemCA: true},
         },
         host: "localhost",
@@ -31,7 +29,7 @@ try {
 
     replTest.startSet({
         env: {
-            SSL_CERT_FILE: 'jstests/libs/ca.pem',
+            SSL_CERT_FILE: 'jstests/libs/trusted-ca.pem',
         },
     });
 
@@ -45,13 +43,13 @@ try {
         var argv = ['mongo', url, '--eval', ('db.runCommand({replSetGetStatus: 1})')];
 
         if (url.endsWith('&ssl=true')) {
-            argv.push('--tls', '--tlsCertificateKeyFile', 'jstests/libs/client.pem');
+            argv.push('--tls', '--tlsCertificateKeyFile', 'jstests/libs/trusted-client.pem');
         }
 
         if (!_isWindows()) {
             // On Linux we override the default path to the system CA store to point to our
             // system CA. On Windows, this CA will have been added to the user's trusted CA list
-            argv.unshift("env", "SSL_CERT_FILE=jstests/libs/ca.pem");
+            argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
         }
         var ret = runMongoProgram(...argv);
         return ret;
@@ -72,7 +70,7 @@ try {
     replTest.stopSet();
 } finally {
     if (_isWindows()) {
-        const ca_thumbprint = cat('jstests/libs/ca.pem.digest.sha1');
+        const ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
         runProgram("certutil.exe", "-delstore", "-f", "Root", ca_thumbprint);
         runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", ca_thumbprint);
     }
