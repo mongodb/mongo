@@ -6,9 +6,11 @@
  *   not_allowed_with_signed_security_token,
  *   no_selinux,
  *   requires_timeseries,
- * # TODO SERVER-82166 remove "balancer off" tag once PM-2077 is over: migration can cause an index
- * # to be created before a dropIndex commits causing the metadata validation to fail
+ * # TODO SERVER-82166 remove "balancer off" and "tenant_migration_incompatible" tag once PM-2077 is
+ * # over: migration can cause an index to be created before a dropIndex commits causing the
+ * # metadata validation to fail
  * assumes_balancer_off,
+ * tenant_migration_incompatible
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
