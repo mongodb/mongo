@@ -2605,13 +2605,11 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
          * clean shutdown.
          */
         if (use_timestamp) {
-            const char *rts_cfg[] = {
-              WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
             __wt_timer_start(session, &timer);
             __wt_verbose(session, WT_VERB_RTS,
               "[SHUTDOWN_INIT] performing shutdown rollback to stable, stable_timestamp=%s",
               __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
-            WT_TRET(conn->rts->rollback_to_stable(session, rts_cfg, true));
+            WT_TRET(conn->rts->rollback_to_stable(session, cfg, true));
 
             /* Time since the shutdown RTS has started. */
             __wt_timer_evaluate_ms(session, &timer, &conn->shutdown_timeline.rts_ms);

@@ -52,13 +52,7 @@ class test_rollback_to_stable03(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=4GB,statistics=(all),verbose=(rts:5)'
@@ -110,7 +104,7 @@ class test_rollback_to_stable03(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
         # Check that the old updates are only seen even with the update timestamp.
         self.check(valueb, uri, nrows, None, 20)
         self.check(valuea, uri, nrows, None, 10)

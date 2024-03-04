@@ -50,7 +50,6 @@ def custom_validator(data):
         "rolling back tree",
         "tree rolled back",
         "finished rollback to stable",
-        "waiting for helper threads"
     ]
     needle = "skipped performing rollback to stable"
 

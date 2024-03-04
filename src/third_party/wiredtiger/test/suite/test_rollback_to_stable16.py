@@ -58,12 +58,6 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         ('inmem', dict(in_memory=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
     def keep(name, d):
         if d['key_format'] == 'i' and d['value_format'] == '8t':
             # Fixed-length format is only special for column-stores.
@@ -71,7 +65,7 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         return True
 
     scenarios = make_scenarios(key_format_values, value_format_values, in_memory_values,
-        worker_thread_values, include=keep)
+        include=keep)
 
     # Don't raise errors for these, the expectation is that the RTS verifier will
     # run on the test output.
@@ -161,7 +155,7 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
             simulate_crash_restart(self,".", "RESTART")
         else:
             # Manually call rollback_to_stable for in memory keys/values.
-            self.conn.rollback_to_stable('threads=' + str(self.threads))
+            self.conn.rollback_to_stable()
 
         self.check(values[0], uri, nrows, 1, 2)
         self.check(values[1], uri, nrows, 201, 5)

@@ -82,7 +82,6 @@ func_ok()
         -e '/int __wt_lsm_manager_pop_entry$/d' \
         -e '/int __wt_once$/d' \
         -e '/int __wt_posix_directory_list_free$/d' \
-        -e '/int __wt_rts_thread_stop$/d' \
         -e '/int __wt_session_breakpoint$/d' \
         -e '/int __wt_set_return_func$/d' \
         -e '/int __wt_spin_init$/d' \

@@ -52,13 +52,7 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
@@ -112,7 +106,7 @@ class test_rollback_to_stable08(test_rollback_to_stable_base):
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
 
         # Check that the correct data is seen.
         self.check(value_a, uri, nrows, None, 20)

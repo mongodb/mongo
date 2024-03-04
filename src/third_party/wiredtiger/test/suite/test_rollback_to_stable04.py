@@ -65,13 +65,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('evict', dict(evict=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, evict, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, evict)
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
@@ -166,7 +160,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false') + ',threads=' + str(self.threads))
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_modQ, uri, nrows, None, 30)

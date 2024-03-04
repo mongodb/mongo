@@ -67,13 +67,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ('dryrun', dict(dryrun=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
 
     def conn_config(self):
         config = 'cache_size=100MB,statistics=(all),verbose=(rts:5)'
@@ -133,7 +127,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false') + ',threads=' + str(self.threads))
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()
 

@@ -50,8 +50,7 @@ class OpType(Enum):
     STABLE_UPDATE_FOUND = 41
     TREE_OBJECT_LOG = 42
     UPDATE_CHAIN_VERIFY = 43
-    WAIT_THREADS = 44
-    SKIP_DEL = 45
+    SKIP_DEL = 44
 
 class Operation:
     def __init__(self, line):
@@ -578,9 +577,6 @@ class Operation:
 
         matches = re.search('btree=(\d+)', line)
         self.btree_id = int(matches.group(1))
-
-    def __init_wait_threads(self, line):
-        self.type = OpType.WAIT_THREADS
 
     def __init_end(self, line):
         self.type = OpType.END

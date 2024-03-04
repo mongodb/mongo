@@ -54,17 +54,11 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
     tablename = "test_rollback_stable09"
     uri = "table:" + tablename
     index_uri = "index:test_rollback_stable09:country"
 
-    scenarios = make_scenarios(colstore_values, in_memory_values, prepare_values, worker_thread_values)
+    scenarios = make_scenarios(colstore_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=250MB,verbose=(rts:5)'
@@ -130,7 +124,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         self.create_index(30)
 
         #perform rollback to stable, still the table and index must exist
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
 
         if not self.in_memory:
             self.assertTrue(os.path.exists(self.tablename + ".wt"))
@@ -149,7 +143,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         self.drop_table(40)
 
         #perform rollback to stable, the table and index must not exist
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
 
         if not self.in_memory:
             self.assertFalse(os.path.exists(self.tablename + ".wt"))

@@ -47,13 +47,7 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         ('inmem', dict(in_memory=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -122,7 +116,7 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
             simulate_crash_restart(self,".", "RESTART")
         else:
             # Manually call rollback_to_stable for in memory keys/values.
-            self.conn.rollback_to_stable('threads=' + str(self.threads))
+            self.conn.rollback_to_stable()
 
         # Check that keys at timestamps 2 and 5 have the correct values they were updated with.
         self.check(values[0], uri, nrows - 1, 2)

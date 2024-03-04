@@ -48,13 +48,7 @@ class test_rollback_to_stable37(test_rollback_to_stable_base):
         ('dryrun', dict(dryrun=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, dryrun_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, dryrun_values)
 
     def test_rollback_to_stable(self):
         uri = 'table:test_rollback_to_stable37'
@@ -109,7 +103,7 @@ class test_rollback_to_stable37(test_rollback_to_stable_base):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2000))
         self.session.checkpoint()
 
-        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false') + ',threads=' + str(self.threads))
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
 
         self.check(value_c, uri, nrows, None, 1000)
         self.check(value_c, uri, nrows, None, 2000)

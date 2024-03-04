@@ -39,13 +39,7 @@ class test_rollback_to_stable41(test_rollback_to_stable_base):
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, worker_thread_values)
+    scenarios = make_scenarios(format_values)
 
     def conn_config(self):
         return 'verbose=(rts:5)'
@@ -74,9 +68,9 @@ class test_rollback_to_stable41(test_rollback_to_stable_base):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 
         # Fake RTS, newer data should still exist.
-        self.conn.rollback_to_stable('dryrun=true' + ', threads=' + str(self.threads))
+        self.conn.rollback_to_stable('dryrun=true')
         self.check(value_b, uri, nrows, None, 30)
 
         # Real RTS, newer data should vanish.
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
         self.check(value_a, uri, nrows, None, 30)

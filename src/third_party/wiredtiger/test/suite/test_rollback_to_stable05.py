@@ -52,13 +52,7 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
@@ -128,7 +122,7 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         session_2.commit_transaction()
         session_2.close()
 
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
         self.check(valued, uri_1, nrows, None, 0)
         self.check(valued, uri_2, nrows, None, 0)
 

@@ -47,13 +47,7 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
         ('inmem', dict(in_memory=True))
     ]
 
-    worker_thread_values = [
-        ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
-    ]
-
-    scenarios = make_scenarios(key_format_values, in_memory_values, worker_thread_values)
+    scenarios = make_scenarios(key_format_values, in_memory_values)
 
     def conn_config(self):
         config = 'verbose=(rts:5)'
@@ -105,7 +99,7 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
 
         # Now roll back.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(15))
-        self.conn.rollback_to_stable('threads=' + str(self.threads))
+        self.conn.rollback_to_stable()
 
         # The only thing we should see (at any time) is value_b at key 7.
         cursor = self.session.open_cursor(uri)
