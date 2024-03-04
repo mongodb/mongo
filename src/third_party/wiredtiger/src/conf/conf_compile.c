@@ -393,6 +393,12 @@ __wt_conf_compile_api_call(WT_SESSION_IMPL *session, const WT_CONFIG_ENTRY *cent
         WT_RET_MSG(session, ENOTSUP,
           "Error compiling, method '%s' does not support compiled configurations", centry->method);
 
+    /* Fast path: if there is no configuration, return with the default config for this API. */
+    if (config == NULL || *config == '\0') {
+        *confp = S2C(session)->conf_api_array[centry_index];
+        return (0);
+    }
+
     conf = NULL;
 
     /* Verify we have the needed size. */

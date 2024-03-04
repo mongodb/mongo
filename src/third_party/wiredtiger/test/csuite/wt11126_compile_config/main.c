@@ -50,7 +50,16 @@
  */
 #define N_CALLS (WT_THOUSAND * 10)
 #define N_RUNS (100)
-#define N_VARIANTS 4
+#define N_VARIANTS 5
+
+/* Description of each variant. */
+static const char *descriptions[N_VARIANTS] = {
+  "baseline, formats a configuration string each time",
+  "each call chooses a pre-made configuration string",
+  "each call uses a precompiled string, and uses bindings",
+  "each call chooses a precompiled configuration string",
+  "each call has a null configuration",
+};
 
 #define IGNORE_PREPARE_VALUE_SIZE 3
 static const char *ignore_prepare_value[3] = {"false", "force", "true"};
@@ -203,6 +212,16 @@ begin_transaction_fast_alternate(WT_SESSION *session, const char **compiled_arra
 }
 
 /*
+ * begin_transaction_null --
+ *     This does a begin transaction without any parameters, merely for comparison benchmarks.
+ */
+static void
+begin_transaction_null(WT_SESSION *session)
+{
+    testutil_check(session->begin_transaction(session, NULL));
+}
+
+/*
  * do_config_run --
  *     Run the test with or without configuration compilation.
  */
@@ -248,6 +267,14 @@ do_config_run(TEST_OPTS *opts, int variant, const char *compiled, const char **c
         case 3:
             begin_transaction_fast_alternate(session, compiled_array, ignore_prepare,
               roundup_prepared, roundup_read, no_timestamp);
+            break;
+        case 4:
+            /*
+             * We always have a null configuration, so we are not setting the "right" parameters.
+             * This one cannot be checked, it is only for comparison benchmarks.
+             */
+            begin_transaction_null(session);
+            check = false;
             break;
         default:
             testutil_assert(variant < N_VARIANTS);
@@ -318,10 +345,8 @@ main(int argc, char *argv[])
     base_ns = ns = nsecs[0] / (N_CALLS * N_RUNS);
     for (variant = 0; variant < N_VARIANTS; ++variant) {
         ns = nsecs[variant] / (N_CALLS * N_RUNS);
-        printf("variant = %d, total = %" PRIu64
-               ", nanoseconds per pair of begin/rollback calls = %" PRIu64
-               ", speed vs baseline = %f\n",
-          variant, nsecs[variant], ns, ((double)base_ns) / ns);
+        printf("variant %d: %s, nsec per begin/rollback pair = %" PRIu64 ", vs baseline = %f\n",
+          variant, descriptions[variant], ns, ((double)base_ns) / ns);
     }
 
     testutil_cleanup(opts);
