@@ -381,7 +381,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], W
          * The user may be trying to read a log record they just wrote. Log records may be buffered,
          * so force out any now.
          */
-        WT_ERR(__wt_log_force_write(session, 1, NULL));
+        WT_ERR(__wt_log_force_write(session, true, NULL));
 
         /* Log cursors block removal. */
         __wt_readlock(session, &log->log_remove_lock);
