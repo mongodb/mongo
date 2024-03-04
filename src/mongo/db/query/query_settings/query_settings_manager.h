@@ -130,6 +130,7 @@ public:
     /**
      * Performs the QuerySettings lookup by computing QueryShapeHash only in cases when at least one
      * QueryShapeConfiguration is set for the given namespace.
+     * TODO: SERVER-84725: This function template may not be necessary after refactoring is done.
      */
     template <typename Fn>
     boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
@@ -157,14 +158,12 @@ public:
         if (queryShapeConfigurationIt == queryShapeConfigurationsMap.end()) {
             return boost::none;
         }
-
         return queryShapeConfigurationIt->second;
     }
 
     /**
      * Returns (QuerySettings, QueryInstance) pair associated with the QueryShapeHash for the given
-     * tenant. Always default to using the other 'getQuerySettingsForQueryShapeHash()' versions if
-     * the 'NamespaceString' parameter is available.
+     * tenant.
      */
     boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
         OperationContext* opCtx,

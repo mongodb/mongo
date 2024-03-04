@@ -243,55 +243,21 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
         ASSERT_BSONOBJ_EQ(r0->second, r1->second);
     };
 
-    // Helper function to perform the same lookup using both the cold & hot path methods. Also booby
-    // traps the lazy query shape hash computation function on the hot path, so it can later be
-    // reasoned whether the computation happened or not.
-    auto doTest = [&](boost::optional<TenantId> tenantId,
-                      query_shape::QueryShapeHash hash,
-                      std::function<void(Result, bool)> assertionFn) {
-        auto slowResult = manager().getQuerySettingsForQueryShapeHash(opCtx(), hash, tenantId);
-        bool wasHashComputed = false;
-        auto fastResult = manager().getQuerySettingsForQueryShapeHash(
-            opCtx(),
-            [&]() {
-                wasHashComputed = true;
-                return hash;
-            },
-            nss(tenantId));
-
-        // Ensure that both code paths returned identical results, and pass the result to the
-        // `assertionFn` callback.
-        assertResultsEq(fastResult, slowResult);
-        assertionFn(fastResult, wasHashComputed);
-    };
-
-    TenantId firstTenantId(OID::fromTerm(1)), secondTenantId(OID::fromTerm(2));
-    auto configs = getExampleQueryShapeConfigurations(opCtx(), firstTenantId);
+    TenantId tenantId(OID::fromTerm(1));
+    auto configs = getExampleQueryShapeConfigurations(opCtx(), tenantId);
     manager().setQueryShapeConfigurations(
-        opCtx(), std::vector<QueryShapeConfiguration>(configs), LogicalTime(), firstTenantId);
+        opCtx(), std::vector<QueryShapeConfiguration>(configs), LogicalTime(), tenantId);
 
-    // Ensure QuerySettingsManager returns boost::none when QuerySettings are not found. Expect the
-    // hash to be computed since there are some settings set on this collection.
-    const auto emptyQueryShapeHash = query_shape::QueryShapeHash();
-    doTest(firstTenantId, emptyQueryShapeHash, [&](Result result, bool wasHashComputed) {
-        ASSERT_TRUE(wasHashComputed);
-        assertResultsEq(result, boost::none);
-    });
+    // Ensure QuerySettingsManager returns boost::none when QuerySettings are not found.
+    assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
+                        opCtx(), query_shape::QueryShapeHash(), tenantId),
+                    boost::none);
+
 
     // Ensure QuerySettingsManager returns a valid (QuerySettings, QueryInstance) pair on lookup.
-    doTest(firstTenantId, configs[1].getQueryShapeHash(), [&](Result result, bool wasHashComputed) {
-        ASSERT_TRUE(wasHashComputed);
-        assertResultsEq(
-            result, std::make_pair(configs[1].getSettings(), configs[1].getRepresentativeQuery()));
-    });
-
-    // Ensure QuerySettingsManager returns boost::none when no QuerySettings are set for the given
-    // tenant, however, exists for other tenant. There's no query settings set for this collection,
-    // so no query shape hash should be computed.
-    doTest(secondTenantId, emptyQueryShapeHash, [&](Result result, bool wasHashComputed) {
-        ASSERT_FALSE(wasHashComputed);
-        assertResultsEq(result, boost::none);
-    });
+    assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
+                        opCtx(), configs[1].getQueryShapeHash(), tenantId),
+                    std::make_pair(configs[1].getSettings(), configs[1].getRepresentativeQuery()));
 }
 
 }  // namespace mongo::query_settings
