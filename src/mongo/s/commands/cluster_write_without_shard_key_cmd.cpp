@@ -158,8 +158,8 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
 
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.
-    const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        dbName, auth::ValidatedTenancyScope::get(opCtx), writeCmd);
+    const auto opMsgRequest =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx), dbName, writeCmd);
 
     DatabaseName requestDbName = dbName;
     boost::optional<BulkWriteCommandRequest> bulkWriteRequest;
@@ -461,8 +461,7 @@ public:
             const auto writeCmdObj = [&] {
                 const auto explainCmdObj = request().getWriteCmd();
                 const auto opMsgRequestExplainCmd =
-                    OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                        ns().dbName(), vts, explainCmdObj);
+                    OpMsgRequestBuilder::create(vts, ns().dbName(), explainCmdObj);
                 auto explainRequest = ExplainCommandRequest::parse(
                     IDLParserContext("_clusterWriteWithoutShardKeyExplain"),
                     opMsgRequestExplainCmd.body);

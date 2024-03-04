@@ -162,8 +162,8 @@ public:
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
             auto aggCmdOnViewObj =
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    dbName, auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView)
+                OpMsgRequestBuilder::create(
+                    auth::ValidatedTenancyScope::get(opCtx), dbName, aggCmdOnView)
                     .body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
@@ -178,8 +178,8 @@ public:
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx,
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    dbName, auth::ValidatedTenancyScope::get(opCtx), std::move(resolvedAggCmd)));
+                OpMsgRequestBuilder::create(
+                    auth::ValidatedTenancyScope::get(opCtx), dbName, std::move(resolvedAggCmd)));
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
@@ -287,8 +287,8 @@ public:
             }
 
             auto aggCmdOnViewObj =
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView.getValue())
+                OpMsgRequestBuilder::create(
+                    auth::ValidatedTenancyScope::get(opCtx), nss.dbName(), aggCmdOnView.getValue())
                     .body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,

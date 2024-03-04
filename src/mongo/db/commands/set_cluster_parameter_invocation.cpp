@@ -179,20 +179,19 @@ BatchedCommandResponse ClusterParameterDBClientService::updateParameterOnDisk(
         ? boost::make_optional(validatedTenancyScope->tenantId())
         : boost::none;
     const auto nss = NamespaceString::makeClusterParametersNSS(tenantId);
-    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), validatedTenancyScope, [&] {
-            write_ops::UpdateCommandRequest updateOp(nss);
-            updateOp.setUpdates({[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(query);
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-                entry.setMulti(false);
-                entry.setUpsert(true);
-                return entry;
-            }()});
+    auto request = OpMsgRequestBuilder::create(validatedTenancyScope, nss.dbName(), [&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setMulti(false);
+            entry.setUpsert(true);
+            return entry;
+        }()});
 
-            return updateOp.toBSON(writeConcernObj);
-        }());
+        return updateOp.toBSON(writeConcernObj);
+    }());
 
     BSONObj res = _dbClient.runCommand(request)->getCommandReply();
     BatchedCommandResponse response;

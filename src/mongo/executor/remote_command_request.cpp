@@ -121,8 +121,7 @@ RemoteCommandRequestBase::operator OpMsgRequest() const {
               *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
         : auth::ValidatedTenancyScope::kNotRequired;
 
-    return OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        this->dbname, vts, std::move(this->cmdObj), this->metadata);
+    return OpMsgRequestBuilder::create(vts, this->dbname, std::move(this->cmdObj), this->metadata);
 }
 
 void RemoteCommandRequestBase::_updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx) {

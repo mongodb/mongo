@@ -126,9 +126,9 @@ private:
         BSONObjBuilder bob(BSON("killOp" << 1 << "op" << opId));
         APIParameters::get(opCtx).appendInfo(&bob);
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin,
+        conn->runCommand(OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+            DatabaseName::kAdmin,
             bob.obj()));
         conn.done();
 

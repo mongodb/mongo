@@ -1028,13 +1028,13 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           -> Status {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
-          auto opMsg = OpMsgRequestBuilder::create(entry.getNss().dbName(), cmd);
+
           const auto tenantId = entry.getNss().tenantId();
           const auto vts = tenantId
-              ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
-                    *tenantId,
-                    auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
-              : boost::none;
+              ? auth::ValidatedTenancyScopeFactory::create(
+                    *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
+              : auth::ValidatedTenancyScope::kNotRequired;
+          auto opMsg = OpMsgRequestBuilder::create(vts, entry.getNss().dbName(), cmd);
           auto collModCmd =
               CollMod::parse(IDLParserContext("collModOplogEntry",
                                               false /* apiStrict */,
@@ -2417,8 +2417,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 invariant(cmd);
 
                 auto ns = cmd->parse(opCtx,
-                                     OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                                         nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), o))
+                                     OpMsgRequestBuilder::create(
+                                         auth::ValidatedTenancyScope::get(opCtx), nss.dbName(), o))
                               ->ns();
 
                 if (mode == OplogApplication::Mode::kInitialSync) {

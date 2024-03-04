@@ -93,8 +93,8 @@ Status doRunCommand(OperationContext* opCtx, const DatabaseName& dbname, const R
     DBDirectClient client(opCtx);
     BSONObj cmd = request.toBSON(kMajorityWriteConcern);
     auto reply = client
-                     .runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                         dbname, auth::ValidatedTenancyScope::get(opCtx), cmd))
+                     .runCommand(OpMsgRequestBuilder::create(
+                         auth::ValidatedTenancyScope::get(opCtx), dbname, cmd))
                      ->getCommandReply();
     return getStatusFromCommandResult(reply);
 }

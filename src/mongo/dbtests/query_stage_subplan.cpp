@@ -133,9 +133,9 @@ protected:
         BSONObj cmdObj = fromjson(findCmd);
 
         // If there is no '$db', append it.
-        auto cmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                       DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+        auto cmd = OpMsgRequestBuilder::create(
                        auth::ValidatedTenancyScope::get(_opCtx.get()),
+                       DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                        cmdObj)
                        .body;
         auto findCommand =

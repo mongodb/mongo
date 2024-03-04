@@ -98,9 +98,9 @@ public:
                     NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nsStr);
                 auto result = CommandHelpers::runCommandDirectly(
                     opCtx,
-                    OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                        ns.dbName(),
+                    OpMsgRequestBuilder::create(
                         auth::ValidatedTenancyScope::get(opCtx),
+                        ns.dbName(),
                         BSON("aggregate" << ns.coll() << "cursor" << BSONObj{} << "pipeline"
                                          << BSON_ARRAY(BSON("$collStats" << BSON(
                                                                 "storageStats" << BSON(

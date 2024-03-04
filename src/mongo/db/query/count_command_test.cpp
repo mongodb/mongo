@@ -181,9 +181,9 @@ TEST(CountCommandTest, ConvertToAggregationWithHint) {
                            << "hint" << BSON("x" << 1));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg)
-                      .body;
+    auto cmdObj =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
+            .body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_BSONOBJ_EQ(ar.getHint().value_or(BSONObj()), BSON("x" << 1));
@@ -205,9 +205,9 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
                            << "limit" << 200 << "skip" << 300 << "query" << BSON("x" << 7));
     auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg)
-                      .body;
+    auto cmdObj =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
+            .body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
@@ -233,9 +233,9 @@ TEST(CountCommandTest, ConvertToAggregationWithMaxTimeMS) {
                                                     << "maxTimeMS" << 100 << "$db"
                                                     << "TestDB"));
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg)
-                      .body;
+    auto cmdObj =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
+            .body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_EQ(ar.getMaxTimeMS().value_or(0), 100u);
@@ -258,9 +258,9 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
     countCmd.setQueryOptions(BSON("readPreference"
                                   << "secondary"));
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg)
-                      .body;
+    auto cmdObj =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
+            .body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_BSONOBJ_EQ(ar.getUnwrappedReadPref().value_or(BSONObj()),
@@ -285,9 +285,9 @@ TEST(CountCommandTest, ConvertToAggregationWithReadConcern) {
     countCmd.setReadConcern(BSON("level"
                                  << "linearizable"));
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
-    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg)
-                      .body;
+    auto cmdObj =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, testns.dbName(), agg)
+            .body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_BSONOBJ_EQ(ar.getReadConcern().value_or(BSONObj()),

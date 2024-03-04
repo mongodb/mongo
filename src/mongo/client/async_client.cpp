@@ -267,9 +267,9 @@ Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSe
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
                                             executor::NetworkConnectionHook* const hook) {
     auto requestObj = _buildHelloRequest(appName, hook);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin,
+    auto opMsgRequest = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+        DatabaseName::kAdmin,
         requestObj);
 
     auto msgId = nextMessageId();

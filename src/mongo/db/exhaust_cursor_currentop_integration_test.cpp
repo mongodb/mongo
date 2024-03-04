@@ -111,8 +111,8 @@ void initTestCollection(DBClientBase* conn) {
     for (int i = 0; i < 10; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            testNSS.dbName(), auth::ValidatedTenancyScope::kNotRequired, insertCmd));
+        auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired, testNSS.dbName(), insertCmd));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
 }
@@ -122,8 +122,8 @@ void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool
                        << "waitWithPinnedCursorDuringGetMoreBatch"
                        << "mode" << (enable ? "alwaysOn" : "off") << "data"
                        << BSON("shouldContinueOnInterrupt" << true));
-    auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmdObj));
+    auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }
 
@@ -132,8 +132,8 @@ void setWaitAfterCommandFinishesExecutionFailpoint(DBClientBase* conn, bool enab
                        << "waitAfterCommandFinishesExecution"
                        << "mode" << (enable ? "alwaysOn" : "off") << "data"
                        << BSON("ns" << testNSS.toString_forTest()));
-    auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmdObj));
+    auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }
 
@@ -142,8 +142,8 @@ void setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(DBClientBa
     auto cmdObj = BSON("configureFailPoint"
                        << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch"
                        << "mode" << (enable ? "alwaysOn" : "off"));
-    auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmdObj));
+    auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }
 
@@ -157,8 +157,8 @@ bool confirmCurrentOpContents(DBClientBase* conn,
                                                    << BSON("$match" << curOpMatch)));
     const auto startTime = clock->now();
     while (clock->now() - startTime < timeoutMS) {
-        auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, curOpCmd));
+        auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, curOpCmd));
         auto swCursorRes = CursorResponse::parseFromBSON(reply->getCommandReply());
         ASSERT_OK(swCursorRes.getStatus());
         if (swCursorRes.getValue().getBatch().empty() == expectEmptyResult) {
@@ -174,18 +174,18 @@ bool confirmCurrentOpContents(DBClientBase* conn,
         "getCommandReply}",
         "curOpMatch"_attr = curOpMatch,
         "conn_runCommand_OpMsgRequestBuilder_createWithValidatedTenancyScope_admin_currentOp_getCommandReply"_attr =
-            conn
-                ->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, currentOp))
+            conn->runCommand(OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                                         DatabaseName::kAdmin,
+                                                         currentOp))
                 ->getCommandReply());
     return false;
 }
 
 repl::OpTime getLastAppliedOpTime(DBClientBase* conn) {
-    auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin,
-        auth::ValidatedTenancyScope::kNotRequired,
-        BSON("replSetGetStatus" << 1)));
+    auto reply =
+        conn->runCommand(OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                                     DatabaseName::kAdmin,
+                                                     BSON("replSetGetStatus" << 1)));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     auto lastAppliedOpTime = reply->getCommandReply()["optimes"]["appliedOpTime"];
     return repl::OpTime(lastAppliedOpTime["ts"].timestamp(), lastAppliedOpTime["t"].numberLong());
@@ -437,8 +437,8 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     for (int i = 0; i < 5; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            testNSS.dbName(), auth::ValidatedTenancyScope::kNotRequired, insertCmd));
+        auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired, testNSS.dbName(), insertCmd));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
 
@@ -482,8 +482,8 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     for (int i = 5; i < 8; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            testNSS.dbName(), auth::ValidatedTenancyScope::kNotRequired, insertCmd));
+        auto reply = conn->runCommand(OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired, testNSS.dbName(), insertCmd));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
 

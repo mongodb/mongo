@@ -246,8 +246,8 @@ TEST_F(MongodbCAPITest, IsMaster) {
 
     // craft the isMaster message
     mongo::BSONObj inputObj = mongo::fromjson("{isMaster: 1}");
-    auto inputOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::kAdmin, boost::none, inputObj);
+    auto inputOpMsg =
+        mongo::OpMsgRequestBuilder::create(boost::none, mongo::DatabaseName::kAdmin, inputObj);
     auto output = performRpc(client, inputOpMsg);
     ASSERT(output.getBoolField("ismaster"));
 }
@@ -270,9 +270,9 @@ TEST_F(MongodbCAPITest, CreateIndex) {
                 }
             ]
         })raw_delimiter");
-    auto inputOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "index_db"),
+    auto inputOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "index_db"),
         inputObj);
     auto output = performRpc(client, inputOpMsg);
 
@@ -301,9 +301,9 @@ TEST_F(MongodbCAPITest, CreateBackgroundIndex) {
                 }
             ]
         })raw_delimiter");
-    auto inputOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "background_index_db"),
+    auto inputOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "background_index_db"),
         inputObj);
     auto output = performRpc(client, inputOpMsg);
 
@@ -330,9 +330,9 @@ TEST_F(MongodbCAPITest, CreateTTLIndex) {
                 }
             ]
         })raw_delimiter");
-    auto inputOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "ttl_index_db"),
+    auto inputOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "ttl_index_db"),
         inputObj);
     auto output = performRpc(client, inputOpMsg);
 
@@ -345,9 +345,9 @@ TEST_F(MongodbCAPITest, InsertDocument) {
 
     mongo::BSONObj insertObj = mongo::fromjson(
         "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
-    auto insertOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto insertOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         insertObj);
     auto outputBSON = performRpc(client, insertOpMsg);
     ASSERT(outputBSON.hasField("n"));
@@ -363,9 +363,9 @@ TEST_F(MongodbCAPITest, InsertMultipleDocuments) {
         "{insert: 'collection_name', documents: [{firstName: 'doc1FirstName', lastName: "
         "'doc1LastName', age: 30}, {firstName: 'doc2FirstName', lastName: 'doc2LastName', age: "
         "20}]}");
-    auto insertOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto insertOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         insertObj);
     auto outputBSON = performRpc(client, insertOpMsg);
     ASSERT(outputBSON.hasField("n"));
@@ -382,8 +382,8 @@ TEST_F(MongodbCAPITest, KillOp) {
             auto client = createClient();
 
             mongo::BSONObj currentOpObj = mongo::fromjson("{currentOp: 1}");
-            auto currentOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                mongo::DatabaseName::kAdmin, boost::none, currentOpObj);
+            auto currentOpMsg = mongo::OpMsgRequestBuilder::create(
+                boost::none, mongo::DatabaseName::kAdmin, currentOpObj);
             mongo::BSONObj outputBSON;
 
             // Wait for the sleep command to start in the main test thread.
@@ -407,8 +407,8 @@ TEST_F(MongodbCAPITest, KillOp) {
             std::stringstream ss;
             ss << "{'killOp': 1, 'op': " << opid << "}";
             mongo::BSONObj killOpObj = mongo::fromjson(ss.str());
-            auto killOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                mongo::DatabaseName::kAdmin, boost::none, killOpObj);
+            auto killOpMsg = mongo::OpMsgRequestBuilder::create(
+                boost::none, mongo::DatabaseName::kAdmin, killOpObj);
             outputBSON = performRpc(client, killOpMsg);
 
             ASSERT(outputBSON.hasField("ok"));
@@ -420,8 +420,8 @@ TEST_F(MongodbCAPITest, KillOp) {
         };
 
         mongo::BSONObj sleepObj = mongo::fromjson("{'sleep': {'secs': 1000}}");
-        auto sleepOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            mongo::DatabaseName::kAdmin, boost::none, sleepObj);
+        auto sleepOpMsg =
+            mongo::OpMsgRequestBuilder::create(boost::none, mongo::DatabaseName::kAdmin, sleepObj);
         auto outputBSON = performRpc(client, sleepOpMsg);
 
         ASSERT(outputBSON.hasField("ok"));
@@ -434,9 +434,9 @@ TEST_F(MongodbCAPITest, ReadDB) {
     auto client = createClient();
 
     mongo::BSONObj findObj = mongo::fromjson("{find: 'collection_name', limit: 2}");
-    auto findMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto findMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         findObj);
     auto outputBSON = performRpc(client, findMsg);
 
@@ -464,9 +464,10 @@ TEST_F(MongodbCAPITest, InsertAndRead) {
 
     mongo::BSONObj insertObj = mongo::fromjson(
         "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
-    auto insertOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto insertOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+
         insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
     ASSERT_OK(validateBSON(outputBSON1));
@@ -476,9 +477,9 @@ TEST_F(MongodbCAPITest, InsertAndRead) {
     ASSERT(outputBSON1.getField("ok").numberDouble() == 1.0);
 
     mongo::BSONObj findObj = mongo::fromjson("{find: 'collection_name', limit: 1}");
-    auto findMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto findMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         findObj);
     auto outputBSON2 = performRpc(client, findMsg);
     ASSERT_OK(validateBSON(outputBSON2));
@@ -505,9 +506,9 @@ TEST_F(MongodbCAPITest, InsertAndReadDifferentClients) {
 
     mongo::BSONObj insertObj = mongo::fromjson(
         "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
-    auto insertOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto insertOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         insertObj);
     auto outputBSON1 = performRpc(client1, insertOpMsg);
     ASSERT_OK(validateBSON(outputBSON1));
@@ -517,9 +518,9 @@ TEST_F(MongodbCAPITest, InsertAndReadDifferentClients) {
     ASSERT(outputBSON1.getField("ok").numberDouble() == 1.0);
 
     mongo::BSONObj findObj = mongo::fromjson("{find: 'collection_name', limit: 1}");
-    auto findMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto findMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         findObj);
     auto outputBSON2 = performRpc(client2, findMsg);
     ASSERT_OK(validateBSON(outputBSON2));
@@ -545,9 +546,9 @@ TEST_F(MongodbCAPITest, InsertAndDelete) {
     mongo::BSONObj insertObj = mongo::fromjson(
         "{insert: 'collection_name', documents: [{firstName: 'toDelete', lastName: 'notImportant', "
         "age: 10}]}");
-    auto insertOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto insertOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
     ASSERT_OK(validateBSON(outputBSON1));
@@ -561,9 +562,9 @@ TEST_F(MongodbCAPITest, InsertAndDelete) {
     mongo::BSONObj deleteObj = mongo::fromjson(
         "{delete: 'collection_name', deletes:   [{q: {firstName: 'toDelete', age: 10}, limit: "
         "1}]}");
-    auto deleteOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto deleteOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         deleteObj);
     auto outputBSON2 = performRpc(client, deleteOpMsg);
     ASSERT_OK(validateBSON(outputBSON2));
@@ -580,9 +581,9 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
     mongo::BSONObj insertObj = mongo::fromjson(
         "{insert: 'collection_name', documents: [{firstName: 'toUpdate', lastName: 'notImportant', "
         "age: 10}]}");
-    auto insertOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto insertOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
     ASSERT_OK(validateBSON(outputBSON1));
@@ -596,9 +597,9 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
     mongo::BSONObj updateObj = mongo::fromjson(
         "{update: 'collection_name', updates: [ {q: {firstName: 'toUpdate', age: 10}, u: {'$inc': "
         "{age: 5}}}]}");
-    auto updateOpMsg = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
+    auto updateOpMsg = mongo::OpMsgRequestBuilder::create(
         boost::none,
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "db_name"),
         updateObj);
     auto outputBSON2 = performRpc(client, updateOpMsg);
     ASSERT_OK(validateBSON(outputBSON2));

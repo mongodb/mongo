@@ -109,8 +109,8 @@ public:
     }
 
     void pushRequest(const DatabaseName& dbname, const BSONObj& cmd) {
-        _requests.emplace(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            dbname, auth::ValidatedTenancyScope::kNotRequired, cmd));
+        _requests.emplace(
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, dbname, cmd));
     }
 
     BSONObj loadMongoCRConversation() {

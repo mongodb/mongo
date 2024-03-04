@@ -325,7 +325,9 @@ OperationSessionInfoFromClient initializeOpSessionInfoWithRequestBody(
     bool attachToOpCtx,
     bool isReplSetMemberOrMongos) {
     auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired,
         DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
+
         requestBody,
         BSONObj());
     auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},

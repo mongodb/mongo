@@ -132,9 +132,9 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
         return {ErrorCodes::AuthenticationFailed, message.str()};
     }
 
-    return OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        AuthDatabaseNameUtil::deserialize(db.getValue()),
+    return OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
+        AuthDatabaseNameUtil::deserialize(db.getValue()),
         BSON("authenticate" << 1 << "mechanism"
                             << "MONGODB-X509"
                             << "user" << username));
@@ -236,9 +236,9 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
     }
     const auto request = builder.obj();
 
-    return runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                          DatabaseName::kAdmin,
+    return runCommand(OpMsgRequestBuilder::create(
                           auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+                          DatabaseName::kAdmin,
                           request))
         .then([](BSONObj reply) -> Future<std::string> {
             auto mechsArrayObj = reply.getField("saslSupportedMechs");

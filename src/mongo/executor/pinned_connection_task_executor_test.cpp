@@ -76,11 +76,10 @@ RemoteCommandRequest makeRCR(HostAndPort remote, BSONObj extraFields) {
 
 void assertMessageBodyCameFromRequest(Message m, RemoteCommandRequest rcr) {
     auto opMsg = OpMsgRequest::parse(m);
-    auto expectedOpMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        std::move(rcr.dbname),
-        auth::ValidatedTenancyScope::kNotRequired,
-        std::move(rcr.cmdObj),
-        std::move(rcr.metadata));
+    auto expectedOpMsg = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                                     std::move(rcr.dbname),
+                                                     std::move(rcr.cmdObj),
+                                                     std::move(rcr.metadata));
     ASSERT_BSONOBJ_EQ(opMsg.body, expectedOpMsg.body);
 }
 
@@ -89,8 +88,8 @@ void assertMessageBodyAndDBName(Message m,
                                 BSONObj metadata,
                                 const DatabaseName& dbName) {
     auto opMsg = OpMsgRequest::parse(m);
-    auto expectedOpMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        dbName, auth::ValidatedTenancyScope::kNotRequired, body, metadata);
+    auto expectedOpMsg = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, dbName, body, metadata);
     ASSERT_BSONOBJ_EQ(opMsg.body, expectedOpMsg.body);
 }
 

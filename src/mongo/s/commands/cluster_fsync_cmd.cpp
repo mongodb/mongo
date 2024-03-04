@@ -95,8 +95,8 @@ public:
     }
 
     void unlockLockedShards(OperationContext* opCtx, const DatabaseName& dbname) {
-        auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            dbname, auth::ValidatedTenancyScope::get(opCtx), BSON("fsyncUnlock" << 1));
+        auto request = OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::get(opCtx), dbname, BSON("fsyncUnlock" << 1));
         auto response = CommandHelpers::runCommandDirectly(opCtx, request);
     }
 

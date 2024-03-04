@@ -150,10 +150,10 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
 void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
                                                 const LogicalSessionRecordSet& sessions) {
     auto send = [&](BSONObj toSend) {
-        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            NamespaceString::kLogicalSessionsNamespace.dbName(),
-            auth::ValidatedTenancyScope::get(opCtx),
-            toSend);
+        auto opMsg =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
+                                        NamespaceString::kLogicalSessionsNamespace.dbName(),
+                                        toSend);
         auto request = BatchedCommandRequest::parseUpdate(opMsg);
 
         BatchedCommandResponse response;
@@ -171,10 +171,10 @@ void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
 void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
                                               const LogicalSessionIdSet& sessions) {
     auto send = [&](BSONObj toSend) {
-        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            NamespaceString::kLogicalSessionsNamespace.dbName(),
-            auth::ValidatedTenancyScope::get(opCtx),
-            toSend);
+        auto opMsg =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
+                                        NamespaceString::kLogicalSessionsNamespace.dbName(),
+                                        toSend);
         auto request = BatchedCommandRequest::parseDelete(opMsg);
 
         BatchedCommandResponse response;
@@ -195,10 +195,9 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     auto send = [&](BSONObj toSend) -> BSONObj {
         // If there is no '$db', append it.
-        toSend = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                     NamespaceString::kLogicalSessionsNamespace.dbName(),
-                     auth::ValidatedTenancyScope::get(opCtx),
-                     toSend)
+        toSend = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
+                                             NamespaceString::kLogicalSessionsNamespace.dbName(),
+                                             toSend)
                      .body;
         auto findCommand =
             query_request_helper::makeFromFindCommand(toSend,

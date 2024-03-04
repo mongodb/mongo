@@ -103,7 +103,14 @@ Message assembleCommandRequest(DBClientBase* client,
     }
 
     commandObj = addMetadata(client, std::move(commandObj));
-    auto opMsgRequest = OpMsgRequestBuilder::create(dbName, commandObj);
+    auto vts = [&]() {
+        auto tenantId = dbName.tenantId();
+        return tenantId
+            ? auth::ValidatedTenancyScopeFactory::create(
+                  *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
+            : auth::ValidatedTenancyScope::kNotRequired;
+    }();
+    auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, commandObj);
     return opMsgRequest.serialize();
 }
 }  // namespace

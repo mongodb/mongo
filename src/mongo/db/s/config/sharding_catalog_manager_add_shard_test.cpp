@@ -492,9 +492,9 @@ protected:
             createAddShardCmd(operationContext(), expectedShardName),
             ShardingCatalogClient::kMajorityWriteConcern);
 
-        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin,
+        const auto opMsgRequest = OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+            DatabaseName::kAdmin,
             upsertCmdObj);
         expectUpdatesReturnSuccess(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
@@ -510,9 +510,9 @@ protected:
             createAddShardCmd(operationContext(), expectedShardName),
             ShardingCatalogClient::kMajorityWriteConcern);
 
-        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin,
+        const auto opMsgRequest = OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+            DatabaseName::kAdmin,
             upsertCmdObj);
         expectUpdatesReturnFailure(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
@@ -542,8 +542,8 @@ protected:
                 addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);
 
             const auto opMsg = static_cast<OpMsgRequest>(request);
-            const auto updateOpMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                request.dbname, opMsg.validatedTenancyScope, updateOpField);
+            const auto updateOpMsgRequest = OpMsgRequestBuilder::create(
+                opMsg.validatedTenancyScope, request.dbname, updateOpField);
             const auto updateOp = UpdateOp::parse(updateOpMsgRequest);
 
             ASSERT_EQUALS(expectedNss, expectedUpdateOp.getNamespace());

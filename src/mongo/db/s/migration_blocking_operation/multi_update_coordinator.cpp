@@ -227,8 +227,8 @@ Message MultiUpdateCoordinatorInstance::getUpdateAsClusterCommand() const {
 
     auto modifiedCmdObj =
         cluster::cmd::translations::replaceCommandNameWithClusterCommandName(updateCmdObj);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        _metadata.getNss().dbName(), auth::ValidatedTenancyScope::kNotRequired, modifiedCmdObj);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, _metadata.getNss().dbName(), modifiedCmdObj);
     return opMsgRequest.serialize();
 }
 

@@ -91,9 +91,8 @@ public:
                                 // use the exhaustiveFind helper to test getMores. Make an
                                 // OpMsgRequest from the command to append $db, which
                                 // FindCommandRequest expects.
-                                auto findOpMsgRequest =
-                                    OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                                        dbName, auth::ValidatedTenancyScope::get(opCtx), command);
+                                auto findOpMsgRequest = OpMsgRequestBuilder::create(
+                                    auth::ValidatedTenancyScope::get(opCtx), dbName, command);
                                 auto findCommand = FindCommandRequest::parse(
                                     IDLParserContext("FindCommandRequest", false /* apiStrict */),
                                     findOpMsgRequest.body);

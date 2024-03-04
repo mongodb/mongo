@@ -1001,8 +1001,8 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
             if (_settings.shouldAutoInitiate()) {
                 BSONObjBuilder bob;
                 bob.append("replSetInitiate", BSONObj());
-                auto initiateCmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    DatabaseName::kEmpty, auth::ValidatedTenancyScope::get(opCtx), bob.obj());
+                auto initiateCmd = OpMsgRequestBuilder::create(
+                    auth::ValidatedTenancyScope::get(opCtx), DatabaseName::kEmpty, bob.obj());
                 auto status = getStatusFromCommandResult(
                     CommandHelpers::runCommandDirectly(opCtx, initiateCmd));
                 uassertStatusOK(status);

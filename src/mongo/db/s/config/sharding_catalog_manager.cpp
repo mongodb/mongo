@@ -165,10 +165,10 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
     return OpMsg::parseOwned(
         opCtx->getService()
             ->getServiceEntryPoint()
-            ->handleRequest(opCtx,
-                            OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                                db, auth::ValidatedTenancyScope::get(opCtx), bob.obj())
-                                .serialize())
+            ->handleRequest(
+                opCtx,
+                OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx), db, bob.obj())
+                    .serialize())
             .get()
             .response);
 }
@@ -239,11 +239,11 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     const auto replyOpMsg = OpMsg::parseOwned(
         newOpCtx->getService()
             ->getServiceEntryPoint()
-            ->handleRequest(
-                newOpCtx.get(),
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    DatabaseName::kAdmin, auth::ValidatedTenancyScope::get(opCtx), cmdObj)
-                    .serialize())
+            ->handleRequest(newOpCtx.get(),
+                            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                                        DatabaseName::kAdmin,
+                                                        cmdObj)
+                                .serialize())
             .get()
             .response);
     return replyOpMsg.body;

@@ -556,8 +556,8 @@ public:
         const auto& dbName = nss.dbName();
         const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
         const auto viewAggCmd =
-            OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                dbName, vts, uassertStatusOK(canonicalDistinct.asAggregationCommand()))
+            OpMsgRequestBuilder::create(
+                vts, dbName, uassertStatusOK(canonicalDistinct.asAggregationCommand()))
                 .body;
         const auto serializationContext = vts != boost::none
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())

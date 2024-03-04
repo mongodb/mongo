@@ -942,8 +942,7 @@ private:
 
         auto svcCtx = _client->getServiceContext();
         auto sep = svcCtx->getService(ClusterRole::ShardServer)->getServiceEntryPoint();
-        auto opMsgRequest =
-            OpMsgRequestBuilder::createWithValidatedTenancyScope(_dbName, _vts, cmdBuilder->obj());
+        auto opMsgRequest = OpMsgRequestBuilder::create(_vts, _dbName, cmdBuilder->obj());
         auto requestMessage = opMsgRequest.serialize();
 
         // Switch to our local client and create a short-lived opCtx for this transaction op.

@@ -199,14 +199,13 @@ OpMsgRequest upconvertRequest(const DatabaseName& dbName,
         ? BSONElement()
         : cmdObj[docSequenceIt->second];
     if (!isArrayOfObjects(docSequenceElem))
-        return OpMsgRequestBuilder::createWithValidatedTenancyScope(dbName, vts, std::move(cmdObj));
+        return OpMsgRequestBuilder::create(vts, dbName, std::move(cmdObj));
 
     auto docSequenceName = docSequenceElem.fieldNameStringData();
 
     // Note: removing field before adding "$db" to avoid the need to copy the potentially large
     // array.
-    auto out = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        dbName, vts, cmdObj.removeField(docSequenceName));
+    auto out = OpMsgRequestBuilder::create(vts, dbName, cmdObj.removeField(docSequenceName));
     out.sequences.push_back({docSequenceName.toString()});
     for (auto elem : docSequenceElem.Obj()) {
         out.sequences[0].objs.push_back(elem.Obj().shareOwnershipWith(cmdObj));

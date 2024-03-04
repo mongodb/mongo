@@ -169,8 +169,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -182,8 +182,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_ShardOnlyCommand) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleMinimal minimalCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), minimalCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), minimalCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -195,8 +195,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterOnlyCommand) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleVoid voidCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), voidCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -209,8 +209,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_NeverAllowe
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleVoidNeverAllowedOnSecondary voidCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::kNotRequired, voidCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
@@ -227,8 +227,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AlwaysAllow
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleVoidAlwaysAllowedOnSecondary voidCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::kNotRequired, voidCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
@@ -244,8 +244,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AllowedOnSe
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleVoidAllowedOnSecondaryIfOptedIn voidCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::kNotRequired, voidCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, ns.dbName(), voidCmd.toBSON({}));
 
     ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
@@ -260,8 +260,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_LocalDatabase) {
 
     auto ns = NamespaceString::makeLocalCollection(kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -273,8 +273,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_ConfigDatabase) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(DatabaseName::kConfig, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -286,8 +286,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_AdminDatabase) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -302,8 +302,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_SystemDotProfileCollection) {
         DatabaseName::createDatabaseName_forTest(boost::none /* tenantId */, {kTestDbName});
     auto ns = NamespaceString::makeSystemDotProfileNamespace(dbName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -316,8 +316,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_ConfigSystemSessionsCollection) {
 
     auto ns = NamespaceString::kLogicalSessionsNamespace;
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -330,8 +330,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_AdminSystemUsersCollection) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(NamespaceString::kSystemUsers);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -344,8 +344,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_UserSystemCollection) {
     auto ns =
         NamespaceString::createNamespaceString_forTest(kTestDbName, "system." + kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -358,24 +358,24 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_UserNonSystemCollection) {
     auto ns0 =
         NamespaceString::createNamespaceString_forTest(kTestDbName, "system-" + kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd0(ns0, 0);
-    auto opMsgRequest0 = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns0.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd0.toBSON({}));
+    auto opMsgRequest0 = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns0.dbName(), incrementCmd0.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest0));
 
     auto ns1 =
         NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName + "system");
     commands_test_example::ExampleIncrement incrementCmd1(ns1, 0);
-    auto opMsgRequest1 = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns1.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd1.toBSON({}));
+    auto opMsgRequest1 = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns1.dbName(), incrementCmd1.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest1));
 
     auto ns2 =
         NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName + ".system.foo");
     commands_test_example::ExampleIncrement incrementCmd2(ns2, 0);
-    auto opMsgRequest2 = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns2.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd2.toBSON({}));
+    auto opMsgRequest2 = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns2.dbName(), incrementCmd2.toBSON({}));
 
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest2));
 }
@@ -386,9 +386,9 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_TargetedCommand) {
     auto opCtx = client->makeOperationContext();
 
     for (const auto& cmdName : kTargetedCmdNames) {
-        auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, kTestDbName),
+        auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::get(opCtx.get()),
+            DatabaseName::createDatabaseName_forTest(boost::none, kTestDbName),
             BSON(cmdName << 1));
         ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
     }
@@ -400,8 +400,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_InternalClientWithNoSession) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -415,8 +415,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_InternalClientWithSession) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -429,8 +429,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_InternalClientDirect) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -445,9 +445,9 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_Multitenant) {
     auto ns =
         NamespaceString::createNamespaceString_forTest(kTestTenantId, kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(),
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::get(opCtx.get()),
+        ns.dbName(),
         incrementCmd.toBSON(BSON("$tenantId" << *ns.tenantId())));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
@@ -462,8 +462,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_GridUninitialized) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -476,8 +476,8 @@ DEATH_TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_RouterPort, "invariant")
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     // shouldRouteRequest() invariants that the operation is running not on the router port.
     shouldRouteRequest(opCtx.get(), opMsgRequest);
@@ -492,8 +492,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_NotRouterServer) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -506,8 +506,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_NotIsConfigShard) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -522,8 +522,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_HasTwoOrMoreShards) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
@@ -538,8 +538,8 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_FeatureFlagDisabled) {
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
-    auto opMsgRequest = mongo::OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        ns.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), incrementCmd.toBSON({}));
+    auto opMsgRequest = mongo::OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::get(opCtx.get()), ns.dbName(), incrementCmd.toBSON({}));
 
     ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }

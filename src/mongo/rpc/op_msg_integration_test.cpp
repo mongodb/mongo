@@ -125,8 +125,8 @@ std::string getThreadNameByAppName(DBClientBase* conn, StringData appName) {
         BSON("aggregate" << 1 << "cursor" << BSONObj() << "pipeline"
                          << BSON_ARRAY(BSON("$currentOp" << BSON("localOps" << true))
                                        << BSON("$match" << BSON("appName" << appName))));
-    const auto curOpReply = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, curOpCmd));
+    const auto curOpReply = conn->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, curOpCmd));
     const auto cursorResponse = CursorResponse::parseFromBSON(curOpReply->getCommandReply());
     ASSERT_OK(cursorResponse.getStatus());
     const auto batch = cursorResponse.getValue().getBatch();
@@ -136,10 +136,10 @@ std::string getThreadNameByAppName(DBClientBase* conn, StringData appName) {
 TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
     auto conn = getIntegrationTestConnection();
 
-    auto request =
-        OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, BSON("ping" << 1))
-            .serialize();
+    auto request = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                               DatabaseName::kAdmin,
+                                               BSON("ping" << 1))
+                       .serialize();
     OpMsg::setFlag(&request, 1u << 15);  // This should be the last required flag to be assigned.
 
     Message reply;
@@ -149,10 +149,10 @@ TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
 TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
     auto conn = getIntegrationTestConnection();
 
-    auto request =
-        OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, BSON("ping" << 1))
-            .serialize();
+    auto request = OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                               DatabaseName::kAdmin,
+                                               BSON("ping" << 1))
+                       .serialize();
     OpMsg::setFlag(&request, 1u << 31);  // This should be the last optional flag to be assigned.
 
     Message reply = conn->call(request);
@@ -165,10 +165,10 @@ TEST(OpMsg, FireAndForgetInsertWorks) {
 
     conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
 
-    conn->runFireAndForgetCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-        auth::ValidatedTenancyScope::kNotRequired,
-        fromjson(R"({
+    conn->runFireAndForgetCommand(
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                    DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                    fromjson(R"({
         insert: "collection",
         writeConcern: {w: 0},
         documents: [
@@ -260,9 +260,9 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
             continue;
         foundSecondary = true;
 
-        auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                           DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+        auto request = OpMsgRequestBuilder::create(
                            auth::ValidatedTenancyScope::kNotRequired,
+                           DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                            fromjson(R"({
             insert: "collection",
             writeConcern: {w: 0},
@@ -334,8 +334,8 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
 TEST(OpMsg, DocumentSequenceReturnsWork) {
     auto conn = getIntegrationTestConnection();
 
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, BSON("echo" << 1));
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, BSON("echo" << 1));
     opMsgRequest.sequences.push_back({"example", {BSON("a" << 1), BSON("b" << 2)}});
     auto request = opMsgRequest.serialize();
 
@@ -398,8 +398,8 @@ void exhaustGetMoreTest(bool enableChecksum) {
     // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
     // guarantee their return order.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0 << "sort" << BSON("_id" << 1));
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, findCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), findCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -415,8 +415,8 @@ void exhaustGetMoreTest(bool enableChecksum) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -485,8 +485,8 @@ TEST(OpMsg, FindIgnoresExhaust) {
 
     // Issue a find request with exhaust flag. Returns 0 documents.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, findCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), findCmd);
     auto request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -517,8 +517,8 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
 
     // Issue a find request to open a cursor but return 0 documents.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, findCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), findCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -534,8 +534,8 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -569,8 +569,8 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     // guarantee their return order.
     auto aggCmd = BSON("aggregate" << nss.coll() << "cursor" << BSON("batchSize" << 0) << "pipeline"
                                    << BSON_ARRAY(BSON("$sort" << BSON("_id" << 1))));
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, aggCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), aggCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -584,8 +584,8 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nss.dbName(), auth::ValidatedTenancyScope::kNotRequired, getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -638,8 +638,8 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
 
     // Issue an isMaster command without a topology version.
     auto isMasterCmd = BSON("isMaster" << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, isMasterCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, isMasterCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -651,8 +651,8 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
     // Construct isMaster command with topologyVersion, maxAwaitTimeMS, and exhaust.
     isMasterCmd =
         BSON("isMaster" << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, isMasterCmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, isMasterCmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -701,8 +701,8 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
 
     // Issue an isMaster command without a topology version.
     auto isMasterCmd = BSON("isMaster" << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, isMasterCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, isMasterCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -716,8 +716,8 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
     isMasterCmd = BSON("isMaster" << 1 << "topologyVersion"
                                   << BSON("processId" << OID::gen() << "counter" << 0LL)
                                   << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, isMasterCmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, isMasterCmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -765,8 +765,8 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
 
     // Issue an isMaster command with exhaust but no maxAwaitTimeMS.
     auto isMasterCmd = BSON("isMaster" << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, isMasterCmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, isMasterCmd);
     auto request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -796,8 +796,8 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
 
     // Issue a hello or isMaster command without a topology version.
     auto cmd = BSON(commandName << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -807,8 +807,8 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
 
     cmd = BSON(commandName << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -876,8 +876,8 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     }
     // Issue a hello or isMaster command without a topology version.
     auto cmd = BSON(cmdName << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn1->call(request);
@@ -887,8 +887,8 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
 
     cmd = BSON(cmdName << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -927,8 +927,8 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
                                    << BSON("threadName" << threadName << "errorCode"
                                                         << ErrorCodes::NotWritablePrimary
                                                         << "failCommands" << BSON_ARRAY(cmdName)));
-    auto response = conn2->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, failPointObj));
+    auto response = conn2->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
     // Wait for the exhaust stream to close from the error returned by hello or isMaster.
@@ -957,8 +957,8 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     std::cout << newCmdName;
     auto newCmd =
         BSON(newCmdName << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, newCmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, newCmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -1015,8 +1015,8 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
         cmdName = "isMaster";
     }
     auto cmd = BSON(cmdName << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn1->call(request);
@@ -1026,8 +1026,8 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
 
     cmd = BSON(cmdName << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -1066,8 +1066,8 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
                                    << BSON("threadName" << threadName << "errorCode"
                                                         << ErrorCodes::NotWritablePrimary
                                                         << "failCommands" << BSON_ARRAY(cmdName)));
-    auto response = conn2->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, failPointObj));
+    auto response = conn2->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
     // Wait for the exhaust stream to close from the error returned by hello or isMaster.
@@ -1130,8 +1130,8 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
         cmdName = "isMaster";
     }
     auto cmd = BSON(cmdName << 1);
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
     Message reply = conn1->call(request);
@@ -1141,8 +1141,8 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
 
     cmd = BSON(cmdName << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -1181,8 +1181,8 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
                                    << BSON("threadName" << threadName << "errorCode"
                                                         << ErrorCodes::NotWritablePrimary
                                                         << "failCommands" << BSON_ARRAY(cmdName)));
-    auto response = conn2->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, failPointObj));
+    auto response = conn2->runCommand(OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
 
     // Wait for the exhaust stream to close from the error returned by hello or isMaster.
@@ -1203,8 +1203,8 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustHello"].numberInt());
     }
 
-    opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
+    opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, cmd);
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -1297,8 +1297,8 @@ void checksumTest(bool enableChecksum) {
 
     ON_BLOCK_EXIT([&] { enableClientChecksum(); });
 
-    auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, BSON("ping" << 1));
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, BSON("ping" << 1));
     auto request = opMsgRequest.serialize();
 
     Message reply = conn->call(request);
@@ -1318,11 +1318,11 @@ TEST(OpMsg, ServerRepliesWithChecksumToRequestWithChecksum) {
 TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
     auto conn = getIntegrationTestConnection();
 
-    auto buildInfo = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                                          DatabaseName::kAdmin,
-                                          auth::ValidatedTenancyScope::kNotRequired,
-                                          BSON("buildInfo" << 1)))
-                         ->getCommandReply();
+    auto buildInfo =
+        conn->runCommand(OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                                     DatabaseName::kAdmin,
+                                                     BSON("buildInfo" << 1)))
+            ->getCommandReply();
     ASSERT_OK(getStatusFromCommandResult(buildInfo));
     const auto maxBSONObjSizeFromServer =
         static_cast<size_t>(buildInfo["maxBsonObjectSize"].Number());
@@ -1368,9 +1368,9 @@ public:
 
     auto checkIfClientSupportsHello(DBClientBase* conn) const {
         auto checkHelloSupport = [conn](const std::string& helloCommand) {
-            auto response = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                                                 DatabaseName::kAdmin,
+            auto response = conn->runCommand(OpMsgRequestBuilder::create(
                                                  auth::ValidatedTenancyScope::kNotRequired,
+                                                 DatabaseName::kAdmin,
                                                  BSON(helloCommand << 1)))
                                 ->getCommandReply()
                                 .getOwned();
@@ -1395,8 +1395,8 @@ private:
             BSON("configureFailPoint" << failPointName << "mode"
                                       << "alwaysOn"
                                       << "data" << BSON("threadName" << threadName));
-        auto response = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, failPointObj));
+        auto response = conn->runCommand(OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, failPointObj));
         ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
     }
 

@@ -484,7 +484,14 @@ ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& db
 
     primeInternalClient(&cc());
 
-    auto opMsgRequest = OpMsgRequestBuilder::create(dbName, cmdBuilder.obj());
+    auto vts = [&]() {
+        auto tenantId = dbName.tenantId();
+        return tenantId
+            ? auth::ValidatedTenancyScopeFactory::create(
+                  *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{})
+            : auth::ValidatedTenancyScope::kNotRequired;
+    }();
+    auto opMsgRequest = OpMsgRequestBuilder::create(vts, dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
     return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .thenRunOn(_executor)

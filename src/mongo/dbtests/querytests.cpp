@@ -846,8 +846,8 @@ public:
                            << "verbosity"
                            << "executionStats");
 
-        auto reply = _client.runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::kLocal, auth::ValidatedTenancyScope::get(&_opCtx), explainCmdObj));
+        auto reply = _client.runCommand(OpMsgRequestBuilder::create(
+            auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kLocal, explainCmdObj));
         BSONObj explainCmdReplyBody = reply->getCommandReply();
         ASSERT_OK(getStatusFromCommandResult(explainCmdReplyBody));
 

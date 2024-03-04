@@ -511,8 +511,8 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                     ClusterExplain::wrapAsExplain(req.toBSON(), verbosity));
                 const auto explainClusterQueryWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
                     clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
-                auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    nss.dbName(), vts, explainClusterQueryWithoutShardKeyCmd);
+                auto opMsg = OpMsgRequestBuilder::create(
+                    vts, nss.dbName(), explainClusterQueryWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
             }();
 
@@ -528,8 +528,8 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                 const auto explainClusterWriteWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
                     clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
 
-                auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    nss.dbName(), vts, explainClusterWriteWithoutShardKeyCmd);
+                auto opMsg = OpMsgRequestBuilder::create(
+                    vts, nss.dbName(), explainClusterWriteWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
             }();
 

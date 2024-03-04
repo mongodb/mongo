@@ -953,17 +953,6 @@ TEST(OpMsgRequest, GetDatabaseThrowsMissing) {
     ASSERT_THROWS(msg.getDatabase(), AssertionException);
 }
 
-TEST(OpMsgRequestBuilder, WithTenantInDatabaseName) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
-                                                                   true);
-    const TenantId tenantId(OID::gen());
-    auto const body = fromjson("{ping: 1}");
-    OpMsgRequest msg = OpMsgRequestBuilder::create(
-        DatabaseName::createDatabaseName_forTest(tenantId, "testDb"), body);
-    ASSERT_EQ(msg.getDatabase(), "testDb");
-}
-
 TEST(OpMsgRequestBuilder, WithVTS) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
@@ -980,8 +969,8 @@ TEST(OpMsgRequestBuilder, WithVTS) {
     const StringData dbString = "testDb";
     auto const body = fromjson("{ping: 1}");
 
-    OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
     ASSERT_EQ(msg.getDatabase(), dbString);
@@ -1006,8 +995,8 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
-    OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
 
@@ -1134,8 +1123,8 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
-    OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
     ASSERT_EQ(msg.getDatabase(), dbString);
@@ -1160,8 +1149,8 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
         auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
         auth::ValidatedTenancyScopeFactory::TokenForTestingTag{});
 
-    OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
 
@@ -1191,8 +1180,8 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
 
     auto body = fromjson("{ping: 1}");
     const void* const bodyPtr = body.objdata();
-    auto msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, "db"), vts, std::move(body));
+    auto msg = OpMsgRequestBuilder::create(
+        vts, DatabaseName::createDatabaseName_forTest(tenantId, "db"), std::move(body));
 
     auto const newBody = BSON("ping" << 1 << "$db"
                                      << "db");

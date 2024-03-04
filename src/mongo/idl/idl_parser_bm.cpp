@@ -99,9 +99,9 @@ void BM_FIND_ONE_OP_MSG(benchmark::State& state) {
                        << "limit" << 1 << "singleBatch" << true << "lsid" << BSON("id" << u)
                        << "$clusterTime" << getClusterTime());
 
-    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
+    auto request = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
+        DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
         doc);
 
     for (auto _ : state) {
@@ -167,9 +167,9 @@ void BM_INSERT_ONE_OP_MSG(benchmark::State& state) {
                        << "ordered" << true << "lsid" << BSON("id" << u) << "$clusterTime"
                        << getClusterTime());
 
-    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
+    auto request = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
+        DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
         doc);
     request.sequences.push_back({"documents", {getInsertDoc()}});
 
@@ -222,9 +222,9 @@ void BM_UPDATE_ONE_OP_MSG(benchmark::State& state) {
 
                        "lsid" << BSON("id" << u) << "$clusterTime" << getClusterTime());
 
-    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
+    auto request = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
+        DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
         doc);
     request.sequences.push_back({"updates", {getUpdateDoc()}});
 

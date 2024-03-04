@@ -68,9 +68,9 @@ void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
     auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() {
         DBDirectClient client(opCtx);
 
-        auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(tenantId, "config"),
+        auto opMsgRequest = OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::get(opCtx),
+            DatabaseName::createDatabaseName_forTest(tenantId, "config"),
             [&] {
                 write_ops::UpdateCommandRequest updateOp(
                     NamespaceString::makeClusterParametersNSS(tenantId));
@@ -103,9 +103,9 @@ void remove(const boost::optional<TenantId>& tenantId) {
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();
     auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() {
-        auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(tenantId, "config"),
+        auto opMsgRequest = OpMsgRequestBuilder::create(
             auth::ValidatedTenancyScope::get(opCtx),
+            DatabaseName::createDatabaseName_forTest(tenantId, "config"),
             [&] {
                 write_ops::DeleteCommandRequest deleteOp(
                     NamespaceString::makeClusterParametersNSS(tenantId));

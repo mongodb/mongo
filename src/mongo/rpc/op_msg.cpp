@@ -394,9 +394,9 @@ void validateExtraFields(const DatabaseName& dbName,
     };
 }
 
-OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
-    const DatabaseName& dbName,
+OpMsgRequest OpMsgRequestBuilder::create(
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
+    const DatabaseName& dbName,
     BSONObj body,
     const BSONObj& extraFields) {
     validateExtraFields(dbName, body, extraFields);
@@ -412,18 +412,6 @@ OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
     if (hasValidVts) {
         request.validatedTenancyScope = std::move(validatedTenancyScope);
     }
-
-    return request;
-}
-
-OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
-                                         BSONObj body,
-                                         const BSONObj& extraFields,
-                                         const SerializationContext& sc) {
-    validateExtraFields(dbName, body, extraFields);
-
-    OpMsgRequest request;
-    request.body = appendDollarDbAndTenant(dbName, std::move(body), sc, false, extraFields);
 
     return request;
 }

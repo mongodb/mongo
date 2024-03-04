@@ -102,8 +102,8 @@ Status doRunCommand(OperationContext* opCtx, const DatabaseName& dbname, const R
     DBDirectClient client(opCtx);
     BSONObj cmd = request.toBSON(kMajorityWriteConcern);
     auto reply = client
-                     .runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                         dbname, auth::ValidatedTenancyScope::kNotRequired, std::move(cmd)))
+                     .runCommand(OpMsgRequestBuilder::create(
+                         auth::ValidatedTenancyScope::kNotRequired, dbname, std::move(cmd)))
                      ->getCommandReply();
     return getStatusFromCommandResult(reply);
 }

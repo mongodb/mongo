@@ -200,8 +200,8 @@ protected:
 
         const auto node = replSet->getNode(requestHost);
         if (node->isRunning()) {
-            const auto opmsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                request.dbname, auth::ValidatedTenancyScope::kNotRequired, request.cmdObj);
+            const auto opmsg = OpMsgRequestBuilder::create(
+                auth::ValidatedTenancyScope::kNotRequired, request.dbname, request.cmdObj);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
             _net->scheduleSuccessfulResponse(noi, RemoteCommandResponse(reply, Milliseconds(0)));
         } else {

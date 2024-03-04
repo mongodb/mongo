@@ -228,8 +228,8 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
               "passing readConcern to DBDirectClient functions is not supported as it has to use "
               "the parent operation's readConcern");
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);
-    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        nsOrUuid.dbName(), _createInnerRequestVTS(nsOrUuid.dbName().tenantId()), cmdObj);
+    auto request = OpMsgRequestBuilder::create(
+        _createInnerRequestVTS(nsOrUuid.dbName().tenantId()), nsOrUuid.dbName(), cmdObj);
 
     // Calls runCommand instead of runCommandDirectly to ensure the tenant inforamtion of this
     // command gets validated and is used for parsing the command request.

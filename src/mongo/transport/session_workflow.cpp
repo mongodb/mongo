@@ -364,9 +364,9 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
             return false;
         auto opCtx = client->makeOperationContext();
         sep->handleRequest(opCtx.get(),
-                           OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                               inRequest.getDbName(),
+                           OpMsgRequestBuilder::create(
                                auth::ValidatedTenancyScope::get(opCtx.get()),
+                               inRequest.getDbName(),
                                KillCursorsCommandRequest(
                                    NamespaceStringUtil::deserialize(inRequest.getDbName(),
                                                                     body["collection"].String()),

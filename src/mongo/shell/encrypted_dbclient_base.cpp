@@ -817,8 +817,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
         vts = auth::ValidatedTenancyScope::get(opCtx);
     }
 
-    OpMsgRequest req = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        fullNameNS.dbName(), vts, findCmd.toBSON({}));
+    OpMsgRequest req = OpMsgRequestBuilder::create(vts, fullNameNS.dbName(), findCmd.toBSON({}));
 
     BSONObj dataKeyObj = doFindOne(req);
 

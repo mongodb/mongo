@@ -250,9 +250,9 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
     const auto dbName = DatabaseNameUtil::deserialize(
         boost::none, targetDatabase, SerializationContext::stateDefault());
     return runCommand(
-               OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                   dbName,
+               OpMsgRequestBuilder::create(
                    auth::ValidatedTenancyScope::kNotRequired /* TODO SERVER-86582 investigate */,
+                   dbName,
                    commandBuilder.obj()))
         .then([runCommand, session, targetDatabase, saslLogLevel](
                   BSONObj serverResponse) -> Future<void> {

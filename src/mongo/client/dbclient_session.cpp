@@ -209,9 +209,9 @@ executor::RemoteCommandResponse initWireVersion(
     WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     Date_t start{Date_t::now()};
-    auto result = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::kAdmin,
+    auto result = conn->runCommand(OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+        DatabaseName::kAdmin,
         bob.obj()));
     Date_t finish{Date_t::now()};
 

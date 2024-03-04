@@ -135,8 +135,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                             auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}));
                 }
 
-                auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    dbNameForAuthCheck, vts, o);
+                auto request = OpMsgRequestBuilder::create(vts, dbNameForAuthCheck, o);
                 commandInOplogEntry->parse(opCtx, request)->checkAuthorization(opCtx, request);
                 return Status::OK();
             } catch (const DBException& e) {

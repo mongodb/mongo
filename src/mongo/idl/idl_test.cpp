@@ -3165,10 +3165,10 @@ void TestDocSequence(StringData name) {
                                  << "field1" << 3 << "field2"
                                  << "five");
 
-    OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-        auth::ValidatedTenancyScope::kNotRequired,
-        testTempDoc);
+    OpMsgRequest request =
+        OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                    DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                    testTempDoc);
     request.sequences.push_back({"structs",
                                  {BSON("value"
                                        << "hello"),
@@ -3210,10 +3210,10 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
 
     // Negative: Duplicate fields in doc sequence
     {
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs",
                                      {BSON("value"
                                            << "hello"),
@@ -3226,10 +3226,10 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
 
     // Negative: Extra field in document sequence
     {
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs",
                                      {BSON("value"
                                            << "hello"),
@@ -3247,10 +3247,10 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
 
     // Negative: Missing field in both document sequence and body
     {
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
         ASSERT_THROWS(TestT::parse(ctxt, request), AssertionException);
@@ -3258,10 +3258,10 @@ void TestBadDocSequences(StringData name, bool extraFieldAllowed) {
 
     // Negative: Missing field in both document sequence and body
     {
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs",
                                      {BSON("value"
                                            << "hello"),
@@ -3295,10 +3295,10 @@ void TestDuplicateDocSequences(StringData name) {
                                                            << "world"))
                                      << "objects" << BSON_ARRAY(BSON("foo" << 1)));
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs",
                                      {BSON("value"
                                            << "hello"),
@@ -3320,10 +3320,10 @@ void TestDuplicateDocSequences(StringData name) {
                                                            << "world"))
                                      << "objects" << BSON_ARRAY(BSON("foo" << 1)));
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"objects", {BSON("foo" << 1)}});
 
         ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), AssertionException);
@@ -3353,10 +3353,10 @@ TEST(IDLDocSequence, TestEmptySequence) {
                                                       << "world"))
                                 << "objects" << BSON_ARRAY(BSON("foo" << 1)));
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs", {}});
 
         ASSERT_THROWS(DocSequenceCommand::parse(ctxt, request), AssertionException);
@@ -3370,10 +3370,10 @@ TEST(IDLDocSequence, TestEmptySequence) {
                                 << "five"
                                 << "objects" << BSON_ARRAY(BSON("foo" << 1)));
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs", {}});
 
         auto testStruct = DocSequenceCommand::parse(ctxt, request);
@@ -3413,10 +3413,10 @@ TEST(IDLDocSequence, TestWellKnownFieldsAreIgnored) {
                                 << "objects" << BSON_ARRAY(BSON("foo" << 1)));
 
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
 
         // Validate it can be parsed as a OpMsgRequest.
         {
@@ -3485,10 +3485,10 @@ TEST(IDLDocSequence, TestNonStrict) {
                                 << "field1" << 3 << "field2"
                                 << "five");
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs",
                                      {BSON("value"
                                            << "hello"),
@@ -3509,10 +3509,10 @@ TEST(IDLDocSequence, TestNonStrict) {
                                 << "five"
                                 << "extra" << 1);
 
-        OpMsgRequest request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-            auth::ValidatedTenancyScope::kNotRequired,
-            testTempDoc);
+        OpMsgRequest request =
+            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        testTempDoc);
         request.sequences.push_back({"structs",
                                      {BSON("value"
                                            << "hello"),
