@@ -1,19 +1,17 @@
-"""Unit tests for buildscripts/resmokelib/utils/scheduler.py."""
+"""Unit tests for scheduler."""
 
 import sched
 import unittest
-
-from buildscripts.resmokelib.utils import scheduler as _scheduler
 
 
 def noop():
     pass
 
 
-class TestScheduler(unittest.TestCase):
-    """Unit tests for the Scheduler class."""
+class TestBuiltinScheduler(unittest.TestCase):
+    """Unit tests for the 'sched.scheduler' class that is used in buildscripts/resmokelib/logging/flush.py."""
 
-    scheduler = _scheduler.Scheduler
+    scheduler = sched.scheduler
 
     def setUp(self):
         self.__scheduler = self.scheduler()
@@ -31,14 +29,3 @@ class TestScheduler(unittest.TestCase):
 
         self.__scheduler.cancel(event2)
         self.assertEqual(self.__scheduler.queue, [])
-
-
-# TODO(SERVER-72079) Either reneable this test to remove uses of scheduler.py
-# See ticket for more details
-# class TestBuiltinScheduler(TestScheduler):
-#     """Unit tests for the sched.scheduler class."""
-#     scheduler = sched.scheduler
-
-#     def test_cancel_with_identical_time_and_priority(self):
-#         with self.assertRaises(AssertionError):
-#             super().test_cancel_with_identical_time_and_priority()

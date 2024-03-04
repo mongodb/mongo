@@ -1,4 +1,4 @@
-"""Unit tests for buildscripts/resmokelib/utils/scheduler.py."""
+"""Unit tests for buildscripts/resmokelib/utils/history.py."""
 
 import sched
 import unittest
