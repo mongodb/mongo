@@ -4254,10 +4254,10 @@ buildvariants:
   - name: ".stress-test-ppc-1"
   - name: ".stress-test-ppc-2"
 
-- name: ubuntu1804-ppc-cmake
-  display_name: "* Ubuntu 18.04 PPC CMake"
+- name: rhel8-ppc-cmake
+  display_name: "* RHEL8 PPC CMake"
   run_on:
-  - ubuntu1804-power8-test
+  - rhel81-power8-small
   batchtime: 10080 # 7 days
   expansions:
     test_env_vars:
@@ -4273,7 +4273,7 @@ buildvariants:
       -DENABLE_STRICT=1
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 4 | bc)
     cmake_generator: Ninja
     make_command: ninja
     is_cmake_build: true
