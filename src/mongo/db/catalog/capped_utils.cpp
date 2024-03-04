@@ -246,7 +246,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             }
 
             uassertStatusOK(collection_internal::insertDocument(
-                opCtx, toCollection, InsertStatement(objToClone), nullptr /* OpDebug */, true));
+                opCtx, toCollection, std::move(insertStmt), nullptr /* OpDebug */, true));
             wunit.commit();
 
             // Go to the next document
