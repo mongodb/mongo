@@ -14,7 +14,7 @@ const commandsToRetry = new Set([
 ]);
 
 const kTimeout = 10 * 60 * 1000;
-const kInterval = 200;
+const kInterval = 50;  // milliseconds
 
 // Make it easier to understand whether or not returns from the assert.soon are being retried.
 const kNoRetry = true;
@@ -52,10 +52,6 @@ function runCommandWithMigrationRetries(conn, dbName, commandName, commandObj, f
             let message = "Retrying the " + commandName +
                 " command because a migration operation is in progress (attempt " + attempt +
                 "): " + tojson(res);
-
-            // Reduce the aggresiveness of retries by introducing a small delay
-            const sleepTime = Math.floor(Math.random() * attempt);
-            sleep(sleepTime);
 
             // This handles the retry case when run against a standalone, replica set, or mongos
             // where both shards returned the same response.
