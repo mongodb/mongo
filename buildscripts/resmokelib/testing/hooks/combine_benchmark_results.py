@@ -4,6 +4,7 @@ import collections
 import datetime
 import json
 from typing import List, Dict, Any
+from dataclasses import dataclass
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.errors import CedarReportError
@@ -148,23 +149,46 @@ class _BenchmarkThreadsReport(object):
       },
       "benchmarks": [
         {
-          "name": "BM_SetInsert/arg name:1024/threads:10",
-          "iterations": 21393,
-          "real_time": 32724,
-          "cpu_time": 33355,
-          "bytes_per_second": 1199226,
-          "items_per_second": 299807
+          "name": "ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING/threads:1",
+          "run_name": "ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING/threads:1",
+          "run_type": "iteration",
+          "repetitions": 0,
+          "repetition_index": 0,
+          "threads": 1,
+          "iterations": 384039,
+          "real_time": 1.8257322104271429e+04,
+          "cpu_time": 1.8254808467369203e+04,
+          "time_unit": "ns",
+          "cycles": 8.5453635200000000e+08,
+          "cycles_per_iteration": 2.2251290936597584e+03,
+          "instructions": 1.4558972662000000e+10,
+          "instructions_per_iteration": 3.7910141058590401e+04,
+          "items_per_second": 5.4780087218527544e+04
         }
       ]
     }
     """
 
-    DEFAULT_CEDAR_METRIC_NAME = "latency_per_op"
+    @dataclass
+    class BenchmarkMetricInfo:
+        """Information about a particular benchmark metric."""
+
+        local_name: str
+        cedar_name: str
+        cedar_metric_type: str
+
+    BENCHMARK_METRICS_TO_GATHER = {
+        "latency":
+            BenchmarkMetricInfo(local_name="cpu_time", cedar_name="latency_per_op",
+                                cedar_metric_type="LATENCY"), "instructions_per_iteration":
+                                    BenchmarkMetricInfo(local_name="instructions_per_iteration",
+                                                        cedar_name="instructions_per_iteration",
+                                                        cedar_metric_type="LATENCY")
+    }
 
     # Map benchmark metric type to the type in Cedar
     # https://github.com/evergreen-ci/cedar/blob/87e22df45845440cf299d4ee1f406e8c00ff05ae/perf.proto#L101-L115
-    BENCHMARK_TO_CEDAR_METRIC_TYPE_MAP = {
-        "latency": "LATENCY",
+    AGGREGATE_TYPE_TO_CEDAR_METRIC_TYPE_MAP = {
         "mean": "MEAN",
         "median": "MEDIAN",
         "stddev": "STANDARD_DEVIATION",
@@ -241,28 +265,136 @@ class _BenchmarkThreadsReport(object):
         return res
 
     def generate_cedar_metrics(self) -> Dict[int, List[CedarMetric]]:
-        """Generate metrics for Cedar."""
+        """
+        Generate metrics for Cedar.
+
+        A single item in a Google Benchmark report looks something like
+
+        {
+          "name": "ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING/threads:32_mean",
+          "run_name": "ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING/threads:32",
+          "run_type": "aggregate",
+          "repetitions": 0,
+          "threads": 32,
+          "aggregate_name": "mean",
+          "iterations": 3,
+          "real_time": 1.8245845942382809e+03,
+          "cpu_time": 2.9134014577311347e+04,
+          "time_unit": "ns",
+          "cycles": 1.7830294660000000e+09,
+          "cycles_per_iteration": 7.3209395365260807e+03,
+          "instructions": 9.2459413546666660e+09,
+          "instructions_per_iteration": 3.7962904655542414e+04,
+          "items_per_second": 3.4326400041023953e+04
+        }
+        The regular output of a benchmark is a list of these types of reports. They differ by what iteration and thread
+        level it is reporting on.
+
+        aggregate_name is optional and only appears in some of the reports. When it appears in the report, it is telling
+        us that all the metrics in that report are an aggregate of that type. The example above is telling us
+        that all the metrics in that report (instructions_per_iteration, items_per_second, etc.) are an average. If
+        aggregate_name is not in the report, that is a report showing only the results for that single iteration run.
+
+        :return: A dictionary containing a list of CedarMetrics split up by what thread each belongs to.
+
+        It looks something like this:
+        [
+            {
+                "info": {
+                    "test_name": "ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING",
+                    "args": {
+                        "thread_level": 1
+                    }
+                },
+                "metrics": [
+                    {
+                        "name": "latency_per_op_0",
+                        "type": "LATENCY",
+                        "value": 18254.808467369203,
+                        "user_submitted": false
+                    },
+                    {
+                        "name": "latency_per_op_1",
+                        "type": "LATENCY",
+                        "value": 18257.808467369203,
+                        "user_submitted": false
+                    },
+                    {
+                        "name": "latency_per_op_stddev",
+                        "type": "STANDARD_DEVIATION",
+                        "value": 33.544253827885704,
+                        "user_submitted": false
+                    }
+                ]
+            },
+            {
+                "info": {
+                    "test_name": "ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING",
+                    "args": {
+                        "thread_level": 2
+                    }
+                },
+                "metrics": [
+                    {
+                        "name": "latency_per_op_0",
+                        "type": "LATENCY",
+                        "value": 19537.578709627178,
+                        "user_submitted": false
+                    },
+                    {
+                        "name": "latency_per_op_1",
+                        "type": "LATENCY",
+                        "value": 19348.98278000912,
+                        "user_submitted": false
+                    },
+                    {
+                        "name": "latency_per_op_stddev",
+                        "type": "STANDARD_DEVIATION",
+                        "value": 112.31621981920948,
+                        "user_submitted": false
+                    }
+                ]
+            }
+        ]
+        """
 
         res = {}
 
         for _, reports in self.thread_benchmark_map.items():
             for report in reports:
-                aggregate_name = report.get("aggregate_name", "latency")
+                # Check to see if this report is a collection of aggregates or not - this field is missing if it's not.
+                aggregate_name = report.get("aggregate_name", None)
+                for bm_metric_info in self.BENCHMARK_METRICS_TO_GATHER.values():
+                    metric_local_name = bm_metric_info.local_name
+                    metric_cedar_name = bm_metric_info.cedar_name
+                    metric_cedar_type = bm_metric_info.cedar_metric_type
 
-                if aggregate_name == "latency":
-                    idx = report.get("repetition_index", 0)
-                    metric_name = f"{self.DEFAULT_CEDAR_METRIC_NAME}_{idx}"
-                else:
-                    metric_name = f"{self.DEFAULT_CEDAR_METRIC_NAME}_{aggregate_name}"
+                    # Some metrics may not be in every benchmark. If a metric we want isn't in this report, move on.
+                    metric_value = report.get(metric_local_name, None)
+                    if metric_value is None:
+                        continue
 
-                metric_type = self.BENCHMARK_TO_CEDAR_METRIC_TYPE_MAP[aggregate_name]
+                    if aggregate_name is not None:
+                        # Call out that this particular metric is an aggregated result. For example, if the aggregate is
+                        # a mean and we are looking at the `latency` metric, metric_name becomes `latency_mean` and the
+                        # cedar_type becomes `MEAN`.
 
-                metric = CedarMetric(name=metric_name, type=metric_type, value=report["cpu_time"])
-                threads = report["threads"]
-                if threads in res:
-                    res[threads].append(metric)
-                else:
-                    res[threads] = [metric]
+                        metric_name = f"{metric_cedar_name}_{aggregate_name}"
+                        metric_cedar_type = self.AGGREGATE_TYPE_TO_CEDAR_METRIC_TYPE_MAP[
+                            aggregate_name]
+                    else:
+                        # Call out what iteration this metric came from. For example, if we are looking at iteration 2
+                        # and the `latency` metric, metric_name becomes `latency_2`.
+                        idx = report.get("repetition_index", 0)
+                        metric_name = f"{metric_cedar_name}_{idx}"
+
+                    metric = CedarMetric(name=metric_name, type=metric_cedar_type,
+                                         value=metric_value)
+                    threads = report["threads"]
+                    if threads in res:
+                        res[threads].append(metric)
+                    else:
+                        res[threads] = [metric]
 
         return res
 
