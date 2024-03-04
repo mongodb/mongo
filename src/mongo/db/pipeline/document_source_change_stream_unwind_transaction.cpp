@@ -205,6 +205,7 @@ DepsTracker::State DocumentSourceChangeStreamUnwindTransaction::getDependencies(
     deps->fields.insert(repl::OplogEntry::kTermFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kWallClockTimeFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kMultiOpTypeFieldName.toString());
 
     return DepsTracker::State::SEE_NEXT;
 }
@@ -283,16 +284,27 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
       _expression(expression),
       _endOfTransactionExpression(change_stream_filter::buildEndOfTransactionFilter(expCtx)) {
 
-    // The lsid and txnNumber can be missing in case of batched writes.
-    Value lsidValue = input["lsid"];
-    DocumentSourceChangeStream::checkValueTypeOrMissing(lsidValue, "lsid", BSONType::Object);
-    _lsid = lsidValue.missing() ? boost::none : boost::optional<Document>(lsidValue.getDocument());
-    Value txnNumberValue = input["txnNumber"];
+    Value multiOpTypeValue = input[repl::OplogEntry::kMultiOpTypeFieldName];
     DocumentSourceChangeStream::checkValueTypeOrMissing(
-        txnNumberValue, "txnNumber", BSONType::NumberLong);
-    _txnNumber = txnNumberValue.missing() ? boost::none
-                                          : boost::optional<TxnNumber>(txnNumberValue.getLong());
+        multiOpTypeValue, repl::OplogEntry::kMultiOpTypeFieldName, BSONType::NumberInt);
+    const bool applyOpsAppliedSeparately = !multiOpTypeValue.missing() &&
+        multiOpTypeValue.getInt() == int(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
+    // The lsid and txnNumber can be missing in case of batched writes, and are ignored when
+    // multiOpType is kApplyOpsAppliedSeparately.  The latter indicates an applyOps that is part of
+    // a retryable write and not a multi-document transaction.
+    if (!applyOpsAppliedSeparately) {
+        Value lsidValue = input["lsid"];
+        DocumentSourceChangeStream::checkValueTypeOrMissing(lsidValue, "lsid", BSONType::Object);
+        _lsid =
+            lsidValue.missing() ? boost::none : boost::optional<Document>(lsidValue.getDocument());
+        Value txnNumberValue = input["txnNumber"];
+        DocumentSourceChangeStream::checkValueTypeOrMissing(
+            txnNumberValue, "txnNumber", BSONType::NumberLong);
+        _txnNumber = txnNumberValue.missing()
+            ? boost::none
+            : boost::optional<TxnNumber>(txnNumberValue.getLong());
+    }
     // We want to parse the OpTime out of this document using the BSON OpTime parser. Instead of
     // converting the entire Document back to BSON, we convert only the fields we need.
     repl::OpTime txnOpTime = repl::OpTime::parse(BSON(repl::OpTime::kTimestampFieldName
@@ -329,13 +341,17 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
     }
 
     // We need endOfTransaction only for unprepared transactions: so this must be an applyOps with
-    // set lsid and txnNumber.
+    // set lsid and txnNumber but not a retryable write.
     _needEndOfTransaction = feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !applyOps.missing() && _lsid.has_value() && _txnNumber.has_value();
+        !applyOps.missing() && !applyOpsAppliedSeparately && _lsid.has_value() &&
+        _txnNumber.has_value();
 
-    if (BSONType::Object ==
-        input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getType()) {
+    // If there's no previous optime, or if this applyOps is of the kApplyOpsAppliedSeparately
+    // multiOptype, we don't need to collect other apply ops operations.
+    if (!applyOpsAppliedSeparately &&
+        BSONType::Object ==
+            input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getType()) {
         // As with the 'txnOpTime' parsing above, we convert a portion of 'input' back to BSON
         // in order to parse an OpTime, this time from the "prevOpTime" field.
         repl::OpTime prevOpTime = repl::OpTime::parse(
