@@ -495,8 +495,10 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
     monitor.setPeriod(Milliseconds(1007));
 
     counterCheckPtr->waitForCount();
-    // Sleep to ensure the monitor runs at least once.
-    sleepmillis(3000);
+    // Wait for monitor to run at least once.
+    while (monitor.getMonitorGeneration() < 1) {
+        sleepmillis(100);
+    }
 
     monitor.shutdown();
 
