@@ -337,6 +337,11 @@ class ReplSetBuilder(FixtureBuilder):
             new_fixture_port = old_fixture.port
 
         new_fixture_mongod_options = replset.get_options_for_mongod(replset_node_index)
+
+        # In multiversion, new binaries must add the command line option --upgradeBackCompat.
+        if is_multiversion:
+            new_fixture_mongod_options["upgradeBackCompat"] = ""
+
         new_fixture = make_fixture(_class, mongod_logger, replset.job_num,
                                    mongod_executable=executables[BinVersionEnum.NEW],
                                    mongod_options=new_fixture_mongod_options,
@@ -618,6 +623,11 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         # We can't restart mongos since explicit ports are not supported.
         new_fixture_mongos_kwargs = sharded_cluster.get_mongos_kwargs()
+
+        # In multiversion, new binaries must add the command line option --upgradeBackCompat.
+        if is_multiversion:
+            new_fixture_mongos_kwargs["mongos_options"]["upgradeBackCompat"] = ""
+
         new_fixture = make_fixture(_class, mongos_logger, sharded_cluster.job_num,
                                    mongos_executable=executables[BinVersionEnum.NEW],
                                    **new_fixture_mongos_kwargs)
