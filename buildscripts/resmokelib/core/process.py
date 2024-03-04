@@ -112,6 +112,9 @@ class Process(object):
         self._stderr_pipe = None
         self._cwd = cwd
 
+        if sys.platform == "win32":
+            self._windows_shutdown_event_set = False
+
     def start(self):
         """Start the process and the logger pipes for its stdout and stderr."""
         if self.NOOP:
@@ -190,52 +193,11 @@ class Process(object):
             mode = fixture_interface.TeardownMode.TERMINATE
 
         if sys.platform == "win32":
-
-            # Attempt to cleanly shutdown mongod.
             if mode != fixture_interface.TeardownMode.KILL and self.args and self.args[0].find(
                     "mongod") != -1:
-                mongo_signal_handle = None
-                try:
-                    mongo_signal_handle = win32event.OpenEvent(
-                        win32event.EVENT_MODIFY_STATE, False,
-                        "Global\\Mongo_" + str(self._process.pid))
-
-                    if not mongo_signal_handle:
-                        # The process has already died.
-                        return
-                    win32event.SetEvent(mongo_signal_handle)
-                    # Wait 60 seconds for the program to exit.
-                    status = win32event.WaitForSingleObject(self._process._handle, 60 * 1000)
-                    if status == win32event.WAIT_OBJECT_0:
-                        return
-                except win32process.error as err:
-                    # ERROR_FILE_NOT_FOUND (winerror=2)
-                    # ERROR_ACCESS_DENIED (winerror=5)
-                    # ERROR_INVALID_HANDLE (winerror=6)
-                    # One of the above errors is received if the process has
-                    # already died.
-                    if err.winerror not in (2, 5, 6):
-                        raise
-                finally:
-                    win32api.CloseHandle(mongo_signal_handle)
-
-                print("Failed to cleanly exit the program, calling TerminateProcess() on PID: " +\
-                    str(self._process.pid))
-
-            # Adapted from implementation of Popen.terminate() in subprocess.py of Python 2.7
-            # because earlier versions do not catch exceptions.
-            try:
-                # Have the process exit with code 0 if it is terminated by us to simplify the
-                # success-checking logic later on.
-                win32process.TerminateProcess(self._process._handle, 0)
-            except win32process.error as err:
-                # ERROR_ACCESS_DENIED (winerror=5) is received when the process
-                # has already died.
-                if err.winerror != winerror.ERROR_ACCESS_DENIED:
-                    raise
-                return_code = win32process.GetExitCodeProcess(self._process._handle)
-                if return_code == win32con.STILL_ACTIVE:
-                    raise
+                self._request_clean_shutdown_on_windows()
+            else:
+                self._terminate_on_windows()
         else:
             try:
                 if mode == fixture_interface.TeardownMode.KILL:
@@ -263,6 +225,26 @@ class Process(object):
         """Wait until process has terminated and all output has been consumed by the logger pipes."""
         if self.NOOP:
             return None
+
+        if sys.platform == "win32" and self._windows_shutdown_event_set:
+            status = None
+            try:
+                # Wait 60 seconds for the program to exit.
+                status = win32event.WaitForSingleObject(self._process._handle, 60 * 1000)
+            except win32process.error as err:
+                # ERROR_FILE_NOT_FOUND (winerror=2)
+                # ERROR_ACCESS_DENIED (winerror=5)
+                # ERROR_INVALID_HANDLE (winerror=6)
+                # One of the above errors is received if the process has
+                # already died.
+                if err.winerror not in (2, 5, 6):
+                    raise
+
+            if status is not None and status != win32event.WAIT_OBJECT_0:
+                self.logger.info(
+                    f"Failed to cleanly exit the program, calling TerminateProcess() on PID:"
+                    f" {str(self._process.pid)}")
+                self._terminate_on_windows()
 
         return_code = self._process.wait(timeout)
 
@@ -322,3 +304,47 @@ class Process(object):
         if self.pid is None:
             return self.as_command()
         return "%s (%d)" % (self.as_command(), self.pid)
+
+    if sys.platform == "win32":
+
+        def _request_clean_shutdown_on_windows(self):
+            """Request clean shutdown on Windows."""
+            _windows_mongo_signal_handle = None
+            try:
+                _windows_mongo_signal_handle = win32event.OpenEvent(
+                    win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" + str(self._process.pid))
+
+                if not _windows_mongo_signal_handle:
+                    # The process has already died.
+                    return
+                win32event.SetEvent(_windows_mongo_signal_handle)
+                self._windows_shutdown_event_set = True
+
+            except win32process.error as err:
+                # ERROR_FILE_NOT_FOUND (winerror=2)
+                # ERROR_ACCESS_DENIED (winerror=5)
+                # ERROR_INVALID_HANDLE (winerror=6)
+                # One of the above errors is received if the process has
+                # already died.
+                if err.winerror not in (2, 5, 6):
+                    raise
+
+            finally:
+                win32api.CloseHandle(_windows_mongo_signal_handle)
+
+        def _terminate_on_windows(self):
+            """Terminate the process on Windows."""
+            # Adapted from implementation of Popen.terminate() in subprocess.py of Python 2.7
+            # because earlier versions do not catch exceptions.
+            try:
+                # Have the process exit with code 0 if it is terminated by us to simplify the
+                # success-checking logic later on.
+                win32process.TerminateProcess(self._process._handle, 0)
+            except win32process.error as err:
+                # ERROR_ACCESS_DENIED (winerror=5) is received when the process
+                # has already died.
+                if err.winerror != winerror.ERROR_ACCESS_DENIED:
+                    raise
+                return_code = win32process.GetExitCodeProcess(self._process._handle)
+                if return_code == win32con.STILL_ACTIVE:
+                    raise
