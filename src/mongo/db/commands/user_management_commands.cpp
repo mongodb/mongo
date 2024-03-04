@@ -715,7 +715,6 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         !std::any_of(pwd.begin(), pwd.end(), ::islower) ||
         !std::any_of(pwd.begin(), pwd.end(), ::isupper) ||
         !std::any_of(pwd.begin(), pwd.end(), ::ispunct)) {
-        std::cerr << "Error: Password does not meet complexity requirements\n";
         uassert(ErrorCodes::BadValue, "Password does not meet complexity requirements", false);
  
     }
