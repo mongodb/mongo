@@ -1488,7 +1488,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "requires_large_host", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1524,7 +1524,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_with_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "requires_large_host", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1539,7 +1539,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "requires_large_host", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1564,12 +1564,13 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: cwrwc_passthrough
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "requires_large_host", "read_write_concern", "large", "write"]
+- <<: *gen_task_template
+  name: cwrwc_passthrough_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "read_write_concern", "large", "write"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: cwrwc_rc_majority_passthrough_gen

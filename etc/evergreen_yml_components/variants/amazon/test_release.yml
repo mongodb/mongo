@@ -45,13 +45,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical .requires_large_host
-    distros:
-    - amazon2-openssl111-large
-  - name: .release_critical !.requires_large_host
-  - name: .release_critical .requires_large_host
-    distros:
-    - amazon2-openssl111-large
+  - name: .development_critical
+  - name: .release_critical
   - name: push
   - name: .publish_crypt
   - name: crypt_build
@@ -105,13 +100,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .development_critical .requires_large_host
-    distros:
-    - amazon2-arm64-openssl111-large
-  - name: .release_critical !.requires_large_host
-  - name: .release_critical .requires_large_host
-    distros:
-    - amazon2-arm64-openssl111-large
+  - name: .development_critical
+  - name: .release_critical
   - name: push
   - name: .publish_crypt
   - name: crypt_build
@@ -151,13 +141,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical .requires_large_host !.incompatible_community
-    distros:
-    - amazon2023.0-large
-  - name: .release_critical !.requires_large_host !.incompatible_community
-  - name: .release_critical .requires_large_host !.incompatible_community
-    distros:
-    - amazon2023.0-large
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
   - name: .publish
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
@@ -199,13 +184,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical .requires_large_host
-    distros:
-    - amazon2023.0-large
-  - name: .release_critical !.requires_large_host
-  - name: .release_critical .requires_large_host
-    distros:
-    - amazon2023.0-large
+  - name: .development_critical
+  - name: .release_critical
   - name: .publish
   - name: .publish_crypt
   - name: crypt_build
@@ -254,13 +234,8 @@ buildvariants:
   # - name: test_packages
   #   distros:
   #   - amazon2023.0-large
-  - name: .development_critical .requires_large_host
-    distros:
-    - amazon2023.0-large
-  - name: .release_critical !.requires_large_host
-  - name: .release_critical .requires_large_host
-    distros:
-    - amazon2023.0-large
+  - name: .development_critical
+  - name: .release_critical
   # TODO: SERVER-79886 Fix broken crypt_build task
   # - name: crypt_build
   #   distros:
@@ -304,13 +279,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: .development_critical .requires_large_host !.incompatible_community
-    distros:
-    - amazon2023.0-arm64-large
-  - name: .release_critical !.requires_large_host !.incompatible_community
-  - name: .release_critical .requires_large_host !.incompatible_community
-    distros:
-    - amazon2023.0-arm64-large
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
   - name: .publish
   - name: stitch_support_lib_build_and_archive
   - name: stitch_support_lib_build_and_test
@@ -352,13 +322,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: .development_critical .requires_large_host
-    distros:
-    - amazon2023.0-arm64-large
-  - name: .release_critical !.requires_large_host
-  - name: .release_critical .requires_large_host
-    distros:
-    - amazon2023.0-arm64-large
+  - name: .development_critical
+  - name: .release_critical
   - name: .publish
   - name: .publish_crypt
   - name: crypt_build
@@ -409,13 +374,8 @@ buildvariants:
   # - name: test_packages
   #   distros:
   #   - ubuntu2204-arm64-large
-  - name: .development_critical .requires_large_host
-    distros:
-    - amazon2023.0-arm64-large
-  - name: .release_critical !.requires_large_host
-  - name: .release_critical .requires_large_host
-    distros:
-    - amazon2023.0-arm64-large
+  - name: .development_critical
+  - name: .release_critical
   # TODO: SERVER-79886 Fix broken crypt_build task
   # - name: crypt_build
   #   distros:

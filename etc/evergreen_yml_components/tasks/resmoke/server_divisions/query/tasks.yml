@@ -456,7 +456,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "requires_large_host", "concurrency", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "concurrency", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -492,7 +492,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore
-  tags: ["assigned_to_jira_team_server_query_execution", "development_critical", "requires_large_host", "jscore", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "development_critical", "jscore", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"

@@ -575,7 +575,7 @@ buildvariants:
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: .recordids_replicated
-  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: replica_sets_large_txns_format_jscore_passthrough_gen
   - name: .replica_sets !.multi_oplog
   - name: .replica_sets .encrypt
   - name: .resharding_fuzzer

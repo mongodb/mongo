@@ -312,7 +312,7 @@ buildvariants:
   - name: .query_fuzzer !.feature_flag_guarded
   - name: .random_multiversion_ds
   - name: .read_write_concern
-  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: replica_sets_large_txns_format_jscore_passthrough_gen
   - name: .replica_sets !.multi_oplog
   - name: .replica_sets .encrypt
   - name: .resharding_fuzzer
@@ -399,7 +399,7 @@ buildvariants:
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
   - name: .read_write_concern
-  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: replica_sets_large_txns_format_jscore_passthrough_gen
   - name: .replica_sets !.multi_oplog
   - name: .replica_sets .encrypt
   - name: .resharding_fuzzer

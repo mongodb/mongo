@@ -2696,20 +2696,20 @@ task_groups:
 
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_archive
-  tags: ["release_critical", "stitch"]
+  tags: ["stitch"]
   tasks:
   - "stitch_support_create_lib"
 
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_test
-  tags: ["release_critical", "stitch"]
+  tags: ["stitch"]
   max_hosts: 1
   tasks:
   - "stitch_support_install_tests"
   - "stitch_support_run_tests"
 
 - name: crypt_build
-  tags: ["release_critical", "incompatible_community", "crypt"]
+  tags: ["crypt"]
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"
