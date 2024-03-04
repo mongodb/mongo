@@ -471,8 +471,8 @@ void HashAggStage::open(bool reOpen) {
 
         MemoryCheckData memoryCheckData;
 
+        value::MaterializedRow key{_inKeyAccessors.size()};
         while (_children[0]->getNext() == PlanState::ADVANCED) {
-            value::MaterializedRow key{_inKeyAccessors.size()};
             // Copy keys in order to do the lookup.
             size_t idx = 0;
             for (auto& p : _inKeyAccessors) {
@@ -487,8 +487,9 @@ void HashAggStage::open(bool reOpen) {
                 // corresponding accumulator. Note that as a future optimization, we could avoid
                 // doing a lookup both in the 'find()' call and in 'emplace()'.
                 newKey = true;
-                key.makeOwned();
-                auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
+                value::MaterializedRow keyCopy(key);
+                keyCopy.makeOwned();
+                auto [it, _] = _ht->emplace(std::move(keyCopy), value::MaterializedRow{0});
                 it->second.resize(_outAggAccessors.size());
 
                 _htIt = it;
