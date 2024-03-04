@@ -237,6 +237,14 @@ public:
     virtual void setRoundUpPreparedTimestamps(bool value) {}
 
     /**
+     * Returns whether we have enabled the setting to round up prepare and commit timestamps for
+     * prepared transactions. See `setRoundUpPreparedTimestamps` for details.
+     */
+    virtual bool getRoundUpPreparedTimestamps() {
+        return false;
+    }
+
+    /**
      * Waits until all commits that happened before this call are durable in the journal. Returns
      * true, unless the storage engine cannot guarantee durability, which should never happen when
      * the engine is non-ephemeral. This cannot be called from inside a unit of work, and should

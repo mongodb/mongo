@@ -119,6 +119,8 @@ public:
 
     void setRoundUpPreparedTimestamps(bool value) override;
 
+    bool getRoundUpPreparedTimestamps() override;
+
     void allowOneUntimestampedWrite() override {
         invariant(!_isActive());
         _untimestampedWriteAssertionLevel =

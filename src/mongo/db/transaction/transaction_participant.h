@@ -622,7 +622,9 @@ public:
          * Transfers management of transaction resources from the Session to the currently
          * checked-out OperationContext.
          */
-        void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
+        void unstashTransactionResources(OperationContext* opCtx,
+                                         const std::string& cmdName,
+                                         bool forRecoveryPreparedTxnApplication = false);
 
         /**
          * Puts a transaction into a prepared state and returns the prepareTimestamp and the list of
@@ -1112,7 +1114,8 @@ public:
          */
         void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx,
                                                  MaxLockTimeout maxLockTimeout,
-                                                 AcquireTicket acquireTicket);
+                                                 AcquireTicket acquireTicket,
+                                                 bool forRecoveryPreparedTxnApplication);
 
         TransactionParticipant::PrivateState& p() {
             return _tp->_p;

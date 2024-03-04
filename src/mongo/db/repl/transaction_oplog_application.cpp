@@ -648,6 +648,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             // may encounter prepare conflicts that did not occur on the primary.
             shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
             // We might replay a prepared transaction behind oldest timestamp.
             if (repl::OplogApplication::inRecovering(mode) ||
                 mode == repl::OplogApplication::Mode::kInitialSync) {
@@ -664,7 +665,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             });
 
             // Starts the WUOW.
-            txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
+            txnParticipant.unstashTransactionResources(
+                opCtx, "prepareTransaction", repl::OplogApplication::inRecovering(mode));
 
             // Set this in case the application of any ops needs to use the prepare timestamp
             // of this transaction. It should be cleared automatically when the txn finishes.
@@ -695,6 +697,14 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                 LOGV2(21847, "Hit applyOpsHangBeforePreparingTransaction failpoint");
                 applyOpsHangBeforePreparingTransaction.pauseWhileSet(opCtx);
             }
+
+            // If we are in a recovery mode, we should have set roundUpPreparedTimestamps to true
+            // above, and that setting should have persisted after we unstashed the transaction
+            // resources and started the WUOW above. This setting is necessary for the subsequent
+            // call to prepareTransaction to succeed in the case where the prepare timestamp is
+            // older than the stable timestamp.
+            invariant(!repl::OplogApplication::inRecovering(mode) ||
+                      shard_role_details::getRecoveryUnit(opCtx)->getRoundUpPreparedTimestamps());
 
             txnParticipant.prepareTransaction(opCtx, prepareOp.getOpTime());
 

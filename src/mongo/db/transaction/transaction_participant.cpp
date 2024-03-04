@@ -1567,7 +1567,10 @@ void TransactionParticipant::Participant::stashTransactionResources(OperationCon
 }
 
 void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
-    OperationContext* opCtx, MaxLockTimeout maxLockTimeout, AcquireTicket acquireTicket) {
+    OperationContext* opCtx,
+    MaxLockTimeout maxLockTimeout,
+    AcquireTicket acquireTicket,
+    bool forRecoveryPreparedTxnApplication) {
     // Transaction resources already exist for this transaction.  Transfer them from the
     // stash to the operation context.
     //
@@ -1594,6 +1597,21 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     auto stashLocker = tempTxnResourceStash->locker();
     invariant(stashLocker);
 
+    if (forRecoveryPreparedTxnApplication) {
+        bool hasRecoveryUnit = tempTxnResourceStash->recoveryUnit() != nullptr;
+        auto roundUpVal = "no recovery unit";
+        if (hasRecoveryUnit) {
+            roundUpVal = tempTxnResourceStash->recoveryUnit()->getRoundUpPreparedTimestamps()
+                ? "true"
+                : "false";
+        }
+        LOGV2(8676302,
+              "Unstashing transaction resources for prepared transaction application during "
+              "recovery",
+              "hasStashedRecoveryUnit"_attr = hasRecoveryUnit,
+              "recoveryUnitRoundUpValue"_attr = roundUpVal);
+    }
+
     if (maxLockTimeout == MaxLockTimeout::kNotAllowed) {
         stashLocker->unsetMaxLockTimeout();
     } else {
@@ -1617,8 +1635,8 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     releaseOnError.dismiss();
 }
 
-void TransactionParticipant::Participant::unstashTransactionResources(OperationContext* opCtx,
-                                                                      const std::string& cmdName) {
+void TransactionParticipant::Participant::unstashTransactionResources(
+    OperationContext* opCtx, const std::string& cmdName, bool forRecoveryPreparedTxnApplication) {
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(opCtx->getTxnNumber());
 
@@ -1686,7 +1704,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
             maxLockTimeout = MaxLockTimeout::kNotAllowed;
         }
 
-        _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout, acquireTicket);
+        _releaseTransactionResourcesToOpCtx(
+            opCtx, maxLockTimeout, acquireTicket, forRecoveryPreparedTxnApplication);
         stdx::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
@@ -1766,7 +1785,8 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
     invariant(o().txnResourceStash);
     invariant(o().txnState.isPrepared());
 
-    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed, AcquireTicket::kSkip);
+    _releaseTransactionResourcesToOpCtx(
+        opCtx, MaxLockTimeout::kNotAllowed, AcquireTicket::kSkip, false);
 
     // Transfer the txn resource back from the operation context to the stash.
     auto stashStyle =

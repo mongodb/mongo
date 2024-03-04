@@ -854,6 +854,10 @@ void WiredTigerRecoveryUnit::setRoundUpPreparedTimestamps(bool value) {
         (value) ? RoundUpPreparedTimestamps::kRound : RoundUpPreparedTimestamps::kNoRound;
 }
 
+bool WiredTigerRecoveryUnit::getRoundUpPreparedTimestamps() {
+    return _roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound;
+}
+
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
                                                     boost::optional<Timestamp> provided) {
     tassert(5863604, "Cannot change ReadSource as it is pinned.", !isReadSourcePinned());
