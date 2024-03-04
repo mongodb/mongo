@@ -119,11 +119,6 @@ feature_flags:
         cpp_varname: gFeatureFlagOIDCInternalAuthorization
         default: true
         shouldBeFCVGated: false
-    featureFlag80MakeAllDeploymentsShardedClusters:
-        description: "Enable upgradeBackCompat and downgradeBackCompat CLI parameters"
-        cpp_varname: gfeatureFlag80MakeAllDeploymentsShardedClusters
-        default: false
-        shouldBeFCVGated: false
     featureFlagUseSorterChecksumV2:
         description: "Feature flag to enable v2 version of sorter file checksum"
         cpp_varname: gFeatureFlagUseSorterChecksumV2
