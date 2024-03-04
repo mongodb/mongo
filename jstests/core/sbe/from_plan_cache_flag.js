@@ -5,8 +5,6 @@
 //   does_not_support_stepdowns,
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
-//   # TODO SERVER-67607: Test plan cache with CQF enabled.
-//   cqf_incompatible,
 //   featureFlagSbeFull,
 // ]
 import {runWithFastPathsDisabled} from "jstests/libs/optimizer_utils.js";

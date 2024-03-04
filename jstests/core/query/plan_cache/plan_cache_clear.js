@@ -17,7 +17,7 @@
 //   tenant_migration_incompatible,
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
-//   # TODO SERVER-67607: Test plan cache with CQF enabled.
+//   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
 //   cqf_experimental_incompatible,
 //   references_foreign_collection,
 // ]

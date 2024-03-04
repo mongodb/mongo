@@ -13,7 +13,7 @@
 //   assumes_unsharded_collection,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
-//   # TODO SERVER-67607: Test plan cache with CQF enabled.
+//   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
 //   cqf_experimental_incompatible,
 // ]
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";

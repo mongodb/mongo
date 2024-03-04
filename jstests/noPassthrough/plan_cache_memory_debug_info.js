@@ -2,7 +2,7 @@
  * Tests that detailed debug information is excluded from new plan cache entries once the estimated
  * cumulative size of the system's plan caches exceeds a pre-configured threshold.
  * @tags: [
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_experimental_incompatible,
  * ]
  */

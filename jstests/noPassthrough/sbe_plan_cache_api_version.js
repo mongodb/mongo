@@ -2,7 +2,7 @@
  * Validates the behaviour of the the SBE plan cache when the API version was provided to the
  * aggregate command.
  * @tags: [
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_incompatible,
  * ]
  */

@@ -3,7 +3,7 @@
  * index available to queries that had a cached plan prior to the build.
  * @tags: [
  *   requires_replication,
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_experimental_incompatible,
  * ]
  */

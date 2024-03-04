@@ -8,7 +8,7 @@
  *   # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_experimental_incompatible,
  *   featureFlagSbeFull,
  * ]

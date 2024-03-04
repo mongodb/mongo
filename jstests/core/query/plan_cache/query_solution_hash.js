@@ -2,7 +2,7 @@
  * Test consistency of query solution hashes by extracting from the plan cache.
  *
  * @tags: [
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_incompatible,
  *   # Plan cache state is node-local and will not get migrated alongside user data.
  *   tenant_migration_incompatible,
@@ -26,6 +26,9 @@
  * ]
  */
 
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
+
+(function() {
 const coll = db.query_solution_hash;
 coll.drop();
 
@@ -75,37 +78,46 @@ function testSameSolutionHash() {
     queries.forEach(sameHashAfterCacheDrop);
 }
 
-// Collscan case
-testSameSolutionHash();
+// TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
+if (checkCascadesOptimizerEnabled(db)) {
+    // We don't support the other cases when indexes are present.
 
-// Irrelevant index case
-assert.commandWorked(coll.createIndex({c: 1}));
-testSameSolutionHash();
+    // Collscan case
+    testSameSolutionHash();
+} else {
+    // Collscan case
+    testSameSolutionHash();
 
-// Useful index case
-assert.commandWorked(coll.createIndex({a: 1}));
-testSameSolutionHash();
+    // Irrelevant index case
+    assert.commandWorked(coll.createIndex({c: 1}));
+    testSameSolutionHash();
 
-// Covering index case
-assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-testSameSolutionHash();
+    // Useful index case
+    assert.commandWorked(coll.createIndex({a: 1}));
+    testSameSolutionHash();
 
-// Test that same queries with different collation have different query plan hashes.
-assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({b: 1}, {name: "b1", collation: {locale: 'fr_CA'}}));
-assert.commandWorked(coll.createIndex({b: 1}, {name: "b2", collation: {locale: 'en_US'}}));
+    // Covering index case
+    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+    testSameSolutionHash();
 
-// It should choose the "a" index.
-for (let i = 0; i < 100; i++) {
-    assert.commandWorked(coll.insert({a: i, b: 'foo'}));
+    // Test that same queries with different collation have different query plan hashes.
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({b: 1}, {name: "b1", collation: {locale: 'fr_CA'}}));
+    assert.commandWorked(coll.createIndex({b: 1}, {name: "b2", collation: {locale: 'en_US'}}));
+
+    // It should choose the "a" index.
+    for (let i = 0; i < 100; i++) {
+        assert.commandWorked(coll.insert({a: i, b: 'foo'}));
+    }
+
+    for (let i = 0; i < 2; i++) {
+        coll.find({a: 5, b: 'foo'}).collation({locale: 'fr_CA'}).toArray();
+        coll.find({a: 5, b: 'foo'}).collation({locale: 'en_US'}).toArray();
+    }
+
+    const cache = coll.getPlanCache().list();
+    assert.eq(cache.length, 2);
+    assert.neq(cache[0].solutionHash, cache[1].solutionHash);
 }
-
-for (let i = 0; i < 2; i++) {
-    coll.find({a: 5, b: 'foo'}).collation({locale: 'fr_CA'}).toArray();
-    coll.find({a: 5, b: 'foo'}).collation({locale: 'en_US'}).toArray();
-}
-
-const cache = coll.getPlanCache().list();
-assert.eq(cache.length, 2);
-assert.neq(cache[0].solutionHash, cache[1].solutionHash);
+})();

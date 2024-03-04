@@ -16,7 +16,7 @@
 //   requires_fcv_62,
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
-//   # TODO SERVER-67607: Test plan cache with CQF enabled.
+//   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
 //   cqf_experimental_incompatible,
 //   references_foreign_collection,
 //   # This tests perform queries and expect a particular number of candidate plans to be evaluated,

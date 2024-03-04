@@ -5,7 +5,7 @@
  *  @tags: [
  *   # The SBE plan cache was enabled by default in 6.3.
  *   requires_fcv_63,
- *  # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_incompatible,
  *   featureFlagSbeFull,
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.

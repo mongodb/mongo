@@ -2,7 +2,7 @@
  * Test that the plan cache memory estimate increases and decreases correctly as plans are added to
  * and cleared from the cache.
  * @tags: [
- *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_experimental_incompatible,
  * ]
  */
