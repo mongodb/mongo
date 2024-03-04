@@ -154,6 +154,7 @@ create_configs()
 
     echo "##################################################" > $file_name
     echo "runs.type=row" >> $file_name              # WT-7379 - Temporarily disable column store tests
+    echo "btree.huffman_value=0" >> $file_name      # WT-12456 - Never used, removed from newer releases
     echo "btree.prefix=0" >> $file_name             # WT-7579 - Prefix testing isn't portable between releases
     echo "cache=80" >> $file_name                   # Medium cache so there's eviction
     echo "checksum=on" >> $file_name                # WT-7851 Fix illegal checksum configuration
