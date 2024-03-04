@@ -561,8 +561,9 @@ tasks:
       jepsen_test_name: set
 
 # TODO: rename if display_name appears on the evergreen UI
+# TODO(SERVER-87421): Add "lint" tag again once EngFlow issue is resolved
 - name: bazel_run_//:format
-  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint", "bazel_check"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version

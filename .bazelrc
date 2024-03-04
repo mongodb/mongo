@@ -63,6 +63,8 @@ build:public-release --experimental_remote_cache_compression=false
 build:public-release --grpc_keepalive_time=0s
 build:public-release --legacy_important_outputs
 
+# Avoid failing builds when BES metadata fails to upload.
+common --bes_upload_mode=fully_async
 
 # try to import the bazelrc files if available
 try-import %workspace%/.bazelrc.local
