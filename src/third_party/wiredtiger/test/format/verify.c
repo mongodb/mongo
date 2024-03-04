@@ -187,13 +187,13 @@ table_verify_mirror(
   WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *checkpoint, TINFO *tinfo)
 {
     SAP sap;
-    WT_CURSOR *base_cursor, *table_cursor;
+    WT_CURSOR *base_cursor, *pinned_cursor, *table_cursor;
     WT_ITEM base_key, base_value, table_key, table_value;
     WT_SESSION *session;
     uint64_t base_id, base_keyno, last_match, table_id, table_keyno, rows;
     uint8_t base_bitv, table_bitv;
     u_int failures, i, last_failures;
-    int base_ret, table_ret;
+    int base_ret, pinned_ret, table_ret;
     uint64_t range_begin, range_end;
     char buf[256], tagbuf[128];
 
@@ -201,6 +201,7 @@ table_verify_mirror(
     base_bitv = table_bitv = FIX_VALUE_WRONG; /* -Wconditional-uninitialized */
     base_ret = table_ret = 0;
     last_match = 0;
+    failures = 0;
 
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, NULL, &session);
@@ -235,6 +236,25 @@ table_verify_mirror(
     trace_msg(session, "%s: start", buf);
 
     /*
+     * If we're not reading from a checkpoint, start a cursor to pin a page. This cursor ensures the
+     * session never refreshes its snapshot in verification of the live tree. If we didn't open this
+     * cursor, we could get a WT_NOTFOUND return when placing the live cursor before the
+     * verification range. That WT_NOTFOUND return result would cause the session to release its
+     * snapshot if there are no other active cursors.
+     */
+    if (checkpoint == NULL) {
+        wt_wrap_open_cursor(session, base->uri, NULL, &pinned_cursor);
+        pinned_ret = pinned_cursor->next(pinned_cursor);
+        testutil_snprintf(
+          buf, sizeof(buf), "open a pinned cursor to pin the snapshot for verification");
+        trace_msg(session, "%s", buf);
+        /* Nothing to verify. */
+        if (pinned_ret == WT_NOTFOUND)
+            goto done;
+        testutil_assert(pinned_ret == 0);
+    }
+
+    /*
      * By default compare the entire range of keys, however if thread info is provided the start/end
      * key ranges can be used instead. These ranges follow the same rules as truncate; If the
      * provided value is zero treat that as the start/end of the table.
@@ -252,7 +272,7 @@ table_verify_mirror(
             range_end = tinfo->last;
     }
 
-    for (failures = 0, rows = range_begin; rows <= range_end; ++rows) {
+    for (rows = range_begin; rows <= range_end; ++rows) {
         last_failures = failures;
         switch (base->type) {
         case FIX:
@@ -389,6 +409,8 @@ page_dump:
         if (last_failures == failures && (base->type == ROW || table->type == ROW))
             last_match = base_keyno;
     }
+
+done:
     testutil_assert(failures == 0);
 
     trace_msg(session, "%s: stop", buf);
