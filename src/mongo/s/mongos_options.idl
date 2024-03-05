@@ -36,6 +36,12 @@ global:
     source: [ yaml, cli, ini ]
 
 configs:
+  "sharding.configDB":
+    description: >-
+      Connection string for communicating with config servers:
+      <config replset name>/<host1:port>,<host2:port>,[...]
+    short_name: configdb
+    arg_vartype: String
   "replication.localPingThresholdMs":
     description: "ping time (in ms) for a node to be considered local (default 15ms)"
     short_name: "localThreshold"

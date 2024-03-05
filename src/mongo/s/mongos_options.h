@@ -54,6 +54,9 @@ struct MongosGlobalParams {
 
     bool upgradeBackCompat{false};    // --upgradeBackCompat
     bool downgradeBackCompat{false};  // --downgradeBackCompat
+
+    // The config server connection string
+    ConnectionString configdbs;
 };
 
 extern MongosGlobalParams mongosGlobalParams;

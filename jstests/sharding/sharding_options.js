@@ -60,48 +60,41 @@ testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_co
 
 // Command line options
 
-const fakeConfigDBStr = "csrs/fakeHost:1234";
 jsTest.log("Testing \"--configsvr\" and \"--routerPort\" command line options");
 expectedResult = {
     "parsed": {
-        "sharding": {"clusterRole": "configsvr", "configDB": fakeConfigDBStr},
+        "sharding": {"clusterRole": "configsvr"},
         "replication": {"replSet": "dummy"},
         "net": {"routerPort": 27016}
     }
 };
-testGetCmdLineOptsMongod(
-    {configsvr: "", routerPort: "", replSet: "dummy", configdb: fakeConfigDBStr}, expectedResult);
+testGetCmdLineOptsMongod({configsvr: "", routerPort: "", replSet: "dummy"}, expectedResult);
 expectedResult = {
     "parsed": {
-        "sharding": {"clusterRole": "configsvr", "configDB": fakeConfigDBStr},
+        "sharding": {"clusterRole": "configsvr"},
         "replication": {"replSet": "dummy"},
         "net": {"routerPort": 25000}
     }
 };
-testGetCmdLineOptsMongod(
-    {configsvr: "", routerPort: "25000", replSet: "dummy", configdb: fakeConfigDBStr},
-    expectedResult);
+testGetCmdLineOptsMongod({configsvr: "", routerPort: "25000", replSet: "dummy"}, expectedResult);
 
 jsTest.log("Testing \"--shardsvr\" and \"--routerPort\" command line options");
 expectedResult = {
     "parsed": {
-        "sharding": {"clusterRole": "shardsvr", "configDB": fakeConfigDBStr},
+        "sharding": {"clusterRole": "shardsvr"},
         "replication": {"replSet": "dummy"},
         "net": {"routerPort": 27016}
     }
 };
-testGetCmdLineOptsMongod(
-    {shardsvr: "", routerPort: "", replSet: "dummy", configdb: fakeConfigDBStr}, expectedResult);
+testGetCmdLineOptsMongod({shardsvr: "", routerPort: "", replSet: "dummy"}, expectedResult);
 expectedResult = {
     "parsed": {
-        "sharding": {"clusterRole": "shardsvr", "configDB": fakeConfigDBStr},
+        "sharding": {"clusterRole": "shardsvr"},
         "replication": {"replSet": "dummy"},
         "net": {"routerPort": 25000}
     }
 };
-testGetCmdLineOptsMongod(
-    {shardsvr: "", routerPort: "25000", replSet: "dummy", configdb: fakeConfigDBStr},
-    expectedResult);
+testGetCmdLineOptsMongod({shardsvr: "", routerPort: "25000", replSet: "dummy"}, expectedResult);
 
 jsTest.log("Ensure starting a replica set with \"--routerPort\" fails");
 testGetCmdLineOptsMongodFailed({routerPort: "", replSet: "dummy"});
@@ -116,7 +109,7 @@ jsTest.log(
 expectedResult = {
     "parsed": {
         "config": "jstests/libs/config_files/enable_router_with_config_role.json",
-        "sharding": {"clusterRole": "configsvr", "configDB": fakeConfigDBStr},
+        "sharding": {"clusterRole": "configsvr"},
         "replication": {"replSetName": "dummy"},
         "net": {"routerPort": 27016}
     }
@@ -129,7 +122,7 @@ jsTest.log(
 expectedResult = {
     "parsed": {
         "config": "jstests/libs/config_files/enable_router_with_shard_role.json",
-        "sharding": {"clusterRole": "shardsvr", "configDB": fakeConfigDBStr},
+        "sharding": {"clusterRole": "shardsvr"},
         "replication": {"replSetName": "dummy"},
         "net": {"routerPort": 27016}
     }

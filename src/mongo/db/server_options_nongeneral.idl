@@ -82,12 +82,3 @@ configs:
         description: 'Query predicate to control which operations are logged and profiled'
         short_name: profileFilter
         arg_vartype: String
-    # TODO SERVER-83059: Remove this option from mongod if it isn't needed to bootstrap embedded routers.
-    'sharding.configDB':
-        description: >-
-            Connection string for communicating with config servers:
-            <config replset name>/<host1:port>,<host2:port>,[...]
-        section: 'Sharding options'
-        short_name: configdb
-        source: [yaml, cli, ini]
-        arg_vartype: String

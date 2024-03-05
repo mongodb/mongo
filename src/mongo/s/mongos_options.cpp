@@ -133,6 +133,56 @@ Status storeMongosOptions(const moe::Environment& params) {
     mongosGlobalParams.upgradeBackCompat = params.count("upgradeBackCompat");
     mongosGlobalParams.downgradeBackCompat = params.count("downgradeBackCompat");
 
+    std::string configdbString = params["sharding.configDB"].as<std::string>();
+
+    auto configdbConnectionString = ConnectionString::parse(configdbString);
+    if (!configdbConnectionString.isOK()) {
+        return configdbConnectionString.getStatus();
+    }
+
+    if (configdbConnectionString.getValue().type() !=
+        ConnectionString::ConnectionType::kReplicaSet) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "configdb supports only replica set connection string");
+    }
+
+    std::vector<HostAndPort> seedServers;
+    bool resolvedSomeSeedSever = false;
+    for (const auto& host : configdbConnectionString.getValue().getServers()) {
+        seedServers.push_back(host);
+        if (!seedServers.back().hasPort()) {
+            seedServers.back() = HostAndPort{host.host(), ServerGlobalParams::ConfigServerPort};
+        }
+        if (!hostbyname(seedServers.back().host().c_str()).empty()) {
+            resolvedSomeSeedSever = true;
+        }
+    }
+    if (!resolvedSomeSeedSever) {
+        if (!hostbyname(configdbConnectionString.getValue().getSetName().c_str()).empty()) {
+            LOGV2_WARNING(24131,
+                          "The replica set name "
+                          "\"{str_escape_configdbConnectionString_getValue_getSetName}\" resolves "
+                          "as a host name, but none of the servers in the seed list do. "
+                          "Did you reverse the replica set name and the seed list in "
+                          "{str_escape_configdbConnectionString_getValue}?",
+                          "str_escape_configdbConnectionString_getValue_getSetName"_attr =
+                              str::escape(configdbConnectionString.getValue().getSetName()),
+                          "str_escape_configdbConnectionString_getValue"_attr =
+                              str::escape(configdbConnectionString.getValue().toString()));
+        }
+    }
+
+    mongosGlobalParams.configdbs =
+        ConnectionString{configdbConnectionString.getValue().type(),
+                         seedServers,
+                         configdbConnectionString.getValue().getSetName()};
+
+    if (mongosGlobalParams.configdbs.getServers().size() < 3) {
+        LOGV2_WARNING(24132,
+                      "Running a sharded cluster with fewer than 3 config servers should only be "
+                      "done for testing purposes and is not recommended for production.");
+    }
+
     return Status::OK();
 }
 

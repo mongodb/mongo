@@ -41,7 +41,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/connection_string.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/logv2/log_format.h"
@@ -317,8 +316,6 @@ struct ServerGlobalParams {
     std::vector<std::string> disabledSecureAllocatorDomains;
 
     bool enableMajorityReadConcern = true;
-
-    ConnectionString configdbs;
 };
 
 extern ServerGlobalParams serverGlobalParams;

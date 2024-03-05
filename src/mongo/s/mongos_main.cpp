@@ -627,13 +627,13 @@ Status initializeSharding(
             catCache->invalidateEntriesThatReferenceShard(removedShard);
         }};
 
-    if (!serverGlobalParams.configdbs) {
+    if (!mongosGlobalParams.configdbs) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
 
     auto shardRegistry = std::make_unique<ShardRegistry>(opCtx->getServiceContext(),
                                                          std::move(shardFactory),
-                                                         serverGlobalParams.configdbs,
+                                                         mongosGlobalParams.configdbs,
                                                          std::move(shardRemovalHooks));
 
     {
@@ -1020,7 +1020,7 @@ ExitCode main(ServiceContext* serviceContext) {
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
     // We either have a setting where all processes are in localhost or none are
-    const auto& configServers = serverGlobalParams.configdbs.getServers();
+    const auto& configServers = mongosGlobalParams.configdbs.getServers();
     invariant(!configServers.empty());
     const auto allowLocalHost = configServers.front().isLocalHost();
 

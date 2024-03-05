@@ -83,7 +83,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
@@ -263,11 +262,6 @@ Status validateMongodOptions(const moe::Environment& params) {
     if (setRouterPort && !setConfigRole && !setShardRole) {
         return Status(ErrorCodes::BadValue,
                       "The embedded router requires the node to act as a shard or config server");
-    }
-
-    bool setConfigDBs = params.count("sharding.configDB");
-    if (setConfigDBs && !setRouterPort) {
-        return Status(ErrorCodes::BadValue, "--configdb is only supported in embedded router mode");
     }
 
     if (params.count("maintenanceMode")) {
@@ -725,10 +719,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         if (feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
             serverGlobalParams.clusterRole += ClusterRole::RouterServer;
         }
-    }
-
-    if (!feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
-        serverGlobalParams.configdbs = ConnectionString{};
     }
 
     if (!params.count("net.port")) {
