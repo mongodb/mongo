@@ -50,8 +50,6 @@ buildvariants:
     - ubuntu2204-large
   - name: .development_critical
   - name: .release_critical !publish_packages
-  - name: stitch_support_lib_build_and_archive
-  - name: stitch_support_lib_build_and_test
 
 - name: enterprise-amazon2-arm64-openssl111
   display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
@@ -103,8 +101,6 @@ buildvariants:
     - ubuntu1804-arm64-build
   - name: .development_critical
   - name: .release_critical !publish_packages
-  - name: stitch_support_lib_build_and_archive
-  - name: stitch_support_lib_build_and_test
 
 - name: amazon2023
   display_name: Amazon Linux 2023
@@ -139,8 +135,6 @@ buildvariants:
     - ubuntu2204-large
   - name: .development_critical !.incompatible_community
   - name: .release_critical !.incompatible_community
-  - name: stitch_support_lib_build_and_archive
-  - name: stitch_support_lib_build_and_test
 
 - name: enterprise-amazon2023
   display_name: "Enterprise Amazon Linux 2023"
@@ -182,8 +176,6 @@ buildvariants:
     - ubuntu2204-large
   - name: .development_critical
   - name: .release_critical
-  - name: stitch_support_lib_build_and_archive
-  - name: stitch_support_lib_build_and_test
 
 # This variant is a special variant to test LTO.
 # We just want it to bake for a while before considering that we turn it on by default.
@@ -233,10 +225,6 @@ buildvariants:
   #   - amazon2023.0-large
   - name: .development_critical
   - name: .release_critical !publish_packages !push !crypt_push
-  # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_archive task
-  # - name: stitch_support_lib_build_and_archive
-  # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_test task
-  # - name: stitch_support_lib_build_and_test
 
 - name: amazon2023-arm64
   display_name: Amazon Linux 2023 arm64
@@ -274,8 +262,6 @@ buildvariants:
     - ubuntu2204-arm64-large
   - name: .development_critical !.incompatible_community
   - name: .release_critical !.incompatible_community
-  - name: stitch_support_lib_build_and_archive
-  - name: stitch_support_lib_build_and_test
 
 - name: enterprise-amazon2023-arm64
   display_name: "Enterprise Amazon Linux 2023 arm64"
@@ -319,8 +305,6 @@ buildvariants:
     - ubuntu2204-arm64-large
   - name: .development_critical
   - name: .release_critical
-  - name: stitch_support_lib_build_and_archive
-  - name: stitch_support_lib_build_and_test
 
 # This variant is a special variant to test LTO.
 # We just want it to bake for a while before considering that we turn it on by default.
@@ -370,10 +354,6 @@ buildvariants:
   #   - ubuntu2204-arm64-large
   - name: .development_critical
   - name: .release_critical !publish_packages !push !crypt_push
-  # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_archive task
-  # - name: stitch_support_lib_build_and_archive
-  # TODO: SERVER-79886 Fix broken stitch_support_lib_build_and_test task
-  # - name: stitch_support_lib_build_and_test
 
 - name: enterprise-amazon2-streams
   display_name: "Amazon Linux 2 enterprise build with streams"

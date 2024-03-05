@@ -8,7 +8,7 @@ rules:
   # proliferation of it.
   - rule: "limit-keyval-inc"
     # the maximum number of keyval.inc commands to allow in your YAML
-    limit: 4
+    limit: 5
 
   # # With the extraction of shell scripts from the Evergreen YAML, we expect
   # # users to source a script called `prelude.sh`. This script requires that

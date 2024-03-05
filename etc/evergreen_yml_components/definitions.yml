@@ -166,8 +166,8 @@ functions:
       bucket: mciuploads
       extract_to: "."
 
-  "get engflow creds": &get_engflow_creds
-  - command: s3.get
+  "get engflow key": &get_engflow_key
+    command: s3.get
     display_name: "get engflow key"
     params:
       aws_key: ${engflow_key}
@@ -175,7 +175,9 @@ functions:
       remote_file: engflow/engflow.key
       bucket: serverengflow
       local_file: "src/engflow.key"
-  - command: s3.get
+
+  "get engflow cert": &get_engflow_cert
+    command: s3.get
     display_name: "get engflow cert"
     params:
       aws_key: ${engflow_key}
@@ -183,12 +185,19 @@ functions:
       remote_file: engflow/engflow.cert
       bucket: serverengflow
       local_file: "src/engflow.cert"
-  - command: subprocess.exec
+
+  "generate evergreen engflow bazelrc": &generate_evergreen_engflow_bazelrc
+    command: subprocess.exec
     params:
       display_name: "generate evergreen engflow bazelrc"
       binary: bash
       args:
       - "src/evergreen/generate_evergreen_engflow_bazelrc.sh"
+
+  "get engflow creds":
+  - *get_engflow_key
+  - *get_engflow_cert
+  - *generate_evergreen_engflow_bazelrc
 
   "adjust venv": &adjust_venv
     command: subprocess.exec
@@ -391,9 +400,8 @@ functions:
       args:
       - "./src/evergreen/functions/credentials_setup.sh"
 
-  "set up win mount script":
-  - *f_expansions_write
-  - command: subprocess.exec
+  "set up win mount script": &set_up_win_mount_script
+    command: subprocess.exec
     display_name: "win mount script setup"
     params:
       binary: bash
@@ -456,9 +464,8 @@ functions:
       args:
       - "./src/evergreen/functions/shared_scons_cache_pruning.sh"
 
-  "umount shared scons directory":
-  - *f_expansions_write
-  - command: subprocess.exec
+  "umount shared scons directory": &umount_shared_scons_directory
+    command: subprocess.exec
     display_name: "shared scons directory umount"
     params:
       binary: bash
@@ -1270,20 +1277,18 @@ functions:
       bucket: mciuploads
       extract_to: src
 
-  "generate compile expansions":
-  - *f_expansions_write
-  - command: subprocess.exec
+  "generate compile expansions": &generate_compile_expansions
+    command: subprocess.exec
     display_name: "compile expansions generate sh"
     params:
       binary: bash
       args:
       - "src/evergreen/functions/compile_expansions_generate.sh"
 
-  "apply compile expansions":
-  - command: expansions.update
+  "apply compile expansions": &apply_compile_expansions
+    command: expansions.update
     params:
       file: src/compile_expansions.yml
-  - *f_expansions_write
 
   "do jepsen setup":
   - *f_expansions_write
@@ -2186,8 +2191,8 @@ functions:
   - *archive_undodb_recordings
 
   ### Attach report & artifacts ###
-  "attach scons logs":
-  - command: s3.put
+  "attach scons config logs": &attach_scons_config_logs
+    command: s3.put
     params:
       optional: true
       aws_key: ${aws_key}
@@ -2199,7 +2204,8 @@ functions:
       content_type: text/plain
       display_name: SCons configure log
 
-  - command: s3.put
+  "attach scons cache logs": &attach_scons_cache_logs
+    command: s3.put
     params:
       optional: true
       aws_key: ${aws_key}
@@ -2211,7 +2217,8 @@ functions:
       permissions: public-read
       display_name: SCons cache debug log
 
-  - command: s3.put
+  "attach scons stdout logs": &attach_scons_stdout_logs
+    command: s3.put
     params:
       optional: true
       aws_key: ${aws_key}
@@ -2222,6 +2229,11 @@ functions:
       bucket: mciuploads
       permissions: public-read
       display_name: SCons stdout log
+
+  "attach scons logs":
+  - *attach_scons_config_logs
+  - *attach_scons_cache_logs
+  - *attach_scons_stdout_logs
 
   "attach report":
     command: attach.results
@@ -2439,3 +2451,34 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/external_auth_gcp_teardown.sh"
+
+  "do stitch setup":
+  - command: manifest.load
+  - *f_expansions_write
+  - *git_get_project
+  - *add_git_tag
+  - *set_task_expansion_macros
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
+  - *upload_pip_requirements
+  - *get_buildnumber
+  - *f_expansions_write
+  - *set_up_win_mount_script
+  - *f_expansions_write
+  - *generate_compile_expansions
+  - *apply_compile_expansions
+  - *f_expansions_write
+  - *set_task_expansion_macros
+  - *f_expansions_write
+  - *get_engflow_key
+  - *get_engflow_cert
+  - *generate_evergreen_engflow_bazelrc
+
+  "do stitch teardown":
+  - *attach_scons_config_logs
+  - *attach_scons_cache_logs
+  - *attach_scons_stdout_logs
+  - *f_expansions_write
+  - *umount_shared_scons_directory

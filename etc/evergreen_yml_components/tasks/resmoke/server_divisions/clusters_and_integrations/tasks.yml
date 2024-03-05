@@ -118,6 +118,7 @@ variables:
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"
+  - func: "f_expansions_write"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
   - func: "get engflow creds"
@@ -174,7 +175,9 @@ variables:
   - func: "f_expansions_write"
   - func: "set up credentials"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "f_expansions_write"
   - func: "set up win mount script"
+  - func: "f_expansions_write"
   - func: "generate compile expansions"
   - func: "f_expansions_write"
   teardown_group:
