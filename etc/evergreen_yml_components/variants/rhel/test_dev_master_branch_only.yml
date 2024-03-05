@@ -614,6 +614,8 @@ buildvariants:
     compile_variant: linux-x86-dynamic-compile-future-tag-multiversion
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
+    unique_gen_suffix: "-future"
+    last_versions: last_lts,last_continuous
   depends_on:
   - name: version_gen
     variant: generate-tasks-for-version
