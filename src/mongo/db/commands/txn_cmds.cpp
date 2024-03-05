@@ -60,6 +60,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/sharding_state.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -156,6 +157,23 @@ public:
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
                     txnParticipant.transactionIsOpen());
+
+            auto txnRouter = TransactionRouter::get(opCtx);
+            if (txnRouter) {
+                auto nss = ns();
+                auto additionalParticipants = txnRouter.getAdditionalParticipantsForResponse(
+                    opCtx, definition()->getName(), nss);
+                if (additionalParticipants) {
+                    for (const auto& p : *additionalParticipants) {
+                        uassert(ErrorCodes::IllegalOperation,
+                                str::stream() << "Cannot commit because this shard added "
+                                                 "participant(s) to this transaction, and did not "
+                                                 "receive a response from additional participant: "
+                                              << p.first,
+                                p.second);
+                    }
+                }
+            }
 
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");

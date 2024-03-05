@@ -154,14 +154,19 @@ jsTestLog("===Additional Participants Fail Point is ON===");
 
 print("Adding one additional participant:");
 const fpDataOneFunc = (st) => {
-    return {"cmdName": "insert", "ns": ns, "shardId": [st.shard2.shardName]};
+    return {"cmdName": "insert", "ns": ns, "shardId": [st.shard2.shardName], "readOnly": false};
 };
 let expectedParticipantListOne = [0, 1, 2];
 testAddingParticipant(true, expectedParticipantListOne, fpDataOneFunc);
 
 print("Adding multiple additional participants:");
 const fpDataMultipleFunc = (st) => {
-    return {"cmdName": "insert", "ns": ns, "shardId": [st.shard2.shardName, st.shard3.shardName]};
+    return {
+        "cmdName": "insert",
+        "ns": ns,
+        "shardId": [st.shard2.shardName, st.shard3.shardName],
+        "readOnly": false
+    };
 };
 let expectedParticipantListMultiple = [0, 1, 2, 3];
 testAddingParticipant(true, expectedParticipantListMultiple, fpDataMultipleFunc);
