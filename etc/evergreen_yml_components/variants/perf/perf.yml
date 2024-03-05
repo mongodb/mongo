@@ -2249,7 +2249,45 @@ buildvariants:
     compile_variant: amazon2-arm64-compile
   run_on:
     - rhel70-small
-  tasks: *1nodetasks
+  # Not using 1nodetasks because some need to be temporarily disabled.
+  # TODO SERVER-87402: Use 1nodetasks once all tasks can work on this variant.
+  tasks:
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: ycsb.2023-09
+    - name: ycsb_single_thread
+    - name: ycsb_60GB.2023-09
+    - name: ycsb_60GB.long.2023-09
+    # - name: crud_workloads_majority
+    # - name: misc_workloads
+    # - name: map_reduce_workloads
+    - name: smoke_test
+    - name: canaries_only
+    - name: non_sharded_workloads
+    # - name: bestbuy_agg
+    # - name: bestbuy_agg_merge_different_db
+    # - name: bestbuy_agg_merge_same_db
+    # - name: bestbuy_agg_merge_wordcount
+    # - name: bestbuy_query
+    # - name: change_streams_latency
+    # - name: change_streams_listen_throughput
+    # - name: snapshot_reads
+    - name: linkbench
+    - name: linkbench2
+    # - name: tsbs_load
+    # - name: tsbs_query
+    # - name: tsbs_query_finance
+    # - name: tsbs_query_manual_bucketing
+    # - name: tsbs_query_fixed_bucketing
+    # - name: tsbs-query-genny
+    # - name: tsbs-query-optimizations
+    # - name: tpcc
+    # - name: tpcc_majority
+    # - name: tpch_1_normalized
+    # - name: tpch_1_denormalized
+    # - name: tpch_10_normalized
+    # - name: tpch_10_denormalized
+    # - name: genny_execution_ValidationFull
 
 # Variant which runs a single shard cluster with a config
 # shard and mongos processes processes co-located on the
@@ -2288,59 +2326,62 @@ buildvariants:
     - name: ycsb_60GB.long.2023-09
       cron: *high-value-workload-cron
     - name: ycsb_secondary_reads.2023-09
-    - name: crud_workloads_majority
-    - name: crud_workloads_w1
-    - name: misc_workloads
-    - name: map_reduce_workloads
+    # TODO SERVER-87402: Enable these tasks.
+    # - name: crud_workloads_majority
+    # - name: crud_workloads_w1
+    # - name: misc_workloads
+    # - name: map_reduce_workloads
     - name: smoke_test
     - name: secondary_performance # Uses a special 2 node mongodb setup
     - name: non_sharded_workloads
-    - name: bestbuy_agg
-      cron: *high-value-workload-cron
-    - name: bestbuy_agg_merge_different_db
-    - name: bestbuy_agg_merge_same_db
-    - name: bestbuy_agg_merge_wordcount
-    - name: bestbuy_query
-    - name: change_streams_preimage_throughput
-    - name: change_streams_latency
-    - name: change_streams_preimage_latency
-    - name: change_streams_listen_throughput
-    - name: snapshot_reads
-    - name: secondary_reads
-    - name: tpcc
-    - name: tpcc_majority
-      cron: *high-value-workload-cron
-    - name: tpch_1_normalized
-    - name: tpch_1_denormalized
+    # TODO SERVER-87402: Enable these tasks.
+    # - name: bestbuy_agg
+      # cron: *high-value-workload-cron
+    # - name: bestbuy_agg_merge_different_db
+    # - name: bestbuy_agg_merge_same_db
+    # - name: bestbuy_agg_merge_wordcount
+    # - name: bestbuy_query
+    # - name: change_streams_preimage_throughput
+    # - name: change_streams_latency
+    # - name: change_streams_preimage_latency
+    # - name: change_streams_listen_throughput
+    # - name: snapshot_reads
+    # - name: secondary_reads
+    # - name: tpcc
+    # - name: tpcc_majority
+      # cron: *high-value-workload-cron
+    # - name: tpch_1_normalized
+    # - name: tpch_1_denormalized
     # TODO: Enable in SERVER-66572.
     # - name: tpch_10_normalized
     # - name: tpch_10_denormalized
     - name: linkbench
     - name: linkbench2
       cron: *high-value-workload-cron
-    - name: tsbs_load
-      cron: *high-value-workload-cron
-    - name: tsbs_query
-      cron: *high-value-workload-cron
-    - name: tsbs_query_finance
-    - name: tsbs_query_manual_bucketing
-    - name: tsbs_query_fixed_bucketing
-    - name: tsbs-query-genny
-    - name: tsbs-query-optimizations
-    - name: tsbs-expression-query
-    - name: big_update_10k
-    - name: mixed_workloads_genny_rate_limited_high_value
-      cron: *high-value-workload-cron
-    - name: load_test_high_value
-      cron: *high-value-workload-cron
-    - name: majority_reads10_k_threads_high_value
-      cron: *high-value-workload-cron
-    - name: large_indexed_ins_high_value
-      cron: *high-value-workload-cron
-    - name: expressive_queries_high_value
-      cron: *high-value-workload-cron
-    - name: time_series_sort_high_value
-      cron: *high-value-workload-cron
-    - name: array_traversal_high_value
-    - name: filter_with_complex_logical_expression_high_value
-    - name: mongos_workloads
+    # TODO SERVER-87402: Enable these tasks.
+    # - name: tsbs_load
+      # cron: *high-value-workload-cron
+    # - name: tsbs_query
+      # cron: *high-value-workload-cron
+    # - name: tsbs_query_finance
+    # - name: tsbs_query_manual_bucketing
+    # - name: tsbs_query_fixed_bucketing
+    # - name: tsbs-query-genny
+    # - name: tsbs-query-optimizations
+    # - name: tsbs-expression-query
+    # - name: big_update_10k
+    # - name: mixed_workloads_genny_rate_limited_high_value
+      # cron: *high-value-workload-cron
+    # - name: load_test_high_value
+      # cron: *high-value-workload-cron
+    # - name: majority_reads10_k_threads_high_value
+      # cron: *high-value-workload-cron
+    # - name: large_indexed_ins_high_value
+      # cron: *high-value-workload-cron
+    # - name: expressive_queries_high_value
+      # cron: *high-value-workload-cron
+    # - name: time_series_sort_high_value
+      # cron: *high-value-workload-cron
+    # - name: array_traversal_high_value
+    # - name: filter_with_complex_logical_expression_high_value
+    # - name: mongos_workloads
