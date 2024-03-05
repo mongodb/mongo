@@ -395,6 +395,12 @@ Status ReplicationCoordinatorMock::waitUntilOpTimeForReadUntil(OperationContext*
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
+                                                               LogicalTime clusterTime,
+                                                               boost::optional<Date_t> deadline) {
+    return Status::OK();
+}
+
 Status ReplicationCoordinatorMock::awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) {
     return Status::OK();
 }

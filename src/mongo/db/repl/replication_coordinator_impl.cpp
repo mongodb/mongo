@@ -376,7 +376,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _replExecutor(std::move(executor)),
       _externalState(std::move(externalState)),
       _replicationWaiterList(replicationWaiterListMetric),
-      _opTimeWaiterList(opTimeWaiterListMetric),
+      _lastAppliedOpTimeWaiterList(opTimeWaiterListMetric),
+      _lastWrittenOpTimeWaiterList(opTimeWaiterListMetric),
       _inShutdown(false),
       _memberState(MemberState::RS_STARTUP),
       _rsConfigState(kConfigPreStart),
@@ -1118,7 +1119,9 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
                                                 shutdownTimeElapsedBuilder);
         _replicationWaiterList.setErrorAll_inlock(
             {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
-        _opTimeWaiterList.setErrorAll_inlock(
+        _lastAppliedOpTimeWaiterList.setErrorAll_inlock(
+            {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
+        _lastWrittenOpTimeWaiterList.setErrorAll_inlock(
             {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
@@ -1566,8 +1569,17 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch>
 
 void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
     WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
+    const auto opTime = opTimeAndWallTime.opTime;
+
     _topCoord->setMyLastWrittenOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
+
+    // Signal anyone waiting on optime changes.
+    _lastWrittenOpTimeWaiterList.setValueIf_inlock(
+        [opTime](const OpTime& waitOpTime, const SharedWaiterHandle& waiter) {
+            return waitOpTime <= opTime;
+        },
+        opTime);
 
     // If we are using written times to calculate the commit level, update it now.
     if (!_rsConfig.getWriteConcernMajorityShouldJournal()) {
@@ -1599,7 +1611,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
     _externalState->updateLastAppliedSnapshot(opTime);
 
     // Signal anyone waiting on optime changes.
-    _opTimeWaiterList.setValueIf_inlock(
+    _lastAppliedOpTimeWaiterList.setValueIf_inlock(
         [opTime](const OpTime& waitOpTime, const SharedWaiterHandle& waiter) {
             return waitOpTime <= opTime;
         },
@@ -1788,7 +1800,8 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
 
 Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
                                                     OpTime targetOpTime,
-                                                    boost::optional<Date_t> deadline) {
+                                                    boost::optional<Date_t> deadline,
+                                                    bool waitForLastApplied) {
     {
         stdx::unique_lock lock(_mutex);
 
@@ -1805,13 +1818,18 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
             return {ErrorCodes::NotYetInitialized, "The oplog does not exist."};
         }
 
-        if (targetOpTime > _getMyLastAppliedOpTime_inlock()) {
+        auto lastOpTime = (waitForLastApplied ? _getMyLastAppliedOpTime_inlock()
+                                              : _getMyLastWrittenOpTime_inlock());
+
+        if (targetOpTime > lastOpTime) {
             if (_inShutdown) {
                 return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
             }
 
             // We just need to wait for the opTime to catch up to what we need (not majority RC).
-            auto future = _opTimeWaiterList.add_inlock(targetOpTime);
+            auto future =
+                (waitForLastApplied ? _lastAppliedOpTimeWaiterList.add_inlock(targetOpTime)
+                                    : _lastWrittenOpTimeWaiterList.add_inlock(targetOpTime));
 
             LOGV2_DEBUG(21333,
                         3,
@@ -1828,7 +1846,10 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
                 return waitStatus.withContext(
                     str::stream() << "Error waiting for optime " << targetOpTime.toString()
                                   << ", current relevant optime is "
-                                  << _getMyLastAppliedOpTime_inlock().toString() << ".");
+                                  << (waitForLastApplied
+                                          ? _getMyLastAppliedOpTime_inlock().toString()
+                                          : _getMyLastWrittenOpTime_inlock().toString())
+                                  << ".");
             }
         }
     }
@@ -1849,6 +1870,32 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
     _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx, /* primaryOnly =*/true);
 
     return Status::OK();
+}
+
+Status ReplicationCoordinatorImpl::waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
+                                                               LogicalTime clusterTime,
+                                                               boost::optional<Date_t> deadline) {
+    if (!_settings.isReplSet()) {
+        // 'afterOpTime', 'afterClusterTime', and 'atClusterTime' are only supported for replica
+        // sets.
+        return {ErrorCodes::NotAReplicaSet,
+                "node needs to be a replica set member to use read concern"};
+    }
+
+    {
+        stdx::lock_guard lock(_mutex);
+        if (_rsConfigState == kConfigUninitialized || _rsConfigState == kConfigInitiating ||
+            (_rsConfigState == kConfigHBReconfiguring && !_rsConfig.isInitialized())) {
+            return {
+                ErrorCodes::NotYetInitialized,
+                "Cannot use non-local read concern until replica set is finished initializing."};
+        }
+    }
+
+    // convert clusterTime to opTime so it can be used by the _lastWrittenOpTimeWaiterList for wait.
+    auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
+
+    return _waitUntilOpTime(opCtx, targetOpTime, deadline, false /* waitForLastApplied */);
 }
 
 Status ReplicationCoordinatorImpl::waitUntilMajorityOpTime(mongo::OperationContext* opCtx,
@@ -1913,8 +1960,8 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
         : *readConcern.getArgsAtClusterTime();
     invariant(clusterTime != LogicalTime::kUninitialized);
 
-    // convert clusterTime to opTime so it can be used by the _opTimeWaiterList for wait on
-    // readConcern level local.
+    // convert clusterTime to opTime so it can be used by the _lastAppliedOpTimeWaiterList for wait
+    // on readConcern level local.
     auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
     invariant(!readConcern.getArgsOpTime());
 
@@ -2346,16 +2393,16 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
 
     if (!writeConcern.needToWaitForOtherNodes() &&
         writeConcern.syncMode != WriteConcernOptions::SyncMode::JOURNAL) {
-        // We are only waiting for our own lastApplied, add this to _opTimeWaiterList instead. This
-        // is because waiters in _replicationWaiterList are not notified on self's lastApplied
-        // updates.
-        return _opTimeWaiterList.add_inlock(opTime);
+        // We are only waiting for our own lastApplied, add this to _lastAppliedOpTimeWaiterList
+        // instead. This is because waiters in _replicationWaiterList are not notified on self's
+        // lastApplied updates.
+        return _lastAppliedOpTimeWaiterList.add_inlock(opTime);
     }
 
     // From now on, we are either waiting for replication or local journaling. And waiters in
     // _replicationWaiterList will be checked and notified on remote opTime updates and on self's
     // lastDurable updates (but not on self's lastApplied updates, in which case use
-    // _opTimeWaiterList instead).
+    // _lastAppliedOpTimeWaiterList instead).
     return _replicationWaiterList.add_inlock(opTime, writeConcern);
 }
 
@@ -4740,7 +4787,10 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _replicationWaiterList.setErrorAll_inlock(
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
-        _opTimeWaiterList.setErrorAll_inlock(
+        _lastAppliedOpTimeWaiterList.setErrorAll_inlock(
+            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
+        // Wake up the optime waiter that is waiting for oplog to be written
+        _lastWrittenOpTimeWaiterList.setErrorAll_inlock(
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
 
         // _canAcceptNonLocalWrites should already be set.
@@ -4954,7 +5004,7 @@ void ReplicationCoordinatorImpl::CatchupState::abort_inlock(PrimaryCatchUpConclu
         _repl->_replExecutor->cancel(_timeoutCbh);
     }
     if (reason != PrimaryCatchUpConclusionReason::kSucceeded && _waiter) {
-        _repl->_opTimeWaiterList.remove_inlock(_waiter);
+        _repl->_lastAppliedOpTimeWaiterList.remove_inlock(_waiter);
         _waiter.reset();
     }
 
@@ -5008,7 +5058,7 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     }
 
     if (_waiter) {
-        _repl->_opTimeWaiterList.remove_inlock(_waiter);
+        _repl->_lastAppliedOpTimeWaiterList.remove_inlock(_waiter);
         _waiter.reset();
     } else {
         // Only increment the 'numCatchUps' election metric the first time we add a waiter, so that
@@ -5034,7 +5084,7 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     auto pf = makePromiseFuture<void>();
     _waiter = std::make_shared<Waiter>(std::move(pf.promise));
     auto future = std::move(pf.future).onCompletion(targetOpTimeCB);
-    _repl->_opTimeWaiterList.add_inlock(_targetOpTime, _waiter);
+    _repl->_lastAppliedOpTimeWaiterList.add_inlock(_targetOpTime, _waiter);
 }
 
 void ReplicationCoordinatorImpl::CatchupState::incrementNumCatchUpOps_inlock(long numOps) {

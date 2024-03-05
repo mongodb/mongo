@@ -6363,6 +6363,30 @@ TEST_F(ReplCoordTest, NodeReturnsOkImmediatelyWhenWaitingUntilOpTimePassesAnOpTi
         opCtx.get(), ReadConcernArgs(time, ReadConcernLevel::kLocalReadConcern)));
 }
 
+TEST_F(ReplCoordTest, NodeReturnsOkWhenWaitingUntilOpTimePassesLastWrittenOpTime) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    auto lastAppliedTS = Timestamp(100, 1);
+    auto lastWrittenTS = Timestamp(150, 1);
+    auto waitUntilOpTimeTS = Timestamp(125, 1);
+    auto waitUntilOpTimeLTS = LogicalTime(waitUntilOpTimeTS);
+    replCoordSetMyLastWrittenOpTime(OpTime(lastWrittenTS, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastAppliedOpTime(OpTime(lastAppliedTS, 1), Date_t() + Seconds(100));
+
+    auto opCtx = makeOperationContext();
+
+    // lastAppliedTS < waitUntilOpTimeTS < lastWrittenTS
+    ASSERT_OK(
+        getReplCoord()->waitUntilOpTimeWrittenUntil(opCtx.get(), waitUntilOpTimeLTS, boost::none));
+}
+
 TEST_F(ReplCoordTest,
        NodeReturnsNotAReplicaSetWhenWaitUntilOpTimeIsRunWithoutMajorityReadConcernEnabled) {
     init(ReplSettings());

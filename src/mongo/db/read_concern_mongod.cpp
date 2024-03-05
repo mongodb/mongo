@@ -160,15 +160,13 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
 
     auto& writeRequests = getWriteRequestsSynchronizer(opCtx->getClient()->getServiceContext());
 
-    auto lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+    auto lastWrittenOpTime = LogicalTime(replCoord->getMyLastWrittenOpTime().getTimestamp());
 
     // secondaries may lag primary so wait first to avoid unnecessary noop writes.
-    if (clusterTime > lastAppliedOpTime && replCoord->getMemberState().secondary()) {
+    if (clusterTime > lastWrittenOpTime && replCoord->getMemberState().secondary()) {
         auto deadline = Date_t::now() + Milliseconds(waitForSecondaryBeforeNoopWriteMS.load());
-        auto readConcernArgs =
-            repl::ReadConcernArgs(clusterTime, repl::ReadConcernLevel::kLocalReadConcern);
-        auto waitStatus = replCoord->waitUntilOpTimeForReadUntil(opCtx, readConcernArgs, deadline);
-        lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+        auto waitStatus = replCoord->waitUntilOpTimeWrittenUntil(opCtx, clusterTime, deadline);
+        lastWrittenOpTime = LogicalTime(replCoord->getMyLastWrittenOpTime().getTimestamp());
         if (!waitStatus.isOK()) {
             LOGV2_DEBUG(20986,
                         1,
@@ -185,7 +183,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
     // this loop addresses the case when two or more threads need to advance the opLog time but the
     // one that waits for the notification gets the later clusterTime, so when the request finishes
     // it needs to be repeated with the later time.
-    while (clusterTime > lastAppliedOpTime) {
+    while (clusterTime > lastWrittenOpTime) {
         // Standalone replica set, so there is no need to advance the OpLog on the primary. The only
         // exception is after a tenant migration because the target time may be from the other
         // replica set and is not guaranteed to be in the oplog of this node's set.
@@ -197,7 +195,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
         if (!remainingAttempts--) {
             std::stringstream ss;
             ss << "Requested clusterTime " << clusterTime.toString()
-               << " is greater than the last primary OpTime: " << lastAppliedOpTime.toString()
+               << " is greater than the last primary OpTime: " << lastWrittenOpTime.toString()
                << " no retries left";
             return Status(ErrorCodes::InternalError, ss.str());
         }
@@ -267,14 +265,14 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
             return Status::OK();
         }
 
-        lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+        lastWrittenOpTime = LogicalTime(replCoord->getMyLastWrittenOpTime().getTimestamp());
     }
     // This is when the noop write failed but the opLog caught up to clusterTime by replicating.
     if (!status.isOK()) {
         LOGV2_DEBUG(20989,
                     1,
-                    "Reached clusterTime {lastAppliedOpTime} but failed noop write due to {error}",
-                    "lastAppliedOpTime"_attr = lastAppliedOpTime.toString(),
+                    "Reached clusterTime {lastWrittenOpTime} but failed noop write due to {error}",
+                    "lastWrittenOpTime"_attr = lastWrittenOpTime.toString(),
                     "error"_attr = status.toString());
     }
     return Status::OK();

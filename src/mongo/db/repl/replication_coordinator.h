@@ -493,6 +493,9 @@ public:
     virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
                                                const ReadConcernArgs& settings,
                                                boost::optional<Date_t> deadline) = 0;
+    virtual Status waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
+                                               LogicalTime clusterTime,
+                                               boost::optional<Date_t> deadline) = 0;
 
     /**
      * Waits until the timestamp of this node's lastCommittedOpTime is >= the given timestamp.

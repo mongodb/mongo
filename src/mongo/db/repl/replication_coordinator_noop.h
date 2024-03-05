@@ -187,6 +187,9 @@ public:
     Status waitUntilOpTimeForReadUntil(OperationContext*,
                                        const ReadConcernArgs&,
                                        boost::optional<Date_t>) final;
+    Status waitUntilOpTimeWrittenUntil(OperationContext*,
+                                       LogicalTime,
+                                       boost::optional<Date_t>) final;
 
     Status waitUntilOpTimeForRead(OperationContext*, const ReadConcernArgs&) final;
     Status awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) final;

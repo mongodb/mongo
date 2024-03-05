@@ -256,6 +256,12 @@ Status ReplicationCoordinatorNoOp::waitUntilOpTimeForReadUntil(OperationContext*
     MONGO_UNREACHABLE;
 }
 
+Status ReplicationCoordinatorNoOp::waitUntilOpTimeWrittenUntil(OperationContext*,
+                                                               LogicalTime,
+                                                               boost::optional<Date_t>) {
+    MONGO_UNREACHABLE;
+}
+
 Status ReplicationCoordinatorNoOp::awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) {
     MONGO_UNREACHABLE;
 }

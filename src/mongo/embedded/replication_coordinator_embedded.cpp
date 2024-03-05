@@ -285,6 +285,12 @@ Status ReplicationCoordinatorEmbedded::waitUntilOpTimeForReadUntil(OperationCont
     UASSERT_NOT_IMPLEMENTED;
 }
 
+Status ReplicationCoordinatorEmbedded::waitUntilOpTimeWrittenUntil(OperationContext*,
+                                                                   LogicalTime,
+                                                                   boost::optional<Date_t>) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::awaitTimestampCommitted(OperationContext* opCtx,
                                                                Timestamp ts) {
     UASSERT_NOT_IMPLEMENTED;

@@ -261,6 +261,9 @@ public:
     virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
                                                const ReadConcernArgs& readConcern,
                                                boost::optional<Date_t> deadline) override;
+    virtual Status waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
+                                               LogicalTime clusterTime,
+                                               boost::optional<Date_t> deadline) override;
 
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                           const ReadConcernArgs& readConcern) override;
@@ -1691,11 +1694,12 @@ private:
     executor::TaskExecutor::EventHandle _cancelElectionIfNeeded(WithLock);
 
     /**
-     * Waits until the lastApplied opTime is at least the 'targetOpTime'.
+     * Waits until the lastApplied/lastWritten opTime is at least the 'targetOpTime'.
      */
     Status _waitUntilOpTime(OperationContext* opCtx,
                             OpTime targetOpTime,
-                            boost::optional<Date_t> deadline = boost::none);
+                            boost::optional<Date_t> deadline = boost::none,
+                            bool waitForLastApplied = true);
 
     /**
      * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
@@ -1816,7 +1820,11 @@ private:
 
     // list of information about clients waiting for a particular lastApplied opTime.
     // Waiters in this list are checked and notified on self's lastApplied opTime updates.
-    WaiterList _opTimeWaiterList;  // (M)
+    WaiterList _lastAppliedOpTimeWaiterList;  // (M)
+
+    // list of information about clients waiting for a particular lastWritten opTime.
+    // Waiters in this list are checked and notified on self's lastWritten opTime updates.
+    WaiterList _lastWrittenOpTimeWaiterList;  // (M)
 
     // Maps a horizon name to the promise waited on by awaitable hello requests when the node
     // has an initialized replica set config and is an active member of the replica set.
