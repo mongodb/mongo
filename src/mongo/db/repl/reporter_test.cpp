@@ -739,4 +739,70 @@ TEST_F(ReporterTest, ShutdownImmediatelyAfterTriggerWhileKeepAliveTimeoutIsSched
     assertReporterDone();
 }
 
+TEST_F(ReporterTest, AllowUsingBackupChannel) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger());
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(BSON("ok" << 1), false);
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, BackupChannelFailureAlsoCauseReporterFailure) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse({ErrorCodes::OperationFailed, "update failed", Milliseconds(0)}, false);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, reporter->getStatus_forTest().code());
+
+    // We need to explicitly shutdown the reporter here because we need to ask the main channel to
+    // quit without processing a network response.
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTest, BackupChannelSendAnotherOneAfterResponseIfReceiveTwo) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isBackupActive());
+    // Trigger on the backup channel one more time so reporter will send another request immediately
+    // after one channel becomes free.
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_TRUE(reporter->isWaitingToSendReport());
+    processNetworkResponse(BSON("ok" << 1), true);
+    processNetworkResponse(BSON("ok" << 1), true);
+    ASSERT_TRUE(reporter->isActive() || reporter->isBackupActive());
+    ASSERT_FALSE(reporter->isWaitingToSendReport());
+
+    processNetworkResponse(BSON("ok" << 1), false);
+
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
+TEST_F(ReporterTestNoTriggerAtSetUp, NotUsingBackupChannelWhenFree) {
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_FALSE(reporter->isActive());
+    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_FALSE(reporter->isBackupActive());
+    ASSERT_TRUE(reporter->isActive());
+
+    reporter->shutdown();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->join());
+    assertReporterDone();
+}
+
 }  // namespace

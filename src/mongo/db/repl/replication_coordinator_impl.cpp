@@ -724,7 +724,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
         _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
 
-        _reportUpstream_inlock(std::move(lock));  // unlocks _mutex.
+        _reportUpstream_inlock(std::move(lock), false /*prioritized*/);  // unlocks _mutex.
     } else {
         lock.unlock();
     }
@@ -1465,7 +1465,9 @@ void ReplicationCoordinatorImpl::setMyLastWrittenOpTimeAndWallTimeForward(
 
     if (opTimeAndWallTime.opTime > _getMyLastWrittenOpTime_inlock()) {
         _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
-        _reportUpstream_inlock(std::move(lock));
+        // When writeConcernMajorityJournalDefault = false, prioritize lastWritten update.
+        _reportUpstream_inlock(std::move(lock),
+                               !getWriteConcernMajorityShouldJournal_inlock() /*prioritized*/);
     }
 }
 
@@ -1479,7 +1481,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
 
     invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
     if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
-        _reportUpstream_inlock(std::move(lock));
+        _reportUpstream_inlock(std::move(lock), false /*prioritized*/);
     }
 }
 
@@ -1496,7 +1498,9 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
     if (!lastWrittenOpTime.isNull()) {
         invariant(opTimeAndWallTime.opTime <= lastWrittenOpTime);
         if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
-            _reportUpstream_inlock(std::move(lock));
+            // When writeConcernMajorityJournalDefault = true, prioritize lastDurable update.
+            _reportUpstream_inlock(std::move(lock),
+                                   getWriteConcernMajorityShouldJournal_inlock() /*prioritized*/);
         }
     }
 }
@@ -1516,7 +1520,8 @@ void ReplicationCoordinatorImpl::setMyLastAppliedAndLastWrittenOpTimeAndWallTime
         _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
     }
     if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
-        _reportUpstream_inlock(std::move(lock));
+        // This function is only called on primary, so we don't need to prioritize the update.
+        _reportUpstream_inlock(std::move(lock), false /*prioritized*/);
     }
 }
 
@@ -1532,14 +1537,15 @@ void ReplicationCoordinatorImpl::setMyLastDurableAndLastWrittenOpTimeAndWallTime
         _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
     }
     if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
-        _reportUpstream_inlock(std::move(lock));
+        // This function is only called on primary, so we don't need to prioritize the update.
+        _reportUpstream_inlock(std::move(lock), false /*prioritized*/);
     }
 }
 
 void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
     stdx::unique_lock<Latch> lock(_mutex);
     _resetMyLastOpTimes(lock);
-    _reportUpstream_inlock(std::move(lock));
+    _reportUpstream_inlock(std::move(lock), false /*prioritized*/);
 }
 
 void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
@@ -1551,7 +1557,8 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
     _setMyLastDurableOpTimeAndWallTime(lk, OpTimeAndWallTime(), isRollbackAllowed);
 }
 
-void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch> lock) {
+void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch> lock,
+                                                        bool prioritized) {
     invariant(lock.owns_lock());
 
     if (!_settings.isReplSet()) {
@@ -1564,7 +1571,7 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch>
 
     lock.unlock();
 
-    _externalState->forwardSecondaryProgress();  // Must do this outside _mutex
+    _externalState->forwardSecondaryProgress(prioritized);  // Must do this outside _mutex
 }
 
 void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
@@ -5533,7 +5540,7 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opC
     _setMyLastWrittenOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
-    _reportUpstream_inlock(std::move(lock));
+    _reportUpstream_inlock(std::move(lock), false /*prioritized*/);
 }
 
 ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(

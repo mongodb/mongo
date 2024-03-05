@@ -86,7 +86,7 @@ public:
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
     void onDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
-    virtual void forwardSecondaryProgress();
+    virtual void forwardSecondaryProgress(bool prioritized);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
     bool isSelfFastPath(const HostAndPort& host) final;
     bool isSelfSlowPath(const HostAndPort& host,
