@@ -261,10 +261,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
                 newDataFieldsBuilder.append(entry.first.c_str(), binary);
             } else {
                 // Update existing column.
-                // TODO (SERVER-87384): Use helper function
-                BSONObj binaryObj = BSON(
-                    "o" << cDiff.offset() << "d"
-                        << BSONBinData(cDiff.data(), cDiff.size(), BinDataType::BinDataGeneral));
+                BSONObj binaryObj = makeBSONColumnDocDiff(cDiff);
                 updatedDataFieldsBuilder.append(entry.first.c_str(), binaryObj);
             }
         }
@@ -573,6 +570,12 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
     uassert(8555701,
             "Catalog changed during operation, missing time-series options",
             bucketsColl->getTimeseriesOptions());
+}
+
+BSONObj makeBSONColumnDocDiff(const BSONColumnBuilder::BinaryDiff& binaryDiff) {
+    return BSON(
+        "o" << binaryDiff.offset() << "d"
+            << BSONBinData(binaryDiff.data(), binaryDiff.size(), BinDataType::BinDataGeneral));
 }
 
 BucketDocument makeNewDocumentForWrite(const NamespaceString& nss,

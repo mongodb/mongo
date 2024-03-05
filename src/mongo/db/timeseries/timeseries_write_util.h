@@ -84,6 +84,16 @@ struct BucketDocument {
 };
 
 /**
+ * Constructs a BSONColumn DocDiff entry.
+ *
+ * {
+ *     o(ffset): Number,    // Offset into existing BSONColumn
+ *     d(ata):   BinData    // Binary data to copy to existing BSONColumn
+ * }
+ */
+BSONObj makeBSONColumnDocDiff(const BSONColumnBuilder::BinaryDiff& binaryDiff);
+
+/**
  * Returns the document for writing a new bucket with a write batch.
  */
 BucketDocument makeNewDocumentForWrite(
