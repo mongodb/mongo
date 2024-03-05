@@ -6715,6 +6715,16 @@ env.Alias('install-all-meta-but-not-unittests', [
     and not str(node).startswith(tuple([prefix_name + '-' for prefix_name in names]))
 ])
 
+# prove prefix only operates on real AIB_COMPONENTS, unittests is now a meta component
+# made up of all the quarter components combined. We create the prove alias for this meta
+# component for compatibility with the past and ease of use.
+env.Alias("prove-unittests", [
+    'prove-first-quarter-unittests',
+    'prove-second-quarter-unittests',
+    'prove-third-quarter-unittests',
+    'prove-fourth-quarter-unittests',
+])
+
 # We don't want installing files to cause them to flow into the cache,
 # since presumably we can re-install them from the origin if needed.
 env.NoCache(env.FindInstalledFiles())
