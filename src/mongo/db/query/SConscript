@@ -456,6 +456,7 @@ env.CppUnitTest(
         'canonical_query_test_util.cpp',
         'ce_mode_parameter_test.cpp',
         'classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test.cpp',
+        'classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.cpp',
         'classic_stage_builder_test.cpp',
         'collection_query_info_test.cpp',
         'count_command_test.cpp',

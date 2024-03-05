@@ -27,11 +27,20 @@ import {
     getPlanStages,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSbeFullyEnabled(db);
 const coll = db.explode_for_sort_plan_cache;
 coll.drop();
+
+// TODO SERVER-87376: Remove this check once the issue resolved when Classic multi-planner for SBE
+// is enabled. The current investigation indicates it is due to isExplainAndCacheIneligible
+// returning true when $in has max elements for scans to explode.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
+    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
+    quit();
+}
 
 // Create two indexes to ensure the multi-planner kicks in and the query plan gets cached when the
 // classic engine is in use.

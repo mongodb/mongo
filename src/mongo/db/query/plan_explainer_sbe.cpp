@@ -765,8 +765,10 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            {} /*optCounterInfo*/,
                            remoteExplains},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
-      _classicRuntimePlannerExplainer{plan_explainer_factory::make(
-          _classicRuntimePlannerStage.get(), _solution->_enumeratorExplainInfo)} {}
+      _classicRuntimePlannerExplainer{
+          plan_explainer_factory::make(_classicRuntimePlannerStage.get(), cachedPlanHash)} {
+    _classicRuntimePlannerExplainer->updateEnumeratorExplainInfo(_solution->_enumeratorExplainInfo);
+}
 
 PlanExplainer::PlanStatsDetails PlanExplainerClassicRuntimePlannerForSBE::getWinningPlanTrialStats()
     const {

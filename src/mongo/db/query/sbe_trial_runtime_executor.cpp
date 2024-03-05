@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/sbe_runtime_planner.h"
+#include "mongo/db/query/sbe_trial_runtime_executor.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -44,8 +44,8 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
-bool BaseRuntimePlanner::fetchNextDocument(plan_ranker::CandidatePlan* candidate,
-                                           size_t maxNumResults) {
+bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candidate,
+                                             size_t maxNumResults) {
     auto* resultSlot = candidate->data.resultAccessor;
     auto* recordIdSlot = candidate->data.recordIdAccessor;
     try {
@@ -85,7 +85,7 @@ bool BaseRuntimePlanner::fetchNextDocument(plan_ranker::CandidatePlan* candidate
     return true;
 }
 
-std::pair<value::SlotAccessor*, value::SlotAccessor*> BaseRuntimePlanner::prepareExecutionPlan(
+std::pair<value::SlotAccessor*, value::SlotAccessor*> TrialRuntimeExecutor::prepareExecutionPlan(
     PlanStage* root,
     stage_builder::PlanStageData* data,
     const bool preparingFromCache,
@@ -111,15 +111,15 @@ std::pair<value::SlotAccessor*, value::SlotAccessor*> BaseRuntimePlanner::prepar
     return std::make_pair(resultSlot, recordIdSlot);
 }
 
-void BaseRuntimePlanner::prepareCandidate(plan_ranker::CandidatePlan* candidate,
-                                          bool preparingFromCache) {
+void TrialRuntimeExecutor::prepareCandidate(plan_ranker::CandidatePlan* candidate,
+                                            bool preparingFromCache) {
     _indexExistenceChecker.check(_opCtx, _collections);
     std::tie(candidate->data.resultAccessor, candidate->data.recordIdAccessor) =
         prepareExecutionPlan(candidate->root.get(), &candidate->data.stageData, preparingFromCache);
 }
 
-void BaseRuntimePlanner::executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate,
-                                                     size_t maxNumResults) {
+void TrialRuntimeExecutor::executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate,
+                                                       size_t maxNumResults) {
     prepareCandidate(candidate, true /*preparingFromCache*/);
     while (fetchNextDocument(candidate, maxNumResults)) {
     }

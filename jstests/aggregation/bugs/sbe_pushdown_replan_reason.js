@@ -10,17 +10,10 @@
 //   not_allowed_with_signed_security_token,
 // ]
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
-
-// TODO SERVER-85239: Remove this check when classic replanning for agg pipeline is implemented.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    quit();
-}
 
 const lcoll = testDB.left;
 const fcoll = testDB.right;

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.h"
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -255,6 +256,18 @@ protected:
         return {std::move(solutions), std::move(expectedSums)};
     }
 
+    // Inserts 'resultDocCount' number of docs with {_id: i, a: i, b: 1} which is the same as the
+    // outputs from the VirtualScanNode from createVirtualScanQuerySolutionsForDefaultFilter().
+    void insertTestDocuments(int resultDocCount) {
+        auto opCtx = operationContext();
+        std::vector<InsertStatement> docs;
+        for (int i = 1; i <= 200; ++i) {
+            docs.emplace_back(InsertStatement(BSON("_id" << i << "a" << i << "b" << 1)));
+        }
+
+        ASSERT_OK(storageInterface()->insertDocuments(opCtx, kNss, docs));
+    }
+
 private:
     std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
         return PlanYieldPolicySBE::make(
@@ -296,9 +309,15 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
         auto&& planCache = sbe::getPlanCache(operationContext());
         auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(cacheEntry);
-        CachedPlanner cachedPlanner{std::move(plannerData), std::move(cacheEntry)};
+        ASSERT_TRUE(cacheEntry->isPinned()) << "Expects single solution to be pinned in cache.";
+        CachedPlanner cachedPlanner{std::move(plannerData),
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    std::move(cacheEntry)};
 
         auto cachedExec = cachedPlanner.plan();
+        PlanSummaryStats stats;
+        cachedExec->getPlanExplainer().getSummaryStats(&stats);
+        ASSERT_FALSE(stats.replanReason) << "Single solution does not need to be replanned.";
         assertPlanExecutorReturnsCorrectSums({3, 4, 5}, cachedExec.get());
     }
 }
@@ -312,7 +331,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
     auto [solutions, expectedSums] =
         createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
 
-    MultiPlanner planner{std::move(plannerData), std::move(solutions)};
+    MultiPlanner planner{
+        std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
     auto exec = planner.plan();
     assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
 
@@ -325,7 +345,9 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
         auto&& planCache = sbe::getPlanCache(operationContext());
         auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(cacheEntry);
-        CachedPlanner cachedPlanner{std::move(plannerData), std::move(cacheEntry)};
+        CachedPlanner cachedPlanner{std::move(plannerData),
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    std::move(cacheEntry)};
         auto cachedExec = cachedPlanner.plan();
         assertPlanExecutorReturnsCorrectSums(std::move(expectedSums), cachedExec.get());
     }
@@ -341,7 +363,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
         PlannerDataForSBE plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
         auto [solutions, expectedSums] =
             createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
-        MultiPlanner planner{std::move(plannerData), std::move(solutions)};
+        MultiPlanner planner{
+            std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
         auto exec = planner.plan();
         ASSERT_EQ(exec->getPlanExplainer().getVersion(), "2");
     }
@@ -351,7 +374,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
         PlannerDataForSBE plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
         auto [solutions, expectedSums] =
             createVirtualScanQuerySolutionsForDefaultFilter(50 /*resultDocCount*/, plannerData.cq);
-        MultiPlanner planner{std::move(plannerData), std::move(solutions)};
+        MultiPlanner planner{
+            std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
         auto exec = planner.plan();
         ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
     }
@@ -369,7 +393,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
         PlannerDataForSBE plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
         auto [solutions, expectedSums] =
             createVirtualScanQuerySolutionsForDefaultFilter(kDocCount, plannerData.cq);
-        MultiPlanner planner{std::move(plannerData), std::move(solutions)};
+        MultiPlanner planner{
+            std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
         auto exec = planner.plan();
         ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
         queryResult = getResultDocumentsAndAssertExecState(kDocCount, exec.get());
@@ -386,7 +411,9 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
         auto&& planCache = sbe::getPlanCache(operationContext());
         auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(cacheEntry);
-        CachedPlanner cachedPlanner{std::move(plannerData), std::move(cacheEntry)};
+        CachedPlanner cachedPlanner{std::move(plannerData),
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    std::move(cacheEntry)};
         auto cachedExec = cachedPlanner.plan();
         ASSERT_EQ(cachedExec->getPlanExplainer().getVersion(), "2");
         auto cachedResult = getResultDocumentsAndAssertExecState(kDocCount, cachedExec.get());
@@ -424,10 +451,129 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksCachedPlanForWholeQuery) 
         auto&& planCache = sbe::getPlanCache(operationContext());
         auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(cacheEntry);
-        CachedPlanner cachedPlanner{std::move(plannerData), std::move(cacheEntry)};
+        CachedPlanner cachedPlanner{std::move(plannerData),
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    std::move(cacheEntry)};
 
         auto cachedExec = cachedPlanner.plan();
         assertPlanExecutorReturnsCorrectSums({20, 180}, cachedExec.get());
+    }
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnFailureMemoryLimitExceeded) {
+    // Ensures that cache entries are available immediately.
+    bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
+    ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
+
+    insertTestDocuments(200);
+
+    PlannerDataForSBE plannerData = createPlannerData();
+    auto [solutions, expectedSums] =
+        createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
+
+    MultiPlanner planner{
+        std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+    auto exec = planner.plan();
+    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+
+    {  // Run CachedPlanner to execute the cached plan.
+        PlannerDataForSBE plannerData = createPlannerData();
+        auto planCacheKey =
+            plan_cache_key_factory::make(*plannerData.cq,
+                                         plannerData.collections,
+                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto&& planCache = sbe::getPlanCache(operationContext());
+        auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
+        ASSERT_TRUE(cacheEntry);
+
+        // Replace the 'root' with a mock stage which always throws memory exceeds exception.
+        cacheEntry->cachedPlan->root = std::make_unique<sbe::MockExceededMemoryLimitStage>(0);
+        cacheEntry->cachedPlan->planStageData.staticData =
+            std::make_shared<stage_builder::PlanStageStaticData>();
+
+        CachedPlanner cachedPlanner{std::move(plannerData),
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    std::move(cacheEntry)};
+        auto cachedExec = cachedPlanner.plan();
+        PlanSummaryStats stats;
+        cachedExec->getPlanExplainer().getSummaryStats(&stats);
+        ASSERT_TRUE(stats.replanReason)
+            << "CachedPlanner should replan upon hitting a memory exceeds error.";
+        ASSERT_STRING_SEARCH_REGEX(*stats.replanReason, "cached plan returned: ");
+
+        assertPlanExecutorReturnsCorrectSums(expectedSums, cachedExec.get());
+
+        // Verify if the cache is not deactivated due to replanning.
+        ASSERT_TRUE(planCache.getCacheEntryIfActive(planCacheKey));
+    }
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, CachedPlannerReplansOnHittingMaxNumReads) {
+    // Ensures that cache entries are available immediately.
+    bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
+    ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
+
+    insertTestDocuments(200);
+
+    PlannerDataForSBE plannerData = createPlannerData();
+    auto [solutions, expectedSums] =
+        createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
+
+    MultiPlanner planner{
+        std::move(plannerData), std::move(solutions), PlanCachingMode::AlwaysCache};
+    auto exec = planner.plan();
+    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+
+    {  // Run CachedPlanner to execute the cached plan.
+        PlannerDataForSBE plannerData = createPlannerData();
+        auto planCacheKey =
+            plan_cache_key_factory::make(*plannerData.cq,
+                                         plannerData.collections,
+                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto&& planCache = sbe::getPlanCache(operationContext());
+        ASSERT_TRUE(planCache.getCacheEntryIfActive(planCacheKey));
+
+        // Since 'works' is an immutable data member, create a mock cache entry with non-zero
+        // 'works' to allow tracking of number reads. Originally the 'works' is always zero due to
+        // reading from VirtualScanNode.
+        auto entry = std::move(planCache.getEntry(planCacheKey).getValue());
+        auto mockCacheEntry =
+            PlanCacheEntryBase<sbe::CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>::create(
+                entry->cachedPlan->clone(),
+                entry->queryHash,
+                entry->planCacheKey,
+                entry->planCacheCommandKey,
+                entry->timeOfCreation,
+                entry->isActive,
+                entry->securityLevel,
+                1 /*works*/,
+                *entry->debugInfo);
+        auto mockPlanCacheHolder = std::make_unique<
+            CachedPlanHolder<sbe::CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>>(
+            *mockCacheEntry);
+
+        // Replace the 'root' with a mock stage which always exceeds max number of reads.
+        mockPlanCacheHolder->cachedPlan->root = std::make_unique<sbe::MockExceededMaxReadsStage>(0);
+        sbe::value::SlotIdGenerator ids = sbe::value::SlotIdGenerator{};
+        auto staticData = std::make_shared<stage_builder::PlanStageStaticData>();
+        staticData->resultSlot = 0;
+        mockPlanCacheHolder->cachedPlan->planStageData.staticData = staticData;
+
+        CachedPlanner cachedPlanner{std::move(plannerData),
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                    std::move(mockPlanCacheHolder)};
+        auto cachedExec = cachedPlanner.plan();
+        PlanSummaryStats stats;
+        cachedExec->getPlanExplainer().getSummaryStats(&stats);
+        ASSERT_TRUE(stats.replanReason)
+            << "CachedPlanner should replan upon hitting max number of reads allowed.";
+        ASSERT_STRING_SEARCH_REGEX(*stats.replanReason,
+                                   "cached plan was less efficient than expected");
+
+        assertPlanExecutorReturnsCorrectSums(expectedSums, cachedExec.get());
+
+        // Verify if the cache is not deactivated due to replanning.
+        ASSERT_TRUE(planCache.getCacheEntryIfActive(planCacheKey));
     }
 }
 

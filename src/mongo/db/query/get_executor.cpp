@@ -966,8 +966,8 @@ private:
             planCacheCounters.incrementSbeHitsCounter();
 
             auto result = releaseResult();
-            result->runtimePlanner =
-                std::make_unique<crp_sbe::CachedPlanner>(makePlannerData(), std::move(cacheEntry));
+            result->runtimePlanner = std::make_unique<crp_sbe::CachedPlanner>(
+                makePlannerData(), _yieldPolicy, std::move(cacheEntry));
             return result;
         }
 
@@ -1001,8 +1001,8 @@ private:
 
         if (solutions.size() > 1) {
             auto result = releaseResult();
-            result->runtimePlanner =
-                std::make_unique<crp_sbe::MultiPlanner>(makePlannerData(), std::move(solutions));
+            result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
+                makePlannerData(), std::move(solutions), PlanCachingMode::AlwaysCache);
             return result;
         } else {
             return buildSingleSolutionPlan(std::move(solutions[0]));

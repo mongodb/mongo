@@ -153,6 +153,10 @@ protected:
         return _plannerData.plannerParams;
     }
 
+    PlannerDataForSBE extractPlannerData() {
+        return std::move(_plannerData);
+    }
+
 private:
     PlannerDataForSBE _plannerData;
 };
@@ -177,22 +181,54 @@ private:
 class CachedPlanner final : public PlannerBase {
 public:
     CachedPlanner(PlannerDataForSBE plannerData,
+                  PlanYieldPolicy::YieldPolicy yieldPolicy,
                   std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder);
 
     /**
-     * Recovers SBE plan from cache and returns PlanExecutor for it.
-     * TODO SERVER-85238 - Implement replanning.
+     * Recovers SBE plan from cache and performs trial on it. When the trial period ends, this
+     * function checks the stats to determine if the number of reads during the trial meets the
+     * criteria for replanning and replans if necessary.
+     *
+     * Returns PlanExecutor for the final selected plan.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
 
 private:
+    /**
+     * Executes the "trial" portion of a single plan until it
+     *   - reaches EOF,
+     *   - reaches the 'maxNumResults' limit,
+     *   - early exits via the TrialRunTracker, or
+     *   - returns a failure Status.
+     *
+     * All documents returned by the plan are enqueued into the 'CandidatePlan->results' queue.
+     */
+    sbe::plan_ranker::CandidatePlan _collectExecutionStatsForCachedPlan(
+        std::unique_ptr<sbe::PlanStage> root,
+        stage_builder::PlanStageData data,
+        size_t maxTrialPeriodNumReads);
+
+    /**
+     * Uses the QueryPlanner and the MultiPlanner to re-generate candidate plans for this
+     * query and select a new winner.
+     *
+     * The plan cache is modified only if 'shouldCache' is true. The 'replanReason' string is used
+     * to indicate the reason for replanning, which can be included, for example, into plan stats
+     * summary.
+     */
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _replan(bool shouldCache,
+                                                                 std::string replanReason);
+
+    PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<sbe::CachedPlanHolder> _cachedPlanHolder;
 };
 
 class MultiPlanner final : public PlannerBase {
 public:
     MultiPlanner(PlannerDataForSBE plannerData,
-                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans);
+                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
+                 PlanCachingMode cachingMode,
+                 boost::optional<std::string> replanReason = boost::none);
 
     /**
      * Picks the best plan given by the classic engine multiplanner and returns a plan executor. If
@@ -203,11 +239,14 @@ public:
 
 private:
     using SbePlanAndData = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
-    SbePlanAndData _buildSbePlanAndUpdatePlanCache(const QuerySolution* winningSolution);
+    SbePlanAndData _buildSbePlanAndUpdatePlanCache(const QuerySolution* winningSolution,
+                                                   const plan_ranker::PlanRankingDecision& ranking);
 
     bool _shouldUseEofOptimization() const;
 
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
+    PlanCachingMode _cachingMode;
+    boost::optional<std::string> _replanReason;
 };
 
 class SubPlanner final : public PlannerBase {

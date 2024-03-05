@@ -159,7 +159,7 @@ MultiPlanner::PlanQ MultiPlanner::preparePlans(
         auto* candidatePtr = &_candidates.back();
         // Store the original plan in the CandidatePlan.
         candidatePtr->clonedPlan.emplace(std::move(origPlan));
-        prepareCandidate(candidatePtr, false /*preparingFromCache*/);
+        _trialRuntimeExecutor.prepareCandidate(candidatePtr, false /*preparingFromCache*/);
         if (fetchOneDocument(candidatePtr)) {
             planq.push(candidatePtr);
         }
@@ -180,7 +180,7 @@ void MultiPlanner::trialPlans(PlanQ planq) {
 }
 
 bool MultiPlanner::fetchOneDocument(plan_ranker::CandidatePlan* candidate) {
-    if (!fetchNextDocument(candidate, _maxNumResults)) {
+    if (!_trialRuntimeExecutor.fetchNextDocument(candidate, _maxNumResults)) {
         candidate->root->detachFromTrialRunTracker();
         if (candidate->status.isOK()) {
             auto numReads =

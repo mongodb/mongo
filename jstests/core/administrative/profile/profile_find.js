@@ -17,7 +17,7 @@ assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();
 var coll = testDB.getCollection(collName);
 
-// TODO SERVER-85238: Remove this check when replanning is properly implemented for classic runtime
+// TODO SERVER-87377: Remove this check when replanReason is properly populated for classic runtime
 // planning for SBE.
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
     jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");

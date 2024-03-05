@@ -29,8 +29,8 @@
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -41,8 +41,12 @@
 namespace mongo::classic_runtime_planner_for_sbe {
 
 MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
-                           std::vector<std::unique_ptr<QuerySolution>> candidatePlans)
-    : PlannerBase(std::move(plannerData)) {
+                           std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
+                           PlanCachingMode cachingMode,
+                           boost::optional<std::string> replanReason)
+    : PlannerBase(std::move(plannerData)),
+      _cachingMode((std::move(cachingMode))),
+      _replanReason(replanReason) {
     _multiPlanStage =
         std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
                                          collections().getMainCollectionPtrOrAcquisition(),
@@ -67,10 +71,22 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
 
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
 
+    // Calculate and update the number of works based on totalKeysExamined + totalDocsExamined to
+    // align with how SBE calculates the works.
+    auto stats = _multiPlanStage->getStats();
+    auto summary = collectExecutionStatsSummary(stats.get(), _multiPlanStage->bestPlanIdx());
+    plan_ranker::PlanRankingDecision ranking = _multiPlanStage->planRankingDecision();
+    tassert(8523807,
+            "Expected StatsDetails in classic runtime planner ranking decision.",
+            std::holds_alternative<plan_ranker::StatsDetails>(ranking.stats));
+    auto& rankerDetails = std::get<plan_ranker::StatsDetails>(ranking.stats);
+    rankerDetails.candidatePlanStats[0]->common.works =
+        summary.totalKeysExamined + summary.totalDocsExamined;
+
     if (_shouldUseEofOptimization()) {
         // We don't need to extend the solution with the agg pipeline, because we don't do EOF
         // optimization if the pipeline is present.
-        _buildSbePlanAndUpdatePlanCache(_multiPlanStage->bestSolution());
+        _buildSbePlanAndUpdatePlanCache(_multiPlanStage->bestSolution(), ranking);
         auto nss = cq()->nss();
         return uassertStatusOK(
             plan_executor_factory::make(extractCq(),
@@ -92,7 +108,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
             *cq(), std::move(winningSolution), plannerParams().secondaryCollectionsInfo);
     }
 
-    auto sbePlanAndData = _buildSbePlanAndUpdatePlanCache(winningSolution.get());
+    auto sbePlanAndData = _buildSbePlanAndUpdatePlanCache(winningSolution.get(), ranking);
     return prepareSbePlanExecutor(std::move(winningSolution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
@@ -101,14 +117,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
 }
 
 MultiPlanner::SbePlanAndData MultiPlanner::_buildSbePlanAndUpdatePlanCache(
-    const QuerySolution* winningSolution) {
+    const QuerySolution* winningSolution, const plan_ranker::PlanRankingDecision& ranking) {
     auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
         opCtx(), collections(), *cq(), *winningSolution, sbeYieldPolicy());
+    sbePlanAndData.second.replanReason = std::move(_replanReason);
     plan_cache_util::updateSbePlanCacheFromClassicCandidates(opCtx(),
                                                              collections(),
-                                                             PlanCachingMode::AlwaysCache,
+                                                             _cachingMode,
                                                              *cq(),
-                                                             _multiPlanStage->planRankingDecision(),
+                                                             ranking,
                                                              _multiPlanStage->candidates(),
                                                              sbePlanAndData,
                                                              winningSolution);

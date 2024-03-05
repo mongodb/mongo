@@ -88,6 +88,15 @@ PlanStage* getStageByType(PlanStage* root, StageType type);
 std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
     const plan_cache_debug_info::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity);
 
+
+/**
+ * Collects and aggregates execution stats summary (totalKeysExamined and totalDocsExamined) by
+ * traversing the stats tree. Skips the top-level MultiPlanStage when it is at the top of the plan,
+ * and extracts stats from its child according to 'planIdx'.
+ */
+PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
+                                              boost::optional<size_t> planIdx);
+
 /**
  * Adds the path-level multikey information to the explain output in a field called "multiKeyPaths".
  * The value associated with the "multiKeyPaths" field is an object with keys equal to those in the

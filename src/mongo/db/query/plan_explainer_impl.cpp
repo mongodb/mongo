@@ -582,6 +582,7 @@ void statsToBSON(const PlanStageStats& stats,
     }
     childrenBob.doneFast();
 }
+}  // namespace
 
 PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
                                               const boost::optional<size_t> planIdx) {
@@ -618,7 +619,6 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
 
     return summary;
 }
-}  // namespace
 
 void appendMultikeyPaths(const BSONObj& keyPattern,
                          const MultikeyPaths& multikeyPaths,

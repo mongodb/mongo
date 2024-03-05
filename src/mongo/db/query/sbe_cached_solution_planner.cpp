@@ -177,7 +177,7 @@ CandidatePlans CachedSolutionPlanner::plan(
     // If the '_decisionReads' is not present then we do not run a trial period, keeping the current
     // plan.
     if (!_decisionReads) {
-        prepareExecutionPlan(
+        _trialRuntimeExecutor.prepareExecutionPlan(
             roots[0].first.get(), &roots[0].second, true /* preparingFromCache */, _remoteCursors);
         roots[0].first->open(false /* reOpen */);
         return {makeVector(plan_ranker::CandidatePlan{
@@ -306,7 +306,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
     candidate.data.tracker = std::make_unique<TrialRunTracker>(
         std::move(onMetricReached), maxNumResults, maxTrialPeriodNumReads);
     candidate.root->attachToTrialRunTracker(candidate.data.tracker.get());
-    executeCachedCandidateTrial(&candidate, maxNumResults);
+    _trialRuntimeExecutor.executeCachedCandidateTrial(&candidate, maxNumResults);
 
     return candidate;
 }
@@ -350,7 +350,8 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache,
 
         // Only one possible plan. Build the stages from the solution.
         auto [root, data] = buildExecutableTree(*solutions[0]);
-        prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/, remoteCursors);
+        _trialRuntimeExecutor.prepareExecutionPlan(
+            root.get(), &data, false /*preparingFromCache*/, remoteCursors);
         root->open(false /* reOpen */);
 
         auto explainer = plan_explainer_factory::make(root.get(), &data, solutions[0].get());

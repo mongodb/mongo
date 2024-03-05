@@ -129,7 +129,7 @@ CandidatePlans SubPlanner::plan(
     // range deletion).
     plan_cache_util::updatePlanCache(_opCtx, _collections, _cq, *compositeSolution, *root, data);
 
-    prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
+    _trialRuntimeExecutor.prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
     root->open(false);
 
     return {makeVector(plan_ranker::CandidatePlan{
@@ -152,7 +152,7 @@ CandidatePlans SubPlanner::planWholeQuery() const {
 
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
-        prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
+        _trialRuntimeExecutor.prepareExecutionPlan(root.get(), &data, false /*preparingFromCache*/);
         root->open(false);
         return {makeVector(plan_ranker::CandidatePlan{
                     std::move(solutions[0]), std::move(root), std::move(data)}),

@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/sbe_trial_runtime_executor.h"
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo::sbe {
@@ -79,10 +80,7 @@ public:
 };
 
 /**
- * A base class for runtime planner which provides a method to perform a trial run for the candidate
- * plan by executing each plan in a round-robin fashion and collecting execution stats. Each
- * specific implementation can use the collected stats to select the best plan amongst the
- * candidates.
+ * A base class for runtime planner for common data members and constructor.
  */
 class BaseRuntimePlanner : public RuntimePlanner {
 public:
@@ -96,51 +94,19 @@ public:
           _cq(cq),
           _queryParams(queryParams),
           _yieldPolicy(yieldPolicy),
-          _indexExistenceChecker(collections) {
+          _indexExistenceChecker(collections),
+          _trialRuntimeExecutor{_opCtx, _collections, _cq, _yieldPolicy, _indexExistenceChecker} {
         invariant(_opCtx);
     }
 
 protected:
-    /**
-     * Fetches a next document from the given plan stage tree and the loaded document is placed into
-     * the candidate's plan result queue.
-     *
-     * Returns true if a document was fetched, and false if the plan stage tree reached EOF, an
-     * exception was thrown or the plan stage tree returned maxNumResults documents.
-     *
-     * If the plan stage throws a 'QueryExceededMemoryLimitNoDiskUseAllowed', it will be caught and
-     * the 'candidate->status' will be set. This failure is considered recoverable, as another
-     * candidate plan may require less memory, or may not contain a stage requiring spilling to disk
-     * at all.
-     */
-    static bool fetchNextDocument(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
-
-    /**
-     * Prepares the given plan stage tree for execution, attaches it to the operation context and
-     * returns two slot accessors for the result and recordId slots. The caller should pass true
-     * for 'preparingFromCache' if the SBE plan being prepared is being recovered from the SBE plan
-     * cache. The caller should pass 'remoteCursors' for replanning hash lookup in $search query,
-     * otherwise keep it nullptr.
-     */
-    std::pair<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*> prepareExecutionPlan(
-        PlanStage* root,
-        stage_builder::PlanStageData* data,
-        bool preparingFromCache,
-        RemoteCursorMap* remoteCursors = nullptr) const;
-
-    /**
-     * Wraps prepareExecutionPlan(), checks index validity, and caches outputAccessors.
-     */
-    void prepareCandidate(plan_ranker::CandidatePlan* candidate, bool preparingFromCache);
-
-    void executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
-
     OperationContext* const _opCtx;
     const MultipleCollectionAccessor& _collections;
     CanonicalQuery& _cq;
     QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;
     const AllIndicesRequiredChecker _indexExistenceChecker;
+    TrialRuntimeExecutor _trialRuntimeExecutor;
 
     std::vector<plan_ranker::CandidatePlan> _candidates;
 };
