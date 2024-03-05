@@ -77,10 +77,18 @@ public:
     }
 
     void onDurable(const Token& token) {
-        onDurableToken = token.first;
+        stdx::lock_guard<Latch> lock(_mutex);
+        _onDurableToken = token.first;
     }
 
-    OpTimeAndWallTime onDurableToken;
+    OpTimeAndWallTime getOnDurableToken() {
+        stdx::lock_guard<Latch> lock(_mutex);
+        return _onDurableToken;
+    }
+
+private:
+    Mutex _mutex = MONGO_MAKE_LATCH("JournalListenerMock::_mutex");
+    OpTimeAndWallTime _onDurableToken;
 };
 
 class OplogWriterImplTest : public ServiceContextMongoDTest {
@@ -287,7 +295,7 @@ TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
     // making sure that it is finalizeOplogBatch() that triggers the journal flush.
     sleepmillis(2000);
     ASSERT_EQ(newOpTimeAndWallTime, getReplCoord()->getMyLastWrittenOpTimeAndWallTime());
-    ASSERT_EQ(newOpTimeAndWallTime, getJournalListener()->onDurableToken);
+    ASSERT_EQ(newOpTimeAndWallTime, getJournalListener()->getOnDurableToken());
 }
 
 }  // namespace
