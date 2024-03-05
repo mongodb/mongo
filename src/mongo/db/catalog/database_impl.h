@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/database.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -58,54 +59,57 @@ class PseudoRandom;
  * The semantics for a const Database are that you can mutate individual collections but not add or
  * remove them.
  */
-class DatabaseImpl : public Database::Impl {
+class DatabaseImpl final : public Database::Impl {
 public:
-    typedef StringMap<Collection*> CollectionMap;
+    using CollectionMapView = Database::CollectionMapView;
+    using CollectionMap = Database::CollectionMap;
+    // using CollectionMap = StringMap<Collection*>;
+    // using CollectionMap = std::map<std::string, Collection, std::less<void>>;
 
     /**
      * Iterating over a Database yields Collection* pointers.
      */
-    class iterator {
-    public:
-        using iterator_category = std::forward_iterator_tag;
-        using value_type = Collection*;
-        using pointer = const value_type*;
-        using reference = const value_type&;
-        using difference_type = ptrdiff_t;
+    // class iterator {
+    // public:
+    //     using iterator_category = std::forward_iterator_tag;
+    //     using value_type = Collection*;
+    //     using pointer = const value_type*;
+    //     using reference = const value_type&;
+    //     using difference_type = ptrdiff_t;
 
-        iterator() = default;
-        iterator(CollectionMap::const_iterator it) : _it(it) {}
+    //     iterator() = default;
+    //     iterator(CollectionMap::const_iterator it) : _it(it) {}
 
-        reference operator*() const {
-            return _it->second;
-        }
+    //     reference operator*() const {
+    //         return _it->second;
+    //     }
 
-        pointer operator->() const {
-            return &_it->second;
-        }
+    //     pointer operator->() const {
+    //         return &_it->second;
+    //     }
 
-        bool operator==(const iterator& other) {
-            return _it == other._it;
-        }
+    //     bool operator==(const iterator& other) {
+    //         return _it == other._it;
+    //     }
 
-        bool operator!=(const iterator& other) {
-            return _it != other._it;
-        }
+    //     bool operator!=(const iterator& other) {
+    //         return _it != other._it;
+    //     }
 
-        iterator& operator++() {
-            ++_it;
-            return *this;
-        }
+    //     iterator& operator++() {
+    //         ++_it;
+    //         return *this;
+    //     }
 
-        iterator operator++(int) {
-            auto oldPosition = *this;
-            ++_it;
-            return oldPosition;
-        }
+    //     iterator operator++(int) {
+    //         auto oldPosition = *this;
+    //         ++_it;
+    //         return oldPosition;
+    //     }
 
-    private:
-        CollectionMap::const_iterator _it;
-    };
+    // private:
+    //     CollectionMap::const_iterator _it;
+    // };
 
     explicit DatabaseImpl(Database* this_,
                           OperationContext* opCtx,
@@ -117,13 +121,13 @@ public:
 
     void init(OperationContext*) final;
 
-    iterator begin() const {
-        return iterator(_collections.begin());
-    }
+    // CollectionMap::const_iterator begin() const {
+    //     return _collections.begin();
+    // }
 
-    iterator end() const {
-        return iterator(_collections.end());
-    }
+    // CollectionMap::const_iterator end() const {
+    //     return _collections.end();
+    // }
 
     // closes files and other cleanup see below.
     void close(OperationContext* opCtx, const std::string& reason) final;
@@ -186,9 +190,9 @@ public:
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
-    Collection* getCollection(OperationContext* opCtx, StringData ns) const final;
+    Collection* getCollection(OperationContext* opCtx, StringData ns) final;
 
-    Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const;
+    Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) override;
 
     /**
      * Get the view catalog, which holds the definition for all views created on this database. You
@@ -227,19 +231,21 @@ public:
     StatusWith<NamespaceString> makeUniqueCollectionNamespace(OperationContext* opCtx,
                                                               StringData collectionNameModel) final;
 
-    inline CollectionMap& collections() final {
-        return _collections;
-    }
-    inline const CollectionMap& collections() const final {
-        return _collections;
-    }
+    CollectionMapView& collections(OperationContext* opCtx) override;
+
+    // const CollectionMap& collections() const override;
+    // CollectionMap::const_iterator begin() const override;
+    // CollectionMap::const_iterator end() const override;
 
 private:
     /**
      * Gets or creates collection instance from existing metadata
      * it will yield here and resume later
      */
-    Collection* _getCollectionYield(OperationContext* opCtx, const NamespaceString& nss);
+    struct CollectionExistResult {
+        Collection* collection;
+        bool exist;
+    };
 
     /**
      * Gets or creates collection instance from existing metadata,
@@ -249,6 +255,11 @@ private:
      * by the caller, who takes onership of the Collection*
      */
     Collection* _getOrCreateCollectionInstance(OperationContext* opCtx, const NamespaceString& nss);
+
+    Collection* _createCollectionHandler(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         bool createIdIndex,
+                                         bool forView = false);
 
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection.
@@ -302,7 +313,9 @@ private:
     // This variable may only be read/written while the database is locked in MODE_X.
     std::unique_ptr<PseudoRandom> _uniqueCollectionNamespacePseudoRandom;
 
-    CollectionMap _collections;
+    CollectionMap _collections;  // owner
+    CollectionMapView _collectionsView;
+    // mutable std::mutex _collectionsMutex;
 
     DurableViewCatalogImpl _durableViews;  // interface for system.views operations
     ViewCatalog _views;                    // in-memory representation of _durableViews

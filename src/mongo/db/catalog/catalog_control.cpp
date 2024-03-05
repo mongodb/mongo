@@ -50,10 +50,10 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     std::vector<std::string> allDbs;
     opCtx->getServiceContext()->getStorageEngine()->listDatabases(&allDbs);
 
-    const auto& databaseHolder = DatabaseHolder::getDatabaseHolder();
+    auto& databaseHolder = DatabaseHolder::getDatabaseHolder();
     for (auto&& dbName : allDbs) {
         const auto db = databaseHolder.get(opCtx, dbName);
-        for (Collection* coll : *db) {
+        for (auto& [name, coll] : db->collections(opCtx)) {
             OptionalCollectionUUID uuid = coll->uuid();
             boost::optional<Timestamp> minVisible = coll->getMinimumVisibleSnapshot();
 
@@ -98,73 +98,79 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->loadCatalog(opCtx);
 
-    log() << "openCatalog: reconciling catalog and idents";
-    auto indexesToRebuild = storageEngine->reconcileCatalogAndIdents(opCtx);
-    fassert(40688, indexesToRebuild.getStatus());
+    // Useless code for Monograph which provide consistency
+    //
+    /*
+        log() << "openCatalog: reconciling catalog and idents";
+        auto indexesToRebuild = storageEngine->reconcileCatalogAndIdents(opCtx);
+        fassert(40688, indexesToRebuild.getStatus());
 
-    // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
-    // indexes on that collection are done at once, so we use a map to group them together.
-    StringMap<IndexNameObjs> nsToIndexNameObjMap;
-    for (auto indexNamespace : indexesToRebuild.getValue()) {
-        NamespaceString collNss(indexNamespace.first);
-        auto indexName = indexNamespace.second;
+        // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that
+       all
+        // indexes on that collection are done at once, so we use a map to group them together.
+        StringMap<IndexNameObjs> nsToIndexNameObjMap;
+        for (auto indexNamespace : indexesToRebuild.getValue()) {
+            NamespaceString collNss(indexNamespace.first);
+            auto indexName = indexNamespace.second;
 
-        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        invariant(dbCatalogEntry,
-                  str::stream() << "couldn't get database catalog entry for database "
-                                << collNss.db());
-        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
-        invariant(collCatalogEntry,
-                  str::stream() << "couldn't get collection catalog entry for collection "
-                                << collNss.toString());
+            auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
+            invariant(dbCatalogEntry,
+                      str::stream() << "couldn't get database catalog entry for database "
+                                    << collNss.db());
+            auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+            invariant(collCatalogEntry,
+                      str::stream() << "couldn't get collection catalog entry for collection "
+                                    << collNss.toString());
 
-        auto indexSpecs = getIndexNameObjs(
-            opCtx, dbCatalogEntry, collCatalogEntry, [&indexName](const std::string& name) {
-                return name == indexName;
-            });
-        if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
-            fassert(40689,
-                    {ErrorCodes::InternalError,
-                     str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection "
-                                   << collNss.toString()});
+            auto indexSpecs = getIndexNameObjs(
+                opCtx, dbCatalogEntry, collCatalogEntry, [&indexName](const std::string& name) {
+                    return name == indexName;
+                });
+            if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
+                fassert(40689,
+                        {ErrorCodes::InternalError,
+                         str::stream() << "failed to get index spec for index " << indexName
+                                       << " in collection "
+                                       << collNss.toString()});
+            }
+            auto indexesToRebuild = indexSpecs.getValue();
+            invariant(
+                indexesToRebuild.first.size() == 1,
+                str::stream() << "expected to find a list containing exactly 1 index name, but found
+       "
+                              << indexesToRebuild.first.size());
+            invariant(
+                indexesToRebuild.second.size() == 1,
+                str::stream() << "expected to find a list containing exactly 1 index spec, but found
+       "
+                              << indexesToRebuild.second.size());
+
+            auto& ino = nsToIndexNameObjMap[collNss.ns()];
+            ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
+            ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
         }
-        auto indexesToRebuild = indexSpecs.getValue();
-        invariant(
-            indexesToRebuild.first.size() == 1,
-            str::stream() << "expected to find a list containing exactly 1 index name, but found "
-                          << indexesToRebuild.first.size());
-        invariant(
-            indexesToRebuild.second.size() == 1,
-            str::stream() << "expected to find a list containing exactly 1 index spec, but found "
-                          << indexesToRebuild.second.size());
 
-        auto& ino = nsToIndexNameObjMap[collNss.ns()];
-        ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
-        ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
-    }
+        for (const auto& entry : nsToIndexNameObjMap) {
+            NamespaceString collNss(entry.first);
 
-    for (const auto& entry : nsToIndexNameObjMap) {
-        NamespaceString collNss(entry.first);
+            auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
+            invariant(dbCatalogEntry,
+                      str::stream() << "couldn't get database catalog entry for database "
+                                    << collNss.db());
+            auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+            invariant(collCatalogEntry,
+                      str::stream() << "couldn't get collection catalog entry for collection "
+                                    << collNss.toString());
 
-        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        invariant(dbCatalogEntry,
-                  str::stream() << "couldn't get database catalog entry for database "
-                                << collNss.db());
-        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
-        invariant(collCatalogEntry,
-                  str::stream() << "couldn't get collection catalog entry for collection "
-                                << collNss.toString());
-
-        for (const auto& indexName : entry.second.first) {
-            log() << "openCatalog: rebuilding index: collection: " << collNss.toString()
-                  << ", index: " << indexName;
+            for (const auto& indexName : entry.second.first) {
+                log() << "openCatalog: rebuilding index: collection: " << collNss.toString()
+                      << ", index: " << indexName;
+            }
+            fassert(40690,
+                    rebuildIndexesOnCollection(
+                        opCtx, dbCatalogEntry, collCatalogEntry, std::move(entry.second)));
         }
-        fassert(40690,
-                rebuildIndexesOnCollection(
-                    opCtx, dbCatalogEntry, collCatalogEntry, std::move(entry.second)));
-    }
-
+    */
     // Open all databases and repopulate the UUID catalog.
     log() << "openCatalog: reopening all databases";
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
@@ -175,15 +181,15 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
 
-        std::list<std::string> collections;
+        std::vector<std::string> collections;
         db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
         for (auto&& collName : collections) {
             // Note that the collection name already includes the database component.
             NamespaceString collNss(collName);
             auto collection = db->getCollection(opCtx, collName);
             invariant(collection,
-                      str::stream() << "failed to get valid collection pointer for namespace "
-                                    << collName);
+                      str::stream()
+                          << "failed to get valid collection pointer for namespace " << collName);
 
             auto uuid = collection->uuid();
             invariant(uuid);

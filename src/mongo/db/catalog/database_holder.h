@@ -52,7 +52,7 @@ public:
     public:
         virtual ~Impl() = 0;
 
-        virtual Database* get(OperationContext* opCtx, StringData ns) const = 0;
+        virtual Database* get(OperationContext* opCtx, StringData ns)  = 0;
 
         virtual Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated) = 0;
 
@@ -80,7 +80,7 @@ public:
      * Retrieves an already opened database or returns NULL. Must be called with the database
      * locked in at least IS-mode.
      */
-    inline Database* get(OperationContext* const opCtx, const StringData ns) const {
+    inline Database* get(OperationContext* const opCtx, const StringData ns)  {
         return this->_impl().get(opCtx, ns);
     }
 

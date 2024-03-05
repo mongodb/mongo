@@ -151,8 +151,8 @@ void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
         [this, oldColl, uuid] { replaceUUIDCatalogEntry(uuid, oldColl); });
 }
 
-void UUIDCatalog::onCloseDatabase(Database* db) {
-    for (auto&& coll : *db) {
+void UUIDCatalog::onCloseDatabase(OperationContext* opCtx, Database* db) {
+    for (const auto& [name, coll] : db->collections(opCtx)) {
         if (coll->uuid()) {
             // While the collection does not actually get dropped, we're going to destroy the
             // Collection object, so for purposes of the UUIDCatalog it looks the same.

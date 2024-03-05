@@ -232,13 +232,13 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
             }
         }
 
-        LOG(3) << "Exiting worker thread in " << _name << " service executor";
+        LOG(0) << "Exiting worker thread in " << _name << " service executor";
     });
 }
 
 
 Status ServiceExecutorCoroutine::shutdown(Milliseconds timeout) {
-    LOG(3) << "Shutting down coroutine executor";
+    LOG(0) << "Shutting down coroutine executor";
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _stillRunning.store(false, std::memory_order_relaxed);

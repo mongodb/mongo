@@ -58,9 +58,16 @@ public:
     virtual RecoveryUnit::UPtr newRecoveryUnitUPtr() {
         MONGO_UNREACHABLE;
     }
-
+    virtual std::pair<bool, Status> lockCollection(OperationContext* opCtx,
+                                                   StringData ns,
+                                                   bool isForWrite) {
+        MONGO_UNREACHABLE;
+    }
     // ---------
 
+    virtual void listDatabases(std::vector<std::string>& out) const {}
+    virtual void listCollections(std::string_view dbName, std::vector<std::string>& out) const {}
+    virtual void listCollections(std::string_view dbName, std::set<std::string>& out) const {}
     /**
      * Having multiple out for the same ns is a rules violation; Calling on a non-created ident is
      * invalid and may crash.

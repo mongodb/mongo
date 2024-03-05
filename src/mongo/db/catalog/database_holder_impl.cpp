@@ -26,15 +26,9 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <shared_mutex>
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-
-#include <atomic>
-#include <cstddef>
 #include <memory>
-#include <mutex>
 #include <utility>
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
 
@@ -100,44 +94,43 @@ StringData _todb(StringData ns) {
 
 }  // namespace
 
-Database* DatabaseHolderImpl::get(OperationContext* opCtx, StringData ns) const {
+Database* DatabaseHolderImpl::get(OperationContext* opCtx, StringData ns) {
     const StringData db = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS));
 
-    int16_t id = localThreadId + 1;
-    // auto& mutex = (localThreadId == -1) ? _globalDBMapMutex :
-    // _localDBMapMutexVector[localThreadId];
-    std::scoped_lock<std::mutex> lock(_dbMapMutexVector[id]);
+    auto id = static_cast<int16_t>(localThreadId + 1);
+    // std::scoped_lock<std::mutex> lock{_dbMapMutexVector[id]};
     const auto& dbMap = _dbMapVector[id];
-
-    DBMap::const_iterator it = dbMap.find(db);
-    if (it != dbMap.end()) {
-        return it->second.get();
+    if (auto iter = dbMap.find(db); iter != dbMap.end()) {
+        return iter->second.get();
+    } else {
+        return openDb(opCtx, ns);
     }
 
     return nullptr;
 }
 
-std::set<std::string> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(StringData name) {
+std::set<std::string> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(
+    StringData name) const {
     std::set<std::string> duplicates;
-    int16_t id = localThreadId + 1;
-    const auto& dbMap = _dbMapVector[id];
-    for (const auto& nameAndPointer : dbMap) {
+    auto id = static_cast<int16_t>(localThreadId + 1);
+
+    for (const auto& [dbName, dbPtr] : _dbMapVector[id]) {
         // A name that's equal with case-insensitive match must be identical, or it's a duplicate.
-        if (name.equalCaseInsensitive(nameAndPointer.first) && name != nameAndPointer.first) {
-            duplicates.insert(nameAndPointer.first);
+        if (name.equalCaseInsensitive(dbName) && name != dbName) {
+            duplicates.insert(dbName);
         }
     }
     return duplicates;
 }
-
 
 std::set<std::string> DatabaseHolderImpl::getNamesWithConflictingCasing(StringData name) {
     return _getNamesWithConflictingCasing_inlock(name);
 }
 
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, bool* justCreated) {
-    // _registerReadLock();
+    MONGO_LOG(1) << "DatabaseHolderImpl::openDb"
+                 << ". ns: " << ns;
     const StringData dbName = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
@@ -145,31 +138,32 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
         *justCreated = false;  // Until proven otherwise.
     }
 
-    int16_t id = localThreadId + 1;
+    auto id = static_cast<int16_t>(localThreadId + 1);
+    auto& dbMap = _dbMapVector[id];
 
-    {
-        std::scoped_lock<std::mutex> lock(_dbMapMutexVector[id]);
-        const auto& dbMap = _dbMapVector[id];
-        // The following will insert a nullptr for dbname, which will treated the same as a non-
-        // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
-        if (const auto& db = dbMap.find(dbName); db != dbMap.end()) {
-            return db->second.get();
-        }
-
-        // Check casing in lock to avoid transient duplicates.
-        auto duplicates = _getNamesWithConflictingCasing_inlock(dbName);
-        uassert(ErrorCodes::DatabaseDifferCase,
-                str::stream() << "db already exists with different case already have: ["
-                              << *duplicates.cbegin() << "] trying to create [" << dbName.toString()
-                              << "]",
-                duplicates.empty());
-
-
-        // Do the catalog lookup and database creation outside of the scoped lock, because these may
-        // block. Only one thread can be inside this method for the same DB name, because of the
-        // requirement for X-lock on the database when we enter. So there is no way we can insert
-        // two different databases for the same name.
+    // std::scoped_lock<std::mutex> lock(_dbMapMutexVector[id]);
+    // The following will insert a nullptr for dbname, which will treated the same as a non-
+    // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
+    if (auto iter = dbMap.find(dbName); iter != dbMap.end()) {
+        MONGO_LOG(1) << "DatabaseHolderImpl::openDb"
+                     << ". ns: " << ns << " exists";
+        return iter->second.get();
     }
+
+    // Check casing in lock to avoid transient duplicates.
+    auto duplicates = _getNamesWithConflictingCasing_inlock(dbName);
+    uassert(ErrorCodes::DatabaseDifferCase,
+            str::stream() << "db already exists with different case already have: ["
+                          << *duplicates.cbegin() << "] trying to create [" << dbName.toString()
+                          << "]",
+            duplicates.empty());
+
+
+    // Do the catalog lookup and database creation outside of the scoped lock, because these may
+    // block. Only one thread can be inside this method for the same DB name, because of the
+    // requirement for X-lock on the database when we enter. So there is no way we can insert
+    // two different databases for the same name.
+
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
     // auto removeDbGuard = MakeGuard([&dbMap, &dbname] {
     //     // if (!lk.owns_lock())
@@ -177,44 +171,37 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     //     dbMap.erase(dbname);
     // });
 
+    MONGO_LOG(1) << "DatabaseHolderImpl::openDb"
+                 << ". ns: " << ns << " create start";
+
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(opCtx, dbName);
 
-    if (!entry->exists()) {
-        audit::logCreateDatabase(&cc(), dbName);
-        if (justCreated) {
-            *justCreated = true;
-        }
+    // if (!entry->exists()) {
+    //     audit::logCreateDatabase(&cc(), dbName);
+    // }
+
+    // yield here
+    auto newDb = std::make_unique<Database>(opCtx, dbName, entry);
+
+    auto [iter, success] = dbMap.try_emplace(dbName.toString(), std::move(newDb));
+    if (!success) {
+        MONGO_LOG(1) << "Another coroutine created Database handler on this thread";
+        return iter->second.get();
     }
 
-    // Finally replace our nullptr entry with the new Database pointer.
-    // auto newDb = stdx::make_unique<Database>(opCtx, dbname, entry);
-    auto newDbPtr = std::make_shared<Database>(opCtx, dbName, entry);
-    ;  // new Database(opCtx, dbName, entry);
-    // auto ret = newDbPtr.get();
-
-    // removeDbGuard.Dismiss();
-    for (size_t i = 0; i < _dbMapVector.size(); ++i) {
-        std::scoped_lock<std::mutex> lock(_dbMapMutexVector[i]);
-        // newDbPtr = dbMap.try_emplace(dbName, opCtx, dbName, entry).first->second.get();
-        // dbMap[i][dbName] = std::move(newDbPtr);
-        _dbMapVector[i][dbName] = newDbPtr;
+    if (justCreated) {
+        *justCreated = true;
     }
-
-    MONGO_LOG(0) << "new DB Ptr use count: " << newDbPtr.use_count();
-    DEV {
-        // ThreadlocalLock lk(_lockVector[localThreadId]);
-        std::scoped_lock<std::mutex> lock(_dbMapMutexVector[id]);
-        invariant(_getNamesWithConflictingCasing_inlock(dbName).empty());
-    }
-
-    return newDbPtr.get();
+    MONGO_LOG(1) << "DatabaseHolderImpl::openDb"
+                 << ". ns: " << ns << " done.";
+    return iter->second.get();
 }
 
 namespace {
 void evictDatabaseFromUUIDCatalog(OperationContext* opCtx, Database* db) {
-    UUIDCatalog::get(opCtx).onCloseDatabase(db);
-    for (auto&& coll : *db) {
+    UUIDCatalog::get(opCtx).onCloseDatabase(opCtx, db);
+    for (const auto& [name, coll] : db->collections(opCtx)) {
         NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
     }
 }
@@ -225,29 +212,21 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns, const std
 
     const StringData dbName = _todb(ns);
 
-    int16_t id = localThreadId + 1;
-    // first lock locally. do delete work
+    auto id = static_cast<int16_t>(localThreadId + 1);
     {
-        std::scoped_lock<std::mutex> lock(_dbMapMutexVector[id]);
-        const auto& dbMap = _dbMapVector[id];
+        // std::scoped_lock<std::mutex> lock{_dbMapMutexVector[id]};
+        auto& dbMap = _dbMapVector[id];
 
-        DBMap::const_iterator it = dbMap.find(dbName);
+        auto it = dbMap.find(dbName);
         if (it != dbMap.end()) {
             auto db = it->second.get();
             repl::oplogCheckCloseDatabase(opCtx, db);
             evictDatabaseFromUUIDCatalog(opCtx, db);
 
-            // only close and delete db pointer once
+            // only close once
             db->close(opCtx, reason);
-            // delete db;
-            // db = nullptr;
+            dbMap.erase(it);
         }
-    }
-
-    // the update all cache
-    for (size_t i = 0; i < _dbMapVector.size(); ++i) {
-        std::scoped_lock<std::mutex> lock(_dbMapMutexVector[i]);
-        _dbMapVector[i].erase(dbName);
     }
 
     getGlobalServiceContext()
@@ -259,21 +238,22 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns, const std
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx, const std::string& reason) {
     invariant(opCtx->lockState()->isW());
 
-    for (size_t i = 0; i < _dbMapVector.size(); ++i) {
-        std::scoped_lock<std::mutex> lock(_dbMapMutexVector[i]);
-        for (auto& [dbName, dbPtr] : _dbMapVector[i]) {
-            BackgroundOperation::assertNoBgOpInProgForDb(dbName);
-            LOG(1) << "DatabaseHolder::closeAll name:" << dbName;
-            repl::oplogCheckCloseDatabase(opCtx, dbPtr.get());
-            evictDatabaseFromUUIDCatalog(opCtx, dbPtr.get());
-            dbPtr->close(opCtx, reason);
+    auto id = static_cast<int16_t>(localThreadId + 1);
 
-            getGlobalServiceContext()
-                ->getStorageEngine()
-                ->closeDatabase(opCtx, dbName)
-                .transitional_ignore();
-        }
-        _dbMapVector[i].clear();
+    auto& dbMap = _dbMapVector[id];
+    // std::scoped_lock<std::mutex> lock{_dbMapMutexVector[i]};
+    for (auto& [dbName, dbPtr] : dbMap) {
+        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+        LOG(0) << "DatabaseHolder::closeAll name:" << dbName;
+        repl::oplogCheckCloseDatabase(opCtx, dbPtr.get());
+        evictDatabaseFromUUIDCatalog(opCtx, dbPtr.get());
+        dbPtr->close(opCtx, reason);
+
+        getGlobalServiceContext()
+            ->getStorageEngine()
+            ->closeDatabase(opCtx, dbName)
+            .transitional_ignore();
     }
+    dbMap.clear();
 }
 }  // namespace mongo

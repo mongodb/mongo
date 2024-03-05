@@ -136,7 +136,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         auto dropPendingGuard = MakeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
 
         std::vector<NamespaceString> collectionsToDrop;
-        for (Collection* collection : *db) {
+        for (auto&& [name, collection] : db->collections(opCtx)) {
             const auto& nss = collection->ns();
             if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
                 opCtx->writesAreReplicated()) {
@@ -250,12 +250,11 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         }
 
         if (!result.status.isOK()) {
-            return result.status.withContext(
-                str::stream() << "dropDatabase " << dbName << " failed waiting for "
-                              << numCollectionsToDrop
-                              << " collection drops (most recent drop optime: "
-                              << awaitOpTime.toString()
-                              << ") to replicate.");
+            return result.status.withContext(str::stream()
+                                             << "dropDatabase " << dbName << " failed waiting for "
+                                             << numCollectionsToDrop
+                                             << " collection drops (most recent drop optime: "
+                                             << awaitOpTime.toString() << ") to replicate.");
         }
 
         log() << "dropDatabase " << dbName << " - successfully dropped " << numCollectionsToDrop
@@ -274,8 +273,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             return Status(ErrorCodes::NamespaceNotFound,
                           str::stream() << "Could not drop database " << dbName
                                         << " because it does not exist after dropping "
-                                        << numCollectionsToDrop
-                                        << " collection(s).");
+                                        << numCollectionsToDrop << " collection(s).");
         }
 
         // If we fail to complete the database drop, we should reset the drop-pending state on
@@ -287,12 +285,11 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::PrimarySteppedDown,
-                          str::stream() << "Could not drop database " << dbName
-                                        << " because we transitioned from PRIMARY to "
-                                        << replCoord->getMemberState().toString()
-                                        << " while waiting for "
-                                        << numCollectionsToDrop
-                                        << " pending collection drop(s).");
+                          str::stream()
+                              << "Could not drop database " << dbName
+                              << " because we transitioned from PRIMARY to "
+                              << replCoord->getMemberState().toString() << " while waiting for "
+                              << numCollectionsToDrop << " pending collection drop(s).");
         }
 
         dropPendingGuard.Dismiss();

@@ -28,6 +28,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/assert_util.h"
 #include <memory>
 
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
@@ -96,6 +97,11 @@ KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVEngine* engine,
       _recordStore(std::move(rs)) {}
 
 KVCollectionCatalogEntry::~KVCollectionCatalogEntry() {}
+
+CollectionOptions KVCollectionCatalogEntry::getCollectionOptions(OperationContext* opCtx) const {
+    MetaData md = _getMetaData(opCtx);
+    return md.options;
+}
 
 bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* opCtx,
                                                   StringData indexName,
@@ -180,31 +186,33 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
 Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
                                                       const IndexDescriptor* spec,
                                                       bool isBackgroundSecondaryBuild) {
-    MetaData md = _getMetaData(opCtx);
-
     KVPrefix prefix = KVPrefix::getNextPrefix(ns());
-    IndexMetaData imd(
-        spec->infoObj(), false, RecordId(), false, prefix, isBackgroundSecondaryBuild);
-    if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
-        const auto feature =
-            KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
-        if (!_catalog->getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
-            _catalog->getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
+    if (!spec->isIdIndex()) {
+        MetaData md = _getMetaData(opCtx);
+
+        // ready is always true
+        IndexMetaData imd(
+            spec->infoObj(), true, RecordId(), false, prefix, isBackgroundSecondaryBuild);
+        if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
+            const auto feature =
+                KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
+            if (!_catalog->getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
+                _catalog->getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
+            }
+            imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
         }
-        imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
-    }
 
-    // Mark collation feature as in use if the index has a non-simple collation.
-    if (imd.spec["collation"]) {
-        const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
-        if (!_catalog->getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
-            _catalog->getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
+        // Mark collation feature as in use if the index has a non-simple collation.
+        if (imd.spec["collation"]) {
+            const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
+            if (!_catalog->getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
+                _catalog->getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
+            }
         }
+
+        md.indexes.push_back(imd);
+        _catalog->putMetaData(opCtx, ns().toString(), md);
     }
-
-    md.indexes.push_back(imd);
-    _catalog->putMetaData(opCtx, ns().toString(), md);
-
     string ident = _catalog->getIndexIdent(opCtx, ns().ns(), spec->indexName());
 
     const Status status = _engine->createGroupedSortedDataInterface(opCtx, ident, spec, prefix);
@@ -216,6 +224,9 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
 }
 
 void KVCollectionCatalogEntry::indexBuildSuccess(OperationContext* opCtx, StringData indexName) {
+    return;
+    MONGO_UNREACHABLE;
+
     MetaData md = _getMetaData(opCtx);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -292,7 +303,6 @@ void KVCollectionCatalogEntry::updateCappedSize(OperationContext* opCtx, long lo
 
 BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData(
     OperationContext* opCtx) const {
-    // return _catalog->getMetaData(opCtx, ns().toString());
     return _catalog->getMetaData(opCtx, ns().toStringData());
 }
 }  // namespace mongo

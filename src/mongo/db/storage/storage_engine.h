@@ -38,8 +38,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -164,13 +164,20 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual std::pair<bool, Status> lockCollection(OperationContext* opCtx,
+                                                   StringData ns,
+                                                   bool isForWrite) {
+        MONGO_UNREACHABLE;
+    }
+
     /**
      * List the databases stored in this storage engine.
      *
      * XXX: why doesn't this take OpCtx?
      */
     virtual void listDatabases(std::vector<std::string>* out) const = 0;
-
+    virtual void listCollections(std::string_view dbName, std::vector<std::string>* out) const {};
+    virtual void listCollections(std::string_view dbName, std::set<std::string>& out) const {};
     /**
      * Return the DatabaseCatalogEntry that describes the database indicated by 'db'.
      *

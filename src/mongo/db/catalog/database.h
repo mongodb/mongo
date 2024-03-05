@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include <memory>
 #include <string>
 
@@ -45,6 +46,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
+#include <unordered_map>
 
 namespace mongo {
 
@@ -56,7 +58,9 @@ namespace mongo {
  */
 class Database : public Decorable<Database> {
 public:
-    typedef StringMap<Collection*> CollectionMap;
+    // Used for range-based loop only
+    using CollectionMapView = std::map<std::string, std::unique_ptr<Collection>>;
+    using CollectionMap = std::map<std::string, std::unique_ptr<Collection>, std::less<void>>;
 
     class Impl {
     public:
@@ -103,8 +107,8 @@ public:
                                   StringData viewName,
                                   const CollectionOptions& options) = 0;
 
-        virtual Collection* getCollection(OperationContext* opCtx, StringData ns) const = 0;
-        virtual Collection* getCollection(OperationContext* opCtx, const NamespaceString& nss) const = 0;
+        virtual Collection* getCollection(OperationContext* opCtx, StringData ns) = 0;
+        virtual Collection* getCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
         virtual ViewCatalog* getViewCatalog() = 0;
 
         virtual Collection* getOrCreateCollection(OperationContext* opCtx,
@@ -122,8 +126,11 @@ public:
         virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
             OperationContext* opCtx, StringData collectionNameModel) = 0;
 
-        virtual CollectionMap& collections() = 0;
-        virtual const CollectionMap& collections() const = 0;
+        virtual CollectionMapView& collections(OperationContext* opCtx) = 0;
+        // virtual CollectionMap& collections() = 0;
+        // virtual const CollectionMap& collections() const = 0;
+        // virtual CollectionMap::const_iterator begin() const = 0;
+        // virtual CollectionMap::const_iterator end() const = 0;
     };
 
 public:
@@ -157,19 +164,19 @@ public:
     public:
         using iterator_category = std::forward_iterator_tag;
         using value_type = Collection*;
-        using pointer = const value_type*;
+        using pointer = const value_type;
         using reference = const value_type&;
         using difference_type = ptrdiff_t;
 
         explicit inline iterator() = default;
-        inline iterator(CollectionMap::const_iterator it) : _it(std::move(it)) {}
+        explicit inline iterator(CollectionMap::const_iterator it) : _it(it) {}
 
-        inline reference operator*() const {
-            return _it->second;
+        inline pointer operator*() const {
+            return _it->second.get();
         }
 
         inline pointer operator->() const {
-            return &_it->second;
+            return _it->second.get();
         }
 
         inline friend bool operator==(const iterator& lhs, const iterator& rhs) {
@@ -208,13 +215,16 @@ public:
     inline Database(Database&&) = delete;
     inline Database& operator=(Database&&) = delete;
 
-    inline iterator begin() const {
-        return iterator(this->_impl().collections().begin());
+    CollectionMapView& collections(OperationContext* opCtx) {
+        return this->_impl().collections(opCtx);
     }
+    // inline iterator begin() const {
+    //     return iterator{this->_impl().collections().begin()};
+    // }
 
-    inline iterator end() const {
-        return iterator(this->_impl().collections().end());
-    }
+    // inline iterator end() const {
+    //     return iterator{this->_impl().collections().end()};
+    // }
 
     // closes files and other cleanup see below.
     inline void close(OperationContext* const opCtx, const std::string& reason) {
@@ -316,11 +326,11 @@ public:
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
-    inline Collection* getCollection(OperationContext* opCtx, const StringData ns) const {
+    inline Collection* getCollection(OperationContext* opCtx, const StringData ns) {
         return this->_impl().getCollection(opCtx, ns);
     }
 
-    inline Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const {
+    inline Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) {
         return this->_impl().getCollection(opCtx, ns);
     }
 

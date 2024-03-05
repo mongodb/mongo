@@ -11,7 +11,8 @@
             "program": "${workspaceFolder}/build/Debug/mongo/mongod",
             "args": [
                 "--config",
-                "src/mongo/db/modules/monograph/test_folder/config/monograph/debug_coroutine.conf"
+                "src/mongo/db/modules/monograph/config/standalone/debug_coroutine.conf"
+                // "src/mongo/db/modules/monograph/config/multinode/node2.template.conf"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -25,7 +26,7 @@
                     // preload asan library and libbraft.so(libbrpc.so)
                     // for more information, please refer to `src/mongo/db/modules/monograph/issues.md`
                     "name": "LD_PRELOAD",
-                    "value": "/usr/lib/x86_64-linux-gnu/libasan.so.5:/usr/lib/libbrpc.so"
+                    "value": "/usr/lib/x86_64-linux-gnu/libasan.so.5:/usr/local/lib/libmimalloc.so:/usr/lib/libbrpc.so"
                 },
             ],
             "externalConsole": false,

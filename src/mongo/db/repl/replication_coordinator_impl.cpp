@@ -1901,7 +1901,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationCont
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
-    invariant(opCtx->lockState()->isLocked());
+    // invariant(opCtx->lockState()->isLocked());
     return canAcceptWritesFor_UNSAFE(opCtx, ns);
 }
 

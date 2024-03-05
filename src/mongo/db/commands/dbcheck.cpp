@@ -138,7 +138,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     int64_t max = std::numeric_limits<int64_t>::max();
     auto rate = invocation.getMaxCountPerSecond();
 
-    for (Collection* coll : *db) {
+    for (const auto& [name, coll] : db->collections(opCtx)) {
         DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate};
         result->push_back(info);
     }
@@ -553,4 +553,4 @@ public:
 
 MONGO_REGISTER_TEST_COMMAND(DbCheckCmd);
 }  // namespace
-}
+}  // namespace mongo

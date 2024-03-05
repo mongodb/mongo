@@ -30,15 +30,84 @@
 
 #pragma once
 
+#include "mongo/base/error_extra_info.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util.h"
+#include <cstddef>
+#include <numeric>
 
 namespace mongo {
+namespace {
+
+// An index will fail to get created if the size in bytes of its key pattern is greater than 2048.
+// We use that value to represent the largest number of path components we could ever possibly
+// expect to see in an indexed field.
+const size_t kMaxKeyPatternPathLength = 2048;
+char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
+
+/**
+ * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The object {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be appended to
+ * 'bob'.
+ */
+void appendMultikeyPathsAsBytes(BSONObj keyPattern,
+                                const MultikeyPaths& multikeyPaths,
+                                BSONObjBuilder* bob) {
+    size_t i = 0;
+    for (const auto keyElem : keyPattern) {
+        StringData keyName = keyElem.fieldNameStringData();
+        size_t numParts = FieldRef{keyName}.numParts();
+        invariant(numParts > 0);
+        invariant(numParts <= kMaxKeyPatternPathLength);
+
+        std::fill_n(multikeyPathsEncodedAsBytes, numParts, 0);
+        for (const auto multikeyComponent : multikeyPaths[i]) {
+            multikeyPathsEncodedAsBytes[multikeyComponent] = 1;
+        }
+        bob->appendBinData(keyName, numParts, BinDataGeneral, &multikeyPathsEncodedAsBytes[0]);
+
+        ++i;
+    }
+}
+
+/**
+ * Parses the path-level multikey information encoded as binary data from 'multikeyPathsObj' and
+ * sets 'multikeyPaths' as that value.
+ *
+ * For example, consider the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause it to be
+ * multikey. The binary data {'a.b': HexData('0101'), 'a.c': HexData('0100')} would then be parsed
+ * into std::vector<std::set<size_t>>{{0U, 1U}, {0U}}.
+ */
+void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multikeyPaths) {
+    invariant(multikeyPaths);
+    for (auto elem : multikeyPathsObj) {
+        std::set<size_t> multikeyComponents;
+        int len;
+        const char* data = elem.binData(len);
+        invariant(len > 0);
+        invariant(static_cast<size_t>(len) <= kMaxKeyPatternPathLength);
+
+        for (int i = 0; i < len; ++i) {
+            if (data[i]) {
+                multikeyComponents.insert(i);
+            }
+        }
+        multikeyPaths->push_back(multikeyComponents);
+    }
+}
+
+}  // namespace
+
 
 class Collection;
 class IndexDescriptor;
@@ -54,6 +123,186 @@ public:
     }
 
     // ------- indexes ----------
+
+
+    struct IndexMetaData {
+        IndexMetaData() = default;
+        IndexMetaData(
+            BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix, bool isBackgroundSecondaryBuild)
+            : spec(s),
+              ready(r),
+              head(h),
+              multikey(m),
+              prefix(prefix),
+              isBackgroundSecondaryBuild(isBackgroundSecondaryBuild) {}
+
+        void updateTTLSetting(long long newExpireSeconds) {
+            BSONObjBuilder b;
+            for (BSONObjIterator bi(spec); bi.more();) {
+                BSONElement e = bi.next();
+                if (e.fieldNameStringData() == "expireAfterSeconds") {
+                    continue;
+                }
+                b.append(e);
+            }
+
+            b.append("expireAfterSeconds", newExpireSeconds);
+            spec = b.obj();
+        }
+        std::string name() const {
+            return spec["name"].String();
+        }
+
+        BSONObj spec;
+        bool ready;
+        RecordId head;
+        bool multikey;
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
+        bool isBackgroundSecondaryBuild;
+
+        // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
+        // the index key pattern. Each element in the vector is an ordered set of positions
+        // (starting at 0) into the corresponding indexed field that represent what prefixes of the
+        // indexed field cause the index to be multikey.
+        MultikeyPaths multikeyPaths;
+    };
+
+    struct MetaData {
+        void parse(const BSONObj& obj) {
+            ns = obj["ns"].valuestrsafe();
+
+            if (obj["options"].isABSONObj()) {
+                options.parse(obj["options"].Obj(), CollectionOptions::parseForStorage)
+                    .transitional_ignore();
+            }
+
+            BSONElement indexList = obj["indexes"];
+
+            if (indexList.isABSONObj()) {
+                for (BSONElement elt : indexList.Obj()) {
+                    BSONObj idx = elt.Obj();
+                    IndexMetaData imd;
+                    imd.spec = idx["spec"].Obj().getOwned();
+                    imd.ready = idx["ready"].trueValue();
+                    if (idx.hasField("head")) {
+                        imd.head = RecordId(idx["head"].Long());
+                    } else {
+                        imd.head = RecordId(idx["head_a"].Int(), idx["head_b"].Int());
+                    }
+                    imd.multikey = idx["multikey"].trueValue();
+
+                    if (auto multikeyPathsElem = idx["multikeyPaths"]) {
+                        parseMultikeyPathsFromBytes(multikeyPathsElem.Obj(), &imd.multikeyPaths);
+                    }
+
+                    imd.prefix = KVPrefix::fromBSONElement(idx["prefix"]);
+                    auto bgSecondary = BSONElement(idx["backgroundSecondary"]);
+                    // Opt-in to rebuilding behavior for old-format index catalog objects.
+                    imd.isBackgroundSecondaryBuild = bgSecondary.eoo() || bgSecondary.trueValue();
+                    indexes.push_back(std::move(imd));
+                }
+            }
+
+            prefix = KVPrefix::fromBSONElement(obj["prefix"]);
+        }
+        BSONObj toBSON() const {
+            BSONObjBuilder b;
+            b.append("ns", ns);
+            b.append("options", options.toBSON());
+            {
+                BSONArrayBuilder arr(b.subarrayStart("indexes"));
+                for (unsigned i = 0; i < indexes.size(); i++) {
+                    BSONObjBuilder sub(arr.subobjStart());
+                    sub.append("spec", indexes[i].spec);
+                    sub.appendBool("ready", indexes[i].ready);
+                    sub.appendBool("multikey", indexes[i].multikey);
+
+                    if (!indexes[i].multikeyPaths.empty()) {
+                        BSONObjBuilder subMultikeyPaths(sub.subobjStart("multikeyPaths"));
+                        appendMultikeyPathsAsBytes(indexes[i].spec.getObjectField("key"),
+                                                   indexes[i].multikeyPaths,
+                                                   &subMultikeyPaths);
+                        subMultikeyPaths.doneFast();
+                    }
+
+                    sub.append("head", static_cast<long long>(indexes[i].head.repr()));
+                    sub.append("prefix", indexes[i].prefix.toBSONValue());
+                    sub.append("backgroundSecondary", indexes[i].isBackgroundSecondaryBuild);
+                    sub.doneFast();
+                }
+                arr.doneFast();
+            }
+            b.append("prefix", prefix.toBSONValue());
+            return b.obj();
+        }
+
+
+        int findIndexOffset(StringData name) const {
+            for (size_t i = 0; i < indexes.size(); i++) {
+                if (indexes[i].name() == name) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        BSONObj getIndexSpec(StringData name) const {
+            int offset = findIndexOffset(name);
+            invariant(offset >= 0);
+            return indexes[offset].spec;
+        }
+
+        /**
+         * Removes information about an index from the MetaData. Returns true if an index
+         * called name existed and was deleted, and false otherwise.
+         */
+        bool eraseIndex(StringData name) {
+            int indexOffset = findIndexOffset(name);
+
+            if (indexOffset < 0) {
+                return false;
+            }
+
+            indexes.erase(indexes.begin() + indexOffset);
+            return true;
+        }
+
+        void rename(StringData toNS) {
+            ns = toNS.toString();
+            for (size_t i = 0; i < indexes.size(); i++) {
+                BSONObj spec = indexes[i].spec;
+                BSONObjBuilder b;
+                // Add the fields in the same order they were in the original specification.
+                for (auto&& elem : spec) {
+                    if (elem.fieldNameStringData() == "ns") {
+                        b.append("ns", toNS);
+                    } else {
+                        b.append(elem);
+                    }
+                }
+                indexes[i].spec = b.obj();
+            }
+        }
+
+        KVPrefix getMaxPrefix() const {
+            // Use the collection prefix as the initial max value seen. Then compare it with each
+            // index prefix. Note the oplog has no indexes so the vector of 'IndexMetaData' may be
+            // empty.
+            return std::accumulate(
+                indexes.begin(), indexes.end(), prefix, [](KVPrefix max, IndexMetaData index) {
+                    return max < index.prefix ? index.prefix : max;
+                });
+        }
+
+        std::string ns;
+        CollectionOptions options;
+        std::vector<IndexMetaData> indexes;
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
+    };
+
+    virtual MetaData getMetaData(OperationContext* opCtx) const {
+        MONGO_UNREACHABLE;
+    }
 
     virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const = 0;
 
@@ -169,7 +418,15 @@ public:
      */
     virtual void updateCappedSize(OperationContext* opCtx, long long size) = 0;
 
+    virtual RecordStore* getRecordStore() {
+        return nullptr;
+    }
+
+    virtual  RecordStore* getRecordStore() const {
+        return nullptr;
+    }
+
 private:
     NamespaceString _ns;
 };
-}
+}  // namespace mongo

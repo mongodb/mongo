@@ -158,7 +158,7 @@ public:
     /**
      * Implies onDropCollection for all collections in db, but is not transactional.
      */
-    void onCloseDatabase(Database* db);
+    void onCloseDatabase(OperationContext* opCtx, Database* db);
 
     Collection* replaceUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
     void registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);

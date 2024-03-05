@@ -52,6 +52,8 @@ public:
 
     ~KVCollectionCatalogEntry() final;
 
+    CollectionOptions getCollectionOptions(OperationContext* opCtx) const override;
+
     int getMaxAllowedIndexes() const final {
         return 64;
     };
@@ -91,12 +93,14 @@ public:
 
     bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) final;
 
-    RecordStore* getRecordStore() {
+    RecordStore* getRecordStore() override {
         return _recordStore.get();
     }
-    const RecordStore* getRecordStore() const {
+
+     RecordStore* getRecordStore() const override {
         return _recordStore.get();
     }
+
 
 protected:
     MetaData _getMetaData(OperationContext* opCtx) const final;
@@ -105,9 +109,11 @@ private:
     class AddIndexChange;
     class RemoveIndexChange;
 
+
     KVEngine* _engine;    // not owned
     KVCatalog* _catalog;  // not owned
     std::string _ident;
     std::unique_ptr<RecordStore> _recordStore;  // owned
+    // MetaData _metadata;
 };
-}
+}  // namespace mongo

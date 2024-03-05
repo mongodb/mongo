@@ -48,7 +48,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-extern thread_local int16_t localThreadId;
+extern const thread_local int16_t localThreadId;
 
 namespace {
 

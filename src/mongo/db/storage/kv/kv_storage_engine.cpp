@@ -26,6 +26,9 @@
  *    it in the license file.
  */
 
+
+#include <cstdint>
+#include <vector>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
     MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
@@ -33,6 +36,8 @@
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
 #include <algorithm>
+#include <memory>
+#include <utility>
 
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/logical_clock.h"
@@ -49,8 +54,9 @@
 
 namespace mongo {
 
-using std::string;
-using std::vector;
+// using std::string;
+// using std::vector;
+extern thread_local int16_t localThreadId;
 
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
@@ -67,8 +73,8 @@ public:
     }
 
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lk(_engine->_dbsLock);
-        _engine->_dbs[_db] = _entry;
+        // stdx::lock_guard<stdx::mutex> lk(_engine->_dbsLock);
+        // _engine->_dbs[_db] = _entry;
     }
 
     KVStorageEngine* const _engine;
@@ -95,6 +101,7 @@ KVStorageEngine::KVStorageEngine(
 }
 
 void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
+    MONGO_LOG(1) << "KVStorageEngine::loadCatalog";
     bool catalogExists = _engine->hasIdent(opCtx, catalogInfo);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -134,8 +141,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
         _dumpCatalog(opCtx);
     }
 
-    _catalog.reset(new KVCatalog(
-        _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
+    _catalog = std::make_unique<KVCatalog>(
+        _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes);
     _catalog->init(opCtx);
 
     // We populate 'identsKnownToStorageEngine' only if we are loading after an unclean shutdown or
@@ -233,12 +240,20 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
         }
 
         // No rollback since this is only for committed dbs.
-        KVDatabaseCatalogEntryBase*& db = _dbs[dbName];
-        if (!db) {
-            db = _databaseCatalogEntryFactory(dbName, this).release();
+        for (auto& dbMap : _dbMapVector) {
+            if (auto iter = dbMap.find(dbName); iter == dbMap.end()) {
+                auto [newIter, _] =
+                    dbMap.try_emplace(dbName, _databaseCatalogEntryFactory(dbName, this));
+                newIter->second->initCollection(opCtx, coll, _options.forRepair);
+            } else {
+                iter->second->initCollection(opCtx, coll, _options.forRepair);
+            }
         }
+        // KVDatabaseCatalogEntryBase*& db = _dbs[dbName];
+        // if (!db) {
+        //     db = _databaseCatalogEntryFactory(dbName, this).release();
+        // }
 
-        db->initCollection(opCtx, coll, _options.forRepair);
         auto maxPrefixForCollection = _catalog->getMetaData(opCtx, coll).getMaxPrefix();
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
 
@@ -256,17 +271,18 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 }
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
+    MONGO_LOG(1) << "KVStorageEngine::closeCatalog";
     dassert(opCtx->lockState()->isLocked());
     if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
         _dumpCatalog(opCtx);
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_dbsLock);
-    for (auto entry : _dbs) {
-        delete entry.second;
-    }
-    _dbs.clear();
+    // stdx::lock_guard<stdx::mutex> lock(_dbsLock);
+    // for (auto entry : _dbMapVector) {
+    //     delete entry.second;
+    // }
+    _dbMapVector.clear();
 
     _catalog.reset(nullptr);
     _catalogRecordStore.reset(nullptr);
@@ -452,13 +468,13 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
 }
 
 void KVStorageEngine::cleanShutdown() {
-    for (DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it) {
-        delete it->second;
-    }
-    _dbs.clear();
+    // for (DBMap::const_iterator it = _dbMapVector.begin(); it != _dbMapVector.end(); ++it) {
+    //     delete it->second;
+    // }
+    _dbMapVector.clear();
 
-    _catalog.reset(NULL);
-    _catalogRecordStore.reset(NULL);
+    _catalog.reset(nullptr);
+    _catalogRecordStore.reset(nullptr);
 
     _engine->cleanShutdown();
     // intentionally not deleting _engine
@@ -471,7 +487,7 @@ void KVStorageEngine::finishInit() {}
 RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
     if (!_engine) {
         // shutdown
-        return NULL;
+        return nullptr;
     }
     return _engine->newRecoveryUnit();
 }
@@ -484,24 +500,50 @@ RecoveryUnit::UPtr KVStorageEngine::newRecoveryUnitUPtr() {
     return _engine->newRecoveryUnitUPtr();
 }
 
+std::pair<bool, Status> KVStorageEngine::lockCollection(OperationContext* opCtx,
+                                                        StringData ns,
+                                                        bool isForWrite) {
+    return _engine->lockCollection(opCtx, ns, isForWrite);
+}
+
 void KVStorageEngine::listDatabases(std::vector<std::string>* out) const {
-    stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-    for (DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it) {
-        if (it->second->isEmpty())
-            continue;
-        out->push_back(it->first);
-    }
+    return _engine->listDatabases(*out);
+    // stdx::lock_guard<stdx::mutex> lk(_dbsLock);
+    // for (DBMap::const_iterator it = _dbMapVector.begin(); it != _dbMapVector.end(); ++it) {
+    //     if (it->second->isEmpty())
+    //         continue;
+    //     out->push_back(it->first);
+    // }
+}
+
+void KVStorageEngine::listCollections(std::string_view dbName,
+                                      std::vector<std::string>* out) const {
+    _engine->listCollections(dbName, *out);
+}
+
+void KVStorageEngine::listCollections(std::string_view dbName, std::set<std::string>& out) const {
+    _engine->listCollections(dbName, out);
 }
 
 KVDatabaseCatalogEntryBase* KVStorageEngine::getDatabaseCatalogEntry(OperationContext* opCtx,
                                                                      StringData dbName) {
-    stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-    KVDatabaseCatalogEntryBase*& db = _dbs[dbName.toString()];
-    if (!db) {
-        // Not registering change since db creation is implicit and never rolled back.
-        db = _databaseCatalogEntryFactory(dbName, this).release();
+    // stdx::lock_guard<stdx::mutex> lk(_dbsLock);
+    auto id = static_cast<int16_t>(localThreadId + 1);
+    auto& dbMap = _dbMapVector[id];
+    if (auto iter = dbMap.find(dbName); iter == dbMap.end()) {
+        auto [newIter, _] =
+            dbMap.try_emplace(dbName.toString(), _databaseCatalogEntryFactory(dbName, this));
+        return newIter->second.get();
+    } else {
+        return iter->second.get();
     }
-    return db;
+
+    // KVDatabaseCatalogEntryBase*& db = _dbs[dbName.toString()];
+    // if (!db) {
+    //     // Not registering change since db creation is implicit and never rolled back.
+    //     db = _databaseCatalogEntryFactory(dbName, this).release();
+    // }
+    // return db;
 }
 
 Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
@@ -510,24 +552,48 @@ Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
 }
 
 Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
-    KVDatabaseCatalogEntryBase* entry;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-        DBMap::const_iterator it = _dbs.find(db.toString());
-        if (it == _dbs.end())
-            return Status(ErrorCodes::NamespaceNotFound, "db not found to drop");
-        entry = it->second;
+    // KVDatabaseCatalogEntryBase* entry;
+    // {
+    //     stdx::lock_guard<stdx::mutex> lk(_dbsLock);
+    //     DBMap::const_iterator it = _dbMapVector.find(db.toString());
+    //     if (it == _dbMapVector.end())
+    //         return Status(ErrorCodes::NamespaceNotFound, "db not found to drop");
+    //     entry = it->second;
+    // }
+
+    auto id = static_cast<int16_t>(localThreadId + 1);
+    auto& dbMap = _dbMapVector[id];
+    KVDatabaseCatalogEntryBase* entry{nullptr};
+    if (auto iter = dbMap.find(db); iter == dbMap.end()) {
+        entry = _databaseCatalogEntryFactory(db, this).release();
+    } else {
+        entry = iter->second.get();
     }
 
-    std::list<std::string> toDrop;
+    std::vector<std::string> toDrop;
     entry->getCollectionNamespaces(&toDrop);
-
-    // Do not timestamp any of the following writes. This will remove entries from the catalog as
-    // well as drop any underlying tables. It's not expected for dropping tables to be reversible
-    // on crash/recoverToStableTimestamp.
-    return _dropCollectionsNoTimestamp(opCtx, entry, toDrop.begin(), toDrop.end());
+    return _dropCollections(opCtx, entry, toDrop);
 }
 
+Status KVStorageEngine::_dropCollections(OperationContext* opCtx,
+                                         KVDatabaseCatalogEntryBase* dbce,
+                                         std::vector<std::string>& collections) {
+    MONGO_LOG(1) << "KVStorageEngine::_dropCollections";
+
+    Status firstError = Status::OK();
+    WriteUnitOfWork wuow(opCtx);
+    for (const auto& collection : collections) {
+        // NamespaceString nss{std::move(collection)};
+
+        Status result = dbce->dropCollection(opCtx, collection);
+        if (!result.isOK() && firstError.isOK()) {
+            firstError = result;
+        }
+    }
+
+    wuow.commit();
+    return firstError;
+}
 /**
  * Returns the first `dropCollection` error that this method encounters. This method will attempt
  * to drop all collections, regardless of the error status.
@@ -536,6 +602,7 @@ Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
                                                     KVDatabaseCatalogEntryBase* dbce,
                                                     CollIter begin,
                                                     CollIter end) {
+    MONGO_UNREACHABLE;
     // On primaries, this method will be called outside of any `TimestampBlock` state meaning the
     // "commit timestamp" will not be set. For this case, this method needs no special logic to
     // avoid timestamping the upcoming writes.
@@ -618,7 +685,7 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::st
         repairObserver->onModification(str::stream()
                                        << "Collection " << ns << ": " << status.reason());
     }
-    _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(opCtx, ns);
+    // _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(opCtx, ns);
 
     return Status::OK();
 }

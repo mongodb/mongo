@@ -148,8 +148,8 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
     for (const auto& dbName : dbNames) {
         Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db);
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
-            Collection* coll = *collectionIt;
+        for (const auto& [name, coll] : db->collections(opCtx)) {
+            // Collection* coll = *collectionIt;
             // The presence of system.indexes or system.namespaces on wiredTiger may
             // have undesirable results (see SERVER-32894, SERVER-34482). It is okay to
             // drop these collections on wiredTiger because users are not permitted to
@@ -163,8 +163,8 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                 const auto nssToDrop = coll->ns();
                 LOG(1) << "Attempting to drop invalid system collection " << nssToDrop;
                 if (coll->numRecords(opCtx)) {
-                    severe(LogComponent::kControl) << "Cannot drop non-empty collection "
-                                                   << nssToDrop.ns();
+                    severe(LogComponent::kControl)
+                        << "Cannot drop non-empty collection " << nssToDrop.ns();
                     exitCleanly(EXIT_NEED_DOWNGRADE);
                 }
                 repl::UnreplicatedWritesBlock uwb(opCtx);
@@ -224,9 +224,9 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
 }
 
 /**
-* Check that the oplog is capped, and abort the process if it is not.
-* Caller must lock DB before calling this function.
-*/
+ * Check that the oplog is capped, and abort the process if it is not.
+ * Caller must lock DB before calling this function.
+ */
 void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
@@ -263,7 +263,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         invariant(dbce,
                   str::stream() << "couldn't get database catalog entry for database "
                                 << collNss.db());
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNss.ns());
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(opCtx, collNss.ns());
         invariant(cce,
                   str::stream() << "couldn't get collection catalog entry for collection "
                                 << collNss.toString());
@@ -274,15 +274,13 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
             fassert(40590,
                     {ErrorCodes::InternalError,
                      str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection "
-                                   << collNss.toString()});
+                                   << " in collection " << collNss.toString()});
         }
 
         auto& indexesToRebuild = swIndexSpecs.getValue();
         invariant(indexesToRebuild.first.size() == 1 && indexesToRebuild.second.size() == 1,
                   str::stream() << "Num Index Names: " << indexesToRebuild.first.size()
-                                << " Num Index Objects: "
-                                << indexesToRebuild.second.size());
+                                << " Num Index Objects: " << indexesToRebuild.second.size());
         auto& ino = nsToIndexNameObjMap[collNss.ns()];
         ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
@@ -292,7 +290,8 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         NamespaceString collNss(entry.first);
 
         auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
-        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+        auto collCatalogEntry =
+            dbCatalogEntry->getCollectionCatalogEntry(opCtx, collNss.toString());
         for (const auto& indexName : entry.second.first) {
             log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
         }
@@ -497,8 +496,9 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
                               << "command to resume upgrade to 4.0." << startupWarningsLog;
-                    } else if (version == ServerGlobalParams::FeatureCompatibility::Version::
-                                              kDowngradingTo36) {
+                    } else if (version ==
+                               ServerGlobalParams::FeatureCompatibility::Version::
+                                   kDowngradingTo36) {
                         log() << "** WARNING: A featureCompatibilityVersion downgrade did not "
                               << "complete. " << startupWarningsLog;
                         log() << "**          The current featureCompatibilityVersion is "
@@ -596,7 +596,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
         return;
     }
 
-    std::list<std::string> collectionNames;
+    std::vector<std::string> collectionNames;
     db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collectionNames);
 
     for (const auto& collectionName : collectionNames) {

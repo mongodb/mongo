@@ -490,8 +490,8 @@ void _addCollectionUUIDsPerDatabase(OperationContext* opCtx,
         if (!db) {
             return;
         }
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
-            Collection* coll = *collectionIt;
+        for (const auto &[name, coll] : db->collections(opCtx)) {
+            // Collection* coll = *collectionIt;
             collNamespaceStrings.push_back(coll->ns());
         }
     }
@@ -674,10 +674,10 @@ Status _updateNonReplicatedUniqueIndexesPerDatabase(OperationContext* opCtx,
 
     // Iterate through all collections if we're in the "local" database.
     if (dbName == "local") {
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
-            Collection* coll = *collectionIt;
+        for ( auto& [name, coll] : db->collections(opCtx)) {
+            // Collection* coll = *collectionIt;
 
-            auto collModStatus = _updateNonReplicatedIndexPerCollection(opCtx, coll);
+            auto collModStatus = _updateNonReplicatedIndexPerCollection(opCtx, coll.get());
             if (!collModStatus.isOK())
                 return collModStatus;
         }
@@ -707,8 +707,8 @@ void _updateUniqueIndexesForDatabase(OperationContext* opCtx, const std::string&
         if (!db)
             return;
 
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
-            Collection* coll = *collectionIt;
+        for (const auto& [name, coll] : db->collections(opCtx)) {
+            // Collection* coll = *collectionIt;
             NamespaceString collNSS = coll->ns();
 
             // Skip non-replicated collection.

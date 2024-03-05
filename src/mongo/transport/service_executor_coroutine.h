@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <string_view>
 
@@ -16,8 +15,8 @@
 #include "mongo/db/modules/monograph/tx_service/include/moodycamelqueue.h"
 
 
-namespace mongo {
-namespace transport {
+
+namespace mongo::transport {
 
 class ThreadGroup {
     friend class ServiceExecutorCoroutine;
@@ -124,5 +123,4 @@ private:
     constexpr static uint32_t kIdleTimeoutMs = 1000;
 };
 
-}  // namespace transport
-}  // namespace mongo
+} // namespace mongo::transport

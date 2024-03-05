@@ -313,15 +313,15 @@ public:
                         }
                     }
                 } else {
-                    for (auto&& collection : *db) {
+                    for (const auto& [name, collection] : db->collections(opCtx)) {
                         if (authorizedCollections &&
                             (collection->ns().coll().startsWith("system.") ||
                              !as->isAuthorizedForAnyActionOnResource(
                                  ResourcePattern::forExactNamespace(collection->ns())))) {
                             continue;
                         }
-                        BSONObj collBson =
-                            buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
+                        BSONObj collBson = buildCollectionBson(
+                            opCtx, collection.get(), includePendingDrops, nameOnly);
                         if (!collBson.isEmpty()) {
                             _addWorkingSetMember(
                                 opCtx, collBson, matcher.get(), ws.get(), root.get());

@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 
@@ -49,7 +50,8 @@ public:
 
     virtual ~BSONCollectionCatalogEntry() {}
 
-    virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const;
+    // virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const = 0;
+     MetaData getMetaData(OperationContext* opCtx) const override;
 
     virtual int getTotalIndexCount(OperationContext* opCtx) const;
 
@@ -76,62 +78,19 @@ public:
 
     virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const;
 
+    virtual RecordStore* getRecordStore() {
+        return nullptr;
+    }
+
+    // virtual const RecordStore* getRecordStore() const {
+    //     return nullptr;
+    // }
+
     // ------ for implementors
 
-    struct IndexMetaData {
-        IndexMetaData() {}
-        IndexMetaData(
-            BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix, bool isBackgroundSecondaryBuild)
-            : spec(s),
-              ready(r),
-              head(h),
-              multikey(m),
-              prefix(prefix),
-              isBackgroundSecondaryBuild(isBackgroundSecondaryBuild) {}
 
-        void updateTTLSetting(long long newExpireSeconds);
-
-        std::string name() const {
-            return spec["name"].String();
-        }
-
-        BSONObj spec;
-        bool ready;
-        RecordId head;
-        bool multikey;
-        KVPrefix prefix = KVPrefix::kNotPrefixed;
-        bool isBackgroundSecondaryBuild;
-
-        // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
-        // the index key pattern. Each element in the vector is an ordered set of positions
-        // (starting at 0) into the corresponding indexed field that represent what prefixes of the
-        // indexed field cause the index to be multikey.
-        MultikeyPaths multikeyPaths;
-    };
-
-    struct MetaData {
-        void parse(const BSONObj& obj);
-        BSONObj toBSON() const;
-
-        int findIndexOffset(StringData name) const;
-
-        /**
-         * Removes information about an index from the MetaData. Returns true if an index
-         * called name existed and was deleted, and false otherwise.
-         */
-        bool eraseIndex(StringData name);
-
-        void rename(StringData toNS);
-
-        KVPrefix getMaxPrefix() const;
-
-        std::string ns;
-        CollectionOptions options;
-        std::vector<IndexMetaData> indexes;
-        KVPrefix prefix = KVPrefix::kNotPrefixed;
-    };
 
 protected:
     virtual MetaData _getMetaData(OperationContext* opCtx) const = 0;
 };
-}
+}  // namespace mongo

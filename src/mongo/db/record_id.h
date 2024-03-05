@@ -109,7 +109,7 @@ public:
         }
     }
 
-    explicit RecordId(const std::string& str) : RecordId(str.data(), str.size()) {}
+    // explicit RecordId(const std::string& str) : RecordId(str.data(), str.size()) {}
     explicit RecordId(std::string_view str) : RecordId(str.data(), str.size()) {}
 
     /**
@@ -333,7 +333,7 @@ private:
     }
 
     std::string_view _getSmallStrNoCheck() const {
-        uint8_t size = static_cast<uint8_t>(_buffer[0]);
+        auto size = static_cast<uint8_t>(_buffer[0]);
         invariant(size > 0);
         invariant(size <= kSmallStrMaxSize);
         return {_buffer.data() + sizeof(char), size};

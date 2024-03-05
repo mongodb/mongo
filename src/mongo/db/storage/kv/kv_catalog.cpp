@@ -28,6 +28,13 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
+#include <cassert>
+#include <mutex>
+#include <utility>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -131,8 +138,7 @@ std::string escapeDbName(StringData dbname) {
 
 }  // namespace
 
-using std::string;
-using std::unique_ptr;
+/*
 
 class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
 public:
@@ -141,8 +147,8 @@ public:
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
-        _catalog->_idents.erase(_ident);
+        // stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
+        // _catalog->_idents.erase(_ident);
     }
 
     KVCatalog* const _catalog;
@@ -156,15 +162,15 @@ public:
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
-        _catalog->_idents[_ident] = _entry;
+        // stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
+        // _catalog->_idents[_ident] = _entry;
     }
 
     KVCatalog* const _catalog;
     const std::string _ident;
     const Entry _entry;
 };
-
+*/
 bool KVCatalog::FeatureTracker::isFeatureDocument(BSONObj obj) {
     BSONElement firstElem = obj.firstElement();
     if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
@@ -318,49 +324,40 @@ void KVCatalog::FeatureTracker::putInfo(OperationContext* opCtx, const FeatureBi
 KVCatalog::KVCatalog(RecordStore* rs, bool directoryPerDb, bool directoryForIndexes)
     : _rs(rs),
       _directoryPerDb(directoryPerDb),
-      _directoryForIndexes(directoryForIndexes),
-      _rand(_newRand()) {}
+      _directoryForIndexes(directoryForIndexes) /*,
+       _rand(_newRand())*/
+{}
 
 KVCatalog::~KVCatalog() {
-    _rs = NULL;
+    _rs = nullptr;
 }
 
-std::string KVCatalog::_newRand() {
-    return str::stream() << std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64();
-}
+// std::string KVCatalog::_newRand() {
+//     return str::stream() << std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64();
+// }
 
-bool KVCatalog::_hasEntryCollidingWithRand() const {
-    // Only called from init() so don't need to lock.
-    for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
-        if (StringData(it->first).endsWith(_rand))
-            return true;
-    }
-    return false;
-}
+// bool KVCatalog::_hasEntryCollidingWithRand() const {
+//     MONGO_UNREACHABLE;
+//     // Only called from init() so don't need to lock.
+//     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
+//         if (StringData(it->first).endsWith(_rand))
+//             return true;
+//     }
+//     return false;
+// }
 
-std::string KVCatalog::newUniqueIdent(StringData ns, const char* kind) {
-    // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
-    StringBuilder buf;
-    if (_directoryPerDb) {
-        buf << escapeDbName(nsToDatabaseSubstring(ns)) << '/';
-    }
-    buf << kind;
-    buf << (_directoryForIndexes ? '/' : '-');
-    buf << _next.fetchAndAdd(1) << '-' << _rand;
-    return buf.str();
-}
-
-std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
-    // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
-    StringBuilder buf;
-    if (_directoryPerDb) {
-        buf << escapeDbName(nsToDatabaseSubstring(ns)) << '/';
-    }
-    buf << kind;
-    buf << (_directoryForIndexes ? '/' : '-');
-    buf << _next.fetchAndAdd(1) << '-' << _rand;
-    return buf.str();
-}
+// std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
+//     MONGO_UNREACHABLE;
+//     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
+//     StringBuilder buf;
+//     if (_directoryPerDb) {
+//         buf << escapeDbName(nsToDatabaseSubstring(ns)) << '/';
+//     }
+//     buf << kind;
+//     buf << (_directoryForIndexes ? '/' : '-');
+//     buf << _next.fetchAndAdd(1) << '-' << _rand;
+//     return buf.str();
+// }
 
 void KVCatalog::init(OperationContext* opCtx) {
     // No locking needed since called single threaded.
@@ -379,9 +376,9 @@ void KVCatalog::init(OperationContext* opCtx) {
         }
 
         // No rollback since this is just loading already committed data.
-        string ns = obj["ns"].String();
-        string ident = obj["ident"].String();
-        _idents[ns] = Entry(ident, record->id);
+        // std::string ns = obj["ns"].String();
+        // std::string ident = obj["ident"].String();
+        // _idents[ns] = Entry(ident, record->id);
     }
 
     if (!_featureTracker) {
@@ -390,132 +387,129 @@ void KVCatalog::init(OperationContext* opCtx) {
         _featureTracker = KVCatalog::FeatureTracker::create(opCtx, this);
     }
 
+    return;
+    MONGO_UNREACHABLE;
     // In the unlikely event that we have used this _rand before generate a new one.
-    while (_hasEntryCollidingWithRand()) {
-        _rand = _newRand();
-    }
+    // while (_hasEntryCollidingWithRand()) {
+    //     _rand = _newRand();
+    // }
 }
 
 void KVCatalog::getAllCollections(std::vector<std::string>* out) const {
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
-        out->push_back(it->first);
-    }
+    // stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    // for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
+    //     out->push_back(it->first);
+    // }
+    _rs->getAllCollections(*out);
 }
 
+
+// Status KVCatalog::newCollection(OperationContext* opCtx,
+//                                 StringData ns,
+//                                 const CollectionOptions& options,
+//                                 KVPrefix prefix) {
+//     MONGO_UNREACHABLE;
+//     invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+
+//     StringData ident{ns};  //_newUniqueIdent(ns, "collection");
+
+//     // stdx::lock_guard<stdx::mutex> lk(_identsLock);
+//     // Entry& old = _idents[ns.toString()];
+//     // if (!old.ident.empty()) {
+//     //     return Status(ErrorCodes::NamespaceExists, "collection already exists");
+//     // }
+
+//     opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
+
+//     BSONObj obj;
+//     {
+//         BSONObjBuilder b;
+//         b.append("ns", ns);
+//         b.append("ident", ident);
+//         BSONCollectionCatalogEntry::MetaData md;
+//         md.ns = ns.toString();
+//         md.options = options;
+//         md.prefix = prefix;
+//         b.append("md", md.toBSON());
+//         obj = b.obj();
+//     }
+//     const bool enforceQuota = false;
+//     // TODO SERVER-30638: using timestamp 0 for these inserts.
+//     StatusWith<RecordId> res =
+//         _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp(), enforceQuota);
+//     assert(res.isOK());
+//     if (!res.isOK()) {
+//         return res.getStatus();
+//     }
+
+//     // _idents.try_emplace(ns.toString(), Entry{ident, res.getValue()});
+//     MONGO_LOG(1) << "_idents ns:" << ns.toString();
+//     LOG(1) << "stored meta data for " << ns << " @ " << res.getValue();
+//     return Status::OK();
+// }
+
+
 Status KVCatalog::newCollection(OperationContext* opCtx,
-                     StringData ns,
-                     const std::string& ident,
-                     const CollectionOptions& options,
-                     KVPrefix prefix) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
-
-    Entry& old = _idents[ns.toString()];
-    if (!old.ident.empty()) {
-        return Status(ErrorCodes::NamespaceExists, "collection already exists");
-    }
-
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
-
-    BSONObj obj;
-    {
-        BSONObjBuilder b;
-        b.append("ns", ns);
-        b.append("ident", ident);
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = ns.toString();
-        md.options = options;
-        md.prefix = prefix;
-        b.append("md", md.toBSON());
-        obj = b.obj();
-    }
-    const bool enforceQuota = false;
-    // TODO SERVER-30638: using timestamp 0 for these inserts.
-    StatusWith<RecordId> res =
-        _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp(), enforceQuota);
-    if (!res.isOK())
-        return res.getStatus();
-
-    old = Entry(ident, res.getValue());
-    LOG(1) << "stored meta data for " << ns << " @ " << res.getValue();
-    return Status::OK();
-}
-
-Status KVCatalog::newCollection(OperationContext* opCtx,
-                                StringData ns,
+                                const NamespaceString& nss,
                                 const CollectionOptions& options,
-                                KVPrefix prefix) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+                                const BSONObj& idIndexSpec) {
+    BSONObj obj = _buildMetadata(opCtx, nss, options, idIndexSpec);
 
-    const string ident = _newUniqueIdent(ns, "collection");
-
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    Entry& old = _idents[ns.toString()];
-    if (!old.ident.empty()) {
-        return Status(ErrorCodes::NamespaceExists, "collection already exists");
-    }
-
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
-
-    BSONObj obj;
-    {
-        BSONObjBuilder b;
-        b.append("ns", ns);
-        b.append("ident", ident);
-        BSONCollectionCatalogEntry::MetaData md;
-        md.ns = ns.toString();
-        md.options = options;
-        md.prefix = prefix;
-        b.append("md", md.toBSON());
-        obj = b.obj();
-    }
-    const bool enforceQuota = false;
-    // TODO SERVER-30638: using timestamp 0 for these inserts.
     StatusWith<RecordId> res =
-        _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp(), enforceQuota);
-    if (!res.isOK())
-        return res.getStatus();
+        _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp{}, false);
 
-    old = Entry(ident, res.getValue());
-    LOG(1) << "stored meta data for " << ns << " @ " << res.getValue();
-    return Status::OK();
+    return res.getStatus();
 }
+
+// void KVCatalog::addIdent(OperationContext* opCtx,
+//                          StringData ns,
+//                          StringData ident,
+//                          RecordId recordId) {
+//     std::scoped_lock<std::mutex> lk{_identsLock};
+//     _idents.try_emplace(ns.toString(), Entry{ident.toString(), std::move(recordId)});
+// }
 
 std::string KVCatalog::getCollectionIdent(StringData ns) const {
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    NSToIdentMap::const_iterator it = _idents.find(ns.toString());
-    invariant(it != _idents.end());
-    return it->second.ident;
+    // stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    // NSToIdentMap::const_iterator it = _idents.find(ns.toString());
+    // invariant(it != _idents.end());
+    // return it->second.ident;
+    return ns.toString();
 }
 
 std::string KVCatalog::getIndexIdent(OperationContext* opCtx,
                                      StringData ns,
                                      StringData idxName) const {
-    BSONObj obj = _findEntry(opCtx, ns);
-    BSONObj idxIdent = obj["idxIdent"].Obj();
-    return idxIdent[idxName].String();
+    // BSONObj obj = _findEntry(opCtx, ns);
+    // BSONObj idxIdent = obj["idxIdent"].Obj();
+    // return idxIdent[idxName].String();
+    std::string ident = ns.toString();
+    ident.append(".");
+    ident.append(idxName.toStringView());
+    return ident;
 }
 
 BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* out) const {
-    RecordId dl;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_identsLock);
-        NSToIdentMap::const_iterator it = _idents.find(ns.toString());
-        invariant(it != _idents.end(), str::stream() << "Did not find collection. Ns: " << ns);
-        dl = it->second.storedLoc;
-    }
+    RecordId dl{ns.rawData(), ns.size()};
+    // {
+    //     stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    //     NSToIdentMap::const_iterator it = _idents.find(ns.toString());
+    //     invariant(it != _idents.end(), str::stream() << "Did not find collection. Ns: " << ns);
+    //     dl = it->second.storedLoc;
+    // }
 
-    LOG(3) << "looking up metadata for: " << ns << " @ " << dl;
+    MONGO_LOG(1) << "looking up metadata for: " << ns << " @ " << dl;
     RecordData data;
     if (!_rs->findRecord(opCtx, dl, &data)) {
         // since the in memory meta data isn't managed with mvcc
         // its possible for different transactions to see slightly
         // different things, which is ok via the locking above.
-        return BSONObj();
+        return {};
     }
 
-    if (out)
+    if (out) {
         *out = dl;
+    }
 
     return data.releaseToBson().getOwned();
 }
@@ -523,7 +517,7 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* 
 BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* opCtx,
                                                             StringData ns) const {
     BSONObj obj = _findEntry(opCtx, ns);
-    LOG(3) << " fetched CCE metadata: " << obj;
+    MONGO_LOG(1) << " fetched CCE metadata: " << obj;
     BSONCollectionCatalogEntry::MetaData md;
     const BSONElement mdElement = obj["md"];
     if (mdElement.isABSONObj()) {
@@ -546,19 +540,20 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
 
         BSONObjBuilder newIdentMap;
         BSONObj oldIdentMap;
-        if (obj["idxIdent"].isABSONObj())
+        if (obj["idxIdent"].isABSONObj()) {
             oldIdentMap = obj["idxIdent"].Obj();
+        }
 
         // fix ident map
-        for (size_t i = 0; i < md.indexes.size(); i++) {
-            string name = md.indexes[i].name();
+        for (const auto& index : md.indexes) {
+            std::string name = index.name();
             BSONElement e = oldIdentMap[name];
             if (e.type() == String) {
                 newIdentMap.append(e);
                 continue;
             }
             // missing, create new
-            newIdentMap.append(name, _newUniqueIdent(ns, "index"));
+            newIdentMap.append(name, ns);
         }
         b.append("idxIdent", newIdentMap.obj());
 
@@ -567,8 +562,8 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
         obj = b.obj();
     }
 
-    LOG(3) << "recording new metadata: " << obj;
-    Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), false, NULL);
+    MONGO_LOG(1) << "recording new metadata: " << obj;
+    Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), false, nullptr);
     fassert(28521, status.isOK());
 }
 
@@ -576,6 +571,7 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
                                    StringData fromNS,
                                    StringData toNS,
                                    bool stayTemp) {
+    MONGO_UNREACHABLE;
     RecordId loc;
     BSONObj old = _findEntry(opCtx, fromNS, &loc).getOwned();
     {
@@ -597,48 +593,42 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
         fassert(28522, status.isOK());
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    const NSToIdentMap::iterator fromIt = _idents.find(fromNS.toString());
-    invariant(fromIt != _idents.end());
+    // stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    // const NSToIdentMap::iterator fromIt = _idents.find(fromNS.toString());
+    // invariant(fromIt != _idents.end());
 
-    opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, fromNS, fromIt->second));
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, toNS));
+    // opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, fromNS, fromIt->second));
+    // opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, toNS));
 
-    _idents.erase(fromIt);
-    _idents[toNS.toString()] = Entry(old["ident"].String(), loc);
+    // _idents.erase(fromIt);
+    // _idents[toNS.toString()] = Entry(old["ident"].String(), loc);
 
     return Status::OK();
 }
 
 Status KVCatalog::dropCollection(OperationContext* opCtx, StringData ns) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    const NSToIdentMap::iterator it = _idents.find(ns.toString());
-    if (it == _idents.end()) {
-        return Status(ErrorCodes::NamespaceNotFound, "collection not found");
-    }
+    MONGO_LOG(1) << "KVCatalog::dropCollection";
 
-    opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, ns, it->second));
-
-    LOG(1) << "deleting metadata for " << ns << " @ " << it->second.storedLoc;
-    _rs->deleteRecord(opCtx, it->second.storedLoc);
-    _idents.erase(it);
+    RecordId recordId{ns.rawData(), ns.size()};
+    MONGO_LOG(1) << "deleting metadata for " << ns << " @ " << recordId;
+    _rs->deleteRecord(opCtx, recordId);
 
     return Status::OK();
 }
 
 std::vector<std::string> KVCatalog::getAllIdentsForDB(StringData db) const {
+    MONGO_UNREACHABLE;
     std::vector<std::string> v;
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_identsLock);
-        for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
-            NamespaceString ns(it->first);
-            if (ns.db() != db)
-                continue;
-            v.push_back(it->second.ident);
-        }
-    }
+    // {
+    //     stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    //     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
+    //         NamespaceString ns(it->first);
+    //         if (ns.db() != db)
+    //             continue;
+    //         v.push_back(it->second.ident);
+    //     }
+    // }
 
     return v;
 }
@@ -657,14 +647,13 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
         v.push_back(obj["ident"].String());
 
         BSONElement e = obj["idxIdent"];
-        if (!e.isABSONObj())
+        if (!e.isABSONObj()) {
             continue;
+        }
         BSONObj idxIdent = e.Obj();
 
-        BSONObjIterator sub(idxIdent);
-        while (sub.more()) {
-            BSONElement e = sub.next();
-            v.push_back(e.String());
+        for (const auto& elem : idxIdent) {
+            v.push_back(elem.String());
         }
     }
 
@@ -672,17 +661,20 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
 }
 
 bool KVCatalog::isUserDataIdent(StringData ident) const {
+    MONGO_UNREACHABLE;
     return ident.find("index-") != std::string::npos || ident.find("index/") != std::string::npos ||
         ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
 
 bool KVCatalog::isCollectionIdent(StringData ident) const {
+    MONGO_UNREACHABLE;
     return ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
 
 StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std::string ident) {
+    MONGO_UNREACHABLE;
     // The collection will be named local.orphan.xxxxx.
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
@@ -690,13 +682,13 @@ StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std
                                      NamespaceString::kOrphanCollectionPrefix + identNs)
                          .ns();
 
-    stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    Entry& old = _idents[ns];
-    if (!old.ident.empty()) {
-        return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << ns << " already exists in the catalog");
-    }
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
+    // stdx::lock_guard<stdx::mutex> lk(_identsLock);
+    // Entry& old = _idents[ns];
+    // if (!old.ident.empty()) {
+    //     return Status(ErrorCodes::NamespaceExists,
+    //                   str::stream() << ns << " already exists in the catalog");
+    // }
+    // opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
 
     // Generate a new UUID for the orphaned collection.
     CollectionOptions optionsWithUUID;
@@ -721,8 +713,39 @@ StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std
     if (!res.isOK())
         return res.getStatus();
 
-    old = Entry(ident, res.getValue());
+    // old = Entry(ident, res.getValue());
     LOG(1) << "stored meta data for orphaned collection " << ns << " @ " << res.getValue();
     return StatusWith<std::string>(std::move(ns));
 }
+
+BSONObj KVCatalog::_buildMetadata(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const CollectionOptions& options,
+                                  const BSONObj& idIndexSpec) {
+    StringData ident = nss.toStringData();
+    KVPrefix prefix = KVPrefix::getNextPrefix(nss);
+    BSONObjBuilder b;
+
+    b.append("ns", nss.toStringData());
+    b.append("ident", ident);
+
+    BSONCollectionCatalogEntry::MetaData md;
+    md.ns = nss.toString();
+    md.options = options;
+    md.prefix = prefix;
+    md.indexes.emplace_back(idIndexSpec, true, RecordId{}, false, prefix, false);
+    b.append("md", md.toBSON());
+    
+    {
+        BSONObjBuilder indexIdentsBuilder;
+        for (const auto& index : md.indexes) {
+            std::string name = index.name();
+            indexIdentsBuilder.append(name, getIndexIdent(opCtx, nss.toStringData(), name));
+        }
+        b.append("idxIdent", indexIdentsBuilder.obj());
+    }
+
+    return b.obj();
+}
+
 }  // namespace mongo

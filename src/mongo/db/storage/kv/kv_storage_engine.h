@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include "mongo/db/server_options.h"
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -43,6 +46,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include <vector>
 
 namespace mongo {
 
@@ -72,76 +76,80 @@ public:
     /**
      * @param engine - ownership passes to me
      */
-    KVStorageEngine(KVEngine* engine,
-                    const KVStorageEngineOptions& options = KVStorageEngineOptions(),
-                    stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory =
-                        defaultDatabaseCatalogEntryFactory);
+    explicit KVStorageEngine(KVEngine* engine,
+                             const KVStorageEngineOptions& options = KVStorageEngineOptions(),
+                             stdx::function<KVDatabaseCatalogEntryFactory>
+                                 databaseCatalogEntryFactory = defaultDatabaseCatalogEntryFactory);
 
-    virtual ~KVStorageEngine();
+    ~KVStorageEngine() override;
 
-    virtual void finishInit();
+    void finishInit() override;
 
-    virtual RecoveryUnit* newRecoveryUnit();
-    virtual RecoveryUnit::UPtr newRecoveryUnitUPtr();
+    RecoveryUnit* newRecoveryUnit() override;
+    RecoveryUnit::UPtr newRecoveryUnitUPtr() override;
+    std::pair<bool, Status> lockCollection(OperationContext* opCtx,
+                                           StringData ns,
+                                           bool isForWrite) override;
 
-    virtual void listDatabases(std::vector<std::string>* out) const;
-
+    void listDatabases(std::vector<std::string>* out) const override;
+    void listCollections(std::string_view dbName, std::vector<std::string>* out) const override;
+    void listCollections(std::string_view dbName, std::set<std::string>& out) const override;
     KVDatabaseCatalogEntryBase* getDatabaseCatalogEntry(OperationContext* opCtx,
                                                         StringData db) override;
 
-    virtual bool supportsDocLocking() const {
+    bool supportsDocLocking() const override {
         return _supportsDocLocking;
     }
 
-    virtual bool supportsDBLocking() const {
+    bool supportsDBLocking() const override {
         return _supportsDBLocking;
     }
 
-    virtual bool supportsCappedCollections() const {
+    bool supportsCappedCollections() const override {
         return _supportsCappedCollections;
     }
 
-    virtual Status closeDatabase(OperationContext* opCtx, StringData db);
+    Status closeDatabase(OperationContext* opCtx, StringData db) override;
 
-    virtual Status dropDatabase(OperationContext* opCtx, StringData db);
+    Status dropDatabase(OperationContext* opCtx, StringData db) override;
 
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
+    int flushAllFiles(OperationContext* opCtx, bool sync) override;
 
-    virtual Status beginBackup(OperationContext* opCtx);
+    Status beginBackup(OperationContext* opCtx) override;
 
-    virtual void endBackup(OperationContext* opCtx);
+    void endBackup(OperationContext* opCtx) override;
 
-    virtual bool isDurable() const;
+    bool isDurable() const override;
 
-    virtual bool isEphemeral() const;
+    bool isEphemeral() const override;
 
-    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns);
+    Status repairRecordStore(OperationContext* opCtx, const std::string& ns) override;
 
-    virtual void cleanShutdown();
+    void cleanShutdown() override;
 
-    virtual void setStableTimestamp(Timestamp stableTimestamp) override;
+    void setStableTimestamp(Timestamp stableTimestamp) override;
 
-    virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
+    void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
-    virtual void setOldestTimestamp(Timestamp oldestTimestamp) override;
+    void setOldestTimestamp(Timestamp oldestTimestamp) override;
 
-    virtual bool supportsRecoverToStableTimestamp() const override;
+    bool supportsRecoverToStableTimestamp() const override;
 
-    virtual bool supportsRecoveryTimestamp() const override;
+    bool supportsRecoveryTimestamp() const override;
 
-    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
-    virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
+    boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
-    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const override;
+    boost::optional<Timestamp> getLastStableCheckpointTimestamp() const override;
 
-    virtual Timestamp getAllCommittedTimestamp() const override;
+    Timestamp getAllCommittedTimestamp() const override;
 
     bool supportsReadConcernSnapshot() const final;
 
     bool supportsReadConcernMajority() const final;
 
-    virtual void replicationBatchIsComplete() const override;
+    void replicationBatchIsComplete() const override;
 
     SnapshotManager* getSnapshotManager() const final;
 
@@ -173,23 +181,25 @@ public:
      * When loading after an unclean shutdown, this performs cleanup on the KVCatalog and unsets the
      * startingAfterUncleanShutdown decoration on the global ServiceContext.
      */
-    void loadCatalog(OperationContext* opCtx) final;
+    void loadCatalog(OperationContext* opCtx) override;
 
     void closeCatalog(OperationContext* opCtx) final;
 
 private:
     using CollIter = std::list<std::string>::iterator;
-
+    Status _dropCollections(OperationContext* opCtx,
+                            KVDatabaseCatalogEntryBase* dbce,
+                            std::vector<std::string>& collections);
     Status _dropCollectionsNoTimestamp(OperationContext* opCtx,
                                        KVDatabaseCatalogEntryBase* dbce,
                                        CollIter begin,
                                        CollIter end);
 
-    Status _dropCollectionsWithTimestamp(OperationContext* opCtx,
-                                         KVDatabaseCatalogEntryBase* dbce,
-                                         std::list<std::string>& toDrop,
-                                         CollIter begin,
-                                         CollIter end);
+    // Status _dropCollectionsWithTimestamp(OperationContext* opCtx,
+    //                                      KVDatabaseCatalogEntryBase* dbce,
+    //                                      std::list<std::string>& toDrop,
+    //                                      CollIter begin,
+    //                                      CollIter end);
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
@@ -224,9 +234,10 @@ private:
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;
 
-    typedef std::map<std::string, KVDatabaseCatalogEntryBase*> DBMap;
-    DBMap _dbs;
-    mutable stdx::mutex _dbsLock;
+    using DBMap =
+        std::map<std::string, std::unique_ptr<KVDatabaseCatalogEntryBase>, std::less<void>>;
+    std::vector<DBMap> _dbMapVector{1 + serverGlobalParams.reservedThreadNum};
+    // mutable stdx::mutex _dbsLock;
 
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;

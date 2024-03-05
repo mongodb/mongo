@@ -55,9 +55,9 @@ using std::string;
 using std::vector;
 
 namespace {
-void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
+void checkNS(OperationContext* opCtx, const std::vector<std::string>& nsToCheck) {
     bool firstTime = true;
-    for (std::list<std::string>::const_iterator it = nsToCheck.begin(); it != nsToCheck.end();
+    for (auto it = nsToCheck.begin(); it != nsToCheck.end();
          ++it) {
         NamespaceString nss(*it);
 
@@ -150,7 +150,7 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
     storageEngine->listDatabases(&dbNames);
 
     try {
-        std::list<std::string> collNames;
+        std::vector<std::string> collNames;
         for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
              dbName < dbNames.end();
              ++dbName) {
