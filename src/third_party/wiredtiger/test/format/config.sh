@@ -73,7 +73,7 @@ done<<END_OF_INPUT>$fc
 CONFIG configuration_list[] = {
 {"assert.read_timestamp", "assert read_timestamp", C_BOOL, 2, 0, 0}
 
-{"background_compact", "configure background compaction", C_BOOL, 10, 0, 0}
+{"background_compact", "configure background compaction", C_BOOL, 50, 0, 0}
 
 {"background_compact.free_space_target", "free space target for background compaction (MB)", 0x0, 1, 100, UINT_MAX}
 
