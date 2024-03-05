@@ -44,7 +44,7 @@ namespace {
  */
 class GlobalHistogramServerStatusSection final : public ServerStatusSection {
 public:
-    GlobalHistogramServerStatusSection() : ServerStatusSection("opLatencies") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -62,6 +62,8 @@ public:
             .appendGlobalLatencyStats(includeHistograms, slowBuckets, &latencyBuilder);
         return latencyBuilder.obj();
     }
-} globalHistogramServerStatusSection;
+};
+auto globalHistogramServerStatusSection =
+    *ServerStatusSectionBuilder<GlobalHistogramServerStatusSection>("opLatencies");
 }  // namespace
 }  // namespace mongo

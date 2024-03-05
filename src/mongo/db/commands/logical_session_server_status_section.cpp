@@ -44,7 +44,7 @@ namespace {
 
 class LogicalSessionServerStatusSection : public ServerStatusSection {
 public:
-    LogicalSessionServerStatusSection() : ServerStatusSection("logicalSessionRecordCache") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -61,8 +61,10 @@ public:
 
         return statsBuilder.obj();
     }
+};
 
-} logicalSessionsServerStatusSection;
+auto& logicalSessionServerStatusSection =
+    *ServerStatusSectionBuilder<LogicalSessionServerStatusSection>("logicalSessionRecordCache");
 
 }  // namespace
 }  // namespace mongo

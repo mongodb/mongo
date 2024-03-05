@@ -62,7 +62,7 @@ selector:
     - jstests/core/query/internal_rename_if_options_and_indexes_match.js
     # The tests below drop a collection in the config database, which is not allowed via a router
     # on a sharded cluster.
-    # TODO (SERVER-79353): Support role-aware serverStatus on mongod with router role.
+    # TODO (SERVER-87512): Support role-aware serverStatus on mongod with router role.
     - jstests/core/write/find_and_modify/find_and_modify_metrics.js
     - jstests/core/write/update/update_metrics.js
     # TODO (SERVER-86777): Investigate why timeseries_delete_with_meta_concurrent.js and

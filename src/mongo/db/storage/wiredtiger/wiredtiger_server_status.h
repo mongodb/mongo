@@ -43,7 +43,7 @@ class WiredTigerKVEngine;
  */
 class WiredTigerServerStatusSection : public ServerStatusSection {
 public:
-    WiredTigerServerStatusSection();
+    using ServerStatusSection::ServerStatusSection;
     bool includeByDefault() const override;
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override;

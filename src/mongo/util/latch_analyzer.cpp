@@ -125,7 +125,7 @@ bool shouldAnalyzeLatches() {
 // Define a new serverStatus section "latchAnalysis"
 class LatchAnalysisSection final : public ServerStatusSection {
 public:
-    LatchAnalysisSection() : ServerStatusSection(kLatchAnalysisName.toString()) {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return false;
@@ -136,7 +136,9 @@ public:
         LatchAnalyzer::get(opCtx->getClient()).appendToBSON(analysis);
         return analysis.obj();
     };
-} gLatchAnalysisSection;
+};
+auto& gLatchAnalysisSection =
+    *ServerStatusSectionBuilder<LatchAnalysisSection>(kLatchAnalysisName.toString());
 
 // Latching state object to pin onto the Client (i.e. thread)
 struct LatchSetState {

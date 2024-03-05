@@ -406,7 +406,7 @@ void ReplicationMetrics::_updateAverageCatchUpOps(WithLock lk) {
 
 class ReplicationMetrics::ElectionMetricsSSS : public ServerStatusSection {
 public:
-    ElectionMetricsSSS() : ServerStatusSection("electionMetrics") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -418,7 +418,9 @@ public:
 
         return replicationMetrics.getElectionMetricsBSON();
     }
-} electionMetricsSSS;
+};
+auto electionMetricsSSS =
+    *ServerStatusSectionBuilder<ReplicationMetrics::ElectionMetricsSSS>("electionMetrics");
 
 }  // namespace repl
 }  // namespace mongo

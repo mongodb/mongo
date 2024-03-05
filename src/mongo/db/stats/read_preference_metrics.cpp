@@ -120,7 +120,7 @@ void ReadPreferenceMetrics::generateMetricsDoc(ReadPreferenceMetricsDoc* doc) {
 namespace {
 class ReadPreferenceMetricsSSS : public ServerStatusSection {
 public:
-    ReadPreferenceMetricsSSS() : ServerStatusSection("readPreferenceCounters") {}
+    using ServerStatusSection::ServerStatusSection;
 
     ~ReadPreferenceMetricsSSS() override = default;
 
@@ -137,8 +137,9 @@ public:
         ReadPreferenceMetrics::get(opCtx)->generateMetricsDoc(&stats);
         return stats.toBSON();
     }
-
-} ReadPreferenceMetricsSSS;
+};
+auto& readPreferenceMetricsSSS =
+    *ServerStatusSectionBuilder<ReadPreferenceMetricsSSS>("readPreferenceCounters");
 }  // namespace
 
 }  // namespace mongo

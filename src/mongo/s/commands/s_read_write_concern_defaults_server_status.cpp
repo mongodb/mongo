@@ -41,7 +41,7 @@ namespace {
 
 class ReadWriteConcernDefaultsServerStatus final : public ServerStatusSection {
 public:
-    ReadWriteConcernDefaultsServerStatus() : ServerStatusSection("defaultRWConcern") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -55,8 +55,9 @@ public:
         response.setLocalUpdateWallClockTime(rwcDefault.localUpdateWallClockTime());
         return response.toBSON();
     }
-
-} defaultRWConcernServerStatus;
+};
+auto& defaultRWConcernServerStatus =
+    *ServerStatusSectionBuilder<ReadWriteConcernDefaultsServerStatus>("defaultRWConcern");
 
 }  // namespace
 }  // namespace mongo

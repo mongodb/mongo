@@ -294,7 +294,7 @@ private:
 
 class TCMallocServerStatusSection : public ServerStatusSection {
 public:
-    TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -375,6 +375,7 @@ private:
 
     MyMetrics _metrics;
 };
-TCMallocServerStatusSection tcmallocServerStatusSection;
+auto& tcmallocServerStatusSection =
+    *ServerStatusSectionBuilder<TCMallocServerStatusSection>("tcmalloc");
 }  // namespace
 }  // namespace mongo

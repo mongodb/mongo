@@ -178,8 +178,6 @@ MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
-const std::string kWiredTigerEngineName = "wiredTiger";
-
 std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers>
 WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(OperationContext* opCtx,
                                                                         WiredTigerRecordStore* rs,

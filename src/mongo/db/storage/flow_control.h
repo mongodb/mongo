@@ -61,7 +61,7 @@ namespace mongo {
  * Otherwise this class' only output is to refresh the tickets available in the
  * `FlowControlTicketholder`.
  */
-class FlowControl : public ServerStatusSection {
+class FlowControl {
 public:
     static constexpr int kMaxTickets = 1000 * 1000 * 1000;
 
@@ -102,24 +102,13 @@ public:
      */
     int getNumTickets(Date_t now);
 
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const;
+
     /**
      * This method is called when replication is reserving `opsApplied` timestamps. `timestamp` is
      * the timestamp in the oplog associated with the first oplog time being reserved.
      */
     void sample(Timestamp timestamp, std::uint64_t opsApplied);
-
-    /**
-     * <ServerStatusSection>
-     */
-    bool includeByDefault() const override {
-        return true;
-    }
-
-    /**
-     * <ServerStatusSection>
-     */
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override;
 
     /**
      * Disables flow control until `deadline` is reached.

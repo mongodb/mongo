@@ -43,7 +43,7 @@ namespace {
 // are introduced in their own named section (e.g. "gRPC").
 class Connections : public ServerStatusSection {
 public:
-    Connections() : ServerStatusSection("connections") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -63,7 +63,8 @@ public:
         }
         return bb.obj();
     }
-} connections;
+};
+auto& connections = *ServerStatusSectionBuilder<Connections>("connections");
 }  // namespace
 
 std::string AsioSessionManager::getClientThreadName(const Session& session) const {

@@ -103,7 +103,7 @@ private:
 
 class TransactionCoordinatorsSSS final : public ServerStatusSection {
 public:
-    TransactionCoordinatorsSSS() : ServerStatusSection("twoPhaseCommitCoordinator") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;

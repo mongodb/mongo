@@ -109,12 +109,7 @@ void incrementSSSMetricNoOverflow(AtomicWord<long long>& metric, long long value
  * Reports globally-aggregated batch stats.
  */
 struct BatchedDeletesSSS : ServerStatusSection {
-    BatchedDeletesSSS()
-        : ServerStatusSection("batchedDeletes"),
-          batches(0),
-          docs(0),
-          stagedSizeBytes(0),
-          timeInBatchMillis(0) {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -131,12 +126,13 @@ struct BatchedDeletesSSS : ServerStatusSection {
         return bob.obj();
     }
 
-    AtomicWord<long long> batches;
-    AtomicWord<long long> docs;
-    AtomicWord<long long> stagedSizeBytes;
-    AtomicWord<long long> timeInBatchMillis;
-    AtomicWord<long long> refetchesDueToYield;
-} batchedDeletesSSS;
+    AtomicWord<long long> batches{0};
+    AtomicWord<long long> docs{0};
+    AtomicWord<long long> stagedSizeBytes{0};
+    AtomicWord<long long> timeInBatchMillis{0};
+    AtomicWord<long long> refetchesDueToYield{0};
+};
+auto& batchedDeletesSSS = *ServerStatusSectionBuilder<BatchedDeletesSSS>("batchedDeletes");
 
 // Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
 // serverStatus metric. As with ensureStillMatches, if false is returned, the WoringSetMember

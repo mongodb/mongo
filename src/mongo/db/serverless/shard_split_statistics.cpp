@@ -69,7 +69,7 @@ void ShardSplitStatistics::appendInfoForServerStatus(BSONObjBuilder* builder) co
 
 class ShardSplitServerStatus final : public ServerStatusSection {
 public:
-    ShardSplitServerStatus() : ServerStatusSection("shardSplits") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -81,6 +81,7 @@ public:
         ShardSplitStatistics::get(opCtx->getServiceContext())->appendInfoForServerStatus(&result);
         return result.obj();
     }
-} shardSplitServerStatus;
+};
+auto shardSplitServerStatus = *ServerStatusSectionBuilder<ShardSplitServerStatus>("shardSplits");
 
 }  // namespace mongo

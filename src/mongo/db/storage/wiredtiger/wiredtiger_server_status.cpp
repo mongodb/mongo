@@ -60,9 +60,6 @@ namespace mongo {
 
 using std::string;
 
-WiredTigerServerStatusSection::WiredTigerServerStatusSection()
-    : ServerStatusSection(kWiredTigerEngineName) {}
-
 bool WiredTigerServerStatusSection::includeByDefault() const {
     return true;
 }

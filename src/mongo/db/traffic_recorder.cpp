@@ -378,7 +378,7 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorder::_getCurrentRecordin
 
 class TrafficRecorder::TrafficRecorderSSS : public ServerStatusSection {
 public:
-    TrafficRecorderSSS() : ServerStatusSection("trafficRecording") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -400,6 +400,8 @@ public:
 
         return recording->getStats();
     }
-} trafficRecorderStats;
+};
+auto& trafficRecorderStats =
+    *ServerStatusSectionBuilder<TrafficRecorder::TrafficRecorderSSS>("trafficRecording");
 
 }  // namespace mongo

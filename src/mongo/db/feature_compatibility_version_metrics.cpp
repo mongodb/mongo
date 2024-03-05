@@ -43,7 +43,7 @@ namespace {
 
 class FCVServerStatusMetrics : public ServerStatusSection {
 public:
-    FCVServerStatusMetrics() : ServerStatusSection("featureCompatibilityVersion") {}
+    using ServerStatusSection::ServerStatusSection;
 
     ~FCVServerStatusMetrics() override = default;
 
@@ -77,8 +77,9 @@ public:
 
         return bob.obj();
     }
-
-} FCVServerStatusMetrics;
+};
+auto& fcvServerStatusMetrics =
+    *ServerStatusSectionBuilder<FCVServerStatusMetrics>("featureCompatibilityVersion");
 
 }  // namespace
 }  // namespace mongo

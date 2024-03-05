@@ -69,6 +69,26 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(flowControlTicketOverride);
 
 namespace {
+class FlowControlServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        auto fc = FlowControl::get(opCtx);
+        if (!fc) {
+            return {};
+        }
+        return fc->generateSection(opCtx, configElement);
+    }
+};
+
+auto& flowControlSection =
+    *ServerStatusSectionBuilder<FlowControlServerStatusSection>("flowControl");
+
 const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<FlowControl>>();
 
 int multiplyWithOverflowCheck(double term1, double term2, int maxValue) {
@@ -142,14 +162,10 @@ bool sustainerAdvanced(const std::vector<repl::MemberData>& prevMemberData,
 }  // namespace
 
 FlowControl::FlowControl(repl::ReplicationCoordinator* replCoord)
-    : ServerStatusSection("flowControl"),
-      _replCoord(replCoord),
-      _lastTimeSustainerAdvanced(Date_t::now()) {}
+    : _replCoord(replCoord), _lastTimeSustainerAdvanced(Date_t::now()) {}
 
 FlowControl::FlowControl(ServiceContext* service, repl::ReplicationCoordinator* replCoord)
-    : ServerStatusSection("flowControl"),
-      _replCoord(replCoord),
-      _lastTimeSustainerAdvanced(Date_t::now()) {
+    : _replCoord(replCoord), _lastTimeSustainerAdvanced(Date_t::now()) {
     // Initialize _lastTargetTicketsPermitted to maximum tickets to make sure flow control doesn't
     // cause a slow start on start up.
     FlowControlTicketholder::set(service, std::make_unique<FlowControlTicketholder>(kMaxTickets));

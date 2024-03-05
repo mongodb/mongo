@@ -201,7 +201,7 @@ void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::toBSON(
 namespace {
 class OpWriteConcernCountersSSS : public ServerStatusSection {
 public:
-    OpWriteConcernCountersSSS() : ServerStatusSection("opWriteConcernCounters") {}
+    using ServerStatusSection::ServerStatusSection;
 
     ~OpWriteConcernCountersSSS() override = default;
 
@@ -216,8 +216,9 @@ public:
                             const BSONElement& configElement) const override {
         return ServerWriteConcernMetrics::get(opCtx)->toBSON();
     }
-
-} opWriteConcernCountersSSS;
+};
+auto& opWriteConcernCountersSSS =
+    *ServerStatusSectionBuilder<OpWriteConcernCountersSSS>("opWriteConcernCounters");
 }  // namespace
 
 }  // namespace mongo

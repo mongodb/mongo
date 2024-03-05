@@ -57,7 +57,7 @@ namespace {
 
 class Network : public ServerStatusSection {
 public:
-    Network() : ServerStatusSection("network") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -81,12 +81,12 @@ public:
 
         return b.obj();
     }
-
-} network;
+};
+auto& network = *ServerStatusSectionBuilder<Network>("network");
 
 class Security : public ServerStatusSection {
 public:
-    Security() : ServerStatusSection("security") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -111,7 +111,8 @@ public:
 
         return result.obj();
     }
-} security;
+};
+auto& security = *ServerStatusSectionBuilder<Security>("security");
 
 #ifdef MONGO_CONFIG_SSL
 /**
@@ -122,7 +123,7 @@ public:
  */
 class TLSVersionStatus : public ServerStatusSection {
 public:
-    TLSVersionStatus() : ServerStatusSection("transportSecurity") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -140,12 +141,13 @@ public:
         builder.append("unknown", counts.tlsUnknown.load());
         return builder.obj();
     }
-} tlsVersionStatus;
+};
+auto& tlsVersionStatus = *ServerStatusSectionBuilder<TLSVersionStatus>("transportSecurity");
 #endif
 
 class AdvisoryHostFQDNs final : public ServerStatusSection {
 public:
-    AdvisoryHostFQDNs() : ServerStatusSection("advisoryHostFQDNs") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return false;
@@ -160,7 +162,8 @@ public:
             out->append("advisoryHostFQDNs", statusWith.getValue());
         }
     }
-} advisoryHostFQDNs;
+};
+auto& advisoryHostFQDNs = *ServerStatusSectionBuilder<AdvisoryHostFQDNs>("advisoryHostFQDNs");
 
 }  // namespace
 }  // namespace mongo
