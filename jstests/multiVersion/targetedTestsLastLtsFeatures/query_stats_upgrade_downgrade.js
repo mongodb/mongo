@@ -74,7 +74,7 @@ class UpgradeDowngradeTestFixture {
         } else {
             // Check that $queryStats related parameter does not work.
             assert.commandFailedWithCode(
-                this.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1}), 7506200);
+                this.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1}), 7373500);
         }
     }
 
