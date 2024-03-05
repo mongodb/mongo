@@ -543,9 +543,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const boost::optional<mongo::UUID>& collectionUUID,
                                 bool ordered,
                                 std::vector<InsertStatement>& batch,
+                                OperationSource source,
                                 LastOpFixer* lastOpFixer,
-                                WriteResult* out,
-                                OperationSource source) {
+                                WriteResult* out) {
     if (batch.empty())
         return true;
 
@@ -1170,9 +1170,9 @@ WriteResult performInserts(OperationContext* opCtx,
                                                      wholeOp.getCollectionUUID(),
                                                      wholeOp.getOrdered(),
                                                      batch,
+                                                     source,
                                                      &lastOpFixer,
-                                                     &out,
-                                                     source);
+                                                     &out);
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
@@ -1221,10 +1221,10 @@ WriteResult performInserts(OperationContext* opCtx,
  */
 static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
                                                       OperationSource source,
-                                                      bool* containsDotsAndDollarsField,
                                                       CurOp& curOp,
                                                       CollectionAcquisition collection,
-                                                      ParsedUpdate& parsedUpdate) {
+                                                      ParsedUpdate& parsedUpdate,
+                                                      bool* containsDotsAndDollarsField) {
     auto exec = uassertStatusOK(
         getExecutorUpdate(&curOp.debug(), collection, &parsedUpdate, boost::none /* verbosity */));
 
@@ -1277,8 +1277,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const boost::optional<mongo::UUID>& opCollectionUUID,
                                                UpdateRequest* updateRequest,
                                                OperationSource source,
-                                               bool* containsDotsAndDollarsField,
-                                               bool forgoOpCounterIncrements) {
+                                               bool forgoOpCounterIncrements,
+                                               bool* containsDotsAndDollarsField) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchUpdate,
         opCtx,
@@ -1363,11 +1363,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     if (updateRequest->getSort().isEmpty()) {
         return performSingleUpdateOpNoRetry(
-            opCtx, source, containsDotsAndDollarsField, curOp, collection, parsedUpdate);
+            opCtx, source, curOp, collection, parsedUpdate, containsDotsAndDollarsField);
     } else {
         return writeConflictRetry(opCtx, "update", ns, [&]() -> SingleWriteResult {
             return performSingleUpdateOpNoRetry(
-                opCtx, source, containsDotsAndDollarsField, curOp, collection, parsedUpdate);
+                opCtx, source, curOp, collection, parsedUpdate, containsDotsAndDollarsField);
         });
     }
 }
@@ -1430,8 +1430,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                                              opCollectionUUID,
                                              &request,
                                              source,
-                                             &containsDotsAndDollarsField,
-                                             forgoOpCounterIncrements);
+                                             forgoOpCounterIncrements,
+                                             &containsDotsAndDollarsField);
 
             if (containsDotsAndDollarsField) {
                 // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
@@ -2255,10 +2255,10 @@ write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
  */
 TimeseriesSingleWriteResult performTimeseriesInsert(
     OperationContext* opCtx,
-    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds,
-    const write_ops::InsertCommandRequest& request) {
+    const write_ops::InsertCommandRequest& request,
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch) {
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
         return {status->first, status->second};
     }
@@ -2276,7 +2276,6 @@ TimeseriesSingleWriteResult performTimeseriesInsert(
  */
 TimeseriesSingleWriteResult performTimeseriesUpdate(
     OperationContext* opCtx,
-    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const BSONObj& metadata,
     const write_ops::UpdateCommandRequest& op,
     const write_ops::InsertCommandRequest& request) {
@@ -2292,8 +2291,8 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
  * by the write and silently leave the bucket uncompressed when any type of error is encountered.
  */
 void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
-                                           timeseries::bucket_catalog::ClosedBucket& closedBucket,
-                                           const write_ops::InsertCommandRequest& request) {
+                                           const write_ops::InsertCommandRequest& request,
+                                           timeseries::bucket_catalog::ClosedBucket& closedBucket) {
     // Buckets with just a single measurement is not worth compressing.
     if (closedBucket.numMeasurements.has_value() && closedBucket.numMeasurements.value() <= 1) {
         return;
@@ -2393,7 +2392,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
         const auto output =
-            performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds), request);
+            performTimeseriesInsert(opCtx, metadata, std::move(stmtIds), request, batch);
         if (auto error = write_ops_exec::generateError(
                 opCtx, output.result.getStatus(), start + index, errors->size())) {
             bool canContinue = output.canContinue;
@@ -2421,7 +2420,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                                                  makeTimeseriesBucketsNamespace(ns(request)),
                                                  metadata,
                                                  std::move(stmtIds));
-        auto const output = performTimeseriesUpdate(opCtx, batch, metadata, op, request);
+        auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
 
         if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
             output.result.getStatus().code() == ErrorCodes::WriteConflict ||
@@ -2452,7 +2451,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
-        tryPerformTimeseriesBucketCompression(opCtx, *closedBucket, request);
+        tryPerformTimeseriesBucketCompression(opCtx, request, *closedBucket);
     }
     return true;
 } catch (const DBException& ex) {
@@ -2467,11 +2466,11 @@ std::shared_ptr<timeseries::bucket_catalog::WriteBatch>& extractFromPair(
 }
 
 bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
+                                       const write_ops::InsertCommandRequest& request,
                                        TimeseriesBatches& batches,
                                        TimeseriesStmtIds&& stmtIds,
                                        boost::optional<repl::OpTime>* opTime,
-                                       boost::optional<OID>* electionId,
-                                       const write_ops::InsertCommandRequest& request) {
+                                       boost::optional<OID>* electionId) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     auto batchesToCommit = timeseries::determineBatchesToCommit(batches, extractFromPair);
@@ -2535,7 +2534,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                 continue;
             }
 
-            tryPerformTimeseriesBucketCompression(opCtx, *closedBucket, request);
+            tryPerformTimeseriesBucketCompression(opCtx, request, *closedBucket);
         }
     } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
         abortStatus = ex.toStatus();
@@ -2554,8 +2553,8 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 // granularity value, due to the possible inconsistency in the process of granularity
 // updates.
 void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
-                                                   TimeseriesOptions& timeSeriesOptions,
-                                                   const NamespaceString& bucketsNs) {
+                                                   const NamespaceString& bucketsNs,
+                                                   TimeseriesOptions& timeSeriesOptions) {
     AutoGetCollectionForRead coll(opCtx, bucketsNs);
     auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
                         ->getCollectionDescription(opCtx);
@@ -2734,7 +2733,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
 
     boost::optional<Status> rebuildOptionsError;
     try {
-        rebuildOptionsWithGranularityFromConfigServer(opCtx, timeSeriesOptions, bucketsNs);
+        rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsNs, timeSeriesOptions);
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // This could occur when the shard version attached to the request is for the time
         // series namespace (unsharded), which is compared to the shard version of the
@@ -2804,7 +2803,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
         // If this insert closed buckets, rewrite to be a compressed column. If we cannot
         // perform write operations at this point the bucket will be left uncompressed.
         for (auto& closedBucket : insertResult->closedBuckets) {
-            tryPerformTimeseriesBucketCompression(opCtx, closedBucket, request);
+            tryPerformTimeseriesBucketCompression(opCtx, request, closedBucket);
         }
 
         return true;
@@ -2854,7 +2853,7 @@ bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
     if (!commitTimeseriesBucketsAtomically(
-            opCtx, batches, std::move(stmtIds), opTime, electionId, request)) {
+            opCtx, request, batches, std::move(stmtIds), opTime, electionId)) {
         return false;
     }
 

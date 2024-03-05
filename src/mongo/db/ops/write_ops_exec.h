@@ -111,9 +111,9 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const boost::optional<mongo::UUID>& collectionUUID,
                                 bool ordered,
                                 std::vector<InsertStatement>& batch,
+                                OperationSource source,
                                 LastOpFixer* lastOpFixer,
-                                WriteResult* out,
-                                OperationSource source);
+                                WriteResult* out);
 
 /**
  * If the operation succeeded, then returns either a document to return to the client, or

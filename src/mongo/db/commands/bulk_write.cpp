@@ -816,9 +816,9 @@ bool handleGroupedInserts(OperationContext* opCtx,
                                                                      nsEntry.getCollectionUUID(),
                                                                      req.getOrdered(),
                                                                      batch,
+                                                                     OperationSource::kStandard,
                                                                      &lastOpFixer,
-                                                                     &out,
-                                                                     OperationSource::kStandard);
+                                                                     &out);
 
         batch.clear();
         bytesInBatch = 0;
