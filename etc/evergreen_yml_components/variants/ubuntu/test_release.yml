@@ -59,31 +59,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-large
-  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
-  - name: aggregation !.feature_flag_guarded
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .jscore .common
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: libunwind_tests
-  # - name: multiversion_gen
-  - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .sharding .txns
-  - name: sharding_gen
-  - name: sharding_jscore_passthrough_gen
-  - name: .ssl
-  - name: .stitch
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
 
 - name: ubuntu2004
   display_name: Ubuntu 20.04
@@ -115,31 +95,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-large
-  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
-  - name: aggregation !.feature_flag_guarded
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .jscore .common
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: libunwind_tests
-  # - name: multiversion_gen
-  - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .sharding .txns
-  - name: sharding_gen
-  - name: sharding_jscore_passthrough_gen
-  - name: .ssl
-  - name: .stitch
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
 
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
@@ -181,31 +141,12 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-large
-  - name: .crypt
-  - name: .publish_crypt
-  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
-  - name: audit
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_oidc_azure
-  - name: external_auth_oidc_gcp
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: jsCore_auth
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: libunwind_tests
-  - name: .ocsp
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: sasl
-  - name: sharding_auth_audit_gen
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: enterprise-ubuntu2204-64
   display_name: Enterprise Ubuntu 22.04
@@ -248,32 +189,15 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-large
-  - name: .crypt
-  - name: .publish_crypt
-  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
-  - name: audit
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: jsCore_auth
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: libunwind_tests
-  - name: .ocsp
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: sasl
-  - name: sharding_auth_audit_gen
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
   - name: test_packages_release
     distros:
     - ubuntu2204-large
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
@@ -314,32 +238,12 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-arm64-large
-  - name: aggregation !.feature_flag_guarded
-  - name: aggregation_wildcard_fuzzer_gen
-  - name: .auth !.audit !.multiversion !.jscore
-  - name: sharding_auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency_gen
-  - name: fle
-  - name: .jscore .common !.auth !.feature_flag_guarded
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: sharding_gen
-  - name: sharding_jscore_passthrough_gen
-  - name: .ssl
-  - name: .stitch
-  - name: .crypt
-  - name: .publish_crypt
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .timeseries_crud
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: ubuntu2004-arm64
   display_name: Ubuntu 20.04 arm64
@@ -373,13 +277,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-arm64-large
-  - name: jsCore
-  - name: replica_sets_jscore_passthrough_gen
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
 
 - name: enterprise-ubuntu2204-arm64
   display_name: Enterprise Ubuntu 22.04 arm64
@@ -413,35 +315,15 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-arm64-large
-  - name: aggregation !.feature_flag_guarded
-  - name: aggregation_wildcard_fuzzer_gen
-  - name: .auth !.audit !.multiversion !.jscore
-  - name: sharding_auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency_gen
-  - name: fle
-  - name: .jscore .common !.auth !.feature_flag_guarded
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: sharding_gen
-  - name: sharding_jscore_passthrough_gen
-  - name: .ssl
-  - name: .stitch
-  - name: .crypt
-  - name: .publish_crypt
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: .timeseries_crud
   - name: test_packages_release
     distros:
     - ubuntu2204-arm64-large
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: ubuntu2204-arm64
   display_name: Ubuntu 22.04 arm64
@@ -471,10 +353,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-arm64-large
-  - name: jsCore
-  - name: replica_sets_jscore_passthrough_gen
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community

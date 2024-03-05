@@ -37,25 +37,12 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
-  - name: audit
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: sasl
-  - name: sharding_auth_audit_gen
-  - name: .stitch
-  - name: .crypt
-  - name: .publish_crypt
-  - name: .publish
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: suse15
   display_name: SUSE 15
@@ -87,28 +74,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
-  - name: aggregation !.feature_flag_guarded
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .jscore .common !.decimal !.feature_flag_guarded
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: multiversion_gen
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  - name: .ssl
-  - name: .stitch
-  - name: .publish
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
