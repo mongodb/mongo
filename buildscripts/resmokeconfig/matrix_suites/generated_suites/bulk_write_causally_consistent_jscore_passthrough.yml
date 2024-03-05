@@ -23,6 +23,7 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
+        enableAutoCompaction: 1
         enableTestCommands: 1
     num_nodes: 2
   hooks:
