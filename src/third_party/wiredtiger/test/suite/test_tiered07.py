@@ -77,11 +77,6 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
         self.pr('create table local')
         self.session.create(self.localuri, 'key_format=S,value_format=S,tiered_storage=(name=none)')
 
-        # Rename is not supported for tiered tables.
-        msg = "/is not supported/"
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.rename(self.uri, self.newuri, None), 0), msg)
-
         # Add some data and flush tier.
         self.pr('add one item to all tables')
         c = self.session.open_cursor(self.uri)

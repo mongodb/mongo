@@ -154,7 +154,7 @@ def wiredtiger_open_tiered(ignored_self, args):
 # We want readonly tests to run with tiered storage, since it is possible to do readonly
 # operations.  This function is called for two purposes:
 #  - when readonly is enabled, we don't want to do flush_tier calls.
-#  - normally the hook silently removes other (not supported) calls, like compact/rename/salvage.
+#  - normally the hook silently removes other (not supported) calls, like compact/salvage.
 #    Except that some tests enable readonly and call these functions, expecting an exception.
 #    So for these "modifying" APIs, we want to actually do the operation (but only when readonly).
 def testcase_is_readonly():
@@ -246,17 +246,6 @@ def session_open_cursor_replace(orig_session_open_cursor, session_self, uri, dup
     if uri != None and uri.startswith("backup:"):
         skip_test("backup on tiered tables not yet implemented")
     return orig_session_open_cursor(session_self, uri, dupcursor, config)
-
-# Called to replace Session.rename
-def session_rename_replace(orig_session_rename, session_self, uri, newuri, config):
-    # Rename isn't implemented for tiered tables.  Only call it if this can't be the uri
-    # of a tiered table.  Note this isn't a precise match for when we did/didn't create
-    # a tiered table, but we don't have the create config around to check.
-    # We want readonly connections to do the real call, see comment in testcase_is_readonly.
-    ret = 0
-    if not uri.startswith("table:") or testcase_is_readonly():
-        ret = orig_session_rename(session_self, uri, newuri, config)
-    return ret
 
 # Called to replace Session.salvage
 def session_salvage_replace(orig_session_salvage, session_self, uri, config):
@@ -352,10 +341,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
         orig_session_open_cursor = self.Session['open_cursor']
         self.Session['open_cursor'] = (wthooks.HOOK_REPLACE, lambda s, uri, todup=None, config=None:
           session_open_cursor_replace(orig_session_open_cursor, s, uri, todup, config))
-
-        orig_session_rename = self.Session['rename']
-        self.Session['rename'] = (wthooks.HOOK_REPLACE, lambda s, uri, newuri, config=None:
-          session_rename_replace(orig_session_rename, s, uri, newuri, config))
 
         orig_session_salvage = self.Session['salvage']
         self.Session['salvage'] = (wthooks.HOOK_REPLACE, lambda s, uri, config=None:

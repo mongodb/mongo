@@ -46,11 +46,8 @@ class test_backup06(backup_base):
     num_table_sets = 10
     pfx='test_backup'
 
-    # We try to do some schema operations.  Have some well
-    # known names.
+    # We try to do some schema operations. Have a well known name.
     schema_uri = 'file:schema_test'
-    rename_uri = 'file:new_test'
-    trename_uri = 'table:new_test'
 
     fobjs = [
         ( 'file:' + pfx + '.1', SimpleDataSet),
@@ -109,8 +106,6 @@ class test_backup06(backup_base):
 
     def test_cursor_schema_protect(self):
         schema_uri = 'file:schema_test'
-        rename_uri = 'file:new_test'
-        trename_uri = 'table:new_test'
 
         #
         # Set up a number of tables.  Close and reopen the connection so that
@@ -124,18 +119,15 @@ class test_backup06(backup_base):
         self.populate(self.fobjs)
         self.populate(self.tobjs)
         cursor = self.session.open_cursor('backup:', None, None)
+
         # Check that we can create.
         self.session.create(schema_uri, None)
         for i in self.fobjs:
             self.assertRaises(wiredtiger.WiredTigerError,
                 lambda: self.session.drop(i[0], None))
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.rename(i[0], rename_uri))
         for i in self.tobjs:
             self.assertRaises(wiredtiger.WiredTigerError,
                 lambda: self.session.drop(i[0], None))
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.rename(i[0], trename_uri))
         cursor.close()
 
     # Test cursor reset runs through the list twice.

@@ -38,7 +38,7 @@ class test_util22(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Skip 'copyright', which does not process options
     commands = ['alter', 'backup', 'compact', 'create', 'downgrade', 'drop', 'dump', 'list', 'load',
-                'loadtext', 'printlog', 'read', 'rename', 'salvage', 'stat', 'truncate', 'upgrade',
+                'loadtext', 'printlog', 'read', 'salvage', 'stat', 'truncate', 'upgrade',
                 'verify', 'write']
 
     def test_help_option(self):

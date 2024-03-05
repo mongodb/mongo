@@ -55,9 +55,6 @@ class test_bug006(wttest.WiredTigerTestCase):
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.drop(uri, None))
         self.assertRaises(
-            wiredtiger.WiredTigerError,
-            lambda: self.session.rename(uri, self.uri + "new", None))
-        self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.salvage(uri, None))
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.upgrade(uri, None))
@@ -67,9 +64,7 @@ class test_bug006(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Table operations should succeed, the cursor is closed.
-        self.renameUntilSuccess(self.session, uri, self.uri + "new")
-        self.renameUntilSuccess(self.session, self.uri + "new", uri)
-        self.session.salvage(uri, None)
+        self.salvageUntilSuccess(self.session, uri)
         self.session.truncate(uri, None, None, None)
         self.upgradeUntilSuccess(self.session, uri)
         self.verifyUntilSuccess(self.session, uri)
