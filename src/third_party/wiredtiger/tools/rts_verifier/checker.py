@@ -287,6 +287,10 @@ class Checker:
         # TODO expand this out
         pass
 
+    def __apply_check_wait_threads(self, operation):
+        # TODO expand this out
+        pass
+
     def __apply_check_end(self, operation):
         # TODO expand this out
         pass

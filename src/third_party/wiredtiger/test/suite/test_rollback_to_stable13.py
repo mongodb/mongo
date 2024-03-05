@@ -53,7 +53,13 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         ('dryrun', dict(dryrun=True)),
     ]
 
-    scenarios = make_scenarios(format_values, prepare_values, dryrun_values)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, prepare_values, dryrun_values, worker_thread_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
@@ -304,7 +310,7 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         self.check(None, uri, 0, nrows, 41 if self.prepare else 40)
         self.check(value_c, uri, nrows, None, 61 if self.prepare else 60)
 
-        self.conn.rollback_to_stable("dryrun={}".format("true" if self.dryrun else "false"))
+        self.conn.rollback_to_stable("dryrun={}".format("true" if self.dryrun else "false") + ',threads=' + str(self.threads))
         # Perform several updates and checkpoint.
         self.large_updates(uri, value_c, ds, nrows, self.prepare, 65 if self.dryrun else 60)
         self.session.checkpoint()

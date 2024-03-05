@@ -32,9 +32,10 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
-# test_rollback_to_stable02.py
-# Test that rollback to stable brings back the history value to replace on-disk value.
-class test_rollback_to_stable02(test_rollback_to_stable_base):
+# test_rollback_to_stable43.py
+# Test that rollback to stable brings back the history value to replace on-disk value
+# using worker threads.
+class test_rollback_to_stable43(test_rollback_to_stable_base):
 
     # For FLCS, set the page size down. Otherwise for the in-memory scenarios we get enough
     # updates on the page that the in-memory page footprint exceeds the default maximum
@@ -57,11 +58,6 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ('inmem', dict(in_memory=True))
     ]
 
-    prepare_values = [
-        ('no_prepare', dict(prepare=False)),
-        ('prepare', dict(prepare=True))
-    ]
-
     dryrun_values = [
         ('no_dryrun', dict(dryrun=False)),
         ('dryrun', dict(dryrun=True))
@@ -69,11 +65,13 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
 
     worker_thread_values = [
         ('0', dict(threads=0)),
-        ('4', dict(threads=4)),
-        ('8', dict(threads=8))
+        ('1', dict(threads=1)),
+        ('2', dict(threads=2)),
+        ('3', dict(threads=3)),
+        ('4', dict(threads=4))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, worker_thread_values)
+    scenarios = make_scenarios(format_values, in_memory_values, dryrun_values, worker_thread_values)
 
     def conn_config(self):
         config = 'cache_size=100MB,statistics=(all),verbose=(rts:5)'
@@ -82,15 +80,17 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         return config
 
     def test_rollback_to_stable(self):
-        nrows = 10000
+        nrows = 1000
+        ntables = 10
 
-        # Create a table.
-        uri = "table:rollback_to_stable02"
-        ds_config = self.extraconfig
-        ds_config += ',log=(enabled=false)' if self.in_memory else ''
-        ds = SimpleDataSet(self, uri, 0,
-            key_format=self.key_format, value_format=self.value_format, config=ds_config)
-        ds.populate()
+        # Create a tables.
+        for i in range(1, ntables + 1):
+            uri = "table:rollback_to_stable43" + str(i)
+            ds_config = self.extraconfig
+            ds_config += ',log=(enabled=false)' if self.in_memory else ''
+            ds = SimpleDataSet(self, uri, 0,
+                key_format=self.key_format, value_format=self.value_format, config=ds_config)
+            ds.populate()
 
         if self.value_format == '8t':
             valuea = 97
@@ -107,27 +107,27 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
 
-        self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
-        # Check that all updates are seen.
-        self.check(valuea, uri, nrows, None, 11 if self.prepare else 10)
+        for i in range(1, ntables + 1):
+            uri = "table:rollback_to_stable43" + str(i)
+            self.large_updates(uri, valuea, ds, nrows, None, 10)
+            # Check that all updates are seen.
+            self.check(valuea, uri, nrows, None, 10)
 
-        self.large_updates(uri, valueb, ds, nrows, self.prepare, 20)
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(valueb, uri, nrows, None, 21 if self.prepare else 20)
+            self.large_updates(uri, valueb, ds, nrows, None, 20)
+            # Check that the new updates are only seen after the update timestamp.
+            self.check(valueb, uri, nrows, None, 20)
 
-        self.large_updates(uri, valuec, ds, nrows, self.prepare, 30)
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(valuec, uri, nrows, None, 31 if self.prepare else 30)
+            self.large_updates(uri, valuec, ds, nrows, None, 30)
+            # Check that the new updates are only seen after the update timestamp.
+            self.check(valuec, uri, nrows, None, 30)
 
-        self.large_updates(uri, valued, ds, nrows, self.prepare, 40)
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(valued, uri, nrows, None, 41 if self.prepare else 40)
+            self.large_updates(uri, valued, ds, nrows, None, 40)
+            # Check that the new updates are only seen after the update timestamp.
+            self.check(valued, uri, nrows, None, 40)
 
-        # Pin stable to timestamp 30 if prepare otherwise 20.
-        if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
-        else:
-            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        # Pin stable to timestamp 20.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+
         # Checkpoint to ensure that all the data is flushed.
         self.session.breakpoint()
         if not self.in_memory:
@@ -149,8 +149,6 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         calls = stat_cursor[stat.conn.txn_rts][2]
         upd_aborted = (stat_cursor[stat.conn.txn_rts_upd_aborted][2] +
             stat_cursor[stat.conn.txn_rts_hs_removed][2])
-        upd_aborted_dryrun = (stat_cursor[stat.conn.txn_rts_upd_aborted_dryrun][2] +
-            stat_cursor[stat.conn.txn_rts_hs_removed_dryrun][2])
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
@@ -163,7 +161,8 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
 
         if self.dryrun:
             self.assertEqual(upd_aborted, 0)
-            self.assertGreaterEqual(upd_aborted_dryrun, nrows * 2)
         else:
-            self.assertGreaterEqual(upd_aborted, nrows * 2)
-            self.assertEqual(upd_aborted_dryrun, 0)
+            self.assertGreaterEqual(upd_aborted, nrows * 2 * ntables)
+
+if __name__ == '__main__':
+    wttest.run()

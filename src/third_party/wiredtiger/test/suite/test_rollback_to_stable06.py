@@ -57,7 +57,13 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         ('evict', dict(evict=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, evict)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, evict, worker_thread_values)
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
@@ -104,7 +110,7 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Check that all keys are removed.
         # (For FLCS, at least for now, they will read back as 0, meaning deleted, rather

@@ -2703,6 +2703,9 @@ struct __wt_connection {
      * @configstart{WT_CONNECTION.rollback_to_stable, see dist/api_data.py}
      * @config{dryrun, perform the checks associated with RTS\, but don't modify any data., a
      * boolean flag; default \c false.}
+     * @config{threads, maximum number of threads WiredTiger will start to help RTS. Each RTS worker
+     * thread uses a session from the configured session_max., an integer between \c 0 and \c 10;
+     * default \c 4.}
      * @configend
      * @errors
      * An error should occur only in the case of a system problem, and an application typically

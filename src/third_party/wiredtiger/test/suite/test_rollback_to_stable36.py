@@ -62,7 +62,12 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         ('runtime', dict(crash=False)),
         ('recovery', dict(crash=True)),
     ]
-    scenarios = make_scenarios(trunc_values, format_values, rollback_modes)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+    scenarios = make_scenarios(trunc_values, format_values, rollback_modes, worker_thread_values)
 
     # Don't raise errors for these, the expectation is that the RTS verifier will
     # run on the test output.
@@ -174,7 +179,7 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         if self.crash:
             simulate_crash_restart(self, ".", "RESTART")
         else:
-            self.conn.rollback_to_stable()
+            self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Currently rolling back a fast-truncate works by instantiating the pages and
         # rolling back the instantiated updates, so we should see some page instantiations.

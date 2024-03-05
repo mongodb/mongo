@@ -42,7 +42,12 @@ class test_rollback_to_stable33(wttest.WiredTigerTestCase):
         ('no', dict(logged=False)),
         ('yes', dict(logged=True))
     ]
-    scenarios = make_scenarios(format_values, logged)
+    worker_thread_values = [
+        ('0', dict(threads=0)),
+        ('4', dict(threads=4)),
+        ('8', dict(threads=8))
+    ]
+    scenarios = make_scenarios(format_values, logged, worker_thread_values)
 
     # Configure an in-memory database.
     conn_config = 'in_memory=true,verbose=(rts:5)'
@@ -73,7 +78,7 @@ class test_rollback_to_stable33(wttest.WiredTigerTestCase):
 
         # Set stable to 20 and rollback.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('threads=' + str(self.threads))
 
         # Objects with logging enabled should not be rolled back, objects without logging enabled
         # should have their updates rolled back.
