@@ -130,8 +130,7 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpressi
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
                                      expr.clone(),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
-                                                       getBSONTypeMask(BSONType::Undefined))),
+                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
                         makeBoolConstant(true));
 }
 
@@ -147,6 +146,31 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frame
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg) {
     return generateNullOrMissingExpr(*arg);
+}
+
+std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefinedExpr(const sbe::EExpression& expr) {
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                        makeFunction("typeMatch",
+                                     expr.clone(),
+                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
+                                                       getBSONTypeMask(BSONType::Undefined))),
+                        makeBoolConstant(true));
+}
+
+
+std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(const sbe::EVariable& var) {
+    return generateNullMissingOrUndefinedExpr(var);
+}
+
+std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(sbe::FrameId frameId,
+                                                                 sbe::value::SlotId slotId) {
+    sbe::EVariable var{frameId, slotId};
+    return generateNullMissingOrUndefined(var);
+}
+
+std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(
+    std::unique_ptr<sbe::EExpression> arg) {
+    return generateNullMissingOrUndefinedExpr(*arg);
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
@@ -200,7 +224,7 @@ std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
     auto numericConvert32 =
         sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
     return makeBinaryOp(sbe::EPrimBinary::logicOr,
-                        generateNullOrMissing(var),
+                        generateNullMissingOrUndefined(var),
                         makeNot(makeFunction("exists", std::move(numericConvert32))));
 }
 
@@ -393,11 +417,11 @@ std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values
         auto frameId = frameIdGenerator->generate();
         auto var = sbe::EVariable{frameId, 0};
 
-        expr = sbe::makeE<sbe::ELocalBind>(frameId,
-                                           sbe::makeEs(std::move(values[idx])),
-                                           sbe::makeE<sbe::EIf>(makeNot(generateNullOrMissing(var)),
-                                                                var.clone(),
-                                                                std::move(expr)));
+        expr = sbe::makeE<sbe::ELocalBind>(
+            frameId,
+            sbe::makeEs(std::move(values[idx])),
+            sbe::makeE<sbe::EIf>(
+                makeNot(generateNullMissingOrUndefined(var)), var.clone(), std::move(expr)));
     }
 
     return expr;

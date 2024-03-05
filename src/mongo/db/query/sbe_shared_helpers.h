@@ -86,7 +86,7 @@ ExpressionType generateComparisonExpr(BuilderType& b,
                 MONGO_UNREACHABLE_TASSERT(8217101);
         }
     } else if (tag == sbe::value::TypeTags::Null) {
-        // When comparing to null we have to consider missing and undefined.
+        // When comparing to null we have to consider missing.
         inputExpr = b.buildMultiBranchConditional(
             typename BuilderType::CaseValuePair{b.generateNullOrMissing(b.cloneExpr(inputExpr)),
                                                 b.makeNullConstant()},

@@ -567,6 +567,14 @@ Collection count: 213
 
 
 [jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : null } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ null ] }
+{  "a" : null }
+
+
+[jsTest] ----
 [jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : /(?:)/ } },  "projection" : {  "_id" : 0 } }
 [jsTest] ----
 

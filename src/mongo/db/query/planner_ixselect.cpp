@@ -137,14 +137,12 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
     // with a value of null if the index is multikey on one of the components of the path.
     //
     // This is quite subtle, and due to the semantics of null matching. For example, if the query is
-    // {a: {$ne: null}}, you might expect us to build index bounds of [MinKey, undefined) and
-    // (null, MaxKey] (or similar) on an 'a' index. However, with this query the document {a: []}
-    // should match (because it does not match {a: null}), but will have an index key of undefined.
-    // Similarly, the document {a: [null, null]} matches the query {'a.b': {$ne: null}}, but would
-    // have an index key of null in an index on 'a.b'. Since it's possible for a key of undefined to
-    // be included in the results and also possible for a value of null to be included, there are no
-    // restrictions on the bounds of the index for such a predicate. Further, such an index could
-    // not be used for covering, so would not provide any help to the query.
+    // {'a.b': {$ne: null}}, you might expect us to build index bounds of [MinKey, null) and
+    // (null, MaxKey] (or similar) on an 'a.b' index. However, the document {a: [null, null]}
+    // matches the query {'a.b': {$ne: null}}, but would have an index key of null. Since it's
+    // possible for a value of null to be included in the results, there are no restrictions on the
+    // bounds of the index for such a predicate. Further, such an index could not be used for
+    // covering, so would not provide any help to the query.
     //
     // There are two exceptions to this rule, both having to do with $elemMatch, see below.
     auto* parentElemMatch = elemMatchContext.innermostParentElemMatch;
@@ -155,12 +153,11 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
 
     if (MatchExpression::ELEM_MATCH_VALUE == parentElemMatch->matchType()) {
         // If this $ne clause is within a $elemMatch *value*, the semantics of $elemMatch guarantee
-        // that no matching values will be null or undefined, even if the index is multikey.
+        // that no matching values will be null, even if the index is multikey.
         //
         // For example, the document {a: []} does *not* match the query {a: {$elemMatch: {$ne:
         // null}} because there was no element within the array that matched. While the document {a:
-        // [[]]} *does* match that query, the index entry for that document would be [], not null or
-        // undefined.
+        // [[]]} *does* match that query, the index entry for that document would be [], not null.
         return true;
     } else {
         invariant(MatchExpression::ELEM_MATCH_OBJECT == parentElemMatch->matchType());

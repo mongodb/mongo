@@ -923,8 +923,7 @@ public:
 
         if (exprIsParameterized || expr->getRegexes().size() == 0) {
             auto makePredicate = [&, hasNull = hasNull](SbExpr inputExpr) {
-                // We have to match nulls and undefined if a 'null' is present in
-                // equalities.
+                // We have to match nulls and missing if a 'null' is present in equalities.
                 auto valueExpr = !hasNull ? std::move(inputExpr)
                                           : b.makeIf(b.generateNullOrMissing(inputExpr.clone()),
                                                      b.makeNullConstant(),
@@ -981,7 +980,7 @@ public:
                     "regexMatch", std::move(pcreRegexesConstant), inputExpr.clone())));
 
             if (expr->getEqualities().size() > 0) {
-                // We have to match nulls and undefined if a 'null' is present in equalities.
+                // We have to match nulls and missing if a 'null' is present in equalities.
                 if (hasNull) {
                     inputExpr = b.makeIf(b.generateNullOrMissing(inputExpr.clone()),
                                          b.makeNullConstant(),

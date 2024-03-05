@@ -171,9 +171,12 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
             // We can't call 'compareElements' on elements of different canonical types.  Usually
             // elements with different canonical types should never match any comparison, but there
             // are a few exceptions, handled here.
-            // jstNULL and undefined are treated the same
+
+            // jstNULL and missing are treated the same.
             if (ect + rct == 5) {
-                return matchType() == EQ || matchType() == LTE || matchType() == GTE;
+                // At this point we know null (RHS) is being compared to either EOO (missing) or
+                // undefined.
+                return e.eoo() && (matchType() == EQ || matchType() == LTE || matchType() == GTE);
             }
             if (_rhs.type() == MaxKey || _rhs.type() == MinKey) {
                 switch (matchType()) {
@@ -480,8 +483,8 @@ std::unique_ptr<MatchExpression> InMatchExpression::clone() const {
 
 bool InMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     // When an $in has a null, it adopts the same semantics as {$eq:null}. Namely, in addition to
-    // matching literal null values, the $in should match missing and undefined.
-    if (hasNull() && (e.eoo() || e.type() == BSONType::Undefined)) {
+    // matching literal null values, the $in should match missing.
+    if (hasNull() && e.eoo()) {
         return true;
     }
     if (contains(e)) {

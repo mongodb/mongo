@@ -286,18 +286,8 @@ void OrderedIntervalList::complement() {
     // We will build up a list of intervals that represents the inversion of those in the OIL.
     vector<Interval> newIntervals;
     for (const auto& curInt : intervals) {
-
-        // There is one special case worth optimizing for: we will generate two point queries for an
-        // equality-to-null predicate like {a: {$eq: null}}. The points are undefined and null, so
-        // when complementing (for {a: {$ne: null}} or similar), we know that there is nothing in
-        // between these two points, and can avoid adding that range.
-        const bool isProvablyEmptyRange =
-            (curBoundary.type() == BSONType::Undefined && curInclusive &&
-             curInt.start.type() == BSONType::jstNULL && curInt.startInclusive);
-
         if ((0 != curInt.start.woCompare(curBoundary) ||
-             (!curInclusive && !curInt.startInclusive)) &&
-            !isProvablyEmptyRange) {
+             (!curInclusive && !curInt.startInclusive))) {
             // Make a new interval from 'curBoundary' to the start of 'curInterval'.
             BSONObjBuilder intBob;
             intBob.append(curBoundary);
