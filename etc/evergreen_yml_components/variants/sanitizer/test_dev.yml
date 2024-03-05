@@ -409,8 +409,7 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
-  # TODO SERVER-85584 Reenable uninitialized_fcv passthrough
-  - name: .sharding .jscore !.wo_snapshot !.uninitialized_fcv !.feature_flag_guarded
+  - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
   - name: .sharding .common !.csrs !.feature_flag_guarded
   - name: .stitch
   - name: .updatefuzzer

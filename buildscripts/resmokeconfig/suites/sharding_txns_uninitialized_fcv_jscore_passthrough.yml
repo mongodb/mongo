@@ -30,7 +30,7 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/send_command_to_initial_sync_node.js');
+        await import('jstests/libs/override_methods/send_command_to_initial_sync_node_sharded_cluster.js');
   fixture:
     class: ShardedClusterFixture
     mongos_options:

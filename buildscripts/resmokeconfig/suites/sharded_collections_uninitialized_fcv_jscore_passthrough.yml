@@ -98,6 +98,8 @@ selector:
 
   # Will fail all commands including those needed to forward command to initial sync node.
   - jstests/core/failcommand_failpoint.js
+  # Starts MongoCryptD instead of mongod nodes
+  - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
@@ -122,7 +124,7 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/send_command_to_initial_sync_node.js');
+        await import('jstests/libs/override_methods/send_command_to_initial_sync_node_sharded_cluster.js');
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   fixture:
     class: ShardedClusterFixture

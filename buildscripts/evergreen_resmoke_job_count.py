@@ -34,7 +34,13 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
     "enterprise-rhel-80-64-bit-inmem": [
         {"task": "secondary_reads_passthrough", "factor": 0.3},
         {"task": "multi_stmt_txn_jscore_passthrough_with_migration", "factor": 0.3},
-    ]
+    ], "enterprise-rhel80-debug-tsan": [{
+        "task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125
+    }], "rhel80-debug-aubsan-classic-engine": [{
+        "task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25
+    }], "rhel80-debug-aubsan-all-feature-flags": [{
+        "task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25
+    }]
 }
 
 TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]

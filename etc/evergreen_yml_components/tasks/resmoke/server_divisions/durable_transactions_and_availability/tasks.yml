@@ -986,7 +986,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -994,7 +994,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_txns_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1010,7 +1010,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1018,7 +1018,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_txns_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:

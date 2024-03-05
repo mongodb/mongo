@@ -586,8 +586,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: streams
-  # TODO SERVER-85584 Reenable uninitialized_fcv passthrough
-  - name: .sharding .jscore !.wo_snapshot !.uninitialized_fcv
+  - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: .serverless
   - name: .shard_split
@@ -731,8 +730,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  # TODO SERVER-85584: Remove !.uninitialized_fcv and reenable sharding uninitialized fcv passthrough suites.
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   # - name: .sharding .common # Not passing
