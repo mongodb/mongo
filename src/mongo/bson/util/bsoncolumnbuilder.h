@@ -400,7 +400,7 @@ public:
      * Validates that the internal state of this BSONColumnBuilder is identical to the provided one.
      * This guarantees that appending more data to either of them would produce the same binary.
      */
-    void assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const;
+    bool isInternalStateIdentical(const BSONColumnBuilder& other) const;
 
     /**
      * Returns the last non-skipped appended scalar element into this BSONColumnBuilder.

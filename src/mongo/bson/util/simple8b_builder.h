@@ -169,7 +169,7 @@ public:
      * Validates that the internal state of this Simple8bBuilder is identical to the provided one.
      * This guarantees that appending more data to either of them would produce the same binary.
      */
-    void assertInternalStateIdentical_forTest(const Simple8bBuilder<T>& other) const;
+    bool isInternalStateIdentical(const Simple8bBuilder<T>& other) const;
 
 private:
     // Number of different type of selectors and their extensions available

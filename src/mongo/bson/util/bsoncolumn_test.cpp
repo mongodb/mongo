@@ -587,7 +587,7 @@ public:
         [[maybe_unused]] auto diff = reference.intermediate();
 
         // Verify that the internal state is identical to the reference builder
-        reopen.assertInternalStateIdentical_forTest(reference);
+        invariant(reopen.isInternalStateIdentical(reference));
     }
 
     static void verifyBinary(BSONBinData columnBinary,

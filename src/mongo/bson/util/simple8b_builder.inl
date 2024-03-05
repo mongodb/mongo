@@ -597,16 +597,30 @@ std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuil
 }
 
 template <typename T>
-void Simple8bBuilder<T>::assertInternalStateIdentical_forTest(
-    const Simple8bBuilder<T>& other) const {
+bool Simple8bBuilder<T>::isInternalStateIdentical(const Simple8bBuilder<T>& other) const {
     // Verifies the pending values
-    invariant(std::equal(begin(), end(), other.begin(), other.end()));
-    invariant(_rleCount == other._rleCount);
-    invariant(_lastValueInPrevWord == other._lastValueInPrevWord);
-    invariant(_currMaxBitLen == other._currMaxBitLen);
-    invariant(_currTrailingZerosCount == other._currTrailingZerosCount);
-    invariant(_lastValidExtensionType == other._lastValidExtensionType);
-    invariant(isSelectorPossible == other.isSelectorPossible);
+    if (!std::equal(begin(), end(), other.begin(), other.end())) {
+        return false;
+    }
+    if (_rleCount != other._rleCount) {
+        return false;
+    }
+    if (_lastValueInPrevWord != other._lastValueInPrevWord) {
+        return false;
+    }
+    if (_currMaxBitLen != other._currMaxBitLen) {
+        return false;
+    }
+    if (_currTrailingZerosCount != other._currTrailingZerosCount) {
+        return false;
+    }
+    if (_lastValidExtensionType != other._lastValidExtensionType) {
+        return false;
+    }
+    if (isSelectorPossible != other.isSelectorPossible) {
+        return false;
+    }
+    return true;
 }
 
 }  // namespace mongo

@@ -29,6 +29,11 @@
 
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/testing_proctor.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -46,6 +51,27 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                           std::make_pair(numMeasurements, BSONColumnBuilder(binData, binLength)));
     }
     _measurementCount = numMeasurements;
+    if (TestingProctor::instance().isEnabled()) {
+        for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
+            int binLength = 0;
+            const char* binData = columnValue.binData(binLength);
+            BSONColumnBuilder builderToCompareTo;
+            BSONColumn c(binData, binLength);
+            for (auto&& elem : c) {
+                builderToCompareTo.append(elem);
+            }
+            [[maybe_unused]] auto diff = builderToCompareTo.intermediate();
+            auto it = _builders.find(key);
+            bool isInternalStateCorrect =
+                std::get<1>(it->second).isInternalStateIdentical(builderToCompareTo);
+            if (!isInternalStateCorrect) {
+                LOGV2(10402,
+                      "Detected incorrect internal state when reopening from following binary: ",
+                      "binary"_attr = base64::encode(StringData(binData, binLength)));
+            }
+            invariant(isInternalStateCorrect);
+        }
+    }
 }
 
 void MeasurementMap::_insertNewKey(StringData key,

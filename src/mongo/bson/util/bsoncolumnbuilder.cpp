@@ -414,7 +414,6 @@ private:
                                     const boost::optional<T>& lastValForRLE,
                                     const char* s8bBlock,
                                     int index);
-
     /*
      * Special case of _appendUntilOverflow when we know that the last simple8b block is RLE. It is
      * trivial to calculate the overflow point as it will be inside the first discovered non-RLE
@@ -2219,21 +2218,33 @@ void BSONColumnBuilder::_flushSubObjMode() {
     _is.mode = Mode::kRegular;
 }
 
-void BSONColumnBuilder::assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const {
+bool BSONColumnBuilder::isInternalStateIdentical(const BSONColumnBuilder& other) const {
     // Verify that buffers are identical
-    invariant(_bufBuilder.len() == other._bufBuilder.len());
+    if (_bufBuilder.len() != other._bufBuilder.len()) {
+        return false;
+    }
     if (_bufBuilder.len() > 0) {
-        invariant(memcmp(_bufBuilder.buf(), other._bufBuilder.buf(), _bufBuilder.len()) == 0);
+        if (memcmp(_bufBuilder.buf(), other._bufBuilder.buf(), _bufBuilder.len()) != 0) {
+            return false;
+        }
     }
 
     // Validate internal state of regular mode
-    invariant(_is.mode == other._is.mode);
-    invariant(_is.regular._controlByteOffset == other._is.regular._controlByteOffset);
+    if (_is.mode != other._is.mode) {
+        return false;
+    }
+    if (_is.regular._controlByteOffset != other._is.regular._controlByteOffset) {
+        return false;
+    }
     if (auto encoder = std::get_if<bsoncolumn::EncodingState::Encoder64>(&_is.regular._encoder)) {
         auto encoderOther = std::get_if<EncodingState::Encoder64>(&other._is.regular._encoder);
-        invariant(encoderOther);
+        if (!encoderOther) {
+            return false;
+        }
 
-        invariant(encoder->scaleIndex == encoderOther->scaleIndex);
+        if (encoder->scaleIndex != encoderOther->scaleIndex) {
+            return false;
+        }
 
         // Our mac toolchain does not have std::bit_cast yet.
         auto bit_cast = [](double from) {
@@ -2243,38 +2254,61 @@ void BSONColumnBuilder::assertInternalStateIdentical_forTest(const BSONColumnBui
         };
         // NaN does not compare equal to itself, so we bit cast and perform this comparison as
         // interger
-        invariant(bit_cast(encoder->lastValueInPrevBlock) ==
-                  bit_cast(encoderOther->lastValueInPrevBlock));
+        if (bit_cast(encoder->lastValueInPrevBlock) !=
+            bit_cast(encoderOther->lastValueInPrevBlock)) {
+            return false;
+        }
 
-        invariant(encoder->prevDelta == encoderOther->prevDelta);
-        invariant(encoder->prevEncoded64 == encoderOther->prevEncoded64);
+        if (encoder->prevDelta != encoderOther->prevDelta) {
+            return false;
+        }
+        if (encoder->prevEncoded64 != encoderOther->prevEncoded64) {
+            return false;
+        }
 
-        encoder->simple8bBuilder.assertInternalStateIdentical_forTest(
-            encoderOther->simple8bBuilder);
+        if (!encoder->simple8bBuilder.isInternalStateIdentical(encoderOther->simple8bBuilder)) {
+            return false;
+        }
 
 
     } else if (auto encoder =
                    std::get_if<bsoncolumn::EncodingState::Encoder128>(&_is.regular._encoder)) {
         auto encoderOther = std::get_if<EncodingState::Encoder128>(&other._is.regular._encoder);
-        invariant(encoderOther);
+        if (!encoderOther) {
+            return false;
+        }
 
-        invariant(encoder->prevEncoded128 == encoderOther->prevEncoded128);
+        if (encoder->prevEncoded128 != encoderOther->prevEncoded128) {
+            return false;
+        }
 
-        encoder->simple8bBuilder.assertInternalStateIdentical_forTest(
-            encoderOther->simple8bBuilder);
+        if (!encoder->simple8bBuilder.isInternalStateIdentical(encoderOther->simple8bBuilder)) {
+            return false;
+        }
     } else {
-        invariant(false);
+        return false;
     }
 
-    invariant(_is.regular._prev.size == other._is.regular._prev.size);
-    invariant(memcmp(_is.regular._prev.buffer.get(),
-                     other._is.regular._prev.buffer.get(),
-                     _is.regular._prev.size) == 0);
+    if (_is.regular._prev.size != other._is.regular._prev.size) {
+        return false;
+    }
+    if (memcmp(_is.regular._prev.buffer.get(),
+               other._is.regular._prev.buffer.get(),
+               _is.regular._prev.size) != 0) {
+        return false;
+    }
 
     // Validate intermediate data
-    invariant(_is.offset == other._is.offset);
-    invariant(_is.lastBufLength == other._is.lastBufLength);
-    invariant(_is.lastControl == other._is.lastControl);
+    if (_is.offset != other._is.offset) {
+        return false;
+    }
+    if (_is.lastBufLength != other._is.lastBufLength) {
+        return false;
+    }
+    if (_is.lastControl != other._is.lastControl) {
+        return false;
+    }
+    return true;
 }
 
 }  // namespace mongo
