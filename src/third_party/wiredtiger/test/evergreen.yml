@@ -3042,7 +3042,45 @@ tasks:
               cat coverage_report/diff.txt
             fi
 
-            ${python_binary|python3} test/evergreen/code_change_report/code_change_info.py -v -c coverage_report/full_coverage_report.json -g . $EXTRA_CODE_CHANGE_PARAMETERS -o coverage_report/code_change_info.json
+            ######################################################
+            # Obtain the complexity metrics for the 'current' code
+            ######################################################
+            # Install Metrix++, ensuring it is outside the 'src' directory
+            source test/evergreen/download_metrixpp.sh
+
+            # We only want complexity measures for the 'src' directory
+            cd src
+            python3 "../metrixplusplus/metrix++.py" collect --std.code.lines.code --std.code.complexity.cyclomatic
+            python3 "../metrixplusplus/metrix++.py" export --db-file=metrixpp.db > ../coverage_report/metrixpp.csv
+            cd ..
+
+            #######################################################
+            # Obtain the complexity metrics for the 'previous' code
+            #######################################################
+            git clone https://github.com/wiredtiger/wiredtiger.git wiredtiger_previous
+            cd wiredtiger_previous
+            git checkout ${github_commit}
+            if [ ${is_patch|false} = true ]; then
+              # Checkout the point at which this patch/branch diverged from develop
+              git checkout `python3 dist/common_functions.py last_commit_from_dev`
+            else
+              # Checkout the previous commit
+              git checkout HEAD~
+            fi
+
+            # Log the current git status of the 'previous' code
+            git status
+
+            cd src
+            python3 "../../metrixplusplus/metrix++.py" collect --std.code.lines.code --std.code.complexity.cyclomatic
+            python3 "../../metrixplusplus/metrix++.py" export --db-file=metrixpp.db > ../../coverage_report/metrixpp_prev.csv
+            cd ../..
+
+            #########################################
+            # Generate the change info and the report
+            #########################################
+
+            ${python_binary|python3} test/evergreen/code_change_report/code_change_info.py -v -c coverage_report/full_coverage_report.json -g . $EXTRA_CODE_CHANGE_PARAMETERS -m coverage_report/metrixpp.csv -p coverage_report/metrixpp_prev.csv -o coverage_report/code_change_info.json
 
             # Log the contents of the change info file
             cat coverage_report/code_change_info.json
@@ -3970,7 +4008,7 @@ tasks:
             set -o verbose
 
             # Install Metrix++, ensuring it is outside the 'src' directory
-            git clone https://github.com/metrixplusplus/metrixplusplus metrixplusplus
+            source test/evergreen/download_metrixpp.sh
 
             mkdir -p code_statistics_report
 

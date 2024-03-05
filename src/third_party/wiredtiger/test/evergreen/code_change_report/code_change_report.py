@@ -1,14 +1,47 @@
+#!/usr/bin/env python
+#
+# Public Domain 2014-present MongoDB, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
+#
+# This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+
 import argparse
 import json
 import html
+from code_change_helpers import is_useful_line
 
 
-def read_code_change_info(code_change_info_path: str):
+# read_code_change_info reads code change info (written by code_change_info.py) from a json file
+def read_code_change_info(code_change_info_path: str) -> dict:
     with open(code_change_info_path) as json_file:
         info = json.load(json_file)
         return info
 
 
+# get_branch_info returns a list of branch counts for a list of branches.
+# Negative counts (which gcov can incorrectly return) are corrected to zero.
 def get_branch_info(branches: list):
     branch_info = list()
     for branch in branches:
@@ -19,6 +52,7 @@ def get_branch_info(branches: list):
     return branch_info
 
 
+# get_non_zero_count returns a count of non-zero values in a list
 def get_non_zero_count(value_list: list):
     non_zero_count = 0
     for value in value_list:
@@ -27,11 +61,12 @@ def get_non_zero_count(value_list: list):
     return non_zero_count
 
 
-def get_html_colour(count: int, of: int):
+# get_html_colour converts a count and a total into a colour code for highlighting
+def get_html_colour(count: int, total: int):
     colour = ""
     if count == 0:
         colour = "LightPink"
-    elif count == of:
+    elif count == total:
         colour = "PaleGreen"
     else:
         colour = "SandyBrown"
@@ -39,10 +74,40 @@ def get_html_colour(count: int, of: int):
     return colour
 
 
+# get_complexity_html_colour converts a complexity value into an html colour string for highlighting.
+def get_complexity_html_colour(complexity: int):
+    colour = ""
+    if complexity <= 10:
+        colour = "PaleGreen"
+    elif complexity <= 20:
+        colour = "Orange"
+    elif complexity <= 50:
+        colour = "LightPink"
+    else:
+        colour = "#eb98e8"  # Light purple
+
+    return colour
+
+
+# get_coverage_html_colour converts a code coverage value into an html colour string for highlighting.
+def get_coverage_html_colour(coverage_percent: int):
+    colour = ""
+    if coverage_percent >= 80:
+        colour = "PaleGreen"
+    elif coverage_percent >= 60:
+        colour = "Orange"
+    else:
+        colour = "LightPink"
+
+    return colour
+
+
+# centred_text centres html text
 def centred_text(text):
     return "<p style=\"text-align: center\">{}</p>\n".format(text)
 
 
+# right_text right aligns html text
 def right_text(text):
     return "<p style=\"text-align: right\">{}</p>\n".format(text)
 
@@ -54,7 +119,51 @@ def line_number_to_text(code_colour, line_number):
         return ""
 
 
-def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool):
+def value_as_centred_text(code_colour, value):
+    return "    <p style=\"background-color:{};text-align: center\">{}</p>\n".format(code_colour, value)
+
+
+# generate_summary_table generates the summary table as html
+def generate_summary_table(code_change_info: dict) -> list:
+    summary_info = code_change_info['summary_info']
+    num_lines = int(summary_info['num_lines'])
+    num_lines_covered = int(summary_info['num_lines_covered'])
+    num_branches = int(summary_info['num_branches'])
+    num_branches_covered = int(summary_info['num_branches_covered'])
+
+    branch_coverage_string = ""
+    line_coverage_string = ""
+
+    if num_branches > 0:
+        branch_coverage_string = coverage_string(num_branches_covered, num_branches)
+
+    if num_lines > 0:
+        line_coverage_string = coverage_string(num_lines_covered, num_lines)
+
+    summary_table = []
+
+    summary_table.append("<table class=\"center\">\n")
+    summary_table.append("  <tr>\n")
+    summary_table.append("    <th>Summary Metric for<br>Added or Changed Code</th>\n")
+    summary_table.append("    <th>Value</th>\n")
+    summary_table.append("  </tr>\n")
+    summary_table.append("    <tr><td>Branch coverage</td><td>{}</td></tr>\n".format(branch_coverage_string))
+    summary_table.append("    <tr><td>Covered branches</td><td>{}</td></tr>\n".format(
+        centred_text(summary_info['num_branches_covered'])))
+    summary_table.append(
+        "    <tr><td>Total branches</td><td>{}</td></tr>\n".format(centred_text(summary_info['num_branches'])))
+    summary_table.append("    <tr><td>Line coverage</td><td>{}</td></tr>\n".format(line_coverage_string))
+    summary_table.append(
+        "    <tr><td>Covered lines</td><td>{}</td></tr>\n".format(centred_text(summary_info['num_lines_covered'])))
+    summary_table.append(
+        "    <tr><td>Total lines</td><td>{}</td></tr>\n".format(centred_text(summary_info['num_lines'])))
+    summary_table.append("</table>\n")
+
+    return summary_table
+
+
+# generate_file_info_as_html_text generates code change info as html text from a particular file
+def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool) -> list:
     report = list()
     code_unhighlighted = "White"
 
@@ -99,7 +208,7 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool):
                 count_str = ""
                 if 'count' in line:
                     count = line['count']
-                    if count >= 0 and content != '\n':
+                    if count >= 0 and is_useful_line(content):
                         count_str = str(count)
                         code_colour = get_html_colour(count, count)
                 report.append("  <tr>\n")
@@ -159,8 +268,133 @@ def generate_file_info_as_html_text(file: str, file_info: dict, verbose: bool):
     return report
 
 
+# change_string generates an html string indicating a change (if any) between two values
+def change_string(old_value: int, new_value: int) -> str:
+    result = ""
+    if new_value > old_value:
+        # up arrow
+        result = "&#8679;{}".format(new_value - old_value)
+    elif new_value < old_value:
+        # down arrow
+        result = "&#8681;{}".format(old_value - new_value)
+
+    return result
+
+
+# describe_complexity_categories generates an html table describing the complexity categories
+def describe_complexity_categories() -> list:
+    code_colour_ = get_complexity_html_colour(1)
+    description = list()
+    description.append("<table class=\"center\">\n")
+    description.append("<tr>\n")
+    description.append(
+        "<th><a href='https://en.wikipedia.org/wiki/Cyclomatic_complexity'>Cyclomatic complexity</a></th></th>\n")
+    description.append(
+        "<th><a href='https://en.wikipedia.org/wiki/Cyclomatic_complexity#Interpretation'>Risk evaluation</a></th>\n")
+    description.append("</tr>\n")
+    description.append("<tr><td> {} </td><td> Simple procedure, little risk </td></tr>\n".
+                       format(value_as_centred_text(get_complexity_html_colour(1), "1-10")))
+    description.append("<tr><td> {} </td><td> More complex, moderate risk   </td></tr>\n".
+                       format(value_as_centred_text(get_complexity_html_colour(11), "11-20")))
+    description.append("<tr><td> {} </td><td> Complex, high risk            </td></tr>\n".
+                       format(value_as_centred_text(get_complexity_html_colour(21), "21-50")))
+    description.append("<tr><td> {} </td><td> Untestable code, very high risk    </td></tr>\n".
+                       format(value_as_centred_text(get_complexity_html_colour(51), ">50")))
+    description.append("</table>\n")
+    return description
+
+
+# coverage_string converts a coverage value and a total into a colour-coded html string
+def coverage_string(covered: int, total: int) -> str:
+    string = ""
+    if total > 0:
+        coverage_percent = int(covered / total * 100)
+        colour = get_coverage_html_colour(coverage_percent=coverage_percent)
+        string = value_as_centred_text(colour, "{}% ({} of {})".format(coverage_percent, covered, total))
+    return string
+
+
+# Create table with a list of changed functions
+def generate_changed_function_table(changed_functions: dict) -> list:
+    report = []
+    report.append("<table class=\"center\">\n")
+    report.append("  <tr>\n")
+    report.append("    <th>File</th>\n")
+    report.append("    <th>Changed Function(s)</th>\n")
+    report.append("    <th>Complexity</th>\n")
+    report.append("    <th> </th>")  # a column for the complexity change arrow
+    report.append("    <th>Previous<br>Complexity</th>\n")
+    report.append("    <th>Branch<br>Coverage</th>\n")
+    report.append("    <th>Uncovered<br>Complexity</th>\n")
+    report.append("    <th>Lines in<br>function</th>\n")
+    report.append("    <th> </th>")  # a column for the lines of code change arrow
+    report.append("    <th>Previous lines<br>in function</th>\n")
+    report.append("    <th>Line<br>Coverage</th>\n")
+    report.append("  </tr>\n")
+    for file in changed_functions:
+        escaped_file = html.escape(file, quote=True)
+        functions_info = changed_functions[file]
+        for function in functions_info:
+            function_info = functions_info[function]
+            complexity = int(function_info['complexity'])
+            prev_complexity = -1
+            code_colour = get_complexity_html_colour(complexity)
+            complexity_string = value_as_centred_text(code_colour, complexity)
+            prev_complexity_string = ""
+            complexity_change_string = ""
+            if 'prev_complexity' in function_info:
+                prev_complexity = int(function_info['prev_complexity'])
+                code_colour = get_complexity_html_colour(prev_complexity)
+                prev_complexity_string = value_as_centred_text(code_colour, prev_complexity)
+                complexity_change_string = change_string(old_value=prev_complexity, new_value=complexity)
+
+            num_lines_in_function = int(function_info["num_lines_in_function"])
+            num_covered_lines_in_function = int(function_info["num_covered_lines_in_function"])
+            num_branches_in_function = int(function_info["num_branches_in_function"])
+            num_covered_branches_in_function = int(function_info["num_covered_branches_in_function"])
+
+            uncovered_complexity_string = ""
+            if num_branches_in_function > 0:
+                uncovered_complexity = complexity * (1 - num_covered_branches_in_function / num_branches_in_function)
+                uncovered_complexity_string = "{:.1f}".format(uncovered_complexity)
+
+            branch_coverage_string = coverage_string(num_covered_branches_in_function, num_branches_in_function)
+            line_coverage_string = coverage_string(num_covered_lines_in_function, num_lines_in_function)
+
+            lines_in_function = int(function_info['lines_of_code'])
+            lines_change_string = ""
+            prev_lines_in_function_string = ""
+            if 'prev_lines_of_code' in function_info:
+                prev_lines_in_function = int(function_info['prev_lines_of_code'])
+                lines_change_string = change_string(old_value=prev_lines_in_function, new_value=lines_in_function)
+                prev_lines_in_function_string = prev_lines_in_function
+
+            report.append("  <tr>\n")
+            report.append("    <td>{}</td>\n".format(escaped_file))
+            report.append("    <td>{}</td>\n".format(function_info['name']))
+            report.append("    <td>{}</td>\n".format(complexity_string))
+            report.append("    <td>{}</td>\n".format(complexity_change_string))
+            report.append("    <td>{}</td>\n".format(prev_complexity_string))
+            report.append("    <td>{}</td>\n".format(centred_text(branch_coverage_string)))
+            report.append("    <td>{}</td>\n".format(centred_text(uncovered_complexity_string)))
+            report.append("    <td>{}</td>\n".format(centred_text(lines_in_function)))
+            report.append("    <td>{}</td>\n".format(centred_text(lines_change_string)))
+            report.append("    <td>{}</td>\n".format(centred_text(prev_lines_in_function_string)))
+            report.append("    <td>{}</td>\n".format(centred_text(line_coverage_string)))
+            report.append("  </tr>\n")
+    report.append("</table>\n")
+
+    report.append("<p>")
+
+    report.extend(describe_complexity_categories())
+    return report
+
+
+# generate_html_report_as_text generates html text from code change info
 def generate_html_report_as_text(code_change_info: dict, verbose: bool):
     report = list()
+    change_info_list = code_change_info['change_info_list']
+    changed_functions = code_change_info['changed_functions']
 
     report.append("")
 
@@ -207,7 +441,7 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
     report.append("  <tr>\n")
     report.append("    <th>Changed File(s)</th>\n")
     report.append("  </tr>\n")
-    for file in code_change_info:
+    for file in change_info_list:
         escaped_file = html.escape(file, quote=True)
         report.append("  <tr><td>\n")
         if file.startswith("src/"):
@@ -217,18 +451,21 @@ def generate_html_report_as_text(code_change_info: dict, verbose: bool):
             report.append("    </a>\n")
         report.append("  </td></tr>\n")
     report.append("</table>\n")
-
-    report.append("<p><p>")
+    report.append("<p>")
 
     report.append("<h2 style=\"text-align: center\">Code Change Details</h2>\n")
-    report.append(centred_text("Only files in the 'src' directory are shown below<p>\n"))
+    report.append(centred_text("Only data on files in the 'src' directory is shown below<p>\n"))
+
+    report.extend(generate_summary_table(code_change_info=code_change_info))
+    report.append("<p>")
+
+    report.extend(generate_changed_function_table(changed_functions=changed_functions))
 
     # Create per-file info
-    for file in code_change_info:
-        file_info = code_change_info[file]
+    for file in change_info_list:
+        file_info = change_info_list[file]
         html_lines = generate_file_info_as_html_text(file=file, file_info=file_info, verbose=verbose)
-        for line in html_lines:
-            report.append(line)
+        report.extend(html_lines)
 
     report.append("</body>\n")
     report.append("</html>\n")
