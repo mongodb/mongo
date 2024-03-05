@@ -531,6 +531,16 @@ env.Library(
 )
 
 env.Library(
+    target='system_perf',
+    source=[
+        'sysprofile.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='signal_handlers',
     source=[
         'signal_handlers.cpp',

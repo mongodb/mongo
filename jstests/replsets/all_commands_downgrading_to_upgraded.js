@@ -1543,6 +1543,7 @@ const allCommands = {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
     },
+    sysprofile: {skip: isAnInternalCommand},
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},

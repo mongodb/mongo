@@ -458,6 +458,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/analyze_shard_key_common',
         '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/util/system_perf',
     ],
 )
 

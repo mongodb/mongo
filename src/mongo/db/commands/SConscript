@@ -580,6 +580,7 @@ env.Library(
 env.Library(
     target='test_commands',
     source=[
+        'sysprofile.idl',
         'test_commands.cpp',
         'whats_my_uri_cmd.cpp',
     ],
@@ -593,6 +594,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/util/system_perf',
         'test_commands_enabled',
     ],
 )

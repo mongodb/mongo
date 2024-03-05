@@ -387,6 +387,7 @@ let testCases = {
     startRecordingTraffic: {skip: "does not return user data"},
     startSession: {skip: "does not return user data"},
     stopRecordingTraffic: {skip: "does not return user data"},
+    sysprofile: {skip: "internal command"},
     testDeprecation: {skip: "does not return user data"},
     testDeprecationInVersion2: {skip: "does not return user data"},
     testInternalTransactions: {skip: "primary only"},
