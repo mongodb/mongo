@@ -298,13 +298,13 @@ private:
 
     /*
      * Derives retryable write oplog entries from the given retryable internal transaction applyOps
-     * oplog entry, and adds the ones that are related to the migration the given oplog buffer. Must
-     * be called while holding the mutex that protects the buffer.
+     * oplog entry, or retryable write applyOps entry (with multiOpType() ==
+     * kApplyOpsAppliedSeparately), and adds the ones that are related to the migration the given
+     * oplog buffer. Must be called while holding the mutex that protects the buffer.
      */
-    void _extractOplogEntriesForInternalTransactionForRetryableWrite(
-        WithLock,
-        const repl::OplogEntry& applyOplogEntry,
-        std::vector<repl::OplogEntry>* oplogBuffer);
+    void _extractOplogEntriesForRetryableApplyOps(WithLock,
+                                                  const repl::OplogEntry& applyOplogEntry,
+                                                  std::vector<repl::OplogEntry>* oplogBuffer);
 
     // Namespace for which the migration is happening
     const NamespaceString _ns;

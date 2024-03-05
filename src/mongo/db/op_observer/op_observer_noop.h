@@ -226,7 +226,8 @@ public:
     void onBatchedWriteStart(OperationContext* opCtx) override {}
 
     void onBatchedWriteCommit(OperationContext* opCtx,
-                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) override {}
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                              OpStateAccumulator* opStateAccumulator = nullptr) override {}
 
     void onBatchedWriteAbort(OperationContext* opCtx) override {}
 

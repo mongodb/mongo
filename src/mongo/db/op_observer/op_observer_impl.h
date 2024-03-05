@@ -230,7 +230,8 @@ public:
         OpStateAccumulator* opAccumulator = nullptr) final;
     void onBatchedWriteStart(OperationContext* opCtx) final;
     void onBatchedWriteCommit(OperationContext* opCtx,
-                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) final;
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                              OpStateAccumulator* opAccumulator = nullptr) final;
     void onBatchedWriteAbort(OperationContext* opCtx) final;
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

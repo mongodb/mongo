@@ -170,6 +170,25 @@ private:
 };
 
 /**
+ * Used to keep track of retryable applyOps that may include changes in documents that are
+ * part of a chunk being migrated.  Only takes care of retryability; the actual operations
+ * are broken out and added to the transfer mods  by the other handlers.
+ */
+class LogRetryableApplyOpsForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogRetryableApplyOpsForShardingHandler(std::vector<NamespaceString> namespaces,
+                                           std::vector<repl::OpTime> opTimes);
+
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>);
+
+    void rollback(OperationContext* opCtx){};
+
+private:
+    std::vector<NamespaceString> _namespaces;
+    std::vector<repl::OpTime> _opTimes;
+};
+
+/**
  * This class is responsible for producing chunk documents to be moved from donor to a recipient
  * shard and its methods represent cloning stages. Its lifetime is owned and controlled by a single
  * migration source manager which registers it for notifications from the replication subsystem
@@ -391,6 +410,7 @@ public:
 private:
     friend class LogOpForShardingHandler;
     friend class LogTransactionOperationsForShardingHandler;
+    friend class LogRetryableApplyOpsForShardingHandler;
 
     using RecordIdSet = std::set<RecordId>;
 

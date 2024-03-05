@@ -1568,4 +1568,26 @@ void LogDeleteForShardingHandler::commit(OperationContext* opCtx, boost::optiona
     }
 }
 
+LogRetryableApplyOpsForShardingHandler::LogRetryableApplyOpsForShardingHandler(
+    std::vector<NamespaceString> namespaces, std::vector<repl::OpTime> opTimes)
+    : _namespaces(std::move(namespaces)), _opTimes(std::move(opTimes)) {}
+
+void LogRetryableApplyOpsForShardingHandler::commit(OperationContext* opCtx,
+                                                    boost::optional<Timestamp>) {
+    for (const auto& nss : _namespaces) {
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
+        const auto scopedCss =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+
+        auto cloner = MigrationSourceManager::getCurrentCloner(*scopedCss);
+        if (cloner) {
+            for (const auto& opTime : _opTimes) {
+                cloner->_addToSessionMigrationOptimeQueue(
+                    opTime, SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+            }
+        }
+    }
+}
+
 }  // namespace mongo

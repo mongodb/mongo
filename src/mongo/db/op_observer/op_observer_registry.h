@@ -597,10 +597,12 @@ public:
     }
 
     void onBatchedWriteCommit(OperationContext* opCtx,
-                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) override {
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                              OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
+        OpStateAccumulator opStateAccumulator;
         for (auto& o : _observers) {
-            o->onBatchedWriteCommit(opCtx, oplogGroupingFormat);
+            o->onBatchedWriteCommit(opCtx, oplogGroupingFormat, &opStateAccumulator);
         }
     }
 

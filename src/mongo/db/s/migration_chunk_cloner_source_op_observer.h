@@ -118,6 +118,10 @@ public:
                                         const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,
                                         const repl::OpTime& prepareOpTime) final;
+
+    void onBatchedWriteCommit(OperationContext* opCtx,
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                              OpStateAccumulator* opAccumulator = nullptr) final;
 };
 
 }  // namespace mongo

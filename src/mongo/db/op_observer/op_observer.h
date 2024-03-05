@@ -275,6 +275,9 @@ public:
      * 'fromMigrate' to describe the entire set of inserts.
      * Examples: ShardServerOpObserver, UserWriteBlockModeOpObserver, and
      * MigrationChunkClonerSourceOpObserver::onInserts().
+     *
+     * The 'defaultFromMigrate' value must be consistent with the 'fromMigrate' array; that is,
+     * if 'defaultFromMigrate' is true, all entries in the 'fromMigrate' array must be true.
      */
     virtual void onInserts(OperationContext* opCtx,
                            const CollectionPtr& coll,
@@ -543,7 +546,8 @@ public:
      * to the oplog.
      */
     virtual void onBatchedWriteCommit(OperationContext* opCtx,
-                                      WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) = 0;
+                                      WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                                      OpStateAccumulator* opStateAccumulator = nullptr) = 0;
 
     /**
      * Clears the accumulated write operations. No further writes is allowed in this storage

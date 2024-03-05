@@ -55,12 +55,38 @@ const coll = (() => {
     return coll;
 })();
 
+// Events may be batched in an applyOps when featureFlagReplicateVectoredInsertsTransactionally
+// is enabled; expand them here, and filter the expanded events by docId.
+function _expandAndFilterEvents(oplogEvents, docId) {
+    let expandedEvents = Array();
+    for (let idx = 0; idx < oplogEvents.length; idx++) {
+        const event = oplogEvents[idx];
+        if (event.o.hasOwnProperty("applyOps")) {
+            for (let applyOpsIdx = 0; applyOpsIdx < event.o.applyOps.length; applyOpsIdx++) {
+                const innerEvent = event.o.applyOps[applyOpsIdx];
+                if (innerEvent.o._id == docId) {
+                    expandedEvents.push(innerEvent);
+                }
+            }
+        } else {
+            expandedEvents.push(event);
+        }
+    }
+    return expandedEvents;
+}
+
 // Verifies that expected 'fromMigrate' events are observed in the oplog for the specified shard.
 function verifyFromMigrateOplogEvents(shard, docId, ops) {
-    const oplogEvents = shard.getDB("local")
-                            .getCollection("oplog.rs")
-                            .find({"fromMigrate": true, "o._id": docId})
-                            .toArray();
+    let oplogEvents = shard.getDB("local")
+                          .getCollection("oplog.rs")
+                          .find({
+                              "$or": [
+                                  {"fromMigrate": true, "o._id": docId},
+                                  {"fromMigrate": true, "o.applyOps": {$exists: true}}
+                              ]
+                          })
+                          .toArray();
+    oplogEvents = _expandAndFilterEvents(oplogEvents, docId);
     assert.eq(oplogEvents.length, ops.length, oplogEvents);
 
     for (let idx = 0; idx < oplogEvents.length; idx++) {

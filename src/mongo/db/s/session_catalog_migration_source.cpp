@@ -529,11 +529,13 @@ BSONObj SessionCatalogMigrationSource::extractShardKeyFromOplogEntry(
     return shardKeyPattern.extractShardKeyFromDocumentKey(objWithDocumentKey);
 }
 
-void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionForRetryableWrite(
+void SessionCatalogMigrationSource::_extractOplogEntriesForRetryableApplyOps(
     WithLock,
     const repl::OplogEntry& applyOpsOplogEntry,
     std::vector<repl::OplogEntry>* oplogBuffer) {
-    invariant(isInternalSessionForRetryableWrite(*applyOpsOplogEntry.getSessionId()));
+    invariant(isInternalSessionForRetryableWrite(*applyOpsOplogEntry.getSessionId()) ||
+              applyOpsOplogEntry.getMultiOpType() ==
+                  repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
     invariant(applyOpsOplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
 
     auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsOplogEntry.getObject());
@@ -587,11 +589,13 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
 
             // Determine if this oplog entry should be migrated. If so, add the oplog entry or the
             // oplog entries derived from it to the oplog buffer.
-            if (isInternalSessionForRetryableWrite(*nextOplog->getSessionId())) {
+            if (isInternalSessionForRetryableWrite(*nextOplog->getSessionId()) ||
+                nextOplog->getMultiOpType() ==
+                    repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
                 if (nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
                     // Derive retryable write oplog entries from this retryable internal transaction
-                    // applyOps oplog entry, and add them to the oplog buffer.
-                    _extractOplogEntriesForInternalTransactionForRetryableWrite(
+                    // or retryable write applyOps oplog entry, and add them to the oplog buffer.
+                    _extractOplogEntriesForRetryableApplyOps(
                         lk, *nextOplog, &_unprocessedOplogBuffer);
                 } else {
                     tassert(7393800,
@@ -742,7 +746,37 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
             // Determine how this oplog entry should be migrated. Either add the oplog entry or the
             // oplog entries derived from it to the oplog buffer. Finally, dequeue the opTime.
 
+            auto handleRetryableApplyOps = [&]() {
+                // Derive retryable write oplog entries from this retryable internal
+                // transaction or retryable write applyOps oplog entry, and add them to the
+                // oplog buffer.
+                _extractOplogEntriesForRetryableApplyOps(
+                    lk, nextNewWriteOplog, &_unprocessedNewWriteOplogBuffer);
+                _newWriteOpTimeList.pop_front();
+
+                // There's no need to follow the prevOpTime chain for retryable writes because we
+                // should have already added all optimes using the op observer.
+                if (entryAtOpTimeType == EntryAtOpTimeType::kTransaction) {
+                    if (auto prevOpTime = nextNewWriteOplog.getPrevWriteOpTimeInTransaction();
+                        prevOpTime && !prevOpTime->isNull()) {
+                        // Add the opTime for the previous applyOps oplog entry in the transaction
+                        // to the queue.
+                        _notifyNewWriteOpTime(lk, *prevOpTime, EntryAtOpTimeType::kTransaction);
+                    }
+                }
+
+                lk.unlock();
+                return _fetchNextNewWriteOplog(opCtx);
+            };
+
             if (entryAtOpTimeType == EntryAtOpTimeType::kRetryableWrite) {
+                if (nextNewWriteOplog.getMultiOpType() ==
+                    repl::MultiOplogEntryType::kApplyOpsAppliedSeparately) {
+                    invariant(nextNewWriteOplog.getCommandType() ==
+                              repl::OplogEntry::CommandType::kApplyOps);
+                    return handleRetryableApplyOps();
+                }
+
                 _unprocessedNewWriteOplogBuffer.emplace_back(nextNewWriteOplog);
                 _newWriteOpTimeList.pop_front();
                 _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
@@ -768,21 +802,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                 }
 
                 if (isInternalSessionForRetryableWrite(sessionId)) {
-                    // Derive retryable write oplog entries from this retryable internal
-                    // transaction applyOps oplog entry, and add them to the oplog buffer.
-                    _extractOplogEntriesForInternalTransactionForRetryableWrite(
-                        lk, nextNewWriteOplog, &_unprocessedNewWriteOplogBuffer);
-                    _newWriteOpTimeList.pop_front();
-
-                    if (auto prevOpTime = nextNewWriteOplog.getPrevWriteOpTimeInTransaction();
-                        prevOpTime && !prevOpTime->isNull()) {
-                        // Add the opTime for the previous applyOps oplog entry in the transaction
-                        // to the queue.
-                        _notifyNewWriteOpTime(lk, *prevOpTime, EntryAtOpTimeType::kTransaction);
-                    }
-
-                    lk.unlock();
-                    return _fetchNextNewWriteOplog(opCtx);
+                    return handleRetryableApplyOps();
                 }
 
                 // This applyOps oplog entry corresponds to non-internal transaction prepare/commit,

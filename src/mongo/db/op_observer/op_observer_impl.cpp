@@ -751,7 +751,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
 
     if (inBatchedWrite) {
-        invariant(!defaultFromMigrate);
+        dassert(!defaultFromMigrate ||
+                std::all_of(
+                    fromMigrate.begin(), fromMigrate.end(), [](bool migrate) { return migrate; }));
+        batchedWriteContext.setDefaultFromMigrate(defaultFromMigrate);
 
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
@@ -1786,8 +1789,9 @@ void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
     batchedWriteContext.setWritesAreBatched(true);
 }
 
-void OpObserverImpl::onBatchedWriteCommit(
-    OperationContext* opCtx, WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
+void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
+                                          WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                                          OpStateAccumulator* opAccumulator) {
     if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
         !opCtx->writesAreReplicated()) {
         return;
@@ -1876,12 +1880,14 @@ void OpObserverImpl::onBatchedWriteCommit(
               "batched writes must not contain pre/post images to store in image collection");
 
     auto logApplyOpsForBatchedWrite =
-        [opCtx, operationLogger = _operationLogger.get()](
-            repl::MutableOplogEntry* oplogEntry,
-            bool firstOp,
-            bool lastOp,
-            std::vector<StmtId> stmtIdsWritten,
-            WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
+        [opCtx,
+         defaultFromMigrate = batchedWriteContext.getDefaultFromMigrate(),
+         operationLogger =
+             _operationLogger.get()](repl::MutableOplogEntry* oplogEntry,
+                                     bool firstOp,
+                                     bool lastOp,
+                                     std::vector<StmtId> stmtIdsWritten,
+                                     WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
             // Remove 'prevOpTime' when replicating as a single applyOps oplog entry.
             // This preserves backwards compatibility with the legacy atomic applyOps oplog
             // entry format that we use to replicate batched writes.
@@ -1893,6 +1899,7 @@ void OpObserverImpl::onBatchedWriteCommit(
             if (firstOp && lastOp) {
                 oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
             }
+            oplogEntry->setFromMigrateIfTrue(defaultFromMigrate);
             const bool updateTxnTable =
                 oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
             return logApplyOps(opCtx,
@@ -1914,6 +1921,21 @@ void OpObserverImpl::onBatchedWriteCommit(
                                       oplogGroupingFormat,
                                       logApplyOpsForBatchedWrite,
                                       &noPrePostImage);
+
+    // Ensure the transactionParticipant properly tracks the namespaces affected by a
+    // retryable batched write.
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant) {
+        for (const auto& statement : statements) {
+            txnParticipant.addToAffectedNamespaces(opCtx, statement.getNss());
+        }
+    }
+
+    if (opAccumulator) {
+        for (const auto& entry : applyOpsOplogSlotAndOperationAssignment.applyOpsEntries) {
+            opAccumulator->insertOpTimes.emplace_back(entry.oplogSlot);
+        }
+    }
 }
 
 void OpObserverImpl::onBatchedWriteAbort(OperationContext* opCtx) {

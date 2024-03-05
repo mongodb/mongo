@@ -350,4 +350,31 @@ void MigrationChunkClonerSourceOpObserver::onTransactionPrepareNonPrimary(
             lsid, statements, prepareOpTime));
 }
 
+void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
+    OperationContext* opCtx,
+    WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+    OpStateAccumulator* opAccumulator) {
+    // Return early if we are secondary or in some replication state in which we are not
+    // appending entries to the oplog.
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    // Return early if this isn't a retryable batched write.
+    if (!opAccumulator || opAccumulator->insertOpTimes.empty() ||
+        oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations ||
+        !opCtx->getTxnNumber() || !opCtx->getLogicalSessionId()) {
+        return;
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant);
+    const auto affectedNamespaces = txnParticipant.affectedNamespaces();
+    std::vector<NamespaceString> namespaces(affectedNamespaces.begin(), affectedNamespaces.end());
+
+    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+        std::make_unique<LogRetryableApplyOpsForShardingHandler>(std::move(namespaces),
+                                                                 opAccumulator->insertOpTimes));
+}
+
 }  // namespace mongo
