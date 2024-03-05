@@ -99,6 +99,8 @@ public:
                "{ autoCompact : <bool>, [force:<bool>], [freeSpaceTargetMB:<int64_t>], "
                "[runOnce:<bool>] }\n"
                "  force - allows to run on a replica set primary\n"
+               "  freeSpaceTargetMB - minimum amount of space recoverable for compaction to "
+               "proceed\n"
                "  runOnce - executes compaction on the database only once\n";
     }
 };

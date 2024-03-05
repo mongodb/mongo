@@ -87,7 +87,9 @@ public:
                "warning: this operation has blocking behaviour and is slow. You can cancel with "
                "killOp()\n"
                "{ compact : <collection_name>, [force:<bool>], [freeSpaceTargetMB:<int64_t>] }\n"
-               "  force - allows to run on a replica set primary\n";
+               "  force - allows to run on a replica set primary\n"
+               "  freeSpaceTargetMB - minimum amount of space recoverable for compaction to "
+               "proceed\n";
     }
 
     CompactCmd() : BasicCommand("compact") {}
