@@ -39,6 +39,7 @@ else
   LOCAL_PATH=$TMPDIR/bazelisk
 fi
 
+# Delete any previously downloaded bazel/bazelisk bin in case that would get in the way of the curl request below
 if [ -f "$LOCAL_PATH" ]; then
   rm $LOCAL_PATH
 fi
