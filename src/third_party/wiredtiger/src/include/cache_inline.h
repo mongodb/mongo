@@ -25,7 +25,7 @@ __wt_cache_aggressive(WT_SESSION_IMPL *session)
 static WT_INLINE uint64_t
 __wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
-    return (S2C(session)->cache->read_gen);
+    return (__wt_atomic_load64(&S2C(session)->cache->read_gen));
 }
 
 /*
@@ -35,7 +35,7 @@ __wt_cache_read_gen(WT_SESSION_IMPL *session)
 static WT_INLINE void
 __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
 {
-    ++S2C(session)->cache->read_gen;
+    (void)__wt_atomic_add64(&S2C(session)->cache->read_gen, 1);
 }
 
 /*
@@ -147,7 +147,7 @@ __wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64_t sz)
 static WT_INLINE uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-    return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_inmem));
+    return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_inmem)));
 }
 
 /*
@@ -157,8 +157,8 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 static WT_INLINE uint64_t
 __wt_cache_dirty_inuse(WT_CACHE *cache)
 {
-    return (
-      __wt_cache_bytes_plus_overhead(cache, cache->bytes_dirty_intl + cache->bytes_dirty_leaf));
+    return (__wt_cache_bytes_plus_overhead(cache,
+      __wt_atomic_load64(&cache->bytes_dirty_intl) + __wt_atomic_load64(&cache->bytes_dirty_leaf)));
 }
 
 /*
@@ -168,7 +168,7 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 static WT_INLINE uint64_t
 __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
 {
-    return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_dirty_leaf));
+    return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_dirty_leaf)));
 }
 
 /*
@@ -178,7 +178,7 @@ __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
 static WT_INLINE uint64_t
 __wt_cache_bytes_updates(WT_CACHE *cache)
 {
-    return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_updates));
+    return (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_updates)));
 }
 
 /*
@@ -188,8 +188,8 @@ __wt_cache_bytes_updates(WT_CACHE *cache)
 static WT_INLINE uint64_t
 __wt_cache_bytes_image(WT_CACHE *cache)
 {
-    return (
-      __wt_cache_bytes_plus_overhead(cache, cache->bytes_image_intl + cache->bytes_image_leaf));
+    return (__wt_cache_bytes_plus_overhead(cache,
+      __wt_atomic_load64(&cache->bytes_image_intl) + __wt_atomic_load64(&cache->bytes_image_leaf)));
 }
 
 /*
@@ -204,8 +204,8 @@ __wt_cache_bytes_other(WT_CACHE *cache)
     /*
      * Reads can race with changes to the values, so check that the calculation doesn't go negative.
      */
-    bytes_other =
-      __wt_safe_sub(cache->bytes_inmem, cache->bytes_image_intl + cache->bytes_image_leaf);
+    bytes_other = __wt_safe_sub(__wt_atomic_load64(&cache->bytes_inmem),
+      __wt_atomic_load64(&cache->bytes_image_intl) + __wt_atomic_load64(&cache->bytes_image_leaf));
     return (__wt_cache_bytes_plus_overhead(cache, bytes_other));
 }
 
@@ -471,8 +471,10 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
      */
     txn_global = &S2C(session)->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
-    busy = busy || txn_shared->id != WT_TXN_NONE || session->hazards.num_active > 0 ||
-      (txn_shared->pinned_id != WT_TXN_NONE && txn_global->current != txn_global->oldest_id);
+    busy = busy || __wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE ||
+      session->hazards.num_active > 0 ||
+      (__wt_atomic_loadv64(&txn_shared->pinned_id) != WT_TXN_NONE &&
+        __wt_atomic_loadv64(&txn_global->current) != __wt_atomic_loadv64(&txn_global->oldest_id));
 
     /*
      * LSM sets the "ignore cache size" flag when holding the LSM tree lock, in that case, or when

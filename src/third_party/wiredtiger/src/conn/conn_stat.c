@@ -77,7 +77,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     __wt_txn_stats_update(session);
 
     WT_STAT_SET(session, stats, file_open, conn->open_file_count);
-    WT_STAT_SET(session, stats, cursor_open_count, conn->open_cursor_count);
+    WT_STAT_SET(session, stats, cursor_open_count, __wt_atomic_load32(&conn->open_cursor_count));
     WT_STAT_SET(session, stats, dh_conn_handle_count, conn->dhandle_count);
     WT_STAT_SET(session, stats, rec_split_stashed_objects, conn->stashed_objects);
     WT_STAT_SET(session, stats, rec_split_stashed_bytes, conn->stashed_bytes);

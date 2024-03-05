@@ -548,7 +548,7 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
     if (cache->eviction_checkpoint_target < DBL_EPSILON)
         return;
 
-    bytes_written_start = cache->bytes_written;
+    bytes_written_start = __wt_atomic_load64(&cache->bytes_written);
 
     /*
      * If the cache size is zero or very small, we're done. The cache size can briefly become zero
@@ -585,7 +585,7 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
          * Don't wait indefinitely: there might be dirty pages that can't be evicted. If we can't
          * meet the target, give up and start the checkpoint for real.
          */
-        bytes_written_total = cache->bytes_written - bytes_written_start;
+        bytes_written_total = __wt_atomic_load64(&cache->bytes_written) - bytes_written_start;
         if (bytes_written_total > max_write)
             break;
     }
@@ -804,8 +804,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      *
      * We never do checkpoints in the default session (with id zero).
      */
-    WT_ASSERT(session, session->id != 0 && txn_global->checkpoint_id == 0);
-    txn_global->checkpoint_id = session->id;
+    WT_ASSERT(session, session->id != 0 && __wt_atomic_loadv32(&txn_global->checkpoint_id) == 0);
+    __wt_atomic_storev32(&txn_global->checkpoint_id, session->id);
 
     /*
      * Remove the checkpoint transaction from the global table.
@@ -815,21 +815,25 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      */
     __wt_writelock(session, &txn_global->rwlock);
     txn_global->checkpoint_txn_shared = *txn_shared;
-    txn_global->checkpoint_txn_shared.pinned_id = txn->snapshot_data.snap_min;
+    __wt_atomic_storev64(&txn_global->checkpoint_txn_shared.pinned_id, txn->snapshot_data.snap_min);
 
     /*
      * Sanity check that the oldest ID hasn't moved on before we have cleared our entry.
      */
     WT_ASSERT(session,
-      WT_TXNID_LE(txn_global->oldest_id, txn_shared->id) &&
-        WT_TXNID_LE(txn_global->oldest_id, txn_shared->pinned_id));
+      WT_TXNID_LE(
+        __wt_atomic_loadv64(&txn_global->oldest_id), __wt_atomic_loadv64(&txn_shared->id)) &&
+        WT_TXNID_LE(__wt_atomic_loadv64(&txn_global->oldest_id),
+          __wt_atomic_loadv64(&txn_shared->pinned_id)));
 
     /*
      * Clear our entry from the global transaction session table. Any operation that needs to know
      * about the ID for this checkpoint will consider the checkpoint ID in the global structure.
      * Most operations can safely ignore the checkpoint ID (see the visible all check for details).
      */
-    txn_shared->id = txn_shared->pinned_id = txn_shared->metadata_pinned = WT_TXN_NONE;
+    __wt_atomic_storev64(&txn_shared->id, WT_TXN_NONE);
+    __wt_atomic_storev64(&txn_shared->pinned_id, WT_TXN_NONE);
+    __wt_atomic_storev64(&txn_shared->metadata_pinned, WT_TXN_NONE);
 
     /*
      * Set the checkpoint transaction's timestamp, if requested.
@@ -1417,7 +1421,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * Now that the metadata is stable, re-open the metadata file for regular eviction by clearing
      * the checkpoint_pinned flag.
      */
-    txn_global->checkpoint_txn_shared.pinned_id = WT_TXN_NONE;
+    __wt_atomic_storev64(&txn_global->checkpoint_txn_shared.pinned_id, WT_TXN_NONE);
 
     if (full) {
         __checkpoint_stats(session);

@@ -114,7 +114,7 @@ err:
     /* Increment the cache statistics. */
     __wt_cache_page_inmem_incr(session, page, size);
     (void)__wt_atomic_add64(&cache->pages_inmem, 1);
-    page->cache_create_gen = cache->evict_pass_gen;
+    page->cache_create_gen = __wt_atomic_load64(&cache->evict_pass_gen);
 
     *pagep = page;
     return (0);

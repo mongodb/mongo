@@ -78,11 +78,13 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
             continue;
 
         if (page->evict_pass_gen == 0) {
-            unvisited_age_gap_sum += (cache->evict_pass_gen - page->cache_create_gen);
+            unvisited_age_gap_sum +=
+              (__wt_atomic_load64(&cache->evict_pass_gen) - page->cache_create_gen);
             ++unvisited_count;
         } else {
-            visited_age_gap_sum += (cache->evict_pass_gen - page->cache_create_gen);
-            gen_gap = cache->evict_pass_gen - page->evict_pass_gen;
+            visited_age_gap_sum +=
+              (__wt_atomic_load64(&cache->evict_pass_gen) - page->cache_create_gen);
+            gen_gap = __wt_atomic_load64(&cache->evict_pass_gen) - page->evict_pass_gen;
             if (gen_gap > gen_gap_max)
                 gen_gap_max = gen_gap;
             gen_gap_sum += gen_gap;
@@ -129,7 +131,8 @@ __wt_curstat_cache_walk(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Set statistics that don't require walking the cache. */
-    WT_STAT_DATA_SET(session, cache_state_gen_current, conn->cache->evict_pass_gen);
+    WT_STAT_DATA_SET(
+      session, cache_state_gen_current, __wt_atomic_load64(&conn->cache->evict_pass_gen));
 
     /* Root page statistics */
     root_idx = WT_INTL_INDEX_GET_SAFE(btree->root.page);

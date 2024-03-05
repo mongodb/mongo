@@ -231,7 +231,7 @@ stall:
 
     /* Wait for our group to start. */
     time_start = l->stat_read_count_off != -1 && WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
-    for (pause_cnt = 0; ticket != l->u.s.current; pause_cnt++) {
+    for (pause_cnt = 0; ticket != __wt_atomic_loadv8(&l->u.s.current); pause_cnt++) {
         if (pause_cnt < WT_THOUSAND)
             WT_PAUSE();
         else if (pause_cnt < 1200)
@@ -271,7 +271,9 @@ stall:
     WT_ACQUIRE_BARRIER();
 
     /* Sanity check that we (still) have the lock. */
-    WT_ASSERT(session, ticket == l->u.s.current && l->u.s.readers_active > 0);
+    WT_ASSERT(session,
+      ticket == __wt_atomic_loadv8(&l->u.s.current) &&
+        __wt_atomic_loadv32(&l->u.s.readers_active) > 0);
 }
 
 /*
@@ -350,7 +352,8 @@ __write_blocked(WT_SESSION_IMPL *session)
     WT_RWLOCK *l;
 
     l = session->current_rwlock;
-    return (session->current_rwticket != l->u.s.current || l->u.s.readers_active != 0);
+    return (session->current_rwticket != __wt_atomic_loadv8(&l->u.s.current) ||
+      __wt_atomic_loadv32(&l->u.s.readers_active) != 0);
 }
 
 /*
@@ -437,7 +440,9 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_ACQUIRE_BARRIER();
 
     /* Sanity check that we (still) have the lock. */
-    WT_ASSERT(session, ticket == l->u.s.current && l->u.s.readers_active == 0);
+    WT_ASSERT(session,
+      ticket == __wt_atomic_loadv8(&l->u.s.current) &&
+        __wt_atomic_loadv32(&l->u.s.readers_active) == 0);
 }
 
 /*

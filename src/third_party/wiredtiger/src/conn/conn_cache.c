@@ -241,7 +241,8 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
      * The lowest possible page read-generation has a special meaning, it marks a page for forcible
      * eviction; don't let it happen by accident.
      */
-    cache->read_gen = cache->read_gen_oldest = WT_READGEN_START_VALUE;
+    cache->read_gen_oldest = WT_READGEN_START_VALUE;
+    __wt_atomic_store64(&cache->read_gen, WT_READGEN_START_VALUE);
 
     /*
      * The target size must be lower than the trigger size or we will never get any work done.
@@ -300,7 +301,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     stats = conn->stats;
 
     inuse = __wt_cache_bytes_inuse(cache);
-    intl = __wt_cache_bytes_plus_overhead(cache, cache->bytes_internal);
+    intl = __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_internal));
     /*
      * There are races updating the different cache tracking values so be paranoid calculating the
      * leaf byte usage.
@@ -313,9 +314,9 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 
     WT_STAT_SET(session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
     WT_STAT_SET(session, stats, cache_bytes_dirty_total,
-      __wt_cache_bytes_plus_overhead(cache, cache->bytes_dirty_total));
-    WT_STAT_SET(
-      session, stats, cache_bytes_hs, __wt_cache_bytes_plus_overhead(cache, cache->bytes_hs));
+      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_dirty_total)));
+    WT_STAT_SET(session, stats, cache_bytes_hs,
+      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_hs)));
     WT_STAT_SET(session, stats, cache_bytes_image, __wt_cache_bytes_image(cache));
     WT_STAT_SET(session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
     WT_STAT_SET(session, stats, cache_bytes_internal, intl);
@@ -330,7 +331,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(
       session, stats, cache_pages_dirty, cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
-    WT_STAT_SET(session, stats, cache_eviction_state, cache->flags);
+    WT_STAT_SET(session, stats, cache_eviction_state, __wt_atomic_load32(&cache->flags));
     WT_STAT_SET(session, stats, cache_eviction_aggressive_set, cache->evict_aggressive_score);
     WT_STAT_SET(session, stats, cache_eviction_empty_score, cache->evict_empty_score);
 
@@ -376,17 +377,21 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
         __wt_errx(session,
           "cache server: exiting with %" PRIu64 " pages in memory and %" PRIu64 " pages evicted",
           cache->pages_inmem, cache->pages_evicted);
-    if (cache->bytes_image_intl + cache->bytes_image_leaf != 0)
+    if ((__wt_atomic_load64(&cache->bytes_image_intl) +
+          __wt_atomic_load64(&cache->bytes_image_leaf)) != 0)
         __wt_errx(session, "cache server: exiting with %" PRIu64 " image bytes in memory",
-          cache->bytes_image_intl + cache->bytes_image_leaf);
-    if (cache->bytes_inmem != 0)
-        __wt_errx(
-          session, "cache server: exiting with %" PRIu64 " bytes in memory", cache->bytes_inmem);
-    if (cache->bytes_dirty_intl + cache->bytes_dirty_leaf != 0 ||
+          __wt_atomic_load64(&cache->bytes_image_intl) +
+            __wt_atomic_load64(&cache->bytes_image_leaf));
+    if (__wt_atomic_load64(&cache->bytes_inmem) != 0)
+        __wt_errx(session, "cache server: exiting with %" PRIu64 " bytes in memory",
+          __wt_atomic_load64(&cache->bytes_inmem));
+    if ((__wt_atomic_load64(&cache->bytes_dirty_intl) +
+          __wt_atomic_load64(&cache->bytes_dirty_leaf)) != 0 ||
       cache->pages_dirty_intl + cache->pages_dirty_leaf != 0)
         __wt_errx(session,
           "cache server: exiting with %" PRIu64 " bytes dirty and %" PRIu64 " pages dirty",
-          cache->bytes_dirty_intl + cache->bytes_dirty_leaf,
+          __wt_atomic_load64(&cache->bytes_dirty_intl) +
+            __wt_atomic_load64(&cache->bytes_dirty_leaf),
           cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
     __wt_cond_destroy(session, &cache->evict_cond);

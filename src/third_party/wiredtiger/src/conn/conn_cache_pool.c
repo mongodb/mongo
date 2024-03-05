@@ -474,7 +474,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
          *
          * Count pages read, using virtual memory page size.
          */
-        tmp = cache->bytes_read / (uint64_t)entry->page_size;
+        tmp = __wt_atomic_load64(&cache->bytes_read) / (uint64_t)entry->page_size;
         if (tmp >= cache->cp_saved_read)
             reads = tmp - cache->cp_saved_read;
         else

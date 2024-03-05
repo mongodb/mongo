@@ -120,6 +120,7 @@ __WT_MISC_H
 __wt_atomic_and_generic
 __wt_atomic_load_generic
 __wt_atomic_or_generic
+__wt_atomic_store_generic
 __wt_bswap16
 __wt_checksum_with_seed
 __wt_conf_gets

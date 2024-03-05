@@ -209,7 +209,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
             clsm->nupdates = 1;
             if (txn->isolation == WT_ISO_SNAPSHOT && F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
                 WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
-                pinned_id = WT_SESSION_TXN_SHARED(session)->pinned_id;
+                pinned_id = __wt_atomic_loadv64(&WT_SESSION_TXN_SHARED(session)->pinned_id);
                 for (i = clsm->nchunks - 2; clsm->nupdates < clsm->nchunks; clsm->nupdates++, i--) {
                     switch_txn = clsm->chunks[i]->switch_txn;
                     if (WT_TXNID_LT(switch_txn, pinned_id))

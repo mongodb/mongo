@@ -527,7 +527,8 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
          * will not be equal to the latest one. We want both variables to be read in as early as
          * possible in this loop, acquire reads encourage this.
          */
-        WT_ACQUIRE_READ_WITH_BARRIER(ckpt_gen, __wt_gen(session, WT_GEN_CHECKPOINT));
+        ckpt_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
+        WT_ACQUIRE_BARRIER();
         WT_ACQUIRE_READ_WITH_BARRIER(ckpt_running, S2C(session)->txn_global.checkpoint_running);
 
         if (!must_resolve)
