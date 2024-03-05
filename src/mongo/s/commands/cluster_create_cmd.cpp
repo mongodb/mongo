@@ -94,7 +94,6 @@ public:
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             auto cmd = request();
             auto dbName = cmd.getDbName();
-            cluster::createDatabase(opCtx, dbName);
 
             if (cmd.getClusteredIndex()) {
                 clustered_util::checkCreationOptions(cmd);

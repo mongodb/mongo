@@ -124,8 +124,6 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750, 1, "CMD: createIndexes", logAttrs(nss), "command"_attr = redact(cmdObj));
 
-        cluster::createDatabase(opCtx, dbName);
-
         auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
         auto routingInfo = targeter.getRoutingInfo();
         auto cmdToBeSent = cmdObj;
