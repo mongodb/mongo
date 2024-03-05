@@ -8,8 +8,7 @@ from buildscripts.resmokelib.testing.hooks.interface import Hook
 from bson import binary
 import pymongo.errors
 
-QUERY_FEATURE_NOT_ALLOWED_CODE = 224
-QUERY_STATS_NOT_ENABLED_CODE = 7373500
+QUERY_STATS_NOT_ENABLED_CODES = [224, 7373500, 6579000]
 
 
 class RunQueryStats(Hook):
@@ -41,11 +40,11 @@ class RunQueryStats(Hook):
                     assert "metrics" in operation
                     assert "asOf" in operation
         except pymongo.errors.OperationFailure as err:
-            if not self.allow_feature_not_supported or err.code != QUERY_FEATURE_NOT_ALLOWED_CODE:
-                raise err
-            else:
-                self.logger.info("Encountered a 'QueryFeatureNotAllowed' error. "
+            if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
+                self.logger.info("Encountered an error while running $queryStats. "
                                  "$queryStats will not be run for this test.")
+            else:
+                raise err
 
     def after_test(self, test, test_report):
         self.verify_query_stats({})
@@ -58,8 +57,8 @@ class RunQueryStats(Hook):
             self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="0%")
             self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="1%")
         except pymongo.errors.OperationFailure as err:
-            if not self.allow_feature_not_supported or err.code != QUERY_STATS_NOT_ENABLED_CODE:
-                raise err
-            else:
+            if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
                 self.logger.info("Encountered an error while configuring the query stats store. "
                                  "Query stats will not be collected for this test.")
+            else:
+                raise err
