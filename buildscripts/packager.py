@@ -44,7 +44,7 @@ import time
 ARCH_CHOICES = ["x86_64", "arm64", "aarch64", "s390x"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
+DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2", "amazon2023"]
 
 
 class Spec(object):
@@ -291,6 +291,8 @@ class Distro(object):
             return "2013.03"
         elif self.dname == 'amazon2':
             return "2017.12"
+        elif self.dname == 'amazon2023':
+            return "2023.0"
         elif self.dname == 'ubuntu':
             if build_os == 'ubuntu1204':
                 return "precise"
@@ -354,7 +356,7 @@ class Distro(object):
                 "rhel55",
                 "rhel67",
             ]
-        elif self.dname in ['amazon', 'amazon2']:
+        elif self.dname in ['amazon', 'amazon2', 'amazon2023']:
             return [self.dname]
         elif self.dname == 'ubuntu':
             return [
@@ -382,6 +384,8 @@ class Distro(object):
             return 'amzn1'
         elif self.dname == 'amazon2':
             return 'amzn2'
+        elif self.dname == 'amazon2023':
+            return 'amzn2023'
         return re.sub(r'^rh(el\d).*$', r'\1', build_os)
 
 

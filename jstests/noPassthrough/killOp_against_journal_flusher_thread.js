@@ -1,7 +1,7 @@
 /**
  * Tests that killOp is ineffectual against the journal flusher thread.
  *
- * @tags: [requires_journaling]
+ * @tags: [requires_journaling,requires_latch_analyzer]
  */
 
 (function() {
