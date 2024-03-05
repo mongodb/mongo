@@ -187,6 +187,12 @@ public:
 
                 if (auto zones = request().getZones()) {
                     checkForOverlappingZones(*zones);
+                    for (const auto& zone : *zones) {
+                        uassertStatusOK(
+                            ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(zone.getMin()));
+                        uassertStatusOK(
+                            ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(zone.getMax()));
+                    }
                 }
 
                 auto coordinatorDoc =
