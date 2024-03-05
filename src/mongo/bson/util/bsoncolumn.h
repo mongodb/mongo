@@ -723,7 +723,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
     const char* control = _binary;
     const char* end = _binary + _size;
     while (*control != EOO) {
-        BlockBasedInterleavedDecompressor<CMaterializer> decompressor{*allocator, control, end};
+        BlockBasedInterleavedDecompressor decompressor{*allocator, control, end};
         invariant(bsoncolumn::isInterleavedStartControlByte(*control),
                   "non-interleaved data is not yet handled via this API");
         control = decompressor.decompress(pathCollectors);
