@@ -312,7 +312,7 @@ export let MongosAPIParametersUtil = (function() {
             commandName: "convertToCapped",
             run: {
                 inAPIVersion1: false,
-                shardCommandName: "convertToCapped",
+                shardCommandName: "_shardsvrConvertToCapped",
                 permittedOnShardedCollection: false,
                 permittedInTxn: false,
                 command: () => ({convertToCapped: "collection", size: 8192}),

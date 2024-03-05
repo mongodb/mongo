@@ -161,6 +161,7 @@ let testCases = {
     _shardsvrCommitIndexParticipant: {skip: "internal command"},
     _shardsvrCommitReshardCollection: {skip: "internal command"},
     _shardsvrCompactStructuredEncryptionData: {skip: "internal command"},
+    _shardsvrConvertToCapped: {skip: "internal command"},
     _shardsvrCoordinateMultiUpdate: {skip: "internal command"},
     _shardsvrCreateCollection: {skip: "internal command"},
     _shardsvrCreateCollectionParticipant: {skip: "internal command"},

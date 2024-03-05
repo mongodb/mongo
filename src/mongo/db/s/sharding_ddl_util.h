@@ -300,6 +300,16 @@ void runTransactionOnShardingCatalog(
     bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& inputExecutor = nullptr);
 
+/*
+ * Same as `runTransactionOnShardingCatalog` but automatically adding StmtsIds to passed in
+ * operations
+ */
+void runTransactionWithStmtIdsOnShardingCatalog(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const OperationSessionInfo& osi,
+    const std::vector<BatchedCommandRequest>&& ops);
+
 /**
  * Returns the default key pattern value for unsplittable collections.
  */
@@ -322,6 +332,16 @@ std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShard
     const std::vector<ChunkType>& chunks,
     const ChunkVersion& placementVersion,
     const std::set<ShardId>& shardIds);
+
+/*
+ * Same as `getOperationsToCreateOrShardCollectionOnShardingCatalog`, with the difference that it
+ * generates the collection and chunk entries for an unsplittable collection.
+ */
+std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& collectionUuid,
+    const ShardId& shardId);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

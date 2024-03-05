@@ -55,6 +55,7 @@
 #include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
+#include "mongo/db/s/convert_to_capped_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
@@ -95,52 +96,41 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
     switch (op.getId().getOperationType()) {
         case DDLCoordinatorTypeEnum::kMovePrimary:
             return std::make_shared<MovePrimaryCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kDropDatabase:
             return std::make_shared<DropDatabaseCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kDropCollection:
             return std::make_shared<DropCollectionCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kRenameCollection:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kCreateCollection:
             return std::make_shared<CreateCollectionCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kRefineCollectionShardKeyPre71Compatible:
             return std::make_shared<RefineCollectionShardKeyCoordinatorPre71Compatible>(
                 service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kCreateCollectionPre80Compatible:
             return std::make_shared<CreateCollectionCoordinatorLegacy>(service,
                                                                        std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kRefineCollectionShardKey:
             return std::make_shared<RefineCollectionShardKeyCoordinator>(service,
                                                                          std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kSetAllowMigrations:
             return std::make_shared<SetAllowMigrationsCoordinator>(service,
                                                                    std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kCollMod:
             return std::make_shared<CollModCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kReshardCollection:
             return std::make_shared<ReshardCollectionCoordinator>(service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData:
             return std::make_shared<CompactStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kCleanupStructuredEncryptionData:
             return std::make_shared<CleanupStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));
-            break;
         case DDLCoordinatorTypeEnum::kMigrationBlockingOperation:
             return std::make_shared<MigrationBlockingOperationCoordinator>(service,
                                                                            std::move(initialState));
+        case DDLCoordinatorTypeEnum::kConvertToCapped:
+            return std::make_shared<ConvertToCappedCoordinator>(service, std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

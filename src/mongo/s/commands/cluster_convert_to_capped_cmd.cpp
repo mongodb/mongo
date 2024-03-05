@@ -35,73 +35,20 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/str.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 
 namespace mongo {
 namespace {
-
-bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
-                                            const DatabaseName& dbName,
-                                            const NamespaceString& nss,
-                                            const CollectionRoutingInfo& cri,
-                                            const BSONObj& cmdObj,
-                                            Shard::RetryPolicy retryPolicy,
-                                            BSONObjBuilder* out) {
-    const StringData cmdName(cmdObj.firstElementFieldName());
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
-            !cri.cm.isSharded());
-
-    auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                                dbName,
-                                                                nss,
-                                                                cri,
-                                                                cmdObj,
-                                                                ReadPreferenceSetting::get(opCtx),
-                                                                retryPolicy,
-                                                                {} /*query*/,
-                                                                {} /*collation*/,
-                                                                boost::none /*letParameters*/,
-                                                                boost::none /*runtimeConstants*/);
-    invariant(responses.size() == 1);
-
-    const auto cmdResponse = uassertStatusOK(std::move(responses.front().swResponse));
-    const auto status = getStatusFromCommandResult(cmdResponse.data);
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
-            !ErrorCodes::isStaleShardVersionError(status));
-
-    out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data));
-    return status.isOK();
-}
 
 class ConvertToCappedCmd : public BasicCommand {
 public:
@@ -135,24 +82,31 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
-        const auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        uassert(ErrorCodes::IllegalOperation,
-                "You can't convertToCapped a sharded collection",
-                !cri.cm.isSharded());
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        const long long size = cmdObj.getField("size").safeNumberLong();
 
-        // convertToCapped creates a temp collection and renames it at the end. It will require
-        // special handling for create collection.
-        return nonShardedCollectionCommandPassthrough(
+        ShardsvrConvertToCappedRequest req;
+        req.setSize(size);
+
+        ShardsvrConvertToCapped shardSvrConvertToCappedCommand(nss);
+        shardSvrConvertToCappedCommand.setDbName(dbName);
+        shardSvrConvertToCappedCommand.setShardsvrConvertToCappedRequest(std::move(req));
+
+        const CachedDatabaseInfo dbInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
+        auto cmdResponse = executeCommandAgainstDatabasePrimary(
             opCtx,
             dbName,
-            nss,
-            cri,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            Shard::RetryPolicy::kIdempotent,
-            &result);
+            dbInfo,
+            CommandHelpers::appendMajorityWriteConcern(shardSvrConvertToCappedCommand.toBSON({}),
+                                                       opCtx->getWriteConcern()),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kIdempotent);
+
+        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+        uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+        return true;
     }
 };
 MONGO_REGISTER_COMMAND(ConvertToCappedCmd).forRouter();

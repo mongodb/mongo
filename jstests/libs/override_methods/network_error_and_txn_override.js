@@ -89,7 +89,6 @@ const kNonRetryableCommands = new Set([
     "captrunc",
     "clone",
     "cloneCollectionAsCapped",
-    "convertToCapped",
     "create",
     "createIndexes",
     "deleteIndexes",

@@ -4,6 +4,9 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+// TODO SERVER-87501 Review all usages of ErrorCodes.MovePrimaryInProgress in this file once v8.0
+// branches out
+
 let st = new ShardingTest({
     mongos: 2,
     shards: 2,
@@ -118,7 +121,6 @@ function buildCommands(collName, shouldFail) {
             command:
                 {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
             shouldFail: true,
-            // TODO SERVER-77915 Remove ErrorCodes.MovePrimaryInProgress
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
@@ -142,13 +144,11 @@ function buildCommands(collName, shouldFail) {
         {
             command: {create: "testCollection"},
             shouldFail: true,
-            // TODO SERVER-77915 Remove ErrorCodes.MovePrimaryInProgress
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
             command: {create: "testView", viewOn: collName, pipeline: [{$match: {}}]},
             shouldFail: true,
-            // TODO SERVER-77915 Remove ErrorCodes.MovePrimaryInProgress
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
@@ -165,7 +165,11 @@ function buildCommands(collName, shouldFail) {
             shouldFail: true,
             errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
-        {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true},
+        {
+            command: {convertToCapped: "unshardedFoo", size: 1000000},
+            shouldFail: true,
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+        },
         {
             command: {dropIndexes: collName, index: collName + "Index"},
             shouldFail: true,

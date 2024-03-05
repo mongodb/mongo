@@ -516,43 +516,6 @@ void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
                                str::stream() << "Error removing chunks matching uuid " << uuid);
 }
 
-void updateCollectionMetadataInTransaction(OperationContext* opCtx,
-                                           const std::shared_ptr<executor::TaskExecutor>& executor,
-                                           const std::vector<ChunkType>& chunks,
-                                           const CollectionType& coll,
-                                           const ChunkVersion& placementVersion,
-                                           const std::set<ShardId>& shardIds,
-                                           const OperationSessionInfo& osi) {
-    const auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
-                                      ExecutorPtr txnExec) {
-        auto ops = sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
-            coll, chunks, placementVersion, shardIds);
-
-        StmtId statementsCounter = 0;
-        for (auto&& op : ops) {
-            const auto numOps = op.sizeWriteOps();
-            std::vector<StmtId> statementIds(numOps);
-            std::iota(statementIds.begin(), statementIds.end(), statementsCounter);
-            statementsCounter += numOps;
-            const auto response = txnClient.runCRUDOpSync(op, std::move(statementIds));
-            uassertStatusOK(response.toStatus());
-        }
-
-        return SemiFuture<void>::makeReady();
-    };
-
-    // Ensure that this function will only return once the transaction gets majority committed
-    auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
-                                  WriteConcernOptions::SyncMode::UNSET,
-                                  WriteConcernOptions::kNoTimeout};
-
-    // This always runs in the shard role so should use a cluster transaction to guarantee targeting
-    // the config server.
-    bool useClusterTransaction = true;
-    sharding_ddl_util::runTransactionOnShardingCatalog(
-        opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
-}
-
 void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -1336,13 +1299,11 @@ void commit(OperationContext* opCtx,
         coll.setUnique(*request.getUnique());
     }
 
-    updateCollectionMetadataInTransaction(opCtx,
-                                          executor,
-                                          initialChunks->chunks,
-                                          coll,
-                                          placementVersion,
-                                          shardsHoldingData,
-                                          newSessionBuilder(opCtx));
+    auto ops = sharding_ddl_util::getOperationsToCreateOrShardCollectionOnShardingCatalog(
+        coll, initialChunks->chunks, placementVersion, shardsHoldingData);
+
+    sharding_ddl_util::runTransactionWithStmtIdsOnShardingCatalog(
+        opCtx, executor, newSessionBuilder(opCtx), std::move(ops));
 }
 
 }  // namespace

@@ -421,6 +421,14 @@ structs:
                 description: "If false balancer rounds should be disabled and migrations commit prohibited."
                 optional: false
 
+    ShardsvrConvertToCappedRequest:
+        description: "convertToCapped command parameters"
+        strict: false
+        fields:
+            size:
+                type: safeInt64
+                description: "Maximum number of documents in the capped collection"
+
 commands:
     _shardsvrCreateCollection:
         command_name: _shardsvrCreateCollection
@@ -807,3 +815,14 @@ commands:
             maxKey:
                 type: object
                 description: "The upper bound key value of the chunk."
+
+    _shardsvrConvertToCapped:
+        command_name: _shardsvrConvertToCapped
+        cpp_name: ShardsvrConvertToCapped
+        description: "The internal convertToCapped command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
+

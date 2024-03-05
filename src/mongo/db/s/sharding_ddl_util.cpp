@@ -72,12 +72,14 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/remove_tags_gen.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_util.h"
@@ -657,6 +659,8 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
                                             inlineExecutor,
                                             std::move(customTxnClient));
     txn.run(newOpCtx, std::move(transactionChain));
+
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 }
 
 const KeyPattern& unsplittableCollectionShardKey() {
@@ -738,6 +742,61 @@ std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShard
     ret.emplace_back(std::move(upsertCollection));
     ret.emplace_back(std::move(insertPlacementHistory));
     return ret;
+}
+
+std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOnShardingCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& collectionUuid,
+    const ShardId& shardId) {
+    const auto unsplittableShardKeyPattern = ShardKeyPattern(unsplittableCollectionShardKey());
+    const auto initialChunks = SingleChunkOnPrimarySplitPolicy().createFirstChunks(
+        opCtx, unsplittableShardKeyPattern, {collectionUuid, shardId});
+    invariant(initialChunks.chunks.size() == 1);
+    const auto& placementVersion = initialChunks.chunks.front().getVersion();
+
+    auto coll = CollectionType(nss,
+                               placementVersion.epoch(),
+                               placementVersion.getTimestamp(),
+                               Date_t::now(),
+                               collectionUuid,
+                               unsplittableCollectionShardKey().toBSON());
+    coll.setUnsplittable(true);
+
+    return getOperationsToCreateOrShardCollectionOnShardingCatalog(
+        coll, initialChunks.chunks, placementVersion, {shardId});
+}
+
+void runTransactionWithStmtIdsOnShardingCatalog(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const OperationSessionInfo& osi,
+    const std::vector<BatchedCommandRequest>&& ops) {
+    const auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
+                                      ExecutorPtr txnExec) {
+        StmtId statementsCounter = 0;
+        for (auto&& op : ops) {
+            const auto numOps = op.sizeWriteOps();
+            std::vector<StmtId> statementIds(numOps);
+            std::iota(statementIds.begin(), statementIds.end(), statementsCounter);
+            statementsCounter += numOps;
+            const auto response = txnClient.runCRUDOpSync(op, std::move(statementIds));
+            uassertStatusOK(response.toStatus());
+        }
+
+        return SemiFuture<void>::makeReady();
+    };
+
+    // Ensure that this function will only return once the transaction gets majority committed
+    auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
+                                  WriteConcernOptions::SyncMode::UNSET,
+                                  WriteConcernOptions::kNoTimeout};
+
+    // This always runs in the shard role so should use a cluster transaction to guarantee targeting
+    // the config server.
+    bool useClusterTransaction = true;
+    sharding_ddl_util::runTransactionOnShardingCatalog(
+        opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
 }
 
 }  // namespace sharding_ddl_util

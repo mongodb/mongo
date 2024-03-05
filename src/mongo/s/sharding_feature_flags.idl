@@ -124,6 +124,13 @@ feature_flags:
     default: true
     version: 8.0
     shouldBeFCVGated: true
+  featureFlagConvertToCappedCoordinator:
+    description: "Feature flag used for deciding how to serve _shardsvrConvertToCapped commands sent by the router
+                 (new coordinator in case of latest FCV, legacy path otherwise)."
+    cpp_varname: feature_flags::gConvertToCappedCoordinator
+    default: true
+    version: 8.0
+    shouldBeFCVGated: true
   # TODO (SERVER-81037): enable this feature flag once it's possible to detect prepare conflicts on the catalog
   featureFlagCreateCollectionInPreparedTransactions:
     description: "Feature flag protecting the codepath allowing to create collections in prepared transactions "

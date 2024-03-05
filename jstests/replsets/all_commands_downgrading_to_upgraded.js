@@ -100,6 +100,7 @@ const allCommands = {
     _shardsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrCompactStructuredEncryptionData: {skip: isAnInternalCommand},
+    _shardsvrConvertToCapped: {skip: isAnInternalCommand},
     _shardsvrRegisterIndex: {skip: isAnInternalCommand},
     _shardsvrCommitIndexParticipant: {skip: isAnInternalCommand},
     _shardsvrCommitReshardCollection: {skip: isAnInternalCommand},

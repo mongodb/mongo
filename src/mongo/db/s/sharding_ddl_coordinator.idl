@@ -61,6 +61,7 @@ enums:
             kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
             kCleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
             kMigrationBlockingOperation: "migrationBlockingOperation"
+            kConvertToCapped: "convertToCapped"
 
 types:
     ForwardableOperationMetadata:

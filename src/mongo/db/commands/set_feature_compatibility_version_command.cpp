@@ -663,6 +663,15 @@ private:
                     opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
         }
 
+        // TODO SERVER-87119 remove the following scope once v8.0 branches out
+        if (isDowngrading &&
+            feature_flags::gConvertToCappedCoordinator.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kConvertToCapped);
+        }
+
         // TODO SERVER-77915: Remove once trackUnshardedCollections becomes lastLTS.
         if ((isUpgrading &&
              feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
