@@ -1350,8 +1350,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
             const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
             const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
+            const bool querySettingsHintSbe = [&]() {
+                if (auto queryFramework =
+                        canonicalQuery->getExpCtx()->getQuerySettings().getQueryFramework()) {
+                    return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
+                }
+                return false;
+            }();
 
-            if (canUseRegularSbe || sbeFull) {
+            if (canUseRegularSbe || sbeFull || querySettingsHintSbe) {
                 auto sbeYieldPolicy = PlanYieldPolicySBE::make(
                     opCtx, yieldPolicy, collections, canonicalQuery->nss());
                 finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
