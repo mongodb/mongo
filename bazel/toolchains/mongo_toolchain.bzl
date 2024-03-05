@@ -1,4 +1,4 @@
-load("//bazel:utils.bzl", "get_host_distro", "retry_download_and_extract")
+load("//bazel:utils.bzl", "get_host_distro_major_version", "retry_download_and_extract")
 load("//bazel/toolchains:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 
 _OS_MAP = {
@@ -11,6 +11,7 @@ _ARCH_MAP = {
     "aarch64": "@platforms//cpu:arm64",
     "x86_64": "@platforms//cpu:x86_64",
     "ppc64le": "@platforms//cpu:ppc64le",
+    "s390x": "@platforms//cpu:s390x",
 }
 
 _ARCH_NORMALIZE_MAP = {
@@ -19,6 +20,7 @@ _ARCH_NORMALIZE_MAP = {
     "arm64": "aarch64",
     "aarch64": "aarch64",
     "ppc64le": "ppc64le",
+    "s390x": "s390x",
 }
 
 def _toolchain_download(ctx):
@@ -67,8 +69,14 @@ def _toolchain_download(ctx):
             "{bazel_toolchain_cpu}": "ppc",
             "{arch}": arch,
         }
+    elif arch == "s390x":
+        substitutions = {
+            "{platforms_arch}": "s390x",
+            "{bazel_toolchain_cpu}": arch,
+            "{arch}": arch,
+        }
 
-    distro = get_host_distro(ctx)
+    distro = get_host_distro_major_version(ctx)
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
 
     if toolchain_key in TOOLCHAIN_MAP:
@@ -76,7 +84,8 @@ def _toolchain_download(ctx):
         urls = toolchain_info["url"]
         sha = toolchain_info["sha"]
 
-        ctx.report_progress("downloading {} mongo toolchain".format(toolchain_key))
+        ctx.report_progress("downloading {} mongo toolchain {}".format(toolchain_key, urls))
+        print("downloading {} mongo toolchain {}".format(toolchain_key, urls))
         retry_download_and_extract(
             ctx = ctx,
             tries = 5,
@@ -104,7 +113,7 @@ toolchain_download = repository_rule(
             doc = "Host operating system.",
         ),
         "arch": attr.string(
-            values = ["amd64", "aarch64", "amd64", "x86_64", "ppc64le"],
+            values = ["amd64", "aarch64", "amd64", "x86_64", "ppc64le", "s390x"],
             doc = "Host architecture.",
         ),
         "build_tpl": attr.label(

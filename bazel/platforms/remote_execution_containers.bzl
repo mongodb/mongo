@@ -35,11 +35,11 @@ REMOTE_EXECUTION_CONTAINERS = {
         # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a
         "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a",
     },
-    "rhel80_arm64": {
+    "rhel8_arm64": {
         # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:f2ef9e4215149fd7d51f0eb1ed15a0e985dab2935afc8e25a1247c8216af399d
         "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:f2ef9e4215149fd7d51f0eb1ed15a0e985dab2935afc8e25a1247c8216af399d",
     },
-    "rhel80_amd64": {
+    "rhel8_amd64": {
         # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:f2ef9e4215149fd7d51f0eb1ed15a0e985dab2935afc8e25a1247c8216af399d
         "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:f2ef9e4215149fd7d51f0eb1ed15a0e985dab2935afc8e25a1247c8216af399d",
     },

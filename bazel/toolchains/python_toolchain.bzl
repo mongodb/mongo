@@ -13,6 +13,7 @@ _ARCH_MAP = {
     "aarch64": "@platforms//cpu:arm64",
     "x86_64": "@platforms//cpu:x86_64",
     "ppc64le": "@platforms//cpu:ppc64le",
+    "s390x": "@platforms//cpu:s390x",
 }
 
 URLS_MAP = {
@@ -29,6 +30,11 @@ URLS_MAP = {
     "linux_ppc64le": {
         "sha": "7937035f690a624dba4d014ffd20c342e843dd46f89b0b0a1e5726b85deb8eaf",
         "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-ppc64le-unknown-linux-gnu-install_only.tar.gz",
+        "interpreter_path": "bin/python3",
+    },
+    "linux_s390x": {
+        "sha": "f9f19823dba3209cedc4647b00f46ed0177242917db20fb7fb539970e384531c",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-s390x-unknown-linux-gnu-install_only.tar.gz",
         "interpreter_path": "bin/python3",
     },
     "windows_amd64": {
@@ -126,7 +132,7 @@ py_download = repository_rule(
             doc = "Host operating system.",
         ),
         "arch": attr.string(
-            values = ["amd64", "aarch64", "ppc64le"],
+            values = ["amd64", "aarch64", "ppc64le", "s390x"],
             doc = "Host architecture.",
         ),
         "interpreter_path": attr.string(
@@ -177,6 +183,15 @@ def setup_mongo_python_toolchains():
     )
 
     py_download(
+        name = "py_linux_s390x",
+        arch = "s390x",
+        os = "linux",
+        build_tpl = "//bazel/toolchains:python_toolchain.BUILD",
+        sha256 = URLS_MAP["linux_s390x"]["sha"],
+        urls = [URLS_MAP["linux_s390x"]["url"]],
+    )
+
+    py_download(
         name = "py_windows_x86_64",
         arch = "amd64",
         os = "windows",
@@ -208,6 +223,7 @@ def setup_mongo_python_toolchains():
         "@py_linux_arm64//:python_toolchain",
         "@py_linux_x86_64//:python_toolchain",
         "@py_linux_ppc64le//:python_toolchain",
+        "@py_linux_s390x//:python_toolchain",
         "@py_windows_x86_64//:python_toolchain",
         "@py_macos_arm64//:python_toolchain",
         "@py_macos_x86_64//:python_toolchain",

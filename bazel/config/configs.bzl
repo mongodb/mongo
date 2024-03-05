@@ -40,7 +40,7 @@ build_mode = rule(
 # linker
 # ==========
 
-linker_values = ["gold", "lld"]
+linker_values = ["auto", "gold", "lld"]
 
 linker_provider = provider(
     doc = "Specify the type of linker to use.",

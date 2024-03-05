@@ -109,10 +109,15 @@ DEBUG_DEFINES = select({
     "//conditions:default": ["NDEBUG"],
 })
 
+LINKER_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    --//bazel/config:linker=lld is not supported on s390x"
+)
+
 LINKER_LINKFLAGS = select({
     "//bazel/config:linker_gold": ["-fuse-ld=gold"],
-    "//bazel/config:linker_lld": ["-fuse-ld=lld"],
-})
+    "//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
+}, no_match_error = LINKER_ERROR_MESSAGE)
 
 REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = (
     "\nError:\n" +

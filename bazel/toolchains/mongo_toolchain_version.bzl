@@ -19,12 +19,17 @@ TOOLCHAIN_MAP = {
         "sha": "e2bf59dacb789bd3ed708bafb7bf4e432f611f19d6b888340e3b73eee6949b31",
         "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
-    "rhel80_x86_64": {
+    "rhel8_x86_64": {
         "platform_name": "rhel80",
         "sha": "94b67aecc97501a314214c6c8dd00008edeb139f33097180cea70ffef623dc61",
         "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel80/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel80_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
     },
-    "rhel81_ppc64le": {
+    "rhel8_s390x": {
+        "platform_name": "rhel80-zseries",
+        "sha": "efb59b97ac16150a91ad76609bb5ecfe644a5140bc08bd123c0bd44fea78a3a0",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel80-zseries/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel80_zseries_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+    },
+    "rhel8_ppc64le": {
         "platform_name": "rhel81-ppc64le",
         "sha": "e9ac010977f6b92d301174a5749c06e4678a0071556745ea3681a2825b6f7bd1",
         "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel81-ppc64le/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_rhel81_ppc64le_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",

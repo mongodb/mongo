@@ -97,7 +97,47 @@ buildvariants:
     compile_variant: *amazon-linux-2023-arm64-bazel-compile
   tasks:
     - name: compile_bazel_TG
+    - name: compile_bazel_sanitize_TG
     - name: compile_bazel_ninja_TG
+
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &rhel81-ppc64le-bazel-compile rhel81-ppc64le-bazel-compile
+  display_name: "RHEL 8.1 PPC64LE Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
+  run_on:
+  - rhel81-power8-small
+  stepback: false
+  expansions:
+    compile_variant: *rhel81-ppc64le-bazel-compile
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel81
+      -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+  tasks:
+    - name: compile_bazel_TG
+
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &rhel83-s390x-bazel-compile rhel83-s390x-bazel-compile
+  display_name: "RHEL 8.3 S390X Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
+  run_on:
+  - rhel83-zseries-small
+  stepback: false
+  expansions:
+    compile_variant: *rhel83-s390x-bazel-compile
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel83
+      -j3
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --linker=gold
+  tasks:
+    - name: compile_bazel_TG
 
 - &enterprise-amazon-linux2-arm64-all-feature-flags-template
   <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency

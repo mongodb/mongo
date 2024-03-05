@@ -76,3 +76,21 @@ platform(
         "@bazel_tools//tools/cpp:gcc",
     ],
 )
+
+platform(
+    name = "linux_s390x_clang",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+)
+
+platform(
+    name = "linux_s390x_gcc",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:gcc",
+    ],
+)

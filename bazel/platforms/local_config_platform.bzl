@@ -1,5 +1,5 @@
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
-load("//bazel:utils.bzl", "get_host_distro")
+load("//bazel:utils.bzl", "get_host_distro_major_version")
 
 _OS_MAP = {
     "macos": "@platforms//os:osx",
@@ -12,6 +12,7 @@ _ARCH_MAP = {
     "aarch64": "@platforms//cpu:arm64",
     "x86_64": "@platforms//cpu:x86_64",
     "ppc64le": "@platforms//cpu:ppc64le",
+    "s390x": "@platforms//cpu:s390x",
 }
 
 def _setup_local_config_platform(ctx):
@@ -39,7 +40,7 @@ def _setup_local_config_platform(ctx):
     # So Starlark doesn't throw an indentation error when this gets injected.
     constraints_str = ",\n        ".join(['"%s"' % c for c in constraints])
 
-    distro = get_host_distro(ctx)
+    distro = get_host_distro_major_version(ctx)
     if arch == "x86_64":
         arch = "amd64"
     elif arch == "aarch64":

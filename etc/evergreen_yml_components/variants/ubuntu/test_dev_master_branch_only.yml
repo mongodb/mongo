@@ -35,6 +35,7 @@ buildvariants:
     compile_variant: *ubuntu2204-arm64-bazel-compile
   tasks:
     - name: compile_bazel_TG
+    - name: compile_bazel_sanitize_TG
     - name: compile_bazel_ninja_TG
     - name: bazel_workstation_TG
       distros:
@@ -51,6 +52,7 @@ buildvariants:
     compile_variant: *ubuntu2204-x86-64-bazel-compile
   tasks:
     - name: compile_bazel_TG
+    - name: compile_bazel_sanitize_TG
     - name: compile_bazel_ninja_TG
 
 - <<: *enterprise-ubuntu2204-64-libvoidstar-template

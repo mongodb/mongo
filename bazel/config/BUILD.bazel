@@ -133,6 +133,15 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "not_s390x",
+    match_any = [
+        "@platforms//cpu:aarch64",
+        "@platforms//cpu:x86_64",
+        "@platforms//cpu:ppc64le",
+    ],
+)
+
 # ==========
 # build_mode
 # ==========
@@ -278,21 +287,74 @@ config_setting(
 
 linker(
     name = "linker",
-    build_setting_default = "lld",
+    build_setting_default = "auto",
+)
+
+# Underscored settings are for flagging configuration errors and for evaluating auto.
+# Use :linker_gold & linker_lld to check the final evaluated linker.
+config_setting(
+    name = "_linker_auto",
+    flag_values = {
+        "//bazel/config:linker": "auto",
+    },
 )
 
 config_setting(
-    name = "linker_gold",
+    name = "_linker_gold",
     flag_values = {
         "//bazel/config:linker": "gold",
     },
 )
 
 config_setting(
-    name = "linker_lld",
+    name = "_linker_lld",
     flag_values = {
         "//bazel/config:linker": "lld",
     },
+)
+
+selects.config_setting_group(
+    name = "_linker_gold_set_by_auto",
+    match_all = [
+        ":_linker_auto",
+        "@platforms//cpu:s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_linker_lld_set_by_auto",
+    match_all = [
+        ":_linker_auto",
+        ":not_s390x",
+    ],
+)
+
+# Final setting intended for external use.
+#   linker == gold || (linker == auto && cpu == s390x)
+selects.config_setting_group(
+    name = "linker_gold",
+    match_any = [
+        ":_linker_gold_set_by_auto",
+        ":_linker_gold",
+    ],
+)
+
+# Final setting intended for external use.
+#   linker == lld || (linker == auto && cpu == not_s390x)
+selects.config_setting_group(
+    name = "linker_lld",
+    match_any = [
+        ":_linker_lld_set_by_auto",
+        ":_linker_lld",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linker_lld_valid_settings",
+    match_all = [
+        ":linker_lld",
+        ":not_s390x",
+    ],
 )
 
 # --------------------------------------

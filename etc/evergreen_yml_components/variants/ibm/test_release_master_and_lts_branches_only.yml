@@ -11,7 +11,6 @@ buildvariants:
   - rhel81-power8-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
-  tags: ["bazel_check"]
   expansions: &enterprise-rhel-81-ppc64le-expansions-template
     additional_package_targets: >-
       archive-mongocryptd
@@ -66,7 +65,6 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
   - name: .timeseries_crud
-  - name: compile_bazel_TG
 
 - <<: *enterprise-rhel-81-ppc64le-template
   name: enterprise-rhel-81-ppc64le-dynamic

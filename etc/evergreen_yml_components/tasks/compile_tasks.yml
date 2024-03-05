@@ -2314,7 +2314,6 @@ task_groups:
   - compile_bazel_libunwind
   - compile_bazel_program
   - run_bazel_scons_unittest
-  - run_bazel_scons_unittest_sanitize
   - run_bazel_program
 
 - <<: *compile_task_group_template
@@ -2322,6 +2321,11 @@ task_groups:
   tags: []
   tasks:
   - bazel_workstation_unittests
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_sanitize_TG
+  tasks:
+  - run_bazel_scons_unittest_sanitize
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_ninja_TG

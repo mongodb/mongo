@@ -26,12 +26,16 @@ if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
   ARCH="arm64"
 elif [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" || "$ARCH" == "ppcle" ]]; then
   ARCH="ppc64le"
+elif [[ "$ARCH" == "s390x" || "$ARCH" == "s390" ]]; then
+  ARCH="s390x"
 else
   ARCH="amd64"
 fi
 
+mkdir -p $TMPDIR
+
 # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
-if [[ $ARCH == "ppc64le" ]]; then
+if [[ $ARCH == "ppc64le" ]] || [[ $ARCH == "s390x" ]]; then
   REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-${ARCH}
   LOCAL_PATH=$TMPDIR/bazel
 else
