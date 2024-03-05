@@ -66,7 +66,7 @@ protected:
             auto name = fmt::format("TestParameter{}", i);
             _testParameters.push_back(std::make_unique<StorageAndParameter>(
                 name,
-                LogicalTime{Timestamp{0, static_cast<unsigned int>(i)}},
+                LogicalTime{Timestamp{1000, static_cast<unsigned int>(i)}},
                 i,
                 str::stream() << "Test String" << i));
             reportedParameters.insert(name);
@@ -119,10 +119,24 @@ TEST_F(ClusterParameterServerStatusTest, ReportsMultipleParameters) {
     ASSERT_BSONOBJ_EQ(getReport(), expected.obj());
 }
 
-TEST_F(ClusterParameterServerStatusTest, DoNotReportDisabledParameters) {
+TEST_F(ClusterParameterServerStatusTest, DoNotReportParametersNotInReportSet) {
     _serverStatus = std::make_unique<ClusterServerParameterServerStatus>(&_parameterSet,
                                                                          std::set<std::string>{});
     auto parameter = std::addressof(_testParameters[0]->parameter);
+    _parameterSet.add(parameter);
+    ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
+}
+
+TEST_F(ClusterParameterServerStatusTest, DoNotReportDisabledParameters) {
+    auto parameter = std::addressof(_testParameters[0]->parameter);
+    parameter->disable(false);
+    _parameterSet.add(parameter);
+    ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
+}
+
+TEST_F(ClusterParameterServerStatusTest, DoNotReportUnsetParameters) {
+    auto parameter = std::addressof(_testParameters[0]->parameter);
+    ASSERT_OK(parameter->reset(boost::none));
     _parameterSet.add(parameter);
     ASSERT_BSONOBJ_EQ(getReport(), BSONObj::kEmptyObject);
 }
