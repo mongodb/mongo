@@ -45,11 +45,9 @@ variables:
 
 buildvariants:
 - name: &windows-compile-required windows-compile-required
-  display_name: "! Windows Compile"
+  display_name: "! Windows Enterprise Compile"
   run_on:
   - windows-vsCurrent-xxlarge
-  modules:
-  - enterprise
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   expansions:
     exe: ".exe"
@@ -87,8 +85,6 @@ buildvariants:
   name: &enterprise-windows-suggested enterprise-windows-suggested
   display_name: "* Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:

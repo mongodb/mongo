@@ -5,8 +5,6 @@ buildvariants:
 - name: enterprise-ubuntu1804-64
   display_name: Jepsen Tests on Enterprise Ubuntu 18.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-small
   # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
@@ -44,7 +42,10 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+      --enableEnterpriseTests=off
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
     has_packages: true
@@ -80,7 +81,10 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -104,8 +108,6 @@ buildvariants:
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2004-small
   stepback: false
@@ -151,8 +153,6 @@ buildvariants:
 - name: enterprise-ubuntu2204-64
   display_name: Enterprise Ubuntu 22.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2204-small
   stepback: false
@@ -202,8 +202,6 @@ buildvariants:
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2004-arm64
   expansions:
@@ -260,7 +258,10 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -286,8 +287,6 @@ buildvariants:
 - name: enterprise-ubuntu2204-arm64
   display_name: Enterprise Ubuntu 22.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu2204-arm64-small
   expansions:
@@ -335,8 +334,14 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=ubuntu2204
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py

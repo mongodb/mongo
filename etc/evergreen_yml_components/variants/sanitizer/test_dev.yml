@@ -31,7 +31,7 @@ variables:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_debug_compile_expansions
+- &linux_debug_community_compile_expansions
   <<: *generic_linux_compile_expansions
   compile_flags: >-
     --dbg=on
@@ -41,6 +41,7 @@ variables:
     --enable-http-client=on
     --link-model=dynamic
     --use-diagnostic-latches=on
+    --modules=
   num_scons_link_jobs_available: 0.99
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
@@ -117,7 +118,7 @@ buildvariants:
   display_name: "! Linux x86 Shared Library DEBUG Compile"
   stepback: false
   expansions:
-    <<: *linux_debug_compile_expansions
+    <<: *linux_debug_community_compile_expansions
     compile_variant: *linux-x86-dynamic-debug-compile-required
   tasks:
   - name: compile_test_parallel_core_stream_TG
@@ -128,8 +129,6 @@ buildvariants:
 - <<: *generic_linux_compile_params
   name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
   display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
-  modules:
-  - enterprise
   expansions:
     <<: *generic_linux_compile_expansions
     separate_debug: off
@@ -156,7 +155,9 @@ buildvariants:
   - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    test_flags: --excludeWithAnyTags=requires_http_client
+    test_flags: >-
+      --excludeWithAnyTags=requires_http_client
+      --enableEnterpriseTests=off
     target_resmoke_time: 15
     max_sub_suites: 5
     large_distro_name: rhel80-medium
@@ -198,8 +199,6 @@ buildvariants:
   name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
   display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions:
@@ -228,12 +227,15 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --use-diagnostic-latches=on
+      --modules=
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,corrupts_data
+    test_flags: >-
+      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,corrupts_data
+      --enableEnterpriseTests=off
     separate_debug: off
     compile_variant: rhel80-asan
   tasks:
@@ -246,8 +248,6 @@ buildvariants:
 - name: rhel80-debug-asan
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -337,8 +337,6 @@ buildvariants:
 - name: rhel80-debug-ubsan
   display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -423,8 +421,6 @@ buildvariants:
   name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false

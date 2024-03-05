@@ -15,10 +15,12 @@ buildvariants:
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --modules=
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
       --excludeWithAnyTags=requires_os_access,requires_latch_analyzer
+      --enableEnterpriseTests=off
     compile_variant: ubi8
   tasks:
   - name: compile_and_archive_dist_test_TG
@@ -34,8 +36,6 @@ buildvariants:
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-expansions
@@ -184,7 +184,10 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+      --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -226,8 +229,6 @@ buildvariants:
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel82-arm64-small
   expansions:
@@ -303,8 +304,14 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+    compile_flags: >-
+      --ssl MONGO_DISTMOD=rhel90
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     multiversion_platform: rhel90
     multiversion_edition: targeted
     has_packages: true
@@ -349,8 +356,6 @@ buildvariants:
 - name: enterprise-rhel-90-64-bit
   display_name: "Enterprise RHEL 9.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel90-small
   expansions: &enterprise-rhel-90-64-bit-expansions
@@ -434,7 +439,10 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -476,8 +484,6 @@ buildvariants:
 - name: enterprise-rhel-90-arm64
   display_name: "Enterprise RHEL 9.0 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel90-arm64-small
   expansions:
@@ -548,8 +554,6 @@ buildvariants:
 - name: enterprise-rhel-82-arm64-grpc
   display_name: "Enterprise RHEL 8.2 arm64 GRPC"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel82-arm64-large
   stepback: false

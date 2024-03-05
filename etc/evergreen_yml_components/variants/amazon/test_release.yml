@@ -5,8 +5,6 @@ buildvariants:
 - name: enterprise-amazon2-openssl111
   display_name: "Enterprise Amazon Linux 2 (openssl 1.1.1)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2-openssl111-small
   expansions:
@@ -54,8 +52,6 @@ buildvariants:
 - name: enterprise-amazon2-arm64-openssl111
   display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2-arm64-openssl111-small
   expansions:
@@ -117,7 +113,10 @@ buildvariants:
       MONGO_DISTMOD=amazon2023
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -139,8 +138,6 @@ buildvariants:
 - name: enterprise-amazon2023
   display_name: "Enterprise Amazon Linux 2023"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2023.0-small
   expansions:
@@ -184,8 +181,6 @@ buildvariants:
   # TODO(SERVER-85904): Re-enable this to run in nightly once Bazel supports LTO.
   # cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   activate: false
-  modules:
-  - enterprise
   run_on:
   - amazon2023.0-small
   expansions:
@@ -244,7 +239,10 @@ buildvariants:
       BAZEL_BUILD_ENABLED=1
       BAZEL_INTEGRATION_DEBUG=1
       BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -266,8 +264,6 @@ buildvariants:
 - name: enterprise-amazon2023-arm64
   display_name: "Enterprise Amazon Linux 2023 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2023.0-arm64-small
   expansions:
@@ -313,8 +309,6 @@ buildvariants:
   # TODO(SERVER-85904): Re-enable this to run in nightly once Bazel supports LTO.
   # cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   activate: false
-  modules:
-  - enterprise
   run_on:
   - amazon2023.0-arm64-small
   expansions:
@@ -358,8 +352,6 @@ buildvariants:
 - name: enterprise-amazon2-streams
   display_name: "Amazon Linux 2 enterprise build with streams"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - amazon2-test
   expansions:

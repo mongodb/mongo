@@ -76,7 +76,6 @@ variables:
   num_scons_link_jobs_available: 0.99
 
 - modules: &perf_modules
-    - enterprise
     - dsi
     - genny
     - workloads

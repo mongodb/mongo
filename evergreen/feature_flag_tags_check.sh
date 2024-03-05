@@ -21,14 +21,6 @@ if [ -s "$diff_file_name" ]; then
   git apply -R "$diff_file_name"
 fi
 
-# This script has to be run on an Evergreen variant or local repo with the enterprise module.
-pushd "$enterprise_path"
-git --no-pager diff "$(git merge-base origin/${branch_name} HEAD)" --output="$diff_file_name" --binary
-if [ -s "$diff_file_name" ]; then
-  git apply -R "$diff_file_name"
-fi
-popd
-
 $python buildscripts/idl/gen_all_feature_flag_list.py
 mv all_feature_flags.txt base_all_feature_flags.txt
 

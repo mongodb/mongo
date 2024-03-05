@@ -10,15 +10,13 @@ variables:
   run_on:
   - rhel80-xlarge
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
   stepback: false
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-x86-dynamic-compile-expansions
+- &linux-x86-dynamic-enterprise-compile-expansions
   scons_cache_scope: shared
   scons_cache_mode: all
   has_packages: false
@@ -130,9 +128,9 @@ variables:
 buildvariants:
 - <<: *linux-x86-dynamic-compile-params
   name: &linux-x86-dynamic-compile linux-x86-dynamic-compile
-  display_name: "* Linux x86 Shared Library"
+  display_name: "* Linux x86 Enterprise Shared Library"
   expansions:
-    <<: *linux-x86-dynamic-compile-expansions
+    <<: *linux-x86-dynamic-enterprise-compile-expansions
     compile_variant: *linux-x86-dynamic-compile
   tasks:
     - name: compile_ninja_quick_TG
@@ -154,8 +152,6 @@ buildvariants:
   name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
   display_name: "* Shared Library Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions:
@@ -271,8 +267,6 @@ buildvariants:
 #   name: enterprise-rhel-80-64-bit-dynamic-config-shard
 #   display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
 #   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-#   modules:
-#   - enterprise
 #   run_on:
 #   - rhel80-small
 #   stepback: false
@@ -323,8 +317,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-dynamic-embedded-router
   display_name: "* Shared Library Enterprise RHEL 8.0 (Embedded Router all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   stepback: false
@@ -343,8 +335,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine
   display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   stepback: false
@@ -470,8 +460,6 @@ buildvariants:
   name: &rhel80-debug-aubsan-classic-engine rhel80-debug-aubsan-classic-engine
   display_name: "* {A,UB}SAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions:

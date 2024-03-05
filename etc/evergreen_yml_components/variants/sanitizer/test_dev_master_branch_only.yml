@@ -116,8 +116,6 @@ buildvariants:
 - name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
   display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   stepback: false
@@ -271,6 +269,7 @@ buildvariants:
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
       MONGO_DISTMOD=windows
       --use-diagnostic-latches=on
+      --modules=
     num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
@@ -278,7 +277,9 @@ buildvariants:
     multiversion_platform: windows
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_windows_tls
+      --enableEnterpriseTests=off
     compile_variant: *windows-debug-suggested
   tasks:
   - name: compile_test_serial_TG
@@ -340,8 +341,6 @@ buildvariants:
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
   display_name: "Enterprise Windows DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -366,7 +365,8 @@ buildvariants:
     ext: zip
     resmoke_jobs_max: 1
     scons_cache_scope: shared
-    test_flags: *windows_common_test_excludes
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_windows_tls
   tasks:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
@@ -392,7 +392,9 @@ buildvariants:
   - macos-1100
   expansions: &macos-debug-expansions
     compile_variant: *macos-debug-suggested
-    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_macos
+      --enableEnterpriseTests=off
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
@@ -403,6 +405,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
       --use-diagnostic-latches=on
+      --modules=
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_serial_TG
@@ -419,8 +422,6 @@ buildvariants:
 - name: &enterprise-macos enterprise-macos
   display_name: "Enterprise macOS DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100
   expansions:
@@ -457,8 +458,6 @@ buildvariants:
   name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
   display_name: "* Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -503,8 +502,6 @@ buildvariants:
   name: &rhel80-debug-aubsan-lite-all-feature-flags-required rhel80-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions:
@@ -603,8 +600,6 @@ buildvariants:
   name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
   display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-large
   stepback: false
@@ -759,8 +754,6 @@ buildvariants:
   display_name: "~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   activate: false
-  modules:
-  - enterprise
   run_on:
   - rhel80-large
   stepback: false
@@ -788,8 +781,6 @@ buildvariants:
 - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
   display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   expansions:
     compile_flags: >-
       MONGO_DISTMOD=rhel80

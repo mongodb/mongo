@@ -31,7 +31,7 @@ variables:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux_debug_compile_expansions
+- &linux_debug_community_compile_expansions
   <<: *generic_linux_compile_expansions
   compile_flags: >-
     --dbg=on
@@ -41,6 +41,7 @@ variables:
     --enable-http-client=on
     --link-model=dynamic
     --use-diagnostic-latches=on
+    --modules=
   num_scons_link_jobs_available: 0.99
 
 
@@ -52,7 +53,7 @@ buildvariants:
   modules:
   - wtdevelop
   expansions:
-    <<: *linux_debug_compile_expansions
+    <<: *linux_debug_community_compile_expansions
     use_wt_develop: true
     compile_variant: *linux-x86-dynamic-debug-wtdevelop-compile
 
@@ -85,10 +86,13 @@ buildvariants:
       --enable-http-client=on
       --link-model=dynamic
       --use-diagnostic-latches=on
+      --modules=
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
-    test_flags: --excludeWithAnyTags=requires_http_client
+    test_flags: >-
+      --excludeWithAnyTags=requires_http_client
+      --enableEnterpriseTests=off
     compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
   tasks:
   - name: .aggregation !.encrypt !.feature_flag_guarded
@@ -126,7 +130,6 @@ buildvariants:
   run_on:
   - windows-vsCurrent-small
   modules:
-  - enterprise
   - wtdevelop
   expansions:
     additional_package_targets: >-

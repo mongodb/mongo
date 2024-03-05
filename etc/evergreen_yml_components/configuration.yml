@@ -67,11 +67,6 @@ patch_aliases:
 # if a module is added and to be added to the manifest
 # be sure to add the module to git.get_project revisions parameter
 modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-
 - name: wtdevelop
   repo: git@github.com:wiredtiger/wiredtiger.git
   prefix: src/third_party

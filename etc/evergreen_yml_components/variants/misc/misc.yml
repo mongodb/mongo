@@ -36,8 +36,6 @@ buildvariants:
   - name: burn_in_tags_gen
 
 - name: &copybara-sync-between-repos copybara-sync-between-repos
-  modules:
-  - enterprise
   display_name: "* Copybara Sync Between Repos"
   activate: true
   run_on:
@@ -50,8 +48,6 @@ buildvariants:
 - name: enterprise-windows-ninja
   display_name: "Ninja Build: Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   expansions:
     compile_flags: >-
       --ssl
@@ -72,8 +68,6 @@ buildvariants:
 - name: macos-enterprise-ninja
   display_name: "Ninja Build: macOS Enterprise"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100
   expansions:
@@ -87,8 +81,6 @@ buildvariants:
 - name: macos-ninja-build-profiles
   display_name: "Ninja Build Profiles: macOS"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100
   expansions:
@@ -103,8 +95,6 @@ buildvariants:
 - name: macos-arm-ninja-build-profiles
   display_name: "Ninja Build Profiles: macOS ARM"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - macos-1100-arm64
   expansions:
@@ -119,8 +109,6 @@ buildvariants:
 - name: windows-ninja-build-profiles
   display_name: "Ninja Build Profiles: Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   expansions:
     compile_flags: >-
       --ssl
@@ -146,8 +134,6 @@ buildvariants:
 - name: ubuntu1804-ninja-build-profiles
   display_name: "Ninja Build Profiles: Ubuntu 18.04"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - ubuntu1804-small
   stepback: false
@@ -176,8 +162,6 @@ buildvariants:
 - name: enterprise-rhel-80-64-bit-dynamic-ninja
   display_name: "Ninja Build: Enterprise RHEL 8.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions:

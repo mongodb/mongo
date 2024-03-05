@@ -5,8 +5,6 @@ buildvariants:
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:

@@ -19,18 +19,17 @@ from buildscripts.patch_builds.change_data import generate_revision_map, \
 
 LOGGER = structlog.get_logger(__name__)
 MONGO_REVISION_ENV_VAR = "REVISION"
-ENTERPRISE_REVISION_ENV_VAR = "ENTERPRISE_REV"
 
 
 def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     """Get the repo object and a map of revisions to compare against."""
-    modules = git.get_module_paths()
+    modules = [
+        path for path in git.get_module_paths()
+        # Exclude enterprise module; it's in the "modules" folder but does not correspond to a repo
+        if "src/mongo/db/modules/enterprise" not in path
+    ]
     repos = [Repo(path) for path in modules]
-    revision_map = generate_revision_map(
-        repos, {
-            "mongo": os.environ.get(MONGO_REVISION_ENV_VAR),
-            "enterprise": os.environ.get(ENTERPRISE_REVISION_ENV_VAR)
-        })
+    revision_map = generate_revision_map(repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)})
     return repos, revision_map
 
 

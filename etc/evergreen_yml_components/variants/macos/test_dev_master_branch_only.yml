@@ -11,7 +11,9 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -22,6 +24,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
+      --modules=
     resmoke_jobs_max: 6
     compile_variant: *macos-amd64-bazel-compile
   tasks:
@@ -37,7 +40,9 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -48,6 +53,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
+      --modules=
     resmoke_jobs_max: 6
     compile_variant: *macos-arm64-bazel-compile
   tasks:
@@ -56,8 +62,6 @@ buildvariants:
 
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
-  modules:
-  - enterprise
   run_on:
   - macos-1100-arm64
   expansions:

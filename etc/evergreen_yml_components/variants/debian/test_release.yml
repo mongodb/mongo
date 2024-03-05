@@ -5,8 +5,6 @@ buildvariants:
 - name: enterprise-debian10-64
   display_name: Jepsen Tests on Enterprise Debian 10
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - debian10-test
   expansions:
@@ -41,7 +39,10 @@ buildvariants:
       MONGO_DISTMOD=debian12
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     multiversion_platform: debian12
     multiversion_edition: targeted
     has_packages: true
@@ -65,8 +66,6 @@ buildvariants:
 - name: enterprise-debian12-64
   display_name: Enterprise Debian 12
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - debian12-small
   expansions:

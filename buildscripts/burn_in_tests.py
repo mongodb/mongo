@@ -42,7 +42,7 @@ EXTERNAL_LOGGERS = {
 
 DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required"
 ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
-DEFAULT_REPO_LOCATIONS = [".", f"./{ENTERPRISE_MODULE_PATH}"]
+DEFAULT_REPO_LOCATIONS = ["."]
 REPEAT_SUITES = 2
 DEFAULT_EVG_PROJECT_FILE = "etc/evergreen.yml"
 # The executor_file and suite_files defaults are required to make the suite resolver work

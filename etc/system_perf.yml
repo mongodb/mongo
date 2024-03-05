@@ -81,7 +81,6 @@ variables:
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
-    - enterprise
     - mongo-tools
     # - mongo
     - dsi
@@ -172,11 +171,6 @@ modules:
   #    prefix: ${workdir}/src
   #    branch: master
   ###
-  - name: enterprise
-    owner: 10gen
-    repo: mongo-enterprise-modules
-    prefix: src/mongo/db/modules
-    branch: master
   # Pinned to version 100.7.2
   - name: mongo-tools
     owner: mongodb

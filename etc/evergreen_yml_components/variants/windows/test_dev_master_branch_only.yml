@@ -47,7 +47,7 @@ buildvariants:
 # Note that this task is currently optional;
 # This will eventually become suggested, then required.
 - name: &windows-bazel-compile windows-bazel-compile
-  display_name: "Windows Bazel Compile"
+  display_name: "Windows Enterprise Bazel Compile"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tags: ["bazel_check"]
   run_on:
@@ -71,11 +71,9 @@ buildvariants:
     - name: compile_bazel_ninja_TG
 
 - name: &windows-dev-compile-suggested windows-dev-compile-suggested
-  display_name: "* Windows Dev Compile"
+  display_name: "* Windows Enterprise Dev Compile"
   run_on:
   - windows-vsCurrent-xlarge
-  modules:
-  - enterprise
   expansions:
     exe: ".exe"
     ext: zip
@@ -92,7 +90,7 @@ buildvariants:
     - name: ninja_compile_smoke_test_TG
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
-  display_name: "~ Shared Library Windows (visibility test)"
+  display_name: "~ Shared Library Windows Enterprise (visibility test)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
     # --link-model=dynamic is set by visiblity_test's task_compile_flags
@@ -116,12 +114,10 @@ buildvariants:
 
 ### QO & QE Patch-Specific Build Variants ###
 - name: &windows-compile-query-patch-only windows-compile-query-patch-only
-  display_name: "~ Windows Compile Query Patch Only"
+  display_name: "~ Windows Enterprise Compile Query Patch Only"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
   run_on:
   - windows-vsCurrent-small
-  modules:
-  - enterprise
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -157,8 +153,6 @@ buildvariants:
   name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
   display_name: "! Enterprise Windows (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -234,8 +228,6 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - windows-vsCurrent-large # To accommodate OOD issues noted in BF-31698
-  modules:
-  - enterprise
   expansions:
     additional_package_targets: >-
       archive-mongocryptd

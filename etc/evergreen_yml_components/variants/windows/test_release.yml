@@ -22,12 +22,15 @@ buildvariants:
       MONGO_DISTMOD=windows
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
+      --modules=
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
+      --enableEnterpriseTests=off
     compile_variant: windows
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -67,8 +70,6 @@ buildvariants:
 - name: enterprise-windows
   display_name: "Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -99,7 +100,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: windows
     push_arch: x86_64-enterprise
-    test_flags: *windows_common_test_excludes
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
     exec_timeout_secs: 14400 # 3 hour timeout
     compile_variant: enterprise-windows
   tasks:

@@ -5,8 +5,6 @@ buildvariants:
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - suse15-test
   expansions:
@@ -59,7 +57,10 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+      --modules=
+    test_flags: >-
+      --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+      --enableEnterpriseTests=off
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true

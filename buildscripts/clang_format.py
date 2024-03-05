@@ -265,6 +265,7 @@ def is_interesting_file(file_name):
     return (file_name.startswith("jstests")
             or file_name.startswith("src") and not file_name.startswith("src/third_party/")
             and not file_name.startswith("src/mongo/gotools/")
+            and not file_name.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
             and not file_name.startswith("src/streams/third_party")) and FILES_RE.search(file_name)
 
 

@@ -10,15 +10,13 @@ variables:
   run_on:
   - amazon2-arm64-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
   stepback: false
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-dynamic-compile-expansions
+- &linux-arm64-dynamic-enterprise-compile-expansions
   scons_cache_scope: shared
   scons_cache_mode: all
   has_packages: false
@@ -67,18 +65,18 @@ variables:
 buildvariants:
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
-  display_name: "* Amazon Linux 2 arm64 Stitch Compile"
+  display_name: "* Amazon Linux 2 arm64 Enterprise Stitch Compile"
   expansions:
-    <<: *linux-arm64-dynamic-compile-expansions
+    <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-stitch-compile
   tasks:
     - name: .stitch
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-dev-compile amazon-linux2-arm64-dev-compile
-  display_name: "* Amazon Linux 2 arm64 Dev Compile"
+  display_name: "* Amazon Linux 2 arm64 Enterprise Dev Compile"
   expansions:
-    <<: *linux-arm64-dynamic-compile-expansions
+    <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-dev-compile
   tasks:
     - name: scons_compile_smoke_test_TG
@@ -87,7 +85,7 @@ buildvariants:
 # Note that this task is currently optional;
 # This will eventually become suggested, then required.
 - name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
-  display_name: "Amazon Linux 2023 arm64 Bazel Compile"
+  display_name: "Amazon Linux 2023 Enterprise arm64 Bazel Compile"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tags: ["bazel_check"]
   run_on:
@@ -144,8 +142,6 @@ buildvariants:
   name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
   display_name: "! Amazon Linux 2 arm64 Enterprise (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-    - enterprise
   run_on:
     - amazon2-arm64-small
   stepback: true
@@ -276,7 +272,7 @@ buildvariants:
 - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
   <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
   name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
-  display_name: "*| Amazon Linux 2 arm64 (all feature flags) Fuzzers"
+  display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
   tasks:
   - name: .aggfuzzer
   - name: .change_stream_fuzzer
@@ -285,10 +281,8 @@ buildvariants:
 
 - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
   name: &amazon-linux2-arm64-fixed-concurrent-transactions amazon-linux2-arm64-fixed-concurrent-transactions
-  display_name: "Amazon Linux 2 arm64 (Fixed Concurrent Transactions)"
+  display_name: "Amazon Linux 2 arm64 Enterprise (Fixed Concurrent Transactions)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  modules:
-    - enterprise
   run_on:
     - amazon2-arm64-small
   expansions:
@@ -389,11 +383,9 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
 
-- name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
-  display_name: "AL2023 arm64 (SEP Benchmark)"
+ name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
+  display_name: "AL2023 arm64 Enterprise (SEP Benchmark)"
   cron: "0 0,8,16 * * *" # Run this task every 8 hours
-  modules:
-  - enterprise
   run_on:
   - amazon2023.0-arm64-large
   expansions:

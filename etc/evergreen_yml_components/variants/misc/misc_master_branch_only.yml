@@ -23,8 +23,6 @@ buildvariants:
   display_name: "~ Build Metrics Enterprise MacOS"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   stepback: false
-  modules:
-  - enterprise
   run_on:
   - macos-1100
   expansions:
@@ -42,8 +40,6 @@ buildvariants:
   display_name: "~ Build Metrics Enterprise RHEL 8.0 "
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   stepback: false
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions:
@@ -62,8 +58,6 @@ buildvariants:
   display_name: "~ Build Metrics Enterprise AL22 ARM"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   stepback: false
-  modules:
-  - enterprise
   run_on:
   - amazon2023.0-arm64-large
   expansions:
@@ -98,8 +92,6 @@ buildvariants:
   - name: win_shared_scons_cache_pruning
 
 - name: &stm-daily-cron stm-daily-cron
-  modules:
-  - enterprise
   display_name: "* STM Daily Cron"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:

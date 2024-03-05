@@ -10,15 +10,13 @@ variables:
   run_on:
   - amazon2-arm64-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
   stepback: false
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &linux-arm64-dynamic-compile-expansions
+- &linux-arm64-dynamic-enterprise-compile-expansions
   scons_cache_scope: shared
   scons_cache_mode: all
   has_packages: false
@@ -53,7 +51,7 @@ buildvariants:
   name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
   display_name: "! Amazon Linux 2 arm64 Crypt Compile"
   expansions:
-    <<: *linux-arm64-dynamic-compile-expansions
+    <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-crypt-compile
   tasks:
     - name: .crypt
@@ -63,7 +61,7 @@ buildvariants:
   name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
   display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis"
   expansions:
-    <<: *linux-arm64-dynamic-compile-expansions
+    <<: *linux-arm64-dynamic-enterprise-compile-expansions
     clang_tidy_toolchain: v4
     compile_variant: *amazon-linux2-arm64-dynamic-compile
   tasks:
@@ -86,8 +84,6 @@ buildvariants:
 - name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  modules:
-    - enterprise
   run_on:
     - amazon2-arm64-small
   stepback: false
