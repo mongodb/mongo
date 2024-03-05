@@ -129,6 +129,15 @@ function runTests(db, coll) {
     // will be stitched together with the pipeline specified to the aggregate command.
     checkCounters(() => db[viewName].aggregate([{$match: {a: 5}}]).toArray(),
                   ["$match", "$project"]);
+
+    // Failed aggregations should still increment the counters.
+    checkCounters(() => {
+        assert.commandFailed(db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [{$project: {x: {$add: [6, "$item"]}}}],
+            cursor: {}
+        }));
+    }, ["$project"])
 }
 
 // Standalone
