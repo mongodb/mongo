@@ -80,6 +80,14 @@ assert.commandFailedWithCode(mongos.adminCommand({
 }),
                              ErrorCodes.CannotCreateChunkDistribution);
 
+jsTest.log("Fail if zone provided is invalid for storage.");
+assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCollection: ns,
+    key: {"_id": "hashed"},
+    zones: [{min: {"_id": {"$minKey": 1}}, max: {"_id": {"$maxKey": 1}}, zone: "Namezone"}]
+}),
+                             ErrorCodes.BadValue);
+
 jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
 assert.commandFailedWithCode(
     mongos.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
