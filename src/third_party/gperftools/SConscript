@@ -149,7 +149,7 @@ if not env.TargetOSIs('windows'):
 if env['TARGET_ARCH'] == 'ppc64le':
     env.Append(CPPDEFINES=["__linux"])
 
-env.Library(
+env.BazelLibrary(
     target='tcmalloc_minimal',
     source=[env.Dir('dist').File(f) for f in files],
     LIBDEPS_PRIVATE=[

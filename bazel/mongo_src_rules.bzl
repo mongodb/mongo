@@ -25,7 +25,6 @@ WINDOWS_DBG_COPTS = [
     "/MDd",
     "/RTC1",
     "/Od",
-    "/pdbpagesize:16384",
 ]
 
 WINDOWS_OPT_ON_COPTS = [
@@ -35,8 +34,8 @@ WINDOWS_OPT_ON_COPTS = [
 ]
 
 WINDOWS_OPT_OFF_COPTS = [
+    "/MD",
     "/Od",
-    "/pdbpagesize:16384",
 ]
 
 WINDOWS_OPT_DBG_COPTS = [
@@ -56,6 +55,14 @@ WINDOWS_OPT_SIZE_COPTS = [
 WINDOWS_RELEASE_COPTS = [
     "/MD",
     "/Od",
+]
+
+WINDOWS_DBG_LINKFLAGS = [
+    "/pdbpagesize:16384",
+]
+
+WINDOWS_OPT_OFF_LINKFLAGS = [
+    "/pdbpagesize:16384",
 ]
 
 # TODO SERVER-85340 fix this error message when libc++ is readded to the toolchain
@@ -88,6 +95,12 @@ WINDOWS_COPTS = select({
     "//bazel/config:windows_opt_debug": WINDOWS_OPT_DBG_COPTS,
     "//bazel/config:windows_opt_size": WINDOWS_OPT_SIZE_COPTS,
     "//bazel/config:windows_release": WINDOWS_RELEASE_COPTS,
+    "//conditions:default": [],
+})
+
+WINDOWS_LINKFLAGS = select({
+    "//bazel/config:windows_dbg": WINDOWS_DBG_LINKFLAGS,
+    "//bazel/config:windows_opt_off": WINDOWS_OPT_OFF_LINKFLAGS,
     "//conditions:default": [],
 })
 
@@ -336,7 +349,7 @@ MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZE
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + \
                          UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS + \
-                         LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS
+                         LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS + WINDOWS_LINKFLAGS
 
 def force_includes_copt(package_name, name):
     if package_name.startswith("src/mongo"):
