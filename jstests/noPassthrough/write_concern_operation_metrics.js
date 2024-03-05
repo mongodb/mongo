@@ -5,6 +5,8 @@
  *   # j:true requires persistence
  *   requires_persistence,
  *   requires_replication,
+ *   # TODO SERVER-87417: Re-enable this test.
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 

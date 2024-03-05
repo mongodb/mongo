@@ -573,7 +573,13 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         // settings.
         bool shouldSample;
         std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-            opCtx, logOptions.component(), Milliseconds(executionTimeMillis), Milliseconds(slowMs));
+            opCtx,
+            logOptions.component(),
+            (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
+                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+                 ? _debug.workingTimeMillis
+                 : Milliseconds(executionTimeMillis)),
+            Milliseconds(slowMs));
 
         shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
     }
