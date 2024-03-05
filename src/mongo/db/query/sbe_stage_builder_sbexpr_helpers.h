@@ -337,6 +337,7 @@ public:
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
         SbSlot accInternalSlot,
+        bool allowDiskUse,
         PlanYieldPolicy* yieldPolicy) {
         return makeBlockHashAgg(std::move(stage),
                                 nullptr,
@@ -347,6 +348,7 @@ public:
                                 blockAccInternalArgSlots,
                                 bitmapInternalSlot,
                                 accInternalSlot,
+                                allowDiskUse,
                                 yieldPolicy);
     }
 
@@ -360,6 +362,7 @@ public:
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
         SbSlot accInternalSlot,
+        bool allowDiskUse,
         PlanYieldPolicy* yieldPolicy) {
         return makeBlockHashAgg(std::move(stage),
                                 &varTypes,
@@ -370,6 +373,7 @@ public:
                                 blockAccInternalArgSlots,
                                 bitmapInternalSlot,
                                 accInternalSlot,
+                                allowDiskUse,
                                 yieldPolicy);
     }
 
@@ -383,6 +387,7 @@ public:
         const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
         SbSlot accInternalSlot,
+        bool allowDiskUse,
         PlanYieldPolicy* yieldPolicy);
 
     PlanNodeId _nodeId;

@@ -3,7 +3,6 @@
  * @tags: [
  *   requires_timeseries,
  *   does_not_support_stepdowns,
- *   directly_against_shardsvrs_incompatible,
  *   # During fcv upgrade/downgrade the engine might not be what we expect.
  *   cannot_run_during_upgrade_downgrade,
  *   # "Explain of a resolved view must be executed by mongos"
@@ -80,7 +79,11 @@ TimeseriesTest.run((insert) => {
     const sbeFullEnabled = checkSbeFullyEnabled(db) &&
         FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
 
-    function runTests(allowDiskUse) {
+    function runTests(allowDiskUse, forceIncreasedSpilling) {
+        assert.commandWorked(db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceIncreasedSpilling
+        }));
         const dateUpperBound = new Date(datePrefix + 500);
         const dateLowerBound = new Date(datePrefix);
 
@@ -850,7 +853,7 @@ TimeseriesTest.run((insert) => {
             const explain = coll.explain().aggregate(pipeline, options);
             const engineUsed = getEngine(explain);
             const singleNodeQueryPlanner = getQueryPlanner(getSingleNodeExplain(explain));
-            printjson(singleNodeQueryPlanner);
+
             function testcaseAndExplainFn(description) {
                 return () => description + " for test case '" + name + "' failed with explain " +
                     tojson(singleNodeQueryPlanner);
@@ -861,17 +864,17 @@ TimeseriesTest.run((insert) => {
                 hasSbePlan ? singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages : null;
 
             if (usesBlockProcessing) {
-                // Verify that we have an SBE plan, and verify that "block_hashagg" appears in the
+                // Verify that we have an SBE plan, and verify that "block_group" appears in the
                 // plan.
                 assert.eq(engineUsed, "sbe");
 
-                assert(sbePlan.includes("block_hashagg"),
+                assert(sbePlan.includes("block_group"),
                        testcaseAndExplainFn("Expected explain to use block processing"));
             } else {
                 if (hasSbePlan) {
                     // If 'usesBlockProcessing' is false and we have an SBE plan, verify that
-                    // "block_hashagg" does not appear anywhere in the SBE plan.
-                    assert(!sbePlan.includes("block_hashagg"),
+                    // "block_group" does not appear anywhere in the SBE plan.
+                    assert(!sbePlan.includes("block_group"),
                            testcaseAndExplainFn("Expected explain not to use block processing"));
                 }
             }
@@ -879,8 +882,11 @@ TimeseriesTest.run((insert) => {
     }
 
     // Run the tests with allowDiskUse=false.
-    runTests(false /* allowDiskUse */);
+    runTests(false /* allowDiskUse */, false);
 
     // Run the tests with allowDiskUse=true.
-    runTests(true /* allowDiskUse */);
+    runTests(true /* allowDiskUse */, false);
+
+    // Run the tests with allowDiskUse=true and force spilling.
+    runTests(true /* allowDiskUse */, true);
 });

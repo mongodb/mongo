@@ -42,6 +42,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/hashagg_base.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
@@ -104,7 +105,7 @@ namespace sbe {
  *      spillSlots[slot_1, ..., slot_n] mergingExprs[expr_1, ..., expr_n] reopen? collatorSlot?
  *  childStage
  */
-class HashAggStage final : public PlanStage {
+class HashAggStage final : public HashAggBaseStage<HashAggStage> {
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
@@ -119,7 +120,7 @@ public:
                  bool participateInTrialRunTracking = true,
                  bool forceIncreasedSpilling = false);
 
-    virtual ~HashAggStage();
+    ~HashAggStage();
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -131,108 +132,24 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
+    HashAggStats* getHashAggStats();
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
-protected:
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) override;
-    void doDetachFromOperationContext() override;
-    void doAttachToOperationContext(OperationContext* opCtx) override;
-    void doDetachFromTrialRunTracker() override;
-    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
-
 private:
-    using TableType = stdx::unordered_map<value::MaterializedRow,
-                                          value::MaterializedRow,
-                                          value::MaterializedRowHasher,
-                                          value::MaterializedRowEq>;
-
-    using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
-    using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
-
-    using SpilledRow = std::pair<value::MaterializedRow, value::MaterializedRow>;
-
-    /**
-     * We check amount of used memory every T processed incoming records, where T is calculated
-     * based on the estimated used memory and its recent growth. When the memory limit is exceeded,
-     * 'checkMemoryUsageAndSpillIfNecessary()' will create '_recordStore' (if it hasn't already been
-     * created) and spill the contents of the hash table into this record store.
-     */
-    struct MemoryCheckData {
-        MemoryCheckData() {
-            reset();
-        }
-
-        void reset() {
-            memoryCheckFrequency = std::min(atMostCheckFrequency, atLeastMemoryCheckFrequency);
-            nextMemoryCheckpoint = 0;
-            memoryCheckpointCounter = 0;
-            lastEstimatedMemoryUsage = 0;
-        }
-
-        const double checkpointMargin = internalQuerySBEAggMemoryUseCheckMargin.load();
-        const int64_t atMostCheckFrequency = internalQuerySBEAggMemoryCheckPerAdvanceAtMost.load();
-        const int64_t atLeastMemoryCheckFrequency =
-            internalQuerySBEAggMemoryCheckPerAdvanceAtLeast.load();
-
-        // The check frequency upper bound, which start at 'atMost' and exponentially backs off
-        // to 'atLeast' as more data is accumulated. If 'atLeast' is less than 'atMost', the memory
-        // checks will be done every 'atLeast' incoming records.
-        int64_t memoryCheckFrequency = 1;
-
-        // The number of incoming records to process before the next memory checkpoint.
-        int64_t nextMemoryCheckpoint = 0;
-
-        // The counter of the incoming records between memory checkpoints.
-        int64_t memoryCheckpointCounter = 0;
-
-        int64_t lastEstimatedMemoryUsage = 0;
-    };
-
-    /**
-     * Inserts a key and value pair to the '_recordStore'. They key is serialized to a
-     * 'key_string::Value' which becomes the 'RecordId'. This makes the keys memcmp-able and ensures
-     * that the record store ends up sorted by the group-by keys.
-     *
-     * Note that the 'typeBits' are needed to reconstruct the spilled 'key' to a 'MaterializedRow',
-     * but are not necessary for comparison purposes. Therefore, we carry the type bits separately
-     * from the record id, instead appending them to the end of the serialized 'val' buffer.
-     */
-    void spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
-
-    void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
-    void spill(MemoryCheckData& mcd);
-
-    /**
-     * Given a 'record' from the record store, decodes it into a pair of materialized rows (one for
-     * the group-by keys and another for the agg values).
-     *
-     * The given 'keyBuffer' is cleared, and then used to hold data (e.g. long strings and other
-     * values that can't be inlined) obtained by decoding the 'RecordId' keystring to a
-     * 'MaterializedRow'. The values in the resulting 'MaterializedRow' may be pointers into
-     * 'keyBuffer', so it is important that 'keyBuffer' outlive the row.
-     *
-     * This method is used when there is no collator.
-     */
-    SpilledRow deserializeSpilledRecord(const Record& record, BufBuilder& keyBuffer);
-
     /**
      * Given a 'record' from the record store and a 'collator', decodes it into a pair of
      * materialized rows (one for the group-by key and another one for the agg value).
      * Both the group-by key and the agg value are read from the data part of the record.
      */
-    SpilledRow deserializeSpilledRecord(const Record& record, const CollatorInterface& collator);
+    HashAggBaseStage::SpilledRow deserializeSpilledRecordWithCollation(
+        const Record& record, const CollatorInterface& collator);
 
     PlanState getNextSpilled();
-
-    void makeTemporaryRecordStore();
 
     const value::SlotVector _gbs;
     const AggExprVector _aggs;
     const boost::optional<value::SlotId> _collatorSlot;
-    const bool _allowDiskUse;
     const value::SlotVector _seekKeysSlots;
     // When this operator does not expect to be reopened (almost always) then it can close the child
     // early.
@@ -245,10 +162,6 @@ private:
     //
     // When disk use is allowed, this vector must have the same length as '_aggs'.
     const SlotExprPairVector _mergingExprs;
-
-    // When true, we spill frequently without reaching the memory limit. This allows us to exercise
-    // the spilling logic more often in test contexts.
-    const bool _forceIncreasedSpilling;
 
     value::SlotAccessorMap _outAccessors;
 
@@ -288,35 +201,14 @@ private:
     // store and need to be subsequently combined.
     std::vector<std::unique_ptr<vm::CodeFragment>> _mergingExprCodes;
 
-    // Only set if collator slot provided on construction.
-    value::SlotAccessor* _collatorAccessor = nullptr;
-
     // Function object which can be used to check whether two materialized rows of key values are
     // equal. This comparison is collation-aware if the query has a non-simple collation.
     value::MaterializedRowEq _keyEq;
-
-    boost::optional<TableType> _ht;
-    TableType::iterator _htIt;
 
     vm::ByteCode _bytecode;
 
     bool _compiled{false};
     bool _childOpened{false};
-
-    // Memory tracking and spilling to disk.
-    const long long _approxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-
-    // A record store which is instantiated and written to in the case of spilling.
-    std::unique_ptr<SpillingStore> _recordStore;
-    std::unique_ptr<SeekableRecordCursor> _rsCursor;
-
-    // A monotically increasing counter used to ensure uniqueness of 'RecordId' values. When
-    // spilling, the key is encoding into the 'RecordId' of the '_recordStore'. Record ids must be
-    // unique by definition, but we might end up spilling multiple partial aggregates for the same
-    // key. We ensure uniqueness by appending a unique integer to the end of this key, which is
-    // simply ignored during deserialization.
-    int64_t _ridCounter = 0;
 
     // Partial aggregates that have been spilled are read into '_spilledAggRow' and read using
     // '_spilledAggsAccessors' so that they can be merged to compute the final aggregate value.
@@ -332,10 +224,6 @@ private:
     SpilledRow _stashedNextRow;
 
     HashAggStats _specificStats;
-
-    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
-    // run is complete, this pointer is reset to nullptr.
-    TrialRunTracker* _tracker{nullptr};
 };
 }  // namespace sbe
 }  // namespace mongo
