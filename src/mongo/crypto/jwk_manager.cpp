@@ -110,9 +110,12 @@ Status JWKManager::loadKeys() try {
     const auto& parsedKeys = _fetcher->fetch();
     for (const auto& key : parsedKeys.getKeys()) {
         auto JWK = JWK::parse(IDLParserContext("JWK"), key);
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Only RSA key types are accepted at this time",
-                JWK.getType() == "RSA"_sd);
+
+        if (JWK.getType() != "RSA"_sd) {
+            LOGV2_WARNING(
+                8733001, "Unsupported key type in fetched JWK Set", "type"_attr = JWK.getType());
+            continue;
+        }
         uassert(ErrorCodes::BadValue, "Key ID must be non-empty", !JWK.getKeyId().empty());
 
         auto RSAKey = JWKRSA::parse(IDLParserContext("JWKRSA"), key);
