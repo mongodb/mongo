@@ -4,7 +4,11 @@
  *
  * This test is labeled resource intensive because its total io_write is 30MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive]
+ * @tags: [
+ *   resource_intensive,
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
+ * ]
  */
 import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";

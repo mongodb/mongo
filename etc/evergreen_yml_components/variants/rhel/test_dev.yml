@@ -334,6 +334,7 @@ buildvariants:
     test_flags: >-
       --embeddedRouter=true
       --runAllFeatureFlagTests
+      --excludeWithAnyTags=temp_disabled_embedded_router
   tasks:
   - name: sharding_gen
 

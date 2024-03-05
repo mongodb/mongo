@@ -3,7 +3,11 @@
  * set with a cursorID of zero.
  *
  * Requires no shards so there can't be a config shard.
- * @tags: [config_shard_incompatible]
+ * @tags: [
+ *   config_shard_incompatible,
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
+ * ]
  */
 const st = new ShardingTest({shards: 0});
 

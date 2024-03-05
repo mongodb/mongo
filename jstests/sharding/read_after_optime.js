@@ -1,4 +1,8 @@
 // Test read after opTime functionality with maxTimeMS on config servers (CSRS only)`.
+// @tags: [
+//   # Test doesn't start enough mongods to have num_mongos routers
+//   temp_disabled_embedded_router,
+// ]
 
 var shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
 

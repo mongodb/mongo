@@ -3,6 +3,10 @@
 //
 // Note that this is *unsafe* with broadcast removes and updates
 //
+// @tags: [
+//   # Test doesn't start enough mongods to have num_mongos routers
+//   temp_disabled_embedded_router,
+// ]
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";

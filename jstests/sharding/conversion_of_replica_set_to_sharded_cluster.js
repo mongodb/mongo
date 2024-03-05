@@ -1,10 +1,12 @@
-/*
+/**
  * Tests that during an upgrade from a replica set to a sharded cluster the CRUD and DDL command
  * works. This implies testing those commands on a replica set directly when it is in a sharded
  * cluster.
  * @tags: [
+ *   multiversion_incompatible,
  *   requires_persistence,
- *   multiversion_incompatible
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
  * ]
  */
 

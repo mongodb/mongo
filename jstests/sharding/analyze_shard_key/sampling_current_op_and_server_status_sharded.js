@@ -1,7 +1,11 @@
 /**
  * Tests the currentOp and serverStatus for query sampling on a sharded cluster.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   requires_fcv_70,
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
+ * ]
  */
 
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";

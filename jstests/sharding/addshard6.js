@@ -1,5 +1,9 @@
 /**
  * Test that adding a config server replica set as a shard fails.
+ * @tags: [
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
+ * ]
  */
 var addShardRes;
 

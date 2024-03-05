@@ -3,7 +3,12 @@
  * primary mongod in a sharded cluster and the primary mongod in standalone replica set, and that
  * it returns correct sample rates.
  *
- * @tags: [requires_fcv_70, requires_persistence]
+ * @tags: [
+ *   requires_fcv_70,
+ *   requires_persistence,
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
+ * ]
  */
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";

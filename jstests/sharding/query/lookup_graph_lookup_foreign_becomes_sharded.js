@@ -2,8 +2,10 @@
  * Tests that $lookup and $graphLookup correctly succeed if the foreign collection is sharded, or if
  * it becomes sharded mid-iteration.
  *
- *@tags: [
- *   requires_persistence
+ * @tags: [
+ *   requires_persistence,
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
  * ]
  */
 import "jstests/multiVersion/libs/multi_cluster.js";

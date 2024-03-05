@@ -1,4 +1,8 @@
 // Tests whether new sharding is detected on insert by mongos
+// @tags: [
+//   # Test doesn't start enough mongods to have num_mongos routers
+//   temp_disabled_embedded_router,
+// ]
 var st = new ShardingTest({name: "mongos_no_detect_sharding", shards: 1, mongos: 2});
 
 var mongos = st.s;

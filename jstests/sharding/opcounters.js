@@ -1,7 +1,11 @@
 /**
  * Tests that opcounters.command on mongos doesn't count inserts, updates and deletes.
  *
- * @tags: [requires_fcv_62]
+ * @tags: [
+ *   requires_fcv_62,
+ *   # Test doesn't start enough mongods to have num_mongos routers
+ *   temp_disabled_embedded_router,
+ * ]
  */
 
 const st = new ShardingTest({mongos: 2, shards: 1});
