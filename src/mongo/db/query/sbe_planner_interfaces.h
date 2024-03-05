@@ -71,4 +71,42 @@ private:
     std::unique_ptr<RemoteCursorMap> _remoteCursors;
     std::unique_ptr<RemoteExplainVector> _remoteExplains;
 };
+
+/**
+ * Passthrough class which simply takes a single solution and turns it into 'PlanExecutor'.
+ */
+class SbeSingleSolutionPlanner final : public PlannerInterface {
+public:
+    SbeSingleSolutionPlanner(
+        OperationContext* opCtx,
+        CanonicalQuery* cq,
+        const MultipleCollectionAccessor& collections,
+        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+        QueryPlannerParams plannerParams,
+        std::unique_ptr<QuerySolution> solution,
+        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+        boost::optional<size_t> cachedPlanHash,
+        bool isRecoveredPinnedCacheEntry,
+        bool isRecoveredFromPlanCache,
+        std::unique_ptr<RemoteCursorMap> remoteCursors,
+        std::unique_ptr<RemoteExplainVector> remoteExplains);
+
+    /**
+     * Consumes the canonical query to create the final 'PlanExecutor'. Must be called at most once.
+     */
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery) override final;
+
+private:
+    OperationContext* _opCtx;
+    const MultipleCollectionAccessor& _collections;
+    std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
+    QueryPlannerParams _plannerParams;
+    std::unique_ptr<QuerySolution> _solution;
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> _root;
+    const boost::optional<size_t> _cachedPlanHash;
+    const bool _isRecoveredFromPlanCache;
+    std::unique_ptr<RemoteCursorMap> _remoteCursors;
+    std::unique_ptr<RemoteExplainVector> _remoteExplains;
+};
 }  // namespace mongo

@@ -131,6 +131,7 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/planner_interface.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/projection.h"
@@ -1020,6 +1021,7 @@ private:
     boost::optional<size_t> _cachedPlanHash;
 };
 
+// TODO SERVER-87055 Return 'PlannerInterface' instead of 'PlanExecutor'.
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
@@ -1117,6 +1119,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
+// TODO SERVER-87055 Return 'PlannerInterface' instead of 'PlanExecutor'.
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
                                                const MultipleCollectionAccessor& collections,
@@ -1142,27 +1145,21 @@ getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
     return planner->plan();
 }
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
-                                           const MultipleCollectionAccessor& collections,
-                                           std::unique_ptr<CanonicalQuery> cq,
-                                           std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-                                           QueryPlannerParams plannerParams) {
+std::unique_ptr<PlannerInterface> getSbePlannerForSbe(
+    OperationContext* opCtx,
+    CanonicalQuery* cq,
+    const MultipleCollectionAccessor& collections,
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    QueryPlannerParams plannerParams) {
     SlotBasedPrepareExecutionHelper helper{
-        opCtx, collections, cq.get(), yieldPolicy.get(), plannerParams};
-    auto planningResultWithStatus = helper.prepare();
-    if (!planningResultWithStatus.isOK()) {
-        return planningResultWithStatus.getStatus();
-    }
-    auto planningResult = std::move(planningResultWithStatus.getValue());
+        opCtx, collections, cq, yieldPolicy.get(), plannerParams};
+    auto planningResult = uassertStatusOK(helper.prepare());
 
     // Now that we know what executor we are going to use, fill in some opDebug information, unless
     // it has already been filled by an outer pipeline.
     setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
 
     // Analyze the provided query and build the list of candidate plans for it.
-    auto nss = cq->nss();
-
     auto&& [roots, solutions] = planningResult->extractResultData();
 
     invariant(roots.empty() || roots.size() == solutions.size());
@@ -1191,7 +1188,7 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
     // might need to execute the plan(s) to pick the best one or to confirm the choice.
     if (auto runTimePlanner = makeRuntimePlannerIfNeeded(opCtx,
                                                          collections,
-                                                         cq.get(),
+                                                         cq,
                                                          solutions.size(),
                                                          planningResult->decisionWorks(),
                                                          planningResult->needsSubplanning(),
@@ -1199,67 +1196,33 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                                          plannerParams,
                                                          planStageData,
                                                          remoteCursors.get())) {
-        auto plannerInterface =
-            std::make_unique<SbeRuntimePlanner>(opCtx,
-                                                collections,
-                                                std::move(yieldPolicy),
-                                                std::move(plannerParams),
-                                                planningResult->cachedPlanHash(),
-                                                std::move(runTimePlanner),
-                                                std::move(solutions),
-                                                std::move(roots),
-                                                std::move(remoteCursors),
-                                                std::move(remoteExplains));
-        // TODO SERVER-87054: Return 'plannerInterface' directly instead of creating the executor.
-        return plannerInterface->makeExecutor(std::move(cq));
+        return std::make_unique<SbeRuntimePlanner>(opCtx,
+                                                   collections,
+                                                   std::move(yieldPolicy),
+                                                   std::move(plannerParams),
+                                                   planningResult->cachedPlanHash(),
+                                                   std::move(runTimePlanner),
+                                                   std::move(solutions),
+                                                   std::move(roots),
+                                                   std::move(remoteCursors),
+                                                   std::move(remoteExplains));
     }
 
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(solutions.size() == 1);
     invariant(roots.size() == 1);
-    auto&& [root, data] = roots[0];
-
-    if (!planningResult->recoveredPinnedCacheEntry()) {
-        if (!cq->cqPipeline().empty()) {
-            // Need to extend the solution with the agg pipeline and rebuild the execution tree.
-            // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
-            // fillOutSecondaryCollectionsInformation() planner param calls.
-            plannerParams.fillOutPlannerParams(
-                opCtx, *cq.get(), collections, false /* ignoreQuerySettings */);
-            solutions[0] = QueryPlanner::extendWithAggPipeline(
-                *cq, std::move(solutions[0]), plannerParams.secondaryCollectionsInfo);
-            roots[0] = stage_builder::buildSlotBasedExecutableTree(
-                opCtx, collections, *cq, *(solutions[0]), yieldPolicy.get());
-        }
-
-        plan_cache_util::updatePlanCache(opCtx, collections, *cq, *solutions[0], *root, data);
-    }
-
-    // Prepare the SBE tree for execution.
-    stage_builder::prepareSlotBasedExecutableTree(opCtx,
-                                                  root.get(),
-                                                  &data,
-                                                  *cq,
-                                                  collections,
-                                                  yieldPolicy.get(),
-                                                  planningResult->isRecoveredFromPlanCache(),
-                                                  remoteCursors.get());
-
-    return plan_executor_factory::make(opCtx,
-                                       std::move(cq),
-                                       nullptr /*pipeline*/,
-                                       std::move(solutions[0]),
-                                       std::move(roots[0]),
-                                       {},
-                                       plannerParams.options,
-                                       std::move(nss),
-                                       std::move(yieldPolicy),
-                                       planningResult->isRecoveredFromPlanCache(),
-                                       planningResult->cachedPlanHash(),
-                                       false /* generatedByBonsai */,
-                                       {} /* optCounterInfo */,
-                                       std::move(remoteCursors),
-                                       std::move(remoteExplains));
+    return std::make_unique<SbeSingleSolutionPlanner>(opCtx,
+                                                      cq,
+                                                      collections,
+                                                      std::move(yieldPolicy),
+                                                      std::move(plannerParams),
+                                                      std::move(solutions[0]),
+                                                      std::move(roots[0]),
+                                                      planningResult->cachedPlanHash(),
+                                                      planningResult->recoveredPinnedCacheEntry(),
+                                                      planningResult->isRecoveredFromPlanCache(),
+                                                      std::move(remoteCursors),
+                                                      std::move(remoteExplains));
 }  // getSlotBasedExecutor
 
 /**
@@ -1401,11 +1364,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                                                                           std::move(sbeYieldPolicy),
                                                                           std::move(plannerParams));
                 } else {
-                    return getSlotBasedExecutorWithSbeRuntimePlanning(opCtx,
-                                                                      collections,
-                                                                      std::move(canonicalQuery),
-                                                                      std::move(sbeYieldPolicy),
-                                                                      std::move(plannerParams));
+                    auto sbePlanner = getSbePlannerForSbe(opCtx,
+                                                          canonicalQuery.get(),
+                                                          collections,
+                                                          std::move(sbeYieldPolicy),
+                                                          std::move(plannerParams));
+                    return sbePlanner->makeExecutor(std::move(canonicalQuery));
                 }
             }
         }

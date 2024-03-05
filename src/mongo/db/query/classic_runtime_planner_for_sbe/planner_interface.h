@@ -82,6 +82,7 @@ public:
     virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() = 0;
 };
 
+// TODO SERVER-87055 Inherit 'src/mongo/db/query/planner_interface.h::PlannerInterface'.
 class PlannerBase : public PlannerInterface {
 public:
     PlannerBase(PlannerDataForSBE plannerData);

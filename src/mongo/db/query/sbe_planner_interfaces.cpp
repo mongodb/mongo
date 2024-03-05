@@ -29,7 +29,11 @@
 
 #include "mongo/db/query/sbe_planner_interfaces.h"
 
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_builder_util.h"
 
 namespace mongo {
 
@@ -68,5 +72,76 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SbeRuntimePlanner::makeExec
                                                        std::move(_remoteCursors),
                                                        std::move(_remoteExplains),
                                                        _cachedPlanHash));
+}
+
+SbeSingleSolutionPlanner::SbeSingleSolutionPlanner(
+    OperationContext* opCtx,
+    CanonicalQuery* cq,
+    const MultipleCollectionAccessor& collections,
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    QueryPlannerParams plannerParams,
+    std::unique_ptr<QuerySolution> solution,
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    boost::optional<size_t> cachedPlanHash,
+    bool isRecoveredPinnedCacheEntry,
+    bool isRecoveredFromPlanCache,
+    std::unique_ptr<RemoteCursorMap> remoteCursors,
+    std::unique_ptr<RemoteExplainVector> remoteExplains)
+    : _opCtx(opCtx),
+      _collections(collections),
+      _yieldPolicy(std::move(yieldPolicy)),
+      _plannerParams(std::move(plannerParams)),
+      _solution(std::move(solution)),
+      _root(std::move(root)),
+      _cachedPlanHash(cachedPlanHash),
+      _isRecoveredFromPlanCache(isRecoveredFromPlanCache),
+      _remoteCursors(std::move(remoteCursors)),
+      _remoteExplains(std::move(remoteExplains)) {
+    auto& [stage, data] = _root;
+    if (!isRecoveredPinnedCacheEntry) {
+        if (!cq->cqPipeline().empty()) {
+            // Need to extend the solution with the agg pipeline and rebuild the execution tree.
+            // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+            // fillOutSecondaryCollectionsInformation() planner param calls.
+            plannerParams.fillOutPlannerParams(
+                opCtx, *cq, collections, false /* ignoreQuerySettings */);
+            _solution = QueryPlanner::extendWithAggPipeline(
+                *cq, std::move(_solution), plannerParams.secondaryCollectionsInfo);
+            _root = stage_builder::buildSlotBasedExecutableTree(
+                opCtx, collections, *cq, *(_solution), _yieldPolicy.get());
+        }
+
+        plan_cache_util::updatePlanCache(_opCtx, _collections, *cq, *_solution, *stage, data);
+    }
+
+    // Prepare the SBE tree for execution.
+    stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+                                                  stage.get(),
+                                                  &data,
+                                                  *cq,
+                                                  _collections,
+                                                  _yieldPolicy.get(),
+                                                  _isRecoveredFromPlanCache,
+                                                  _remoteCursors.get());
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SbeSingleSolutionPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    auto nss = canonicalQuery->nss();
+    return uassertStatusOK(plan_executor_factory::make(_opCtx,
+                                                       std::move(canonicalQuery),
+                                                       nullptr /*pipeline*/,
+                                                       std::move(_solution),
+                                                       std::move(_root),
+                                                       {},
+                                                       _plannerParams.options,
+                                                       std::move(nss),
+                                                       std::move(_yieldPolicy),
+                                                       _isRecoveredFromPlanCache,
+                                                       _cachedPlanHash,
+                                                       false /* generatedByBonsai */,
+                                                       {} /* optCounterInfo */,
+                                                       std::move(_remoteCursors),
+                                                       std::move(_remoteExplains)));
 }
 }  // namespace mongo
