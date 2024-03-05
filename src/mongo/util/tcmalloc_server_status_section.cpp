@@ -85,9 +85,21 @@ public:
         return 0;
     }
 
-    virtual void appendHighVerbosityMetrics(BSONObjBuilder& bob) const {}
-
-    virtual void appendFormattedString(BSONObjBuilder& bob) const {}
+    /**
+     * tcmalloc metrics have three verbosity settings.
+     *
+     * Verbosity is set through serverStatus calls as db.serverStatus({tcmalloc: <verbosity>}).
+     * We can configure FTDC to use verbosity: 2 using the diagnosticDataCollectionVerboseTCMalloc
+     * server parameter.
+     *
+     * 1 is the default, and nothing will be appended in this function.
+     * 2 will append any additional metrics that we have deemed too large to include by default, but
+     * are useful for further diagnostics. This is often numerical data that is useful to view over
+     * time.
+     * 3 will dump the entire formatted stats string that tcmalloc provides. This should never
+     * be included in FTDC, as its size will harm retention.
+     */
+    virtual void appendHighVerbosityMetrics(BSONObjBuilder& bob, int verbosity) const {}
 
     virtual void appendCustomDerivedMetrics(BSONObjBuilder& bob) const {}
 };
@@ -148,6 +160,12 @@ public:
 
     long long getReleaseRate() const override {
         return getUnderlyingType(tcmalloc::MallocExtension::GetBackgroundReleaseRate());
+    }
+
+    void appendHighVerbosityMetrics(BSONObjBuilder& bob, int verbosity) const override {
+        if (verbosity >= 3) {
+            bob.append("formattedString", tcmalloc::MallocExtension::GetStats());
+        }
     }
 
     void appendCustomDerivedMetrics(BSONObjBuilder& bob) const override {
@@ -212,26 +230,28 @@ public:
         return MallocExtension::instance()->GetMemoryReleaseRate();
     }
 
-    void appendHighVerbosityMetrics(BSONObjBuilder& bob) const override {
+    void appendHighVerbosityMetrics(BSONObjBuilder& bob, int verbosity) const override {
+        if (verbosity >= 2) {
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
-        // Size class information
-        std::pair<BSONArrayBuilder, BSONArrayBuilder> builders(bob.subarrayStart("size_classes"),
-                                                               BSONArrayBuilder());
+            // Size class information
+            std::pair<BSONArrayBuilder, BSONArrayBuilder> builders(
+                bob.subarrayStart("size_classes"), BSONArrayBuilder());
 
-        // Size classes and page heap info is dumped in 1 call so that the performance
-        // sensitive tcmalloc page heap lock is only taken once
-        MallocExtension::instance()->SizeClasses(
-            &builders, appendSizeClassInfo, appendPageHeapInfo);
+            // Size classes and page heap info is dumped in 1 call so that the performance
+            // sensitive tcmalloc page heap lock is only taken once
+            MallocExtension::instance()->SizeClasses(
+                &builders, appendSizeClassInfo, appendPageHeapInfo);
 
-        builders.first.done();
-        bob.append("page_heap", builders.second.arr());
+            builders.first.done();
+            bob.append("page_heap", builders.second.arr());
 #endif  // MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
-    }
+        }
 
-    void appendFormattedString(BSONObjBuilder& bob) const override {
-        char buffer[4096];
-        MallocExtension::instance()->GetStats(buffer, sizeof buffer);
-        bob.append("formattedString", buffer);
+        if (verbosity >= 3) {
+            char buffer[4096];
+            MallocExtension::instance()->GetStats(buffer, sizeof buffer);
+            bob.append("formattedString", buffer);
+        }
     }
 
 private:
@@ -282,10 +302,10 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        long long verbosity = 1;
+        int verbosity = 1;
         if (configElement) {
-            // Relies on the fact that safeNumberLong turns non-numbers into 0.
-            long long configValue = configElement.safeNumberLong();
+            // Relies on the fact that safeNumberInt turns non-numbers into 0.
+            int configValue = configElement.safeNumberInt();
             if (configValue) {
                 verbosity = configValue;
             }
@@ -318,12 +338,7 @@ public:
             }
 
             sub.appendNumber("release_rate", _metrics.getReleaseRate());
-
-            if (verbosity >= 2) {
-                _metrics.appendHighVerbosityMetrics(builder);
-            }
-
-            _metrics.appendFormattedString(builder);
+            _metrics.appendHighVerbosityMetrics(builder, verbosity);
         }
 
         {
