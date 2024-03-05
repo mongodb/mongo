@@ -866,10 +866,8 @@ TEST_F(FTDCProcSelfStatus, FileNotFound) {
                   .code());
 }
 
-// Test we can parse the /proc/self/status on this machine. Also assert we have the expected fields
-// This tests is designed to exercise our parsing code on various Linuxes and fail
-// Normally when run in the FTDC loop we return a non-fatal error so we may not notice the
-// failure otherwise.
+// Test we can parse the /proc/self/status on this machine and assert we have some expected fields
+// Some keys can vary between distros, so we test only for the existence of a few basic ones
 TEST_F(FTDCProcSelfStatus, TestLocalSelfStatus) {
     std::vector<StringData> keys{};
 
@@ -881,7 +879,6 @@ TEST_F(FTDCProcSelfStatus, TestLocalSelfStatus) {
     StringMap<StringData> strMap;
     setMaps(strMap, obj);
 
-    ASSERT(contains(strMap, "HugetlbPages") || contains(uint64Map, "HugetlbPages"));
     ASSERT(contains(strMap, "Threads") || contains(uint64Map, "Threads"));
     ASSERT(contains(strMap, "Cpus_allowed") || contains(uint64Map, "Cpus_allowed"));
     ASSERT(contains(strMap, "Mems_allowed") || contains(uint64Map, "Mems_allowed"));
