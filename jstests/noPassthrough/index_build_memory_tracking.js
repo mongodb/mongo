@@ -38,7 +38,11 @@ const awaitShell = startParallelShell(() => {
     while (!db.getSiblingDB('test').signal.findOne()) {
         const memUsage = assert.commandWorked(db.serverStatus()).indexBulkBuilder.memUsage;
         print("mem usage: " + memUsage);
-        assert.lte(memUsage, 50 * 1024 * 1024);
+        // The index build memory usage is actually a high-water mark. Include a buffer into our
+        // assertion to account of any extra memory usage before spilling.
+        const memBuffer = 1 * 1024 * 1024;
+        const maxMemUsage = 50 * 1024 * 1024;
+        assert.lte(memUsage, maxMemUsage + memBuffer);
         sleep(500);
     }
 }, primary.port);
