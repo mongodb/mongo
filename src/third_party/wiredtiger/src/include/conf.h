@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Sample usage:
  *  __wt_conf_gets(session, conf, statistics, &cval);

@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Define WT threading and concurrency primitives Assumes Windows 7+/2008 R2+
  */

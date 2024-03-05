@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Supported btree formats: the "current" version is the maximum supported major/minor versions.
  */

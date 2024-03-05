@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 #include "test_util.h"
 
 #ifdef HAVE_SETRLIMIT

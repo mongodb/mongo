@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WT_GENERATION_COOKIE --
  *   State passed through to callbacks during the session walk logic when

@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Helper macros for finer-grained RTS verbose messaging categories.
  */

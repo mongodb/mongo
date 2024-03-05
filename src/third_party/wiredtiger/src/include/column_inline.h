@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __col_insert_search_gt --
  *     Search a column-store insert list for the next larger record.

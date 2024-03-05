@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /* clang-format off */
 #define WT_VERBOSE_CATEGORY_STR_INIT \
     { \

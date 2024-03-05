@@ -1,3 +1,5 @@
+#pragma once
+
 extern BOOL CALLBACK __wt_init_once_callback(
   _Inout_ PINIT_ONCE InitOnce, _Inout_opt_ PVOID Parameter, _Out_opt_ PVOID *Context)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

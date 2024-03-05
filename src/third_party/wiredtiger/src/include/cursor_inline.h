@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __wt_curhs_get_btree --
  *     Convert a history store cursor to the underlying btree.

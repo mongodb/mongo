@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_THREAD_PAUSE 10 /* Thread pause timeout in seconds */
 
 /*

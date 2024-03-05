@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __wt_cond_wait --
  *     Wait on a mutex, optionally timing out.

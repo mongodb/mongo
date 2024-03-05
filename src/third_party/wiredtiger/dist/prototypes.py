@@ -66,6 +66,7 @@ def fn_prototypes(fns, tests, name):
 def output(fns, tests, f):
     tmp_file = '__tmp_prototypes' + str(os.getpid())
     tfile = open(tmp_file, 'w')
+    tfile.write("#pragma once\n\n")
     for e in sorted(list(set(fns))):
         tfile.write(e)
 

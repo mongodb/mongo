@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 struct __wt_config {
     WT_SESSION_IMPL *session;
     const char *orig;

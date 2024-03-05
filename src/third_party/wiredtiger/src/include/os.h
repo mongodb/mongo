@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_SYSCALL(call, ret)                                          \
     do {                                                               \
         /*                                                             \

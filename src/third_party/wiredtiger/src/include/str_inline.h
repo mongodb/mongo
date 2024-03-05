@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * __wt_prepare_state_str --
  *     Convert a prepare state to its string representation.

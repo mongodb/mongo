@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 /*
  * util.h
  * 	Utility functions for test that simulates system crashes.

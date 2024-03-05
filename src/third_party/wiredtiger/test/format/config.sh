@@ -9,6 +9,8 @@ fh="config.h"
 cat<<END_OF_HEADER_FILE_PREFIX>$fh
 /* DO NOT EDIT: automatically built by format/config.sh. */
 
+#pragma once
+
 #define C_TYPE_MATCH(cp, type)                                                                    \\
     (!F_ISSET(cp, (C_TYPE_FIX | C_TYPE_ROW | C_TYPE_VAR)) ||                                      \\
       ((type) == FIX && F_ISSET(cp, C_TYPE_FIX)) || ((type) == ROW && F_ISSET(cp, C_TYPE_ROW)) || \\

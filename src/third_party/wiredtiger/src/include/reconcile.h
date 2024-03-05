@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WT_REC_KV--
  *	An on-page key/value item we're building.

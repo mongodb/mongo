@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_CROSSING_MIN_BND(r, next_len) \
     ((r)->cur_ptr->min_offset == 0 && (next_len) > (r)->min_space_avail)
 #define WT_CROSSING_SPLIT_BND(r, next_len) ((next_len) > (r)->space_avail)

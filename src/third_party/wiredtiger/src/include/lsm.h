@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WT_LSM_WORKER_COOKIE --
  *	State for an LSM worker thread.

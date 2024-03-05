@@ -8,6 +8,8 @@
 *
 */
 
+#pragma once
+
 #define CRC 0x1edc6f41
 #define CRC_XOR
 #define REFLECT

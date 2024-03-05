@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_RECNO_OOB 0 /* Illegal record number */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

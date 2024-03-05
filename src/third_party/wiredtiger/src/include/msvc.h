@@ -5,6 +5,9 @@
  *
  * See the file LICENSE for redistribution information.
  */
+
+#pragma once
+
 #include <intrin.h>
 
 #ifndef _M_AMD64

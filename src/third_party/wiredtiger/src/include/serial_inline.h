@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __insert_simple_func --
  *     Worker function to add a WT_INSERT entry to the middle of a skiplist.

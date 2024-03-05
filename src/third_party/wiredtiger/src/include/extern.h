@@ -1,3 +1,5 @@
+#pragma once
+
 extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session, const char *name)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern WT_EXT *__wt_block_off_srch_inclusive(WT_EXTLIST *el, wt_off_t off)

@@ -48,6 +48,7 @@ if __name__ == '__main__':
     tmp = '__tmp_type_to_str' + str(os.getpid())
 
     with open(tmp, 'w') as tfile:
+        tfile.write("#pragma once\n\n")
         generate_string_conversion('Convert a prepare state to its string representation.',
                                    'prepare_state',
                                    r'^#define\s+(WT_PREPARE_[A-Z0-9_]+)\s+[0-9]+',

@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 typedef enum {
     WT_THROTTLE_CHUNKCACHE, /* Chunk cache throttle */
     WT_THROTTLE_CKPT,       /* Checkpoint throttle */

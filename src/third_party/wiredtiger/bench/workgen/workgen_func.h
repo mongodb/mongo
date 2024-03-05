@@ -25,6 +25,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#pragma once
+
 struct workgen_random_state;
 
 extern uint32_t workgen_atomic_add32(uint32_t *vp, uint32_t v);

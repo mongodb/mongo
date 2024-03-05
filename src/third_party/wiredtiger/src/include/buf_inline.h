@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __wt_buf_grow --
  *     Grow a buffer that may be in-use, and ensure that all data is local to the buffer.

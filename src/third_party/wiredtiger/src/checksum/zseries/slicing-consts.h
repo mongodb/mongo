@@ -1,4 +1,7 @@
 /* CRC-32 and CRC-32C slicing-by-8 constants, for use on big-endian systems. */
+
+#pragma once
+
 #if 0
 static const unsigned int __attribute__((aligned(128))) crc32table_le[8][256] = {
   {0x00000000, 0x96300777, 0x2c610eee, 0xba510999, 0x19c46d07, 0x8ff46a70, 0x35a563e9, 0xa395649e,

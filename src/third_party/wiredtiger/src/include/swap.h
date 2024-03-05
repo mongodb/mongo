@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #include "misc.h"
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1300)

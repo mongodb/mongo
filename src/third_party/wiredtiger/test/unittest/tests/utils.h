@@ -5,6 +5,9 @@
  *
  * See the file LICENSE for redistribution information.
  */
+
+#pragma once
+
 #include <string>
 
 #define DB_HOME "test_db"

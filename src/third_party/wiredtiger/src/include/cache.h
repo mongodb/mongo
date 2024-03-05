@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Helper: in order to read without any calls to eviction, we have to ignore the cache size and
  * disable splits.

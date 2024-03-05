@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LOGSCAN_FIRST 0x01u
 #define WT_LOGSCAN_FROM_CKP 0x02u

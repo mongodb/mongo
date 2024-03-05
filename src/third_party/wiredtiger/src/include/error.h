@@ -5,6 +5,9 @@
  *
  * See the file LICENSE for redistribution information.
  */
+
+#pragma once
+
 #define WT_COMPAT_MSG_PREFIX "Version incompatibility detected: "
 
 #define WT_DEBUG_POINT ((void *)(uintptr_t)0xdeadbeef)

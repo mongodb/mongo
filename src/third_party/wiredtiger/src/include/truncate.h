@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WT_TRUNCATE_INFO
  *	A set of context associated with a range truncate operation.

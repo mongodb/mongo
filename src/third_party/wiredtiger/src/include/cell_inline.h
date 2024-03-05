@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __cell_check_value_validity --
  *     Check the value's validity window for sanity.

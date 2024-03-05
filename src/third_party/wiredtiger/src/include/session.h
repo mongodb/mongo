@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WT_DATA_HANDLE_CACHE --
  *	Per-session cache of handles to avoid synchronization when opening

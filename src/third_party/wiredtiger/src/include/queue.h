@@ -30,6 +30,8 @@
  * $FreeBSD$
  */
 
+#pragma once
+
 /*
  * This is a stripped-down version of the FreeBSD sys/queue.h include file.
  *

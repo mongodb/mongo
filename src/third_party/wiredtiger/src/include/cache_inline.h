@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __wt_cache_aggressive --
  *     Indicate if the cache is operating in aggressive mode.

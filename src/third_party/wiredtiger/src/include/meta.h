@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_WIREDTIGER "WiredTiger"        /* Version file */
 #define WT_SINGLETHREAD "WiredTiger.lock" /* Locking file */
 

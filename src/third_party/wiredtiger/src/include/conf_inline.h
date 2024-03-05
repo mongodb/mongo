@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * __wt_conf_get_compiled --
  *     Return true if and only if the given string is a dummy compiled string, and if so, return the

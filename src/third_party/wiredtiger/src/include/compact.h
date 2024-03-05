@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 struct __wt_compact_state {
     uint32_t file_count;        /* Number of files seen */
     uint32_t lsm_count;         /* Number of LSM trees seen */

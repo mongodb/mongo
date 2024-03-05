@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /* Character constants for projection plans */
 #define WT_PROJ_KEY 'k'   /* Go to key in cursor <arg> */
 #define WT_PROJ_NEXT 'n'  /* Process the next item (<arg> repeats) */

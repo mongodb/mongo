@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * Capture cases where a single session handle is used by multiple threads in parallel. The check

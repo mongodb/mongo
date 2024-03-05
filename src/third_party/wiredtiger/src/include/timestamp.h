@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * We format timestamps in a couple of ways, declare appropriate sized buffers. Hexadecimal is 2x
  * the size of the value. MongoDB format (high/low pairs of 4B unsigned integers, with surrounding

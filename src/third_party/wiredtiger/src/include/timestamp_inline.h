@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /* Initialize the fields in a time window to their defaults. */
 #define WT_TIME_WINDOW_INIT(tw)              \
     do {                                     \

@@ -168,6 +168,7 @@ run --bg "function.py" &
 run --bg "style.py" &
 run --bg "comment_style.py" &
 run --bg "type_to_str.py" &
+run --bg "s_include_guards" &
 
 # Wait for completion.
 if [[ -n "$ISTTY" ]]; then

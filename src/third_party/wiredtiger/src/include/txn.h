@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #define WT_TXN_NONE 0                /* Beginning of time */
 #define WT_TXN_FIRST 1               /* First transaction to run */
 #define WT_TXN_MAX (UINT64_MAX - 10) /* End of time */

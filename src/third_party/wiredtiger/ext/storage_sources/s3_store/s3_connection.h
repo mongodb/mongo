@@ -1,4 +1,3 @@
-
 /*-
  * Public Domain 2014-present MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
@@ -26,8 +25,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef S3CONNECTION
-#define S3CONNECTION
+#ifndef S3CONNECTION_H
+#define S3CONNECTION_H
 
 #include <aws/auth/credentials.h>
 #include <aws/core/Aws.h>

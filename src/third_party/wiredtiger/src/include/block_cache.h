@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * WiredTiger's block cache. It is used to cache blocks identical to those that live on disk in a
  * faster storage medium, such as NVRAM.

@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 typedef enum { BOOL_TYPE, CONFIG_STRING_TYPE, INT_TYPE, STRING_TYPE, UINT32_TYPE } CONFIG_OPT_TYPE;
 
 typedef struct {

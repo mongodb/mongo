@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Variable-length integer encoding.
  * We need up to 64 bits, signed and unsigned.  Further, we want the packed

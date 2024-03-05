@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * This macro doesn't do anything and is used for annotation only. We use it to highlight
  * the variable is used in lock-less inter-thread communication - using mechanisms like memory

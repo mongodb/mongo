@@ -1,3 +1,5 @@
+#pragma once
+
 extern bool __wt_absolute_path(const char *path) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_has_priv(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const char *__wt_path_separator(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

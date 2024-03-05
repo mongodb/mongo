@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 #define FORMAT_PREPARE_TIMEOUT 120
 
 /*

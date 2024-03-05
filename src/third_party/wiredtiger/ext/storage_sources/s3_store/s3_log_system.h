@@ -25,8 +25,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef S3LOGSYSTEM
-#define S3LOGSYSTEM
+
+#ifndef S3LOGSYSTEM_H
+#define S3LOGSYSTEM_H
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>

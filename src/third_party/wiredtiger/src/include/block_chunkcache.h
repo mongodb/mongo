@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /* WiredTiger's chunk cache. Locally caches chunks of remote objects. */
 
 #define WT_CC_KEY_FORMAT WT_UNCHECKED_STRING(SLq)

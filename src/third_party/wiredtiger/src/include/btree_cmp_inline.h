@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 #ifdef HAVE_X86INTRIN_H
 #if !defined(_MSC_VER) && !defined(_lint)
 #include <x86intrin.h>

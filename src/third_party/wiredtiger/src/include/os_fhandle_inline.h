@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#pragma once
+
 /*
  * Define functions that increment histogram statistics for filesystem operations latency.
  */
