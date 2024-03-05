@@ -1872,6 +1872,9 @@ BSONObj OpDebug::makeMongotDebugStatsObject() const {
     if (!mongotCountVal.isEmpty()) {
         cursorBuilder.append("resultCount", mongotCountVal);
     }
+    if (!mongotSlowQueryLog.isEmpty()) {
+        cursorBuilder.appendElements(mongotSlowQueryLog);
+    }
     return cursorBuilder.obj();
 }
 

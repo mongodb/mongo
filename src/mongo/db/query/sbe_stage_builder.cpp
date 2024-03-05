@@ -218,6 +218,12 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
                     auto& opDebug = CurOp::get(cq.getOpCtx())->debug();
                     opDebug.mongotCountVal = metaValObj.getField("count").wrap();
                 }
+
+                if (metaValObj.hasField(kSlowQueryLogFieldName)) {
+                    auto& opDebug = CurOp::get(cq.getOpCtx())->debug();
+                    opDebug.mongotSlowQueryLog =
+                        metaValObj.getField(kSlowQueryLogFieldName).wrap(kSlowQueryLogFieldName);
+                }
             }
         }
     }

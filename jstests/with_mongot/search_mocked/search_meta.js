@@ -106,7 +106,13 @@ const cursorId = NumberLong(17);
                     {_id: 3, $searchScore: 0.123}
                 ]
             },
-            vars: {SEARCH_META: {value: 42, "count": {"lowerBound": 3}}}
+            vars: {
+                SEARCH_META: {
+                    value: 42,
+                    "count": {"lowerBound": 3},
+                    "slowQueryLog": {"msg": "Arbitrary payload"}
+                }
+            }
         }
     }];
     assert.commandWorked(
@@ -121,6 +127,9 @@ const cursorId = NumberLong(17);
     assert.gt(arrayLog.length, 0, "no log lines");
     assert(arrayLog.some(function(v) {
         return v.includes("Slow query") && v.includes("resultCount");
+    }));
+    assert(arrayLog.some(function(v) {
+        return v.includes("Slow query") && v.includes("slowQueryLog");
     }));
     testDB.runCommand({profile: 0, slowms: 200});
 }

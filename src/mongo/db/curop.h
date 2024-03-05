@@ -318,6 +318,7 @@ public:
     boost::optional<long long> msWaitingForMongot{boost::none};
     long long mongotBatchNum = 0;
     BSONObj mongotCountVal = BSONObj();
+    BSONObj mongotSlowQueryLog = BSONObj();
 
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
