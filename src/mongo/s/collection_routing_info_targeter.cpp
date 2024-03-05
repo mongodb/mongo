@@ -251,16 +251,16 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceStri
  * namespace.
  */
 CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opCtx, bool refresh) {
-    auto [cm, sii] = [&] {
+    const auto createDatabaseAndGetRoutingInfo = [&opCtx, &refresh](const NamespaceString& nss) {
         size_t attempts = 1;
         while (true) {
             try {
-                cluster::createDatabase(opCtx, _nss.dbName());
+                cluster::createDatabase(opCtx, nss.dbName());
 
                 if (refresh) {
                     uassertStatusOK(
-                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-                            opCtx, _nss));
+                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                              nss));
                 }
 
                 if (MONGO_unlikely(waitForDatabaseToBeDropped.shouldFail())) {
@@ -268,12 +268,12 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                     waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
                 }
 
-                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_INFO(8314601,
                            "Failed initialization of routing info because the database has been "
                            "concurrently dropped",
-                           logAttrs(_nss.dbName()),
+                           logAttrs(nss.dbName()),
                            "attemptNumber"_attr = attempts,
                            "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
 
@@ -285,7 +285,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                 }
             }
         }
-    }();
+    };
+
+    auto [cm, sii] = createDatabaseAndGetRoutingInfo(_nss);
 
     // For a tracked time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
@@ -302,12 +304,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
     //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
     if (!cm.hasRoutingTable() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
-        if (refresh) {
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-                opCtx, bucketsNs));
-        }
-        auto [bucketsPlacementInfo, bucketsIndexInfo] =
-            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs));
+        auto [bucketsPlacementInfo, bucketsIndexInfo] = createDatabaseAndGetRoutingInfo(bucketsNs);
         if (bucketsPlacementInfo.hasRoutingTable()) {
             _nss = bucketsNs;
             cm = std::move(bucketsPlacementInfo);
@@ -318,12 +315,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         // This can happen if a tracked time-series collection is dropped and re-created. Then we
         // need to reset the namespace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
-
-        if (refresh) {
-            uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
-        }
-        auto [newCm, newSii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+        auto [newCm, newSii] = createDatabaseAndGetRoutingInfo(_nss);
         cm = std::move(newCm);
         sii = std::move(newSii);
         _isRequestOnTimeseriesViewNamespace = false;

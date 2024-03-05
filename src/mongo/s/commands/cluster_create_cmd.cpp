@@ -93,7 +93,6 @@ public:
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             auto cmd = request();
             auto dbName = cmd.getDbName();
-            cluster::createDatabase(opCtx, dbName);
 
             uassert(ErrorCodes::InvalidOptions,
                     "specify size:<n> when capped is true",
