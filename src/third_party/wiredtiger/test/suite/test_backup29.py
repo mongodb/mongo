@@ -56,11 +56,11 @@ class test_backup29(backup_base):
     few = 100
     nentries = 5000
 
-    def get_open_file_count(self):
+    def get_stat(self, stat_name):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        n = stat_cursor[stat.conn.file_open][2]
+        value = stat_cursor[stat_name][2]
         stat_cursor.close()
-        return n
+        return value
 
     def parse_blkmods(self, uri):
         meta_cursor = self.session.open_cursor('metadata:')
@@ -109,10 +109,15 @@ class test_backup29(backup_base):
         # the library keep track of the bitmaps.
         config = 'incremental=(enabled,granularity=4k,this_id="ID1")'
         bkup_c = self.session.open_cursor('backup:', None, config)
+        self.assertEqual(1, self.get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(1, self.get_stat(stat.conn.backup_incremental))
         # Uncomment these lines if actually taking the full backup is helpful for debugging.
         # os.mkdir(self.dir)
         # self.take_full_backup(self.dir, bkup_c)
         bkup_c.close()
+
+        self.assertEqual(0, self.get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(1, self.get_stat(stat.conn.backup_incremental))
 
         # Add a lot more data to both tables to generate a filled-in block mod bitmap.
         last_i = self.few
@@ -158,9 +163,20 @@ class test_backup29(backup_base):
 
     def test_backup29_reopen(self):
         self.setup_test()
+        # Make sure all the stats are not set
+        self.assertEqual(0, self.get_stat(stat.conn.backup_blocks))
+        self.assertEqual(0, self.get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(0, self.get_stat(stat.conn.backup_dup_open))
+        self.assertEqual(0, self.get_stat(stat.conn.backup_start))
 
         self.pr("CLOSE and REOPEN conn")
         self.reopen_conn()
+        self.assertEqual(0, self.get_stat(stat.conn.backup_blocks))
+        self.assertEqual(0, self.get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(0, self.get_stat(stat.conn.backup_dup_open))
+        # NOTE: Incremental should be set after restart.
+        self.assertEqual(1, self.get_stat(stat.conn.backup_incremental))
+        self.assertEqual(0, self.get_stat(stat.conn.backup_start))
         self.pr("Reopened conn")
 
         self.incr_backup_and_validate()
@@ -191,7 +207,7 @@ class test_backup29(backup_base):
             self.session.checkpoint()
             sleep += 0.5
             time.sleep(0.5)
-            nfile = self.get_open_file_count()
+            nfile = self.get_stat(stat.conn.file_open)
             if nfile == final_nfile:
                 break
         c.close()

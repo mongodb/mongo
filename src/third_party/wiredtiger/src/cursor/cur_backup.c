@@ -96,6 +96,7 @@ __wt_backup_destroy(WT_SESSION_IMPL *session)
         F_CLR(blkincr, WT_BLKINCR_VALID);
     }
     conn->incr_granularity = 0;
+    WT_STAT_CONN_SET(session, backup_incremental, 0);
     F_CLR(conn, WT_CONN_INCR_BACKUP);
 }
 
@@ -289,11 +290,13 @@ err:
         WT_ASSERT(session, F_ISSET(session, WT_SESSION_BACKUP_CURSOR));
         F_CLR(session, WT_SESSION_BACKUP_DUP);
         F_CLR(cb, WT_CURBACKUP_DUP);
+        WT_STAT_CONN_SET(session, backup_dup_open, 0);
     } else if (F_ISSET(cb, WT_CURBACKUP_LOCKER))
         WT_TRET(__backup_stop(session, cb));
 
     __wt_cursor_close(cursor);
     session->bkp_cursor = NULL;
+    WT_STAT_CONN_SET(session, backup_cursor_open, 0);
 
     API_END_RET(session, ret);
 }
@@ -373,6 +376,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
      * view when creating a copy.
      */
+    WT_STAT_CONN_SET(session, backup_start, 1);
     WT_WITH_CHECKPOINT_LOCK(
       session, WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, othercb, cfg)));
     WT_ERR(ret);
@@ -380,11 +384,13 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
         __wt_cursor_init(cursor, uri, NULL, cfg, cursorp) :
         __wt_curbackup_open_incr(session, uri, other, cursor, cfg, cursorp));
 
+    WT_STAT_CONN_SET(session, backup_cursor_open, 1);
     if (0) {
 err:
         WT_TRET(__curbackup_close(cursor));
         *cursorp = NULL;
     }
+    WT_STAT_CONN_SET(session, backup_start, 0);
 
     return (ret);
 }
@@ -833,6 +839,7 @@ __backup_start(
     if (is_dup) {
         F_SET(cb, WT_CURBACKUP_DUP);
         F_SET(session, WT_SESSION_BACKUP_DUP);
+        WT_STAT_CONN_SET(session, backup_dup_open, 1);
         goto done;
     }
     if (!target_list) {

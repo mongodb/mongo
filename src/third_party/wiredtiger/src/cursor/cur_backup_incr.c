@@ -201,15 +201,19 @@ __curbackup_incr_next(WT_CURSOR *cursor)
         while (cb->bit_offset < cb->nbits)
             if (__bit_test(cb->bitstring.mem, cb->bit_offset)) {
                 found = true;
+                WT_STAT_CONN_INCR(session, backup_blocks);
                 /*
                  * Care must be taken to leave the bit_offset field set to the next offset bit so
                  * that the next call is set to the correct offset.
                  */
                 start_bitoff = cb->bit_offset++;
                 if (F_ISSET(cb, WT_CURBACKUP_CONSOLIDATE)) {
-                    while (
-                      cb->bit_offset < cb->nbits && __bit_test(cb->bitstring.mem, cb->bit_offset++))
+                    while (cb->bit_offset < cb->nbits &&
+                      __bit_test(cb->bitstring.mem, cb->bit_offset++)) {
                         total_len += cb->granularity;
+                        /* Count all the blocks even if we return them consolidated. */
+                        WT_STAT_CONN_INCR(session, backup_blocks);
+                    }
                 }
                 break;
             } else

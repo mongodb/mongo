@@ -299,6 +299,7 @@ struct __wt_name_flag {
     do {                                                     \
         F_SET((conn), WT_CONN_INCR_BACKUP);                  \
         FLD_SET((conn)->log_flags, WT_CONN_LOG_INCR_BACKUP); \
+        WT_STAT_CONN_SET(session, backup_incremental, 1);    \
     } while (0)
 
 /*

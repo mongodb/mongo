@@ -179,6 +179,11 @@ conn_stats = [
     ##########################################
     # System statistics
     ##########################################
+    ConnStat('backup_blocks', 'total modified incremental blocks'),
+    ConnStat('backup_cursor_open', 'backup cursor open', 'no_clear,no_scale'),
+    ConnStat('backup_dup_open', 'backup duplicate cursor open', 'no_clear,no_scale'),
+    ConnStat('backup_incremental', 'incremental backup enabled', 'no_clear,no_scale'),
+    ConnStat('backup_start', 'opening the backup cursor in progress', 'no_clear,no_scale'),
     ConnStat('buckets', 'hash bucket array size general', 'no_clear,no_scale,size'),
     ConnStat('buckets_dh', 'hash bucket array size for data handles', 'no_clear,no_scale,size'),
     ConnStat('cond_auto_wait', 'auto adjusting condition wait calls'),

@@ -1680,19 +1680,24 @@ static const char *const __stats_connection_desc[] = {
   "connection: auto adjusting condition resets",
   "connection: auto adjusting condition wait calls",
   "connection: auto adjusting condition wait raced to update timeout and skipped updating",
+  "connection: backup cursor open",
+  "connection: backup duplicate cursor open",
   "connection: detected system time went backwards",
   "connection: files currently open",
   "connection: hash bucket array size for data handles",
   "connection: hash bucket array size general",
+  "connection: incremental backup enabled",
   "connection: memory allocations",
   "connection: memory frees",
   "connection: memory re-allocations",
   "connection: number of sessions without a sweep for 5+ minutes",
   "connection: number of sessions without a sweep for 60+ minutes",
+  "connection: opening the backup cursor in progress",
   "connection: pthread mutex condition wait calls",
   "connection: pthread mutex shared lock read-lock calls",
   "connection: pthread mutex shared lock write-lock calls",
   "connection: total fsync I/Os",
+  "connection: total modified incremental blocks",
   "connection: total read I/Os",
   "connection: total write I/Os",
   "cursor: Total number of deleted pages skipped during tree walk",
@@ -2408,19 +2413,24 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cond_auto_wait_reset = 0;
     stats->cond_auto_wait = 0;
     stats->cond_auto_wait_skipped = 0;
+    /* not clearing backup_cursor_open */
+    /* not clearing backup_dup_open */
     stats->time_travel = 0;
     /* not clearing file_open */
     /* not clearing buckets_dh */
     /* not clearing buckets */
+    /* not clearing backup_incremental */
     stats->memory_allocation = 0;
     stats->memory_free = 0;
     stats->memory_grow = 0;
     stats->no_session_sweep_5min = 0;
     stats->no_session_sweep_60min = 0;
+    /* not clearing backup_start */
     stats->cond_wait = 0;
     stats->rwlock_read = 0;
     stats->rwlock_write = 0;
     stats->fsync_io = 0;
+    stats->backup_blocks = 0;
     stats->read_io = 0;
     stats->write_io = 0;
     stats->cursor_tree_walk_del_page_skip = 0;
@@ -3168,19 +3178,24 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
     to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
     to->cond_auto_wait_skipped += WT_STAT_READ(from, cond_auto_wait_skipped);
+    to->backup_cursor_open += WT_STAT_READ(from, backup_cursor_open);
+    to->backup_dup_open += WT_STAT_READ(from, backup_dup_open);
     to->time_travel += WT_STAT_READ(from, time_travel);
     to->file_open += WT_STAT_READ(from, file_open);
     to->buckets_dh += WT_STAT_READ(from, buckets_dh);
     to->buckets += WT_STAT_READ(from, buckets);
+    to->backup_incremental += WT_STAT_READ(from, backup_incremental);
     to->memory_allocation += WT_STAT_READ(from, memory_allocation);
     to->memory_free += WT_STAT_READ(from, memory_free);
     to->memory_grow += WT_STAT_READ(from, memory_grow);
     to->no_session_sweep_5min += WT_STAT_READ(from, no_session_sweep_5min);
     to->no_session_sweep_60min += WT_STAT_READ(from, no_session_sweep_60min);
+    to->backup_start += WT_STAT_READ(from, backup_start);
     to->cond_wait += WT_STAT_READ(from, cond_wait);
     to->rwlock_read += WT_STAT_READ(from, rwlock_read);
     to->rwlock_write += WT_STAT_READ(from, rwlock_write);
     to->fsync_io += WT_STAT_READ(from, fsync_io);
+    to->backup_blocks += WT_STAT_READ(from, backup_blocks);
     to->read_io += WT_STAT_READ(from, read_io);
     to->write_io += WT_STAT_READ(from, write_io);
     to->cursor_tree_walk_del_page_skip += WT_STAT_READ(from, cursor_tree_walk_del_page_skip);
