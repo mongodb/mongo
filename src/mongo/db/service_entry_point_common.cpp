@@ -1776,8 +1776,7 @@ void ExecCommandDatabase::_initiateCommand() {
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
     enforceRequireAPIVersion(opCtx, command);
 
-    if (!opCtx->getClient()->isInDirectClient() &&
-        readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern) {
+    if (!opCtx->getClient()->isInDirectClient()) {
         boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
@@ -1789,21 +1788,26 @@ void ExecCommandDatabase::_initiateCommand() {
         }
 
         if (shardVersion || databaseVersion) {
-            // If a timeseries collection is sharded, only the buckets collection would be sharded.
-            // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
-            // is possible that a stale mongos may send the request over a view namespace. In this
-            // case, we initialize the 'OperationShardingState' with buckets namespace.
-            // TODO: SERVER-80719 revisit this.
-            const auto invocationNss = _invocation->ns();
-            auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-            // Hold reference to the catalog for collection lookup without locks to be safe.
-            auto catalog = CollectionCatalog::get(opCtx);
-            auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-            auto namespaceForSharding =
-                (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
+            if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern) {
+                OperationShardingState::get(opCtx).setTreatAsFromRouter();
+            } else {
+                // If a timeseries collection is sharded, only the buckets collection would be
+                // sharded. We expect all versioned commands to be sent over 'system.buckets'
+                // namespace. But it is possible that a stale mongos may send the request over a
+                // view namespace. In this case, we initialize the 'OperationShardingState' with
+                // buckets namespace.
+                // TODO: SERVER-80719 revisit this.
+                const auto invocationNss = _invocation->ns();
+                auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
+                // Hold reference to the catalog for collection lookup without locks to be safe.
+                auto catalog = CollectionCatalog::get(opCtx);
+                auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+                auto namespaceForSharding =
+                    (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
 
-            OperationShardingState::setShardRole(
-                opCtx, namespaceForSharding, shardVersion, databaseVersion);
+                OperationShardingState::setShardRole(
+                    opCtx, namespaceForSharding, shardVersion, databaseVersion);
+            }
         }
     }
 
