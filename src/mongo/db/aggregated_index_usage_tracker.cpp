@@ -213,7 +213,7 @@ long long AggregatedIndexUsageTracker::getCount() const {
 
 class IndexStatsSSS : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    IndexStatsSSS() : ServerStatusSection("indexStats") {}
 
     ~IndexStatsSSS() override = default;
 
@@ -239,6 +239,5 @@ public:
         featuresBuilder.done();
         return builder.obj();
     }
-};
-auto indexStatsSSS = *ServerStatusSectionBuilder<IndexStatsSSS>("indexStats");
+} indexStatsSSS;
 }  // namespace mongo

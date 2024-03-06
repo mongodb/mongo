@@ -82,7 +82,7 @@ inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long 
  */
 class ResourceConsumptionSSS : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    ResourceConsumptionSSS() : ServerStatusSection("resourceConsumption") {}
 
     // Do not include this section unless metrics aggregation is enabled. It will not have populated
     // data otherwise.
@@ -107,10 +107,7 @@ public:
         builder.append(kNumMetrics, static_cast<long long>(numMetrics));
         return builder.obj();
     }
-};
-
-auto& resourceConsumptionSSM =
-    *ServerStatusSectionBuilder<ResourceConsumptionSSS>("resourceConsumption");
+} resourceConsumptionMetricSSM;
 
 }  // namespace
 

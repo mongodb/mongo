@@ -45,7 +45,7 @@ const StringDataSet kTargetedCmdNames = {
     "connectionStatus",
     "fsync",
     "fsyncUnlock",
-    "getDiagnosticData",  // TODO (SERVER-87512): Support role-aware serverStatus on mongod with
+    "getDiagnosticData",  // TODO (SERVER-79353): Support role-aware serverStatus on mongod with
                           // router role. Evaluate this command should go through the router code
                           // paths.
     "getLog",
@@ -63,7 +63,7 @@ const StringDataSet kTargetedCmdNames = {
     "saslStart",
     "saslContinue",
     "setParameter",
-    "serverStatus",  // TODO (SERVER-87512): Support role-aware serverStatus on mongod with
+    "serverStatus",  // TODO (SERVER-79353): Support role-aware serverStatus on mongod with
                      // router role. Evaluate this command should go through the router code
                      // paths.
     "splitVector",   // TODO (SERVER-84090): Investigate whether to change or deprecate router's

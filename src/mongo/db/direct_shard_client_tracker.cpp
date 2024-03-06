@@ -84,7 +84,7 @@ namespace {
 
 class DirectShardConnections : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    DirectShardConnections() : ServerStatusSection("directShardConnections") {}
 
     bool includeByDefault() const override {
         return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
@@ -96,10 +96,8 @@ public:
         DirectShardClientTracker::get(opCtx).appendStats(&bob);
         return bob.obj();
     }
-};
 
-auto& directShardConnections =
-    *ServerStatusSectionBuilder<DirectShardConnections>("directShardConnections");
+} directShardConnections;
 
 }  // namespace
 

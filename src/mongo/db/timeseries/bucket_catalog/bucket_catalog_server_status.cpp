@@ -72,7 +72,7 @@ class BucketCatalogServerStatus : public ServerStatusSection {
     }
 
 public:
-    using ServerStatusSection::ServerStatusSection;
+    BucketCatalogServerStatus() : ServerStatusSection("bucketCatalog") {}
 
     bool includeByDefault() const override {
         return true;
@@ -104,9 +104,7 @@ public:
 
         return builder.obj();
     }
-};
-auto& bucketCatalogServerStatus =
-    *ServerStatusSectionBuilder<BucketCatalogServerStatus>("bucketCatalog");
+} bucketCatalogServerStatus;
 
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

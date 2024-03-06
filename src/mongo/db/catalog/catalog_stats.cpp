@@ -54,7 +54,7 @@ AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
 namespace {
 class CatalogStatsSSS : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    CatalogStatsSSS() : ServerStatusSection("catalogStats") {}
 
     ~CatalogStatsSSS() override = default;
 
@@ -118,7 +118,7 @@ public:
         stats.toBson(&builder);
         return builder.obj();
     }
-};
-auto catalogStatsSSS = *ServerStatusSectionBuilder<CatalogStatsSSS>("catalogStats");
+
+} catalogStatsSSS;
 }  // namespace
 }  // namespace mongo::catalog_stats

@@ -48,7 +48,7 @@ namespace {
 
 class StorageSSS : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    StorageSSS() : ServerStatusSection("storageEngine") {}
 
     ~StorageSSS() override = default;
 
@@ -79,8 +79,8 @@ public:
 
         return bob.obj();
     }
-};
-auto& storageSSS = *ServerStatusSectionBuilder<StorageSSS>("storageEngine");
+
+} storageSSS;
 
 }  // namespace
 }  // namespace mongo

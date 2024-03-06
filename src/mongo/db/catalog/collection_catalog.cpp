@@ -222,7 +222,7 @@ bool isCSFLE1Validator(BSONObj doc) {
  */
 class CollectionCatalogSection final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    CollectionCatalogSection() : ServerStatusSection("collectionCatalog") {}
 
     bool includeByDefault() const override {
         return true;
@@ -236,10 +236,7 @@ public:
     }
 
     AtomicWord<long long> numScansDueToMissingMapping;
-};
-
-auto& gCollectionCatalogSection =
-    *ServerStatusSectionBuilder<CollectionCatalogSection>("collectionCatalog");
+} gCollectionCatalogSection;
 
 class IgnoreExternalViewChangesForDatabase {
 public:

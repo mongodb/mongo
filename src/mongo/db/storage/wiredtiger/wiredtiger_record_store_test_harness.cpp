@@ -68,7 +68,7 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test"),
-      _engine(std::string{kWiredTigerEngineName},
+      _engine(kWiredTigerEngineName,
               _dbpath.path(),
               &_cs,
               _testLoggingSettings(extraStrings.toString()),
@@ -95,7 +95,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
     StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        std::string{kWiredTigerEngineName},
+        kWiredTigerEngineName,
         NamespaceString::createNamespaceString_forTest(ns),
         ident,
         collOptions,
@@ -115,7 +115,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     WiredTigerRecordStore::Params params;
     params.nss = nss;
     params.ident = ident.toString();
-    params.engineName = std::string{kWiredTigerEngineName};
+    params.engineName = kWiredTigerEngineName;
     params.isCapped = collOptions.capped ? true : false;
     params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     params.overwrite = collOptions.clusteredIndex ? false : true;
@@ -150,7 +150,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
 
     const NamespaceString oplogNss = NamespaceString::kRsOplogNamespace;
     StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
+        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,
                                                     oplogNss,
                                                     ident,
                                                     options,
@@ -170,7 +170,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     WiredTigerRecordStore::Params params;
     params.nss = oplogNss;
     params.ident = ident;
-    params.engineName = std::string{kWiredTigerEngineName};
+    params.engineName = kWiredTigerEngineName;
     params.isCapped = true;
     params.keyFormat = KeyFormat::Long;
     params.overwrite = true;

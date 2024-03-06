@@ -1620,7 +1620,7 @@ protected:
     }
 
     void checkServerStatus() {
-        TransactionCoordinatorsSSS tcsss("testSection", ClusterRole::None);
+        TransactionCoordinatorsSSS tcsss;
         BSONElement dummy;
         const auto serverStatusSection = tcsss.generateSection(operationContext(), dummy);
         ASSERT_EQ(metrics()->getTotalCreated(), serverStatusSection["totalCreated"].Long());

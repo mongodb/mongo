@@ -126,7 +126,7 @@ private:
         // Use a small journal for testing to account for the unlikely event that the underlying
         // filesystem does not support fast allocation of a file of zeros.
         std::string extraStrings = "log=(file_max=1m,prealloc=false)";
-        auto kv = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
+        auto kv = std::make_unique<WiredTigerKVEngine>(kWiredTigerEngineName,
                                                        _dbpath.path(),
                                                        _cs.get(),
                                                        extraStrings,

@@ -45,7 +45,7 @@ namespace mongo {
  */
 class ChangeCollectionServerStatus final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    ChangeCollectionServerStatus() : ServerStatusSection("changeCollections") {}
 
     bool includeByDefault() const override {
         return true;
@@ -63,8 +63,6 @@ public:
         result->append(getSectionName(),
                        BSON("purgingJob" << changeCollectionManager.getPurgingJobStats().toBSON()));
     }
-};
-auto& changeCollectionServerStatus =
-    *ServerStatusSectionBuilder<ChangeCollectionServerStatus>("changeCollections");
+} changeCollectionServerStatus;
 
 }  // namespace mongo

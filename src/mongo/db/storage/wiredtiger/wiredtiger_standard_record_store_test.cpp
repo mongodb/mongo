@@ -120,7 +120,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         WiredTigerRecordStore::Params params;
         params.nss = NamespaceString::createNamespaceString_forTest("a.b");
         params.ident = ident;
-        params.engineName = std::string{kWiredTigerEngineName};
+        params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;

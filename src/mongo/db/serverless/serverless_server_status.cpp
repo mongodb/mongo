@@ -42,7 +42,7 @@ namespace {
 
 class ServerlessServerStatus final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    ServerlessServerStatus() : ServerStatusSection("serverless") {}
 
     bool includeByDefault() const override {
         return false;
@@ -55,8 +55,7 @@ public:
             .appendInfoForServerStatus(&result);
         return result.obj();
     }
-};
-auto& serverlessServerStatus = *ServerStatusSectionBuilder<ServerlessServerStatus>("serverless");
+} serverlessServerStatus;
 
 }  // namespace
 }  // namespace mongo

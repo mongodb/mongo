@@ -885,7 +885,7 @@ using heap_profiler_detail_gperf_tcmalloc::HeapProfiler;
 
 class HeapProfilerServerStatusSection final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    HeapProfilerServerStatusSection() : ServerStatusSection("heapProfile") {}
 
     bool includeByDefault() const override {
         return HeapProfilingEnabled;
@@ -900,8 +900,7 @@ public:
 
 #ifdef MONGO_HAVE_HEAP_PROFILER
 
-auto& heapProfilerServerStatusSection =
-    *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
+HeapProfilerServerStatusSection heapProfilerServerStatusSection;
 
 MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext*) {

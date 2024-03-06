@@ -143,6 +143,20 @@ public:
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
+        // We must only add the server parameters to the global registry once during unit testing.
+        static int setupCountForUnitTests = 0;
+        if (setupCountForUnitTests == 0) {
+            ++setupCountForUnitTests;
+
+            // Intentionally leaked.
+            [[maybe_unused]] auto leakedSection = new WiredTigerServerStatusSection();
+
+            // This allows unit tests to run this code without encountering memory leaks
+#if __has_feature(address_sanitizer)
+            __lsan_ignore_object(leakedSection);
+#endif
+        }
+
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
@@ -211,8 +225,5 @@ ServiceContext::ConstructorActionRegisterer registerWiredTiger(
     "WiredTigerEngineInit", [](ServiceContext* service) {
         registerStorageEngine(service, std::make_unique<WiredTigerFactory>());
     });
-
-auto wiredTigerServerStatusSection =
-    *ServerStatusSectionBuilder<WiredTigerServerStatusSection>(std::string{kWiredTigerEngineName});
 }  // namespace
 }  // namespace mongo

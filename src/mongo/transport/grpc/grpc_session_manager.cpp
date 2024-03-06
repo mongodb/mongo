@@ -44,7 +44,7 @@ namespace mongo::transport::grpc {
 namespace {
 class GRPCSection : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    GRPCSection() : ServerStatusSection("gRPC") {}
 
     bool includeByDefault() const override {
         return feature_flags::gFeatureFlagGRPC.isEnabled(
@@ -65,9 +65,7 @@ public:
         }
         return bb.obj();
     }
-};
-
-auto& grpcSection = *ServerStatusSectionBuilder<GRPCSection>("gRPC");
+} grpcSection;
 
 void appendI64(BSONObjBuilder* b, StringData n, auto v) {
     b->append(n, static_cast<std::int64_t>(v));

@@ -42,7 +42,7 @@ namespace mongo {
 
 class HealthMonitoringServerStatus : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    HealthMonitoringServerStatus() : ServerStatusSection("health") {}
 
     bool includeByDefault() const override {
         return true;
@@ -66,8 +66,7 @@ public:
 
         return result.obj();
     }
-};
-auto& healthMonitoringServerStatus =
-    *ServerStatusSectionBuilder<HealthMonitoringServerStatus>("health");
+
+} healthMonitoringServerStatus;
 
 }  // namespace mongo

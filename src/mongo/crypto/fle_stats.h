@@ -63,8 +63,10 @@ static void accumulateStats(ECOCStats& left, const ECOCStats& right) {
  */
 class FLEStatusSection : public ServerStatusSection {
 public:
+    // Creates a section which tracks operation time with system default clock source.
+    FLEStatusSection();
     // Creates a section manager which tracks operation time with provided clock source.
-    FLEStatusSection(std::string name, ClusterRole role, TickSource* tickSource);
+    FLEStatusSection(TickSource* tickSource);
 
     // Return the global status section Singleton
     static FLEStatusSection& get();

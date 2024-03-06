@@ -203,7 +203,8 @@ class MirroredReadsSection final : public ServerStatusSection {
 public:
     using CounterT = long long;
 
-    using ServerStatusSection::ServerStatusSection;
+    MirroredReadsSection()
+        : ServerStatusSection(MirrorMaestro::kServerStatusSectionName.toString()) {}
 
     bool includeByDefault() const override {
         return false;
@@ -277,9 +278,7 @@ public:
     // Counts the number of mirrored operations processed successfully by this node as a
     // secondary. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
     AtomicWord<CounterT> processedAsSecondary;
-};
-auto& gMirroredReadsSection = *ServerStatusSectionBuilder<MirroredReadsSection>(
-    MirrorMaestro::kServerStatusSectionName.toString());
+} gMirroredReadsSection;
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
     IDLParserContext ctx("mirrorReads");

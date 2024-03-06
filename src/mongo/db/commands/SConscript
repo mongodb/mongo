@@ -23,11 +23,9 @@ env.Library(
         'server_status.cpp',
         'server_status_metric.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

@@ -112,7 +112,7 @@ Status onUpdateWatchdogPeriodSeconds(const int& value) {
  */
 class WatchdogServerStatusSection : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    WatchdogServerStatusSection() : ServerStatusSection("watchdog") {}
     bool includeByDefault() const {
         // Only include this by default if the watchdog is on
         return watchdogEnabled;
@@ -134,9 +134,7 @@ public:
 
         return result.obj();
     }
-};
-auto& watchdogServerStatusSection =
-    *ServerStatusSectionBuilder<WatchdogServerStatusSection>("watchdog");
+} watchdogServerStatusSection;
 
 void startWatchdog(ServiceContext* service) {
     // Check three paths if set

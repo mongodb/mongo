@@ -43,7 +43,7 @@ namespace {
 
 class QueryAnalysisServerStatus final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    QueryAnalysisServerStatus() : ServerStatusSection("queryAnalyzers") {}
 
     bool includeByDefault() const override {
         return supportsSamplingQueries(getGlobalServiceContext());
@@ -55,9 +55,8 @@ public:
             ? QueryAnalysisSampleTracker::get(opCtx).reportForServerStatus()
             : BSONObj();
     }
-};
-auto queryAnalysisServerStatus =
-    *ServerStatusSectionBuilder<QueryAnalysisServerStatus>("queryAnalyzers");
+
+} queryAnalysisServerStatus;
 
 }  // namespace
 }  // namespace analyze_shard_key

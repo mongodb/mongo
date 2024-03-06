@@ -97,7 +97,7 @@ public:
 
         const bool isLogged = false;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            std::string{kWiredTigerEngineName}, "", "", nss, desc, isLogged);
+            kWiredTigerEngineName, "", "", nss, desc, isLogged);
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;
@@ -131,13 +131,8 @@ public:
 
         IndexDescriptor& desc = _descriptors.emplace_back("", spec);
 
-        StatusWith<std::string> result =
-            WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
-                                                  "",
-                                                  "",
-                                                  nss,
-                                                  desc,
-                                                  WiredTigerUtil::useTableLogging(nss));
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
+            kWiredTigerEngineName, "", "", nss, desc, WiredTigerUtil::useTableLogging(nss));
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;

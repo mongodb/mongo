@@ -57,7 +57,7 @@ InternalTransactionMetrics* InternalTransactionMetrics::get(OperationContext* op
 namespace {
 class InternalTransactionsSSS : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    InternalTransactionsSSS() : ServerStatusSection("internalTransactions") {}
 
     ~InternalTransactionsSSS() override = default;
 
@@ -77,9 +77,8 @@ public:
 
         return ret.obj();
     }
-};
-auto& internalTransactionSSS =
-    *ServerStatusSectionBuilder<InternalTransactionsSSS>("internalTransactions");
+
+} internalTransactionsSSS;
 }  // namespace
 
 

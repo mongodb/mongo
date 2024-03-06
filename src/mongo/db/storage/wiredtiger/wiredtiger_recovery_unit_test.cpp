@@ -82,14 +82,14 @@ class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelp
 public:
     WiredTigerRecoveryUnitHarnessHelper()
         : _dbpath("wt_test"),
-          _engine(std::string{kWiredTigerEngineName},  // .canonicalName
-                  _dbpath.path(),                      // .path
-                  &_cs,                                // .cs
-                  "",                                  // .extraOpenOptions
-                  1,                                   // .cacheSizeMB
-                  0,                                   // .maxCacheOverflowFileSizeMB
-                  false,                               // .ephemeral
-                  false                                // .repair
+          _engine(kWiredTigerEngineName,  // .canonicalName
+                  _dbpath.path(),         // .path
+                  &_cs,                   // .cs
+                  "",                     // .extraOpenOptions
+                  1,                      // .cacheSizeMB
+                  0,                      // .maxCacheOverflowFileSizeMB
+                  false,                  // .ephemeral
+                  false                   // .repair
           ) {
         // Use a replica set so that writes to replicated collections are not journaled and thus
         // retain their timestamps.
@@ -114,7 +114,7 @@ public:
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
         StatusWith<std::string> result =
-            WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
+            WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,
                                                         nss,
                                                         ident,
                                                         CollectionOptions(),
@@ -136,7 +136,7 @@ public:
         WiredTigerRecordStore::Params params;
         params.nss = nss;
         params.ident = ident;
-        params.engineName = std::string{kWiredTigerEngineName};
+        params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;

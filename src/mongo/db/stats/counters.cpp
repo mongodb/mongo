@@ -323,9 +323,8 @@ void AuthCounter::append(BSONObjBuilder* b) {
 }
 
 OpCounterServerStatusSection::OpCounterServerStatusSection(const std::string& sectionName,
-                                                           ClusterRole role,
                                                            OpCounters* counters)
-    : ServerStatusSection(sectionName, role), _counters(counters) {}
+    : ServerStatusSection(sectionName), _counters(counters) {}
 
 BSONObj OpCounterServerStatusSection::generateSection(OperationContext* opCtx,
                                                       const BSONElement& configElement) const {

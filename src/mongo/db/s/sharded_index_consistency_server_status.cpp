@@ -50,7 +50,7 @@ bool isConfigServerWithShardedIndexConsistencyCheckEnabled() {
 
 class ShardedIndexConsistencyServerStatus final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    ShardedIndexConsistencyServerStatus() : ServerStatusSection("shardedIndexConsistency") {}
 
     bool includeByDefault() const override {
         return isConfigServerWithShardedIndexConsistencyCheckEnabled();
@@ -68,9 +68,8 @@ public:
                            .getNumShardedCollsWithInconsistentIndexes());
         return builder.obj();
     }
-};
-auto& indexConsistencyServerStatus =
-    *ServerStatusSectionBuilder<ShardedIndexConsistencyServerStatus>("shardedIndexConsistency");
+
+} indexConsistencyServerStatus;
 
 }  // namespace
 }  // namespace mongo

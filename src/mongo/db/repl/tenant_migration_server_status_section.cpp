@@ -42,7 +42,7 @@ namespace {
 class TenantMigrationServerStatus final : public ServerStatusSection {
 
 public:
-    using ServerStatusSection::ServerStatusSection;
+    TenantMigrationServerStatus() : ServerStatusSection("tenantMigrations") {}
 
     bool includeByDefault() const override {
         return true;
@@ -54,8 +54,6 @@ public:
             ->appendInfoForServerStatus(&result);
         return result.obj();
     }
-};
-auto tenantMigrationServerStatus =
-    *ServerStatusSectionBuilder<TenantMigrationServerStatus>("tenantMigrations");
+} tenantMigrationServerStatus;
 }  // namespace
 }  // namespace mongo

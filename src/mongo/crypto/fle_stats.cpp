@@ -39,12 +39,13 @@
 namespace mongo {
 
 namespace {
-auto& fleStatusSection =
-    *ServerStatusSectionBuilder<FLEStatusSection>("fle").bind(globalSystemTickSource());
+FLEStatusSection fleStatusSection{};
 }  // namespace
 
-FLEStatusSection::FLEStatusSection(std::string name, ClusterRole role, TickSource* tickSource)
-    : ServerStatusSection(std::move(name), std::move(role)), _tickSource(tickSource) {
+FLEStatusSection::FLEStatusSection() : FLEStatusSection(globalSystemTickSource()) {}
+
+FLEStatusSection::FLEStatusSection(TickSource* tickSource)
+    : ServerStatusSection("fle"), _tickSource(tickSource) {
     ECStats zeroStats;
     ECOCStats zeroECOC;
 

@@ -172,7 +172,7 @@ namespace {
  */
 class IndexBulkBuilderSSS : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    IndexBulkBuilderSSS() : ServerStatusSection("indexBulkBuilder") {}
 
     bool includeByDefault() const final {
         return true;
@@ -209,9 +209,8 @@ public:
     // the external sorter and may be useful in diagnosing situations where the process is
     // close to exhausting this finite resource.
     SorterFileStats sorterFileStats = {&sorterTracker};
-};
 
-auto& indexBulkBuilderSSS = *ServerStatusSectionBuilder<IndexBulkBuilderSSS>("indexBulkBuilder");
+} indexBulkBuilderSSS;
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be

@@ -39,16 +39,16 @@ namespace {
 constexpr auto kTimingSection = "timing"_sd;
 }  // namespace
 
-ServerStatusSectionRegistry* ServerStatusSectionRegistry::instance() {
+ServerStatusSectionRegistry* ServerStatusSectionRegistry::get() {
     static ServerStatusSectionRegistry instance;
     return &instance;
 }
 
-void ServerStatusSectionRegistry::addSection(std::unique_ptr<ServerStatusSection> section) {
+void ServerStatusSectionRegistry::addSection(ServerStatusSection* section) {
     // Disallow adding a section named "timing" as it is reserved for the server status command.
     dassert(section->getSectionName() != kTimingSection);
     MONGO_verify(!_runCalled.load());
-    _sections[section->getSectionName()] = std::move(section);
+    _sections[section->getSectionName()] = section;
 }
 
 ServerStatusSectionRegistry::SectionMap::const_iterator ServerStatusSectionRegistry::begin() {
@@ -58,6 +58,11 @@ ServerStatusSectionRegistry::SectionMap::const_iterator ServerStatusSectionRegis
 
 ServerStatusSectionRegistry::SectionMap::const_iterator ServerStatusSectionRegistry::end() {
     return _sections.end();
+}
+
+ServerStatusSection::ServerStatusSection(const std::string& sectionName)
+    : _sectionName(sectionName) {
+    ServerStatusSectionRegistry::get()->addSection(this);
 }
 
 }  // namespace mongo

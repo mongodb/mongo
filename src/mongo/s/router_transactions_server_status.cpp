@@ -41,7 +41,7 @@ namespace {
 
 class RouterTransactionsSSS final : public ServerStatusSection {
 public:
-    using ServerStatusSection::ServerStatusSection;
+    RouterTransactionsSSS() : ServerStatusSection("transactions") {}
 
     bool includeByDefault() const override {
         return true;
@@ -53,8 +53,8 @@ public:
         RouterTransactionsMetrics::get(opCtx)->updateStats(&stats);
         return stats.toBSON();
     }
-};
-auto& routerTransactionsSSS = *ServerStatusSectionBuilder<RouterTransactionsSSS>("transactions");
+
+} routerTransactionsSSS;
 
 }  // namespace
 }  // namespace mongo

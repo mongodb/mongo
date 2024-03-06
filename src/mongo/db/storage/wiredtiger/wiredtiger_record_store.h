@@ -92,7 +92,7 @@ class RecoveryUnit;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
-inline constexpr auto kWiredTigerEngineName = "wiredTiger"_sd;
+extern const std::string kWiredTigerEngineName;
 
 class WiredTigerRecordStore : public RecordStore {
     friend class WiredTigerRecordStoreCursorBase;
