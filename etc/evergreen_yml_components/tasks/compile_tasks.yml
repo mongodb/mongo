@@ -1170,7 +1170,7 @@ tasks:
       display_name: Binaries
 
 - name: stitch_support_create_lib
-  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "stitch"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "stitch"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -1205,7 +1205,7 @@ tasks:
   - func: "do stitch teardown"
 
 - name: stitch_support_install_and_run_tests
-  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "stitch"]
+  tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "stitch"]
   depends_on:
   - name: stitch_support_create_lib
   commands:

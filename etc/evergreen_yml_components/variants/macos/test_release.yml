@@ -27,16 +27,8 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
-  - name: aggregation
-  - name: auth_gen
-  - name: change_streams
-  - name: .misc_js
-  - name: disk_wiredtiger
-  - name: .jscore .common !.auth !.sharding !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common !.auth
-  - name: .ssl
-  - name: push
+  - name: .development_critical !.incompatible_community !.incompatible_mac
+  - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
 
 - name: macos-arm64
   display_name: macOS arm64
@@ -63,16 +55,8 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
-  - name: aggregation
-  - name: auth_gen
-  - name: change_streams
-  - name: .misc_js
-  - name: disk_wiredtiger
-  - name: .jscore .common !.auth !.sharding !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common !.auth
-  - name: .ssl
-  - name: push
+  - name: .development_critical !.incompatible_community !.incompatible_mac
+  - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -99,15 +83,9 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
-  - name: audit
-  - name: auth_audit_gen
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: replica_sets_auth_gen
-  - name: sasl
-  - name: push
-  - name: .crypt
-  - name: .publish_crypt
+  - name: crypt_build
+  - name: .development_critical !.incompatible_mac
+  - name: .release_critical !.incompatible_mac !publish_packages
 
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
@@ -134,12 +112,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
-  - name: audit
-  - name: auth_audit_gen
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: replica_sets_auth_gen
-  - name: sasl
-  - name: push
-  - name: .crypt
-  - name: .publish_crypt
+  - name: crypt_build
+  - name: .development_critical !.incompatible_mac
+  - name: .release_critical !.incompatible_mac !publish_packages

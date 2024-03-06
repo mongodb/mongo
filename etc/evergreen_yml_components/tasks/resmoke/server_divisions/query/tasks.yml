@@ -125,7 +125,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "auth", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "aggregation", "auth", "common"]
   depends_on:
   - name: aggregation
   commands:
@@ -197,7 +197,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_read_concern_majority_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "read_write_concern", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "aggregation", "read_write_concern", "no_debug_mode"]
   depends_on:
   - name: aggregation
   commands:
@@ -226,7 +226,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_sharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "common", "sharded"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "aggregation", "common", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -236,7 +236,7 @@ tasks:
 ## Standalone fuzzer for checking timeseries optimizations correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_timeseries_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -259,7 +259,7 @@ tasks:
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
   # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "no_debug_mode" tag.
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -456,7 +456,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "concurrency", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "concurrency", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -502,7 +502,7 @@ tasks:
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "jstestfuzz", "common", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -567,7 +567,7 @@ tasks:
 
 - <<: *task_template
   name: search
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -576,7 +576,7 @@ tasks:
 
 - <<: *task_template
   name: search_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -585,7 +585,7 @@ tasks:
 
 - <<: *task_template
   name: search_ssl
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -659,7 +659,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_disabled_optimization
-  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggregation", "common"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "aggregation", "common"]
   depends_on:
   - name: aggregation
   commands:
@@ -669,7 +669,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
 - <<: *jstestfuzz_template
   name: aggregation_expression_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "aggfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -684,7 +684,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines
 - <<: *jstestfuzz_template
   name: aggregation_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggfuzzer", "require_npm", "random_name", "optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "aggfuzzer", "require_npm", "random_name", "optimization"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -918,7 +918,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -927,7 +927,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_auth
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -936,7 +936,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_ssl
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac"]
   commands:
   - func: "do setup"
   - func: "run tests"
