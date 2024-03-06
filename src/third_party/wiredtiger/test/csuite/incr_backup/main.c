@@ -415,17 +415,18 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, TABLE_IN
 static void
 incr_backup(WT_CONNECTION *conn, const char *home, TABLE_INFO *tinfo)
 {
-    int nfiles, nranges, nunmodified;
+    int nfiles, nranges, num_modified;
 
     VERBOSE(2, "INCREMENTAL BACKUP: START: %" PRIu32 " source=%" PRIu32 "\n",
       tinfo->incr_backup_number, tinfo->full_backup_number);
 
+    nfiles = nranges = num_modified = 0;
     testutil_backup_create_incremental(conn, home, (int)tinfo->incr_backup_number,
-      (int)tinfo->full_backup_number, true /* verbose */, &nfiles, &nranges, &nunmodified);
+      (int)tinfo->full_backup_number, true /* verbose */, &nfiles, &nranges, &num_modified);
     VERBOSE(2,
       "INCREMENTAL BACKUP: COMPLETE: %" PRIu32 " files=%" PRId32 ", ranges=%" PRId32
       ", unmodified=%" PRId32 "\n",
-      tinfo->incr_backup_number, nfiles, nranges, nunmodified);
+      tinfo->incr_backup_number, nfiles, nranges, num_modified);
 }
 
 /*
