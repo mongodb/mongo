@@ -166,13 +166,6 @@ tasks:
           test_control: short
           mongodb_setup: shard-lite-auth
           infrastructure_provisioning: shard-lite
-  - name: dsi_integ_test_run_command_simple
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: run_command_simple
-
   - name: renew_ssl_cert
     commands:
       - command: git.get_project

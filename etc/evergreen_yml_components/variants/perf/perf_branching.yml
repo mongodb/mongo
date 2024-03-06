@@ -198,7 +198,6 @@ buildvariants:
     tasks: &standalonetasks
       - *schedule_patch_auto_tasks_task
       - *schedule_variant_auto_tasks_task
-      - name: dsi_integ_test_run_command_simple
       - name: smoke_test
       - name: canaries_only
       - name: ycsb.2023-09
