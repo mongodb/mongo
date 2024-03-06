@@ -720,7 +720,8 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
 void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds,
-                                       std::set<ChunkRange>* chunkRanges) const {
+                                       std::set<ChunkRange>* chunkRanges,
+                                       bool includeMaxBound) const {
     tassert(7626420, "Expected routing table to be initialized", _rt->optRt);
 
     // If our range is [MinKey, MaxKey], we can simply return all shard ids right away. However,
@@ -736,7 +737,7 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
         }
     }
 
-    _rt->optRt->forEachOverlappingChunk(min, max, true, [&](const auto& chunkInfo) {
+    _rt->optRt->forEachOverlappingChunk(min, max, includeMaxBound, [&](const auto& chunkInfo) {
         shardIds->insert(chunkInfo->getShardIdAt(_clusterTime));
         if (chunkRanges) {
             chunkRanges->insert(chunkInfo->getRange());

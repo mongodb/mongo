@@ -138,7 +138,9 @@ public:
         return _impl->get().keyBelongsToMe(key);
     }
 
-    bool isRangeEntirelyOwned(const BSONObj& min, const BSONObj& max) const;
+    bool isRangeEntirelyOwned(const BSONObj& min,
+                              const BSONObj& max,
+                              bool includeMaxBound = true) const;
 };
 
 }  // namespace mongo

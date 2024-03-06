@@ -848,7 +848,8 @@ public:
     void getShardIdsForRange(const BSONObj& min,
                              const BSONObj& max,
                              std::set<ShardId>* shardIds,
-                             std::set<ChunkRange>* chunkRanges = nullptr) const;
+                             std::set<ChunkRange>* chunkRanges = nullptr,
+                             bool includeMaxBound = true) const;
 
     /**
      * Returns the ids of all shards on which the collection has any chunks.
