@@ -418,27 +418,6 @@ TEST_F(ThroughputProbingTest, ReadWriteRatio) {
     ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
 }
 
-DEATH_TEST_REGEX_F(ThroughputProbingTest, AllTicketsTakenStallIsFatal, "Fatal.*8373001") {
-    auto size = _readTicketHolder.outof();
-    _readTicketHolder.setPeakUsed(size);
-    _readTicketHolder.setAvailable(0);
-
-    // Probe up: increases tickets
-    _tick();
-    _run();
-    ASSERT_GT(_readTicketHolder.outof(), size);
-
-    size = _readTicketHolder.outof();
-
-    // These tickets get taken immediately and not released.
-    _readTicketHolder.setPeakUsed(size);
-    _readTicketHolder.setAvailable(0);
-
-    // Probe up fail: tries to decrease tickets as throughput did not increase, but can't
-    _tick();
-    _run();
-}
-
 TEST_F(ThroughputProbingTest, FixedTicketsStuckIsNotFatal) {
     // As long as we can add and remove some tickets, we will not detect a stall
     auto stuckTickets = _readTicketHolder.outof();

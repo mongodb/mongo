@@ -288,25 +288,23 @@ void ThroughputProbing::_resize(TicketHolder* ticketholder, int newTickets) {
     if (!success) {
         auto throughput = ticketholder->numFinishedProcessing() - finishedBefore;
         const auto desc = ticketholder == _readTicketHolder ? "reads" : "writes";
-        LOGV2_FATAL_CONTINUE(8373000,
-                             "Unable to acquire a ticket within deadline, which indicates the "
-                             "system is stalled. Dumping diagnostics",
-                             "ticketPool"_attr = desc,
-                             "total"_attr = ticketholder->outof(),
-                             "target"_attr = newTickets,
-                             "throughput"_attr = throughput,
-                             "queued"_attr = ticketholder->queued(),
-                             "stalled"_attr = elapsed);
-
-        dumpLockManager();
-
-#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
-        // Dump the stack of each thread, non-blocking.
-        printAllThreadStacks();
-#endif
+        LOGV2_WARNING(8373000,
+                      "Unable to acquire a ticket within deadline, which indicates the "
+                      "system is stalled",
+                      "ticketPool"_attr = desc,
+                      "total"_attr = ticketholder->outof(),
+                      "target"_attr = newTickets,
+                      "throughput"_attr = throughput,
+                      "queued"_attr = ticketholder->queued(),
+                      "stalled"_attr = elapsed);
 
         if (TestingProctor::instance().isEnabled()) {
-            LOGV2_FATAL(8373001, "Aborting the processes in testing due to ticket stall");
+            dumpLockManager();
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+            // Dump the stack of each thread, non-blocking.
+            printAllThreadStacks();
+#endif
         }
     }
 }
