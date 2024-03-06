@@ -342,7 +342,7 @@ InitialSyncerInterface::Options createInitialSyncerOptions(
         // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
         // last applied optime here will permit WiredTiger to evict this data as it sees fit.
         replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-            opTimeAndWallTime.opTime.getTimestamp());
+            opTimeAndWallTime.opTime.getTimestamp(), false /*force*/);
     };
     options.resetOptimes = [replCoord]() {
         replCoord->resetMyLastOpTimes();

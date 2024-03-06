@@ -150,7 +150,7 @@ public:
 
     virtual void setOldestTimestampFromStable() override;
 
-    virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
+    virtual void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
     virtual Timestamp getOldestTimestamp() const override;
 

@@ -598,7 +598,7 @@ public:
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. Additionally, all future writes must be newer or equal to this value.
      */
-    virtual void setOldestTimestamp(Timestamp timestamp) = 0;
+    virtual void setOldestTimestamp(Timestamp timestamp, bool force) = 0;
 
     /**
      * Gets the oldest timestamp for which the storage engine must maintain snapshot history

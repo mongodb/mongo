@@ -591,32 +591,18 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         // way we are consistent at the top of the oplog.
         LOGV2(21547, "No oplog entries to apply for recovery. appliedThrough is null");
     } else {
-        // If the appliedThrough is not null, then we shut down uncleanly during secondary oplog
-        // application and must apply from the appliedThrough to the top of the oplog.
+        // If the appliedThrough is not null, then we shut down uncleanly during oplog application
+        // for restore and must apply from the appliedThrough to the top of the oplog.
         LOGV2(21548,
               "Starting recovery oplog application at the appliedThrough through the top of the "
               "oplog",
               "appliedThrough"_attr = appliedThrough,
               "topOfOplog"_attr = topOfOplog);
 
-        // When `recoverFromOplog` truncates the oplog, that also happens to set the "oldest
-        // timestamp" to the truncation point[1]. `_applyToEndOfOplog` will then perform writes
-        // before the truncation point. Doing so violates the constraint that all updates must be
-        // timestamped newer than the "oldest timestamp". So we will need to move the "oldest
-        // timestamp" back to the `startPoint`.
-        //
-        // Before doing so, we will remove any pins. Forcing the oldest timestamp backwards will
-        // error if there are pins in place, as those pin requests will no longer be satisfied.
-        // Recovering from an unstable checkpoint has no history in the first place. Thus, clearing
-        // pins has no real effect on history being held.
-        //
-        // [1] This is arguably incorrect. On rollback for nodes that are not keeping history to
-        // the "majority point", the "oldest timestamp" likely needs to go back in time. The
-        // oplog's `cappedTruncateAfter` method was a convenient location for this logic, which,
-        // unfortunately, conflicts with the usage above.
-        DurableHistoryRegistry::get(opCtx->getServiceContext())->clearPins(opCtx);
+        // We advance both appliedThrough and the oldest timestamp together during oplog application
+        // for restore after each batch, so the oldest timestamp cannot be behind appliedThrough.
         opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-            appliedThrough.getTimestamp());
+            appliedThrough.getTimestamp(), false /*force*/);
 
         if (startupRecoveryForRestore) {
             // When we're recovering for a restore, we may be recovering a large number of oplog
@@ -776,8 +762,10 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
         if (advanceTimestampsEachBatch) {
             invariant(!applyThroughOpTime.isNull());
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
+            // TODO SERVER-85688: Use force=false once we start setting the stable timestamp after
+            // applying each batch during startup recovery for restore.
             replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                applyThroughOpTime.getTimestamp());
+                applyThroughOpTime.getTimestamp(), true /*force*/);
         }
     }
     stats.complete(applyThroughOpTime);
