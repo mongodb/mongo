@@ -33,6 +33,8 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/indexability.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
@@ -64,15 +66,71 @@ inline bool isIdHackEligibleQuery(const CollectionPtr& collection,
         CollatorInterface::collatorsMatch(queryCollator, collection->getDefaultCollator());
 }
 
-inline bool isExpressEligible(OperationContext* opCtx,
-                              const CollectionPtr& coll,
-                              const CanonicalQuery& cq) {
+/**
+ * Returns 'true' if 'query' on the given 'collection' can be answered using a special IXSCAN +
+ * FETCH plan. Among other restrictions, the query must be a single-field equality generating exact
+ * bounds.
+ */
+inline bool isEqualityExpressEligibleQuery(const CollectionPtr& collection,
+                                           const CanonicalQuery& cq) {
+    const auto& findCommand = cq.getFindCommandRequest();
+    auto me = cq.getPrimaryMatchExpression();
+
+    if (internalQueryDisableSingleFieldExpressExecutor.load()) {
+        return false;
+    }
+
+    return
+        // Properties of the find command.
+        !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
+        findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
+        findCommand.getProjection().isEmpty() && findCommand.getSort().isEmpty() &&
+        !findCommand.getSkip() && !findCommand.getTailable() &&
+        // Properties of the query's match expression.
+        me->matchType() == MatchExpression::EQ &&
+        Indexability::isExactBoundsGenerating(
+            static_cast<ComparisonMatchExpressionBase*>(me)->getData());
+}
+
+/**
+ * Describes whether or not a query is eligible for the express executor.
+ */
+enum ExpressEligibility {
+    // For an ineligible query that should go through regular query optimization and execution.
+    Ineligible = 0,
+    // For a point query that can fulfilled via a single lookup into the _id index or with a direct
+    // lookup into a clustered collection.
+    IdPointQueryEligible,
+    // For an equality query that *may* use the express executor if a suitable index is found.
+    IndexedEqualityEligible,
+};
+inline ExpressEligibility isExpressEligible(OperationContext* opCtx,
+                                            const CollectionPtr& coll,
+                                            const CanonicalQuery& cq) {
+    // Not eligible to use the express path if a particular query framework is set.
+    if (auto queryFramework = cq.getExpCtx()->getQuerySettings().getQueryFramework()) {
+        return ExpressEligibility::Ineligible;
+    }
+
     const auto& findCommandReq = cq.getFindCommandRequest();
-    return (coll && (cq.getProj() == nullptr || cq.getProj()->isSimple()) &&
-            isIdHackEligibleQuery(coll, findCommandReq, cq.getExpCtx()->getCollator()) &&
-            !findCommandReq.getReturnKey() && !findCommandReq.getBatchSize() &&
-            (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
-             clustered_util::isClusteredOnId(coll->getClusteredInfo())));
+
+    if (!coll || findCommandReq.getReturnKey() || findCommandReq.getBatchSize() ||
+        (cq.getProj() != nullptr && !cq.getProj()->isSimple())) {
+        return ExpressEligibility::Ineligible;
+    }
+
+    if (isIdHackEligibleQuery(coll, findCommandReq, cq.getExpCtx()->getCollator()) &&
+        (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
+         clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
+        return ExpressEligibility::IdPointQueryEligible;
+    }
+
+    if (isEqualityExpressEligibleQuery(coll, cq) && coll->getIndexCatalog()->haveAnyIndexes() &&
+        !coll->getClusteredInfo()) {
+        return ExpressEligibility::IndexedEqualityEligible;
+    }
+
+    return ExpressEligibility::Ineligible;
 }
 
 bool isSortSbeCompatible(const SortPattern& sortPattern);

@@ -47,6 +47,7 @@ selector:
   - jstests/core/**/profile1.js
   - jstests/core/**/profile2.js
   - jstests/core/**/find9.js
+  - jstests/core/**/express.js
   exclude_with_any_tags:
   - does_not_support_encrypted_storage_engine
   - does_not_support_repeated_reads

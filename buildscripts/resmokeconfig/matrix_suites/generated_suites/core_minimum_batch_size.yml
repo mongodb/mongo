@@ -41,6 +41,7 @@ selector:
   - jstests/core/**/profile1.js
   - jstests/core/**/profile2.js
   - jstests/core/**/find9.js
+  - jstests/core/**/express.js
   roots:
   - jstests/core/**/*.js
   - jstests/core_standalone/**/*.js

@@ -1268,6 +1268,50 @@ bool shouldAttemptSBE(const CanonicalQuery* canonicalQuery) {
     return !QueryKnobConfiguration::decoration(canonicalQuery->getOpCtx())
                 .isForceClassicEngineEnabled();
 }
+
+boost::optional<PlanExecutorExpressParams> tryGetExpressParams(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    const CanonicalQuery& canonicalQuery,
+    size_t plannerOptions) {
+    auto expressEligibility =
+        isExpressEligible(opCtx, collections.getMainCollection(), canonicalQuery);
+    if (expressEligibility == ExpressEligibility::Ineligible) {
+        return boost::none;
+    }
+
+    QueryPlannerParams expressPlannerParams(
+        QueryPlannerParams::ArgsForExpress{opCtx, canonicalQuery, collections, plannerOptions});
+
+    boost::optional<ScopedCollectionFilter> collFilter = boost::none;
+    VariantCollectionPtrOrAcquisition collOrAcq = collections.getMainCollectionPtrOrAcquisition();
+
+    // TODO SERVER-87016: don't need sharding filter if it's equality on shard key.
+    if (expressPlannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+        collFilter = collOrAcq.getShardingFilter(opCtx);
+        invariant(collFilter,
+                  "Attempting to use shard filter when there's no shard filter available for "
+                  "the collection");
+    }
+
+    if (expressEligibility == ExpressEligibility::IdPointQueryEligible) {
+        bool isClusteredOnId = expressPlannerParams.clusteredInfo
+            ? clustered_util::isClusteredOnId(expressPlannerParams.clusteredInfo)
+            : false;
+        return PlanExecutorExpressParams::makeExecutorParamsForIdQuery(
+            opCtx, collOrAcq, std::move(collFilter), isClusteredOnId);
+    }
+
+    // Fill out the full planner params because we need to examine the indexes for the query.
+    expressPlannerParams.fillOutPlannerParams(
+        opCtx, canonicalQuery, collections, /* ignoreQuerySettings */ false);
+    if (auto indexName = getIndexForExpressEquality(canonicalQuery, expressPlannerParams)) {
+        return PlanExecutorExpressParams::makeExecutorParamsForIndexedEqualityQuery(
+            opCtx, collOrAcq, std::move(collFilter), std::move(*indexName));
+    }
+
+    return boost::none;
+}
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
@@ -1286,33 +1330,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     auto exec = [&]() -> StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> {
         invariant(canonicalQuery);
         const auto& mainColl = collections.getMainCollection();
-        const auto& canonicalQueryRef = *canonicalQuery.get();
-        if (isExpressEligible(opCtx, mainColl, canonicalQueryRef)) {
-            QueryPlannerParams expressPlannerParams(QueryPlannerParams::ArgsForExpress{
-                opCtx, canonicalQueryRef, collections, plannerParams.options});
-            PlanExecutor::Deleter planExDeleter(opCtx);
-            boost::optional<ScopedCollectionFilter> collFilter = boost::none;
-            VariantCollectionPtrOrAcquisition collOrAcq =
-                collections.getMainCollectionPtrOrAcquisition();
 
+        if (auto expressParams =
+                tryGetExpressParams(opCtx, collections, *canonicalQuery, plannerParams.options)) {
             planCacheCounters.incrementClassicSkippedCounter();
-
-            if (expressPlannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-                collFilter = collOrAcq.getShardingFilter(opCtx);
-                invariant(
-                    collFilter,
-                    "Attempting to use shard filter when there's no shard filter available for "
-                    "the collection");
-            }
-
-            bool isClusteredOnId = expressPlannerParams.clusteredInfo
-                ? clustered_util::isClusteredOnId(expressPlannerParams.clusteredInfo)
-                : false;
-            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(
-                new PlanExecutorExpress(
-                    opCtx, std::move(canonicalQuery), collOrAcq, collFilter, isClusteredOnId),
-                planExDeleter);
-            return StatusWith{std::move(exec)};
+            return PlanExecutorExpress::makeExecutor(std::move(canonicalQuery),
+                                                     std::move(*expressParams));
         }
 
         canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));

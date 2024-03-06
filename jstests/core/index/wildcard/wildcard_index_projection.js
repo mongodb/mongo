@@ -27,7 +27,9 @@ assert.eq(true, indexSpec.wildcardProjection._id, indexes);
 
 coll.insert({name: "Ted", type: "Person", _id: 1});
 coll.insert({name: "Bernard", type: "Person", _id: 2});
-const explainResFull = coll.find({_id: {$eq: 1}}).explain();
+
+// Use batchSize param to avoid triggering EXPRESS path.
+const explainResFull = coll.find({_id: {$eq: 1}}).batchSize(2).explain();
 const plannerRes = getQueryPlanner(explainResFull);
 // For a query on _id we expect that the IDHACK plan will be selected. However, we should also
 // observe a rejected plan which uses the wildcard index to resolve _id. In a sharded cluster we

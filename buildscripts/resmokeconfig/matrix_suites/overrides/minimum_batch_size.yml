@@ -20,3 +20,4 @@
     - jstests/core/**/profile1.js # Extra operation for a getmore.
     - jstests/core/**/profile2.js # Extra operation for a getmore.
     - jstests/core/**/find9.js # Extra operation for a getmore.
+    - jstests/core/**/express.js # Assumes default batch size.

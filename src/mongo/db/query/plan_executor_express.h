@@ -31,17 +31,76 @@
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_express.h"
-
+#include "mongo/db/query/query_planner_params.h"
 
 namespace mongo {
 
+/**
+ * Tries to find an index suitable for use in the express equality path. Excludes indexes which
+ * cannot 1) satisfy the given query with exact bounds and 2) provably return at most one result
+ * doc. If at least one suitable index remains, returns the name of the index with the fewest
+ * fields. If not, returns boost::none.
+ */
+boost::optional<std::string> getIndexForExpressEquality(const CanonicalQuery& cq,
+                                                        const QueryPlannerParams& plannerParams);
+
+class PlanExecutorExpress;
+class PlanExecutorExpressParams {
+public:
+    /**
+     * Make the executor params for an express executor which will use the _id index or, if the
+     * collection is clustered on _id, the clustered ordering, to answer the query.
+     */
+    static PlanExecutorExpressParams makeExecutorParamsForIdQuery(
+        OperationContext* opCtx,
+        VariantCollectionPtrOrAcquisition coll,
+        boost::optional<ScopedCollectionFilter> collectionFilter,
+        bool isClusteredOnId);
+
+    /**
+     * Make the executor params for an express executor which will use the index specified by
+     * 'indexName' to answer the query.
+     */
+    static PlanExecutorExpressParams makeExecutorParamsForIndexedEqualityQuery(
+        OperationContext* opCtx,
+        VariantCollectionPtrOrAcquisition coll,
+        boost::optional<ScopedCollectionFilter> collectionFilter,
+        std::string indexName);
+
+private:
+    friend class PlanExecutorExpress;
+
+    PlanExecutorExpressParams(OperationContext* opCtx,
+                              VariantCollectionPtrOrAcquisition coll,
+                              boost::optional<ScopedCollectionFilter> collectionFilter,
+                              bool isClusteredOnId,
+                              boost::optional<const std::string> indexName);
+
+    OperationContext* _opCtx;
+    VariantCollectionPtrOrAcquisition _coll;
+    boost::optional<ScopedCollectionFilter> _collectionFilter;
+    bool _isClusteredOnId;
+    boost::optional<const std::string> _indexName;
+};
+
+/**
+ * The Express executor supports bypassing normal query machinery in favor of going directly to
+ * the index and record store for the equivalent of an IXSCAN + FETCH plan.
+ *
+ * It supports single-field equalities which can use an index on that field and will return at most
+ * one document, including point queries on _id.
+ */
 class PlanExecutorExpress final : public PlanExecutor {
 public:
-    PlanExecutorExpress(OperationContext* opCtx,
-                        std::unique_ptr<CanonicalQuery> cq,
-                        VariantCollectionPtrOrAcquisition coll,
-                        boost::optional<ScopedCollectionFilter> collectionFilter,
-                        bool isClusteredOnId);
+    /**
+     * Builds the express executor according to the executor params.
+     *
+     * If '_indexName' is specified, invariants if the index corresponding to '_indexName' does not
+     * exist. Otherwise, if the collection is not clustered, invariants if the _id index does not
+     * exist.
+     */
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> cq, PlanExecutorExpressParams params);
 
     ExecState getNext(BSONObj* out, RecordId* dlOut) override;
 
@@ -177,14 +236,22 @@ public:
     }
 
 private:
+    PlanExecutorExpress(std::unique_ptr<CanonicalQuery> cq,
+                        OperationContext* opCtx,
+                        VariantCollectionPtrOrAcquisition coll,
+                        boost::optional<ScopedCollectionFilter> collectionFilter,
+                        bool isClusteredOnId,
+                        boost::optional<const std::string> indexName);
+
     /**
-     * Fast path for finding a document by _id.
+     * Fast path for finding a RecordId: searches for the first RID where the first element of the
+     * index has value 'pointBound'. Uses the clustered order to answer the query, if
+     * '_isClusteredOnId'. Otherwise, uses the index identified by '_entry'.
      *
-     * Will invariant() if no _id index or collection clustered by id is present.
-     *
-     * Returns true if doc is found, false otherwise.
+     * Will uassert() if the index indicated  by '_entry' has been dropped.
      */
-    bool findById(const BSONObj& query, BSONObj& result, RecordId* ridOut = nullptr) const;
+    RecordId getRIDForPoint(const BSONElement& pointBound) const;
+
 
     OperationContext* _opCtx;
     std::unique_ptr<CanonicalQuery> _cq;
@@ -192,6 +259,12 @@ private:
     bool _done{false};
     const bool _isClusteredOnId;
     VariantCollectionPtrOrAcquisition _coll;
+
+    // The index to use to answer the query. If _indexName is boost::none, we should use the
+    // clustered ordering. Both _indexName and _entry are either present, or boost::none/nullptr.
+    boost::optional<const std::string> _indexName;
+    const IndexCatalogEntry* _entry;
+
     mongo::CommonStats _commonStats;
     const NamespaceString _nss;
     Status _killStatus = Status::OK();

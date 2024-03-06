@@ -31,11 +31,18 @@
 #include "mongo/db/query/plan_explainer.h"
 
 namespace mongo {
-
+/**
+ * A PlanExplainer implementation for express execution plans. Since we don't build a plan tree for
+ * these queries, PlanExplainerExpress does not include stage information that is typically included
+ * by other PlanExplainers, such as whether or not shard filtering was needed and what index bounds
+ * were used. However, it does report the chosen index.
+ */
 class PlanExplainerExpress final : public PlanExplainer {
 public:
-    PlanExplainerExpress(const mongo::CommonStats* stats, bool isClusteredOnId)
-        : _stats(stats), _isClusteredOnId(isClusteredOnId) {}
+    PlanExplainerExpress(const mongo::CommonStats* stats,
+                         bool isClusteredOnId,
+                         const boost::optional<const std::string>& indexName)
+        : _stats(stats), _isClusteredOnId(isClusteredOnId), _indexName(indexName) {}
 
     const ExplainVersion& getVersion() const override {
         static const ExplainVersion kExplainVersion = "1";
@@ -74,6 +81,7 @@ public:
 private:
     const mongo::CommonStats* _stats;
     const bool _isClusteredOnId;
+    const boost::optional<const std::string>& _indexName;
 };
 
 }  // namespace mongo

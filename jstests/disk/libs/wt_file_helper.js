@@ -1,4 +1,10 @@
-import {getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {
+    getPlanStage,
+    getQueryPlanner,
+    getWinningPlan,
+    isExpress,
+    isIxscan
+} from "jstests/libs/analyze_plan.js";
 
 /**
  * Get the URI of the wt collection file given the collection name.
@@ -42,9 +48,15 @@ export let assertQueryUsesIndex = function(coll, query, indexName) {
     let res = coll.find(query).explain();
     assert.commandWorked(res);
 
-    let inputStage = getWinningPlan(res.queryPlanner).inputStage;
-    assert.eq(inputStage.stage, "IXSCAN");
-    assert.eq(inputStage.indexName, indexName);
+    let stage;
+    if (isIxscan(coll.getDB(), res)) {
+        stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "IXSCAN");
+    } else {
+        assert(isExpress(coll.getDB(), res), tojson(res));
+        stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "EXPRESS");
+    }
+    assert.eq(
+        stage.indexName, indexName, "Expecting index scan on " + indexName + ": " + tojson(res));
 };
 
 /**

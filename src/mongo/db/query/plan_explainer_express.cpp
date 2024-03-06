@@ -30,11 +30,14 @@
 #include "mongo/db/query/plan_explainer_express.h"
 
 namespace mongo {
+
 void PlanExplainerExpress::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->nReturned = _stats->advanced;
-    if (!_isClusteredOnId) {
-        statsOut->indexesUsed.insert("_id_");
+
+    if (_indexName) {
+        statsOut->indexesUsed.insert(_indexName.get());
     }
+
     if (_stats->works > 0) {
         statsOut->totalKeysExamined = 1;
         statsOut->totalDocsExamined = 1;
@@ -49,6 +52,10 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
     bob.append("stage", getPlanSummary());
     PlanSummaryStats stats;
     getSummaryStats(&stats);
+
+    if (!stats.indexesUsed.empty()) {
+        bob.append("indexName", *stats.indexesUsed.begin());
+    }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         bob.appendNumber("keysExamined", static_cast<long long>(stats.totalKeysExamined));

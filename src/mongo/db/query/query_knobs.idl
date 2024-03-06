@@ -1023,6 +1023,13 @@ server_parameters:
     default:
       expr: QueryFrameworkControlEnum::kTrySbeRestricted
 
+  internalQueryDisableSingleFieldExpressExecutor:
+    description: "Knob to control whether single-field equalities (other than IDHACK) can use the express executor."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryDisableSingleFieldExpressExecutor"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
   internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin:
     description: "Up to what number of documents do we choose the hash join algorithm when $lookup
     is translated to a SBE plan."

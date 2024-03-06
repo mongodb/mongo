@@ -241,5 +241,4 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     CollectionScanDirection scanDirection,
     const boost::optional<RecordId>& resumeAfterRecordId = boost::none);
 
-
 }  // namespace mongo

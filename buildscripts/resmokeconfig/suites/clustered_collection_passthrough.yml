@@ -64,6 +64,8 @@ selector:
   - jstests/core/**/fts_projection.js
   # Assumes there is one collection that is not clustered.
   - jstests/core/find_with_resume_after_param.js
+  # Asserts that queries can use the express execution path, which does not support clustered colls.
+  - jstests/core/**/express.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

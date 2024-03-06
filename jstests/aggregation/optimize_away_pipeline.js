@@ -323,9 +323,10 @@ assertPipelineDoesNotUseAggregation({
     expectedStages: ["COLLSCAN", "LIMIT"],
 });
 
-// $match followed by $limit can be optimized away.
+// $match followed by $limit can be optimized away. We use limit:2 here rather than limit:1 to avoid
+// triggering the EXPRESS path.
 assertPipelineDoesNotUseAggregation({
-    pipeline: [{$match: {x: 20}}, {$limit: 1}],
+    pipeline: [{$match: {x: 20}}, {$limit: 2}],
     expectedStages: ["IXSCAN", "LIMIT"],
     expectedResult: [{_id: 2, x: 20}],
 });
