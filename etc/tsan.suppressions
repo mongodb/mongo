@@ -34,3 +34,11 @@ signal:StackTraceSigAltStackTest::tryHandler
 # This warning in the mongo-c-driver is expected to be harmless and is suppressed in the
 # mongo-c-driver repo itself.
 race:_mongoc_handshake_freeze
+
+# False positive when call AsyncResultsMerger::_askForNextBatch from executor thread.
+# Happens because we miss synchronization in reading OperationContext::comment in
+# RemoteCommandRequest constructor. Acutally, the writing OperationContext::comment
+# in client thread always occurrs before reading instead of in parallel.
+#
+# TODO SERVER-84514: remove this suppression once we clarify the synchronization.
+race:mongo::AsyncResultsMerger::_askForNextBatch
