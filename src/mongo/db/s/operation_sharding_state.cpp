@@ -76,6 +76,11 @@ bool OperationShardingState::isComingFromRouter(OperationContext* opCtx) {
     return !oss._databaseVersions.empty() || !oss._shardVersions.empty();
 }
 
+bool OperationShardingState::shouldBeTreatedAsFromRouter(OperationContext* opCtx) {
+    const auto& oss = get(opCtx);
+    return !oss._databaseVersions.empty() || !oss._shardVersions.empty() || oss._treatAsFromRouter;
+}
+
 void OperationShardingState::setShardRole(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const boost::optional<ShardVersion>& shardVersion,

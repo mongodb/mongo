@@ -1020,7 +1020,7 @@ Status runAggregateOnView(OperationContext* opCtx,
     }};
 
     auto status{Status::OK()};
-    if (!OperationShardingState::get(opCtx).isComingFromRouter(opCtx)) {
+    if (!OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx)) {
         // Non sharding-aware operation.
         // Run the translated query on the view on this node.
         status = _runAggregate(opCtx,

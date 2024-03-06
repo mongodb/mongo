@@ -113,6 +113,13 @@ public:
     static bool isComingFromRouter(OperationContext* opCtx);
 
     /**
+     * Similar to 'isComingFromRouter()' but also considers '_treatAsFromRouter'. This should be
+     * used when an operation intentionally skips setting shard versions but still wants to tell if
+     * it's sent from a router.
+     */
+    static bool shouldBeTreatedAsFromRouter(OperationContext* opCtx);
+
+    /**
      * NOTE: DO NOT ADD any new usages of this class without including someone from the Sharding
      * Team on the code review.
      *
@@ -184,6 +191,10 @@ public:
      */
     boost::optional<Status> resetShardingOperationFailedStatus();
 
+    void setTreatAsFromRouter(bool treatAsFromRouter = true) {
+        _treatAsFromRouter = treatAsFromRouter;
+    }
+
 private:
     friend class ScopedSetShardRole;
     friend class ScopedStashShardRole;
@@ -220,6 +231,10 @@ private:
     // This value can only be set when a rerouting exception occurs during a write operation, and
     // must be handled before this object gets destructed.
     boost::optional<Status> _shardingOperationFailedStatus;
+
+    // Set when the operation comes from a router but intentionally skips setting the database or
+    // the shard version.
+    bool _treatAsFromRouter{false};
 };
 
 }  // namespace mongo
