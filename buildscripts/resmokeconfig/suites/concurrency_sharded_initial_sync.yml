@@ -156,6 +156,10 @@ selector:
   - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
   - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
 
+  # Applying operation on feature compatibility version document not supported in initial sync
+  - jstests/concurrency/fsm_workloads/drop_database_sharded_setFCV.js
+  - jstests/concurrency/fsm_workloads/random_DDL_setFCV_operations.js
+
   exclude_with_any_tags:
   - requires_non_retryable_writes
   - assumes_against_mongod_not_mongos
