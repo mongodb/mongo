@@ -166,6 +166,10 @@ public:
                              BSONObjBuilder* metadataBob) const override {}
 };
 
+ServiceEntryPointEmbedded::ServiceEntryPointEmbedded() : _hooks(std::make_unique<Hooks>()) {}
+
+ServiceEntryPointEmbedded::~ServiceEntryPointEmbedded() = default;
+
 Future<DbResponse> ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx,
                                                             const Message& m) noexcept {
     // Only one thread will pump at a time and concurrent calls to this will skip the pumping and go
@@ -173,7 +177,7 @@ Future<DbResponse> ServiceEntryPointEmbedded::handleRequest(OperationContext* op
     // guarantees of the state (that they have run).
     checked_cast<PeriodicRunnerEmbedded*>(opCtx->getServiceContext()->getPeriodicRunner())
         ->tryPump();
-    return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
+    return ServiceEntryPointCommon::handleRequest(opCtx, m, *_hooks);
 }
 
 logv2::LogSeverity ServiceEntryPointEmbedded::slowSessionWorkflowLogSeverity() {

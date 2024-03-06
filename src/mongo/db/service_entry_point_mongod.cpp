@@ -331,6 +331,10 @@ public:
     }
 };
 
+ServiceEntryPointMongod::ServiceEntryPointMongod() : _hooks(std::make_unique<Hooks>()) {}
+
+ServiceEntryPointMongod::~ServiceEntryPointMongod() = default;
+
 Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
     OperationContext* opCtx, const Message& m) noexcept try {
     // TODO (SERVER-81551): Move the OpMsgRequest parsing above ServiceEntryPoint::handleRequest().
@@ -351,7 +355,7 @@ Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
         replica_set_endpoint::ScopedSetRouterService service(opCtx);
         return ServiceEntryPointMongos::handleRequestImpl(opCtx, m);
     }
-    return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
+    return ServiceEntryPointCommon::handleRequest(opCtx, m, *_hooks);
 } catch (const DBException& ex) {
     // Try to generate a response based on the status. If encounter another error (e.g.
     // UnsupportedFormat) while trying to generate the response, just return the status.
@@ -372,7 +376,7 @@ Future<DbResponse> ServiceEntryPointMongod::handleRequest(OperationContext* opCt
     if (replica_set_endpoint::isReplicaSetEndpointClient(opCtx->getClient())) {
         return _replicaSetEndpointHandleRequest(opCtx, m);
     }
-    return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
+    return ServiceEntryPointCommon::handleRequest(opCtx, m, *_hooks);
 }
 
 }  // namespace mongo

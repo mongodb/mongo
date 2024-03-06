@@ -38,7 +38,8 @@ class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
     ServiceEntryPointEmbedded& operator=(const ServiceEntryPointEmbedded&) = delete;
 
 public:
-    ServiceEntryPointEmbedded() = default;
+    ServiceEntryPointEmbedded();
+    ~ServiceEntryPointEmbedded();
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override;
 
@@ -46,6 +47,7 @@ public:
 
 private:
     class Hooks;
+    std::unique_ptr<Hooks> _hooks;
 };
 
 }  // namespace mongo
