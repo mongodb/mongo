@@ -142,7 +142,7 @@ WT_CONF_API_DECLARE(WT_CONNECTION, debug_info, 1, 7);
 WT_CONF_API_DECLARE(WT_CONNECTION, load_extension, 1, 4);
 WT_CONF_API_DECLARE(WT_CONNECTION, open_session, 3, 9);
 WT_CONF_API_DECLARE(WT_CONNECTION, query_timestamp, 1, 1);
-WT_CONF_API_DECLARE(WT_CONNECTION, reconfigure, 16, 94);
+WT_CONF_API_DECLARE(WT_CONNECTION, reconfigure, 16, 95);
 WT_CONF_API_DECLARE(WT_CONNECTION, rollback_to_stable, 1, 2);
 WT_CONF_API_DECLARE(WT_CONNECTION, set_timestamp, 1, 4);
 WT_CONF_API_DECLARE(WT_CURSOR, bound, 1, 3);
@@ -173,10 +173,10 @@ WT_CONF_API_DECLARE(object, meta, 5, 64);
 WT_CONF_API_DECLARE(table, meta, 2, 13);
 WT_CONF_API_DECLARE(tier, meta, 5, 65);
 WT_CONF_API_DECLARE(tiered, meta, 5, 67);
-WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open, 20, 157);
-WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_all, 20, 158);
-WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_basecfg, 20, 152);
-WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_usercfg, 20, 151);
+WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open, 20, 158);
+WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_all, 20, 159);
+WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_basecfg, 20, 153);
+WT_CONF_API_DECLARE(GLOBAL, wiredtiger_open_usercfg, 20, 152);
 
 #define WT_CONF_API_ELEMENTS 57
 
