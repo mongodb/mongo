@@ -47,9 +47,9 @@ using unittest::assertGet;
 
 /**
  * Helper function to parse the given BSON object as a MatchExpression, checks the status,
- * and return the MatchExpression*.
+ * and return the MatchExpression pointer.
  */
-MatchExpression* parseMatchExpression(const BSONObj& obj) {
+std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj,
@@ -63,7 +63,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
         FAIL(ss);
     }
 
-    return status.getValue().release();
+    return std::move(status.getValue());
 }
 
 /**
@@ -495,5 +495,11 @@ TEST(ExpressionOptimizeTest, OrRewrittenToIn) {
     ASSERT_BSONOBJ_EQ(optimizeExpr(queries[10].first), fromjson(queries[10].second));
 }
 
+TEST(ExpressionOptimizeTest, PartialOrToInRewriteDoesNotGenerateDirectlyNestedOr) {
+    BSONObj obj = fromjson("{$or: [{x: {$eq: 3}}, {x: {$eq: 4}}, {y: 5}, {z: 6}]}");
+    auto optimizedMatchExpression = MatchExpression::optimize(parseMatchExpression(obj));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(),
+                      fromjson("{$or: [{x: {$in: [3, 4]}}, {y: {$eq: 5}}, {z: {$eq: 6}}]}"));
+}
 }  // namespace
 }  // namespace mongo
