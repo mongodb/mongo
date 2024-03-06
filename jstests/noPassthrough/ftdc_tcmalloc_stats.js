@@ -25,14 +25,22 @@ if (doc.serverStatus.hasOwnProperty("tcmalloc")) {
 
     assert.commandWorked(setParameter(adminDb, {"diagnosticDataCollectionVerboseTCMalloc": true}));
 
-    // Even when the verbose FTDC setting is on, we still do not include the stats string. Either we
-    // are running the new tcmalloc, which has the usingPerCPUCaches field, or we are running the
-    // old one and have included the verbose info.
+    // Even when the verbose FTDC setting is on, we still do not include the stats string.
     assert.soon(() => {
         let doc = verifyGetDiagnosticData(adminDb);
-        return validateTcmallocStats(doc.serverStatus.tcmalloc) &&
-            doc.serverStatus.tcmalloc.hasOwnProperty("usingPerCPUCaches") ||
-            doc.serverStatus.tcmalloc.tcmalloc.hasOwnProperty("size_classes");
+        if (validateTcmallocStats(doc.serverStatus.tcmalloc)) {
+            if (doc.serverStatus.tcmalloc.hasOwnProperty("usingPerCPUCaches")) {
+                // Running New TCMalloc-- if cpu caches are on, we include the cpuCache verbose
+                // info.
+                return !doc.serverStatus.tcmalloc.usingPerCPUCaches ||
+                    doc.serverStatus.tcmalloc.tcmalloc.hasOwnProperty("cpuCache");
+            } else {
+                // Running Old TCMalloc-- we include the size_classes verbose info.
+                return doc.serverStatus.tcmalloc.tcmalloc.hasOwnProperty("size_classes");
+            }
+        }
+
+        return false;
     });
 
     // We can access the stats string through serverStatus with verbosity 3, regardless of the FTDC

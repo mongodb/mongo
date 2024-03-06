@@ -39,13 +39,15 @@
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/itoa.h"
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
+#include <tcmalloc/cpu_cache.h>
 #include <tcmalloc/malloc_extension.h>
+#include <tcmalloc/static_vars.h>
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 #include <gperftools/malloc_extension.h>
 #endif
-
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -76,11 +78,17 @@ public:
         return {};
     }
 
-    virtual boost::optional<size_t> getNumericProperty(StringData propertyName) const {
+    virtual boost::optional<long long> getNumericProperty(StringData propertyName) const {
         return boost::none;
     }
 
     virtual void appendPerCPUMetrics(BSONObjBuilder& bob) const {}
+
+    /**
+     * The tcmalloc names for some metrics are misleading, and so we rename them in order to more
+     * effectively communicate what they represent.
+     */
+    virtual void appendRenamedMetrics(BSONObjBuilder& bob) const {}
 
     virtual long long getReleaseRate() const {
         return 0;
@@ -115,7 +123,6 @@ public:
             "heap_size"_sd,
             "peak_memory_usage"_sd,
             "physical_memory_used"_sd,
-            "realized_fragmentation"_sd,
             "virtual_memory_used"_sd,
         };
     }
@@ -126,7 +133,6 @@ public:
             "cpu_free"_sd,
             "current_total_thread_cache_bytes"_sd,
             "desired_usage_limit_bytes"_sd,
-            "external_fragmentation_bytes"_sd,
             "hard_usage_limit_bytes"_sd,
             "local_bytes"_sd,
             "max_total_thread_cache_bytes"_sd,
@@ -135,7 +141,6 @@ public:
             "pageheap_free_bytes"_sd,
             "pageheap_unmapped_bytes"_sd,
             "required_bytes"_sd,
-            "sampled_internal_fragmentation"_sd,
             "sharded_transfer_cache_free"_sd,
             "thread_cache_count"_sd,
             "thread_cache_free"_sd,
@@ -143,10 +148,10 @@ public:
         };
     }
 
-    boost::optional<size_t> getNumericProperty(StringData propertyName) const override {
+    boost::optional<long long> getNumericProperty(StringData propertyName) const override {
         if (auto res = tcmalloc::MallocExtension::GetNumericProperty(std::string{propertyName});
             res.has_value()) {
-            return res.value();
+            return static_cast<long long>(res.value());
         }
 
         return boost::none;
@@ -156,7 +161,19 @@ public:
         _perCPUCachesActive =
             _perCPUCachesActive || tcmalloc::MallocExtension::PerCpuCachesActive();
         bob.appendBool("usingPerCPUCaches", _perCPUCachesActive);
-        bob.append("maxPerCPUCacheSize", tcmalloc::MallocExtension::GetMaxPerCpuCacheSize());
+        bob.append("maxPerCPUCacheSizeBytes", tcmalloc::MallocExtension::GetMaxPerCpuCacheSize());
+    }
+
+    void appendRenamedMetrics(BSONObjBuilder& bob) const override {
+        auto tryAppendRename = [&](StringData statName, StringData newName) {
+            if (auto val = getNumericProperty(statName); !!val) {
+                bob.appendNumber(newName, *val);
+            }
+        };
+        tryAppendRename("generic.realized_fragmentation", "memory_used_to_memory_held_pct_at_peak");
+        tryAppendRename("tcmalloc.external_fragmentation_bytes", "total_bytes_held");
+        tryAppendRename("tcmalloc.sampled_internal_fragmentation",
+                        "estimated_size_class_overhead_bytes");
     }
 
     long long getReleaseRate() const override {
@@ -164,6 +181,27 @@ public:
     }
 
     void appendHighVerbosityMetrics(BSONObjBuilder& bob, int verbosity) const override {
+        if (verbosity >= 2 && _perCPUCachesActive) {
+            BSONObjBuilder sub(bob.subobjStart("cpuCache"));
+
+            size_t num_cpus = absl::base_internal::NumCPUs();
+            auto& cache = tcmalloc::tcmalloc_internal::tc_globals.cpu_cache();
+
+            for (size_t i = 0; i < num_cpus; i++) {
+                BSONObjBuilder sub2(sub.subobjStart(ItoA(i)));
+
+                sub2.appendNumber("used_bytes", static_cast<long long>(cache.UsedBytes(i)));
+                sub2.appendNumber("allocated", static_cast<long long>(cache.Allocated(i)));
+                sub2.appendNumber("unallocated", static_cast<long long>(cache.Unallocated(i)));
+                sub2.appendNumber("capacity", static_cast<long long>(cache.Capacity(i)));
+                sub2.appendNumber("reclaims", static_cast<long long>(cache.GetNumReclaims(i)));
+
+                auto ms = cache.GetTotalCacheMissStats(i);
+                sub2.appendNumber("overflows", static_cast<long long>(ms.overflows));
+                sub2.appendNumber("underflows", static_cast<long long>(ms.underflows));
+            }
+        }
+
         if (verbosity >= 3) {
             bob.append("formattedString", tcmalloc::MallocExtension::GetStats());
         }
@@ -218,10 +256,10 @@ public:
         };
     }
 
-    boost::optional<size_t> getNumericProperty(StringData propertyName) const override {
+    boost::optional<long long> getNumericProperty(StringData propertyName) const override {
         size_t value;
         if (MallocExtension::instance()->GetNumericProperty(propertyName.rawData(), &value)) {
-            return {value};
+            return static_cast<long long>(value);
         }
 
         return boost::none;
@@ -316,7 +354,7 @@ public:
 
         auto tryAppend = [&](BSONObjBuilder& builder, StringData bsonName, StringData property) {
             if (auto value = _metrics.getNumericProperty(property); !!value) {
-                builder.appendNumber(bsonName, static_cast<long long>(*value));
+                builder.appendNumber(bsonName, *value);
             }
         };
 
@@ -339,6 +377,7 @@ public:
             }
 
             sub.appendNumber("release_rate", _metrics.getReleaseRate());
+            _metrics.appendRenamedMetrics(builder);
             _metrics.appendHighVerbosityMetrics(builder, verbosity);
         }
 

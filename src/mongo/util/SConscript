@@ -388,6 +388,9 @@ if tcmallocAttrs:
         tcmspEnv.InjectThirdParty(tcmallocAttrs['inject'])
     tcmspEnv.Append(CPPDEFINES=tcmallocAttrs['cppdefs'])
 
+    if tcmspEnv.ToolchainIs('clang', 'GCC'):
+        tcmspEnv.Append(CCFLAGS=['-Wno-sign-compare'])
+
     if not use_system_version_of_library('valgrind'):
         # Include valgrind since tcmalloc disables itself while running under valgrind
         tcmspEnv.InjectThirdParty('valgrind')
