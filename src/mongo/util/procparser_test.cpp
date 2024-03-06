@@ -56,6 +56,7 @@ Status parseProcSelfMountStatsImpl(StringData data,
 
 namespace {
 using StringMap = std::map<std::string, uint64_t>;
+using StringDataMap = std::map<StringData, StringData>;
 
 StringMap toStringMap(BSONObj& obj) {
     StringMap map;
@@ -65,6 +66,16 @@ StringMap toStringMap(BSONObj& obj) {
     }
 
     return map;
+}
+
+void setMaps(StringMap& stringMap, StringDataMap& stringDataMap, BSONObj& obj) {
+    for (const auto& e : obj) {
+        if (e.isNumber()) {
+            stringMap[e.fieldName()] = e.numberLong();
+        } else {
+            stringDataMap[e.fieldName()] = e.valueStringData();
+        }
+    }
 }
 
 StringMap toNestedStringMap(BSONObj& obj) {
@@ -103,8 +114,15 @@ bool isPSISupported(StringData filename) {
 }
 
 #define ASSERT_KEY(_key) ASSERT_TRUE(stringMap.find(_key) != stringMap.end());
+#define ASSERT_KEY_IN_EITHER_MAP(_key)                     \
+    ASSERT_TRUE(stringMap.find(_key) != stringMap.end() || \
+                stringDataMap.find(_key) != stringDataMap.end());
 #define ASSERT_NO_KEY(_key) ASSERT_TRUE(stringMap.find(_key) == stringMap.end());
+#define ASSERT_NO_KEY_IN_EITHER_MAP(_key)                  \
+    ASSERT_TRUE(stringMap.find(_key) == stringMap.end() && \
+                stringDataMap.find(_key) == stringDataMap.end());
 #define ASSERT_KEY_AND_VALUE(_key, _value) ASSERT_EQUALS(stringMap.at(_key), _value);
+#define ASSERT_KEY_AND_STRINGDATA_VALUE(_key, _value) ASSERT_EQUALS(stringDataMap.at(_key), _value);
 
 #define ASSERT_PARSE_STAT(_keys, _x)                                 \
     BSONObjBuilder builder;                                          \
@@ -130,6 +148,13 @@ bool isPSISupported(StringData filename) {
     BSONObjBuilder builder;                                                         \
     ASSERT_OK(procparser::parseProcSelfMountStatsImpl(x, &builder, &mockGetSpace)); \
     auto obj = builder.obj();
+#define ASSERT_PARSE_SELFSTATUS(_keys, _x)                           \
+    BSONObjBuilder builder;                                          \
+    ASSERT_OK(procparser::parseProcSelfStatus(_keys, _x, &builder)); \
+    auto obj = builder.obj();                                        \
+    StringMap stringMap;                                             \
+    StringDataMap stringDataMap;                                     \
+    setMaps(stringMap, stringDataMap, obj);
 #define ASSERT_PARSE_VMSTAT(_keys, _x)                           \
     BSONObjBuilder builder;                                      \
     ASSERT_OK(procparser::parseProcVMStat(_keys, _x, &builder)); \
@@ -839,6 +864,73 @@ TEST(FTDCProcMountStats, TestLocalMountStats) {
     ASSERT_OK(procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo", &bb));
     auto obj = bb.obj();
     ASSERT(obj.hasElement("/"));
+}
+
+TEST(FTDCProcSelfStatus, TestSelfStatus) {
+    std::vector<StringData> statusKeys{"key1", "key2", "key3", "key4", "key5", "key6"};
+
+    // Generic testing case
+    {
+        ASSERT_PARSE_SELFSTATUS(
+            statusKeys, "key1: a\nKey2: b\nkey3: 12\nkey4: ab cd 1\nkey5: 12 34\n key6: 12345");
+        ASSERT_KEY_AND_STRINGDATA_VALUE("key1", "a");
+        ASSERT_NO_KEY_IN_EITHER_MAP("key2");
+        ASSERT_KEY_AND_VALUE("key3", 12);
+        ASSERT_KEY_AND_STRINGDATA_VALUE("key4", "ab cd 1");
+        ASSERT_KEY_AND_STRINGDATA_VALUE("key5", "12 34");
+        ASSERT_NO_KEY_IN_EITHER_MAP("key6");
+    }
+
+    // No newline
+    {
+        ASSERT_PARSE_SELFSTATUS(statusKeys,
+                                "key1: a Key2: b key3: 12 key4: ab cd 1 key5: 12 34 key6: 12345");
+        ASSERT_KEY_AND_STRINGDATA_VALUE("key1", "a Key2");
+    }
+
+    // Missing colon
+    {
+        ASSERT_PARSE_SELFSTATUS(
+            statusKeys, "key1 a\nKey2: b\nkey3: 12\nkey4: ab cd 1\nkey5: 12 34\n key6: 12345");
+        ASSERT_NO_KEY_IN_EITHER_MAP("key1");
+        ASSERT_NO_KEY_IN_EITHER_MAP("key2");
+        ASSERT_KEY_AND_VALUE("key3", 12);
+        ASSERT_KEY_AND_STRINGDATA_VALUE("key4", "ab cd 1");
+        ASSERT_KEY_AND_STRINGDATA_VALUE("key5", "12 34");
+        ASSERT_NO_KEY_IN_EITHER_MAP("key6");
+    }
+
+    // Empty data string
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(procparser::parseProcSelfStatus(statusKeys, "", &builder));
+    }
+
+    // File does not exist
+    {
+        BSONObjBuilder builder;
+        ASSERT_NOT_OK(
+            procparser::parseProcSelfStatusFile("/proc/self/statuss", statusKeys, &builder));
+    }
+}
+
+// Test we can parse the /proc/self/status on this machine and assert we have some expected fields.
+// Some keys can vary between distros, so we test only for the existence of a few basic ones
+TEST(FTDCProcSelfStatus, TestLocalSelfStatus) {
+    std::vector<StringData> keys{};
+
+    BSONObjBuilder builder;
+
+    ASSERT_OK(procparser::parseProcMemInfoFile("/proc/self/status", keys, &builder));
+
+    BSONObj obj = builder.obj();
+    StringMap stringMap;
+    StringDataMap stringDataMap;
+    setMaps(stringMap, stringDataMap, obj);
+
+    ASSERT_KEY_IN_EITHER_MAP("Threads");
+    ASSERT_KEY_IN_EITHER_MAP("Cpus_allowed");
+    ASSERT_KEY_IN_EITHER_MAP("Mems_allowed");
 }
 
 TEST(FTDCProcVMStat, TestVMStat) {
