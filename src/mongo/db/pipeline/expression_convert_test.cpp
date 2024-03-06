@@ -3449,4 +3449,83 @@ TEST_F(ExpressionConvertShortcutsTest, ThrowsOnConversionFailure) {
 }
 
 }  // namespace ExpressionConvertShortcutsTest
+
+namespace ExpressionConvertSerializationTest {
+
+using ExpressionConvertSerializationTest = AggregationContextFixture;
+
+TEST_F(ExpressionConvertSerializationTest, ConvertToTypeSerializesCorrectly) {
+    auto expCtx = getExpCtx();
+    auto spec = fromjson("{$convert: {input: '$funnyTest', to: 'bool'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$funnyTest', to: {$const: 'bool'}}}")),
+                    convertExp->serialize(SerializationOptions{}));
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$funnyTest', to: {$const: 'bool'}}}")),
+        convertExp->serialize(SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$funnyTest', to: 'bool'}}")),
+                    convertExp->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions));
+}
+
+TEST_F(ExpressionConvertSerializationTest, ConvertToDollarSerializesCorrectly) {
+    auto expCtx = getExpCtx();
+    auto spec = fromjson("{$convert: {input: '$funnyTest', to: {$add: [7, 2]}}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(
+        Value(
+            fromjson("{$convert: {input: '$funnyTest', to: {$add: [{$const: 7}, {$const: 2}]}}}")),
+        convertExp->serialize(SerializationOptions{}));
+
+    ASSERT_VALUE_EQ(
+        Value(
+            fromjson("{$convert: {input: '$funnyTest', to: {$add: [{$const: 1}, {$const: 1}]}}}")),
+        convertExp->serialize(SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$funnyTest', to: {$add: '?array<?number>'}}}")),
+        convertExp->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions));
+}
+
+TEST_F(ExpressionConvertSerializationTest, ToStringSerializesCorrectly) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$toString"
+                     << "$funnyTest");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$funnyTest', to: {$const: 'string'}}}")),
+                    convertExp->serialize(SerializationOptions{}));
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$funnyTest', to: {$const: 'string'}}}")),
+        convertExp->serialize(SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$funnyTest', to: 'string'}}")),
+                    convertExp->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions));
+}
+
+TEST_F(ExpressionConvertSerializationTest, ToBoolSerializesCorrectly) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$toBool"
+                     << "$funnyTest");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$funnyTest', to: {$const: 'bool'}}}")),
+                    convertExp->serialize(SerializationOptions{}));
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$funnyTest', to: {$const: 'bool'}}}")),
+        convertExp->serialize(SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$funnyTest', to: 'bool'}}")),
+                    convertExp->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions));
+}
+
+}  // namespace ExpressionConvertSerializationTest
+
 }  // namespace mongo
