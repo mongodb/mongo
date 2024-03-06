@@ -28,35 +28,35 @@
  */
 
 
-#include <boost/filesystem/operations.hpp>
-#include <cstddef>
-#include <fstream>  // IWYU pragma: keep
-
 #include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/startup_warnings_mongod.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/str.h"
+
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
-
-#include "mongo/db/server_options.h"
-#include "mongo/db/startup_warnings_common.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/transport/session_manager.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -226,7 +226,7 @@ void checkTHPSettings() {
     if (transparentHugePagesEnabledResult.isOK()) {
         StringData thpEnabledValue = transparentHugePagesEnabledResult.getValue();
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
         if (thpEnabledValue != "always") {
             LOGV2_WARNING_OPTIONS(8640300,
                                   {logv2::LogTag::kStartupWarnings},
@@ -235,7 +235,7 @@ void checkTHPSettings() {
                                   "sysfsFile"_attr = thpParameterPath("enabled"),
                                   "currentValue"_attr = thpEnabledValue);
         }
-#else   //  #ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#else   //  #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
         if (thpEnabledValue == "always") {
             LOGV2_WARNING_OPTIONS(22178,
                                   {logv2::LogTag::kStartupWarnings},
@@ -248,7 +248,7 @@ void checkTHPSettings() {
             // need to warn about its features.
             shouldWarnAboutDefrag = false;
         }
-#endif  // #ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#endif  // #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     } else if (transparentHugePagesEnabledResult.getStatus().code() !=
                ErrorCodes::NonExistentPath) {
         LOGV2_WARNING_OPTIONS(22202,
@@ -263,7 +263,7 @@ void checkTHPSettings() {
             StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
         if (transparentHugePagesDefragResult.isOK()) {
             auto defragValue = transparentHugePagesDefragResult.getValue();
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
             if (defragValue != "defer+madvise") {
                 LOGV2_WARNING_OPTIONS(
                     8640301,
@@ -273,7 +273,7 @@ void checkTHPSettings() {
                     "sysfsFile"_attr = thpParameterPath("defrag"),
                     "currentValue"_attr = defragValue);
             }
-#else   // #ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#else   // #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
             if (defragValue == "always") {
                 LOGV2_WARNING_OPTIONS(
                     22181,
@@ -283,7 +283,7 @@ void checkTHPSettings() {
                     "sysfsFile"_attr = thpParameterPath("defrag"),
                     "currentValue"_attr = defragValue);
             }
-#endif  // #ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#endif  // #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
         } else if (transparentHugePagesDefragResult.getStatus().code() !=
                    ErrorCodes::NonExistentPath) {
             LOGV2_WARNING_OPTIONS(22204,
@@ -294,7 +294,7 @@ void checkTHPSettings() {
         }
     }
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     auto maxPtesNonePath = thpParameterPath("khugepaged/max_ptes_none");
     std::fstream f(maxPtesNonePath, ios_base::in);
     unsigned maxPtesNoneValue;
@@ -307,7 +307,7 @@ void checkTHPSettings() {
                               "sysfsFile"_attr = maxPtesNonePath,
                               "currentValue"_attr = maxPtesNoneValue);
     }
-#endif  // MONGO_HAVE_GOOGLE_TCMALLOC
+#endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }
 
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,

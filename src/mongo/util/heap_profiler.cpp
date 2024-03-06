@@ -68,11 +68,11 @@
 
 #include <MurmurHash3.h>
 
-#ifdef MONGO_HAVE_GPERF_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GPERF
 #include <gperftools/malloc_hook.h>
 #endif
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #include <absl/debugging/symbolize.h>
 #include <tcmalloc/malloc_extension.h>
 #endif
@@ -86,7 +86,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) && \
-    (defined(MONGO_HAVE_GPERF_TCMALLOC) || defined(MONGO_HAVE_GOOGLE_TCMALLOC))
+    (defined(MONGO_CONFIG_TCMALLOC_GPERF) || defined(MONGO_CONFIG_TCMALLOC_GOOGLE))
 
 
 namespace mongo {
@@ -347,7 +347,7 @@ public:
         // so that the top frame is the public tc_* function.
         skipStartFrames = 2;
         skipEndFrames = 0;
-#ifdef MONGO_HAVE_GPERF_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GPERF
         MallocHook::AddNewHook(+[](const void* p, size_t sz) { heapProfiler->_alloc(p, sz); });
         MallocHook::AddDeleteHook(+[](const void* p) { heapProfiler->_free(p); });
 #endif
@@ -709,7 +709,7 @@ private:
 }  // namespace heap_profiler_detail_gperf_tcmalloc
 
 namespace heap_profiler_detail_tcmalloc {
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 class HeapProfiler {
 public:
     static const int kMaxImportantSamples = 4 * 3600;  // reset every 4 hours at 1Hz
@@ -874,12 +874,12 @@ private:
 
     int numImportantSamples = 0;  // samples currently included in importantStacks
 };
-#endif  // MONGO_HAVE_GOOGLE_TCMALLOC
+#endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }  // namespace heap_profiler_detail_tcmalloc
 
-#if defined(MONGO_HAVE_GOOGLE_TCMALLOC)
+#if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
 using heap_profiler_detail_tcmalloc::HeapProfiler;
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 using heap_profiler_detail_gperf_tcmalloc::HeapProfiler;
 #endif
 

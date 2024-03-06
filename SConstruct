@@ -5938,6 +5938,11 @@ if env.get('ENABLE_GRPC_BUILD'):
     env.SetConfigHeaderDefine("MONGO_CONFIG_GRPC")
     env.Tool('protobuf_compiler')
 
+if env['MONGO_ALLOCATOR'] == 'tcmalloc-google':
+    env.SetConfigHeaderDefine("MONGO_CONFIG_TCMALLOC_GOOGLE")
+elif env['MONGO_ALLOCATOR'] == 'tcmalloc-gperf':
+    env.SetConfigHeaderDefine("MONGO_CONFIG_TCMALLOC_GPERF")
+
 if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
 
     separate_debug = Tool('separate_debug')

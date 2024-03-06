@@ -174,14 +174,7 @@ env.Library(
     ],
 )
 
-startupEnv = env.Clone()
-
-if startupEnv['MONGO_ALLOCATOR'] == 'tcmalloc-google':
-    startupEnv.Append(CPPDEFINES=['MONGO_HAVE_GOOGLE_TCMALLOC'])
-elif startupEnv['MONGO_ALLOCATOR'] == 'tcmalloc-gperf':
-    startupEnv.Append(CPPDEFINES=['MONGO_HAVE_GPERF_TCMALLOC'])
-
-startupEnv.Library(
+env.Library(
     target='startup_warnings_mongod',
     source=[
         'startup_warnings_mongod.cpp',

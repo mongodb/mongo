@@ -57,9 +57,9 @@
 #include "mongo/util/str.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #include <tcmalloc/malloc_extension.h>
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 #include <gperftools/malloc_extension.h>
 #endif
 
@@ -73,7 +73,7 @@ constexpr absl::string_view toStringView(StringData s) {
 constexpr auto kMaxTotalThreadCacheBytesPropertyName = "tcmalloc.max_total_thread_cache_bytes"_sd;
 constexpr auto kAggressiveMemoryDecommitPropertyName = "tcmalloc.aggressive_memory_decommit"_sd;
 
-#if defined(MONGO_HAVE_GPERF_TCMALLOC)
+#if defined(MONGO_CONFIG_TCMALLOC_GPERF)
 StatusWith<size_t> getProperty(StringData propname) {
     size_t value;
     if (!MallocExtension::instance()->GetNumericProperty(propname.toString().c_str(), &value)) {
@@ -95,15 +95,15 @@ Status setProperty(StringData propname, size_t value) {
 #endif
 
 void setMaxTotalThreadCacheBytes(size_t cacheSize) {
-#if defined(MONGO_HAVE_GOOGLE_TCMALLOC)
+#if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
     tcmalloc::MallocExtension::SetMaxTotalThreadCacheBytes(cacheSize);
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
     uassertStatusOK(setProperty(kMaxTotalThreadCacheBytesPropertyName, cacheSize));
-#endif  // MONGO_HAVE_GPERF_TCMALLOC
+#endif  // MONGO_CONFIG_TCMALLOC_GPERF
 }
 
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 // Implement abstraction for the differences between gperftools and new tcmalloc.
 bool getNumericProperty(absl::string_view key, size_t* val) {
     auto optVal = tcmalloc::MallocExtension::GetNumericProperty(key);
@@ -225,7 +225,7 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptio
 
     setMaxTotalThreadCacheBytes(cacheSize);
 
-#if defined(MONGO_HAVE_GOOGLE_TCMALLOC)
+#if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
     size_t numCores = pi.getNumAvailableCores();
     // 1024MB in bytes spread across cores.
     size_t defaultTcMallocPerCPUCacheSize = (1024 * 1024 * 1024) / numCores;
@@ -236,7 +236,7 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptio
         std::min(defaultTcMallocPerCPUCacheSize, derivedTcMallocPerCPUCacheSize);
 
     tcmalloc::MallocExtension::SetMaxPerCpuCacheSize(perCPUCacheSize);
-#endif  // MONGO_HAVE_GOOGLE_TCMALLOC
+#endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }
 
 }  // namespace
@@ -246,9 +246,9 @@ void TCMallocReleaseRateServerParameter::append(OperationContext*,
                                                 BSONObjBuilder* builder,
                                                 StringData fieldName,
                                                 const boost::optional<TenantId>&) {
-#if defined(MONGO_HAVE_GOOGLE_TCMALLOC)
+#if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
     auto value = getMemoryReleaseRate();
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
     auto value = MallocExtension::instance()->GetMemoryReleaseRate();
 #endif
     builder->append(fieldName, value);
@@ -266,9 +266,9 @@ Status TCMallocReleaseRateServerParameter::setFromString(StringData tcmalloc_rel
                 str::stream() << "tcmallocReleaseRate cannot be negative: "
                               << tcmalloc_release_rate};
     }
-#if defined(MONGO_HAVE_GOOGLE_TCMALLOC)
+#if defined(MONGO_CONFIG_TCMALLOC_GOOGLE)
     setMemoryReleaseRate(value);
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
     MallocExtension::instance()->SetMemoryReleaseRate(value);
 #endif
     return Status::OK();

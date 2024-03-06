@@ -106,3 +106,9 @@
 
 // Defined if grpc support is enabled
 @mongo_config_grpc@
+
+// Defined if using the tcmalloc-google memory allocator
+@mongo_config_tcmalloc_google@
+
+// Defined if using the tcmalloc-gperf memory allocator
+@mongo_config_tcmalloc_gperf@

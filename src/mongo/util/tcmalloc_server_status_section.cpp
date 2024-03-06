@@ -36,12 +36,13 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #include <tcmalloc/malloc_extension.h>
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 #include <gperftools/malloc_extension.h>
 #endif
 
@@ -104,7 +105,7 @@ public:
     virtual void appendCustomDerivedMetrics(BSONObjBuilder& bob) const {}
 };
 
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 class GoogleTCMallocMetrics : public TCMallocMetrics {
 public:
     std::vector<StringData> getGenericStatNames() const override {
@@ -185,7 +186,7 @@ private:
     // need to.
     static inline bool _perCPUCachesActive = false;
 };
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 class GperfTCMallocMetrics : public TCMallocMetrics {
 public:
     std::vector<StringData> getGenericStatNames() const override {
@@ -290,7 +291,7 @@ private:
     }
 #endif  // MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
 };
-#endif  // MONGO_HAVE_GPERF_TCMALLOC
+#endif  // MONGO_CONFIG_TCMALLOC_GPERF
 
 class TCMallocServerStatusSection : public ServerStatusSection {
 public:
@@ -365,9 +366,9 @@ public:
     }
 
 private:
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
     using MyMetrics = GoogleTCMallocMetrics;
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
     using MyMetrics = GperfTCMallocMetrics;
 #else
     using MyMetrics = TCMallocMetrics;

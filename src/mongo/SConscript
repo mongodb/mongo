@@ -76,6 +76,8 @@ config_header_substs = (
     ('@mongo_config_use_raw_latches@', 'MONGO_CONFIG_USE_RAW_LATCHES'),
     ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
     ('@mongo_config_grpc@', 'MONGO_CONFIG_GRPC'),
+    ('@mongo_config_tcmalloc_google@', 'MONGO_CONFIG_TCMALLOC_GOOGLE'),
+    ('@mongo_config_tcmalloc_gperf@', 'MONGO_CONFIG_TCMALLOC_GPERF'),
 )
 
 
