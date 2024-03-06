@@ -389,8 +389,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
     batch->numPreviouslyCommittedMeasurements = 3;
     BSONObj bucketDataDoc =
         preImageCompressionResult.compressedBucket->getObjectField(kBucketDataFieldName).getOwned();
-    batch->intermediateBuilders.initBuilders(bucketDataDoc,
-                                             batch->numPreviouslyCommittedMeasurements);
+    batch->movableState.intermediateBuilders.initBuilders(
+        bucketDataDoc, batch->numPreviouslyCommittedMeasurements);
 
     const BSONObj expectedDiff = fromjson(
         R"({
@@ -461,8 +461,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
     batch->numPreviouslyCommittedMeasurements = 3;
     BSONObj bucketDataDoc =
         preImageCompressionResult.compressedBucket->getObjectField(kBucketDataFieldName).getOwned();
-    batch->intermediateBuilders.initBuilders(bucketDataDoc,
-                                             batch->numPreviouslyCommittedMeasurements);
+    batch->movableState.intermediateBuilders.initBuilders(
+        bucketDataDoc, batch->numPreviouslyCommittedMeasurements);
 
     const BSONObj expectedDiff = fromjson(
         R"({

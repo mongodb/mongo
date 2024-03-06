@@ -74,10 +74,9 @@ Bucket::Bucket(TrackingContext& trackingContext,
       schema(trackingContext),
       batches(
           make_tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(trackingContext)),
-      uncompressedBucketDoc(makeTrackedBson(trackingContext, {})),
       usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
-      intermediateBuilders(trackingContext) {}
+      movableState(trackingContext) {}
 
 Bucket::~Bucket() {
     decrementBucketCountForEra(bucketStateRegistry, lastChecked);

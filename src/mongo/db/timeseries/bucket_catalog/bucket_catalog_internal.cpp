@@ -442,7 +442,8 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         bucket->size = bucketDoc.objsize();
         if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            bucket->uncompressedBucketDoc = makeTrackedBson(catalog.trackingContext, bucketDoc);
+            bucket->movableState.uncompressedBucketDoc =
+                makeTrackedBson(catalog.trackingContext, bucketDoc);
         }
     }
 
@@ -478,7 +479,8 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                 "Bucket data field is malformed (missing a valid time column)"};
     }
 
-    bucket->bucketIsSortedByTime = controlField.getField(kBucketControlVersionFieldName).Number() ==
+    bucket->movableState.bucketIsSortedByTime =
+        controlField.getField(kBucketControlVersionFieldName).Number() ==
             kTimeseriesControlCompressedSortedVersion
         ? true
         : false;
@@ -489,7 +491,8 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Initialize BSONColumnBuilders from the compressed bucket data fields.
-        bucket->intermediateBuilders.initBuilders(dataObj, bucket->numCommittedMeasurements);
+        bucket->movableState.intermediateBuilders.initBuilders(dataObj,
+                                                               bucket->numCommittedMeasurements);
     }
 
     updateStatsOnError.dismiss();

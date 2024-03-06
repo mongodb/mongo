@@ -57,8 +57,7 @@ WriteBatch::WriteBatch(TrackingContext& tc,
       opId(o),
       stats(s),
       timeField(timeField),
-      uncompressedBucketDoc(makeTrackedBson(tc, {})),
-      intermediateBuilders(trackingContext) {}
+      movableState(trackingContext) {}
 
 BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) {
@@ -74,11 +73,11 @@ BSONObj WriteBatch::toBSON() const {
 }
 
 const BSONObj& getUncompressedBucketDoc(const WriteBatch& batch) {
-    return batch.uncompressedBucketDoc.get().get();
+    return batch.movableState.uncompressedBucketDoc.get().get();
 }
 
 void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc) {
-    batch.uncompressedBucketDoc =
+    batch.movableState.uncompressedBucketDoc =
         makeTrackedBson(batch.trackingContext, std::move(uncompressedBucketDoc));
 }
 
