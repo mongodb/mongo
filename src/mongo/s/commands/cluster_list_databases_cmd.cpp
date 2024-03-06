@@ -196,8 +196,11 @@ public:
                     tenantId, sizeEntry.first, cmd.getSerializationContext());
                 const long long size = sizeEntry.second;
 
-                // Skip the local database, since all shards have their own independent local
-                if (dbname.isLocalDB()) {
+                // Unless this is a listDatabases command on the replica set endpoint (of a
+                // single-shard cluster), skip the 'local' database since all shards have their own
+                // independent 'local' database.
+                if (dbname.isLocalDB() &&
+                    (!opCtx->routedByReplicaSetEndpoint() || shardIds.size() > 1)) {
                     continue;
                 }
 
