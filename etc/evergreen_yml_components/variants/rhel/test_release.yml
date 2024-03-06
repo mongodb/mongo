@@ -75,100 +75,15 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
-  - name: .aggfuzzer !.feature_flag_guarded
-  - name: .aggregation !.feature_flag_guarded
-  - name: audit
-  - name: .auth
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  - name: .change_stream_fuzzer
-  - name: .misc_js
-  - name: .concurrency !.large !.no_txns
-  - name: .concurrency .large !.no_txns
-    distros:
-    - rhel80-medium
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: idl_tests
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: .jstestfuzz !.feature_flag_guarded !.flow_control  # Flow control jstestfuzz take longer.
-  - name: libunwind_tests
-  - name: .multi_shard
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion_gen
-  - name: .query_fuzzer !.feature_flag_guarded
-  - name: .random_multiversion_ds
-  - name: .read_write_concern .large
-    distros:
-    - rhel80-medium
-  - name: .read_write_concern !.large
-  - name: .replica_sets !.encrypt !.auth
-    distros:
-    - rhel80-medium
-  - name: replica_sets_api_version_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: .resharding_fuzzer
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-  - name: sharding_api_version_jscore_passthrough_gen
-  - name: .sharding .txns
-  - name: .sharding .common !.feature_flag_guarded
-  - name: .stitch
-  - name: .crypt
-    distros:
-    - rhel80-large
-  - name: .publish_crypt
-  - name: .updatefuzzer
-  - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
-    distros:
-    - rhel80-large
-  - name: server_selection_json_test_TG
+  - name: crypt_build
     distros:
     - rhel80-large
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
   - name: selinux_rhel8_enterprise
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: rhel-82-arm64
   display_name: RHEL 8.2 arm64
@@ -200,31 +115,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel82-arm64-large
-  - name: aggregation !.feature_flag_guarded
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-    distros:
-    - rhel82-arm64-large
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .jscore .common
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  - name: .ssl
-  - name: .stitch
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .timeseries_crud
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
 
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
@@ -259,40 +154,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel82-arm64-large
-  - name: .aggfuzzer !.multiversion !.feature_flag_guarded
-  - name: audit
-  - name: auth_audit_gen
-  - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .replica_sets .multi_oplog
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: sharding_auth_audit_gen
-  - name: .stitch
-  - name: .crypt
+  - name: crypt_build
     distros:
     - rhel82-arm64-large
-  - name: .timeseries_crud
-  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: rhel90
   display_name: RHEL 9.0
@@ -326,32 +195,12 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-build
-  - name: aggregation !.feature_flag_guarded
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-    distros:
-    - rhel90-build
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .jscore .common
-  - name: .jstestfuzz .common !.multiversion !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  - name: .ssl
-  - name: .stitch
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
   - name: selinux_rhel9_org
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
 
 - name: enterprise-rhel-90-64-bit
   display_name: "Enterprise RHEL 9.0"
@@ -384,46 +233,13 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel90-large
-  - name: .aggfuzzer !.feature_flag_guarded !.multiversion
-  - name: audit
-  - name: auth_audit_gen
-  - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .config_fuzzer !.large
-  - name: .config_fuzzer .large
-    distros:
-    - rhel90-large
-  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: libunwind_tests
-  - name: .ocsp
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .replica_sets .multi_oplog
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: sharding_auth_audit_gen
-  - name: .stitch
-  - name: .crypt
-  - name: .publish_crypt
-  - name: unittest_shell_hang_analyzer_gen
+  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .timeseries_crud
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
   - name: selinux_rhel9_enterprise
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: rhel90-arm64
   display_name: RHEL 9.0 arm64
@@ -455,31 +271,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-arm64-large
-  - name: aggregation
-  - name: .auth !.audit !.multiversion
-  - name: sharding_auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-    distros:
-    - rhel90-arm64-large
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .jscore .common
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  - name: .ssl
-  - name: .stitch
   - name: test_packages
     distros:
     - ubuntu2204-arm64-small
-  - name: .timeseries_crud
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical !.incompatible_community
+  - name: .release_critical !.incompatible_community
 
 - name: enterprise-rhel-90-arm64
   display_name: "Enterprise RHEL 9.0 arm64"
@@ -515,41 +311,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-arm64-large
-  - name: .aggfuzzer !.feature_flag_guarded !.multiversion
-  - name: audit
-  - name: auth_audit_gen
-  - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common !.feature_flag_guarded
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .replica_sets .multi_oplog
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: sharding_auth_audit_gen
-  - name: sharding_auth_gen
-  - name: .stitch
-  - name: .crypt
+  - name: crypt_build
     distros:
     - rhel90-arm64-large
-  - name: .timeseries_crud
-  - name: .publish_crypt
   - name: test_packages
     distros:
     - ubuntu2204-arm64-small
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical
 
 - name: enterprise-rhel-82-arm64-grpc
   display_name: "Enterprise RHEL 8.2 arm64 GRPC"
