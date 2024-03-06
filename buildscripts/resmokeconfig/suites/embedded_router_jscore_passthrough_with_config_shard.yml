@@ -41,9 +41,6 @@ selector:
   # TODO SERVER-77578: Enable authentication testing.
   - jstests/core/**/*[aA]uth*.js
 
-  # TODO (SERVER-84184): Investigate why _flushRoutingTableCacheUpdates fails
-  - jstests/core/commands_namespace_parsing.js
-
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
