@@ -613,17 +613,6 @@ functions:
       prefix: ${task_id}_${execution}
       file: src/cedar_report.json
 
-  "analyze benchmark results":
-  - *f_expansions_write
-  - *configure_evergreen_api_credentials
-  - command: subprocess.exec
-    display_name: "benchmark results analyze"
-    type: test
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/functions/benchmark_results_analyze.sh"
-
   "cleanup environment": &cleanup_environment
     command: subprocess.exec
     display_name: "cleanup environment"

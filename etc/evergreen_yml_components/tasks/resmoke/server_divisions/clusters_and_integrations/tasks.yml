@@ -59,7 +59,6 @@ variables:
       resmoke_args: --help
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-#  - func: "analyze benchmark results"
     vars:
       suite: benchmark_suite
 
@@ -1025,7 +1024,6 @@ tasks:
       suite: benchmarks_sharding
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-#  - func: "analyze benchmark results"
 
 - <<: *benchmark_template
   name: benchmarks_bsoncolumn

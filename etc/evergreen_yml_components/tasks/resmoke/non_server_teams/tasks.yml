@@ -78,7 +78,6 @@ variables:
       resmoke_args: --help
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-#  - func: "analyze benchmark results"
     vars:
       suite: benchmark_suite
 
