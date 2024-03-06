@@ -840,7 +840,6 @@ tasks:
         params:
           directory: src
           revisions:
-            enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep old"
       - func: "compile mongo tools old"
@@ -860,7 +859,6 @@ tasks:
         params:
           directory: src
           revisions:
-            enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "compile mongo tools"
@@ -877,8 +875,6 @@ tasks:
       - command: git.get_project
         params:
           directory: src
-          revisions:
-            enterprise: ${enterprise_rev}
       - func: "compile prep"
       - func: "compile mongocrypt shlib"
 
