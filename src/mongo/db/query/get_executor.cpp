@@ -1277,8 +1277,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         const auto& mainColl = collections.getMainCollection();
         const auto& canonicalQueryRef = *canonicalQuery.get();
         if (isExpressEligible(opCtx, mainColl, canonicalQueryRef)) {
-            plannerParams.fillOutPlannerParams(
-                opCtx, canonicalQueryRef, collections, true /* ignoreQuerySettings */);
+            QueryPlannerParams expressPlannerParams(QueryPlannerParams::ArgsForExpress{
+                opCtx, canonicalQueryRef, collections, plannerParams.options});
             PlanExecutor::Deleter planExDeleter(opCtx);
             boost::optional<ScopedCollectionFilter> collFilter = boost::none;
             VariantCollectionPtrOrAcquisition collOrAcq =
@@ -1286,7 +1286,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
             planCacheCounters.incrementClassicSkippedCounter();
 
-            if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            if (expressPlannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
                 collFilter = collOrAcq.getShardingFilter(opCtx);
                 invariant(
                     collFilter,
@@ -1294,8 +1294,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                     "the collection");
             }
 
-            bool isClusteredOnId = plannerParams.clusteredInfo
-                ? clustered_util::isClusteredOnId(plannerParams.clusteredInfo)
+            bool isClusteredOnId = expressPlannerParams.clusteredInfo
+                ? clustered_util::isClusteredOnId(expressPlannerParams.clusteredInfo)
                 : false;
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(
                 new PlanExecutorExpress(
@@ -2337,14 +2337,4 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
         opCtx, &yieldableCollection, yieldPolicy, direction, resumeAfterRecordId);
 }
 
-bool isExpressEligible(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const CanonicalQuery& cq) {
-    auto findCommandReq = cq.getFindCommandRequest();
-    return (coll && (cq.getProj() == nullptr || cq.getProj()->isSimple()) &&
-            isIdHackEligibleQuery(coll, findCommandReq, cq.getExpCtx()->getCollator()) &&
-            !findCommandReq.getReturnKey() && !findCommandReq.getBatchSize() &&
-            (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
-             clustered_util::isClusteredOnId(coll->getClusteredInfo())));
-}
 }  // namespace mongo

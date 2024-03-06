@@ -67,20 +67,6 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern) {
     return false;
 }
 
-bool isIdHackEligibleQuery(const CollectionPtr& collection,
-                           const FindCommandRequest& findCommand,
-                           const CollatorInterface* queryCollator) {
-    return isIdHackEligibleQueryWithoutCollator(findCommand) &&
-        CollatorInterface::collatorsMatch(queryCollator, collection->getDefaultCollator());
-}
-
-bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand) {
-    return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
-        findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
-        !findCommand.getSkip() && CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) &&
-        !findCommand.getTailable();
-}
-
 bool isSortSbeCompatible(const SortPattern& sortPattern) {
     // If the sort has meta or numeric path components, we cannot use SBE.
     return std::all_of(sortPattern.begin(), sortPattern.end(), [](auto&& part) {

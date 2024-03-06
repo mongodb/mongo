@@ -41,6 +41,7 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 
 namespace mongo {
 
@@ -177,6 +178,17 @@ struct QueryPlannerParams {
         bool ignoreQuerySettings;
     };
 
+    /**
+     * Struct containing all the arguments that are required for QueryPlannerParams initialization
+     * for express commands.
+     */
+    struct ArgsForExpress {
+        OperationContext* opCtx;
+        const CanonicalQuery& canonicalQuery;
+        const MultipleCollectionAccessor& collections;
+        size_t plannerOptions;
+    };
+
     QueryPlannerParams(size_t options = DEFAULT) : options(options) {}
 
     /**
@@ -184,6 +196,14 @@ struct QueryPlannerParams {
      * index filters.
      */
     explicit QueryPlannerParams(const ArgsForDistinct& args);
+
+    /**
+     * Initializes query planner parameters by filling collection info and shard filter.
+     */
+    explicit QueryPlannerParams(const ArgsForExpress& args) : options(args.plannerOptions) {
+        fillOutPlannerParamsForExpressQuery(
+            args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
+    }
 
     /**
      * Fills planner parameters for main and secondary collections as well as applies query
@@ -246,6 +266,41 @@ struct QueryPlannerParams {
     bool querySettingsApplied{false};
 
 private:
+    MONGO_COMPILER_ALWAYS_INLINE
+    void fillOutPlannerParamsForExpressQuery(OperationContext* opCtx,
+                                             const CanonicalQuery& canonicalQuery,
+                                             const CollectionPtr& collection) {
+        // If the caller wants a shard filter, make sure we're actually sharded.
+        if (options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            if (collection.isSharded_DEPRECATED()) {
+                const auto& shardKeyPattern = collection.getShardKeyPattern();
+
+                // If the shard key is specified exactly, the query is guaranteed to only target one
+                // shard. Shards cannot own orphans for the key ranges they own, so there is no need
+                // to include a shard filtering stage. By omitting the shard filter, it may be
+                // possible to get a more efficient plan (for example, a COUNT_SCAN may be used if
+                // the query is eligible).
+                const BSONObj extractedKey =
+                    extractShardKeyFromQuery(shardKeyPattern, canonicalQuery);
+
+                if (extractedKey.isEmpty()) {
+                    shardKey = shardKeyPattern.toBSON();
+                } else {
+                    options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+                }
+            } else {
+                // If there's no metadata don't bother w/the shard filter since we won't know what
+                // the key pattern is anyway...
+                options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+        }
+
+        if (collection->isClustered()) {
+            clusteredInfo = collection->getClusteredInfo();
+            clusteredCollectionCollator = collection->getDefaultCollator();
+        }
+    }
+
     /**
      * Fills planner parameters for the secondary collections.
      */

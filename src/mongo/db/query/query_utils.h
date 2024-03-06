@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -42,17 +43,37 @@ namespace mongo {
 bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
 
 /**
- * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
- */
-bool isIdHackEligibleQuery(const CollectionPtr& collection,
-                           const FindCommandRequest& findCommand,
-                           const CollatorInterface* queryCollator);
-
-/**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,
  * without taking into account the collators.
  */
-bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& query);
+inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand) {
+    return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
+        findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
+        !findCommand.getSkip() && CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) &&
+        !findCommand.getTailable();
+}
+
+/**
+ * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
+ */
+inline bool isIdHackEligibleQuery(const CollectionPtr& collection,
+                                  const FindCommandRequest& findCommand,
+                                  const CollatorInterface* queryCollator) {
+
+    return isIdHackEligibleQueryWithoutCollator(findCommand) &&
+        CollatorInterface::collatorsMatch(queryCollator, collection->getDefaultCollator());
+}
+
+inline bool isExpressEligible(OperationContext* opCtx,
+                              const CollectionPtr& coll,
+                              const CanonicalQuery& cq) {
+    const auto& findCommandReq = cq.getFindCommandRequest();
+    return (coll && (cq.getProj() == nullptr || cq.getProj()->isSimple()) &&
+            isIdHackEligibleQuery(coll, findCommandReq, cq.getExpCtx()->getCollator()) &&
+            !findCommandReq.getReturnKey() && !findCommandReq.getBatchSize() &&
+            (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
+             clustered_util::isClusteredOnId(coll->getClusteredInfo())));
+}
 
 bool isSortSbeCompatible(const SortPattern& sortPattern);
 

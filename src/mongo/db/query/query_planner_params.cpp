@@ -40,7 +40,6 @@
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -518,6 +517,9 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
 void QueryPlannerParams::fillOutMainCollectionPlannerParams(OperationContext* opCtx,
                                                             const CanonicalQuery& canonicalQuery,
                                                             const CollectionPtr& collection) {
+
+    fillOutPlannerParamsForExpressQuery(opCtx, canonicalQuery, collection);
+
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
     // solutions.
@@ -528,30 +530,6 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(OperationContext* op
             canonicalQuery.getQueryObj().isEmpty() || nss.isSystem() || nss.isOnInternalDb();
         if (!ignore) {
             options |= QueryPlannerParams::NO_TABLE_SCAN;
-        }
-    }
-
-    // If the caller wants a shard filter, make sure we're actually sharded.
-    if (options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        if (collection.isSharded_DEPRECATED()) {
-            const auto& shardKeyPattern = collection.getShardKeyPattern();
-
-            // If the shard key is specified exactly, the query is guaranteed to only target one
-            // shard. Shards cannot own orphans for the key ranges they own, so there is no need
-            // to include a shard filtering stage. By omitting the shard filter, it may be possible
-            // to get a more efficient plan (for example, a COUNT_SCAN may be used if the query is
-            // eligible).
-            const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, canonicalQuery);
-
-            if (extractedKey.isEmpty()) {
-                shardKey = shardKeyPattern.toBSON();
-            } else {
-                options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-        } else {
-            // If there's no metadata don't bother w/the shard filter since we won't know what
-            // the key pattern is anyway...
-            options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
         }
     }
 
@@ -570,11 +548,6 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(OperationContext* op
     if (shouldWaitForOplogVisibility(
             opCtx, collection, canonicalQuery.getFindCommandRequest().getTailable())) {
         options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
-    }
-
-    if (collection->isClustered()) {
-        clusteredInfo = collection->getClusteredInfo();
-        clusteredCollectionCollator = collection->getDefaultCollator();
     }
 
     // _id queries can skip checking the catalog for indices since they will always use the _id
