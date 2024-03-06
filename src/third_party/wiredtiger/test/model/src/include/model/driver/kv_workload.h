@@ -57,6 +57,26 @@ struct begin_transaction {
      *     Create the operation.
      */
     inline begin_transaction(txn_id_t txn_id) : txn_id(txn_id) {}
+
+    /*
+     * begin_transaction::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const begin_transaction &other) const noexcept
+    {
+        return txn_id == other.txn_id;
+    }
+
+    /*
+     * begin_transaction::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const begin_transaction &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -82,6 +102,26 @@ struct checkpoint {
      *     Create the operation.
      */
     inline checkpoint(const char *name = nullptr) : name(name == nullptr ? "" : name) {}
+
+    /*
+     * checkpoint::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const checkpoint &other) const noexcept
+    {
+        return name == other.name;
+    }
+
+    /*
+     * begin_transaction::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const checkpoint &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -113,6 +153,27 @@ struct commit_transaction {
         : txn_id(txn_id), commit_timestamp(commit_timestamp), durable_timestamp(durable_timestamp)
     {
     }
+
+    /*
+     * commit_transaction::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const commit_transaction &other) const noexcept
+    {
+        return txn_id == other.txn_id && commit_timestamp == other.commit_timestamp &&
+          durable_timestamp == other.durable_timestamp;
+    }
+
+    /*
+     * commit_transaction::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const commit_transaction &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -138,6 +199,26 @@ struct crash {
      *     Create the operation.
      */
     inline crash() {}
+
+    /*
+     * crash::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const crash &other) const noexcept
+    {
+        return true;
+    }
+
+    /*
+     * crash::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const crash &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -169,6 +250,27 @@ struct create_table {
       table_id_t table_id, const char *name, const char *key_format, const char *value_format)
         : table_id(table_id), name(name), key_format(key_format), value_format(value_format)
     {
+    }
+
+    /*
+     * create_table::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const create_table &other) const noexcept
+    {
+        return table_id == other.table_id && name == other.name && key_format == other.key_format &&
+          value_format == other.value_format;
+    }
+
+    /*
+     * create_table::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const create_table &other) const noexcept
+    {
+        return !(*this == other);
     }
 };
 
@@ -203,6 +305,27 @@ struct insert {
         : table_id(table_id), txn_id(txn_id), key(key), value(value)
     {
     }
+
+    /*
+     * insert::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const insert &other) const noexcept
+    {
+        return table_id == other.table_id && txn_id == other.txn_id && key == other.key &&
+          value == other.value;
+    }
+
+    /*
+     * insert::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const insert &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -232,6 +355,26 @@ struct prepare_transaction {
     inline prepare_transaction(txn_id_t txn_id, timestamp_t prepare_timestamp)
         : txn_id(txn_id), prepare_timestamp(prepare_timestamp)
     {
+    }
+
+    /*
+     * prepare_transaction::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const prepare_transaction &other) const noexcept
+    {
+        return txn_id == other.txn_id && prepare_timestamp == other.prepare_timestamp;
+    }
+
+    /*
+     * prepare_transaction::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const prepare_transaction &other) const noexcept
+    {
+        return !(*this == other);
     }
 };
 
@@ -263,6 +406,26 @@ struct remove {
         : table_id(table_id), txn_id(txn_id), key(key)
     {
     }
+
+    /*
+     * remove::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const remove &other) const noexcept
+    {
+        return table_id == other.table_id && txn_id == other.txn_id && key == other.key;
+    }
+
+    /*
+     * remove::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const remove &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -287,6 +450,26 @@ struct restart {
      *     Create the operation.
      */
     inline restart() {}
+
+    /*
+     * restart::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const restart &other) const noexcept
+    {
+        return true;
+    }
+
+    /*
+     * restart::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const restart &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -311,6 +494,26 @@ struct rollback_to_stable {
      *     Create the operation.
      */
     inline rollback_to_stable() {}
+
+    /*
+     * rollback_to_stable::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const rollback_to_stable &other) const noexcept
+    {
+        return true;
+    }
+
+    /*
+     * rollback_to_stable::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const rollback_to_stable &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -336,6 +539,26 @@ struct rollback_transaction {
      *     Create the operation.
      */
     inline rollback_transaction(txn_id_t txn_id) : txn_id(txn_id) {}
+
+    /*
+     * rollback_transaction::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const rollback_transaction &other) const noexcept
+    {
+        return txn_id == other.txn_id;
+    }
+
+    /*
+     * rollback_transaction::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const rollback_transaction &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -365,6 +588,26 @@ struct set_commit_timestamp {
         : txn_id(txn_id), commit_timestamp(commit_timestamp)
     {
     }
+
+    /*
+     * set_commit_timestamp::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const set_commit_timestamp &other) const noexcept
+    {
+        return txn_id == other.txn_id && commit_timestamp == other.commit_timestamp;
+    }
+
+    /*
+     * set_commit_timestamp::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const set_commit_timestamp &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -391,6 +634,26 @@ struct set_stable_timestamp {
      */
     inline set_stable_timestamp(timestamp_t stable_timestamp) : stable_timestamp(stable_timestamp)
     {
+    }
+
+    /*
+     * set_stable_timestamp::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const set_stable_timestamp &other) const noexcept
+    {
+        return stable_timestamp == other.stable_timestamp;
+    }
+
+    /*
+     * set_stable_timestamp::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const set_stable_timestamp &other) const noexcept
+    {
+        return !(*this == other);
     }
 };
 
@@ -424,6 +687,27 @@ struct truncate {
         : table_id(table_id), txn_id(txn_id), start(start), stop(stop)
     {
     }
+
+    /*
+     * truncate::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const truncate &other) const noexcept
+    {
+        return table_id == other.table_id && txn_id == other.txn_id && start == other.start &&
+          stop == other.stop;
+    }
+
+    /*
+     * truncate::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const truncate &other) const noexcept
+    {
+        return !(*this == other);
+    }
 };
 
 /*
@@ -455,6 +739,22 @@ operator<<(std::ostream &out, const any &op)
 {
     std::visit([&out](auto &&x) { out << x; }, op);
     return out;
+}
+
+/*
+ * parse --
+ *     Parse an operation from a string. Throw an exception on error.
+ */
+any parse(const char *str);
+
+/*
+ * parse --
+ *     Parse an operation from a string. Throw an exception on error.
+ */
+inline any
+parse(const std::string &str)
+{
+    return parse(str.c_str());
 }
 
 } /* namespace operation */

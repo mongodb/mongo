@@ -301,6 +301,72 @@ test_workload_generator(void)
 }
 
 /*
+ * test_workload_parse --
+ *     Test the workload parser.
+ */
+static void
+test_workload_parse(void)
+{
+    model::kv_workload workload;
+
+    /* The workload parser currently supports only unsigned numbers for keys and values. */
+    workload << model::operation::create_table(k_table1_id, "table1", "Q", "Q")
+             << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
+             << model::operation::insert(
+                  k_table1_id, 1, model::data_value((uint64_t)1), model::data_value((uint64_t)1))
+             << model::operation::insert(
+                  k_table1_id, 2, model::data_value((uint64_t)2), model::data_value((uint64_t)2))
+             << model::operation::prepare_transaction(1, 10)
+             << model::operation::prepare_transaction(2, 15)
+             << model::operation::commit_transaction(1, 20, 21)
+             << model::operation::rollback_transaction(2)
+             << model::operation::set_stable_timestamp(22) << model::operation::begin_transaction(1)
+             << model::operation::remove(k_table1_id, 1, model::data_value((uint64_t)1))
+             << model::operation::checkpoint() << model::operation::crash()
+             << model::operation::begin_transaction(1)
+             << model::operation::insert(
+                  k_table1_id, 1, model::data_value((uint64_t)3), model::data_value((uint64_t)3))
+             << model::operation::truncate(
+                  k_table1_id, 2, model::data_value((uint64_t)1), model::data_value((uint64_t)2))
+             << model::operation::prepare_transaction(1, 23)
+             << model::operation::commit_transaction(1, 24, 25)
+             << model::operation::set_stable_timestamp(25) << model::operation::rollback_to_stable()
+             << model::operation::restart();
+
+    /* Convert to string, parse, and compare each operation. */
+    for (size_t i = 0; i < workload.size(); i++) {
+        std::stringstream ss;
+        ss << workload[i];
+        model::operation::any op = model::operation::parse(ss.str());
+        testutil_assert(workload[i] == op);
+    }
+
+    /* Additional tests for different allowed parsing behaviors. */
+    testutil_assert(model::operation::parse("create_table(1, table1, Q, Q)") ==
+      model::operation::any(model::operation::create_table(1, "table1", "Q", "Q")));
+    testutil_assert(model::operation::parse("create_table(1, \"table1\", \"Q\", \"Q\")") ==
+      model::operation::any(model::operation::create_table(1, "table1", "Q", "Q")));
+    testutil_assert(model::operation::parse("create_table   (   0x1,table1, \"Q\",  Q      )  ") ==
+      model::operation::any(model::operation::create_table(1, "table1", "Q", "Q")));
+    testutil_assert(model::operation::parse("create_table(1, \"table\\\" \\\\\", \"Q\", \"\")") ==
+      model::operation::any(model::operation::create_table(1, "table\" \\", "Q", "")));
+    testutil_assert(model::operation::parse("create_table\t\n(0x1 ,\"table\" \"1\", \"Q\", S )") ==
+      model::operation::any(model::operation::create_table(1, "table1", "Q", "S")));
+
+    /* Test optional arguments. */
+    testutil_assert(model::operation::parse("checkpoint()") ==
+      model::operation::any(model::operation::checkpoint()));
+    testutil_assert(model::operation::parse("checkpoint(\"test\")") ==
+      model::operation::any(model::operation::checkpoint("test")));
+    testutil_assert(model::operation::parse("commit_transaction(1)") ==
+      model::operation::any(model::operation::commit_transaction(1)));
+    testutil_assert(model::operation::parse("commit_transaction(1, 2)") ==
+      model::operation::any(model::operation::commit_transaction(1, 2)));
+    testutil_assert(model::operation::parse("commit_transaction(1, 2, 3)") ==
+      model::operation::any(model::operation::commit_transaction(1, 2, 3)));
+}
+
+/*
  * usage --
  *     Print usage help for the program.
  */
@@ -355,6 +421,7 @@ main(int argc, char *argv[])
         test_workload_restart();
         test_workload_crash();
         test_workload_generator();
+        test_workload_parse();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;
         ret = EXIT_FAILURE;

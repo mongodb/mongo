@@ -213,6 +213,38 @@ load_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
 }
 
 /*
+ * load_workload --
+ *     Load the workload from file. Throw an exception on error.
+ */
+static std::shared_ptr<model::kv_workload>
+load_workload(const char *file)
+{
+    std::ifstream f(file);
+    if (!f.is_open())
+        throw std::runtime_error("Cannot open the file");
+
+    std::shared_ptr<model::kv_workload> workload = std::make_shared<model::kv_workload>();
+    std::string line;
+    size_t line_no = 0;
+    while (std::getline(f, line)) {
+        line_no++;
+        line = trim(line);
+        if (line.empty() || line[0] == '#')
+            continue;
+        try {
+            *workload.get() << model::operation::parse(line.c_str());
+        } catch (std::exception &e) {
+            throw std::runtime_error("Error on line " + std::to_string(line_no) + ": " + e.what());
+        }
+    }
+    if (!f.eof() && !f.good())
+        throw std::runtime_error("Cannot read from the file");
+
+    f.close();
+    return workload;
+}
+
+/*
  * usage --
  *     Print usage help for the program. (Don't exit.)
  */
@@ -233,6 +265,7 @@ usage(const char *progname)
     fprintf(stderr, "  -S SEED    specify the random number generator's seed\n");
     fprintf(stderr, "  -T CONFIG  specify WiredTiger's table configuration\n");
     fprintf(stderr, "  -t N       repeat the test for at least this number of seconds\n");
+    fprintf(stderr, "  -w FILE    load an existing workload from a file\n");
     fprintf(stderr, "  -?         show this message\n");
 }
 
@@ -253,6 +286,7 @@ main(int argc, char *argv[])
     bool print_only = false;
     const char *progname = argv[0];
 
+    std::vector<std::string> workload_files;
     std::string conn_config = ENV_CONFIG_BASE;
     std::string table_config = TABLE_CONFIG_BASE;
 
@@ -264,7 +298,7 @@ main(int argc, char *argv[])
         int ch;
 
         __wt_optwt = 1;
-        while ((ch = __wt_getopt(progname, argc, argv, "C:G:h:I:i:l:M:npS:T:t:?")) != EOF)
+        while ((ch = __wt_getopt(progname, argc, argv, "C:G:h:I:i:l:M:npS:T:t:w:?")) != EOF)
             switch (ch) {
             case 'C':
                 conn_config += ",";
@@ -315,6 +349,9 @@ main(int argc, char *argv[])
             case '?':
                 usage(progname);
                 return EXIT_SUCCESS;
+            case 'w':
+                workload_files.push_back(__wt_optarg);
+                break;
             default:
                 usage(progname);
                 return EXIT_FAILURE;
@@ -329,44 +366,78 @@ main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    /* Run the test, potentially many times. */
     double start_time = current_time();
-    for (uint64_t iteration = 1;; iteration++) {
-        uint64_t seed = base_seed + iteration - 1;
-        std::cout << "Iteration " << iteration << ", seed 0x" << std::hex << seed << std::dec
-                  << std::endl;
 
-        /* Generate the workload. */
-        std::shared_ptr<model::kv_workload> workload;
-        try {
-            workload = model::kv_workload_generator::generate(spec, seed);
-        } catch (std::exception &e) {
-            std::cerr << "Failed to generate the workload: " << e.what() << std::endl;
-            return EXIT_FAILURE;
+    /* If the user specified a workload file, use that instead of the workload generator. */
+    if (!workload_files.empty())
+        for (std::string &file : workload_files) {
+            std::cout << "Running workload from file: " << file << std::endl;
+
+            /* Load the workload. */
+            std::shared_ptr<model::kv_workload> workload;
+            try {
+                workload = load_workload(file.c_str());
+            } catch (std::exception &e) {
+                std::cerr << "Failed to load workload from file " << file << ": " << e.what()
+                          << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            /* If we only want to print the workload, then do so. */
+            if (print_only) {
+                std::cout << *workload.get();
+                continue;
+            }
+
+            /* Clean up the previous database directory, if it exists. */
+            testutil_remove(home.c_str());
+
+            /* Run and verify the workload. */
+            try {
+                run_and_verify(workload, home, conn_config, table_config);
+            } catch (std::exception &e) {
+                std::cerr << e.what() << std::endl;
+                return EXIT_FAILURE;
+            }
         }
+    else
+        /* Run the test, potentially many times. */
+        for (uint64_t iteration = 1;; iteration++) {
+            uint64_t seed = base_seed + iteration - 1;
+            std::cout << "Iteration " << iteration << ", seed 0x" << std::hex << seed << std::dec
+                      << std::endl;
 
-        /* If we only want to print the workload, then do so. */
-        if (print_only) {
-            std::cout << *workload.get();
-            break;
+            /* Generate the workload. */
+            std::shared_ptr<model::kv_workload> workload;
+            try {
+                workload = model::kv_workload_generator::generate(spec, seed);
+            } catch (std::exception &e) {
+                std::cerr << "Failed to generate the workload: " << e.what() << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            /* If we only want to print the workload, then do so. */
+            if (print_only) {
+                std::cout << *workload.get();
+                break;
+            }
+
+            /* Clean up the previous database directory, if it exists. */
+            testutil_remove(home.c_str());
+
+            /* Run and verify the workload. */
+            try {
+                run_and_verify(workload, home, conn_config, table_config);
+            } catch (std::exception &e) {
+                std::cerr << e.what() << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            /* Check the test exit conditions. */
+            double total_time = current_time() - start_time;
+            if (total_time >= min_runtime_s && iteration >= min_iterations)
+                break;
         }
-
-        /* Clean up the previous database directory, if it exists. */
-        testutil_remove(home.c_str());
-
-        /* Run and verify the workload. */
-        try {
-            run_and_verify(workload, home, conn_config, table_config);
-        } catch (std::exception &e) {
-            std::cerr << e.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        /* Check the test exit conditions. */
-        double total_time = current_time() - start_time;
-        if (total_time >= min_runtime_s && iteration >= min_iterations)
-            break;
-    }
 
     /* Clean up the database directory. */
     if (!preserve)

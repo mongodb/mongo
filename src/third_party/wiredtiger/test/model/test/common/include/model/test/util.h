@@ -31,6 +31,7 @@
 #include <string>
 #include <utility>
 #include "model/driver/kv_workload.h"
+#include "model/util.h"
 
 extern "C" {
 #include "test_util.h"
@@ -65,7 +66,12 @@ double current_time();
  * parse_uint64 --
  *     Parse the string into a number. Throw an exception on error.
  */
-uint64_t parse_uint64(const char *str, char **end = nullptr);
+inline uint64_t
+parse_uint64(const char *str, char **end = nullptr)
+{
+    /* Convenience function, at least until we refactor these utilities. */
+    return model::parse_uint64(str, end);
+}
 
 /*
  * parse_uint64_range --

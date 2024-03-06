@@ -429,6 +429,22 @@ private:
 };
 
 /*
+ * parse_uint64 --
+ *     Parse the string into a number. Throw an exception on error.
+ */
+uint64_t parse_uint64(const char *str, char **end = nullptr);
+
+/*
+ * parse_uint64 --
+ *     Parse the string into a number. Throw an exception on error.
+ */
+inline uint64_t
+parse_uint64(const std::string &str)
+{
+    return parse_uint64(str.c_str());
+}
+
+/*
  * starts_with --
  *     Check whether the string has the given prefix. (C++ does not have this until C++20.)
  */

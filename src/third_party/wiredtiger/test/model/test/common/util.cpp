@@ -83,26 +83,6 @@ current_time()
 }
 
 /*
- * parse_uint64 --
- *     Parse the string into a number. Throw an exception on error.
- */
-uint64_t
-parse_uint64(const char *str, char **end)
-{
-    if (str == nullptr || str[0] == '\0')
-        throw std::runtime_error("Cannot parse a number");
-
-    char *p = nullptr;
-    uint64_t r = (uint64_t)strtoull(str, &p, 0 /* automatically detect "0x" for hex numbers */);
-    if (end != nullptr)
-        *end = p;
-    if (str == p || (end == nullptr && p[0] != '\0'))
-        throw std::runtime_error("Cannot parse a number");
-
-    return r;
-}
-
-/*
  * parse_uint64_range --
  *     Parse the string into a range of numbers (two numbers separated by '-'). Throw an exception
  *     on error.
