@@ -84,7 +84,8 @@ TEST_F(InternalSearchMongotRemoteTest, RedactsCorrectly) {
             "$_internalSearchMongotRemote": {
                 "mongotQuery": "?object",
                 "metadataMergeProtocolVersion": "?number",
-                "limit": "?number"
+                "limit": "?number",
+                "requiresSearchMetaCursor": "?bool"
             }
         })",
         redact(*mongotRemoteStage));
@@ -117,6 +118,7 @@ TEST_F(InternalSearchMongotRemoteTest, RedactsCorrectlyWithMergingPipeline) {
                 "mongotQuery": "?object",
                 "metadataMergeProtocolVersion": "?number",
                 "limit": "?number",
+                "requiresSearchMetaCursor": "?bool",
                 "mergingPipeline": [
                     {
                         "$group": {

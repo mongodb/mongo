@@ -136,9 +136,12 @@ void prepareSearchForNestedPipeline(Pipeline* pipeline);
  * aggregation command to generate metadata results. Either returns the additional pipeline
  * or nullptr if no pipeline is necessary.
  *
+ * Also retrieves search cursors from mongot and attaches them to their relevant search and metadata
+ * stages.
+ *
  * This can modify the passed in pipeline but does not take ownership of it.
  */
-std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
+std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineAndAttachCursorsForSearch(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const AggregateCommandRequest& request,

@@ -72,10 +72,12 @@ public:
                          const boost::intrusive_ptr<ExpressionContext> expCtx,
                          boost::optional<InternalSearchMongotRemoteSpec> spec,
                          boost::optional<long long> limit,
-                         bool requireSearchSequenceToken = false)
+                         bool requireSearchSequenceToken = false,
+                         bool pipelineNeedsSearchMeta = true)
         : DocumentSource(kStageName, expCtx),
           _searchQuery(query.getOwned()),
           _spec(spec),
+          _queryReferencesSearchMeta(pipelineNeedsSearchMeta),
           _limit(limit),
           _requiresSearchSequenceToken(requireSearchSequenceToken) {}
 
@@ -167,14 +169,20 @@ private:
     /**
      * Valid in a sharded environment and holding information returned from planShardedSearch call,
      * including metadataMergeProtocolVersion, sortSpec, and mergingPipeline.
+     *
+     * TODO SERVER-87077 This _spec should not be optional. It should be constructed on construction
+     * of the document source, which can enable us to remove fields like _queryReferencesSearchMeta,
+     * _limit, and _requiresSearchSequenceToken that will just live in the _spec instead.
      */
     boost::optional<InternalSearchMongotRemoteSpec> _spec;
 
     /**
-     * Flag indicating whether or not the pipeline references the $$SEARCH_META variable. If true,
-     * we will insert a $setVariableFromSubPipeline stage into the merging pipeline to provide it.
+     * Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable.
+     * If true on mongos, we will insert a $setVariableFromSubPipeline stage into the merging
+     * pipeline to provide it. If true on mongod, we will create a second plan executor and cursor
+     * to handle the metadata pipeline (see generateMetadataPipelineAndAttachCursorsForSearch).
      */
-    bool _pipelineNeedsSearchMeta = true;
+    bool _queryReferencesSearchMeta = true;
 
     /**
      * This will populate the docsRequested field of the cursorOptions document sent as part of the

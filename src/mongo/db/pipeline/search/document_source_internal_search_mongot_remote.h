@@ -81,6 +81,7 @@ public:
           _taskExecutor(taskExecutor),
           _metadataMergeProtocolVersion(spec.getMetadataMergeProtocolVersion()),
           _limit(spec.getLimit().value_or(0)),
+          _queryReferencesSearchMeta(spec.getRequiresSearchMetaCursor().value_or(true)),
           _mongotDocsRequested(mongotDocsRequested),
           _requiresSearchSequenceToken(requiresSearchSequenceToken) {
         if (spec.getSortSpec().has_value()) {
@@ -130,6 +131,7 @@ public:
             if (_sortSpec.has_value()) {
                 remoteSpec.setSortSpec(_sortSpec->getOwned());
             }
+            remoteSpec.setRequiresSearchMetaCursor(_queryReferencesSearchMeta);
             return make_intrusive<DocumentSourceInternalSearchMongotRemote>(
                 std::move(remoteSpec), expCtx, _taskExecutor, _mongotDocsRequested);
         } else {
@@ -194,6 +196,10 @@ public:
             return boost::none;
         }
         return _metadataMergeProtocolVersion;
+    }
+
+    bool queryReferencesSearchMeta() {
+        return _queryReferencesSearchMeta;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
@@ -292,6 +298,14 @@ private:
      * Sort key generator used to populate $sortKey. Has a value iff '_sortSpec' has a value.
      */
     boost::optional<SortKeyGenerator> _sortKeyGen;
+
+    /**
+     * Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable.
+     * In sharded search, mongos will set this value send it to mongod; mongod should not try to
+     * recompute this value since it may incorrectly think it doesn't need metadata if only the
+     * merging pipeline (and not the shard's pipeline) references $$SEARCH_META.
+     */
+    bool _queryReferencesSearchMeta = true;
 
     /**
      * This will populate the docsRequested field of the cursorOptions document sent as part of the

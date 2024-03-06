@@ -65,3 +65,7 @@ structs:
         description: "The number of documents that mongod requests mongot should return; mongot can choose to return more."
         optional: true
         type: long
+      requiresSearchMetaCursor:
+        description: "If false, we will ignore the metadata cursor returned from mongot and not establish a search metadata pipeline."
+        optional: true
+        type: bool

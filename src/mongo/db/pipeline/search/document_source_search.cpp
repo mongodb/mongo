@@ -80,6 +80,9 @@ Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
                 spec.addField(InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
                               opts.serializeLiteral(_requiresSearchSequenceToken));
             }
+
+            spec.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+                          opts.serializeLiteral(_queryReferencesSearchMeta));
             return Value(Document{{getSourceName(), spec.freezeToValue()}});
         }
     }
@@ -98,18 +101,22 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
     // If kMongotQueryFieldName is present, this is the case that we re-create the DocumentSource
     // from a serialized DocumentSourceSearch that was originally parsed on a router.
     if (specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)) {
+        const auto limitElem = specObj[InternalSearchMongotRemoteSpec::kLimitFieldName];
         boost::optional<long long> limit =
-            specObj.hasField(InternalSearchMongotRemoteSpec::kLimitFieldName)
-            ? boost::optional<long long>(
-                  specObj.getField(InternalSearchMongotRemoteSpec::kLimitFieldName).numberLong())
-            : boost::none;
+            limitElem.eoo() ? boost::none : boost::optional<long long>(limitElem.numberLong());
+
+        const auto requiresSearchMetaCursorElem =
+            specObj[InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName];
+        // queryReferencesSearchMeta should default to true if the argument wasn't provided
+        bool queryReferencesSearchMeta =
+            requiresSearchMetaCursorElem.eoo() || requiresSearchMetaCursorElem.Bool();
         return make_intrusive<DocumentSourceSearch>(
             specObj.getField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName).Obj(),
             expCtx,
             InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj),
             limit,
-            specObj.hasField(
-                InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName));
+            specObj.hasField(InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName),
+            queryReferencesSearchMeta);
     } else {
         return make_intrusive<DocumentSourceSearch>(specObj, expCtx, boost::none, boost::none);
     }
@@ -130,6 +137,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
         // Remove mergingPipeline info since it is not useful for
         // DocumentSourceInternalSearchMongotRemote.
         spec.setMergingPipeline(boost::none);
+        spec.setRequiresSearchMetaCursor(_queryReferencesSearchMeta);
 
         desugaredPipeline.push_back(make_intrusive<DocumentSourceInternalSearchMongotRemote>(
             spec, pExpCtx, executor, _limit, _requiresSearchSequenceToken));
@@ -192,12 +200,23 @@ Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
         }
     }
 
-    // Determine whether the pipeline references the $$SEARCH_META variable. We won't insert a
-    // $setVariableFromSubPipeline stage until we split the pipeline (see distributedPlanLogic()),
-    // but at that point we don't have access to the full pipeline to know whether we need it.
-    _pipelineNeedsSearchMeta = std::any_of(std::next(itr), container->end(), [](const auto& itr) {
-        return search_helpers::hasReferenceToSearchMeta(*itr);
-    });
+    // If this $search stage was parsed from a spec sent from a router, the current pipeline may be
+    // missing a reference to $$SEARCH_META that is only in the merging pipeline, so we shouldn't
+    // compute _queryReferencesSearchMeta based on the current pipeline.
+
+    // TODO SERVER-87077 If spec is no longer optional, this condition may need to use
+    // pExpCtx->needsMerge (or some other way to indicate if a router already computed
+    // _queryReferencesSearchMeta for us).
+    if (!_spec) {
+        // Determine whether the pipeline references the $$SEARCH_META variable. We won't insert a
+        // $setVariableFromSubPipeline stage until we split the pipeline (see
+        // distributedPlanLogic()), but at that point we don't have access to the full pipeline to
+        // know whether we need it.
+        _queryReferencesSearchMeta =
+            std::any_of(std::next(itr), container->end(), [](const auto& itr) {
+                return search_helpers::hasReferenceToSearchMeta(*itr);
+            });
+    }
 
     return std::next(itr);
 }
@@ -239,7 +258,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
     // from mongot.
     DistributedPlanLogic logic;
     logic.shardsStage = this;
-    if (_spec->getMergingPipeline() && _pipelineNeedsSearchMeta) {
+    if (_spec->getMergingPipeline() && _queryReferencesSearchMeta) {
         logic.mergingStages = {DocumentSourceSetVariableFromSubPipeline::create(
             pExpCtx,
             Pipeline::parse(*_spec->getMergingPipeline(), pExpCtx),

@@ -7,7 +7,7 @@
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
-    mockPlanShardedSearchResponse,
+    mockPlanShardedSearchResponseOnConn,
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
@@ -115,25 +115,11 @@ function mockMongotShardResponses(mongotQuery) {
     s1Mongot.setMockResponses(history1, uniqueCursorId(), uniqueCursorId());
 }
 
-function mockPlanShardedSearchResponseForShard(collName, query, dbName, sortSpec, shardConn) {
-    const pssResp = [{
-        expectedCommand: {planShardedSearch: collName, query: query, $db: dbName},
-        response: {
-            ok: 1,
-            protocolVersion: NumberInt(1),
-            metaPipeline: [{$limit: 1}],
-            sortSpec: sortSpec,
-        }
-    }];
-    const mongot = stWithMock.getMockConnectedToHost(shardConn);
-    mongot.setMockResponses(pssResp, uniqueCursorId());
-}
-
 (function testUnionWith() {
     const mongotQuery = {sort: {a: 1}};
     const sortSpec = {"$searchSortValues.a": 1};
-    mockPlanShardedSearchResponseForShard(
-        shardedCollName, mongotQuery, dbName, sortSpec, shard0Conn);
+    mockPlanShardedSearchResponseOnConn(
+        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
     mockMongotShardResponses(mongotQuery);
 
     const result = unshardedColl
@@ -174,8 +160,8 @@ function mockPlanShardedSearchResponseForShard(collName, query, dbName, sortSpec
     // Mock PSS on primary shard's mongotmock.
     // The primary shard ends up sending planShardedSearch to its mongotmock during $lookup's
     // getNext() implementation which parses the subpipeline on each invocation.
-    mockPlanShardedSearchResponseForShard(
-        shardedCollName, mongotQuery, dbName, sortSpec, shard0Conn);
+    mockPlanShardedSearchResponseOnConn(
+        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
     mockMongotShardResponses(mongotQuery);
     const result =
         unshardedColl
@@ -196,10 +182,10 @@ function mockPlanShardedSearchResponseForShard(collName, query, dbName, sortSpec
     const mongotQuery = {sort: {a: 1}};
     const sortSpec = {"$searchSortValues.a": 1};
     // Mock PSS for both shards. It is invoked during the execution of $lookup.
-    mockPlanShardedSearchResponseForShard(
-        shardedCollName, mongotQuery, dbName, sortSpec, shard0Conn);
-    mockPlanShardedSearchResponseForShard(
-        shardedCollName, mongotQuery, dbName, sortSpec, shard1Conn);
+    mockPlanShardedSearchResponseOnConn(
+        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
+    mockPlanShardedSearchResponseOnConn(
+        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard1Conn);
     // Mock search result for both shards twice. Each shard will execute the subpipeline which
     // requires it to get search results for itself and the other shard.
     for (let i = 0; i < 2; i++) {

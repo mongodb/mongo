@@ -793,7 +793,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipeline
         resetContextFn();
         pipelines.push_back(std::move(pipeline));
 
-        if (auto metadataPipe = search_helpers::generateMetadataPipelineForSearch(
+        if (auto metadataPipe = search_helpers::generateMetadataPipelineAndAttachCursorsForSearch(
                 expCtx->opCtx, expCtx, request, pipelines.back().get(), expCtx->uuid)) {
             pipelines.push_back(std::move(metadataPipe));
         }
