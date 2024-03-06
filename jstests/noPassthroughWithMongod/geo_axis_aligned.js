@@ -3,115 +3,177 @@
 let t = db.axisaligned;
 t.drop();
 
-let scale = [1, 10, 1000, 10000];
-let bits = [2, 3, 4, 5, 6, 7, 8, 9];
-let radius = [0.0001, 0.001, 0.01, 0.1];
-let center = [[5, 52], [6, 53], [7, 54], [8, 55], [9, 56]];
-
-let bound = [];
-for (var j = 0; j < center.length; j++)
-    bound.push([-180, 180]);
-
-// Scale all our values to test different sizes
-let radii = [];
-let centers = [];
-let bounds = [];
-
-for (var s = 0; s < scale.length; s++) {
-    for (var i = 0; i < radius.length; i++) {
-        radii.push(radius[i] * scale[s]);
+function checkCircle(center, radius, bound) {
+    // Make sure our numbers are precise enough for this test
+    if ((center[0] - radius == center[0]) || (center[1] - radius == center[1])) {
+        print(`omitting circle due to precision`);
+        return false;
     }
 
-    for (var j = 0; j < center.length; j++) {
-        centers.push([center[j][0] * scale[s], center[j][1] * scale[s]]);
-        bounds.push([bound[j][0] * scale[s], bound[j][1] * scale[s]]);
+    // Make sure all points will fall within bounds
+    if ((center[0] - radius < bound.min) || (center[1] - radius < bound.min) ||
+        (center[0] + radius > bound.max) || (center[1] + radius > bound.max)) {
+        print(`omitting circle due to bounds`);
+        return false;
     }
+
+    return true;
 }
 
-radius = radii;
-center = centers;
-bound = bounds;
+let radiiUnscaled = [0.0001, 0.001, 0.01, 0.1];
+let centersUnscaled = [[5, 52], [6, 53], [7, 54], [8, 55], [9, 56]];
 
-for (var b = 0; b < bits.length; b++) {
-    printjson(radius);
-    printjson(centers);
+// Test matrix of various bits and scales. There are 32 combinations.
+let bits = [2, 3, 4, 5, 6, 7, 8, 9];
+let scale = [1, 10, 1000, 10000];
+for (let b = 0; b < bits.length; b++) {
+    for (let s = 0; s < scale.length; s++) {
+        let radii = [];
+        let centers = [];
 
-    for (var i = 0; i < radius.length; i++) {
-        for (var j = 0; j < center.length; j++) {
-            printjson({center: center[j], radius: radius[i], bits: bits[b]});
+        // Compute a set of centers and radii for the circles.
+        for (let i = 0; i < centersUnscaled.length; i++) {
+            centers.push([centersUnscaled[i][0] * scale[s], centersUnscaled[i][1] * scale[s]]);
+        }
 
-            t.drop();
+        for (let i = 0; i < radiiUnscaled.length; i++) {
+            radii.push(radiiUnscaled[i] * scale[s]);
+        }
 
-            // Make sure our numbers are precise enough for this test
-            if ((center[j][0] - radius[i] == center[j][0]) ||
-                (center[j][1] - radius[i] == center[j][1]))
-                continue;
+        let bound = {min: -180 * scale[s], max: 180 * scale[s]};
 
-            t.save({"_id": 1, "loc": {"x": center[j][0] - radius[i], "y": center[j][1]}});
-            t.save({"_id": 2, "loc": {"x": center[j][0], "y": center[j][1]}});
-            t.save({"_id": 3, "loc": {"x": center[j][0] + radius[i], "y": center[j][1]}});
-            t.save({"_id": 4, "loc": {"x": center[j][0], "y": center[j][1] + radius[i]}});
-            t.save({"_id": 5, "loc": {"x": center[j][0], "y": center[j][1] - radius[i]}});
-            t.save(
-                {"_id": 6, "loc": {"x": center[j][0] - radius[i], "y": center[j][1] + radius[i]}});
-            t.save(
-                {"_id": 7, "loc": {"x": center[j][0] + radius[i], "y": center[j][1] + radius[i]}});
-            t.save(
-                {"_id": 8, "loc": {"x": center[j][0] - radius[i], "y": center[j][1] - radius[i]}});
-            t.save(
-                {"_id": 9, "loc": {"x": center[j][0] + radius[i], "y": center[j][1] - radius[i]}});
+        t.drop();
 
-            var res =
-                t.createIndex({loc: "2d"}, {max: bound[j][1], min: bound[j][0], bits: bits[b]});
+        let circles = [];
 
-            // createIndex fails when this iteration inserted coordinates that are out of bounds.
-            // These are invalid cases, so we skip them.
-            if (!res.ok)
-                continue;
+        // Insert legacy points for each combination of centers and radii.
+        for (let c = 0; c < centers.length; c++) {
+            for (let r = 0; r < radii.length; r++) {
+                if (!checkCircle(centers[c], radii[r], bound)) {
+                    continue;
+                }
 
-            print("DOING WITHIN QUERY ");
-            let r = t.find({"loc": {"$within": {"$center": [center[j], radius[i]]}}});
+                // Define a set of points around a circle with the given center and radius.
+                //
+                //     x -->
+                //
+                // y   8    5    9
+                // |
+                // V   1    2    3
+                //
+                //     6    4    7
+                //
+                // Points 1-5 will be inside the circle (with point 2 at the center).
+                // Points 6-9 will be outside.
+                const circleIdx = circles.length;
+                t.save({
+                    circleIdx,
+                    ptNum: 1,
+                    "loc": {"x": centers[c][0] - radii[r], "y": centers[c][1]}
+                });
+                t.save({circleIdx, ptNum: 2, "loc": {"x": centers[c][0], "y": centers[c][1]}});
+                t.save({
+                    circleIdx,
+                    ptNum: 3,
+                    "loc": {"x": centers[c][0] + radii[r], "y": centers[c][1]}
+                });
+                t.save({
+                    circleIdx,
+                    ptNum: 4,
+                    "loc": {"x": centers[c][0], "y": centers[c][1] + radii[r]}
+                });
+                t.save({
+                    circleIdx,
+                    ptNum: 5,
+                    "loc": {"x": centers[c][0], "y": centers[c][1] - radii[r]}
+                });
+                t.save({
+                    circleIdx,
+                    ptNum: 6,
+                    "loc": {"x": centers[c][0] - radii[r], "y": centers[c][1] + radii[r]}
+                });
+                t.save({
+                    circleIdx,
+                    ptNum: 7,
+                    "loc": {"x": centers[c][0] + radii[r], "y": centers[c][1] + radii[r]}
+                });
+                t.save({
+                    circleIdx,
+                    ptNum: 8,
+                    "loc": {"x": centers[c][0] - radii[r], "y": centers[c][1] - radii[r]}
+                });
+                t.save({
+                    circleIdx,
+                    ptNum: 9,
+                    "loc": {"x": centers[c][0] + radii[r], "y": centers[c][1] - radii[r]}
+                });
 
+                circles.push({center: centers[c], radius: radii[r]});
+            }
+        }
+
+        // Create a 2d legacy geo index with an additional component "circleIdx" so we can run
+        // geo queries against each individual circle created above.
+        assert.commandWorked(t.createIndex({loc: "2d", circleIdx: 1},
+                                           {min: bound.min, max: bound.max, bits: bits[b]}));
+
+        print(`Testing 2d geo index with ${bits[b]} bits at scale ${scale[s]} with ${
+            circles.length} circles.`);
+        for (let ci = 0; ci < circles.length; ci++) {
+            const circle = circles[ci];
+
+            // $within query
+            let r = t.find({
+                "loc": {"$within": {"$center": [circle.center, circle.radius]}},
+                circleIdx: {$eq: ci}
+            });
             assert.eq(5, r.count());
 
-            // FIXME: surely code like this belongs in utils.js.
+            // Make sure the 5 internal points are represented.
             let a = r.toArray();
             let x = [];
             for (k in a)
-                x.push(a[k]["_id"]);
+                x.push(a[k]["ptNum"]);
             x.sort();
             assert.eq([1, 2, 3, 4, 5], x);
 
-            print(" DOING NEAR QUERY ");
-            // printjson( center[j] )
-            r = t.find({loc: {$near: center[j], $maxDistance: radius[i]}}, {_id: 1});
+            // $near query
+            r = t.find({loc: {$near: circle.center, $maxDistance: circle.radius}, circleIdx: ci},
+                       {_id: 1});
             assert.eq(5, r.count());
 
-            print(" DOING DIST QUERY ");
-
+            // $geoNear query
             a = t.aggregate({
                      $geoNear: {
-                         near: center[j],
+                         near: circle.center,
                          distanceField: "dis",
-                         maxDistance: radius[i],
+                         maxDistance: circle.radius,
                      }
-                 }).toArray();
+                 },
+                            {$match: {circleIdx: ci}})
+                    .toArray();
             assert.eq(5, a.length, tojson(a));
-
-            var distance = 0;
             for (var k = 0; k < a.length; k++) {
-                assert.gte(a[k].dis, distance);
+                if (a[k].ptNum == 2) {
+                    assert.eq(a[k].dis, 0, a[k]);
+                } else {
+                    // precision issues make it challenging to assert a distance equal to
+                    // circle.radius here.
+                    assert.close(a[k].dis, circle.radius);
+                }
             }
 
+            // $within $box query
             r = t.find({
                 loc: {
                     $within: {
                         $box: [
-                            [center[j][0] - radius[i], center[j][1] - radius[i]],
-                            [center[j][0] + radius[i], center[j][1] + radius[i]]
+                            [circle.center[0] - circle.radius, circle.center[1] - circle.radius],
+                            [circle.center[0] + circle.radius, circle.center[1] + circle.radius]
                         ]
                     }
-                }
+                },
+                circleIdx: {$eq: ci},
             },
                        {_id: 1});
             assert.eq(9, r.count());
