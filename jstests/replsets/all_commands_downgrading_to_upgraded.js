@@ -153,6 +153,8 @@ const allCommands = {
     streams_getStats: {skip: isAnInternalCommand},
     streams_testOnlyInsert: {skip: isAnInternalCommand},
     streams_getMetrics: {skip: isAnInternalCommand},
+    streams_updateFeatureFlags: {skip: isAnInternalCommand},
+    streams_testOnlyGetFeatureFlags: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortMoveCollection: {
