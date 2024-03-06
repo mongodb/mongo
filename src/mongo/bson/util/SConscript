@@ -94,6 +94,18 @@ env.CppLibfuzzerTest(
     ],
 )
 
+env.CppLibfuzzerTest(
+    target='bsoncolumn_decompress_fuzzer',
+    source=[
+        'bsoncolumn_decompress_fuzzer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
+        'bson_column',
+    ],
+)
+
 env.Benchmark(
     target='bufbuilder_bm',
     source=[
