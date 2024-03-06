@@ -66,8 +66,6 @@ const StringDataSet kTargetedCmdNames = {
     "serverStatus",  // TODO (SERVER-79353): Support role-aware serverStatus on mongod with
                      // router role. Evaluate this command should go through the router code
                      // paths.
-    "splitVector",   // TODO (SERVER-84090): Investigate whether to change or deprecate router's
-                     // splitVector command.
     "validate",
     "waitForFailPoint",
     "_flushRoutingTableCacheUpdates"};

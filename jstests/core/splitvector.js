@@ -10,9 +10,6 @@
 //   does_not_support_stepdowns,
 //   requires_collstats,
 //   requires_fastcount,
-//   # TODO SERVER-84469: remove feature flag once splitVector works correctly on tracked
-//   # collections.
-//   cannot_run_during_upgrade_downgrade,
 //   no_selinux,
 // ]
 
@@ -117,24 +114,12 @@ assert.eq(
 
 // -------------------------
 // Case 3: empty collection
-// TODO SERVER-84469: remove feature flag once splitVector works correctly on tracked collections
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
 f.createIndex({x: 1});
-if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-    !TestData.testingReplicaSetEndpoint) {
-    assert.eq(false,
-              db.runCommand(
-                    {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
-                  .ok,
-              "3");
-} else {
-    assert.eq([],
-              db.runCommand(
-                    {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
-                  .splitKeys,
-              "3");
-}
+assert.eq(
+    [],
+    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
+        .splitKeys,
+    "3");
 
 // -------------------------
 // Case 4: uniform collection
@@ -160,19 +145,14 @@ var case4 = function() {
 
     // splitVector aims at getting half-full chunks after split
     let factor = 0.5;
-    if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-        !TestData.testingReplicaSetEndpoint) {
-        assert.eq(false, res.ok, "4b");
 
-    } else {
-        assert.eq(true, res.ok, "4b");
+    assert.eq(true, res.ok, "4b");
 
-        assert.close(
-            numDocs * docSize / ((1 << 20) * factor), res.splitKeys.length, "num split keys", -1);
-        assertChunkSizes(res.splitKeys, numDocs, (1 << 20) * factor, "4d");
-        for (let i = 0; i < res.splitKeys.length; i++) {
-            assertFieldNamesMatch(res.splitKeys[i], {x: 1});
-        }
+    assert.close(
+        numDocs * docSize / ((1 << 20) * factor), res.splitKeys.length, "num split keys", -1);
+    assertChunkSizes(res.splitKeys, numDocs, (1 << 20) * factor, "4d");
+    for (let i = 0; i < res.splitKeys.length; i++) {
+        assertFieldNamesMatch(res.splitKeys[i], {x: 1});
     }
 };
 case4();
@@ -184,10 +164,6 @@ resetCollection();
 f.createIndex({x: 1});
 
 var case5 = function() {
-    if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-        !TestData.testingReplicaSetEndpoint) {
-        return;
-    }
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 4499, filler);
     let res = db.runCommand({
@@ -212,11 +188,6 @@ resetCollection();
 f.createIndex({x: 1});
 
 var case6 = function() {
-    if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-        !TestData.testingReplicaSetEndpoint) {
-        return;
-    }
-
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 1999, filler);
     let res = db.runCommand({
@@ -242,10 +213,6 @@ resetCollection();
 f.createIndex({x: 1});
 
 var case7 = function() {
-    if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-        !TestData.testingReplicaSetEndpoint) {
-        return;
-    }
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocsFixedX(f, 2099, filler, 1);
     bulkInsertDocsFixedX(f, 9, filler, 2);
@@ -268,10 +235,6 @@ resetCollection();
 f.createIndex({x: 1});
 
 var case8 = function() {
-    if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-        !TestData.testingReplicaSetEndpoint) {
-        return;
-    }
     bulkInsertDocsFixedX(f, 9, filler, 1);
     bulkInsertDocsFixedX(f, 2099, filler, 2);
     bulkInsertDocsFixedX(f, 9, filler, 3);
@@ -296,10 +259,6 @@ resetCollection();
 f.createIndex({x: 1});
 
 var case9 = function() {
-    if (isTrackUnshardedEnabled && FixtureHelpers.isUnsplittable(f) &&
-        !TestData.testingReplicaSetEndpoint) {
-        return;
-    }
     f.save({x: 1});
     f.save({x: 2});
     f.save({x: 3});
@@ -313,7 +272,8 @@ var case9 = function() {
     assert.eq(1, res.splitKeys.length, "9b");
     assert.eq(2, res.splitKeys[0].x, "9c");
 
-    if (db.runCommand("hello").msg != "isdbgrid") {
+    // TODO SERVER-87574 remove !TestData.testingReplicaSetEndpoint
+    if (db.runCommand("hello").msg != "isdbgrid" && !TestData.testingReplicaSetEndpoint) {
         res = db.adminCommand(
             {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, force: true});
 

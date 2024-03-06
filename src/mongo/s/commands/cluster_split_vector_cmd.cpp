@@ -60,10 +60,22 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
+using namespace fmt::literals;
 
 namespace mongo {
 namespace {
+
+std::string rangeString(const BSONObj& min, const BSONObj& max) {
+    return "{min: " + min.toString() + " , max" + max.toString() + " }";
+}
+
+std::string shardSetString(const std::set<ShardId>& shardIds) {
+    std::string result = "[";
+    for (auto& shardid : shardIds) {
+        result += shardid + ", ";
+    }
+    return result += "]";
+}
 
 class SplitVectorCmd : public BasicCommand {
 public:
@@ -104,41 +116,44 @@ public:
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.dbName() == dbName);
 
-        const auto [cm, _] =
+        auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "can't do command: " << getName() << " on sharded collection",
-                !cm.isSharded());
 
-        // Here, we first filter the command before appending an UNSHARDED shardVersion, because
-        // "shardVersion" is one of the fields that gets filtered out.
-        BSONObj filteredCmdObj(applyReadWriteConcern(
-            opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
-        BSONObj filteredCmdObjWithVersion(
-            appendShardVersion(filteredCmdObj, ShardVersion::UNSHARDED()));
+        BSONObj min = cmdObj.getObjectField("min");
+        BSONObj max = cmdObj.getObjectField("max");
+        BSONObj keyPattern = cmdObj.getObjectField("keyPattern");
 
-        auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
-        auto commandResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting::get(opCtx),
-            dbName,
-            cm.dbVersion().isFixed() ? filteredCmdObj : filteredCmdObjWithVersion,
-            Shard::RetryPolicy::kIdempotent));
+        BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+        // splitVector is allowed to run on a sharded cluster only if the range requested
+        // belongs to one shard. We target the shard owning the input min chunk and we let the
+        // targetted shard figure whether the range is fully owned by itself. In case the
+        // constraint is not respected we will get a InvalidOptions as part of the response.
+        auto query = [&]() {
+            if (!min.isEmpty()) {
+                return min;
+            }
+            // if no min is passed as input, we assume it's the global min of the keyPattern
+            // passed as input
+            return KeyPattern::fromBSON(keyPattern).globalMin();
+        }();
+        auto response =
+            scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                       nss.dbName(),
+                                                       nss,
+                                                       cri,
+                                                       filteredCmdObj,
+                                                       ReadPreferenceSetting::get(opCtx),
+                                                       Shard::RetryPolicy::kIdempotent,
+                                                       query,
+                                                       {} /*collation*/,
+                                                       boost::none /*letParameters*/,
+                                                       boost::none /*runtimeConstants*/)
+                .front();
 
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "can't do command: " << getName() << " on a sharded collection",
-                !ErrorCodes::isStaleShardVersionError(commandResponse.commandStatus.code()));
-
-        uassertStatusOK(commandResponse.commandStatus);
-
-        if (!commandResponse.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                cm.dbPrimary(), commandResponse.response["writeConcernError"], result);
-        }
-        result.appendElementsUnique(
-            CommandHelpers::filterCommandReplyForPassthrough(std::move(commandResponse.response)));
-
+        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+        uassertStatusOK(status);
+        result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(
+            std::move(response.swResponse.getValue().data)));
         return true;
     }
 };
