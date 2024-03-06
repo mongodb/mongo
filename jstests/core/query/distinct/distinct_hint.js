@@ -9,7 +9,7 @@
 
 import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
-var isCursorHintsToQuerySettings = TestData.isCursorHintsToQuerySettings || false;
+var isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
 const collName = "jstests_explain_distinct_hint";
 const coll = db[collName];
@@ -34,7 +34,7 @@ let ixScanStage = getPlanStage(explain, "IXSCAN");
 assert(ixScanStage, tojson(explain));
 assert.eq(ixScanStage.indexName, "b_1", tojson(ixScanStage));
 // You won't see hint in .explain() if it was overriden by query settings.
-if (!isCursorHintsToQuerySettings) {
+if (!isHintsToQuerySettingsSuite) {
     assert.eq(explain.command.hint, {"b": 1});
 }
 
@@ -42,7 +42,7 @@ explain = db.coll.explain().distinct("a", {a: 1, b: 2}, {hint: "b_1"});
 ixScanStage = getPlanStage(explain, "IXSCAN");
 assert(ixScanStage, tojson(explain));
 assert.eq(ixScanStage.indexName, "b_1");
-if (!isCursorHintsToQuerySettings) {
+if (!isHintsToQuerySettingsSuite) {
     assert.eq(explain.command.hint, "b_1");
 }
 
@@ -60,14 +60,14 @@ cmdObj = db.coll.runCommand("distinct", {"key": "a", query: {a: 1, b: 2}, hint: 
 // Hinting a sparse index may produce incomplete result. Query settings have slightly different
 // semantics and if planner can't guarantee query correctness then it will fall back to sequential
 // scan.
-if (!isCursorHintsToQuerySettings) {
+if (!isHintsToQuerySettingsSuite) {
     assert.eq([], cmdObj.values);
 } else {
     assert.eq([1], cmdObj.values);
 }
 
 cmdObj = db.coll.runCommand("distinct", {"key": "a", query: {a: 1, b: 2}, hint: "x_1"});
-if (!isCursorHintsToQuerySettings) {
+if (!isHintsToQuerySettingsSuite) {
     assert.eq([], cmdObj.values);
 } else {
     assert.eq([1], cmdObj.values);
@@ -88,7 +88,7 @@ var regex = new RegExp("hint provided does not correspond to an existing index")
 assert(regex.test(cmdRes.errmsg));
 
 // Make sure $natural hints are applied to distinct.
-if (!isCursorHintsToQuerySettings) {
+if (!isHintsToQuerySettingsSuite) {
     // Query settings for distinct have different semantics. $natural in that case is _only_ a hint
     // and may not be enforced if there are better query plans available.
     let explain = db.coll.explain().distinct("a", {}, {hint: {$natural: 1}});

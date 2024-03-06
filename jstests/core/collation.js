@@ -270,7 +270,7 @@ assertIndexHasCollation({e: 1}, {locale: "simple"});
 
 // Test that an index with a non-simple collation contains collator-generated comparison keys
 // rather than the verbatim indexed strings.
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     // This guard excludes this test case from being run on the cursor_hints_to_query_settings
     // suite. The suite replaces cursor hints with query settings. Query settings do not force
     // indexes, and therefore empty filter will result in collection scans.
@@ -676,7 +676,7 @@ assert.commandWorked(coll.dropIndexes());
 
 // Find should return correct results when collation specified and compatible partial index
 // exists.
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     // This guard excludes this test case from being run on cursor_hints_to_query_settings suite.
     // The suite replaces cursor hints with query settings. Query settings do not force
     // partial/sparse indexes with incomplete result sets as described in SERVER-26413, and as such

@@ -196,14 +196,6 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
 }
 
 /**
- * Check if the operation comes from the internal client. Returns 'true' if the client is
- * internal ('mongos'), and false otherwise.
- */
-bool isInternalClient(const OperationContext* opCtx) {
-    return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
-}
-
-/**
  * Parses the grammar elements like 'filter', 'sort', and 'projection' from the raw
  * 'FindCommandRequest', and tracks internal state like begining the operation's timer and recording
  * query shape stats (if enabled).
@@ -549,7 +541,7 @@ public:
                     }
                 }
 
-                auto isInternal = isInternalClient(opCtx);
+                auto isInternal = opCtx->getClient()->isInternalClient();
                 if (MONGO_unlikely(allowExternalReadsForReverseOplogScanRule.shouldFail())) {
                     isInternal = true;
                 }
@@ -878,6 +870,7 @@ public:
             auto aggRequest =
                 query_request_conversion::asAggregateCommandRequest(cq.getFindCommandRequest());
             aggRequest.setExplain(verbosity);
+            aggRequest.setQuerySettings(cq.getExpCtx()->getQuerySettings());
 
             // An empty PrivilegeVector for explain is acceptable because these privileges are only
             // checked on getMore and explain will not open a cursor.
@@ -887,8 +880,13 @@ public:
                                                     aggRequest.getNamespace(),
                                                     aggRequest,
                                                     false));
-            const auto status =
-                runAggregate(opCtx, aggRequest, _request.body, privileges, replyBuilder);
+            const auto status = runAggregate(opCtx,
+                                             aggRequest,
+                                             {aggRequest},
+                                             _request.body,
+                                             privileges,
+                                             replyBuilder,
+                                             {} /* usedExternalDataSources  */);
             if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                 uasserted(ErrorCodes::InvalidPipelineOperator,
                           str::stream() << "Unsupported in view pipeline: " << status.reason());
@@ -945,7 +943,8 @@ public:
             // Forbid users from passing 'querySettings' explicitly.
             uassert(7746901,
                     "BSON field 'querySettings' is an unknown field",
-                    isInternalClient(opCtx) || !findCommand->getQuerySettings().has_value());
+                    query_settings::utils::allowQuerySettingsFromClient(opCtx->getClient()) ||
+                        !findCommand->getQuerySettings().has_value());
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {

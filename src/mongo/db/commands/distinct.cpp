@@ -121,10 +121,6 @@
 namespace mongo {
 namespace {
 
-bool isInternalClient(OperationContext* opCtx) {
-    return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
-}
-
 CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const BSONObj& cmdObj,
@@ -147,7 +143,8 @@ CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
     // Forbid users from passing 'querySettings' explicitly.
     uassert(7923000,
             "BSON field 'querySettings' is an unknown field",
-            isInternalClient(opCtx) || !distinctCommand->getQuerySettings().has_value());
+            query_settings::utils::allowQuerySettingsFromClient(opCtx->getClient()) ||
+                !distinctCommand->getQuerySettings().has_value());
 
     auto expCtx = CanonicalDistinct::makeExpressionContext(
         opCtx, nss, *distinctCommand, defaultCollator, verbosity);
@@ -552,7 +549,8 @@ public:
                            const CanonicalDistinct& canonicalDistinct,
                            boost::optional<ExplainOptions::Verbosity> verbosity,
                            rpc::ReplyBuilderInterface* replyBuilder) const {
-        const auto& nss = canonicalDistinct.getQuery()->nss();
+        const auto& cq = *canonicalDistinct.getQuery();
+        const auto& nss = cq.nss();
         const auto& dbName = nss.dbName();
         const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
         const auto viewAggCmd =
@@ -569,12 +567,18 @@ public:
             verbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
             serializationContext);
+        viewAggRequest.setQuerySettings(cq.getExpCtx()->getQuerySettings());
 
-        // If running explain distinct on view, then aggregate is executed without plivilege checks
+        // If running explain distinct on view, then aggregate is executed without privilege checks
         // and without response formatting.
         if (verbosity) {
-            uassertStatusOK(
-                runAggregate(opCtx, viewAggRequest, viewAggCmd, PrivilegeVector(), replyBuilder));
+            uassertStatusOK(runAggregate(opCtx,
+                                         viewAggRequest,
+                                         {viewAggRequest},
+                                         viewAggCmd,
+                                         PrivilegeVector(),
+                                         replyBuilder,
+                                         {} /* usedExternalDataSources */));
             return;
         }
 
@@ -583,7 +587,13 @@ public:
                                             viewAggRequest.getNamespace(),
                                             viewAggRequest,
                                             false /* isMongos */));
-        uassertStatusOK(runAggregate(opCtx, viewAggRequest, viewAggCmd, privileges, replyBuilder));
+        uassertStatusOK(runAggregate(opCtx,
+                                     viewAggRequest,
+                                     {viewAggRequest},
+                                     viewAggCmd,
+                                     privileges,
+                                     replyBuilder,
+                                     {} /* usedExternalDataSources */));
 
         // Copy the result from the aggregate command.
         auto resultBuilder = replyBuilder->getBodyBuilder();

@@ -381,6 +381,12 @@ public:
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
             canonicalDistinct.getQuery()->getFindCommandRequest().getSerializationContext());
 
+        // Propagate the query settings with the request to the shards if present.
+        const auto& querySettings = canonicalDistinct.getQuery()->getExpCtx()->getQuerySettings();
+        if (!query_settings::utils::isEmpty(querySettings)) {
+            viewAggRequest.setQuerySettings(querySettings);
+        }
+
         // If running explain distinct on view, then aggregate is executed without plivilege checks
         // and without response formatting.
         if (verbosity) {

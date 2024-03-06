@@ -670,7 +670,7 @@ public:
     }
 
     void setQuerySettings(query_settings::QuerySettings querySettings) {
-        _querySettings = querySettings;
+        _querySettings = std::move(querySettings);
     }
 
     // Forces the plan cache to be used even if there's only one solution available. Queries that

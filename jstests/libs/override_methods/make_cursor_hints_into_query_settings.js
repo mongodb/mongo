@@ -67,7 +67,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     delete innerCmd.hint;
     const commandType = getCommandType(innerCmd);
     const collectionName = innerCmd[commandType];
-    const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
+    const settings = {indexHints: {allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
     const representativeQuery = (function() {
         switch (commandType) {

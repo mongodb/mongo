@@ -51,7 +51,7 @@ assert.eq(0,
           "simple.1.3 - docs examined should be 0 for covered query");
 
 // Test no query
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     // This guard excludes this test case from being run on the cursor_hints_to_query_settings
     // suite. The suite replaces cursor hints with query settings. Query settings do not force
     // indexes, and therefore empty filter will result in collection scans.

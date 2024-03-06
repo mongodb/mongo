@@ -91,7 +91,7 @@ explain = t.find({b: {$exists: false}}).explain();
 assert(!isIxscan(db, getWinningPlan(explain.queryPlanner)), explain);
 
 // Test sparse index has smaller total items on after inserts.
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     for (let i = 0; i < 10; i++) {
         assert.commandWorked(t.insert({b: i}));
     }

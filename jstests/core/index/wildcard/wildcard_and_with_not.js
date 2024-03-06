@@ -14,10 +14,11 @@
  *   references_foreign_collection,
  * ]
  */
-
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
 const documentList = [
     {
@@ -99,7 +100,11 @@ function ensureCorrectResultsWithAndWithoutPlanning(testDb, collName, pipeline, 
 }
 
 function testAndMatches(testDb, useCollScan) {
-    ensureCorrectResultsWithAndWithoutPlanning(testDb, "this", testGraphLookup, useCollScan);
+    // The 'cursor_hints_to_query_settings_...' suites can only apply query settings to queries that
+    // involve a single collection.
+    if (!isHintsToQuerySettingsSuite) {
+        ensureCorrectResultsWithAndWithoutPlanning(testDb, "this", testGraphLookup, useCollScan);
+    }
     ensureCorrectResultsWithAndWithoutPlanning(testDb, "that", testLargerMatch, useCollScan);
     ensureCorrectResultsWithAndWithoutPlanning(testDb, "that", testSmallerMatch, useCollScan);
 }

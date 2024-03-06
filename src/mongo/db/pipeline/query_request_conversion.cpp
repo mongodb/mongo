@@ -154,6 +154,9 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     if (!findCommand.getHint().isEmpty()) {
         result.setHint(findCommand.getHint().getOwned());
     }
+    if (findCommand.getQuerySettings()) {
+        result.setQuerySettings(findCommand.getQuerySettings());
+    }
     if (findCommand.getReadConcern()) {
         result.setReadConcern(findCommand.getReadConcern()->getOwned());
     }

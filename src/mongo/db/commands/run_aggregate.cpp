@@ -1045,9 +1045,6 @@ Status runAggregateOnView(OperationContext* opCtx,
             opCtx,
             "runAggregateOnView",
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                const auto readUnderlyingCollectionLocally =
-                    canReadUnderlyingCollectionLocally(opCtx, cri);
-
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
                 // request, if present.
@@ -1057,18 +1054,7 @@ Status runAggregateOnView(OperationContext* opCtx,
                 // If the underlying collection is unsharded and is located on this shard, then we
                 // can execute the view aggregation locally. Otherwise, we need to kick-back to the
                 // router.
-                if (readUnderlyingCollectionLocally) {
-                    // Run the resolved aggregation locally.
-                    return _runAggregate(opCtx,
-                                         newRequest,
-                                         {newRequest},
-                                         std::move(deferredCmd),
-                                         privileges,
-                                         result,
-                                         nullptr,
-                                         resolvedView,
-                                         request);
-                } else {
+                if (!canReadUnderlyingCollectionLocally(opCtx, cri)) {
                     // Cannot execute the resolved aggregation locally. The router must do it.
                     //
                     // Before throwing the kick-back exception, validate the routing table
@@ -1086,6 +1072,17 @@ Status runAggregateOnView(OperationContext* opCtx,
                               "Resolved views on collections that do not exclusively live on the "
                               "db-primary shard must be executed by mongos");
                 }
+
+                // Run the resolved aggregation locally.
+                return _runAggregate(opCtx,
+                                     newRequest,
+                                     {newRequest},
+                                     std::move(deferredCmd),
+                                     privileges,
+                                     result,
+                                     nullptr,
+                                     resolvedView,
+                                     request);
             });
     }
 
@@ -1179,6 +1176,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         });
     }
 
+    // Lookup the query settings and attach it to the 'expCtx'.
+    // TODO: SERVER-73632 Remove feature flag for PM-635.
+    // Query settings will only be looked up on mongos and therefore should be part of command
+    // body on mongod if present.
+    expCtx->setQuerySettings(
+        query_settings::lookupQuerySettingsForAgg(expCtx,
+                                                  requestForQueryStats,
+                                                  *pipeline,
+                                                  liteParsedPipeline.getInvolvedNamespaces(),
+                                                  origNss));
+
     if (resolvedView.has_value()) {
         expCtx->startExpressionCounters();
 
@@ -1201,17 +1209,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     }
 
     expCtx->initializeReferencedSystemVariables();
-
-    // Lookup the query settings and attach it to the 'expCtx'.
-    // TODO: SERVER-73632 Remove feature flag for PM-635.
-    // Query settings will only be looked up on mongos and therefore should be part of command body
-    // on mongod if present.
-    expCtx->setQuerySettings(
-        query_settings::lookupQuerySettingsForAgg(expCtx,
-                                                  request,
-                                                  *pipeline,
-                                                  liteParsedPipeline.getInvolvedNamespaces(),
-                                                  request.getNamespace()));
 
     return pipeline;
 }
@@ -1475,7 +1472,6 @@ Status _runAggregate(OperationContext* opCtx,
         }
 
         invariant(collatorToUse);
-
 
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
             parsePipelineAndRegisterQueryStats(opCtx,
@@ -1770,22 +1766,6 @@ Status _runAggregate(OperationContext* opCtx,
 }
 
 }  // namespace
-
-Status runAggregate(OperationContext* opCtx,
-                    AggregateCommandRequest& request,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result) {
-    return _runAggregate(opCtx,
-                         request,
-                         {request},
-                         DeferredCmd(cmdObj),
-                         privileges,
-                         result,
-                         nullptr,
-                         boost::none,
-                         boost::none);
-}
 
 Status runAggregate(
     OperationContext* opCtx,

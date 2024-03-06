@@ -66,15 +66,6 @@ Status runAggregate(
         usedExternalDataSources = {});
 
 /**
- * Convenience version that internally constructs the LiteParsedPipeline.
- */
-Status runAggregate(OperationContext* opCtx,
-                    AggregateCommandRequest& request,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result);
-
-/**
  * Tracks explicit use of allowDiskUse:false with find and aggregate commands.
  */
 extern Counter64& allowDiskUseFalseCounter;

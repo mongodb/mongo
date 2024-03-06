@@ -55,11 +55,6 @@ auto const kSerializationContext = SerializationContext{SerializationContext::So
                                                         SerializationContext::Prefix::Default,
                                                         true /* nonPrefixedTenantId */};
 
-bool isInternalClient(OperationContext* opCtx) {
-    return opCtx->getClient()->session() &&
-        (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
-}
-
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const QuerySettings& settings) {
     if (expCtx->explain) {
@@ -275,13 +270,10 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
         return query_settings::QuerySettings();
     }
 
-    // If the client is internal the query settings are:
-    // - either looked up on the mongos and attached to the request
-    // - or a command is issued internally while processing the original request.
-    // Do not perform the query settings lookup and retrieve the settings from the request. In this
-    // case query settings rejection flag will not be checked.
-    if (isInternalClient(expCtx->opCtx)) {
-        return parsedFind.findCommandRequest->getQuerySettings().get_value_or({});
+    // If query settings are present as part of the request, use them as opposed to performing the
+    // query settings lookup. In this case, no check for 'reject' setting will be made.
+    if (auto querySettings = parsedFind.findCommandRequest->getQuerySettings()) {
+        return *querySettings;
     }
 
     // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -335,13 +327,10 @@ QuerySettings lookupQuerySettingsForAgg(
         return query_settings::QuerySettings();
     }
 
-    // If the client is internal the query settings are:
-    // - either looked up on the mongos and attached to the request
-    // - or a command is issued internally while processing the original request.
-    // Do not perform the query settings lookup and retrieve the settings from the request. In this
-    // case query settings rejection flag will not be checked.
-    if (isInternalClient(expCtx->opCtx)) {
-        return aggregateCommandRequest.getQuerySettings().get_value_or({});
+    // If query settings are present as part of the request, use them as opposed to performing the
+    // query settings lookup. In this case, no check for 'reject' setting will be made.
+    if (auto querySettings = aggregateCommandRequest.getQuerySettings()) {
+        return *querySettings;
     }
 
     // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -392,13 +381,10 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
         return query_settings::QuerySettings();
     }
 
-    // If the client is internal the query settings are:
-    // - either looked up on the mongos and attached to the request
-    // - or a command is issued internally while processing the original request.
-    // Do not perform the query settings lookup and retrieve the settings from the request. In this
-    // case query settings rejection flag will not be checked.
-    if (isInternalClient(expCtx->opCtx)) {
-        return parsedDistinct.distinctCommandRequest->getQuerySettings().get_value_or({});
+    // If query settings are present as part of the request, use them as opposed to performing the
+    // query settings lookup. In this case, no check for 'reject' setting will be made.
+    if (auto querySettings = parsedDistinct.distinctCommandRequest->getQuerySettings()) {
+        return *querySettings;
     }
 
     // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -443,6 +429,14 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
 }
 
 namespace utils {
+
+bool allowQuerySettingsFromClient(const Client* client) {
+    // Query settings are allowed to be part of the request only in cases when request:
+    // - comes from mongos (internal client), which has already performed the query settings lookup
+    // or
+    // - has been created interally and is executed via DBDirectClient.
+    return client->isInternalClient() || client->isInDirectClient();
+}
 
 bool isEmpty(const QuerySettings& settings) {
     // The `serialization_context` field is not significant.

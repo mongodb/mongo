@@ -62,6 +62,7 @@
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
@@ -128,11 +129,10 @@ public:
 
         // TODO: SERVER-73632 Remove feature flag for PM-635.
         // Forbid users from passing 'querySettings' explicitly.
-        const bool isInternalCLient = opCtx->getClient()->session() &&
-            (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
         uassert(7708001,
                 "BSON field 'querySettings' is an unknown field",
-                isInternalCLient || !aggregationRequest.getQuerySettings().has_value());
+                query_settings::utils::allowQuerySettingsFromClient(opCtx->getClient()) ||
+                    !aggregationRequest.getQuerySettings().has_value());
 
         return std::make_unique<Invocation>(
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));

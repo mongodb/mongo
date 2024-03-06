@@ -21,20 +21,20 @@ function checkScanMatch(query, docsExamined, n) {
     assert.eq(n, e.executionStats.nReturned);
 }
 
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     checkScanMatch({a: /o/}, 1, 1);
     checkScanMatch({a: /a/}, 0, 0);
 }
 checkScanMatch({a: {$not: /o/}}, 2, 1);
 checkScanMatch({a: {$not: /a/}}, 2, 2);
 
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     checkScanMatch({$and: [{a: /o/}]}, 1, 1);
     checkScanMatch({$and: [{a: /a/}]}, 0, 0);
 }
 checkScanMatch({$and: [{a: {$not: /o/}}]}, 2, 1);
 checkScanMatch({$and: [{a: {$not: /a/}}]}, 2, 2);
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     checkScanMatch({$and: [{a: /oo/}, {a: {$not: /o/}}]}, 1, 0);
     checkScanMatch({$and: [{a: /o/}, {a: {$not: /a/}}]}, 1, 1);
     checkScanMatch({$or: [{a: /o/}]}, 1, 1);
@@ -43,13 +43,13 @@ if (!TestData.isCursorHintsToQuerySettings) {
 checkScanMatch({$nor: [{a: /o/}]}, 2, 1);
 checkScanMatch({$nor: [{a: /a/}]}, 2, 2);
 
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     checkScanMatch({$and: [{$and: [{a: /o/}]}]}, 1, 1);
     checkScanMatch({$and: [{$and: [{a: /a/}]}]}, 0, 0);
 }
 checkScanMatch({$and: [{$and: [{a: {$not: /o/}}]}]}, 2, 1);
 checkScanMatch({$and: [{$and: [{a: {$not: /a/}}]}]}, 2, 2);
-if (!TestData.isCursorHintsToQuerySettings) {
+if (!TestData.isHintsToQuerySettingsSuite) {
     checkScanMatch({$and: [{$or: [{a: /o/}]}]}, 1, 1);
     checkScanMatch({$and: [{$or: [{a: /a/}]}]}, 0, 0);
 }

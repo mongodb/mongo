@@ -7,13 +7,10 @@ selector:
   roots:
     - jstests/core/**/*.js
   exclude_files:
-    # TODO SERVER-81601 Re-enable once query settings support views.
-    - jstests/core/views/*.js
-
     # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
     - jstests/core/query/or/orj.js
 
-    # TODO SERVER-81601 Re-enable once query settings support views.
+    # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
 
     # TODO SERVER-29449: Re-enable once 'executionStats.nReturned' is correct for sharded queries
@@ -148,7 +145,7 @@ executor:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
       global_vars:
         TestData:
-          isCursorHintsToQuerySettings: true
+          isHintsToQuerySettingsSuite: true
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

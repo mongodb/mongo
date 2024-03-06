@@ -16,7 +16,7 @@ import {
     isIxscan
 } from "jstests/libs/analyze_plan.js";
 
-const isCursorHintsToQuerySettings = TestData.isCursorHintsToQuerySettings || false;
+const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -162,7 +162,7 @@ function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamine
 (function testNoHashedIndex() {
     // This test case is using a bad index. Query settings will not apply bad indexes and therefore
     // this test case should not run in cursor hints to query settings suite.
-    if (isCursorHintsToQuerySettings) {
+    if (isHintsToQuerySettingsSuite) {
         return;
     }
 

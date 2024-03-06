@@ -6,13 +6,10 @@ selector:
   roots:
     - jstests/core/**/*.js
   exclude_files:
-    # TODO SERVER-81601 Re-enable once query settings support views.
-    - jstests/core/views/*.js
-
     # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
     - jstests/core/query/or/orj.js
 
-    # TODO SERVER-81601 Re-enable once query settings support views.
+    # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
 
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
@@ -70,7 +67,7 @@ executor:
         await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
       global_vars:
         TestData:
-          isCursorHintsToQuerySettings: true
+          isHintsToQuerySettingsSuite: true
   hooks:
     - class: ValidateCollections
       shell_options:

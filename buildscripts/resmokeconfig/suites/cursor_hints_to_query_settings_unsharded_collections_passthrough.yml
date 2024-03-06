@@ -7,13 +7,10 @@ selector:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js
   exclude_files:
-    # TODO SERVER-81601 Re-enable once query settings support views.
-    - jstests/core/views/*.js
-
     # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
     - jstests/core/query/or/orj.js
 
-    # TODO SERVER-81601 Re-enable once query settings support views.
+    # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
 
     # The following tests fail because a certain command or functionality is not supported by
@@ -113,7 +110,7 @@ executor:
         await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
       global_vars:
         TestData:
-          isCursorHintsToQuerySettings: true
+          isHintsToQuerySettingsSuite: true
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

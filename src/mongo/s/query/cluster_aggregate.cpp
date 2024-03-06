@@ -578,6 +578,19 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         explain_common::generateServerParameters(opCtx, result);
     }
 
+    // Here we modify the original 'request' object by copying the query settings from 'expCtx' into
+    // it.
+    //
+    // In case when the original 'request' fails with the 'CommandOnShardedViewNotSupportedOnMongod'
+    // exception, we retrieve the view definition and run the resolved/expanded request. The
+    // resolved/expanded request must use the query settings matching the original request.
+    //
+    // By attaching the query settings to the original request object we can re-use the query
+    // settings even though the original 'expCtx' object has been already destroyed.
+    const auto& querySettings = expCtx->getQuerySettings();
+    if (!query_settings::utils::isEmpty(querySettings)) {
+        request.setQuerySettings(querySettings);
+    }
 
     auto status = [&]() {
         try {

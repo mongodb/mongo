@@ -263,6 +263,12 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
         expandedRequest.setHint(request.getHint());
     }
 
+    // If query settings were present in the original request, they should be present in the
+    // 'expandedRequest'.
+    if (request.getQuerySettings()) {
+        expandedRequest.setQuerySettings(request.getQuerySettings());
+    }
+
     expandedRequest.setMaxTimeMS(request.getMaxTimeMS());
     expandedRequest.setReadConcern(request.getReadConcern());
     expandedRequest.setUnwrappedReadPref(request.getUnwrappedReadPref());

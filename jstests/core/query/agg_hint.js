@@ -1,20 +1,16 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
+// Confirms correct behavior for hinted aggregation execution. This includes tests for scenarios
+// where agg execution differs from query. It also includes confirmation that hint works for find
+// command against views, which is converted to a hinted aggregation on execution.
+//
 // @tags: [
-//   assumes_no_implicit_collection_creation_after_drop,
 //   does_not_support_stepdowns,
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,
 // ]
+import {getAggPlanStages, getOptimizer, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
-// Confirms correct behavior for hinted aggregation execution. This includes tests for scenarios
-// where agg execution differs from query. It also includes confirmation that hint works for find
-// command against views, which is converted to a hinted aggregation on execution.
-
-import {getAggPlanStage, getOptimizer, getPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
-
-const isCursorHintsToQuerySettings = TestData.isCursorHintsToQuerySettings || false;
+const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
 const testDB = db.getSiblingDB("agg_hint");
 assert.commandWorked(testDB.dropDatabase());
@@ -22,7 +18,6 @@ const collName = jsTestName() + "_col"
 const coll = testDB.getCollection(collName);
 const viewName = jsTestName() + "_view"
 const view = testDB.getCollection(viewName);
-const isSbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 function confirmWinningPlanUsesExpectedIndex(
     explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
@@ -34,13 +29,16 @@ function confirmWinningPlanUsesExpectedIndex(
         return;
     }
 
-    const planStage = pipelineOptimizedAway ? getPlanStage(explainResult, stageName[optimizer])
-                                            : getAggPlanStage(explainResult, stageName[optimizer]);
+    const planStages = pipelineOptimizedAway
+        ? getPlanStages(explainResult, stageName[optimizer])
+        : getAggPlanStages(explainResult, stageName[optimizer]);
 
     switch (optimizer) {
         case "classic":
-            assert.neq(null, planStage, tojson(explainResult));
-            assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
+            assert.neq(null, planStages, tojson(explainResult));
+            planStages.forEach(planStage => {
+                assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
+            });
             break;
         case "CQF":
             // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
@@ -121,7 +119,7 @@ confirmAggUsesIndex({
 //
 
 // Hint on poor index choice should force use of the hinted index over one more optimal.
-coll.drop();
+assertDropCollection(testDB, collName);
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({x: i}));
@@ -142,7 +140,7 @@ confirmAggUsesIndex({
 });
 
 // Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
-if (!isCursorHintsToQuerySettings) {
+if (!isHintsToQuerySettingsSuite) {
     confirmAggUsesIndex({
         collName: coll.getName(),
         aggPipeline: [{$match: {x: 3}}],
@@ -155,7 +153,7 @@ if (!isCursorHintsToQuerySettings) {
 // With no hint specified, aggregation will always prefer an index that provides sort order over
 // one that requires a blocking sort. A hinted aggregation should allow for choice of an index
 // that provides blocking sort.
-coll.drop();
+assertDropCollection(testDB, collName);
 assert.commandWorked(coll.createIndex({x: 1}));
 assert.commandWorked(coll.createIndex({y: 1}));
 for (let i = 0; i < 5; ++i) {
@@ -186,7 +184,7 @@ confirmAggUsesIndex({
 // With no hint specified, aggregation will always prefer an index that provides a covered
 // projection over one that does not. A hinted aggregation should allow for choice of an index
 // that does not cover.
-coll.drop();
+assertDropCollection(testDB, collName);
 assert.commandWorked(coll.createIndex({x: 1}));
 assert.commandWorked(coll.createIndex({x: 1, y: 1}));
 for (let i = 0; i < 5; ++i) {
@@ -214,14 +212,9 @@ confirmAggUsesIndex({
     pipelineOptimizedAway: true
 });
 
-// TODO:SERVER-81601 Apply QuerySettings for queries involving views.
-if (isCursorHintsToQuerySettings) {
-    quit();
-}
-
 // Confirm that a hinted agg can be executed against a view.
-coll.drop();
-view.drop();
+assertDropCollection(testDB, collName);
+assertDropCollection(testDB, viewName);
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({x: i}));
@@ -241,17 +234,21 @@ confirmAggUsesIndex({
     expectedKeyPattern: {x: 1},
     pipelineOptimizedAway: true
 });
-confirmAggUsesIndex({
-    collName: view.getName(),
-    aggPipeline: [{$match: {x: 3}}],
-    hintKeyPattern: {_id: 1},
-    expectedKeyPattern: {_id: 1},
-    pipelineOptimizedAway: true
-});
+
+// Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
+if (!isHintsToQuerySettingsSuite) {
+    confirmAggUsesIndex({
+        collName: view.getName(),
+        aggPipeline: [{$match: {x: 3}}],
+        hintKeyPattern: {_id: 1},
+        expectedKeyPattern: {_id: 1},
+        pipelineOptimizedAway: true
+    });
+}
 
 // Confirm that a hinted find can be executed against a view.
-coll.drop();
-view.drop();
+assertDropCollection(testDB, collName);
+assertDropCollection(testDB, viewName);
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({x: i}));
@@ -269,16 +266,20 @@ confirmCommandUsesIndex({
     expectedKeyPattern: {x: 1},
     pipelineOptimizedAway: true
 });
-confirmCommandUsesIndex({
-    command: {find: view.getName(), filter: {x: 3}},
-    hintKeyPattern: {_id: 1},
-    expectedKeyPattern: {_id: 1},
-    pipelineOptimizedAway: true
-});
+
+// Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
+if (!isHintsToQuerySettingsSuite) {
+    confirmCommandUsesIndex({
+        command: {find: view.getName(), filter: {x: 3}},
+        hintKeyPattern: {_id: 1},
+        expectedKeyPattern: {_id: 1},
+        pipelineOptimizedAway: true
+    });
+}
 
 // Confirm that a hinted count can be executed against a view.
-coll.drop();
-view.drop();
+assertDropCollection(testDB, collName);
+assertDropCollection(testDB, viewName);
 assert.commandWorked(coll.createIndex({x: 1}));
 for (let i = 0; i < 5; ++i) {
     assert.commandWorked(coll.insert({x: i}));
@@ -298,8 +299,12 @@ confirmCommandUsesIndex({
     expectedKeyPattern: {x: 1},
     stageName: {"classic": "COUNT_SCAN", "CQF": ""},
 });
-confirmCommandUsesIndex({
-    command: {count: view.getName(), query: {x: 3}},
-    hintKeyPattern: {_id: 1},
-    expectedKeyPattern: {_id: 1},
-});
+
+// Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
+if (!isHintsToQuerySettingsSuite) {
+    confirmCommandUsesIndex({
+        command: {count: view.getName(), query: {x: 3}},
+        hintKeyPattern: {_id: 1},
+        expectedKeyPattern: {_id: 1},
+    });
+}

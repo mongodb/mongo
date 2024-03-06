@@ -11,7 +11,14 @@
 // For arrayEq. We don't use array.eq as it does an ordered comparison on arrays but we don't
 // care about order in the distinct response.
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAllNodeExplains, getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {
+    getAllNodeExplains,
+    getPlanStage,
+    getWinningPlan,
+    hasRejectedPlans
+} from "jstests/libs/analyze_plan.js";
+
+const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
 var viewsDB = db.getSiblingDB("views_distinct");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -106,27 +113,43 @@ assert.eq(nReturned, 2);
 
 // Distinct with hints work on views.
 assert.commandWorked(viewsDB.coll.createIndex({state: 1}));
+assert.commandWorked(viewsDB.coll.createIndex({pop: 1}));
 
+// Query settings do not force indexes and therefore 'state' index is not used when filtering on
+// 'pop'.
+if (!isHintsToQuerySettingsSuite) {
+    getAllNodeExplains(largePopView.explain().distinct("pop", {}, {
+        hint: {state: 1}
+    })).forEach((explainPlan) => {
+        assert(getPlanStage(explainPlan.stages[0].$cursor, "FETCH"));
+        const ixscan = getPlanStage(explainPlan.stages[0].$cursor, "IXSCAN");
+        assert.eq(ixscan.indexName, "state_1");
+        assert(!hasRejectedPlans(explainPlan));
+    });
+
+    getAllNodeExplains(largePopView.explain().distinct("pop")).forEach((explainPlan) => {
+        assert.neq(getWinningPlan(explainPlan.stages[0].$cursor.queryPlanner).stage,
+                   "IXSCAN",
+                   tojson(explainPlan));
+    });
+
+    // Make sure that the hint produces the right results.
+    assert(arrayEq([10, 7], largePopView.distinct("pop", {}, {hint: {state: 1}})));
+    const result = largePopView.runCommand(
+        "distinct", {"key": "a", query: {a: 1, b: 2}, hint: {bad: 1, hint: 1}});
+    assert.commandFailedWithCode(result, ErrorCodes.BadValue, result);
+    const regex = new RegExp("hint provided does not correspond to an existing index");
+    assert(regex.test(result.errmsg));
+}
+
+// Ensure hint is applied and 'pop' index is used.
 getAllNodeExplains(largePopView.explain().distinct("pop", {}, {
-    hint: {state: 1}
+    hint: {pop: 1}
 })).forEach((explainPlan) => {
-    assert(getPlanStage(explainPlan.stages[0].$cursor, "FETCH"));
-    assert(getPlanStage(explainPlan.stages[0].$cursor, "IXSCAN"));
+    const ixscan = getPlanStage(explainPlan.stages[0].$cursor, "IXSCAN");
+    assert.eq(ixscan.indexName, "pop_1");
+    assert(!hasRejectedPlans(explainPlan));
 });
-
-getAllNodeExplains(largePopView.explain().distinct("pop")).forEach((explainPlan) => {
-    assert.neq(getWinningPlan(explainPlan.stages[0].$cursor.queryPlanner).stage,
-               "IXSCAN",
-               tojson(explainPlan));
-});
-
-// Make sure that the hint produces the right results.
-assert(arrayEq([10, 7], largePopView.distinct("pop", {}, {hint: {state: 1}})));
-const result =
-    largePopView.runCommand("distinct", {"key": "a", query: {a: 1, b: 2}, hint: {bad: 1, hint: 1}});
-assert.commandFailedWithCode(result, ErrorCodes.BadValue, result);
-const regex = new RegExp("hint provided does not correspond to an existing index");
-assert(regex.test(result.errmsg));
 
 // Distinct commands fail when they try to change the collation of a view.
 assert.commandFailedWithCode(

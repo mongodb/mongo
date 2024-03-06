@@ -231,13 +231,6 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards[AggregateCommandRequest::kCollationFieldName] = Value(collationObj);
     }
 
-    // Pass query settings of the original request to the shards.
-    if (auto querySettingsBSON = expCtx->getQuerySettings().toBSON();
-        !querySettingsBSON.isEmpty()) {
-        cmdForShards[AggregateCommandRequest::kQuerySettingsFieldName] =
-            Value(std::move(querySettingsBSON));
-    }
-
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (explainVerbosity) {
