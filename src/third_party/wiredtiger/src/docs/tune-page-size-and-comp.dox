@@ -353,23 +353,6 @@ such a configuration string is as follows:
 "key_format=S,value_format=S,dictionary=1000"
 </pre>
 
-- Huffman
-\n
-Reduces the size requirement by compressing individual value items, and
-can be configured for values. The additional CPU cost of Huffman encoding
-can be high, and should be considered. (See @ref huffman for details.)
-\n\n
-Huffman configuration:
-\n
-Specified using the \c huffman_value configuration
-options to WT_SESSION::create. These options can take values of "english"
-(to use a built-in English language frequency table), "utf8<file>" or
-"utf16<file>" (to use a custom UTF-8 or UTF-16 symbol frequency table file).
-An example of such a configuration string is as follows:
-<pre>
-"key_format=S,value_format=S,huffman_value=english"
-</pre>
-
 - Block Compression
 \n
 Reduces the size requirement of on-disk objects by compressing blocks of
@@ -405,7 +388,6 @@ different compression options.
       Reduces on-disk size, CPU and Memory cost}
 @row{Key-prefix, yes, no, no, disabled, yes, yes, minor}
 @row{Dictionary, yes, yes, no, disabled, yes, yes, minor}
-@row{Huffman, yes, yes, no, disabled, yes, yes, can be high}
 @row{Block, yes, yes, yes, disabled, no, yes, can be high}
 </table>
 

@@ -83,10 +83,6 @@ misses when searching the tree.
 WiredTiger supports key prefix compression and value dictionaries,
 reducing the amount of memory keys and values require.
 
-WiredTiger supports static encoding with a configurable Huffman engine,
-which typically reduces the amount of information maintained in memory
-by 20-50%.
-
 @section io Making I/O more valuable
 
 WiredTiger uses compact file formats to minimize on-disk overhead.

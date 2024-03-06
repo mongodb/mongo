@@ -160,13 +160,13 @@ struct __wt_cursor_btree {
     uint32_t row_iteration_slot; /* Row-store iteration slot */
 
     /*
-     * Variable-length column-store values are run-length encoded and may be overflow values or
-     * Huffman encoded. To avoid repeatedly reading overflow values or decompressing encoded values,
-     * process it once and store the result in a temporary buffer. The cip_saved field is used to
-     * determine if we've switched columns since our last cursor call. Note however that this result
-     * caching is not necessarily safe for all RLE cells. The flag WT_CBT_CACHEABLE_RLE_CELL
-     * indicates that the value is uniform across the whole cell. If it is not set (e.g. if the cell
-     * is not globally visible yet), the cached values should not be used.
+     * Variable-length column-store values are run-length encoded and may be overflow values. To
+     * avoid repeatedly reading overflow values or decompressing encoded values, process it once and
+     * store the result in a temporary buffer. The cip_saved field is used to determine if we've
+     * switched columns since our last cursor call. Note however that this result caching is not
+     * necessarily safe for all RLE cells. The flag WT_CBT_CACHEABLE_RLE_CELL indicates that the
+     * value is uniform across the whole cell. If it is not set (e.g. if the cell is not globally
+     * visible yet), the cached values should not be used.
      */
     WT_COL *cip_saved; /* Last iteration reference */
 

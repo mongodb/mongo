@@ -69,7 +69,7 @@ configurations when there is any question.
 @section file_formats_compression File formats and compression
 
 Row-stores support four types of compression: key prefix compression,
-dictionary compression, Huffman encoding and block compression.
+dictionary compression and block compression.
 
 - Key prefix compression reduces the size requirement of both in-memory
 and on-disk objects by storing any identical key prefix only once per
@@ -99,15 +99,6 @@ pages to disk.
 
   Dictionary compression is disabled by default.
 
-- Huffman encoding reduces the size requirement of both the in-memory
-and on-disk objects by compressing individual value items.  The cost is
-additional CPU and memory use when returning values from the in-memory
-tree and when writing pages to disk.  Note the additional CPU cost of
-Huffman encoding can be high, and should be considered. (See
-@subpage_single huffman for details.)
-
-  Huffman encoding is disabled by default.
-
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
@@ -116,9 +107,8 @@ considered.   (See @ref compression_considerations for details.)
 
   Block compression is disabled by default.
 
-Variable-length column stores support four types of compression:
-run-length encoding, dictionary compression, Huffman encoding and
-block compression.
+Variable-length column stores support three types of compression:
+run-length encoding, dictionary compression and block compression.
 
 - Run-length encoding reduces the size requirement of both the in-memory
 and on-disk objects by storing sequential, duplicate values in the store
@@ -134,15 +124,6 @@ per page.  The cost is minor additional CPU and memory use when
 returning values from the in-memory tree and when writing pages to disk.
 
   Dictionary compression is disabled by default.
-
-- Huffman encoding reduces the size requirement of both the in-memory
-and on-disk objects by compressing individual value items.  The cost is
-additional CPU and memory use when returning values from the in-memory
-tree and when writing pages to disk.  Note the additional CPU cost of
-Huffman encoding can be high, and should be considered.
-(See @ref_single huffman for details.)
-
-  Huffman encoding is disabled by default.
 
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional

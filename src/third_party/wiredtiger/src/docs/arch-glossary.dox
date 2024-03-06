@@ -35,7 +35,7 @@ they are used in other settings.
 <tr><td>column store<td>btree<td>a Btrees that has as its key a record id
 <tr><td>commit timestamp<td>transactions<td>values in this transaction become visible at this timestamp.
 <tr><td>compare and swap (CAS)<td>general<td>a CPU instruction that can be used to coordinate the activity of multiple threads. Specifically, the instruction atomically changes a memory location to a new value only if the existing value matches a second value.
-<tr><td>compression<td>general<td>one of several techniques to reduce the size of data on disk and memory.  See block compression, run length encoding, Huffman encoding, key prefix compression.
+<tr><td>compression<td>general<td>one of several techniques to reduce the size of data on disk and memory.  See block compression, run length encoding, key prefix compression.
 <tr><td>connection<td>general<td>an encapsulation of information stored for an application's use of a WiredTiger instance attached to a specific home directory. This encapsulation is kept in a handle that is used in the API.
 <tr><td>cursor<td>general<td>a handle in the WiredTiger API that encapsulates a position in a Btree, and may hold the key and value associated with that position.
 <tr><td>data handle<td>general<td>an abstraction of a named file, table or other data source in WiredTiger
@@ -58,7 +58,6 @@ they are used in other settings.
 <tr><td>history store value<td>durable history<td>a version of a key older than the on-disk value, which has been written out to the history store.
 <tr><td>home directory<td>general<td>the directory containing all the data for a WiredTiger connection.  The connection is attached to this directory via a call to ::wiredtiger_open.
 <tr><td>HS<td>durable history<td>see "history store".
-<tr><td>Huffman encoding<td>btree<td>data in a btree may optionally be encoded using a Huffman encoding, based on either English letter frequencies or a custom encoding.  See @subpage_single huffman for details.
 <tr><td>index<td>schema<td>a Btree with records having values that are keys to another Btree. An index (or set of indices) become associated with a primary Btree via the table construct.
 <tr><td>insert<td>btree<td>an in-memory structure holding a key and a set of updates for a Btree.
 <tr><td>internal page<td>btree<td>either in-memory or on disk, a page in a Btree that has a set of keys that reference pages beneath it.

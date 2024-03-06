@@ -64,7 +64,6 @@ code sprinkled throughout that is conditional on \c WT_BTREE->type.
 @row{Block compression, Yes, Yes, Yes}
 @row{Dictionary compression, Yes, Yes, No}
 @row{Fast truncate, Yes, No, No}
-@row{Huffman encoding, Yes, Yes, No}
 @row{Prefix and suffix compression, Yes, No, No}
 @row{RLE compression, No, Yes, No}
 </table>
