@@ -424,10 +424,9 @@ __wt_conf_compile_api_call(WT_SESSION_IMPL *session, const WT_CONFIG_ENTRY *cent
     /* Save the config string from the API call, it can be helpful for debugging. */
     conf->api_config = config;
 
-    /* Add to it the user format if any. */
-    if (config != NULL)
-        WT_ERR(__conf_compile(session, centry->method, conf, conf, centry->checks,
-          centry->checks_entries, centry->checks_jump, config, strlen(config), false, false));
+    /* Add the user config to it. */
+    WT_ERR(__conf_compile(session, centry->method, conf, conf, centry->checks,
+      centry->checks_entries, centry->checks_jump, config, strlen(config), false, false));
 
     *confp = conf;
 
