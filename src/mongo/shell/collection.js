@@ -8,7 +8,6 @@ if ((typeof DBCollection) == "undefined") {
         this._db = db;
         this._shortName = shortName;
         this._fullName = fullName;
-
         this.verify();
     };
 }
@@ -640,6 +639,56 @@ DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
     }
     return this._db.runCommand(
         {createIndexes: this.getName(), indexes: indexSpecs, commitQuorum: commitQuorum});
+};
+
+// TODO SERVER-87541 add createSearchIndexes command.
+DBCollection.prototype.createSearchIndex = function(keys, blockUntilSearchIndexQueryable) {
+    if (arguments.length > 2) {
+        throw new Error("createSearchIndex accepts up to 2 arguments");
+    }
+
+    let blockOnIndexQueryable = true;
+    if (arguments.length == 2) {
+        // The second arg may only be the "blockUntilSearchIndexQueryable" flag.
+        if (typeof (blockUntilSearchIndexQueryable) != 'object' ||
+            Object.keys(blockUntilSearchIndexQueryable).length != 1 ||
+            !blockUntilSearchIndexQueryable.hasOwnProperty('blockUntilSearchIndexQueryable')) {
+            throw new Error(
+                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object")
+        }
+
+        blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
+        if (typeof blockOnIndexQueryable != "boolean") {
+            throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean")
+        }
+    }
+
+    if (!keys.hasOwnProperty('definition')) {
+        throw new Error("createSearchIndex must have a definition");
+    }
+
+    let response = assert.commandWorked(
+        this._db.runCommand({createSearchIndexes: this.getName(), indexes: [keys]}));
+
+    if (!blockOnIndexQueryable) {
+        return response;
+    }
+
+    let id = response["indexesCreated"][0]["id"];
+
+    // This should return a single index as the query specifies an id.
+    let searchIndexArray = this.aggregate([{$listSearchIndexes: {id}}]).toArray();
+    assert.eq(searchIndexArray.length, 1, searchIndexArray);
+
+    // Do not exit until search index is queryable.
+    let queryable = searchIndexArray[0]["queryable"];
+    if (queryable) {
+        return response;
+    }
+    // This default times out in 90 seconds.
+    assert.soon(() => this.aggregate([{$listSearchIndexes: {id}}]).toArray()[0]["queryable"]);
+
+    return response;
 };
 
 DBCollection.prototype.reIndex = function() {

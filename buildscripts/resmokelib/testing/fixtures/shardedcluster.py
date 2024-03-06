@@ -164,6 +164,13 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         all_nodes += self.shards
         return sum([node._all_mongo_d_s_t() for node in all_nodes], [])
 
+    def _all_mongots(self):
+        """Return a list of all `mongot` `Process` instances in this fixture."""
+        mongot_processes = []
+        for replicaset in self.shards:
+            mongot_processes.extend(replicaset._all_mongots())
+        return mongot_processes
+
     def refresh_logical_session_cache(self, target):
         """Refresh logical session cache with no timeout."""
         primary = target.get_primary().mongo_client()
