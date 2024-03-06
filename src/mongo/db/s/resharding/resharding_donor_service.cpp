@@ -720,7 +720,15 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         })
         .thenRunOn(**executor)
         .then([this]() { _transitionState(DonorStateEnum::kDonatingOplogEntries); })
-        .onCompletion([=](Status s) {
+        .onCompletion([=, this](Status status) {
+            if (!status.isOK()) {
+                LOGV2_ERROR(8639700,
+                            "Failed to transition the donor shard's state to `donating`",
+                            "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                            "error"_attr = redact(status));
+                return status;
+            }
+
             reshardingDonorFailsAfterTransitionToDonatingOplogEntries.execute(
                 [&](const BSONObj& data) {
                     auto errmsgElem = data["errmsg"];
@@ -728,6 +736,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
                         errmsgElem ? errmsgElem.checkAndGetStringData() : "Failing for test"_sd;
                     uasserted(ErrorCodes::InternalError, errmsg);
                 });
+            return status;
         });
 }
 
