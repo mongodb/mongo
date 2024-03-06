@@ -315,17 +315,17 @@ def create_report_info(change_list: dict,
                         change_num_branches += len(branch_coverage)
                         change_num_branches_covered += get_num_branches_covered(branch_coverage_info=branch_coverage)
 
-                    if preprocessed_complexity_data:
-                        function_info = get_function_info(file_path=new_file,
-                                                          line_number=line.new_lineno,
-                                                          preprocessed_complexity_data=preprocessed_complexity_data,
-                                                          preprocessed_prev_complexity_data=preprocessed_prev_complexity_data,
-                                                          coverage_data=coverage_data)
-                        if function_info:
-                            if new_file not in changed_function_info:
-                                changed_function_info[new_file] = dict()
-                            function_name = function_info['name']
-                            changed_function_info[new_file][function_name] = function_info
+                        if preprocessed_complexity_data:
+                            function_info = get_function_info(file_path=new_file,
+                                                              line_number=line.new_lineno,
+                                                              preprocessed_complexity_data=preprocessed_complexity_data,
+                                                              preprocessed_prev_complexity_data=preprocessed_prev_complexity_data,
+                                                              coverage_data=coverage_data)
+                            if function_info:
+                                if new_file not in changed_function_info:
+                                    changed_function_info[new_file] = dict()
+                                function_name = function_info['name']
+                                changed_function_info[new_file][function_name] = function_info
 
                 lines_info.append(line_info)
 
