@@ -171,6 +171,8 @@ boost::optional<NamespaceString> namespaceForUUID(OperationContext* opCtx,
     // TODO SERVER-73111: Remove the dependency on CollectionCatalog
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
 }
+
+auto& boundRetries = *MetricBuilder<Counter64>("wiredTiger.recordStoreCursorBoundRetries");
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
@@ -2173,6 +2175,14 @@ Record WiredTigerRecordStoreCursorBase::getRecord(WT_CURSOR* c, const RecordId& 
     return {id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}};
 }
 
+void WiredTigerRecordStoreCursorBase::resetCursor() {
+    if (_cursor) {
+        WT_CURSOR* c = _cursor->get();
+        invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
+        _boundSet = false;
+    }
+}
+
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seek(const RecordId& start,
                                                               BoundInclusion boundInclusion) {
     invariant(_hasRestored);
@@ -2183,29 +2193,35 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seek(const RecordId& st
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
 
-    // We must unposition our cursor by resetting so that we can set new bounds.
-    invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
-
     const char* config;
+    WiredTigerRecordStore::CursorKey key;
     // The default bound is inclusive.
     if (_forward) {
-        auto key = makeCursorKey(start, _keyFormat);
-        setKey(c, &key);
+        key = makeCursorKey(start, _keyFormat);
         config = boundInclusion == BoundInclusion::kExclude ? "bound=lower,inclusive=false"
                                                             : "bound=lower";
     } else {
         if (_readTimestampForOplog && start.getLong() > *_readTimestampForOplog) {
-            auto key = makeCursorKey(RecordId(*_readTimestampForOplog), _keyFormat);
-            setKey(c, &key);
+            key = makeCursorKey(RecordId(*_readTimestampForOplog), _keyFormat);
             config = "bound=upper";
         } else {
-            auto key = makeCursorKey(start, _keyFormat);
-            setKey(c, &key);
+            key = makeCursorKey(start, _keyFormat);
             config = boundInclusion == BoundInclusion::kExclude ? "bound=upper,inclusive=false"
                                                                 : "bound=upper";
         }
     }
-    invariantWTOK(c->bound(c, config), c->session);
+    setKey(c, &key);
+    // Optimistically set the bounds on the cursor, which can fail if this cursor is already
+    // positioned. If this fails, reset the cursor and retry. The majority of callers do not reuse
+    // positioned cursors, so we accept this cost.
+    if (MONGO_unlikely(c->bound(c, config) != 0)) {
+        // Unposition the cursor and retry.
+        boundRetries.increment(1);
+        resetCursor();
+        setKey(c, &key);
+        invariantWTOK(c->bound(c, config), c->session);
+    }
+    _boundSet = true;
 
     int ret =
         wiredTigerPrepareConflictRetry(_opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
@@ -2242,7 +2258,9 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     WT_CURSOR* c = _cursor->get();
 
     // Reset the cursor before using it in case it has any saved bounds from a previous seek.
-    invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
+    if (_boundSet) {
+        resetCursor();
+    }
 
     auto key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
@@ -2282,7 +2300,9 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     WT_CURSOR* c = _cursor->get();
 
     // Reset the cursor before using it in case it has any saved bounds from a previous seek.
-    invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
+    if (_boundSet) {
+        resetCursor();
+    }
 
     auto key = makeCursorKey(start, _keyFormat);
     setKey(c, &key);
@@ -2344,10 +2364,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
 }
 
 void WiredTigerRecordStoreCursorBase::save() {
-    if (_cursor) {
-        WT_CURSOR* wtCur = _cursor->get();
-        invariantWTOK(WT_READ_CHECK(wtCur->reset(wtCur)), wtCur->session);
-    }
+    resetCursor();
     _oplogVisibleTs = boost::none;
     _cappedSnapshot = boost::none;
     _readTimestampForOplog = boost::none;

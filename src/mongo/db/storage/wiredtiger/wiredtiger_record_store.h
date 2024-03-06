@@ -478,6 +478,7 @@ private:
     void initCappedVisibility(OperationContext* opCtx);
     void reportOutOfOrderRead(RecordId& id, bool failWithOutOfOrderForTest);
     Record getRecord(WT_CURSOR* c, const RecordId& id);
+    void resetCursor();
 
     /**
      * This value is used for visibility calculations on what oplog entries can be returned to a
@@ -496,6 +497,7 @@ private:
      */
     boost::optional<std::int64_t> _readTimestampForOplog = boost::none;
     bool _saveStorageCursorOnDetachFromOperationContext = false;
+    bool _boundSet = false;
 };
 
 class WiredTigerRecordStoreStandardCursor final : public WiredTigerRecordStoreCursorBase {
