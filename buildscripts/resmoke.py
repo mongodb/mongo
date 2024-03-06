@@ -12,6 +12,7 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts.resmokelib import cli
 
 
+# Entrypoint
 def entrypoint():
     cli.main(sys.argv)
 
