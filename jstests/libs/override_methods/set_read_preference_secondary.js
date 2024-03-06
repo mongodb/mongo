@@ -1,9 +1,6 @@
 /**
  * Use prototype overrides to set read preference to "secondary" when running tests.
  */
-import {
-    EncryptedClient,
-} from "jstests/fle2/libs/encrypted_client_util.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 

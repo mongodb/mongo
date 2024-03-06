@@ -3,13 +3,16 @@
 // databases at the end of the suite to verify that each secondary only ran the read commands it
 // got directly from the shell.
 
-assert(TestData.connectDirectlyToRandomSubsetOfSecondaries);
-
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {
+    getTotalNumProfilerDocs,
+    validateProfilerCollections
+} from "jstests/noPassthrough/rs_endpoint/lib/validate_direct_secondary_reads.js";
+
+assert(TestData.connectDirectlyToRandomSubsetOfSecondaries);
 
 assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
-
 if (topology.type !== Topology.kReplicaSet) {
     throw new Error("Unrecognized topology format:" + tojsononeline(topology));
 }
@@ -19,79 +22,11 @@ const hostDocs = hostColl.find().toArray();
 assert.gt(hostDocs.length, 0, "Could not find information about direct secondary reads");
 print("Validating profiler collections on hosts " + tojsononeline(hostDocs));
 
-/**
- * Returns the profiler docs for the specified database that match that specified filter.
- * Automatically retries on a CappedPositionLost error since the profiler collection is capped so
- * this error is expected.
- */
-function findProfilerDocsAutoRetry(conn, dbName, filter) {
-    const profilerColl = conn.getDB(dbName).system.profile;
-
-    let profilerDocs;
-    assert.soon(() => {
-        try {
-            profilerDocs = profilerColl.find(filter).toArray();
-            return true;
-        } catch (e) {
-            if (e.code !== ErrorCodes.CappedPositionLost) {
-                throw e;
-            }
-            print(`Retrying on CappedPositionLost error: ${tojson(e)}`);
-            return false;
-        }
-    });
-    return profilerDocs;
-}
-
+// Count the number of profiler docs to verify that that profiling is enabled.
 const numProfilerDocsPerHost = {};
-
-function validateProfilerCollections(hostDoc) {
-    print("Validating profiler collections on host " + tojsononeline(hostDoc));
-    const conn = new Mongo(hostDoc.host);
-    conn.setSecondaryOk();
-    jsTest.authenticate(conn);
-
-    const dbNames = conn.getDBNames();
-    for (let dbName of dbNames) {
-        const profilerDocs = findProfilerDocsAutoRetry(
-            conn, dbName, {ns: {$ne: dbName + ".system.profile"}, appName: "MongoDB Shell"});
-        numProfilerDocsPerHost[hostDoc.host] += profilerDocs.length;
-
-        jsTest.log("Validating profiler collection for database '" + dbName + "' on host " +
-                   tojsononeline({...hostDoc, numDocs: profilerDocs.length}));
-        if (hostDoc.isExcluded) {
-            // Verify that this host didn't run any commands from the shell since it was excluded.
-            assert.eq(profilerDocs.length, 0, profilerDocs);
-        }
-
-        // Verify that this host didn't run any commands from the shell that were supposed to run on
-        // other hosts.
-        hostDocs.forEach(otherHostDoc => {
-            if (otherHostDoc.host == hostDoc.host) {
-                return;
-            }
-            if (!otherHostDoc.hasOwnProperty("comment")) {
-                assert(otherHostDoc.isPrimary || otherHostDoc.isExcluded, otherHostDoc);
-                return;
-            }
-            const profilerDocs = findProfilerDocsAutoRetry(
-                conn,
-                dbName,
-                {ns: {$ne: dbName + ".system.profile"}, comment: otherHostDoc.comment});
-            assert.eq(profilerDocs.length, 0, profilerDocs);
-        });
-    }
-}
-
 hostDocs.forEach(hostDoc => {
-    numProfilerDocsPerHost[hostDoc.host] = 0
-    validateProfilerCollections(hostDoc);
+    validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPerHost);
 });
-// Sanity check to verify that profiling is enabled.
-let totalNumProfilerDocs = 0;
-for (let host in numProfilerDocsPerHost) {
-    totalNumProfilerDocs += numProfilerDocsPerHost[host];
-}
 jsTest.log("Finished validating profiler collections on hosts " +
            tojsononeline({numProfilerDocsPerHost}));
-assert.gt(totalNumProfilerDocs, 0);
+assert.gt(getTotalNumProfilerDocs(numProfilerDocsPerHost), 0);
