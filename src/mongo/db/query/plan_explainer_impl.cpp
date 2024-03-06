@@ -738,66 +738,87 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->collectionScansNonTailable = 0;
 
     for (size_t i = 0; i < stages.size(); i++) {
-        statsOut->totalKeysExamined +=
-            getKeysExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
-        statsOut->totalDocsExamined +=
-            getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
+        auto stageType = stages[i]->stageType();
+        statsOut->totalKeysExamined += getKeysExamined(stageType, stages[i]->getSpecificStats());
+        statsOut->totalDocsExamined += getDocsExamined(stageType, stages[i]->getSpecificStats());
 
-        if (isSortStageType(stages[i]->stageType())) {
-            auto sortStage = static_cast<const SortStage*>(stages[i]);
-            auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
-            PlanSummaryStatsVisitor(*statsOut).visit(sortStats);
-        }
-
-        if (STAGE_IXSCAN == stages[i]->stageType()) {
-            const IndexScan* ixscan = static_cast<const IndexScan*>(stages[i]);
-            const IndexScanStats* ixscanStats =
-                static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
-            statsOut->indexesUsed.insert(ixscanStats->indexName);
-        } else if (STAGE_COUNT_SCAN == stages[i]->stageType()) {
-            const CountScan* countScan = static_cast<const CountScan*>(stages[i]);
-            const CountScanStats* countScanStats =
-                static_cast<const CountScanStats*>(countScan->getSpecificStats());
-            statsOut->indexesUsed.insert(countScanStats->indexName);
-        } else if (STAGE_IDHACK == stages[i]->stageType()) {
-            const IDHackStage* idHackStage = static_cast<const IDHackStage*>(stages[i]);
-            const IDHackStats* idHackStats =
-                static_cast<const IDHackStats*>(idHackStage->getSpecificStats());
-            statsOut->indexesUsed.insert(idHackStats->indexName);
-        } else if (STAGE_DISTINCT_SCAN == stages[i]->stageType()) {
-            const DistinctScan* distinctScan = static_cast<const DistinctScan*>(stages[i]);
-            const DistinctScanStats* distinctScanStats =
-                static_cast<const DistinctScanStats*>(distinctScan->getSpecificStats());
-            statsOut->indexesUsed.insert(distinctScanStats->indexName);
-        } else if (STAGE_TEXT_MATCH == stages[i]->stageType()) {
-            const TextMatchStage* textStage = static_cast<const TextMatchStage*>(stages[i]);
-            const TextMatchStats* textStats =
-                static_cast<const TextMatchStats*>(textStage->getSpecificStats());
-            statsOut->indexesUsed.insert(textStats->indexName);
-        } else if (STAGE_GEO_NEAR_2D == stages[i]->stageType() ||
-                   STAGE_GEO_NEAR_2DSPHERE == stages[i]->stageType()) {
-            const NearStage* nearStage = static_cast<const NearStage*>(stages[i]);
-            const NearStats* nearStats =
-                static_cast<const NearStats*>(nearStage->getSpecificStats());
-            statsOut->indexesUsed.insert(nearStats->indexName);
-        } else if (STAGE_CACHED_PLAN == stages[i]->stageType()) {
-            const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
-            const CachedPlanStats* cachedStats =
-                static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
-            statsOut->replanReason = cachedStats->replanReason;
-            // Nonnull replanReason indicates cached plan was less effecient than expected and an
-            // alternative plan was chosen.
-            statsOut->replanReason ? statsOut->fromPlanCache = false
-                                   : statsOut->fromPlanCache = true;
-        } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
-            statsOut->fromMultiPlanner = true;
-        } else if (STAGE_COLLSCAN == stages[i]->stageType()) {
-            statsOut->collectionScans++;
-            const auto collScan = static_cast<const CollectionScan*>(stages[i]);
-            const auto collScanStats =
-                static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
-            if (!collScanStats->tailable)
-                statsOut->collectionScansNonTailable++;
+        switch (stageType) {
+            case STAGE_SORT_DEFAULT:
+            case STAGE_SORT_SIMPLE: {
+                auto sortStage = static_cast<const SortStage*>(stages[i]);
+                auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
+                PlanSummaryStatsVisitor(*statsOut).visit(sortStats);
+                break;
+            }
+            case STAGE_IXSCAN: {
+                const IndexScan* ixscan = static_cast<const IndexScan*>(stages[i]);
+                const IndexScanStats* ixscanStats =
+                    static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
+                statsOut->indexesUsed.insert(ixscanStats->indexName);
+                break;
+            }
+            case STAGE_COUNT_SCAN: {
+                const CountScan* countScan = static_cast<const CountScan*>(stages[i]);
+                const CountScanStats* countScanStats =
+                    static_cast<const CountScanStats*>(countScan->getSpecificStats());
+                statsOut->indexesUsed.insert(countScanStats->indexName);
+                break;
+            }
+            case STAGE_IDHACK: {
+                const IDHackStage* idHackStage = static_cast<const IDHackStage*>(stages[i]);
+                const IDHackStats* idHackStats =
+                    static_cast<const IDHackStats*>(idHackStage->getSpecificStats());
+                statsOut->indexesUsed.insert(idHackStats->indexName);
+                break;
+            }
+            case STAGE_DISTINCT_SCAN: {
+                const DistinctScan* distinctScan = static_cast<const DistinctScan*>(stages[i]);
+                const DistinctScanStats* distinctScanStats =
+                    static_cast<const DistinctScanStats*>(distinctScan->getSpecificStats());
+                statsOut->indexesUsed.insert(distinctScanStats->indexName);
+                break;
+            }
+            case STAGE_TEXT_MATCH: {
+                const TextMatchStage* textStage = static_cast<const TextMatchStage*>(stages[i]);
+                const TextMatchStats* textStats =
+                    static_cast<const TextMatchStats*>(textStage->getSpecificStats());
+                statsOut->indexesUsed.insert(textStats->indexName);
+                break;
+            }
+            case STAGE_GEO_NEAR_2D:
+            case STAGE_GEO_NEAR_2DSPHERE: {
+                const NearStage* nearStage = static_cast<const NearStage*>(stages[i]);
+                const NearStats* nearStats =
+                    static_cast<const NearStats*>(nearStage->getSpecificStats());
+                statsOut->indexesUsed.insert(nearStats->indexName);
+                break;
+            }
+            case STAGE_CACHED_PLAN: {
+                const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
+                const CachedPlanStats* cachedStats =
+                    static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
+                statsOut->replanReason = cachedStats->replanReason;
+                // Nonnull replanReason indicates cached plan was less effecient than expected and
+                // an alternative plan was chosen.
+                statsOut->replanReason ? statsOut->fromPlanCache = false
+                                       : statsOut->fromPlanCache = true;
+                break;
+            }
+            case STAGE_MULTI_PLAN: {
+                statsOut->fromMultiPlanner = true;
+                break;
+            }
+            case STAGE_COLLSCAN: {
+                statsOut->collectionScans++;
+                const auto collScan = static_cast<const CollectionScan*>(stages[i]);
+                const auto collScanStats =
+                    static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
+                if (!collScanStats->tailable)
+                    statsOut->collectionScansNonTailable++;
+                break;
+            }
+            default:
+                break;
         }
     }
 }
