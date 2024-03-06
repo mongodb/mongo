@@ -1308,15 +1308,6 @@ __wt_rec_col_var(
             goto record_loop;
         }
 
-        /*
-         * If data is Huffman encoded, we have to decode it in order to compare it with the last
-         * item we saw, which may have been an update string. This guarantees we find every single
-         * pair of objects we can RLE encode, including applications updating an existing record
-         * where the new value happens (?) to match a Huffman- encoded value in a previous or next
-         * record.
-         */
-        WT_ERR(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_COL_VAR, vpack, orig));
-
 record_loop:
         /*
          * Generate on-page entries: loop repeat records, looking for WT_INSERT entries matching the
@@ -1404,16 +1395,15 @@ record_loop:
                      * copy; read it into memory.
                      */
                     WT_ERR(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_COL_VAR, vpack, orig));
-
-                    ovfl_state = OVFL_IGNORE;
-                /* FALLTHROUGH */
-                case OVFL_IGNORE:
-                    /*
-                     * Original is an overflow item and we were forced to copy it into memory, or
-                     * the original wasn't an overflow item; use the data copied into orig.
-                     */
                     data = orig->data;
                     size = (uint32_t)orig->size;
+
+                    ovfl_state = OVFL_IGNORE;
+                    break;
+                case OVFL_IGNORE:
+                    /* The original wasn't an overflow item. */
+                    data = vpack->data;
+                    size = vpack->size;
                     break;
                 }
             } else {
