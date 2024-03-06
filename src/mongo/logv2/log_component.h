@@ -65,6 +65,7 @@ namespace mongo::logv2 {
     X(kQueryStats,             , "queryStats"            , "QRYSTATS", kDefault) \
     X(kQueryOptimizer,         , "optimizer"             , "Q_OPT"   , kQuery) \
     X(kQueryCE,                , "ce"                    , "Q_CE"    , kQuery) \
+    X(kQueryRejected,          , "rejected"              , "Q_REJECT", kQuery) \
     X(kReplication,            , "replication"           , "REPL"    , kDefault) \
     X(kReplicationElection,    , "election"              , "ELECTION", kReplication) \
     X(kReplicationHeartbeats,  , "heartbeats"            , "REPL_HB" , kReplication) \

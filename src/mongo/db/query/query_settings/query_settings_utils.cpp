@@ -40,6 +40,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 namespace mongo::query_settings {
 
 using namespace query_shape;
@@ -65,9 +67,24 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
         // do not fail here.
         return;
     }
-    uassert(ErrorCodes::QueryRejectedBySettings,
-            "Query rejected by admin query settings",
-            !settings.getReject());
+    if (settings.getReject()) {
+        auto* opCtx = expCtx->opCtx;
+        const Command* curCommand = CommandInvocation::get(opCtx)->definition();
+        auto* curOp = CurOp::get(opCtx);
+        auto& opDebug = curOp->debug();
+        auto query = curOp->opDescription();
+
+        mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
+        curCommand->snipForLogging(&cmdToLog);
+        LOGV2_DEBUG_OPTIONS(8687100,
+                            2,
+                            {logv2::LogComponent::kQueryRejected},
+                            "Query rejected by QuerySettings",
+                            "queryShapeHash"_attr = opDebug.queryShapeHash->toHexString(),
+                            "ns"_attr = CurOp::get(expCtx->opCtx)->getNS(),
+                            "command"_attr = redact(cmdToLog.getObject()));
+        uasserted(ErrorCodes::QueryRejectedBySettings, "Query rejected by admin query settings");
+    }
 }
 }  // namespace
 
