@@ -92,6 +92,24 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     sendCommandToShards(opCtx, DatabaseName::kAdmin, cmdObj, shardIds, executor);
 }
 
+void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
+                                        const std::vector<ShardId>& shardIds,
+                                        const NamespaceString& nss) {
+    auto cmd = FlushRoutingTableCacheUpdates(nss);
+    cmd.setSyncFromConfig(true);
+    cmd.setDbName(nss.dbName());
+
+    for (const auto& shardId : shardIds) {
+        auto recipientShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+
+        recipientShard->runFireAndForgetCommand(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                DatabaseName::kAdmin,
+                                                cmd.toBSON({}));
+    }
+}
+
 std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,

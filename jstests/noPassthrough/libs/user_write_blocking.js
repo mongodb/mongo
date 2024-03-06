@@ -1,4 +1,5 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 export const UserWriteBlockHelpers = (function() {
@@ -317,6 +318,15 @@ export const UserWriteBlockHelpers = (function() {
                                       {getParameter: 1, featureCompatibilityVersion: 1}))
                                   .featureCompatibilityVersion.version;
             assert.eq(actualFCV, expectedFCV);
+        }
+
+        // TODO (SERVER-83924) Remove once feature flag checks are not necessary.
+        checkFailPointEnabled(failpointName) {
+            const primary = this.st.rs0.getPrimary();
+            return authutil.asCluster(
+                primary,
+                keyfile,
+                () => FeatureFlagUtil.isPresentAndEnabled(primary, failpointName));
         }
     }
 

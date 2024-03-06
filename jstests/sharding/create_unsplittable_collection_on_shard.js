@@ -10,6 +10,8 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const kDbName = "test";
 
 const st = new ShardingTest({shards: 2});
@@ -39,4 +41,18 @@ jsTest.log(
 
     assert.eq(chunk.shard, shard1);
 }
+
+jsTest.log(
+    "Testing that creating a collection on a different data shard when it exists already fails");
+{
+    const kDataColl = 'unsplittable_collection_on_different_shard_2';
+
+    assert.commandWorked(st.s.getDB(kDbName).runCommand(
+        {createUnsplittableCollection: kDataColl, dataShard: shard1}));
+
+    assert.commandFailedWithCode(st.s.getDB(kDbName).runCommand(
+                                     {createUnsplittableCollection: kDataColl, dataShard: shard0}),
+                                 ErrorCodes.AlreadyInitialized);
+}
+
 st.stop();

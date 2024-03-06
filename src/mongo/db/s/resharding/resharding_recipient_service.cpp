@@ -103,6 +103,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -762,7 +763,8 @@ void ReshardingRecipientService::RecipientStateMachine::
                         CollationSpec::kSimpleSpec,
                         false /* unique */,
                         true /* enforceUniquenessCheck */,
-                        shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()),
+                        shardkeyutil::ValidationBehaviorsShardCollection(
+                            opCtx.get(), ShardingState::get(opCtx.get())->shardId()),
                         boost::none /* tsOpts */,
                         false /* updatedToHandleTimeseriesIndex */);
                 });

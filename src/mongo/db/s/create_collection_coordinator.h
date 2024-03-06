@@ -44,6 +44,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
+#include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -101,6 +102,12 @@ public:
     virtual ~CreateCollectionResponseProvider() {}
 };
 
+struct OptionsAndIndexes {
+    BSONObj options;
+    std::vector<BSONObj> indexSpecs;
+    BSONObj idIndexSpec;
+};
+
 // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
 class CreateCollectionCoordinatorLegacy
     : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocumentLegacy,
@@ -140,6 +147,9 @@ private:
     StringData serializePhase(const Phase& phase) const override {
         return CreateCollectionCoordinatorPhaseLegacy_serializer(phase);
     }
+
+    OptionsAndIndexes _getCollectionOptionsAndIndexes(OperationContext* opCtx,
+                                                      const NamespaceStringOrUUID& nssOrUUID);
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
@@ -219,12 +229,39 @@ private:
     // Translate the request parameters and persist them in the coordinator document.
     void _translateRequestParameters();
 
+    // Enter to the critical section on the coordinator for the namespace and its buckets namespace.
+    // Only blocks writes. Additionally, checks if the collection is empty and sets the
+    // collectionExistsAndIsEmpty parameter on the coordiantor document.
+    void _enterWriteCriticalSectionOnDataShardAndCheckCollectionEmpty(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
+
+    // Clone the indexes from the data shard to the coordinator. This ensures that the coordinator
+    // has the most up to date indexes.
+    void _syncIndexesOnCoordinator(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                   const CancellationToken& token);
+
     // Ensure that the collection is created locally and build the shard key index if necessary.
-    void _createCollectionOnCoordinator();
+    void _createCollectionOnCoordinator(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
+
+    // Enter to the critical section on the specified shards. Blocks writes and reads.
+    void _enterCriticalSectionOnShards(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token,
+        const NamespaceString& nss,
+        const std::vector<ShardId>& shardIds,
+        CriticalSectionBlockTypeEnum blockType);
 
     // Enter to the critical section on all the shards. Blocks writes and reads.
     void _enterCriticalSection(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                const CancellationToken& token);
+
+    // Fetches the collection options and indexes from the specified shard.
+    OptionsAndIndexes _getCollectionOptionsAndIndexes(OperationContext* opCtx,
+                                                      const ShardId& fromShard);
 
     // Broadcast create collection to the other shards.
     void _createCollectionOnParticipants(
@@ -243,10 +280,11 @@ private:
                               const CancellationToken& token);
 
     // Exit critical sections on participant shards.
-    void _exitCriticalSectionsOnParticipants(OperationContext* opCtx,
-                                             bool throwIfReasonDiffers,
-                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                             const CancellationToken& token);
+    void _exitCriticalSectionOnShards(OperationContext* opCtx,
+                                      bool throwIfReasonDiffers,
+                                      std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                      const CancellationToken& token,
+                                      const std::vector<ShardId>& shardIds);
 
     mongo::ShardsvrCreateCollectionRequest _request;
 

@@ -61,9 +61,6 @@ selector:
   # support all timeseries/bucket namespace cases.
   - jstests/core/timeseries/timeseries_user_system_buckets.js
 
-  # TODO: SERVER-80135 re-enable once shardCollection works for tracked collection living on non-db-primary shard
-  - jstests/core_sharding/shard_collection_basic.js
-
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

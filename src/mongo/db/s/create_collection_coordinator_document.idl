@@ -53,6 +53,8 @@ enums:
             kUnset: "unset"
             kEnterWriteCriticalSectionOnCoordinator: "enterWriteCriticalSectionOnCoordinator"
             kTranslateRequestParameters: "translateRequestParameters"
+            kEnterWriteCSOnDataShardAndCheckEmpty: "enterWriteCSOnDataShardAndCheckEmpty"
+            kSyncIndexesOnCoordinator: "syncIndexesOnCoordinator"
             kCreateCollectionOnCoordinator: "createCollectionOnCoordinator"
             kEnterCriticalSection: "enterCriticalSection"
             kCreateCollectionOnParticipants: "createCollectionOnParticipants"
@@ -113,7 +115,18 @@ structs:
                 type: TranslatedRequestParams
                 description: "The field is populated only once the kTranslateRequest phase is completed."
                 optional: true
+            collectionIsEmpty:
+                type: bool
+                description: "True if the collection has no data or does not exist. False otherwise."
+                optional: true
             shardIds:
                 type: array<shard_id>
                 description: "The list of shards involved in the create collection operation."
+                optional: true
+            originalDataShard:
+                type: shard_id
+                description: >-
+                    The current data shard that the collection lives on. Will be the coordinator
+                    shard if the collection does not yet exist. Only guaranteed to be set after the
+                    enterWriteCSOnDataShardAndCheckEmpty phase completes.
                 optional: true

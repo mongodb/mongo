@@ -43,6 +43,18 @@ function initializeCluster() {
 function resetCollection(setupCommand) {
     testColl.drop();
     assert.commandWorked(testDB.createCollection(collName));
+    // The create coordinator issues a best effort refresh at the end of the coordinator which can
+    // inferfere with the counts in the test cases. Wait here for the refreshes to finish.
+    let curOps = [];
+    assert.soon(() => {
+        curOps = primary.getDB("admin")
+                     .aggregate([
+                         {$currentOp: {allUsers: true}},
+                         {$match: {"command._flushRoutingTableCacheUpdates": {$exists: true}}}
+                     ])
+                     .toArray();
+        return curOps.length == 0;
+    }, "Timed out waiting for create refreshes to finish, found: " + tojson(curOps));
     if (setupCommand) {
         assert.commandWorked(testDB.runCommand(setupCommand));
     }

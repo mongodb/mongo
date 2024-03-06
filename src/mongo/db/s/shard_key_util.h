@@ -44,6 +44,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
 
@@ -79,8 +80,11 @@ public:
  */
 class ValidationBehaviorsShardCollection final : public ShardKeyValidationBehaviors {
 public:
-    ValidationBehaviorsShardCollection(OperationContext* opCtx)
-        : _localClient(std::make_unique<DBDirectClient>(opCtx)) {}
+    ValidationBehaviorsShardCollection(OperationContext* opCtx, const ShardId& dataShard)
+        : _opCtx(opCtx),
+          _localClient(std::make_unique<DBDirectClient>(opCtx)),
+          _dataShard(
+              uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dataShard))) {}
 
     std::vector<BSONObj> loadIndexes(const NamespaceString& nss) const override;
 
@@ -97,7 +101,9 @@ public:
                              boost::optional<TimeseriesOptions> tsOpts) const override;
 
 private:
+    OperationContext* _opCtx;
     std::unique_ptr<DBDirectClient> _localClient;
+    std::shared_ptr<Shard> _dataShard;
 };
 
 /**

@@ -56,6 +56,14 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
+ * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Does not wait for or
+ * check the responses from the shards.
+ */
+void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
+                                        const std::vector<ShardId>& shardIds,
+                                        const NamespaceString& nss);
+
+/**
  * Process the responses received from a set of requests sent to the shards. If `throwOnError=true`,
  * throws in case one of the commands fails.
  */

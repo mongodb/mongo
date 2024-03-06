@@ -63,6 +63,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_key_index_util.h"
@@ -303,7 +304,7 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     // back on the original index created.
     //
     // TODO (SERVER-79304): Remove 'updatedToHandleTimeseriesIndex' once 8.0 becomes last LTS, or
-    //  update the ticket number to when the parameter can be removed.
+    // update the ticket number to when the parameter can be removed.
     auto indexKeyPatternBSON = shardKeyPattern.toBSON();
     if (updatedToHandleTimeseriesIndex && tsOpts.has_value()) {
         // 'createBucketsShardKeyIndexFromTimeseriesShardKeySpec' expects the shard key to be
@@ -389,23 +390,35 @@ std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
 
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
-    BSONObj res;
-    auto success = _localClient->runCommand(
+    auto res = Shard::CommandResponse::getEffectiveStatus(_dataShard->runCommand(
+        _opCtx,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         DatabaseName::kAdmin,
         BSON(kCheckShardingIndexCmdName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
              << kKeyPatternField << proposedKey),
-        res);
-    uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
+        Shard::RetryPolicy::kIdempotent));
+    uassert(ErrorCodes::InvalidOptions, res.reason(), res.isOK());
 }
 
 void ValidationBehaviorsShardCollection::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
                                                                       std::string* errMsg) const {
+    repl::ReadConcernArgs readConcern =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+    FindCommandRequest findCommand(nss);
+    findCommand.setLimit(1);
+    findCommand.setReadConcern(readConcern.toBSONInner());
+    Shard::QueryResponse response = uassertStatusOK(
+        _dataShard->runExhaustiveCursorCommand(_opCtx,
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               nss.dbName(),
+                                               findCommand.toBSON(BSONObj()),
+                                               Milliseconds(-1)));
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Please create an index that starts with the proposed shard key before"
                              " sharding the collection. "
                           << *errMsg,
-            _localClient->findOne(nss, BSONObj{}).isEmpty());
+            response.docs.empty());
 }
 
 void ValidationBehaviorsShardCollection::createShardKeyIndex(

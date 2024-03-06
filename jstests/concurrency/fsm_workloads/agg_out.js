@@ -47,11 +47,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // cause all subsequent aggregations to fail, so give these a low probability to make
             // sure they don't happen too early in the test.
             convertToCapped: 0.01,
-            // TODO SERVER-80135: This state is temporarily disabled because sharding an
-            // unsplittable collection that does not live on the primary shard will not work
-            // correctly (this test can fail the 'CheckOrphansDeleted' hook). Reset the
-            // probability of shardCollection to '0.01' once this is fixed.
-            shardCollection: 0.00,
+            shardCollection: 0.01,
         },
         createIndexes: {query: 1},
         movePrimary: {query: 1},

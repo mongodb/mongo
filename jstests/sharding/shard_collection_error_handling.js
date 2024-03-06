@@ -248,4 +248,33 @@ testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(false /* cre
     assert(st.shard1.getCollection(ns).drop());
 })();
 
+(function testShardCollectionOutsideDbPrimaryWithoutInvolvingDataShard() {
+    const collName = "collE";
+    const ns = dbName + "." + collName;
+
+    jsTestLog(
+        "Testing shard collection living outside dbPrimary without chunks on the data shard for " +
+        ns);
+
+    // Create an unsplittable collection living outside the dbPrimary
+    assert.commandWorked(st.s.getDB(dbName).runCommand(
+        {createUnsplittableCollection: collName, dataShard: st.shard1.shardName}));
+
+    // Create zones that will force the entire collection onto shard 0 (dbPrimary)
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "E_1"}));
+    assert.commandWorked(st.s.adminCommand(
+        {updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: MaxKey}, zone: "E_1"}));
+
+    // Shard the collection
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+
+    // Ensure that the collection only exists on the dbPrimary
+    const rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
+        {listCollections: 1, filter: {name: collName}}));
+    assert.eq(1, rs0Collections.cursor.firstBatch.length);
+    const rs1Collections = assert.commandWorked(st.rs1.getPrimary().getDB(dbName).runCommand(
+        {listCollections: 1, filter: {name: collName}}));
+    assert.eq(0, rs1Collections.cursor.firstBatch.length);
+})();
+
 st.stop();

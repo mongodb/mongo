@@ -51,11 +51,19 @@ function failFn_sigkill() {
 
 function failFn_killOp() {
     let adminDB = st.rs0.getPrimary().getDB("admin");
-    const curOps =
-        adminDB
-            .aggregate(
-                [{$currentOp: {allUsers: true}}, {$match: {"command.comment": "testComment"}}])
-            .toArray();
+    // The create coordinator issues fire and forget refreshes after creating a collection. We
+    // filter these out to ensure we are killing the correct operation.
+    const curOps = adminDB
+                       .aggregate([
+                           {$currentOp: {allUsers: true}},
+                           {
+                               $match: {
+                                   "command.comment": "testComment",
+                                   "command._flushRoutingTableCacheUpdates": {$exists: false}
+                               }
+                           }
+                       ])
+                       .toArray();
     assert.eq(1, curOps.length, curOps);
     adminDB.killOp(curOps[0].opid);
 }

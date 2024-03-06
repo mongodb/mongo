@@ -18,6 +18,9 @@ selector:
   # TODO SERVER-85395: remove the following exclusion together with the test
   # Expects the collection creation options not to change.
   - jstests/sharding/create_unsplittable_collection.js
+  # TODO SERVER-85395: remove the following exclusion together with the test
+  # Expects the collection creation options not to change.
+  - jstests/sharding/create_unsplittable_collection_on_shard.js
   exclude_with_any_tags:
   - expects_explicit_underscore_id_index
 

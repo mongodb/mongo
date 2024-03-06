@@ -54,6 +54,18 @@ function dropAndRecreateTestCollection() {
     assert(mongosColl.drop());
     assert.commandWorked(
         mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: "hashed"}}));
+    // The insert via direct connection will fail with stale config if the metadata is unknown, so
+    // we wait for the refresh spawned by shardCollection to complete.
+    let curOps = [];
+    assert.soon(() => {
+        curOps = rsConn.getDB("admin")
+                     .aggregate([
+                         {$currentOp: {allUsers: true}},
+                         {$match: {"command._flushRoutingTableCacheUpdates": {$exists: true}}}
+                     ])
+                     .toArray();
+        return curOps.length == 0;
+    }, "Timed out waiting for create refreshes to finish, found: " + tojson(curOps));
 }
 
 /**

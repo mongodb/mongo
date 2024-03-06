@@ -6,6 +6,7 @@
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLastOpTime} from "jstests/replsets/rslib.js";
 
 const conn = MongoRunner.runMongod();
@@ -27,11 +28,23 @@ const mongosFailpointParams = {
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 2},
+    rs: {nodes: 1},
     other: {
         mongosOptions: mongosFailpointParams,
     }
 });
+
+// TODO (SERVER-87461) Re-enable this test when track unsharded is enabled
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+if (isMultiversion ||
+    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"),
+                                        "TrackUnshardedCollectionsOnShardingCatalog")) {
+    jsTest.log(
+        "Skipping test since featureFlagTrackUnshardedCollectionsOnShardingCatalog is enabled");
+    st.stop();
+    quit();
+}
 
 // Create database "test0" on shard 0.
 const testDB0 = st.s.getDB("test0");
