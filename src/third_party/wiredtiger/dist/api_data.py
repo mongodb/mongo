@@ -743,10 +743,6 @@ connection_runtime_config = [
             number of bytes per second available to the chunk cache. The minimum non-zero setting
             is 1MB.''',
             min='0', max='1TB'),
-        Config('fsync_maximum_wait_period', '0', r'''
-            max waiting period for background fsync. If the written threshold is not met in this
-            time, a background fsync is done.''',
-            min='0', max='60'),
         ]),
     Config('json_output', '[]', r'''
         enable JSON formatted messages on the event handler interface. Options are given as a

@@ -55,8 +55,6 @@ struct __wt_capacity {
     uint64_t total;      /* Bytes/sec total capacity */
     uint64_t threshold;  /* Capacity size period */
 
-    uint64_t fsync_maximum_wait_period; /* Maximum period between fsync calls */
-
     wt_shared volatile uint64_t written; /* Written this period */
     wt_shared volatile bool signalled;   /* Capacity signalled */
 

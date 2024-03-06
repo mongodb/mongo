@@ -34,25 +34,14 @@ __capacity_config(WT_SESSION_IMPL *session, const char *cfg[])
     uint64_t chunkcache, total;
 
     conn = S2C(session);
-    cap = &conn->capacity;
-
     chunkcache = total = 0;
+
     WT_RET(__wt_config_gets(session, cfg, "io_capacity.total", &cval));
     if (cval.val != 0) {
         if (cval.val < WT_THROTTLE_MIN)
             WT_RET_MSG(session, EINVAL, "total I/O capacity value %" PRId64 " below minimum %d",
               cval.val, WT_THROTTLE_MIN);
-        cap->total = total = (uint64_t)cval.val;
-    }
-
-    WT_RET(__wt_config_gets(session, cfg, "io_capacity.fsync_maximum_wait_period", &cval));
-    if (cval.val != 0)
-        cap->fsync_maximum_wait_period = (uint64_t)cval.val;
-
-    if (cap->total == 0 && cap->fsync_maximum_wait_period != 0) {
-        WT_RET_MSG(session, EINVAL,
-          "io_capacity.fsync_maximum_wait_period is valid only when io_capacity.total is greater "
-          "than 0");
+        total = (uint64_t)cval.val;
     }
 
     WT_RET(__wt_config_gets(session, cfg, "io_capacity.chunk_cache", &cval));
@@ -124,12 +113,11 @@ __capacity_server(void *arg)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint64_t last_time, now, start, stop;
+    uint64_t start, stop, time_ms;
 
     session = arg;
     conn = S2C(session);
     cap = &conn->capacity;
-    last_time = __wt_clock(session);
     for (;;) {
         /*
          * Wait until signalled but check once per second in case the signal was missed.
@@ -141,24 +129,14 @@ __capacity_server(void *arg)
             break;
 
         cap->signalled = false;
-        if (cap->written == 0)
+        if (cap->written < cap->threshold)
             continue;
 
-        now = __wt_clock(session);
-        if (cap->fsync_maximum_wait_period == 0) {
-            if (cap->written < cap->threshold)
-                continue;
-        } else {
-            if (WT_CLOCKDIFF_SEC(now, last_time) < cap->fsync_maximum_wait_period &&
-              cap->written < cap->threshold)
-                continue;
-        }
-
-        start = now;
+        start = __wt_clock(session);
         WT_ERR(__wt_fsync_background(session));
         stop = __wt_clock(session);
-        WT_STAT_CONN_SET(session, fsync_all_time, WT_CLOCKDIFF_MS(stop, start));
-        last_time = stop;
+        time_ms = WT_CLOCKDIFF_MS(stop, start);
+        WT_STAT_CONN_SET(session, fsync_all_time, time_ms);
         cap->written = 0;
     }
 
