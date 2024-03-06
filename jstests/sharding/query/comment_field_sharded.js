@@ -33,7 +33,7 @@ assert.commandWorked(testDB.adminCommand({profile: 0, slowms: -1}));
 
 /**
  * Verifies that there are 'expectedNumOccurrences' log lines contains every element of
- * 'inputArray'.
+ * 'inputArray'; log lines including references to StaleConfig errors are ignored.
  */
 function verifyLogContains(connections, inputArray, expectedNumOccurrences) {
     let numOccurrences = 0;
@@ -42,7 +42,7 @@ function verifyLogContains(connections, inputArray, expectedNumOccurrences) {
         for (let logMsg of logs) {
             let numMatches = 0;
             for (let input of inputArray) {
-                numMatches += logMsg.includes(input) ? 1 : 0;
+                numMatches += (logMsg.includes(input) && !logMsg.includes('StaleConfig')) ? 1 : 0;
             }
             numOccurrences += ((numMatches == inputArray.length) ? 1 : 0);
         }
@@ -148,7 +148,8 @@ function runCommentParamTest({
     if (!Array.isArray(expectedProfilerEntriesList)) {
         expectedProfilerEntriesList = [expectedProfilerEntriesList];
     }
-    const profileFilter = {"command.comment": commentObj};
+
+    const profileFilter = {"command.comment": commentObj, "errName": {$ne: "StaleConfig"}};
     const foundProfilerEntriesCount = shard0DB.system.profile.find(profileFilter).itcount() +
         shard1DB.system.profile.find(profileFilter).itcount();
     assert(expectedProfilerEntriesList.includes(foundProfilerEntriesCount),

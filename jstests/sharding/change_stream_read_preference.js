@@ -81,7 +81,8 @@ for (let rs of [st.rs0, st.rs1]) {
             op: "command",
             ns: mongosColl.getFullName(),
             "command.comment": changeStreamComment,
-            "command.aggregate": mongosColl.getName()
+            "command.aggregate": mongosColl.getName(),
+            "errName": {$ne: "StaleConfig"}
         };
 
         profilerHasSingleMatchingEntryOrThrow({profileDB: primaryDB, filter: filter});

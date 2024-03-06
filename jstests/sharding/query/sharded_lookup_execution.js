@@ -163,6 +163,7 @@ function assertLookupExecution(pipeline, opts, expected) {
                 filter: {
                     "command.aggregate": reviewsColl.getName(),
                     "command.comment": opts.comment,
+                    "errName": {$ne: "StaleConfig"},
                     "command.pipeline.$lookup": {$exists: true}
                 }
             });
