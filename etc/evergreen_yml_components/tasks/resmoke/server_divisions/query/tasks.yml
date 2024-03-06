@@ -125,7 +125,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "aggregation", "auth", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_windows", "aggregation", "auth", "common"]
   depends_on:
   - name: aggregation
   commands:
@@ -567,7 +567,7 @@ tasks:
 
 - <<: *task_template
   name: search
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -576,7 +576,7 @@ tasks:
 
 - <<: *task_template
   name: search_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -585,7 +585,7 @@ tasks:
 
 - <<: *task_template
   name: search_ssl
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -918,7 +918,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -927,7 +927,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_auth
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -936,7 +936,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_ssl
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
   commands:
   - func: "do setup"
   - func: "run tests"

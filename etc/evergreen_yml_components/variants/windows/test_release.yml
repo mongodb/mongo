@@ -36,36 +36,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - windows-vsCurrent-xlarge
-  - name: .aggfuzzer !.feature_flag_guarded
-  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
-  - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-    # Some concurrency workloads require a lot of memory, so we use machines
-    # with more RAM for these suites.
-  - name: .concurrency !.no_txns !.kill_terminate !.common
-    distros:
-    - windows-vsCurrent-large
-  - name: .concurrency .common
-  - name: disk_wiredtiger
-  - name: .jscore .common !.auth !.feature_flag_guarded
-  - name: json_schema
-  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns !.feature_flag_guarded
-  - name: multiversion_gen
-  - name: multiversion_auth_gen
-  - name: .query_fuzzer !.feature_flag_guarded
-  - name: .read_write_concern
-  - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
-  - name: .sharding .txns
-  - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  - name: .ssl
-  - name: .stitch
-  - name: .updatefuzzer
-  - name: push
-  - name: .timeseries_crud
+  - name: .development_critical !.incompatible_community !.incompatible_windows
+  - name: .release_critical !.incompatible_community !.incompatible_windows !publish_packages
 
 - name: enterprise-windows
   display_name: "Enterprise Windows"
@@ -110,36 +82,8 @@ buildvariants:
   - name: compile_test_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-xxlarge
-  - name: .aggfuzzer !.feature_flag_guarded
-  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
-  - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-    # Some concurrency workloads require a lot of memory, so we use machines
-    # with more RAM for these suites.
-  - name: .concurrency !.no_txns !.kill_terminate !.common
+  - name: crypt_build
     distros:
     - windows-vsCurrent-large
-  - name: .concurrency .common
-  - name: .crypt
-    distros:
-    - windows-vsCurrent-large
-  - name: .publish_crypt
-  - name: disk_wiredtiger
-  - name: .jscore .common !.auth !.feature_flag_guarded
-  - name: json_schema
-  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns !.feature_flag_guarded
-  - name: multiversion_gen
-  - name: multiversion_auth_gen
-  - name: .query_fuzzer !.feature_flag_guarded
-  - name: .read_write_concern
-  - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
-  - name: .sharding .txns
-  - name: .sharding .common !.csrs !.gcm !.feature_flag_guarded
-  - name: .ssl
-  - name: .stitch
-  - name: .updatefuzzer
-  - name: push
-  - name: .timeseries_crud
+  - name: .development_critical !.incompatible_windows
+  - name: .release_critical !.incompatible_windows !publish_packages

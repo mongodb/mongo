@@ -339,7 +339,7 @@ tasks:
       - "src/evergreen/gen_patch_test_tags.sh"
 
 - name: generate_buildid_to_debug_symbols_mapping
-  tags: ["assigned_to_jira_team_devprod_correctness", "release_critical", "incompatible_mac", "symbolizer"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "release_critical", "incompatible_mac", "incompatible_windows", "symbolizer"]
   stepback: false
   patchable: true
   depends_on:

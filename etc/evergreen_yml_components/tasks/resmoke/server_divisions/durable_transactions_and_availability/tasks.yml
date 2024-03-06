@@ -478,7 +478,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore_txns_large_txns_format
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "jscore", "txns", "multi_oplog"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_windows", "jscore", "txns", "multi_oplog"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -707,7 +707,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_auth_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "replica_sets", "common", "san", "auth", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_windows", "replica_sets", "common", "san", "auth", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -790,7 +790,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_large_txns_format_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "replica_sets", "multi_oplog", "large", "non_maj_read", "san"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_windows", "replica_sets", "multi_oplog", "large", "non_maj_read", "san"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -986,7 +986,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_windows", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -994,7 +994,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_txns_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_windows", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1010,7 +1010,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_windows", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1018,7 +1018,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_txns_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "incompatible_windows", "sharding", "jscore", "initsync", "uninitialized_fcv", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
