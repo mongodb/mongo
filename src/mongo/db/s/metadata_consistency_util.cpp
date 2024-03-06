@@ -309,49 +309,61 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
     std::vector<BSONObj> results;
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    shardVersionRetry(opCtx, catalogCache, nss, reason, [&] {
-        auto cursor = [&] {
-            BSONObjBuilder responseBuilder;
-            auto status = ClusterAggregate::runAggregate(opCtx,
-                                                         ClusterAggregate::Namespaces{nss, nss},
-                                                         aggRequest,
-                                                         PrivilegeVector(),
-                                                         &responseBuilder);
-            uassertStatusOKWithContext(
-                status, str::stream() << "Failed to execute aggregation for: " << reason);
-            return uassertStatusOK(CursorResponse::parseFromBSON(responseBuilder.obj()));
-        }();
+    try {
+        shardVersionRetry(opCtx, catalogCache, nss, reason, [&] {
+            auto cursor = [&] {
+                BSONObjBuilder responseBuilder;
+                auto status = ClusterAggregate::runAggregate(opCtx,
+                                                             ClusterAggregate::Namespaces{nss, nss},
+                                                             aggRequest,
+                                                             PrivilegeVector(),
+                                                             &responseBuilder);
+                uassertStatusOKWithContext(
+                    status, str::stream() << "Failed to execute aggregation for: " << reason);
+                return uassertStatusOK(CursorResponse::parseFromBSON(responseBuilder.obj()));
+            }();
 
-        results = cursor.releaseBatch();
+            results = cursor.releaseBatch();
 
-        if (!cursor.getCursorId()) {
-            return;
-        }
-
-        const auto authzSession = AuthorizationSession::get(opCtx->getClient());
-        const auto authChecker =
-            [&authzSession](const boost::optional<UserName>& userName) -> Status {
-            return authzSession->isCoauthorizedWith(userName)
-                ? Status::OK()
-                : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
-        };
-
-        // Check out the cursor. If the cursor is not found, all data was retrieve in the
-        // first batch.
-        const auto cursorManager = Grid::get(opCtx)->getCursorManager();
-        auto pinnedCursor = uassertStatusOK(
-            cursorManager->checkOutCursor(cursor.getCursorId(), opCtx, authChecker));
-        while (true) {
-            auto next = pinnedCursor->next();
-            if (!next.isOK() || next.getValue().isEOF()) {
-                break;
+            if (!cursor.getCursorId()) {
+                return;
             }
 
-            if (auto data = next.getValue().getResult()) {
-                results.emplace_back(data.get().getOwned());
+            const auto authzSession = AuthorizationSession::get(opCtx->getClient());
+            const auto authChecker =
+                [&authzSession](const boost::optional<UserName>& userName) -> Status {
+                return authzSession->isCoauthorizedWith(userName)
+                    ? Status::OK()
+                    : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
+            };
+
+            // Check out the cursor. If the cursor is not found, all data was retrieve in the
+            // first batch.
+            const auto cursorManager = Grid::get(opCtx)->getCursorManager();
+            auto pinnedCursor = uassertStatusOK(
+                cursorManager->checkOutCursor(cursor.getCursorId(), opCtx, authChecker));
+            while (true) {
+                auto next = pinnedCursor->next();
+                if (!next.isOK() || next.getValue().isEOF()) {
+                    break;
+                }
+
+                if (auto data = next.getValue().getResult()) {
+                    results.emplace_back(data.get().getOwned());
+                }
             }
-        }
-    });
+        });
+    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
+        // In presence on metadata inconsistency within the config catalog, the refresh of the
+        // routing information cache may fail.
+        // When this happens, ignore the error: the problem will still be reported to the user
+        // thanks  to the consistency checks performed on the config server.
+        LOGV2(8739100,
+              "Failed to refresh the routing information due to a potential metadata "
+              "inconsistency",
+              "nss"_attr = nss,
+              "err"_attr = redact(e));
+    }
     return results;
 }
 
