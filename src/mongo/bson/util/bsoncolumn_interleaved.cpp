@@ -243,6 +243,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
                   boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;
                   d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
                   deltaElem = loadDelta(allocator, d64);
+                  ++d64.pos;
               },
               [&](DecodingState::Decoder128& d128) {
                   // We can read the last known value from the decoder iterator even as it has
@@ -251,6 +252,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
                       d128.pos.valid() ? *d128.pos : uint128_t(0);
                   d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
                   deltaElem = loadDelta(allocator, d128);
+                  ++d128.pos;
               }},
           decoder);
     return LoadControlResult{deltaElem, size + 1};

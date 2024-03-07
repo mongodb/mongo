@@ -642,29 +642,271 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithBinData) {
     }
 }
 
-TEST_F(BSONColumnBlockBasedTest, DecompressNothing) {
+TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     auto col = bsonColumnFromObjs({
-        fromjson("{a: [{b:  0}, {b: 10}]}"),
+        fromjson("{a: [{b:  0}]}"),
+        fromjson("{a: [{b: 20}, {b: 30}]}"),
+        fromjson("{a: [{b: 40}]}"),
+        fromjson("{a: [{b: 60}, {b: 70}]}"),
     });
 
-    struct NoElemsPath {
-        std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
-            return {};
+    // Create a path that will get the "b" fields of both array elements.
+    TestArrayPath path;
+    auto mockRefObj = fromjson("{a: [{b: 0}, {b: 10}]}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>>> paths{{path, {}}};
+
+    // This is decompressing scalars, but since a single path is accessing two fields that need to
+    // be interleaved in the output, we still need to use the slow path.
+    col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+    // TODO(SERVER-87339): This is not the right answer for Traverse paths ,which is what this test
+    // is simulating. We should be getting only 6 elements back, and no missing/EOO elements.
+    ASSERT_EQ(paths[0].second.size(), 8);
+    ASSERT_EQ(paths[0].second[0].type(), NumberInt);
+    for (int i = 0; i < 8; ++i) {
+        if (i == 1 || i == 5) {
+            ASSERT(paths[0].second[i].eoo());
+        } else {
+            ASSERT_EQ(paths[0].second[i].Int(), i * 10);
         }
-    };
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
+    // Create a BSONColumn where even elements have a "b" field, and odd elements have "c." This
+    // will use a single section of interleaved mode, with three scalar fields. "b" and "c" will
+    // have missing values in the delta blocks.
+    const int nObjs = 10;
+    std::vector<BSONObj> objs;
+    for (int i = 0; i < nObjs; ++i) {
+        auto fld2 = i % 2 ? "c" : "b";
+        objs.push_back(BSON("a" << (i * 10) << fld2 << (i * 100)));
+    }
+    auto col = bsonColumnFromObjs(std::move(objs));
 
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
 
     {
-        // Paths that don't map to any fields in the reference object just produce nothing.
-        // TODO(SERVER-86636): we should in fact be producing nulls here.
-        std::vector<std::pair<NoElemsPath, std::vector<BSONElement>>> paths{{NoElemsPath{}, {}}};
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{}}, {}}};
+        // This takes the general path since we are getting whole documents.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
-        ASSERT_EQ(paths[0].second.size(), 0);
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            auto fld2 = i % 2 ? "c" : "b";
+            ASSERT_BSONOBJ_EQ(paths[0].second[i].Obj(), BSON("a" << (i * 10) << fld2 << (i * 100)));
+        }
+    }
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"a"}}, {}},
+                                                                         {TestPath{{"b"}}, {}}};
+        // This takes the fast path because each path maps to a single scalar stream.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            ASSERT_EQ(paths[0].second[i].Int(), i * 10);
+        }
+
+        ASSERT_EQ(paths[1].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT(paths[1].second[i].eoo());
+            } else {
+                ASSERT_EQ(paths[1].second[i].Int(), i * 100);
+            }
+        }
+    }
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"c"}}, {}}};
+        // This takes the fast path because each path maps to a single scalar stream.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT_EQ(paths[0].second[i].Int(), i * 100);
+            } else {
+                ASSERT(paths[0].second[i].eoo());
+            }
+        }
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
+    const int nObjs = 10;
+    std::vector<BSONObj> objs;
+    for (int i = 0; i < nObjs; ++i) {
+        if (i % 2) {
+            objs.push_back(BSON("a" << (i * 10)));
+        } else {
+            objs.push_back(BSON("a" << (i * 10) << "b" << BSON("bb" << (i * 100))));
+        }
+    }
+    auto col = bsonColumnFromObjs(std::move(objs));
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{}}, {}}};
+        // this takes the general path because we are materializing objects.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT_BSONOBJ_EQ(paths[0].second[i].Obj(), BSON("a" << (i * 10)));
+            } else {
+                ASSERT_BSONOBJ_EQ(paths[0].second[i].Obj(),
+                                  BSON("a" << (i * 10) << "b" << BSON("bb" << (i * 100))));
+            }
+        }
+    }
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"b"}}, {}}};
+        // this takes the general path because we are materializing objects.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT(paths[0].second[i].eoo());
+            } else {
+                ASSERT_BSONOBJ_EQ(paths[0].second[i].Obj(), BSON("bb" << (i * 100)));
+            }
+        }
+    }
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
+            {TestPath{{"b", "bb"}}, {}}};
+        // this takes the fast path because we are materializing a scalar field.
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT(paths[0].second[i].eoo());
+            } else {
+                ASSERT_EQ(paths[0].second[i].Int(), i * 100);
+            }
+        }
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
+    const int nObjs = 10;
+    std::vector<BSONObj> objs;
+    for (int i = 0; i < nObjs; ++i) {
+        if (i % 2) {
+            objs.push_back(BSON("a" << (i * 10)));
+        } else {
+            objs.push_back(BSON("a" << (i * 10) << "b" << BSON("bb" << BSON("bbb" << (i * 100)))));
+        }
+    }
+
+    auto col = bsonColumnFromObjs(std::move(objs));
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
+            {TestPath{{"b", "bb"}}, {}},        // general
+            {TestPath{{"b", "bb", "bbb"}}, {}}  // fast
+        };
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT(paths[0].second[i].eoo());
+            } else {
+                ASSERT_BSONOBJ_EQ(paths[0].second[i].Obj(), BSON("bbb" << (i * 100)));
+            }
+        }
+
+        ASSERT_EQ(paths[1].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            if (i % 2) {
+                ASSERT(paths[1].second[i].eoo());
+            } else {
+                ASSERT_EQ(paths[1].second[i].Int(), i * 100);
+            }
+        }
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
+    const int nObjs = 10;
+    std::vector<BSONObj> objs;
+    for (int i = 0; i < nObjs; ++i) {
+        std::stringstream ss;
+        ss << "{a: " << (i * 10) << ", b: {}}";
+        objs.push_back(fromjson(ss.str()));
+    }
+
+    auto col = bsonColumnFromObjs(std::move(objs));
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
+    {
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
+            {TestPath{{"b"}}, {}},       // general
+            {TestPath{{"b", "bb"}}, {}}  // fast (missing)
+        };
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+        ASSERT_EQ(paths[0].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            ASSERT_BSONOBJ_EQ(paths[0].second[i].Obj(), fromjson("{}"));
+        }
+
+        ASSERT_EQ(paths[1].second.size(), nObjs);
+        for (int i = 0; i < nObjs; ++i) {
+            ASSERT(paths[1].second[i].eoo());
+        }
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
+    auto col = bsonColumnFromObjs({
+        fromjson("{a: {b:  0}}"),
+        fromjson("{a: {b:  10}}"),
+        fromjson("{a: {b:  20}}"),
+        fromjson("{a: {b:  30}}"),
+    });
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
+    {
+        // The bogus paths don't match anything in the reference object and so should all be
+        // materialized as missing, aka a EOO BSONElement.
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
+            {TestPath{{"bogus"}}, {}},       // empty, fast path
+            {TestPath{{"a"}}, {}},           // general path
+            {TestPath{{"a", "b"}}, {}},      // fast path
+            {TestPath{{"also-bogus"}}, {}},  // empty, fast path
+
+        };
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+        ASSERT_EQ(paths[0].second.size(), 4);
+        for (int i = 0; i < 4; ++i) {
+            ASSERT(paths[0].second[i].eoo());
+        }
+
+        ASSERT_EQ(paths[1].second.size(), 4);
+        for (int i = 0; i < 4; ++i) {
+            ASSERT_BSONOBJ_EQ(paths[1].second[i].Obj(), BSON("b" << (i * 10)));
+        }
+
+        ASSERT_EQ(paths[2].second.size(), 4);
+        for (int i = 0; i < 4; ++i) {
+            ASSERT_EQ(paths[2].second[i].Int(), i * 10);
+        }
+
+        ASSERT_EQ(paths[3].second.size(), 4);
+        for (int i = 0; i < 4; ++i) {
+            ASSERT(paths[3].second[i].eoo());
+        }
     }
     {
         // Make sure that decompressing zero paths doesn't segfault or anything like that.
-        std::vector<std::pair<NoElemsPath, std::vector<BSONElement>>> paths{{}};
+        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{}};
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
     }
 }

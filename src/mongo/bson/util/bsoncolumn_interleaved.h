@@ -48,6 +48,7 @@ template <typename Buffer>
 struct BlockBasedSubObjectFinisher {
     BlockBasedSubObjectFinisher(const BufferVector<Buffer*>& buffers) : _buffers(buffers) {}
     void finish(const char* elemBytes, int fieldNameSize, int totalSize);
+    void finishMissing();
 
     const BufferVector<Buffer*>& _buffers;
 };
@@ -160,6 +161,8 @@ private:
     const char* decompressGeneral(
         absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer);
 
+    static bool moreData(DecodingState& ds, const char* control);
+
     template <typename T, typename Encoding, class Buffer, typename Materialize, typename Finish>
     static void decompressAllDelta(const char* ptr,
                                    const char* end,
@@ -212,6 +215,13 @@ void BlockBasedSubObjectFinisher<Buffer>::finish(const char* elemBytes,
     }
 }
 
+template <typename Buffer>
+void BlockBasedSubObjectFinisher<Buffer>::finishMissing() {
+    for (auto&& buffer : _buffers) {
+        buffer->appendMissing();
+    }
+}
+
 /**
  * Decompresses interleaved data where data at a given path is sent to the corresonding buffer.
  * Returns a pointer to the next byte after the EOO that ends the interleaved data.
@@ -239,13 +249,17 @@ const char* BlockBasedInterleavedDecompressor::decompress(
         findScalar.traverse(refObj);
     }
 
-    // For each path, we can use a fast implementation if it just decompresses a single
-    // scalar field to a buffer.
+    // For each path, we can use a fast implementation if it just decompresses a single scalar field
+    // to a buffer. Paths that don't match any elements in the reference object will just get a
+    // bunch of missing values appended, and can take the fast path as well.
     absl::flat_hash_map<const void*, BufferVector<Buffer*>> elemToBufferFast;
     absl::flat_hash_map<const void*, BufferVector<Buffer*>> elemToBufferGeneral;
     for (auto&& path : paths) {
         auto elems = path.first.elementsToMaterialize(refObj);
-        if (elems.size() == 1 && scalarElems.contains(elems[0])) {
+        if (elems.empty()) {
+            // Use nullptr as a sentinel for paths that don't map to any elements.
+            elemToBufferFast[nullptr].push_back(&path.second);
+        } else if (elems.size() == 1 && scalarElems.contains(elems[0])) {
             elemToBufferFast[elems[0]].push_back(&path.second);
         } else {
             for (const void* valueAddr : elems) {
@@ -392,17 +406,17 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
             // Get the next element for this scalar field.
             DecodingState::Elem decodingStateElem;
             if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
-                d64 && d64->pos.valid() && (++d64->pos).more()) {
+                d64 && d64->pos.valid() && d64->pos.more()) {
                 // We have an iterator into a block of deltas
                 decodingStateElem = state.loadDelta(_allocator, *d64);
+                ++d64->pos;
             } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
-                       d128 && d128->pos.valid() && (++d128->pos).more()) {
+                       d128 && d128->pos.valid() && d128->pos.more()) {
                 // We have an iterator into a block of deltas
                 decodingStateElem = state.loadDelta(_allocator, *d128);
-            } else if (*control == EOO) {
-                // End of interleaved mode. Stop object traversal early by returning false.
-                return false;
+                ++d128->pos;
             } else {
+                invariant(*control != EOO, "moreData() should ensure we terminate loop at EOO");
                 // No more deltas for this scalar field. The next control byte is guaranteed
                 // to belong to this scalar field, since traversal order is fixed.
                 auto result = state.loadControl(_allocator, control);
@@ -429,16 +443,39 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
             return true;
         }};
 
-    bool more = true;
-    while (more || *control != EOO) {
+    while (moreData(decoderStates[0], control)) {
         scalarIdx = 0;
         nodeIdx = 0;
-        more = trDecompress.traverse(refObj);
+        trDecompress.traverse(refObj);
     }
+
+    invariant(*control == EOO, "expected EOO that ends interleaved mode");
 
     // Advance past the EOO that ends interleaved mode.
     ++control;
     return control;
+}
+
+inline bool BlockBasedInterleavedDecompressor::moreData(DecodingState& ds, const char* control) {
+    return visit(OverloadedVisitor{[&](typename DecodingState::Decoder64& d64) {
+                                       if (!d64.pos.valid() || !d64.pos.more()) {
+                                           // We need to load the next control byte. Is interleaved
+                                           // mode continuing?
+                                           return *control != EOO;
+                                       }
+
+                                       return true;
+                                   },
+                                   [&](typename DecodingState::Decoder128& d128) {
+                                       if (!d128.pos.valid() || !d128.pos.more()) {
+                                           // We need to load the next control byte. Is interleaved
+                                           // mode continuing?
+                                           return *control != EOO;
+                                       }
+
+                                       return true;
+                                   }},
+                 ds.decoder);
 }
 
 /**
@@ -671,6 +708,17 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
         std::push_heap(heap.begin(), heap.end(), std::greater<>());
     }
 
+    // If there were paths that don't match anything, call appendMissing().
+    if (auto it = elemToBuffer.find(nullptr); it != elemToBuffer.end()) {
+        // All the decoder states should have the same value count.
+        auto valueCount = heap[0]._valueCount;
+        for (auto&& buffer : it->second) {
+            for (size_t i = 0; i < valueCount; ++i) {
+                buffer->appendMissing();
+            }
+        }
+    }
+
     // Advance past the EOO that ends interleaved mode.
     ++control;
     return control;
@@ -752,5 +800,4 @@ void BlockBasedInterleavedDecompressor::appendToBuffers(BufferVector<Buffer*>& b
           },
           elem);
 }
-
 }  // namespace mongo::bsoncolumn

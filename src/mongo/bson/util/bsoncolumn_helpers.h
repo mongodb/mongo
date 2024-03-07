@@ -226,6 +226,7 @@ private:
 
 struct NoopSubObjectFinisher {
     void finish(const char* elemBytes, int fieldNameSize, int totalSize) {}
+    void finishMissing() {}
 };
 
 /**
@@ -307,6 +308,9 @@ public:
             if (!_allowEmpty &&
                 _allocator.position() == _allocator.contiguous() + _sizeOffset + 4) {
                 _allocator.deallocate(_fieldNameSize + 6);
+                if (_contiguousBlock) {
+                    _finisher.finishMissing();
+                }
                 return;
             }
 
