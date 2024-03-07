@@ -106,7 +106,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedResults: [{a: 11}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Min_GroupByNullAllPass",
@@ -116,7 +116,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedResults: [{a: 11}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByNull",
@@ -125,7 +125,7 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: null, a: {$min: '$y'}}}
                 ],
                 expectedResults: [{_id: null, a: 11}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Max_GroupByNull",
@@ -135,7 +135,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedResults: [{a: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Max_GroupByNullAllPass",
@@ -145,7 +145,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedResults: [{a: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByNull",
@@ -154,7 +154,7 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: null, a: {$max: '$y'}}}
                 ],
                 expectedResults: [{_id: null, a: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMin_GroupByNull",
@@ -164,7 +164,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMin_GroupByNullAllPass",
@@ -174,7 +174,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByNull",
@@ -184,7 +184,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: null, a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinAndMaxWithId_GroupByNull",
@@ -193,7 +193,7 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}}
                 ],
                 expectedResults: [{_id: null, a: 11, b: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Min_GroupByX",
@@ -203,7 +203,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedResults: [{a: 11}, {a: 42}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByX",
@@ -212,7 +212,7 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: '$x', a: {$min: '$y'}}}
                 ],
                 expectedResults: [{_id: 123, a: 42}, {_id: 456, a: 11}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Max_GroupByX",
@@ -222,7 +222,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedResults: [{a: 73}, {a: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxWithId_GroupByX",
@@ -231,7 +231,7 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: '$x', a: {$max: '$y'}}}
                 ],
                 expectedResults: [{_id: 123, a: 73}, {_id: 456, a: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMin_GroupByX",
@@ -241,7 +241,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{a: 31}, {a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByX",
@@ -251,7 +251,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: 123, a: 31}, {_id: 456, a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinAndMaxWithId_GroupByX",
@@ -260,7 +260,7 @@ TimeseriesTest.run((insert) => {
                     {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}
                 ],
                 expectedResults: [{_id: 123, a: 42, b: 73}, {_id: 456, a: 11, b: 99}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByDateTrunc",
@@ -276,7 +276,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByDateAdd",
@@ -296,7 +296,7 @@ TimeseriesTest.run((insert) => {
                     {_id: ISODate("1970-01-20T10:55:12.840Z"), a: 11},
                     {_id: ISODate("1970-01-20T10:55:12.940Z"), a: 99}
                 ],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByDateAddAndDateDiff",
@@ -351,7 +351,7 @@ TimeseriesTest.run((insert) => {
                     {_id: ISODate("1970-01-20T10:55:12.640Z"), a: 11},
                     {_id: ISODate("1970-01-20T10:55:12.740Z"), a: 99},
                 ],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByDateSubtractAndDateDiff",
@@ -435,7 +435,7 @@ TimeseriesTest.run((insert) => {
                 expectedResults: [
                     {a: 100, b: 500, c: -500, d: -100},
                 ],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxAndMinOfDateAddDateSubtractDateTruncWithId_GroupByNull",
@@ -467,7 +467,7 @@ TimeseriesTest.run((insert) => {
                         c: ISODate("1970-01-20T10:55:12.000Z")
                     },
                 ],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByDateTruncAndDateAdd",
@@ -491,7 +491,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByDateTruncAndDateSubtract",
@@ -515,7 +515,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByDateDiffAndDateAdd",
@@ -541,7 +541,7 @@ TimeseriesTest.run((insert) => {
                 expectedResults:
                     [{_id: 200, a: 73}, {_id: 300, a: 42}, {_id: 400, a: 11}, {_id: 500, a: 99}],
 
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinOfDateDiffWithId_GroupByNull_InvalidDate",
@@ -564,7 +564,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: 1}}
                 ],
                 expectedErrorCode: 7157922,
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinOfDateAddWithId_GroupByNull_MissingAmount",
@@ -615,7 +615,7 @@ TimeseriesTest.run((insert) => {
                     {_id: 400, a: 99 + 99},
                     {_id: 500, a: null}
                 ],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxPlusMinWithId_GroupByFilteredComputedDateDiff",
@@ -637,31 +637,31 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$add: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: 300, a: 11 + 11}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Min_GroupByX_NoFilter",
                 pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}, {$project: {_id: 0, a: 1}}],
                 expectedResults: [{a: 11}, {a: 42}, {a: null}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinWithId_GroupByX_NoFilter",
                 pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}],
                 expectedResults: [{_id: 123, a: 42}, {_id: 456, a: 11}, {_id: null, a: null}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "Max_GroupByX_NoFilter",
                 pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}, {$project: {_id: 0, a: 1}}],
                 expectedResults: [{a: 73}, {a: 99}, {a: null}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxWithId_GroupByX_NoFilter",
                 pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}],
                 expectedResults: [{_id: 123, a: 73}, {_id: 456, a: 99}, {_id: null, a: null}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMin_GroupByX_NoFilter",
@@ -670,7 +670,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{a: 31}, {a: 88}, {a: null}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByX_NoFilter",
@@ -679,7 +679,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: 123, a: 31}, {_id: 456, a: 88}, {_id: null, a: null}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MinAndMaxWithId_GroupByX_NoFilter",
@@ -689,7 +689,7 @@ TimeseriesTest.run((insert) => {
                     {_id: 456, a: 11, b: 99},
                     {_id: null, a: null, b: null}
                 ],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByDateTrunc_NoFilter",
@@ -704,7 +704,7 @@ TimeseriesTest.run((insert) => {
                     {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
                 ],
                 expectedResults: [{_id: ISODate("1970-01-20T10:55:00Z"), a: 88}],
-                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+                usesBlockProcessing: false
             },
             {
                 name: "MaxMinusMinWithId_GroupByDateTruncAndDateDiff_NoFilter",

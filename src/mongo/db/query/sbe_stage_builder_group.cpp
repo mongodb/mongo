@@ -967,10 +967,6 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                       const PlanStageReqs& reqs,
                                       PlanStageSlots childOutputs,
                                       const GroupNode* groupNode) {
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-    auto collatorSlot = _state.getCollatorSlot();
     const auto& idExpr = groupNode->groupByExpression;
     const auto nodeId = groupNode->nodeId();
     SbBuilder b(_state, nodeId);
@@ -1050,9 +1046,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     std::vector<AccumulatorArgs> blockAccArgsVec;
     bool vectorizedAccumulatorArgs = false;
 
-    // These are the conditions for attempting to vectorize the expressions in 'accArgsVec'.
-    bool tryToVectorizeAccumulatorArgs = sbeFullEnabled && childOutputs.hasBlockOutput() &&
-        idIsSingleKey && !hasVariableGroupInit && !collatorSlot && !_cq.getExpCtx()->allowDiskUse;
+    // TODO SERVER-87560 re-enable block hashagg end-to-end.
+    bool tryToVectorizeAccumulatorArgs = false;
 
     // If the necessary conditions are met, try to vectorize 'accArgsVec'.
     if (tryToVectorizeAccumulatorArgs) {
