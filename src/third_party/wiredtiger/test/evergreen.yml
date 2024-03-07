@@ -246,7 +246,7 @@ functions:
           DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
         fi
 
-        if [[ "${build_variant|}" =~ "macos-1100" ]]; then
+        if [[ "${build_variant|}" =~ "macos-1300" ]]; then
           # For mac builds, we want explicitly tell cmake which python to use, as
           # well as the matching library directory and header files. The find_libpython
           # module gives us the library.
@@ -272,7 +272,7 @@ functions:
              fi
           fi
 
-          if [ "${build_variant|}" = "macos-1100-arm64" ]; then
+          if [ "${build_variant|}" = "macos-1300-arm64" ]; then
             DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPython3_EXECUTABLE=$SYSPY -DPython3_LIBRARY=$SYSPYLIB -DPython3_INCLUDE_DIR=$SYSPYINCDEF"
           else
             DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPYTHON_EXECUTABLE:FILEPATH=$SYSPY -DPYTHON_LIBRARY=$SYSPYLIB -DPYTHON_INCLUDE_DIR=$SYSPYINCDEF"
@@ -5539,25 +5539,14 @@ buildvariants:
     - name: catch2-unittest-test
 
 - <<: *mac_test_template
-  name: macos-1100-arm64
-  display_name: "macOS 11.00 ARM64"
+  name: macos-1300-arm64
+  display_name: "macOS 13.00 (ARM64)"
   run_on:
-    - macos-1100-arm64
+    - macos-1300-arm64
   batchtime: 120 # 2 hours
   expansions:
     python_binary: '/opt/homebrew/Frameworks/Python.framework/Versions/3.11/bin/python3.11'
     python_config_search_string: '_Python3_EXECUTABLE'
-    <<: *mac_test_template_expansions
-
-- <<: *mac_test_template
-  name: macos-1100
-  display_name: "macOS 11.00"
-  run_on:
-    - macos-1100
-  batchtime: 120 # 2 hours
-  expansions:
-    python_binary: '/usr/bin/python3'
-    python_config_search_string: 'PYTHON_EXECUTABLE'
     <<: *mac_test_template_expansions
 
 - name: little-endian
