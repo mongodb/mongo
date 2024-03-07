@@ -1,24 +1,11 @@
 /**
- * Tests batch-deleting a large range of data.
+ * Tests batch-deleting a large range of data using a given predicate.
  * This test does not rely on getMores on purpose, as this is a requirement for running on
  * tenant migration passthroughs.
- *
- * @tags: [
- *  does_not_support_retryable_writes,
- *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
- *  does_not_support_transactions,
- *  multiversion_incompatible,
- *  no_selinux,
- *  requires_fcv_61,
- *  requires_non_retryable_writes,
- *  # TODO SERVER-87044: re-enable test in suites that perform random migrations
- *  assumes_balancer_off,
- * ]
  */
 
-function populateAndMassDelete(queryPredicate) {
-    const testDB = db.getSiblingDB('test');
-    const coll = testDB['c'];
+export function runBatchedMultiDeletesTest(coll, queryPredicate) {
+    const testDB = coll.getDB();
 
     const collCount = 94321;  // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
@@ -50,6 +37,3 @@ function populateAndMassDelete(queryPredicate) {
     assert.commandWorked(coll.deleteMany(queryPredicate));
     assert.eq(null, coll.findOne());
 }
-
-populateAndMassDelete({_id: {$gte: 0}});
-populateAndMassDelete({a: {$gte: 0}});

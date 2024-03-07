@@ -78,7 +78,8 @@ selector:
   - jstests/core/**/bench_test2.js
   - jstests/core/**/bindata_eq.js
   - jstests/core/**/bindata_indexonly.js
-  - jstests/core/**/batched_multi_deletes.js
+  - jstests/core/write/delete/batched_multi_deletes_a.js
+  - jstests/core/write/delete/batched_multi_deletes_id.js
   - jstests/core/**/capped_update.js
   - jstests/core/**/collation.js
   - jstests/core/**/collation_find_and_modify.js

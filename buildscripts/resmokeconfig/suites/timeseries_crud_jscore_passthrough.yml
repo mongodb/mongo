@@ -87,7 +87,8 @@ selector:
   - jstests/core/query/sort/sort_array.js
   - jstests/core/query/sort/sort_merge_collation.js
   - jstests/core/record_store_count.js
-  - jstests/core/write/batched_multi_deletes.js
+  - jstests/core/write/delete/batched_multi_deletes_a.js
+  - jstests/core/write/delete/batched_multi_deletes_id.js
   - jstests/core/write/bulk/bulk_write_profile.js
   - jstests/core/query/regex/regex_collations.js
   - jstests/core/write/delete/delete_hint.js
