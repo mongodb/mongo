@@ -47,12 +47,14 @@ def _setup_local_config_platform(ctx):
         arch = "arm64"
 
     if distro != None and distro + "_" + arch in REMOTE_EXECUTION_CONTAINERS:
+        container_url = REMOTE_EXECUTION_CONTAINERS[distro + "_" + arch]["container-image"]
+        print("Using remote execution container: {}".format(container_url))
         exec_props = """
     exec_properties = {
         "container-image": "%s",
         "dockerNetwork": "standard"
     },
-""" % REMOTE_EXECUTION_CONTAINERS[distro + "_" + arch]["container-image"]
+""" % container_url
     else:
         exec_props = ""
 

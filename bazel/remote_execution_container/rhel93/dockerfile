@@ -1,6 +1,6 @@
 # Image used by bazel remote execution hosts.
 
-FROM redhat/ubi8:8.9
+FROM redhat/ubi9:9.3
 
 RUN yum install -y glibc-devel
 

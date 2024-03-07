@@ -48,10 +48,19 @@ _SANITIZER_MAP = {
     "undefined": "ubsan",
 }
 
-_DISTRO_MAP = {
-    "Ubuntu 22.04": "ubuntu22",
+_DISTRO_PATTERN_MAP = {
+    "Ubuntu 18*": "ubuntu18",
+    "Ubuntu 20*": "ubuntu20",
+    "Ubuntu 22*": "ubuntu22",
     "Amazon Linux 2": "amazon_linux_2",
     "Amazon Linux 2023": "amazon_linux_2023",
+    "Debian GNU/Linux 10": "debian10",
+    "Debian GNU/Linux 12": "debian12",
+    "Red Hat Enterprise Linux Server 7*": "rhel7",
+    "Red Hat Enterprise Linux 7*": "rhel7",
+    "Red Hat Enterprise Linux 8*": "rhel8",
+    "Red Hat Enterprise Linux 9*": "rhel9",
+    "SLES 15*": "suse15",
 }
 
 _S3_HASH_MAPPING = {
@@ -532,6 +541,17 @@ def verify_s3_hash(s3_path: str, local_path: str) -> None:
             f"Hash mismatch for {s3_path}, expected {_S3_HASH_MAPPING[s3_path]} but got {hash}")
 
 
+def find_distro_match(distro_str: str) -> str:
+    for distro_pattern, simplified_name in _DISTRO_PATTERN_MAP.items():
+        if "*" in distro_pattern:
+            prefix_suffix = distro_pattern.split("*")
+            if distro_str.startswith(prefix_suffix[0]) and distro_str.endswith(prefix_suffix[1]):
+                return simplified_name
+        elif distro_str == distro_pattern:
+            return simplified_name
+    return None
+
+
 # Establishes logic for BazelLibrary build rule
 def generate(env: SCons.Environment.Environment) -> None:
 
@@ -613,10 +633,11 @@ def generate(env: SCons.Environment.Environment) -> None:
         else:
             allocator = env.GetOption("allocator")
 
-        if normalized_os == "linux" and f"{distro.name()} {distro.version()}" in _DISTRO_MAP:
-            distro_or_os = _DISTRO_MAP[f"{distro.name()} {distro.version()}"]
-        else:
-            distro_or_os = normalized_os
+        distro_or_os = normalized_os
+        if normalized_os == "linux":
+            distro_id = find_distro_match(f"{distro.name()} {distro.version()}")
+            if distro_id is not None:
+                distro_or_os = distro_id
 
         bazel_internal_flags = [
             f'--//bazel/config:compiler_type={env.ToolchainName()}',

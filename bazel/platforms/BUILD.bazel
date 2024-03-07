@@ -26,9 +26,17 @@ package(default_visibility = ["//visibility:public"])
     ]
     for distro_or_os in [
         "linux",
+        "ubuntu18",
+        "ubuntu20",
         "ubuntu22",
         "amazon_linux_2",
         "amazon_linux_2023",
+        "debian10",
+        "debian12",
+        "rhel7",
+        "rhel8",
+        "rhel9",
+        "suse15",
     ]
 ]
 
@@ -88,6 +96,42 @@ platform(
 
 platform(
     name = "linux_s390x_gcc",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:gcc",
+    ],
+)
+
+platform(
+    name = "rhel8_ppc64le_clang",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+)
+
+platform(
+    name = "rhel8_ppc64le_gcc",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:gcc",
+    ],
+)
+
+platform(
+    name = "rhel8_s390x_clang",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+)
+
+platform(
+    name = "rhel8_s390x_gcc",
     constraint_values = [
         "@platforms//cpu:s390x",
         "@platforms//os:linux",

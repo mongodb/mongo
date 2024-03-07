@@ -13,11 +13,19 @@ def retry_download_and_extract(ctx, tries, **kwargs):
             sleep_time *= 2
 
 def get_host_distro_major_version(repository_ctx):
-    distro_pattern_map = {
+    _DISTRO_PATTERN_MAP = {
+        "Ubuntu 18*": "ubuntu18",
+        "Ubuntu 20*": "ubuntu20",
         "Ubuntu 22*": "ubuntu22",
         "Amazon Linux 2": "amazon_linux_2",
         "Amazon Linux 2023": "amazon_linux_2023",
+        "Debian GNU/Linux 10": "debian10",
+        "Debian GNU/Linux 12": "debian12",
+        "Red Hat Enterprise Linux Server 7*": "rhel7",
+        "Red Hat Enterprise Linux 7*": "rhel7",
         "Red Hat Enterprise Linux 8*": "rhel8",
+        "Red Hat Enterprise Linux 9*": "rhel9",
+        "SLES 15*": "suse15",
     }
 
     if repository_ctx.os.name != "linux":
@@ -44,7 +52,7 @@ def get_host_distro_major_version(repository_ctx):
         distro_version = distro_seq[1],
     )
 
-    for distro_pattern, simplified_name in distro_pattern_map.items():
+    for distro_pattern, simplified_name in _DISTRO_PATTERN_MAP.items():
         if "*" in distro_pattern:
             prefix_suffix = distro_pattern.split("*")
             if distro_str.startswith(prefix_suffix[0]) and distro_str.endswith(prefix_suffix[1]):

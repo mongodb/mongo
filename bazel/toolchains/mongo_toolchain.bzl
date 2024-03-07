@@ -101,7 +101,7 @@ def _toolchain_download(ctx):
             substitutions = substitutions,
         )
     else:
-        ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
+        fail("Mongo toolchain not supported on " + distro + " and " + arch + ". Toolchain key not found: " + toolchain_key)
 
     return None
 
