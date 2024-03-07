@@ -414,7 +414,19 @@ if tcmallocAttrs:
             '$BUILD_DIR/mongo/s/mongos_initializers',
         ],
         LIBDEPS_TAGS=[
+            'lint-allow-bidirectional-edges',
             'lint-allow-nonprivate-on-deps-dependents',
+        ],
+    )
+
+    tcmspEnv.CppUnitTest(
+        target='tcmalloc_set_parameters_test',
+        source=[
+            'tcmalloc_set_parameter_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/server_base',
+            'tcmalloc_set_parameter',
         ],
     )
 
