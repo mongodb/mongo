@@ -138,4 +138,24 @@ StatusWith<std::string> JWSValidatedToken::extractIssuerFromCompactSerialization
     return ex.toStatus();
 }
 
+StatusWith<IssuerAudiencePair> JWSValidatedToken::extractIssuerAndAudienceFromCompactSerialization(
+    StringData token) try {
+    auto tokenSplit = parseSignedToken(token);
+    auto payload = fromjson(base64url::decode(tokenSplit.body));
+    auto jwt = JWT::parse(IDLParserContext{"JWT"}, payload);
+
+    IssuerAudiencePair pair;
+    pair.issuer = jwt.getIssuer().toString();
+
+    auto& audience = jwt.getAudience();
+    if (std::holds_alternative<std::string>(audience)) {
+        pair.audience.push_back(std::get<std::string>(audience));
+    } else {
+        pair.audience = std::get<std::vector<std::string>>(audience);
+    }
+    return pair;
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
 }  // namespace mongo::crypto
