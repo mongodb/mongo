@@ -34,7 +34,7 @@ namespace mongo::timeseries::bucket_catalog {
 
 MeasurementMap::MeasurementMap(TrackingContext& trackingContext)
     : _trackingContext(trackingContext),
-      _builders(makeTrackedStringMap<std::pair<size_t, BSONColumnBuilder>>(_trackingContext)) {}
+      _builders(makeTrackedStringMap<std::tuple<size_t, BSONColumnBuilder>>(_trackingContext)) {}
 
 void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                                   size_t numMeasurements) {
@@ -99,12 +99,12 @@ void MeasurementMap::insertOne(std::vector<BSONElement> oneMeasurementDataFields
 BSONColumnBuilder& MeasurementMap::getBuilder(StringData key) {
     auto it = _builders.find(key);
     invariant(it != _builders.end());
-    return it->second.second;
+    return std::get<1>(it->second);
 }
 
 void MeasurementMap::_assertInternalStateIdentical_forTest() {
     for (auto& entry : _builders) {
-        invariant(entry.second.first == _measurementCount);
+        invariant(std::get<0>(entry.second) == _measurementCount);
     }
 }
 

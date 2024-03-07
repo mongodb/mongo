@@ -68,7 +68,7 @@ public:
 
     BSONColumnBuilder& getBuilder(StringData key);
 
-    TrackedStringMap<std::pair<size_t, BSONColumnBuilder>>& getBuilders() {
+    TrackedStringMap<std::tuple<size_t, BSONColumnBuilder>>& getBuilders() {
         return _builders;
     }
 
@@ -88,7 +88,7 @@ private:
 
     std::reference_wrapper<TrackingContext> _trackingContext;
 
-    TrackedStringMap<std::pair<size_t, BSONColumnBuilder>> _builders;
+    TrackedStringMap<std::tuple<size_t, BSONColumnBuilder>> _builders;
     size_t _measurementCount{0};
 };
 

@@ -251,7 +251,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
         BSONObjBuilder updatedDataFieldsBuilder;
 
         for (auto& entry : batch->movableState.intermediateBuilders.getBuilders()) {
-            auto& cBuilder = entry.second.second;
+            auto& cBuilder = std::get<1>(entry.second);
             auto cDiff = cBuilder.intermediate();
 
             if (batch->newFieldNamesToBeInserted.count(entry.first.c_str())) {
