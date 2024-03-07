@@ -656,16 +656,16 @@ buildvariants:
   - name: .auth
   - name: buildscripts_test
   - name: unittest_shell_hang_analyzer_gen
-  # - name: .config_fuzzer # Not passing
+  - name: .config_fuzzer
   - name: config_fuzzer_jsCore
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  # - name: .concurrency !.large !.no_txns # Not passing
-  # - name: .concurrency .large !.no_txns # Not passing
-  #   distros:
-  #   - rhel80-medium
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
+    distros:
+    - rhel80-xlarge
   - name: disk_wiredtiger
   - name: .encrypt
   - name: external_auth
@@ -678,14 +678,10 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.feature_flag_guarded !.flow_control  # Flow control jstestfuzz take longer.
-  # - name: libunwind_tests # Cant be used because tsan does not use libunwind
-  # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .query_fuzzer !.feature_flag_guarded
   - name: query_golden_classic
-  # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .read_write_concern .large
     distros:
     - rhel80-medium
@@ -728,18 +724,14 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  # - name: .sharding .common # Not passing
+  - name: .sharding .common !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .stitch
-  # - name: .crypt # Doesn't pass on v4
-  #   distros:
-  #   - rhel80-xlarge
-  # - name: .updatefuzzer # Cannot find the variant on older versions. Should not be enabled with TSAN
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
-  # - name: .serverless # Not passing
-  #   distros:
-  #   - rhel80-xlarge
+  - name: .serverless
+    distros:
+    - rhel80-xlarge
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
@@ -747,35 +739,6 @@ buildvariants:
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
-  - name: generate_buildid_to_debug_symbols_mapping
-
-- &enterprise-rhel80-debug-complete-tsan-template
-  name: &enterprise-rhel80-debug-complete-tsan enterprise-rhel80-debug-complete-tsan
-  display_name: "~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  activate: false
-  run_on:
-  - rhel80-large
-  stepback: false
-  expansions:
-    <<: *enterprise-rhel80-debug-tsan-expansions-template
-    compile_variant: *enterprise-rhel80-debug-complete-tsan
-  tasks:
-  - name: compile_test_serial_TG
-  - name: .concurrency !.no_txns !.compute_mode
-  - name: .config_fuzzer
-  # - name: libunwind_tests # Cant be used because tsan does not use libunwind
-  # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  - name: .sharding .common !.feature_flag_guarded
-  # - name: .crypt # Doesn't pass on v4
-  #   distros:
-  #   - rhel80-xlarge
-  # - name: .updatefuzzer # Cannot find the variant on older versions. Should not be enabled with TSAN.
-  - name: .serverless
-    distros:
-    - rhel80-xlarge
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
