@@ -718,6 +718,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     {
         Lock::GlobalWrite globalLk(startupOpCtx.get());
         DurableHistoryRegistry::get(serviceContext)->reconcilePins(startupOpCtx.get());
+
+        // Initialize the cached pointer to the oplog collection. We want to do this even as
+        // standalone
+        // so accesses to the cached pointer in replica set nodes started as standalone still work
+        // (mainly AutoGetOplog). In case the oplog doesn't exist, it is just initialized to null.
+        // This initialization must happen within a GlobalWrite lock context.
+        repl::acquireOplogCollectionForLogging(startupOpCtx.get());
     }
 
     // Notify the storage engine that startup is completed before repair exits below, as repair sets
