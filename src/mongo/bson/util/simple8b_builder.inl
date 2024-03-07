@@ -194,7 +194,7 @@ template <class F>
 requires Simple8bBlockWriter<F>
 bool Simple8bBuilder<T>::append(T value, F&& writeFn) {
     if (_rlePossible()) {
-        if (_lastValueInPrevWord.val == value) {
+        if (_lastValueInPrevWord == value) {
             ++_rleCount;
             return true;
         }
@@ -208,7 +208,7 @@ template <typename T>
 template <class F>
 requires Simple8bBlockWriter<F>
 void Simple8bBuilder<T>::skip(F&& writeFn) {
-    if (_rlePossible() && _lastValueInPrevWord.isSkip()) {
+    if (_rlePossible() && !_lastValueInPrevWord.has_value()) {
         ++_rleCount;
         return;
     }
@@ -238,18 +238,20 @@ void Simple8bBuilder<T>::flush(F&& writeFn) {
     }
 
     // Always reset _lastValueInPrevWord. We may only start RLE after flush on 0 value.
-    _lastValueInPrevWord = {};
+    _lastValueInPrevWord = 0;
     _lastValidExtensionType = 0;
 }
 
 template <typename T>
 void Simple8bBuilder<T>::setLastForRLE(boost::optional<T> val) {
-    if (!val) {
-        _lastValueInPrevWord = {boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}};
-        return;
-    }
+    _lastValueInPrevWord = val;
+}
 
-    _lastValueInPrevWord = *_calculatePendingValue(*val);
+template <typename T>
+void Simple8bBuilder<T>::resetLastForRLEIfNeeded() {
+    if (!_rlePossible()) {
+        _lastValueInPrevWord = 0;
+    }
 }
 
 template <typename T>
@@ -359,7 +361,7 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle, F&& writeFn) {
             // There are no more words in _pendingValues and the last element of the last Simple8b
             // word is the same as the new value. Therefore, start RLE.
             _rleCount = 1;
-            _lastValueInPrevWord = lastPendingValue;
+            _lastValueInPrevWord = lastPendingValue.val;
         } else {
             _pendingValues.push_back(*pendingValue);
             _updateSimple8bCurrentState(*pendingValue);
@@ -388,7 +390,7 @@ void Simple8bBuilder<T>::_appendSkip(bool tryRle, F&& writeFn) {
         if (_pendingValues.empty() && isLastValueSkip && tryRle) {
             // It is possible to start rle
             _rleCount = 1;
-            _lastValueInPrevWord = {boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}};
+            _lastValueInPrevWord = boost::none;
             return;
         }
     }
@@ -407,7 +409,7 @@ void Simple8bBuilder<T>::_handleRleTermination(F&& writeFn) {
     _appendRleEncoding(writeFn);
     // Add any values that could not be encoded in RLE.
     while (_rleCount > 0) {
-        if (_lastValueInPrevWord.isSkip()) {
+        if (!_lastValueInPrevWord.has_value()) {
             _appendSkip(false /* tryRle */, writeFn);
         } else {
             _appendValue(_lastValueInPrevWord.value(), false, writeFn);
@@ -566,12 +568,12 @@ void Simple8bBuilder<T>::_updateSimple8bCurrentState(const PendingValue& val) {
 
 template <typename T>
 typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::begin() const {
-    return {_pendingValues.begin(), _pendingValues.begin(), _lastValueInPrevWord.val, _rleCount};
+    return {_pendingValues.begin(), _pendingValues.begin(), _lastValueInPrevWord, _rleCount};
 }
 
 template <typename T>
 typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::end() const {
-    return {_pendingValues.begin(), _pendingValues.end(), _lastValueInPrevWord.val, 0};
+    return {_pendingValues.begin(), _pendingValues.end(), _lastValueInPrevWord, 0};
 }
 
 template <typename T>
@@ -592,10 +594,7 @@ void Simple8bBuilder<T>::assertInternalStateIdentical_forTest(
     // Verifies the pending values
     invariant(std::equal(begin(), end(), other.begin(), other.end()));
     invariant(_rleCount == other._rleCount);
-    invariant(_lastValueInPrevWord.val == other._lastValueInPrevWord.val);
-    invariant(_lastValueInPrevWord.bitCount == other._lastValueInPrevWord.bitCount);
-    invariant(_lastValueInPrevWord.trailingZerosCount ==
-              other._lastValueInPrevWord.trailingZerosCount);
+    invariant(_lastValueInPrevWord == other._lastValueInPrevWord);
     invariant(_currMaxBitLen == other._currMaxBitLen);
     invariant(_currTrailingZerosCount == other._currTrailingZerosCount);
     invariant(_lastValidExtensionType == other._lastValidExtensionType);

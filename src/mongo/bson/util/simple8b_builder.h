@@ -158,11 +158,7 @@ public:
     /**
      * Reset RLE state on the last value, if needed. This should not be called in normal operation.
      */
-    void resetLastForRLEIfNeeded() {
-        if (!_rlePossible()) {
-            _lastValueInPrevWord = {};
-        }
-    }
+    void resetLastForRLEIfNeeded();
 
     /**
      * Validates that the internal state of this Simple8bBuilder is identical to the provided one.
@@ -312,7 +308,7 @@ private:
     // If RLE is ongoing, the number of consecutive repeats fo lastValueInPrevWord.
     uint32_t _rleCount = 0;
     // If RLE is ongoing, the last value in the previous Simple8b word.
-    PendingValue _lastValueInPrevWord;
+    boost::optional<T> _lastValueInPrevWord{0};
 
     // These variables hold the max amount of bits for each value in _pendingValues. They are
     // updated whenever values are added or removed from _pendingValues to always reflect the max
