@@ -270,6 +270,7 @@ public:
          * any, isn't checked.
          */
         virtual void setEndPosition(const BSONObj& key, bool inclusive) = 0;
+        virtual void setEndPosition(const key_string::Value& keyString) = 0;
 
         /**
          * Moves forward and returns the new data or boost::none if there is no more data.

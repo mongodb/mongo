@@ -970,8 +970,22 @@ public:
         const auto discriminator = _forward == inclusive
             ? key_string::Discriminator::kExclusiveAfter
             : key_string::Discriminator::kExclusiveBefore;
-        _endPosition = std::make_unique<key_string::Builder>(_version);
-        _endPosition->resetToKey(key, _ordering, discriminator);
+        key_string::Builder builder(_version);
+        builder.resetToKey(key, _ordering, discriminator);
+        setEndPosition(builder.getValueCopy());
+    }
+
+    void setEndPosition(const key_string::Value& keyString) override {
+        LOGV2_TRACE_CURSOR(20089, "setEndPosition: {key}", "key"_attr = keyString);
+
+        if (keyString.isEmpty()) {
+            // This means scan to end of index.
+            _endPosition.reset();
+            return;
+        }
+
+        auto newEndPosition = std::make_unique<key_string::Value>(keyString);
+        _endPosition.swap(newEndPosition);
     }
 
     boost::optional<IndexKeyEntry> seek(
@@ -1341,7 +1355,7 @@ protected:
     key_string::TypeBits _typeBits;
     RecordId _id;
 
-    std::unique_ptr<key_string::Builder> _endPosition;
+    std::unique_ptr<key_string::Value> _endPosition;
 
     // Used by next to decide to return current position rather than moving. Should be reset to
     // false by any operation that moves the cursor, other than subsequent save/restore pairs.
