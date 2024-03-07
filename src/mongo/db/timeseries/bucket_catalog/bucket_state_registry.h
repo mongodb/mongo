@@ -191,9 +191,9 @@ bool isBucketStateFrozen(std::variant<BucketState, DirectWriteCounter>& state);
 bool isBucketStatePrepared(std::variant<BucketState, DirectWriteCounter>& state);
 
 /**
- * Returns true if the state conflicts with reopening (aka a direct write).
+ * Returns true if the state transiently conflicts with reopening (aka a direct write).
  */
-bool conflictsWithReopening(std::variant<BucketState, DirectWriteCounter>& state);
+bool transientlyConflictsWithReopening(std::variant<BucketState, DirectWriteCounter>& state);
 
 /**
  * Returns true if the state conflicts with reopening or is cleared.

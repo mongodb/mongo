@@ -213,12 +213,12 @@ bool isBucketStatePrepared(std::variant<BucketState, DirectWriteCounter>& state)
     return false;
 }
 
-bool conflictsWithReopening(std::variant<BucketState, DirectWriteCounter>& state) {
+bool transientlyConflictsWithReopening(std::variant<BucketState, DirectWriteCounter>& state) {
     return holds_alternative<DirectWriteCounter>(state);
 }
 
 bool conflictsWithInsertions(std::variant<BucketState, DirectWriteCounter>& state) {
-    return conflictsWithReopening(state) || isBucketStateCleared(state) ||
+    return transientlyConflictsWithReopening(state) || isBucketStateCleared(state) ||
         isBucketStateFrozen(state);
 }
 
@@ -241,7 +241,7 @@ Status initializeBucketState(BucketStateRegistry& registry,
     if (it == registry.bucketStates.end()) {
         registry.bucketStates.emplace(bucketId, BucketState::kNormal);
         return Status::OK();
-    } else if (conflictsWithReopening(it->second)) {
+    } else if (transientlyConflictsWithReopening(it->second)) {
         // If we are currently performing direct writes on it we cannot initialize the bucket to a
         // normal state.
         return {ErrorCodes::WriteConflict,
@@ -393,7 +393,7 @@ void stopTrackingBucketState(BucketStateRegistry& registry, const BucketId& buck
         return;
     }
 
-    if (conflictsWithReopening(it->second)) {
+    if (transientlyConflictsWithReopening(it->second)) {
         // We cannot release the bucket state of pending direct writes.
         auto directWriteCount = get<DirectWriteCounter>(it->second);
         if (directWriteCount > 0) {

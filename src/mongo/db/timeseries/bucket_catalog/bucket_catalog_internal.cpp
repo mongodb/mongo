@@ -588,7 +588,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
               nullptr,
               getTimeseriesBucketClearedError(nss, existingBucket.bucketId.oid));
         return {ErrorCodes::WriteConflict, "Bucket may be stale"};
-    } else if (conflictsWithReopening(state.value())) {
+    } else if (transientlyConflictsWithReopening(state.value())) {
         // Avoid reusing the bucket if it conflicts with reopening.
         return {ErrorCodes::WriteConflict, "Bucket may be stale"};
     }
@@ -840,7 +840,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     // can't use this bucket.
     if (info.time - candidateTime < Seconds(*info.options.getBucketMaxSpanSeconds())) {
         auto bucketState = getBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
-        if (bucketState && !conflictsWithReopening(bucketState.value())) {
+        if (bucketState && !transientlyConflictsWithReopening(bucketState.value())) {
             return candidateBucket.bucketId.oid;
         } else {
             if (bucketState) {
