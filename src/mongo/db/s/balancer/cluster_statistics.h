@@ -66,15 +66,13 @@ public:
                         uint64_t currSizeBytes,
                         bool isDraining,
                         std::set<std::string> shardTags,
-                        std::string mongoVersion,
                         use_bytes_t t);
 
         ShardStatistics(ShardId shardId,
                         uint64_t maxSizeMB,
                         uint64_t currSizeMB,
                         bool isDraining,
-                        std::set<std::string> shardTags,
-                        std::string mongoVersion);
+                        std::set<std::string> shardTags);
 
         /**
          * Returns true if a shard is not allowed to receive any new chunks because it has reached
@@ -101,9 +99,6 @@ public:
 
         // Set of tags for the shard
         std::set<std::string> shardTags;
-
-        // Version of mongod, which runs on this shard's primary
-        std::string mongoVersion;
     };
 
     virtual ~ClusterStatistics();

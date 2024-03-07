@@ -152,8 +152,7 @@ protected:
                                     bool maxed = false,
                                     bool draining = false,
                                     std::set<std::string>&& zones = {}) {
-        return ShardStatistics(
-            id, maxed ? currentSizeBytes : 0, currentSizeBytes, draining, zones, "");
+        return ShardStatistics(id, maxed ? currentSizeBytes : 0, currentSizeBytes, draining, zones);
     }
 
     void setDefaultClusterStats(const std::vector<NamespaceString>& nssList = {kNss1}) {

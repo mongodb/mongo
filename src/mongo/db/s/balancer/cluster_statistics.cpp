@@ -54,27 +54,23 @@ ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inCurrSizeBytes,
                                                     bool inIsDraining,
                                                     std::set<std::string> inShardTags,
-                                                    std::string inMongoVersion,
                                                     use_bytes_t t)
     : shardId(std::move(inShardId)),
       maxSizeBytes(inMaxSizeBytes),
       currSizeBytes(inCurrSizeBytes),
       isDraining(inIsDraining),
-      shardTags(std::move(inShardTags)),
-      mongoVersion(std::move(inMongoVersion)) {}
+      shardTags(std::move(inShardTags)) {}
 
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inMaxSizeMB,
                                                     uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
-                                                    std::set<std::string> inShardTags,
-                                                    std::string inMongoVersion)
+                                                    std::set<std::string> inShardTags)
     : ShardStatistics(inShardId,
                       convertMBToBytes(inMaxSizeMB),
                       convertMBToBytes(inCurrSizeMB),
                       inIsDraining,
                       std::move(inShardTags),
-                      std::move(inMongoVersion),
                       use_bytes_t{}) {}
 
 bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
@@ -95,8 +91,6 @@ BSONObj ClusterStatistics::ShardStatistics::toBSON() const {
         BSONArrayBuilder arrayBuilder(builder.subarrayStart("tags"));
         arrayBuilder.append(shardTags);
     }
-
-    builder.append("version", mongoVersion);
     return builder.obj();
 }
 

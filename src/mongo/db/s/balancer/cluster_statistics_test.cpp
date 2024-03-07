@@ -40,12 +40,9 @@ using ShardStatistics = ClusterStatistics::ShardStatistics;
 const auto emptyTagSet = std::set<std::string>();
 
 TEST(ShardStatistics, SizeMaxedTest) {
-    ASSERT(
-        !ShardStatistics(ShardId("TestShardId"), 0, 0, false, emptyTagSet, "3.2.0").isSizeMaxed());
-    ASSERT(!ShardStatistics(ShardId("TestShardId"), 100LL, 80LL, false, emptyTagSet, "3.2.0")
-                .isSizeMaxed());
-    ASSERT(ShardStatistics(ShardId("TestShardId"), 100LL, 110LL, false, emptyTagSet, "3.2.0")
-               .isSizeMaxed());
+    ASSERT(!ShardStatistics(ShardId("TestShardId"), 0, 0, false, emptyTagSet).isSizeMaxed());
+    ASSERT(!ShardStatistics(ShardId("TestShardId"), 100LL, 80LL, false, emptyTagSet).isSizeMaxed());
+    ASSERT(ShardStatistics(ShardId("TestShardId"), 100LL, 110LL, false, emptyTagSet).isSizeMaxed());
 }
 
 }  // namespace
