@@ -453,6 +453,14 @@ public:
         _appendSimple8bBlocks<uint128_t>(builder, vals, expectedNum);
     }
 
+    static void appendSimple8bRLE(BufBuilder& builder, int elemCount) {
+        ASSERT(elemCount % 120 == 0);
+        ASSERT(elemCount / 120 <= 16);
+
+        uint64_t block = (elemCount / 120) - 1;
+        builder.appendNum(block << 4 | simple8b_internal::kRleSelector);
+    }
+
     static void appendEOO(BufBuilder& builder) {
         builder.appendChar(EOO);
     }
@@ -3414,6 +3422,180 @@ TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected, false);
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
+}
+
+TEST_F(BSONColumnTest, RLEAfterMixedValueBlock) {
+    // This test produces an RLE block after a simple8b block with different values. We test that we
+    // can properly handle when the value to use for RLE is at the end of this block and not the
+    // beginning.
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {createElementInt64(64), createElementInt64(128)};
+
+    for (size_t i = 0; i < 128; ++i) {
+        elems.push_back(createElementInt64(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bBlocks64(
+        expected, deltaInt64(elems.begin() + 1, elems.begin() + 10, elems.front()), 1);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, RLEAfterMixedValueBlock128) {
+    // This test produces an RLE block after a simple8b block with different values. We test that we
+    // can properly handle when the value to use for RLE is at the end of this block and not the
+    // beginning.
+    BSONColumnBuilder cb;
+
+    // Generate strings from integer to make it easier to control the delta values
+    auto createStringFromInt = [&](int64_t val) {
+        auto str = Simple8bTypeUtil::decodeString(val);
+        return createElementString(StringData(str.str.data(), str.size));
+    };
+
+    std::vector<BSONElement> elems = {createStringFromInt(64), createStringFromInt(128)};
+
+    for (size_t i = 0; i < 128; ++i) {
+        elems.push_back(createStringFromInt(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bBlocks128(
+        expected, deltaString(elems.begin() + 1, elems.begin() + 10, elems.front()), 1);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock) {
+    // This test produces an RLE block after a simple8b block with different values. The RLE block
+    // is located as the first block after a control byte. We test that we can properly handle when
+    // the value to use for RLE is at the end of the last block in the previous control byte and not
+    // at the beginning of this block.
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFF),
+                                      createElementInt64(64),
+                                      createElementInt64(128)};
+
+    for (size_t i = 0; i < 129; ++i) {
+        elems.push_back(createElementInt64(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + 1, elems.begin() + elems.size() - 120, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
+    // This test produces an RLE block after a simple8b block with different values. The RLE block
+    // is located as the first block after a control byte. We test that we can properly handle when
+    // the value to use for RLE is at the end of the last block in the previous control byte and not
+    // at the beginning of this block.
+    BSONColumnBuilder cb;
+
+    // Generate strings from integer to make it easier to control the delta values
+    auto createStringFromInt = [&](int64_t val) {
+        auto str = Simple8bTypeUtil::decodeString(val);
+        return createElementString(StringData(str.str.data(), str.size));
+    };
+
+    std::vector<BSONElement> elems = {createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFF),
+                                      createStringFromInt(64),
+                                      createStringFromInt(128)};
+
+    for (size_t i = 0; i < 129; ++i) {
+        elems.push_back(createStringFromInt(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks128(
+        expected,
+        deltaString(elems.begin() + 1, elems.begin() + elems.size() - 120, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, Interleaved) {

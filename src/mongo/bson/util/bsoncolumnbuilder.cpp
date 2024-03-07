@@ -413,6 +413,15 @@ private:
                                     const char* s8bBlock,
                                     int index);
 
+    /*
+     * Special case of _appendUntilOverflow when we know that the last simple8b block is RLE. It is
+     * trivial to calculate the overflow point as it will be inside the first discovered non-RLE
+     * block and the last value for RLE will be the actual value used for RLE.
+     */
+    template <typename T>
+    static std::pair<boost::optional<T>, int> _appendUntilOverflowForRLE(
+        Simple8bBuilder<T>& mainBuilder, bool& overflow, const char* s8bBlock, int index);
+
     struct ControlBlock {
         const char* control = nullptr;
         double lastAtEndOfBlock = 0.0;
@@ -594,16 +603,31 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
     // Calculate how many simple8b blocks this control byte contains
     auto currNumBlocks = numSimple8bBlocksForControlByte(*control);
 
-    // First setup RLE state, we can do this by assuming that the last value in Simple8b
-    // blocks is the same as the one before the first. This assumption will hold if all
-    // values are equal and RLE is eligible. If it turns out to be incorrect the
-    // Simple8bBuilder will internally reset and disregard RLE.
-    boost::optional<uint64_t> lastForS8b =
-        _setupRLEForOverflowDetector(s8bBuilder, control, currNumBlocks - 1);
+    // First setup RLE state, the implementation for doing this differ if the last block actually
+    // ends with RLE or not.
+    const char* lastBlock = control + (sizeof(uint64_t) * (currNumBlocks - 1)) + 1;
+    bool rle = (ConstDataView(lastBlock).read<LittleEndian<uint64_t>>() &
+                simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
 
-    // When RLE is setup we append as many values as we can to detect when we overflow
-    int currIndex = _appendUntilOverflow(
-        s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
+    boost::optional<uint64_t> lastForS8b;
+    int currIndex;
+    if (rle) {
+        // If the last block ends with RLE we just need to look for the last non-RLE block to
+        // discover the overflow point. The last value for RLE will be the actual last in this block
+        // as we know the RLE will follow.
+        std::tie(lastForS8b, currIndex) = _appendUntilOverflowForRLE(
+            encoder.simple8bBuilder, overflow, control, currNumBlocks - 2);
+
+    } else {
+        // Assume that the last value in Simple8b blocks is the same as the one before the first.
+        // This assumption will hold if all values are equal and RLE is eligible. If it turns out to
+        // be incorrect the Simple8bBuilder will internally reset and disregard RLE.
+        lastForS8b = _setupRLEForOverflowDetector(s8bBuilder, control, currNumBlocks - 1);
+
+        // When RLE is setup we append as many values as we can to detect when we overflow
+        currIndex = _appendUntilOverflow(
+            s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
+    }
 
     // If we have not yet overflowed then continue the same operation from the previous
     // simple8b block
@@ -615,12 +639,17 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
         // here.
         int overflowIndex;
         if (current.scaleIndex == last.scaleIndex) {
-            overflowIndex = _appendUntilOverflow(s8bBuilder,
-                                                 encoder.simple8bBuilder,
-                                                 overflow,
-                                                 lastForS8b,
-                                                 last.control,
-                                                 blocks - 1);
+            if (rle) {
+                std::tie(lastForS8b, overflowIndex) = _appendUntilOverflowForRLE(
+                    encoder.simple8bBuilder, overflow, last.control, blocks - 1);
+            } else {
+                overflowIndex = _appendUntilOverflow(s8bBuilder,
+                                                     encoder.simple8bBuilder,
+                                                     overflow,
+                                                     lastForS8b,
+                                                     last.control,
+                                                     blocks - 1);
+            }
         } else {
             overflowIndex = blocks - 1;
             // Because we did not yet overflow we need to set last value in our simple8b
@@ -817,16 +846,31 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
     // Calculate how many simple8b blocks this control byte contains
     auto currNumBlocks = numSimple8bBlocksForControlByte(*control);
 
-    // First setup RLE state, we can do this by assuming that the last value in Simple8b
-    // blocks is the same as the one before the first. This assumption will hold if all
-    // values are equal and RLE is eligible. If it turns out to be incorrect the
-    // Simple8bBuilder will internally reset and disregard RLE.
-    boost::optional<uint128_t> lastForS8b =
-        _setupRLEForOverflowDetector(s8bBuilder, control, currNumBlocks - 1);
+    // First setup RLE state, the implementation for doing this differ if the last block actually
+    // ends with RLE or not.
+    const char* lastBlock = control + (sizeof(uint64_t) * (currNumBlocks - 1)) + 1;
+    bool rle = (ConstDataView(lastBlock).read<LittleEndian<uint64_t>>() &
+                simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
 
-    // When RLE is setup we append as many values as we can to detect when we overflow
-    int currIndex = _appendUntilOverflow(
-        s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
+    boost::optional<uint128_t> lastForS8b;
+    int currIndex;
+    if (rle) {
+        // If the last block ends with RLE we just need to look for the last non-RLE block to
+        // discover the overflow point. The last value for RLE will be the actual last in this block
+        // as we know the RLE will follow.
+        std::tie(lastForS8b, currIndex) = _appendUntilOverflowForRLE(
+            encoder.simple8bBuilder, overflow, control, currNumBlocks - 2);
+
+    } else {
+        // Assume that the last value in Simple8b blocks is the same as the one before the first.
+        // This assumption will hold if all values are equal and RLE is eligible. If it turns out to
+        // be incorrect the Simple8bBuilder will internally reset and disregard RLE.
+        lastForS8b = _setupRLEForOverflowDetector(s8bBuilder, control, currNumBlocks - 1);
+
+        // When RLE is setup we append as many values as we can to detect when we overflow
+        currIndex = _appendUntilOverflow(
+            s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
+    }
 
     // If we have not yet overflowed then continue the same operation from the previous
     // simple8b block
@@ -834,8 +878,18 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
 
         auto blocks = numSimple8bBlocksForControlByte(*last.control);
         // Append values from control block to detect overflow.
-        auto overflowIndex = _appendUntilOverflow(
-            s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, last.control, blocks - 1);
+        int overflowIndex;
+        if (rle) {
+            std::tie(lastForS8b, overflowIndex) = _appendUntilOverflowForRLE(
+                encoder.simple8bBuilder, overflow, last.control, blocks - 1);
+        } else {
+            overflowIndex = _appendUntilOverflow(s8bBuilder,
+                                                 encoder.simple8bBuilder,
+                                                 overflow,
+                                                 lastForS8b,
+                                                 last.control,
+                                                 blocks - 1);
+        }
 
         // Check if we overflowed in the first simple8b in this second control block. We can
         // then disregard this control block and proceed as-if we didn't overflow in the
@@ -1005,6 +1059,40 @@ int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& ov
         }
     }
     return index;
+}
+
+template <typename T>
+std::pair<boost::optional<T>, int> BSONColumnBuilder::BinaryReopen::_appendUntilOverflowForRLE(
+    Simple8bBuilder<T>& mainBuilder, bool& overflow, const char* s8bBlock, int index) {
+    for (; index >= 0; --index) {
+        const char* block = s8bBlock +
+            /* offset to block at index */ index * sizeof(uint64_t) +
+            /* control byte*/ 1;
+        bool rle = (ConstDataView(block).read<LittleEndian<uint64_t>>() &
+                    simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
+
+        if (rle) {
+            continue;
+        }
+
+        Simple8b<T> s8b(block, sizeof(uint64_t), boost::none);
+
+        boost::optional<T> last;
+        for (auto&& elem : s8b) {
+            if (elem) {
+                last = elem;
+            }
+        }
+
+        // Overflow point detected, record the last value in last Simple8b block
+        // before our pending values. This is necessary to be able to resume with
+        // RLE.
+        mainBuilder.setLastForRLE(last);
+        overflow = true;
+        return std::make_pair(last, index);
+    }
+
+    return std::make_pair(boost::none, index);
 }
 
 BSONColumnBuilder::InternalState::InternalState() : lastControl(bsoncolumn::kInvalidControlByte) {}
