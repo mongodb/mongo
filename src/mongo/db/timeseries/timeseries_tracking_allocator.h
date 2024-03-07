@@ -66,8 +66,9 @@ public:
     }
 
     void deallocate(T* p, size_t n) {
-        _stats->bytesAllocated.fetchAndSubtractRelaxed(n * sizeof(T));
-        ::operator delete(p);
+        auto size = n * sizeof(T);
+        _stats->bytesAllocated.fetchAndSubtractRelaxed(size);
+        ::operator delete(p, size);
     }
 
     TrackingAllocatorStats* getStats() const {
