@@ -5520,10 +5520,10 @@ buildvariants:
     - name: long-test
     - name: configure-combinations
 
-- name: windows-64
-  display_name: "! Windows 64-bit"
+- name: windows
+  display_name: "! Windows"
   run_on:
-  - windows-64-vs2017-test
+  - windows-2022-small
   expansions:
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
     # Remove the default configurations for the toolchain, install prefix and number of jobs.

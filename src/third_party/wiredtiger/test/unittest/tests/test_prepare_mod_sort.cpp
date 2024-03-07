@@ -17,8 +17,6 @@
 #include "wrappers/connection_wrapper.h"
 #include "wiredtiger.h"
 
-#include <iostream>
-
 namespace {
 
 bool

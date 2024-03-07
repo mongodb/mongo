@@ -8,7 +8,6 @@
 
 #include <thread>
 #include <catch2/catch.hpp>
-#include <iostream>
 #include "wiredtiger.h"
 #include "wt_internal.h"
 #include "../utils.h"

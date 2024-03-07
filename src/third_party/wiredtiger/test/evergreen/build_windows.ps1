@@ -1,7 +1,7 @@
 param (
     [bool]$configure = $false,
     [bool]$build = $false,
-    [string]$vcvars_bat = "C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\VC\Auxiliary\Build\vcvars64.bat"
+    [string]$vcvars_bat = "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
 )
 
 function Die-On-Failure {
