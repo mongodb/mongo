@@ -364,6 +364,17 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     checkTHPSettings();
 
+#if defined(MONGO_CONFIG_TCMALLOC_GOOGLE) && defined(MONGO_CONFIG_GLIBC_RSEQ)
+    if (auto res = ProcessInfo::checkGlibcRseqTunable(); !res) {
+        LOGV2_WARNING_OPTIONS(
+            8718500,
+            {logv2::LogTag::kStartupWarnings},
+            "Your system has glibc support for rseq built in, which is not yet supported by "
+            "tcmalloc-google and has critical performance implications. Please set the "
+            "environment variable GLIBC_TUNABLES=glibc.pthread.rseq=0");
+    }
+#endif
+
     if (auto tlm = svcCtx->getTransportLayerManager()) {
         tlm->checkMaxOpenSessionsAtStartup();
     }

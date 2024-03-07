@@ -5563,6 +5563,30 @@ def doConfigure(myenv):
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USDT_PROVIDER", usdt_provider)
     myenv = conf.Finish()
 
+    def CheckGlibcRseqPresent(context):
+        compile_test_body = textwrap.dedent("""
+        #include <sys/rseq.h>
+        #include <stdlib.h>
+        #include <stdio.h>
+
+        int main() {
+            printf("%d", __rseq_size);
+            return EXIT_SUCCESS;
+        }
+        """)
+
+        context.Message("Checking if glibc rseq implemenation is present...")
+        result = context.TryCompile(compile_test_body, ".cpp")
+        context.Result(result)
+        return result
+
+    conf = Configure(myenv)
+    conf.AddTest('CheckGlibcRseqPresent', CheckGlibcRseqPresent)
+
+    if conf.CheckGlibcRseqPresent():
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_GLIBC_RSEQ")
+    myenv = conf.Finish()
+
     return myenv
 
 

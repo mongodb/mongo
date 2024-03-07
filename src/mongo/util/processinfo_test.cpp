@@ -83,6 +83,7 @@ TEST(ProcessInfo, TestSysInfo) {
     ASSERT_KEY("cpuVariant");
     ASSERT_KEY("cpuPart");
     ASSERT_KEY("cpuRevision");
+    ASSERT_KEY("glibc_rseq_present");
 #endif
 
     ASSERT_KEY("mountInfo");
@@ -115,5 +116,34 @@ TEST(ProcessInfo, GetNumAvailableCores) {
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
     ASSERT_GREATER_THAN(ProcessInfo::getNumLogicalCores(), 0u);
 }
+
+#if defined(__linux__) && defined(MONGO_CONFIG_GLIBC_RSEQ)
+TEST(ProcessInfo, GLIBCRseqTunable) {
+    using namespace fmt::literals;
+
+    std::string glibcOriginalEnv("");
+    if (auto res = getenv(ProcessInfo::kGlibcTunableEnvVar); res != nullptr) {
+        glibcOriginalEnv = std::string(res);
+    }
+
+    ON_BLOCK_EXIT([&]() { setenv(ProcessInfo::kGlibcTunableEnvVar, glibcOriginalEnv.c_str(), 1); });
+
+    auto checkRseqSetting = [&](const char* settingName, const char* setting, bool expectOK) {
+        auto setting1 = "{}={}"_format(settingName, setting);
+        setenv(ProcessInfo::kGlibcTunableEnvVar, setting1.c_str(), 1);
+        auto res = ProcessInfo::checkGlibcRseqTunable();
+        if (expectOK) {
+            ASSERT(res);
+        } else {
+            ASSERT_FALSE(res);
+        }
+    };
+
+    checkRseqSetting(ProcessInfo::kRseqKey, "0", true);
+    checkRseqSetting(ProcessInfo::kRseqKey, "1", false);
+    checkRseqSetting("", "", false);
+    checkRseqSetting(ProcessInfo::kRseqKey, "a", false);
+}
+#endif
 }  // namespace
 }  // namespace mongo

@@ -831,6 +831,25 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
+bool ProcessInfo::checkGlibcRseqTunable() {
+    using namespace fmt::literals;
+
+    StringData glibcEnv = getenv(kGlibcTunableEnvVar);
+    auto foundIndex = glibcEnv.find(kRseqKey);
+
+    if (foundIndex != std::string::npos) {
+        try {
+            auto rseqSetting = glibcEnv.at(foundIndex + strlen(kRseqKey) + 1);
+
+            return std::stoi(std::string{rseqSetting}) == 0;
+        } catch (std::exception const&) {
+            return false;
+        }
+    }
+
+    return false;
+}
+
 void collectPressureStallInfo(BSONObjBuilder& builder) {
 
     auto parsePressureFile = [](StringData key, StringData filename, BSONObjBuilder& bob) {
@@ -1019,6 +1038,13 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     appendIfExists(&bExtra, "cpuVariant", cpuVariant);
     appendIfExists(&bExtra, "cpuPart", cpuPart);
     appendIfExists(&bExtra, "cpuRevision", cpuRevision);
+
+#if defined(MONGO_CONFIG_GLIBC_RSEQ)
+    bExtra.append("glibc_rseq_present", true);
+    bExtra.append("glibc_pthread_rseq_disabled", checkGlibcRseqTunable());
+#else
+    bExtra.append("glibc_rseq_present", false);
+#endif
 
     appendMountInfo(bExtra);
 

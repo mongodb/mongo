@@ -50,6 +50,9 @@ namespace mongo {
 
 class ProcessInfo {
 public:
+    static auto constexpr kGlibcTunableEnvVar = "GLIBC_TUNABLES";
+    static auto constexpr kRseqKey = "glibc.pthread.rseq";
+
     ProcessInfo(ProcessId pid = ProcessId::getCurrent());
     ~ProcessInfo();
 
@@ -178,6 +181,11 @@ public:
     static bool preferMsyncOverFSync() {
         return sysInfo().preferMsyncOverFSync;
     }
+
+    /**
+     * Check whether the environment variable GLIBC_TUNABLES=glibc.pthread.rseq=0 is correctly set.
+     */
+    static bool checkGlibcRseqTunable();
 
     /**
      * Get extra system stats
