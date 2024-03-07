@@ -148,17 +148,13 @@ void TaskRunner::_runTasks() {
     if (AuthorizationManager::get(client->getService())->isAuthEnabled()) {
         AuthorizationSession::get(client)->grantInternalAuthorization(client);
     }
-    ServiceContext::UniqueOperationContext opCtx;
 
     while (Task task = _waitForNextTask()) {
-        if (!opCtx) {
-            opCtx = client->makeOperationContext();
-        }
+        NextAction nextAction;
 
-        NextAction nextAction = runSingleTask(task, opCtx.get(), Status::OK());
-
-        if (nextAction != NextAction::kKeepOperationContext) {
-            opCtx.reset();
+        {
+            auto opCtx = client->makeOperationContext();
+            nextAction = runSingleTask(task, opCtx.get(), Status::OK());
         }
 
         if (nextAction == NextAction::kCancel) {
@@ -174,7 +170,6 @@ void TaskRunner::_runTasks() {
             }
         }
     }
-    opCtx.reset();
 
     std::list<Task> tasks;
     UniqueLock lk{_mutex};

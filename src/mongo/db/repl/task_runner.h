@@ -58,7 +58,6 @@ public:
     enum class NextAction {
         kInvalid = 0,
         kDisposeOperationContext = 1,
-        kKeepOperationContext = 2,
         kCancel = 3,
     };
 
@@ -102,9 +101,6 @@ public:
      *
      *     If the task returns kDisposeOperationContext, the task runner destroys the operation
      *     context. The next task to be invoked will receive a new operation context.
-     *
-     *     If the task returns kKeepOperationContext, the task runner will retain the operation
-     *     context to pass to the next task in the queue.
      *
      *     If the task returns kCancel, the task runner will destroy the operation context and
      *     cancel the remaining tasks (each task will be invoked with a status containing the
