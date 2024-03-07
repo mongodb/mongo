@@ -40,9 +40,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-openssl111-large
-  - name: crypt_build
-    distros:
-    - amazon2-openssl111-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -87,9 +84,6 @@ buildvariants:
     distros:
     - amazon2-arm64-openssl111-large
   - name: compile_integration_and_test_parallel_stream_TG
-    distros:
-    - amazon2-arm64-openssl111-large
-  - name: crypt_build
     distros:
     - amazon2-arm64-openssl111-large
   - name: test_packages
@@ -167,7 +161,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023.0-large
-  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -210,10 +203,6 @@ buildvariants:
   - name: compile_test_and_package_serial_lto_no_unittests_TG
     distros:
     - amazon2023.0-large
-  # TODO: SERVER-79886 Fix broken crypt_build task
-  # - name: crypt_build
-  #   distros:
-  #   - amazon2023.0-large
   # TODO: SERVER-79886 Fix broken test_packages task
   # - name: test_packages
   #   distros:
@@ -293,9 +282,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023.0-arm64-large
-  - name: crypt_build
-    distros:
-    - amazon2023.0-arm64-large
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
@@ -338,10 +324,6 @@ buildvariants:
   - name: compile_test_and_package_serial_lto_no_unittests_TG
     distros:
     - amazon2023.0-arm64-large
-  # TODO: SERVER-79886 Fix broken crypt_build task
-  # - name: crypt_build
-  #   distros:
-  #   - amazon2023.0-arm64-large
   # TODO: SERVER-79886 Fix broken test_packages task
   # - name: test_packages
   #   distros:

@@ -1175,7 +1175,7 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  - func: "do stitch setup"
+  - func: "do scons setup"
   - func: "f_expansions_write"
   - func: "scons compile"
     vars:
@@ -1202,14 +1202,14 @@ tasks:
       permissions: public-read
       content_type: application/tar
       display_name: "Stitch Support Library"
-  - func: "do stitch teardown"
+  - func: "do scons teardown"
 
 - name: stitch_support_install_and_run_tests
   tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "stitch"]
   depends_on:
   - name: stitch_support_create_lib
   commands:
-  - func: "do stitch setup"
+  - func: "do scons setup"
   - func: "f_expansions_write"
   - func: "scons compile"
     vars:
@@ -1228,14 +1228,15 @@ tasks:
       binary: bash
       args:
       - "src/evergreen/stitch_support_run_tests.sh"
-  - func: "do stitch teardown"
+  - func: "do scons teardown"
 
 - name: crypt_create_lib
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "crypt"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - func: "f_expansions_write"
   - func: "scons compile"
     vars:
@@ -1264,6 +1265,7 @@ tasks:
       permissions: public-read
       content_type: ${content_type|application/tar}
       display_name: "Mongo crypt Library"
+  - func: "do scons teardown"
 
 - name: crypt_create_debug_lib
   tags: ["assigned_to_jira_team_server_security"]
@@ -2686,39 +2688,6 @@ task_groups:
   - func: "attach scons logs"
   tasks:
   - compile_visibility_test
-
-- name: crypt_build
-  tags: ["crypt"]
-  setup_task:
-  - func: "f_expansions_write"
-  - func: "apply compile expansions"
-  - func: "f_expansions_write"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "get engflow creds"
-  teardown_task:
-  - func: "attach scons logs"
-  setup_group_can_fail_task: true
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up win mount script"
-  - func: "f_expansions_write"
-  - func: "generate compile expansions"
-  teardown_group:
-  - func: "f_expansions_write"
-  - func: "umount shared scons directory"
-  max_hosts: 1
-  tasks:
-  - "crypt_create_lib"
 
 - name: crypt_build_debug_and_test
   tags: ["default"]

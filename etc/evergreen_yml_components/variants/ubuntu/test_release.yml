@@ -143,7 +143,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-large
-  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -189,7 +188,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-large
-  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -236,7 +234,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-arm64-large
-  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
@@ -314,7 +311,6 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-arm64-large
-  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large

@@ -75,9 +75,6 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
-  - name: crypt_build
-    distros:
-    - rhel80-large
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -152,9 +149,6 @@ buildvariants:
     compile_variant: enterprise-rhel-82-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel82-arm64-large
-  - name: crypt_build
     distros:
     - rhel82-arm64-large
   - name: test_packages
@@ -233,7 +227,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel90-large
-  - name: crypt_build
   - name: test_packages
     distros:
     - ubuntu2204-large
@@ -309,9 +302,6 @@ buildvariants:
     compile_variant: enterprise-rhel-90-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
-    distros:
-    - rhel90-arm64-large
-  - name: crypt_build
     distros:
     - rhel90-arm64-large
   - name: test_packages

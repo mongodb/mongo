@@ -2441,7 +2441,7 @@ functions:
       args:
       - "./src/evergreen/external_auth_gcp_teardown.sh"
 
-  "do stitch setup":
+  "do scons setup":
   - command: manifest.load
   - *f_expansions_write
   - *git_get_project
@@ -2465,7 +2465,7 @@ functions:
   - *get_engflow_cert
   - *generate_evergreen_engflow_bazelrc
 
-  "do stitch teardown":
+  "do scons teardown":
   - *attach_scons_config_logs
   - *attach_scons_cache_logs
   - *attach_scons_stdout_logs

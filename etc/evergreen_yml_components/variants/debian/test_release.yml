@@ -101,6 +101,5 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: crypt_build
   - name: .development_critical
   - name: .release_critical

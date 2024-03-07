@@ -82,8 +82,5 @@ buildvariants:
   - name: compile_test_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-xxlarge
-  - name: crypt_build
-    distros:
-    - windows-vsCurrent-large
   - name: .development_critical !.incompatible_windows
   - name: .release_critical !.incompatible_windows !publish_packages

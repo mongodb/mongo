@@ -83,7 +83,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
-  - name: crypt_build
   - name: .development_critical !.incompatible_mac
   - name: .release_critical !.incompatible_mac !publish_packages
 
@@ -112,6 +111,5 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_parallel_unittest_stream_TG
-  - name: crypt_build
   - name: .development_critical !.incompatible_mac
   - name: .release_critical !.incompatible_mac !publish_packages
