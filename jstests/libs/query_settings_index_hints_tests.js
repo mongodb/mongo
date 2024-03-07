@@ -4,7 +4,7 @@ import {
     getQueryPlanners,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Class containing common test functions used in query_settings_index_application_* tests.
@@ -71,7 +71,7 @@ export class QuerySettingsIndexHintsTests {
     assertLookupJoinStage(cmd, expectedIndex) {
         // $lookup stage is only pushed down to find in SBE and not in classic.
         const db = this.qsutils.db;
-        if (!checkSbeRestrictedOrFullyEnabled(db)) {
+        if (!checkSbeFullyEnabled(db)) {
             return this.assertLookupPipelineStage(cmd, expectedIndex);
         }
 

@@ -6,7 +6,6 @@
 //   simulate_atlas_proxy_incompatible,
 //   requires_sharding,
 //   requires_replication,
-//   requires_fcv_80,
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

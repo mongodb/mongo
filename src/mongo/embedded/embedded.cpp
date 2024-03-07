@@ -67,7 +67,6 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -409,7 +408,6 @@ ServiceContext* initialize(const char* yaml_config) {
     // Init succeeded, no need for global deinit.
     giGuard.dismiss();
 
-    mongo::query_settings::QuerySettingsManager::create(serviceContext, {});
     return serviceContext;
 }
 

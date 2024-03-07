@@ -44,4 +44,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # TODO SERVER-52304 Remove this once the query settings feature flag is enabled.
+        featureFlagQuerySettings: true
     num_nodes: 2
