@@ -143,6 +143,9 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #cmakedefine HAVE_MEMORY_H 1
 
+/* Automatically set by the build system, turns on or off optional RCpc ARM instructions. */
+#cmakedefine HAVE_RCPC 0
+
 /* Define to 1 to disable any crc32 hardware support. */
 #cmakedefine HAVE_NO_CRC32_HARDWARE
 

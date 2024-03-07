@@ -1,11 +1,19 @@
 include(CheckCCompilerFlag)
+include(cmake/rcpc_test.cmake)
 
 set(WT_ARCH "aarch64" CACHE STRING "")
 set(WT_OS "darwin" CACHE STRING "")
 set(WT_POSIX ON CACHE BOOL "")
 
-# ARMv8-A is the 64-bit ARM architecture, turn on the optional CRC instructions.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a+crc" CACHE STRING "" FORCE)
+# ARMv8-A is the 64-bit ARM architecture, turn on the optional CRC.
+# If the compilation check in rcpc_test passes also turn on the RCpc instructions.
+if(HAVE_RCPC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8.2-a+rcpc+crc" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8.2-a+rcpc+crc" CACHE STRING "" FORCE)
+else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a+crc" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+crc" CACHE STRING "" FORCE)
+endif()
 
 check_c_compiler_flag("-moutline-atomics" has_moutline_atomics)
 
