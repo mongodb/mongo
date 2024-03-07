@@ -12,7 +12,9 @@
  *   requires_fcv_73,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -39,7 +41,15 @@ function makeSpec(opts) {
 // Runs a createIndex command with the given key pattern and options. Then verifies that the
 // number of indexes changed in accordance with the 'expectedChange' argument.
 function buildIndexAndAssertChangeInIndexCount(keyPattern, indexOptions, expectedChange) {
-    const numIndexesBefore = coll.getIndexes().length;
+    let numIndexesBefore = coll.getIndexes().length;
+    if (ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
+        // A clustered collection has no actual index on _id even though listIndexes includes
+        // an "_id" index in its results with {clustered: true}. See SERVER-59798.
+        // This implicit "_id" index however is not included in the createIndexes stats
+        // so we need to adjust "numIndexesBefore" to accordingly.
+        numIndexesBefore--;
+    }
+
     const cmdRes = assert.commandWorked(coll.createIndex(keyPattern, indexOptions));
 
     // In a sharded cluster, the results from all shards are returned in cmdRes.raw.
