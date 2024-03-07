@@ -49,6 +49,7 @@ BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(ElementStor
  * a BSONElement with the appropriate field name.
  */
 void BlockBasedInterleavedDecompressor::writeToElementStorage(DecodingState::Elem elem,
+                                                              BSONElement lastLiteral,
                                                               StringData fieldName) {
     visit(OverloadedVisitor{
               [&](BSONElement& bsonElem) {
@@ -65,6 +66,7 @@ void BlockBasedInterleavedDecompressor::writeToElementStorage(DecodingState::Ele
                               _allocator.allocate(elem.first, fieldName, 4);
                           DataView(esElem.value()).write<LittleEndian<int32_t>>(elem.second);
                       } break;
+                      case Date:
                       case NumberLong: {
                           ElementStorage::Element esElem =
                               _allocator.allocate(elem.first, fieldName, 8);
@@ -75,12 +77,66 @@ void BlockBasedInterleavedDecompressor::writeToElementStorage(DecodingState::Ele
                               _allocator.allocate(elem.first, fieldName, 1);
                           DataView(esElem.value()).write<LittleEndian<bool>>(elem.second);
                       } break;
+                      case jstOID: {
+                          ElementStorage::Element esElem =
+                              _allocator.allocate(elem.first, fieldName, 12);
+                          Simple8bTypeUtil::decodeObjectIdInto(
+                              esElem.value(), elem.second, lastLiteral.__oid().getInstanceUnique());
+                      } break;
+                      case bsonTimestamp: {
+                          ElementStorage::Element esElem =
+                              _allocator.allocate(elem.first, fieldName, 8);
+                          DataView(esElem.value()).write<LittleEndian<long long>>(elem.second);
+                      } break;
                       default:
                           invariant(false, "attempt to materialize unsupported type");
                   }
               },
-              [&](std::pair<BSONType, int128_t>) {
-                  invariant(false, "tried to materialize a 128-bit type");
+              [&](std::pair<BSONType, int128_t> elem) {
+                  switch (elem.first) {
+                      case String:
+                      case Code: {
+                          Simple8bTypeUtil::SmallString ss =
+                              Simple8bTypeUtil::decodeString(elem.second);
+                          // Add 5 bytes to size, strings begin with a 4 byte count and ends with a
+                          // null terminator
+                          ElementStorage::Element esElem =
+                              _allocator.allocate(elem.first, fieldName, ss.size + 5);
+                          // Write count, size includes null terminator
+                          DataView(esElem.value()).write<LittleEndian<int32_t>>(ss.size + 1);
+                          // Write string value
+                          memcpy(esElem.value() + sizeof(int32_t), ss.str.data(), ss.size);
+                          // Write null terminator
+                          DataView(esElem.value()).write<char>('\0', ss.size + sizeof(int32_t));
+                      } break;
+                      case NumberDecimal: {
+                          ElementStorage::Element esElem =
+                              _allocator.allocate(elem.first, fieldName, 16);
+                          Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(elem.second);
+                          Decimal128::Value dec128Val = dec128.getValue();
+                          DataView(esElem.value()).write<LittleEndian<long long>>(dec128Val.low64);
+                          DataView(esElem.value() + sizeof(long long))
+                              .write<LittleEndian<long long>>(dec128Val.high64);
+                      } break;
+                      case BinData: {
+                          // Layout of a binary element:
+                          // - 4-byte length of binary data
+                          // - 1-byte binary subtype
+                          // - The binary data
+                          ElementStorage::Element esElem =
+                              _allocator.allocate(elem.first, fieldName, lastLiteral.valuesize());
+                          // The first 5 bytes in binData is a count and subType, copy them from
+                          // previous
+                          memcpy(esElem.value(), lastLiteral.value(), 5);
+                          uassert(8690003,
+                                  "BinData length should not exceed 16 in a delta encoding",
+                                  lastLiteral.valuestrsize() <= 16);
+                          Simple8bTypeUtil::decodeBinary(
+                              elem.second, esElem.value() + 5, lastLiteral.valuestrsize());
+                      } break;
+                      default:
+                          invariant(false, "attempted to materialize unsupported type");
+                  }
               },
           },
           elem);
@@ -92,21 +148,55 @@ void BlockBasedInterleavedDecompressor::writeToElementStorage(DecodingState::Ele
  */
 void BlockBasedInterleavedDecompressor::DecodingState::loadUncompressed(const BSONElement& elem) {
     BSONType type = elem.type();
-    invariant(!uses128bit(type));
-    invariant(!usesDeltaOfDelta(type));
-    auto& d64 = decoder.template emplace<Decoder64>();
-    switch (type) {
-        case Bool:
-            d64.lastEncodedValue = elem.boolean();
-            break;
-        case NumberInt:
-            d64.lastEncodedValue = elem._numberInt();
-            break;
-        case NumberLong:
-            d64.lastEncodedValue = elem._numberLong();
-            break;
-        default:
-            invariant(false, "unsupported type");
+    if (uses128bit(type)) {
+        auto& d128 = decoder.template emplace<Decoder128>();
+        switch (type) {
+            case String:
+            case Code:
+                d128.lastEncodedValue =
+                    Simple8bTypeUtil::encodeString(elem.valueStringData()).value_or(0);
+                break;
+            case BinData: {
+                int size;
+                const char* binary = elem.binData(size);
+                d128.lastEncodedValue = Simple8bTypeUtil::encodeBinary(binary, size).value_or(0);
+                break;
+            }
+            case NumberDecimal:
+                d128.lastEncodedValue = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());
+                break;
+            default:
+                invariant(false, "unsupported type");
+        }
+    } else {
+        auto& d64 = decoder.template emplace<Decoder64>();
+        d64.deltaOfDelta = usesDeltaOfDelta(type);
+        switch (type) {
+            case jstOID:
+                d64.lastEncodedValue = Simple8bTypeUtil::encodeObjectId(elem.__oid());
+                break;
+            case Date:
+                d64.lastEncodedValue = elem.date().toMillisSinceEpoch();
+                break;
+            case Bool:
+                d64.lastEncodedValue = elem.boolean();
+                break;
+            case NumberInt:
+                d64.lastEncodedValue = elem._numberInt();
+                break;
+            case NumberLong:
+                d64.lastEncodedValue = elem._numberLong();
+                break;
+            case bsonTimestamp:
+                d64.lastEncodedValue = elem.timestampValue();
+                break;
+            default:
+                invariant(false, "unsupported type");
+        }
+        if (d64.deltaOfDelta) {
+            d64.lastEncodedValueForDeltaOfDelta = d64.lastEncodedValue.get();
+            d64.lastEncodedValue = 0;
+        }
     }
 
     _lastLiteral = elem;
@@ -132,12 +222,37 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
     uint8_t blocks = numSimple8bBlocksForControlByte(control);
     int size = sizeof(uint64_t) * blocks;
 
-    auto& d64 = std::get<DecodingState::Decoder64>(decoder);
-    // We can read the last known value from the decoder iterator even as it has
-    // reached end.
-    boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;
-    d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
-    Elem deltaElem = loadDelta(allocator, d64);
+    Elem deltaElem;
+    visit(OverloadedVisitor{
+              [&](DecodingState::Decoder64& d64) {
+                  // Simple-8b delta block, load its scale factor and validate for sanity
+                  d64.scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
+                  uassert(8690002,
+                          "Invalid control byte in BSON Column",
+                          d64.scaleIndex != bsoncolumn::kInvalidScaleIndex);
+                  // If Double, scale last value according to this scale factor
+                  auto type = _lastLiteral.type();
+                  if (type == NumberDouble) {
+                      auto encoded = Simple8bTypeUtil::encodeDouble(_lastLiteral._numberDouble(),
+                                                                    d64.scaleIndex);
+                      uassert(8690001, "Invalid double encoding in BSON Column", encoded);
+                      d64.lastEncodedValue = *encoded;
+                  }
+                  // We can read the last known value from the decoder iterator even as it has
+                  // reached end.
+                  boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;
+                  d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  deltaElem = loadDelta(allocator, d64);
+              },
+              [&](DecodingState::Decoder128& d128) {
+                  // We can read the last known value from the decoder iterator even as it has
+                  // reached end.
+                  boost::optional<uint128_t> lastSimple8bValue =
+                      d128.pos.valid() ? *d128.pos : uint128_t(0);
+                  d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  deltaElem = loadDelta(allocator, d128);
+              }},
+          decoder);
     return LoadControlResult{deltaElem, size + 1};
 }
 
@@ -155,8 +270,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allo
         return BSONElement{};
     }
 
-    // Note: delta-of-delta not handled here yet.
-    if (*delta == 0) {
+    if (!d64.deltaOfDelta && *delta == 0) {
         // If we have an encoded representation of the last value, return it.
         if (d64.lastEncodedValue) {
             return std::pair{_lastLiteral.type(), *d64.lastEncodedValue};
@@ -168,10 +282,47 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allo
     uassert(8625729,
             "attempt to expand delta for type that does not have encoded representation",
             d64.lastEncodedValue);
+
+    // Expand delta or delta-of-delta as last encoded.
     d64.lastEncodedValue =
         expandDelta(*d64.lastEncodedValue, Simple8bTypeUtil::decodeInt64(*delta));
+    if (d64.deltaOfDelta) {
+        d64.lastEncodedValueForDeltaOfDelta =
+            expandDelta(d64.lastEncodedValueForDeltaOfDelta, *d64.lastEncodedValue);
+        return std::pair{_lastLiteral.type(), d64.lastEncodedValueForDeltaOfDelta};
+    }
 
     return std::pair{_lastLiteral.type(), *d64.lastEncodedValue};
+}
+
+BlockBasedInterleavedDecompressor::DecodingState::Elem
+BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allocator,
+                                                            Decoder128& d128) {
+    invariant(d128.pos.valid());
+    const auto& delta = *d128.pos;
+
+    if (!delta) {
+        return BSONElement();
+    }
+
+    // If we have a zero delta no need to allocate a new Element, we can just use previous.
+    if (*delta == 0) {
+        // If we have an encoded representation of the last value, return it.
+        if (d128.lastEncodedValue) {
+            return std::pair{_lastLiteral.type(), *d128.lastEncodedValue};
+        }
+        // Otherwise return the last uncompressed value we found.
+        return _lastLiteral;
+    }
+
+    uassert(8690000,
+            "attempt to expand delta for type that does not have encoded representation",
+            d128.lastEncodedValue);
+
+    // Expand delta as last encoded.
+    d128.lastEncodedValue =
+        expandDelta(*d128.lastEncodedValue, Simple8bTypeUtil::decodeInt128(*delta));
+    return std::pair{_lastLiteral.type(), *d128.lastEncodedValue};
 }
 
 }  // namespace mongo::bsoncolumn

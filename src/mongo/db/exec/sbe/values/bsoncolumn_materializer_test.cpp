@@ -519,5 +519,105 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectInArrayWithSBEPath) {
         assertSbeValueEquals(paths[0].second[i], {value::TypeTags::NumberInt32, i * 10});
     }
 }
+
+template <typename T>
+void verifyDecompressGeneral(const std::vector<T> values) {
+    std::vector<BSONObj> objs;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        auto bsonObj = BSON("a" << BSON("b" << values[i]));
+        objs.emplace_back(bsonObj);
+    }
+
+    BSONColumnBuilder cb;
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{
+        {SBEPath{
+             value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                           {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})},
+         {}}};
+
+    // Decompress only the values of "a" to the vector.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), values.size());
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        auto bsonObj = BSON("b" << values[i]);
+        auto expectedElement = std::pair(value::TypeTags::bsonObject,
+                                         value::bitcastFrom<const char*>(bsonObj.objdata()));
+        assertSbeValueEquals(paths[0].second[i], expectedElement);
+    }
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithDecimals) {
+    std::vector<Decimal128> decimals = {
+        Decimal128(1024.75), Decimal128(1025.75), Decimal128(1026.75), Decimal128(1027.75)};
+
+    verifyDecompressGeneral(decimals);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithBindata) {
+    uint8_t binData0[] = {100, 101, 102, 103};
+    uint8_t binData1[] = {101, 102, 103, 104};
+    uint8_t binData2[] = {102, 103, 104, 105};
+    uint8_t binData3[] = {103, 104, 105, 106};
+
+    std::vector<BSONBinData> bsonBinDatas = {
+        BSONBinData(binData0, sizeof(binData0), BinDataGeneral),
+        BSONBinData(binData1, sizeof(binData1), BinDataGeneral),
+        BSONBinData(binData2, sizeof(binData2), BinDataGeneral),
+        BSONBinData(binData3, sizeof(binData3), BinDataGeneral)};
+
+    verifyDecompressGeneral(bsonBinDatas);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithCode) {
+    std::vector<BSONCode> codes = {BSONCode(StringData{"x = 0"}),
+                                   BSONCode(StringData{"x = 1"}),
+                                   BSONCode(StringData{"x = 2"}),
+                                   BSONCode(StringData{"x = 3"})};
+
+    verifyDecompressGeneral(codes);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithString) {
+    std::vector<StringData> strs = {StringData("hello_world0"),
+                                    StringData("hello_world1"),
+                                    StringData("hello_world2"),
+                                    StringData("hello_world3")};
+
+    verifyDecompressGeneral(strs);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithOID) {
+    std::vector<OID> oids = {OID("112233445566778899AABBCC"),
+                             OID("112233445566778899AABBCB"),
+                             OID("112233445566778899AABBAA"),
+                             OID("112233445566778899AABBAB")};
+
+    verifyDecompressGeneral(oids);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithDateAndTimestamp) {
+    Date_t date0 = Date_t::fromMillisSinceEpoch(1702334800770);
+    Date_t date1 = Date_t::fromMillisSinceEpoch(1702334800771);
+    Date_t date2 = Date_t::fromMillisSinceEpoch(1702334800772);
+    Date_t date3 = Date_t::fromMillisSinceEpoch(1702334800772);
+
+    std::vector<Date_t> dates = {date0, date1, date2, date3};
+
+    verifyDecompressGeneral(dates);
+
+    std::vector<Timestamp> timestamps = {
+        Timestamp(date0), Timestamp(date1), Timestamp(date2), Timestamp(date3)};
+
+    verifyDecompressGeneral(timestamps);
+}
+
 }  // namespace
 }  // namespace mongo::sbe::bsoncolumn

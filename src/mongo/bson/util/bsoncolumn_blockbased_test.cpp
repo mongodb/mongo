@@ -449,30 +449,196 @@ struct TestArrayPath {
     }
 };
 
-TEST_F(BSONColumnBlockBasedTest, DecompressArrays) {
-    auto col = bsonColumnFromObjs({
-        fromjson("{a: [{b:  0}, {b: 10}]}"),
-        fromjson("{a: [{b: 20}, {b: 30}]}"),
-        fromjson("{a: [{b: 40}, {b: 50}]}"),
-        fromjson("{a: [{b: 60}, {b: 70}]}"),
-    });
+template <typename T>
+auto decompressArraysAndFullColumns(const std::vector<T> values,
+                                    boost::intrusive_ptr<ElementStorage>& allocator) {
+    std::vector<BSONObj> objs;
+    for (std::size_t i = 0; i < values.size(); i += 2) {
+        auto bsonObj =
+            BSON("a" << BSON_ARRAY(BSON("b" << values[i]) << BSON("b" << values[i + 1])));
+        objs.emplace_back(bsonObj);
+    }
 
+    BSONColumnBuilder cb;
+    for (auto& o : objs) {
+        cb.append(o);
+    }
+
+    auto col = BSONColumnBlockBased{cb.finalize()};
+
+    auto mockRefObj = BSON("a" << BSON_ARRAY(BSON("b" << values[0]) << BSON("b" << values[1])));
+
+    // Test that we can decompress the whole column.
+    TestPath testPath{};
+    ASSERT_EQ(testPath.elementsToMaterialize(mockRefObj).size(), 1);
+    std::vector<std::pair<TestPath, std::vector<BSONElement>>> testPaths{{testPath, {}}};
+
+    // This is decompressing the whole column, in which there are scalars within objects.
+    col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
+
+    ASSERT_EQ(testPaths[0].second.size(), objs.size());
+    ASSERT_EQ(testPaths[0].second[0].type(), Object);
+
+    for (size_t i = 0; i < testPaths[0].second.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(testPaths[0].second[i].Obj(), objs[i]);
+    }
+
+    // Test that we can decompress multiple elements within arrays.
     // Create a path that will get the "b" fields of both array elements.
-    TestArrayPath path;
-    auto mockRefObj = fromjson("{a: [{b: 0}, {b: 10}]}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+    TestArrayPath arrayPath;
+    ASSERT_EQ(arrayPath.elementsToMaterialize(mockRefObj).size(), 2);
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>>> paths{{path, {}}};
+    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>>> arrayPaths{{arrayPath, {}}};
 
     // This is decompressing scalars, but since a single path is accessing two fields that need to
     // be interleaved in the output, we still need to use the slow path.
-    col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+    col.decompress<BSONElementMaterializer>(allocator, std::span(arrayPaths));
 
-    ASSERT_EQ(paths[0].second.size(), 8);
-    ASSERT_EQ(paths[0].second[0].type(), NumberInt);
-    for (int i = 0; i < 8; ++i) {
-        ASSERT_EQ(paths[0].second[i].Int(), i * 10);
+    ASSERT_EQ(arrayPaths[0].second.size(), values.size());
+
+    return arrayPaths[0].second;
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressArraysWithIntegers) {
+    const std::vector<int> integers = {0, 10, 20, 30, 40, 50, 60, 70};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<BSONElement> result = decompressArraysAndFullColumns(integers, allocator);
+
+    ASSERT_EQ(result[0].type(), NumberInt);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].Int(), integers[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithDecimals) {
+    const std::vector<Decimal128> decimals = {Decimal128(1023.75),
+                                              Decimal128(1024.75),
+                                              Decimal128(1025.75),
+                                              Decimal128(1026.75),
+                                              Decimal128(1027.75),
+                                              Decimal128(1028.75)};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(decimals, allocator);
+
+    ASSERT_EQ(result[0].type(), NumberDecimal);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].Decimal(), decimals[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithOID) {
+    std::vector<OID> oids = {OID("112233445566778899AABBCC"),
+                             OID("112233445566778899AABBCB"),
+                             OID("112233445566778899AABBAA"),
+                             OID("112233445566778899AABBAB"),
+                             OID("112233445566778899AABBAC"),
+                             OID("112233445566778899AABBBC")};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(oids, allocator);
+
+    ASSERT_EQ(result[0].type(), jstOID);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].OID(), oids[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithStrings) {
+    std::vector<StringData> strs = {StringData("hello_world0"),
+                                    StringData("hello_world1"),
+                                    StringData("hello_world2"),
+                                    StringData("hello_world3"),
+                                    StringData("hello_world4"),
+                                    StringData("hello_world5")};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(strs, allocator);
+
+    ASSERT_EQ(result[0].type(), String);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].String(), strs[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithDate) {
+    std::vector<Date_t> dates = {Date_t::fromMillisSinceEpoch(1702334800770),
+                                 Date_t::fromMillisSinceEpoch(1702334800771),
+                                 Date_t::fromMillisSinceEpoch(1702334800772),
+                                 Date_t::fromMillisSinceEpoch(1702334800773),
+                                 Date_t::fromMillisSinceEpoch(1702334800774),
+                                 Date_t::fromMillisSinceEpoch(1702334800775)};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(dates, allocator);
+
+    ASSERT_EQ(result[0].type(), Date);
+
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].Date(), dates[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithTimestamp) {
+    // Test for Timestamp
+    std::vector<Timestamp> timestamps = {Timestamp(Date_t::fromMillisSinceEpoch(1702334800770)),
+                                         Timestamp(Date_t::fromMillisSinceEpoch(1702334800771)),
+                                         Timestamp(Date_t::fromMillisSinceEpoch(1702334800772)),
+                                         Timestamp(Date_t::fromMillisSinceEpoch(1702334800773)),
+                                         Timestamp(Date_t::fromMillisSinceEpoch(1702334800774)),
+                                         Timestamp(Date_t::fromMillisSinceEpoch(1702334800775))};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(timestamps, allocator);
+
+    ASSERT_EQ(result[0].type(), bsonTimestamp);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].timestamp(), timestamps[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithCode) {
+    std::vector<BSONCode> codes = {BSONCode(StringData{"x = 0"}),
+                                   BSONCode(StringData{"x = 1"}),
+                                   BSONCode(StringData{"x = 2"}),
+                                   BSONCode(StringData{"x = 3"}),
+                                   BSONCode(StringData{"x = 4"}),
+                                   BSONCode(StringData{"x = 5"})};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(codes, allocator);
+
+    for (size_t i = 0; i < result.size(); ++i) {
+        BSONCode res;
+        extractValueTo<BSONCode>(res, result[i]);
+        assertEquals<BSONCode>(res, codes[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithBinData) {
+    uint8_t binData0[] = {100, 101, 102, 103};
+    uint8_t binData1[] = {101, 102, 103, 104};
+    uint8_t binData2[] = {102, 103, 104, 105};
+    uint8_t binData3[] = {103, 104, 105, 106};
+    uint8_t binData4[] = {104, 105, 106, 107};
+    uint8_t binData5[] = {105, 106, 107, 108};
+
+    std::vector<BSONBinData> bsonBinDatas = {
+        BSONBinData(binData0, sizeof(binData0), BinDataGeneral),
+        BSONBinData(binData1, sizeof(binData1), BinDataGeneral),
+        BSONBinData(binData2, sizeof(binData2), BinDataGeneral),
+        BSONBinData(binData3, sizeof(binData3), BinDataGeneral),
+        BSONBinData(binData4, sizeof(binData4), BinDataGeneral),
+        BSONBinData(binData5, sizeof(binData5), BinDataGeneral)};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(bsonBinDatas, allocator);
+
+    for (size_t i = 0; i < result.size(); ++i) {
+        BSONBinData res;
+        extractValueTo<BSONBinData>(res, result[i]);
+        assertEquals<BSONBinData>(res, bsonBinDatas[i]);
     }
 }
 
