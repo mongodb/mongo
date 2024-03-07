@@ -245,16 +245,16 @@ ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
  * user request is on the view namespace, we implicity tranform the request to the buckets namepace.
  */
 ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx, bool refresh) {
-    auto cm = [&] {
+    const auto createDatabaseAndGetRoutingInfo = [&opCtx, &refresh](const NamespaceString& nss) {
         size_t attempts = 1;
         while (true) {
             try {
-                cluster::createDatabase(opCtx, _nss.db());
+                cluster::createDatabase(opCtx, nss.db());
 
                 if (refresh) {
                     uassertStatusOK(
-                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-                            opCtx, _nss));
+                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                              nss));
                 }
 
                 if (MONGO_unlikely(waitForDatabaseToBeDropped.shouldFail())) {
@@ -262,12 +262,12 @@ ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx, bool refresh) 
                     waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
                 }
 
-                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_INFO(8314601,
                            "Failed initialization of routing info because the database has been "
                            "concurrently dropped",
-                           "db"_attr = _nss.db(),
+                           logAttrs(nss),
                            "attemptNumber"_attr = attempts,
                            "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
 
@@ -279,7 +279,11 @@ ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx, bool refresh) 
                 }
             }
         }
-    }();
+    };
+
+    createDatabaseAndGetRoutingInfo(_nss);
+
+    auto cm = createDatabaseAndGetRoutingInfo(_nss);
 
     // For a sharded time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
@@ -295,27 +299,18 @@ ChunkManager ChunkManagerTargeter::_init(OperationContext* opCtx, bool refresh) 
     //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
     if (!cm.isSharded() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
-        if (refresh) {
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-                opCtx, bucketsNs));
-        }
-        auto bucketsRoutingInfo =
-            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs));
-        if (bucketsRoutingInfo.isSharded()) {
+        auto bucketsPlacementInfo = createDatabaseAndGetRoutingInfo(bucketsNs);
+        if (bucketsPlacementInfo.isSharded()) {
             _nss = bucketsNs;
-            cm = std::move(bucketsRoutingInfo);
+            cm = std::move(bucketsPlacementInfo);
             _isRequestOnTimeseriesViewNamespace = true;
         }
     } else if (!cm.isSharded() && _isRequestOnTimeseriesViewNamespace) {
         // This can happen if a sharded time-series collection is dropped and re-created. Then we
         // need to reset the namepace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
-
-        if (refresh) {
-            uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
-        }
-        cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
+        auto newCm = createDatabaseAndGetRoutingInfo(_nss);
+        cm = std::move(newCm);
         _isRequestOnTimeseriesViewNamespace = false;
     }
 

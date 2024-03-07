@@ -89,8 +89,6 @@ public:
                     "namespace"_attr = nss,
                     "command"_attr = redact(cmdObj));
 
-        cluster::createDatabase(opCtx, dbName);
-
         auto targeter = ChunkManagerTargeter(opCtx, nss);
         auto routingInfo = targeter.getRoutingInfo();
         auto cmdToBeSent = cmdObj;
