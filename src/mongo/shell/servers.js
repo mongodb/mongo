@@ -781,6 +781,7 @@ MongoRunner.mongodOptions = function(opts = {}) {
     _removeSetParameterIfBeforeVersion(
         opts, "disableTransitionFromLatestToLastContinuous", "7.0.0");
     _removeSetParameterIfBeforeVersion(opts, "defaultConfigCommandTimeoutMS", "7.3.0");
+    _removeSetParameterIfBeforeVersion(opts, "enableAutoCompaction", "7.3.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

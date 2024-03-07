@@ -63,6 +63,7 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
+        enableAutoCompaction: 1
         enableTestCommands: 1
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
