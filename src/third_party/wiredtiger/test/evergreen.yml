@@ -973,7 +973,7 @@ functions:
         # The first run is for calibration only.  We just want to run for the designated
         # time and get an appropriate stop timestamp that can be used in later runs.
         calibration_run_args="-PSD$r,E$x0 -T $nthreads -t $runtime"
-        ./test_schema_abort -p -h RUNDIR_0 $first_run_args || exit 1
+        ./test_schema_abort -p -h RUNDIR_0 $calibration_run_args || exit 1
         echo "Finished calibration run"
         stable_hex=$($toolsdir/wt_timestamps RUNDIR_0/WT_HOME | sed -e '/stable=/!d' -e 's/.*=//')
         op_count=$(echo $((0x$stable_hex)))
