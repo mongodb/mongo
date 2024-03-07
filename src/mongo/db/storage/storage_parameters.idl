@@ -113,6 +113,17 @@ server_parameters:
         cpp_vartype: bool
         default: false
 
+    internalInsertMaxBatchSize:
+        description: "Maximum number of documents that we will insert in a single batch."
+        set_at: [ startup, runtime ]
+        cpp_varname: "internalInsertMaxBatchSize"
+        cpp_vartype: AtomicWord<int>
+        default:
+            expr: 64
+            is_constexpr: false
+        validator:
+            gt: 0
+
     maxNumberOfBatchedOperationsInSingleOplogEntry:
         description: >-
             Maximum number of operations to pack into a single oplog entry, when multi-oplog
