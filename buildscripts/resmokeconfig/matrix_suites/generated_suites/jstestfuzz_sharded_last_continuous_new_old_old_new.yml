@@ -42,6 +42,11 @@ executor:
     num_shards: 2
     old_bin_version: last_continuous
   hooks:
+  - class: CheckRoutingTableConsistency
+    shell_options:
+      global_vars:
+        TestData:
+          mayForgeReshardingTempCollections: true
   - class: FuzzerRestoreSettings
   - class: CheckReplDBHash
     shell_options:

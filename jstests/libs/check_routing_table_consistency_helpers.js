@@ -92,15 +92,8 @@ export var RoutingTableConsistencyChecker = (function() {
      * }
      **/
     const collectPlacementMetadataByNamespace = (mongos) => {
-        const pipeline = [
-            // 1.1. Filter out temporary collections created by the resharding coordinator, as those
-            //      collections are not handled by placementHistory.
-            {
-                $match: {
-                    _id: { $not: { $regex: /^[^.]+\.system\.resharding\..+$/ } }
-                }
-            },
-            // 1.2  Current placement metadata on existing collections
+        let pipeline = [
+            // 1.1  Current placement metadata on existing collections
             {
                 $lookup: {
                     from: "chunks",
@@ -127,7 +120,7 @@ export var RoutingTableConsistencyChecker = (function() {
                     }
                 }
             },
-            // 1.3 Current placement metadata on existing databases
+            // 1.2 Current placement metadata on existing databases
             {
                 $unionWith: {
                     coll: "databases",
@@ -199,6 +192,24 @@ export var RoutingTableConsistencyChecker = (function() {
             }
         ];
 
+        // Sharding metadata on temporary resharding collections require special treatment:
+        // - when created by the server code, they only include routing information (but no
+        // historical placement metadata)
+        // - when forged by the test code (usually through shardCollection()) they behave as a
+        // regular collection. The pipeline needs hence to be modified as follows:
+        const tempReshardingCollectionsFilter = {
+            $match: {_id: {$not: {$regex: /^[^.]+\.system\.resharding\..+$/}}}
+        };
+        if (TestData.mayForgeReshardingTempCollections) {
+            // Perform no check on the temporary collections by adding a filter to
+            // the fully-outer-joined data.
+            pipeline.push(tempReshardingCollectionsFilter);
+        } else {
+            // Only filter out temporary collections from config.collections; this will allow to
+            // check that such namespaces are not mentioned in config.placementHistory.
+            pipeline.unshift(tempReshardingCollectionsFilter);
+        }
+
         return mongos.getDB('config').collections.aggregate(pipeline,
                                                             {readConcern: {level: "snapshot"}});
     };
@@ -212,13 +223,6 @@ export var RoutingTableConsistencyChecker = (function() {
                        namespaceMetadata.placement.length === 2,
                    `Unexpected output format from collectPlacementMetadataByNamespace(): ${
                        tojson(namespaceMetadata)}`);
-            // Moving unsplittable collections may fail in the following check because some
-            // collections might be on flight
-            const collName = namespaceMetadata._id.substring(namespaceMetadata._id.indexOf('.') + 1,
-                                                             namespaceMetadata._id.length);
-            if (collName.startsWith("system.resharding")) {
-                return;
-            }
             // Information missing from either the routing table or placement history.
             assert(namespaceMetadata.placement.length === 2,
                    `Incomplete placement metadata for namespace ${
