@@ -625,8 +625,18 @@ var ReplSetTest = function ReplSetTest(opts) {
      * Starts each node in the replica set with the given options.
      *
      * @param options - The options passed to {@link MongoRunner.runMongod}
+     * @param restart - Boolean indicating whether we are restarting the set (if true,
+     *     then `forRestart` should have been passed as true to `stopSet()`.) Defaults to false.
+     * @param isMixedVersionCluster - Boolean indicating whether this is a mixed version replica
+     *     set. Defaults to false.
+     * @param skipStepUpOnRestart - Boolean indicating that this method should skip attempting to
+     *     step up a new primary after restarting the set. Defaults to false. This may be useful if
+     *     e.g. the test has no electable node or if it uses the in-memory storage engine and must
+     *     reinitiate the set upon restart. This option has no effect if `restart` is not also
+     *     passed as true.
      */
-    ReplSetTest.prototype.startSet = function(options, restart, isMixedVersionCluster) {
+    ReplSetTest.prototype.startSet = function(
+        options, restart, isMixedVersionCluster, skipStepUpOnRestart) {
         // If the caller has explicitly specified 'waitForConnect:false', then we will start up all
         // replica set nodes and return without waiting to connect to any of them.
         const skipWaitingForAllConnections = (options && options.waitForConnect === false);
@@ -644,7 +654,42 @@ var ReplSetTest = function ReplSetTest(opts) {
             return this.nodes;
         }
 
-        return this.startSetAwait();
+        this.startSetAwait();
+
+        // If the set is being restarted, by default we will try to find a node to step up
+        // proactively rather than waiting for the election timeout.
+        const triggerStepUp = (restart || (options && options.restart)) && !skipStepUpOnRestart;
+        if (!triggerStepUp) {
+            print("ReplSetTest startSet skipping stepping a new primary");
+            return this.nodes;
+        }
+
+        if (triggerStepUp) {
+            const serverStatus = asCluster(this, this.nodes[0], () => {
+                return assert.commandWorked(this.nodes[0].adminCommand({serverStatus: 1}));
+            });
+            if (!serverStatus.storageEngine.persistent) {
+                throw Error(
+                    "skipStepUpOnRestart must be set to false when using non-persistent storage engine," +
+                    " as the replica set needs to be re-initiated via initiate() after restart before " +
+                    " a node can be elected");
+            }
+        }
+
+        print("ReplSetTest startSet attempting to step up a new primary");
+
+        // Try to step up each node and stop after the first success.
+        // We use asCluster as replSetStepUp requires auth.
+        return asCluster(this, this.nodes, () => {
+            for (const node of this.nodes) {
+                if (_isElectable(node)) {
+                    this.stepUp(node, {awaitReplicationBeforeStepUp: false});
+                    return this.nodes;
+                }
+            }
+            throw Error(
+                "Restarted set but failed to get a node to step up, as none were electable");
+        });
     };
 
     /**

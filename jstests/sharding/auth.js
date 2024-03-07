@@ -109,9 +109,19 @@ assert(thrown);
 
 print("start rs w/correct key");
 
-d1.stopSet();
-d1.startSet({keyFile: "jstests/libs/key1", restart: true});
-d1.initiate();
+d1.stopSet(null /* signal */, true /* forRestart */);
+// If we are using the in-memory storage engine, we need to re-initiate the replica set
+// after restart before an election can occur, since the config does not persist. So
+// we must disable the auto stepup-on-restart behavior.
+if (jsTest.options().storageEngine == "inMemory") {
+    d1.startSet({keyFile: "jstests/libs/key1"},
+                true /* restart */,
+                false /* isMixedVersionCluster */,
+                true /* skipStepUpOnRestart */);
+    d1.initiate();
+} else {
+    d1.startSet({keyFile: "jstests/libs/key1", restart: true});
+}
 
 var primary = d1.getPrimary();
 
