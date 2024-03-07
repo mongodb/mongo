@@ -49,6 +49,7 @@ class TypeStats(object):
         self.files = 0
         self.files_changed = 0
         self.gran_blocks = 0
+        self.total_blocks = 0
         self.pct20 = 0
         self.pct80 = 0
 
@@ -174,6 +175,7 @@ def compare_file(dir1, dir2, filename, cmp_size):
     bytes_gran = 0          # Number of bytes changed within a granularity block.
     gran_blocks = 0         # Number of granularity blocks changed.
     num_cmp_blocks = min_size // cmp_size # Number of comparisons .
+    total_blocks = num_cmp_blocks
     offset = 0              # Current offset within the filel
     partial_cmp = min_size % cmp_size
     pct20_count = 0         # Number of granularity blocks that changed 20% or less.
@@ -220,6 +222,7 @@ def compare_file(dir1, dir2, filename, cmp_size):
     if partial_cmp != 0:
         buf1 = fp1.read(partial_cmp)
         buf2 = fp2.read(partial_cmp)
+        total_blocks += 1
         # If they're different, gather information.
         if buf1 != buf2:
             total_bytes_diff += partial_cmp
@@ -230,6 +233,7 @@ def compare_file(dir1, dir2, filename, cmp_size):
     fp1.close()
     fp2.close()
     end = time.asctime()
+    ts.total_blocks = total_blocks
 
     # Report for each file.
     if f1_size < f2_size:
@@ -255,7 +259,8 @@ def compare_file(dir1, dir2, filename, cmp_size):
         print(f'{filename}: size: {f1_size} {f2_size} {change} by {change_diff} bytes')
     else:
         print(f'{filename}: size: {f1_size} {f2_size} {change}')
-    print(f'{filename}: common: {min_size} differs by {total_bytes_diff} bytes in {gran_blocks} granularity blocks')
+    chg_blocks = round(abs(gran_blocks / total_blocks * 100))
+    print(f'{filename}: common: {min_size} differs by {total_bytes_diff} bytes in {gran_blocks} ({chg_blocks}%) changed granularity blocks out of {total_blocks} total')
     if gran_blocks != 0:
         ts.files_changed += 1
         pct20_blocks = round(abs(pct20_count / gran_blocks * 100))
@@ -282,7 +287,9 @@ def print_summary():
         total_files += ts.files
         total_files_changed += ts.files_changed
         total_gran_blocks += ts.gran_blocks
-    print(f'Total: {total_bytes} bytes changed in {total_gran_blocks} granularity-sized ({granularity}) blocks')
+        total_blocks += ts.total_blocks
+    chg_blocks = round(abs(total_gran_blocks / total_blocks * 100))
+    print(f'Total: {total_bytes} bytes changed in {total_gran_blocks} changed granularity-sized ({granularity}) blocks ({chg_blocks}%) of {total_blocks} blocks overall')
     print(f'Total: {total_files_changed} {plural("file", total_files_changed)} changed out of {total_files} total files')
 
     # Walk through all the types printing out final information per type.
@@ -292,12 +299,13 @@ def print_summary():
         total = plural('file', ts.files)
         print(f'{n}: {ts.files_changed} {changed} changed out of {ts.files} {total}')
         if ts.gran_blocks != 0:
-            print(f'{ts.files_changed} changed {changed}: differs by {ts.gran_blocks} granularity blocks in {ts.gran_blocks} total granularity blocks')
-            print(f'{ts.files_changed} changed {changed}: differs by {ts.bytes} bytes in {ts.gran_blocks} total granularity blocks')
+            chg_blocks = round(abs(ts.gran_blocks / total_blocks * 100))
+            print(f'{ts.files_changed} changed {changed}: differs by {ts.gran_blocks} ({chg_blocks}%) granularity blocks in {ts.total_blocks} total granularity blocks')
+            print(f'{ts.files_changed} changed {changed}: differs by {ts.bytes} bytes in {ts.gran_blocks} changed granularity blocks')
             pct20_blocks = round(abs(ts.pct20 / ts.gran_blocks * 100))
             pct80_blocks = round(abs(ts.pct80 / ts.gran_blocks * 100))
-            print(f'{n}: smallest 20%: {pct20_blocks} of {ts.gran_blocks} blocks ({pct20_blocks}%) differ by {pct20} bytes or less of {granularity}')
-            print(f'{n}: largest 80%: {pct80_blocks} of {ts.gran_blocks} blocks ({pct80_blocks}%) differ by {pct80} bytes or more of {granularity}')
+            print(f'{n}: smallest 20%: {pct20_blocks} of {ts.gran_blocks} changed blocks ({pct20_blocks}%) differ by {pct20} bytes or less of {granularity}')
+            print(f'{n}: largest 80%: {pct80_blocks} of {ts.gran_blocks} changed blocks ({pct80_blocks}%) differ by {pct80} bytes or more of {granularity}')
 
 #
 # This is the wrapper function to compare two backup directories. This function
