@@ -226,7 +226,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings") && !FixtureHelpers.
 
     // Specify 'allowedIndexes' with more than one index, otherwise it will result in single
     // solution plan, that won't be cached in classic.
-    const settings = {indexHints: {allowedIndexes: ["a_1", "a_1_b_1"]}};
+    const settings = {
+        indexHints:
+            {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1", "a_1_b_1"]}
+    };
     const filter = {a: 1};
     const query = qsutils.makeFindQueryInstance({filter});
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: settings}));

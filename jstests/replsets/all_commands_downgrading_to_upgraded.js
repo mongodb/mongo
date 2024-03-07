@@ -1473,7 +1473,7 @@ const allCommands = {
         doesNotRunOnStandalone: true,
         command: {
             setQuerySettings: {find: collName, $db: dbName, filter: {a: 1}},
-            settings: {indexHints: {allowedIndexes: ["a_1"]}}
+            settings: {indexHints: {ns: {db: dbName, coll: collName}, allowedIndexes: ["a_1"]}}
         }
     },
     removeQuerySettings: {

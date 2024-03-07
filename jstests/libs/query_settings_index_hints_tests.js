@@ -120,8 +120,7 @@ export class QuerySettingsIndexHintsTests {
     /**
      * Ensure query settings are applied as expected in a straightforward scenario.
      */
-    assertQuerySettingsIndexApplication(
-        querySettingsQuery, ns = {db: this.qsutils.db.getName(), coll: this.qsutils.collName}) {
+    assertQuerySettingsIndexApplication(querySettingsQuery, ns) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         for (const index of [this.indexA, this.indexB, this.indexAB]) {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
@@ -212,24 +211,24 @@ export class QuerySettingsIndexHintsTests {
      * - Only backward scans allowed.
      * - Both forward and backward scans allowed.
      */
-    assertQuerySettingsNaturalApplication(querySettingsQuery) {
+    assertQuerySettingsNaturalApplication(querySettingsQuery, ns) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         const naturalForwardScan = {$natural: 1};
-        const naturalForwardSettings = {indexHints: {allowedIndexes: [naturalForwardScan]}};
+        const naturalForwardSettings = {indexHints: {ns, allowedIndexes: [naturalForwardScan]}};
         this.qsutils.withQuerySettings(querySettingsQuery, naturalForwardSettings, () => {
             this.assertCollScanStage(query, ["forward"]);
             this.assertQuerySettingsInCacheForCommand(query, naturalForwardSettings);
         });
 
         const naturalBackwardScan = {$natural: -1};
-        const naturalBackwardSettings = {indexHints: {allowedIndexes: [naturalBackwardScan]}};
+        const naturalBackwardSettings = {indexHints: {ns, allowedIndexes: [naturalBackwardScan]}};
         this.qsutils.withQuerySettings(querySettingsQuery, naturalBackwardSettings, () => {
             this.assertCollScanStage(query, ["backward"]);
             this.assertQuerySettingsInCacheForCommand(query, naturalBackwardSettings);
         });
 
         const naturalAnyDirectionSettings = {
-            indexHints: {allowedIndexes: [naturalForwardScan, naturalBackwardScan]}
+            indexHints: {ns, allowedIndexes: [naturalForwardScan, naturalBackwardScan]}
         };
         this.qsutils.withQuerySettings(querySettingsQuery, naturalAnyDirectionSettings, () => {
             this.assertCollScanStage(query, ["forward", "backward"]);
@@ -289,8 +288,7 @@ export class QuerySettingsIndexHintsTests {
      * any viable plans have the same winning plan as the queries that have no query settings
      * attached to them.
      */
-    assertQuerySettingsFallback(querySettingsQuery,
-                                ns = {db: this.qsutils.db.getName(), coll: this.qsutils.collName}) {
+    assertQuerySettingsFallback(querySettingsQuery, ns) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
         const explainWithoutQuerySettings = assert.commandWorked(db.runCommand({explain: query}));
@@ -309,8 +307,7 @@ export class QuerySettingsIndexHintsTests {
     /**
      * Ensure that users can not pass query settings to the commands explicitly.
      */
-    assertQuerySettingsCommandValidation(querySettingsQuery) {
-        const ns = {db: this.qsutils.db.getName(), coll: this.qsutils.collName};
+    assertQuerySettingsCommandValidation(querySettingsQuery, ns) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: [this.indexAB]}};
         const expectedErrorCodes = [7746900, 7746901, 7923000, 7923001, 7708000, 7708001];

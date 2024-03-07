@@ -13,6 +13,10 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 // Creating the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
+const ns = {
+    db: db.getName(),
+    coll: coll.getName()
+};
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 
 /**
@@ -179,16 +183,16 @@ let testQuerySettingsParameterized = ({find, distinct, aggregate}) => {
 // Test changing allowed indexes.
 testQuerySettingsParameterized({
     find: {
-        querySettingsA: {indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}},
-        querySettingsB: {indexHints: {allowedIndexes: ["b_1"]}}
+        querySettingsA: {indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: ["b_1"]}}
     },
     distinct: {
-        querySettingsA: {indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}},
-        querySettingsB: {indexHints: {allowedIndexes: ["b_1"]}}
+        querySettingsA: {indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: ["b_1"]}}
     },
     aggregate: {
-        querySettingsA: {indexHints: {allowedIndexes: ["groupID_1", {$natural: 1}]}},
-        querySettingsB: {indexHints: {allowedIndexes: ["matchKey_1"]}}
+        querySettingsA: {indexHints: {ns, allowedIndexes: ["groupID_1", {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: ["matchKey_1"]}}
     }
 });
 
@@ -205,7 +209,7 @@ testQuerySettingsParameterized({
 
 // Test changing reject, with an unrelated setting present to allow it to be changed to false.
 const unrelated = {
-    indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
+    indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}
 };
 testQuerySettingsParameterized({
     find: {

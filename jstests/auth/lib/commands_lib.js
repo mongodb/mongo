@@ -7445,6 +7445,7 @@ export const authCommandsLib = {
           },
           settings: {
             "indexHints": {
+              "ns": {db: firstDbName, coll: "foo"},
               "allowedIndexes": [{ "sku": 1 }]
             }
           }

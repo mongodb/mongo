@@ -67,10 +67,10 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
         pipeline: [{$match: {a: 1, b: 5}}],
         cursor: {},
     });
-    qstests.assertQuerySettingsIndexApplication(aggregateCmd);
+    qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
-    qstests.assertQuerySettingsFallback(aggregateCmd);
-    qstests.assertQuerySettingsCommandValidation(aggregateCmd);
+    qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
 })();
 
 (function testAggregateQuerySettingsApplicationWithLookupEquiJoin() {
@@ -86,7 +86,7 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
   });
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
-    qstests.assertQuerySettingsIndexApplication(aggregateCmd);
+    qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsLookupJoinIndexApplication(aggregateCmd, secondaryNs);
     qstests.assertQuerySettingsIndexAndLookupJoinApplications(aggregateCmd, mainNs, secondaryNs);
 
@@ -94,8 +94,15 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, secondaryNs);
 
-    qstests.assertQuerySettingsFallback(aggregateCmd);
-    qstests.assertQuerySettingsCommandValidation(aggregateCmd);
+    // Ensure that providing query settings with an invalid index result in the same plan as no
+    // query settings being set.
+    // NOTE: The fallback is not tested when hinting secondary collections, as instead of fallback,
+    // hash join or nlj will be used.
+    // TODO: SERVER-86400 Add support for $natural hints on secondary collections.
+    qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+
+    qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
 })();
 
 (function testAggregateQuerySettingsApplicationWithLookupPipeline() {
@@ -112,7 +119,7 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
   });
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
-    qstests.assertQuerySettingsIndexApplication(aggregateCmd);
+    qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsLookupPipelineIndexApplication(aggregateCmd, secondaryNs);
     qstests.assertQuerySettingsIndexAndLookupPipelineApplications(
         aggregateCmd, mainNs, secondaryNs);
@@ -126,5 +133,7 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
-    qstests.assertQuerySettingsCommandValidation(aggregateCmd);
+
+    qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
 })();

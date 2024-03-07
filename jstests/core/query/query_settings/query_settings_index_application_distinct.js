@@ -24,7 +24,7 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 const qstests = new QuerySettingsIndexHintsTests(qsutils);
-const mainNs = {
+const ns = {
     db: db.getName(),
     coll: coll.getName()
 };
@@ -33,7 +33,7 @@ const mainNs = {
 function assertQuerySettingsDistinctIndexApplication(querySettingsQuery) {
     const query = qsutils.withoutDollarDB(querySettingsQuery);
     for (const index of [qstests.indexA, qstests.indexAB]) {
-        const settings = {indexHints: {allowedIndexes: [index]}};
+        const settings = {indexHints: {ns, allowedIndexes: [index]}};
         qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             // Avoid checking plan cache entries. Multiplanner is not involved into plans with
             // DISTINCT_SCAN stage thus one shouldn't expect new plan cache entries.
@@ -46,7 +46,7 @@ function assertQuerySettingsDistinctIndexApplication(querySettingsQuery) {
 // set.
 function assertQuerySettingsDistinctScanIgnoreCursorHints(querySettingsQuery) {
     const query = qsutils.withoutDollarDB(querySettingsQuery);
-    const settings = {indexHints: {allowedIndexes: [qstests.indexAB]}};
+    const settings = {indexHints: {ns, allowedIndexes: [qstests.indexAB]}};
     const queryWithHint = {...query, hint: qstests.indexA};
     qsutils.withQuerySettings(querySettingsQuery, settings, () => {
         // Avoid checking plan cache entries. Multiplanner is not involved into plans with
@@ -63,7 +63,7 @@ function assertQuerySettingsDistinctFallback(querySettingsQuery) {
     // query planner back to IXSCAN or COLLSCAN but ignoring query settings would keep
     // DISTINCT_SCAN plan generated then query settings should be ignored.
     const query = qsutils.withoutDollarDB(querySettingsQuery);
-    const settings = {indexHints: {allowedIndexes: ["doesnotexist"]}};
+    const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
     qsutils.withQuerySettings(querySettingsQuery, settings, () => {
         // Here any index is considered just as good as any other as long as DISTINCT_SCAN plan
         // is generated. Don't expect any particular index from the planner.
@@ -100,11 +100,11 @@ function setIndexes(coll, indexList) {
         query: {a: 1, b: 1},
     });
 
-    qstests.assertQuerySettingsIndexApplication(querySettingsDistinctQuery);
-    qstests.assertQuerySettingsNaturalApplication(querySettingsDistinctQuery);
-    qstests.assertQuerySettingsIgnoreCursorHints(querySettingsDistinctQuery, mainNs);
-    qstests.assertQuerySettingsFallback(querySettingsDistinctQuery);
-    qstests.assertQuerySettingsCommandValidation(querySettingsDistinctQuery);
+    qstests.assertQuerySettingsIndexApplication(querySettingsDistinctQuery, ns);
+    qstests.assertQuerySettingsNaturalApplication(querySettingsDistinctQuery, ns);
+    qstests.assertQuerySettingsIgnoreCursorHints(querySettingsDistinctQuery, ns);
+    qstests.assertQuerySettingsFallback(querySettingsDistinctQuery, ns);
+    qstests.assertQuerySettingsCommandValidation(querySettingsDistinctQuery, ns);
 })();
 
 (function testDistinctWithDistinctScanQuerySettingsApplication() {

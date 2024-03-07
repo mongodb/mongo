@@ -14,7 +14,7 @@ const collName = jsTestName();
 const qsutils = new QuerySettingsUtils(db, collName)
 
 const querySettingsA = {
-    indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
+    indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: ["a_1", {$natural: 1}]}
 };
 const nonExistentQueryShapeHash = "0".repeat(64);
 
@@ -83,44 +83,6 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     const settings = {
         "indexHints":
             {"ns": {"db": db.getName(), "coll": "inventory"}, "allowedIndexes": [{"sku": 1}]}
-    };
-    assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(settings, queryInstance)]);
-    qsutils.removeAllQuerySettings();
-}
-
-{
-    // Ensure that index hint may not refer to a collection which is not involved in the query.
-    assertDropAndRecreateCollection(db, "order");
-    assert.commandFailedWithCode(db.adminCommand({
-        setQuerySettings: {
-            aggregate: "order",
-            $db: "testDB",
-            pipeline: [{
-            $lookup: {
-                from: "inventory",
-                localField: "item",
-                foreignField: "sku",
-                as: "inventory_docs"
-            }
-            }]
-        },
-        settings:
-            {"indexHints": {"ns": {"db": "testDB", "coll": "someOtherColl"}, "allowedIndexes": []}}
-    }),
-                                 7746603);
-
-    const queryInstance = {
-        aggregate: "order",
-        $db: db.getName(),
-        pipeline: [{
-            $lookup:
-                {from: "inventory", localField: "item", foreignField: "sku", as: "inventory_docs"}
-        }]
-    };
-    const settings = {
-        "indexHints": {"ns": {"db": db.getName(), "coll": "order"}, "allowedIndexes": []}
     };
     assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
     qsutils.assertQueryShapeConfiguration(

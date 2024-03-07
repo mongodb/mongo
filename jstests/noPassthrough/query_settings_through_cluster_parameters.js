@@ -29,7 +29,12 @@ let test =
                 },
             ]
         });
-        let querySetting = {indexHints: {allowedIndexes: ["groupID_1", {$natural: 1}]}};
+        const querySettings = {
+            indexHints: {
+                ns: {db: db.getName(), coll: coll.getName()},
+                allowedIndexes: ["groupID_1", {$natural: 1}]
+            }
+        };
 
         // Ensure that query settings cluster parameter is empty.
         qsutils.assertQueryShapeConfiguration([]);
@@ -38,7 +43,7 @@ let test =
         assert.commandFailedWithCode(db.adminCommand({
             setClusterParameter: {
                 querySettings: [
-                    querySetting,
+                    querySettings,
                 ]
             }
         }),
@@ -49,12 +54,12 @@ let test =
         qsutils.assertQueryShapeConfiguration([]);
 
         // Ensure that query settings can be configured through setQuerySettings command.
-        assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: querySetting}));
+        assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: querySettings}));
 
         // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after
         // invoking setQuerySettings command.
         qsutils.assertQueryShapeConfiguration(
-            [qsutils.makeQueryShapeConfiguration(querySetting, query)]);
+            [qsutils.makeQueryShapeConfiguration(querySettings, query)]);
 
         // Ensure 'getClusterParameter' doesn't accept query settings parameter directly.
         assert.commandFailedWithCode(db.adminCommand({getClusterParameter: "querySettings"}),

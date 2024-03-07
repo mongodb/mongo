@@ -15,6 +15,10 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const dbName = db.getName();
 const collName = jsTestName();
+const ns = {
+    db: dbName,
+    coll: collName
+};
 
 const entryCount = 300000;
 const largeFindQueryA = {
@@ -41,7 +45,7 @@ assert.commandWorked(db.runCommand(largeFindQueryA));
 // Setting query settings for a large find query should succeed.
 assert.commandWorked(db.adminCommand({
     setQuerySettings: {...largeFindQueryA, $db: dbName},
-    settings: {indexHints: {allowedIndexes: ["a123_1", {$natural: 1}]}}
+    settings: {indexHints: {ns, allowedIndexes: ["a123_1", {$natural: 1}]}}
 }));
 
 // Re-running the large find query with the persisted query settings should also succeed.
@@ -64,7 +68,7 @@ assert.commandFailedWithCode(
 // Setting query settings for another large query should fail with the BSONObjectTooLarge error.
 assert.commandFailedWithCode(db.adminCommand({
     setQuerySettings: {...largeFindQueryB, $db: dbName},
-    settings: {indexHints: {allowedIndexes: ["b1_1"]}}
+    settings: {indexHints: {ns, allowedIndexes: ["b1_1"]}}
 }),
                              ErrorCodes.BSONObjectTooLarge);
 

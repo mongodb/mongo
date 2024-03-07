@@ -8,10 +8,11 @@
 
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
-const qsutils = new QuerySettingsUtils(db, jsTestName());
+const collName = jsTestName();
+const qsutils = new QuerySettingsUtils(db, collName);
 const querySettingsQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 1}, skip: 3});
 const querySettingsSettings = {
-    indexHints: {allowedIndexes: ["a_1"]}
+    indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: ["a_1"]}
 };
 
 (function setQuerySettingsFailsOnStandalone() {

@@ -26,19 +26,24 @@ if (!FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('s
 
 const testConn = db.getMongo();
 // (Re)create the collection - will be sharded if required.
-assertDropAndRecreateCollection(db, jsTestName());
-const qsutils = new QuerySettingsUtils(db, jsTestName());
+const collName = jsTestName();
+assertDropAndRecreateCollection(db, collName);
+const ns = {
+    db: db.getName(),
+    coll: collName
+};
+const qsutils = new QuerySettingsUtils(db, collName);
 const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
 const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
 const queryC = qsutils.makeFindQueryInstance({filter: {c: 1}});
 const querySettingsA = {
-    indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
+    indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}
 };
 const querySettingsB = {
-    indexHints: {allowedIndexes: ["b_1"]}
+    indexHints: {ns, allowedIndexes: ["b_1"]}
 };
 const querySettingsC = {
-    indexHints: {allowedIndexes: ["c_1"]}
+    indexHints: {ns, allowedIndexes: ["c_1"]}
 };
 
 function runSetQuerySettingsConcurrently(

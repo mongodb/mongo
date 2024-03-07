@@ -23,7 +23,7 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 const qstests = new QuerySettingsIndexHintsTests(qsutils);
-const mainNs = {
+const ns = {
     db: db.getName(),
     coll: coll.getName()
 };
@@ -55,9 +55,9 @@ function setIndexes(coll, indexList) {
         skip: 3,
     });
 
-    qstests.assertQuerySettingsIndexApplication(querySettingsFindQuery);
-    qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery);
-    qstests.assertQuerySettingsIgnoreCursorHints(querySettingsFindQuery, mainNs);
-    qstests.assertQuerySettingsFallback(querySettingsFindQuery);
-    qstests.assertQuerySettingsCommandValidation(querySettingsFindQuery);
+    qstests.assertQuerySettingsIndexApplication(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsIgnoreCursorHints(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsCommandValidation(querySettingsFindQuery, ns);
 })();

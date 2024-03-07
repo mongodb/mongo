@@ -62,7 +62,10 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
     // forward and backward collection scans.
     queryInstance["$db"] = dbName;
     const settings = {
-        indexHints: {allowedIndexes: [...cmdObj["indexes"], {$natural: 1}, {$natural: -1}]}
+        indexHints: {
+            ns: {db: dbName, coll: collName},
+            allowedIndexes: [...cmdObj["indexes"], {$natural: 1}, {$natural: -1}]
+        }
     };
 
     // Run setQuerySettings command.

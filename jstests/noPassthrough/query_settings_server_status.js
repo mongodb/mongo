@@ -24,17 +24,17 @@ assertDropAndRecreateCollection(db, collName);
 
 const primaryQSU = new QuerySettingsUtils(db, collName);
 const query = primaryQSU.makeFindQueryInstance({filter: {a: 1}});
-const smallerQuerySetting = {
-    indexHints: {allowedIndexes: ["a_1"]}
+const smallerQuerySettings = {
+    indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: ["a_1"]}
 };
-const biggerQuerySetting = {
-    indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
+const biggerQuerySettings = {
+    indexHints: {ns: {db: db.getName(), coll: collName}, allowedIndexes: ["a_1", {$natural: 1}]}
 };
 
 function restartCluster() {
     st.restartMongoses();
-    primaryQSU.db = st.s.getDB(db.getName());  // refresh the db reference so it's possible to later
-                                               // call 'clusterParamRefreshSecs.restore()'
+    // Refresh the db reference so it's possible to later call 'clusterParamRefreshSecs.restore()'.
+    primaryQSU.db = st.s.getDB(db.getName());
     st.stopAllConfigServers({startClean: false}, /* forRestart*/ true);
     st.restartAllConfigServers();
     st.stopAllShards({startClean: false}, /* forRestart */ true);
@@ -98,10 +98,10 @@ let lastSize;
 
 // Insert the bigger entry and verify that the count increases to 1 and that the size is now
 // greater than 0.
-st.adminCommand({setQuerySettings: query, settings: biggerQuerySetting});
+st.adminCommand({setQuerySettings: query, settings: biggerQuerySettings});
 runTest({
     expectedQueryShapeConfiguration:
-        [primaryQSU.makeQueryShapeConfiguration(biggerQuerySetting, query)],
+        [primaryQSU.makeQueryShapeConfiguration(biggerQuerySettings, query)],
     assertionFunc: ({count, size}) => {
         assert.eq(count, 1, "`querySettings.count` server status failed to increase on addition.");
         assert.gt(size, 0, "`querySettings.size` server status failed to increase on addition.");
@@ -111,10 +111,10 @@ runTest({
 
 // Replace the query setting with a smaller one and ensure that the size decreases while the
 // count remains unchanged.
-st.adminCommand({setQuerySettings: query, settings: smallerQuerySetting});
+st.adminCommand({setQuerySettings: query, settings: smallerQuerySettings});
 runTest({
     expectedQueryShapeConfiguration:
-        [primaryQSU.makeQueryShapeConfiguration(smallerQuerySetting, query)],
+        [primaryQSU.makeQueryShapeConfiguration(smallerQuerySettings, query)],
     assertionFunc: ({count, size}) => {
         assert.eq(count,
                   1,
@@ -131,7 +131,7 @@ runTest({
 restartCluster();
 runTest({
     expectedQueryShapeConfiguration:
-        [primaryQSU.makeQueryShapeConfiguration(smallerQuerySetting, query)],
+        [primaryQSU.makeQueryShapeConfiguration(smallerQuerySettings, query)],
     assertionFunc: ({count, size}) => {
         assert.eq(count,
                   1,
@@ -156,12 +156,12 @@ runTest({
     }
 });
 
-const rejectQuerySetting = {
+const rejectQuerySettings = {
     "reject": true
 };
-const rejectQueryConfig = primaryQSU.makeQueryShapeConfiguration(rejectQuerySetting, query);
+const rejectQueryConfig = primaryQSU.makeQueryShapeConfiguration(rejectQuerySettings, query);
 // Set reject=true for the test query.
-st.adminCommand({setQuerySettings: query, settings: rejectQuerySetting});
+st.adminCommand({setQuerySettings: query, settings: rejectQuerySettings});
 
 // Confirm rejectCount was updated.
 runTest({
