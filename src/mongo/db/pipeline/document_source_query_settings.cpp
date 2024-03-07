@@ -70,9 +70,9 @@ DocumentSource::GetNextResult createResult(OperationContext* opCtx,
                                            bool includeDebugQueryShape) try {
     BSONObjBuilder bob;
     configuration.serialize(&bob);
-    if (includeDebugQueryShape) {
+    if (includeDebugQueryShape && configuration.getRepresentativeQuery()) {
         bob.append(DocumentSourceQuerySettings::kDebugQueryShapeFieldName,
-                   createDebugQueryShape(configuration.getRepresentativeQuery(), opCtx, tenantId));
+                   createDebugQueryShape(*configuration.getRepresentativeQuery(), opCtx, tenantId));
     }
     return Document{bob.obj()};
 } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {

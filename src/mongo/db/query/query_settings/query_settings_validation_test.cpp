@@ -61,20 +61,13 @@ void checkQuerySettingsAreValid(const boost::intrusive_ptr<ExpressionContext>& e
                                 size_t errorCode) {
     auto representativeQueryInfo =
         createRepresentativeInfo(representativeQuery, expCtx->opCtx, boost::none);
-    auto config(QueryShapeConfiguration(
-        representativeQueryInfo.queryShapeHash, querySettings, representativeQuery));
-    ASSERT_THROWS_CODE(utils::validateQuerySettings(config, representativeQueryInfo, boost::none),
-                       DBException,
-                       errorCode);
-}
-
-TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeEmpty) {
-    const BSONObj representativeQ = BSON("find"
-                                         << "someColl"
-                                         << "$db"
-                                         << "testDB");
-    QuerySettings querySettings(boost::none);
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746604);
+    QueryShapeConfiguration queryShapeConfiguration(representativeQueryInfo.queryShapeHash,
+                                                    querySettings);
+    queryShapeConfiguration.setRepresentativeQuery(representativeQuery);
+    ASSERT_THROWS_CODE(
+        utils::validateQuerySettings(queryShapeConfiguration, representativeQueryInfo, boost::none),
+        DBException,
+        errorCode);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnIdHack) {

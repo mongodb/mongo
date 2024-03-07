@@ -71,9 +71,10 @@ namespace query_settings {
 
 using QueryInstance = BSONObj;
 
-using QueryShapeConfigurationsMap = stdx::unordered_map<query_shape::QueryShapeHash,
-                                                        std::pair<QuerySettings, QueryInstance>,
-                                                        QueryShapeHashHasher>;
+using QueryShapeConfigurationsMap =
+    stdx::unordered_map<query_shape::QueryShapeHash,
+                        std::pair<QuerySettings, boost::optional<QueryInstance>>,
+                        QueryShapeHashHasher>;
 
 /**
  * Struct which stores all query shape configurations for a given tenant, containing the same
@@ -128,47 +129,13 @@ public:
     static QuerySettingsManager& get(OperationContext* opCtx);
 
     /**
-     * Performs the QuerySettings lookup by computing QueryShapeHash only in cases when at least one
-     * QueryShapeConfiguration is set for the given namespace.
-     * TODO: SERVER-84725: This function template may not be necessary after refactoring is done.
-     */
-    template <typename Fn>
-    boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
-        OperationContext* opCtx, const Fn& queryShapeHashFn, const NamespaceString& nss) const {
-        Lock::SharedLock readLock(opCtx, _mutex);
-        // Perform the lookup for namespace string to query settings map maintained for the given
-        // tenant.
-        auto queryShapeConfigurationsIt =
-            _tenantIdToVersionedQueryShapeConfigurationsMap.find(nss.dbName().tenantId());
-        if (queryShapeConfigurationsIt == _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
-            return boost::none;
-        }
-
-        // Perform the lookup for query settings map maintained for the given namespace.
-        const auto& nssToQueryShapeConfigurationsMap =
-            queryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap;
-        auto nssToQueryShapeConfigurationsMapIt = nssToQueryShapeConfigurationsMap.find(nss);
-        if (nssToQueryShapeConfigurationsMapIt == nssToQueryShapeConfigurationsMap.end()) {
-            return boost::none;
-        }
-
-        // Lookup query settings for the QueryShapeHash.
-        const auto& queryShapeConfigurationsMap = nssToQueryShapeConfigurationsMapIt->second;
-        auto queryShapeConfigurationIt = queryShapeConfigurationsMap.find(queryShapeHashFn());
-        if (queryShapeConfigurationIt == queryShapeConfigurationsMap.end()) {
-            return boost::none;
-        }
-        return queryShapeConfigurationIt->second;
-    }
-
-    /**
      * Returns (QuerySettings, QueryInstance) pair associated with the QueryShapeHash for the given
      * tenant.
      */
-    boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
-        OperationContext* opCtx,
-        const query_shape::QueryShapeHash& queryShapeHash,
-        const boost::optional<TenantId>& tenantId) const;
+    boost::optional<std::pair<QuerySettings, boost::optional<QueryInstance>>>
+    getQuerySettingsForQueryShapeHash(OperationContext* opCtx,
+                                      const query_shape::QueryShapeHash& queryShapeHash,
+                                      const boost::optional<TenantId>& tenantId) const;
 
     /**
      * Returns all QueryShapeConfigurations stored for the given tenant.

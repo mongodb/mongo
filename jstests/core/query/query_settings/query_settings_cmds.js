@@ -20,7 +20,6 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
  * agg stage.
  *
  *  params.queryA - query of some shape
- *  params.queryShapeA - debugQueryShape of params.queryA
  *  params.queryB - query of shape different from A
  *  params.queryBPrime - different query of the same shape as params.queryB
  *  params.querySettingsA - query setting for all queries of the shape as params.queryA
@@ -28,6 +27,7 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
  */
 let testQuerySettingsUsing =
     (params) => {
+        let queryShapeHashA = null;
         // Ensure that query settings cluster parameter is empty.
         { qsutils.assertQueryShapeConfiguration([]); }
 
@@ -56,7 +56,7 @@ let testQuerySettingsUsing =
         // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
         // setQuerySettings by passing a QueryShapeHash.
         {
-            const queryShapeHashA = qsutils.getQueryHashFromQuerySettings(params.queryShapeA);
+            queryShapeHashA = qsutils.getQueryHashFromQuerySettings(params.queryA);
             assert.neq(queryShapeHashA, undefined);
             assert.commandWorked(db.adminCommand(
                 {setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));
@@ -95,8 +95,43 @@ let testQuerySettingsUsing =
         // Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings
         // command providing a query shape hash.
         {
-            qsutils.removeAllQuerySettings();
+            // Some suites may transparently retry this request if it fails due to e.g., step down.
+            // However, the settings may already be modified. The retry will then fail with: "A
+            // matching query settings entry does not exist" despite the call actually succeeding.
+            // Since we immediately check the correct set of settings exists, this test still
+            // verifies the correct behavior, even without an assert.commandWorked here.
+            db.adminCommand({removeQuerySettings: queryShapeHashA});
+            qsutils.assertQueryShapeConfiguration([]);
             qsutils.assertExplainQuerySettings(params.queryA, undefined);
+        }
+
+        // Ensure that query settings can also be added for a query shape hash without providing a
+        // representative query.
+        {
+            assert.commandWorked(db.adminCommand(
+                {setQuerySettings: queryShapeHashA, settings: params.querySettingsA}));
+
+            // Call 'assertQueryShapeConfiguration()' with shouldRunExplain = false, because we
+            // don't have a representative query.
+            qsutils.assertQueryShapeConfiguration([{settings: params.querySettingsA}],
+                                                  false /* shouldRunExplain */);
+            // Run 'assertExplainQuerySettings()' separately with a query.
+            qsutils.assertExplainQuerySettings(params.queryA, params.querySettingsA);
+
+            // Assert there is no 'debugQueryShape'.
+            assert(!qsutils
+                        .getQuerySettings({
+                            showDebugQueryShape: true,
+                        })[0]
+                        .hasOwnProperty("debugQueryShape"));
+
+            // Some suites may transparently retry this request if it fails due to e.g., step down.
+            // However, the settings may already be modified. The retry will then fail with: "A
+            // matching query settings entry does not exist" despite the call actually succeeding.
+            // Since we immediately check the correct set of settings exists, this test still
+            // verifies the correct behavior, even without an assert.commandWorked here.
+            db.adminCommand({removeQuerySettings: queryShapeHashA});
+            qsutils.assertQueryShapeConfiguration([]);
         }
     }
 
@@ -109,20 +144,10 @@ let buildPipeline = (matchValue) => [{$match: {matchKey: matchValue}},
                                      },
 ];
 
-let buildPipelineShape = matchValue => {
-    return {
-        command: "aggregate", pipeline: [
-            {$match: {matchKey: matchValue}},
-            {$group: {_id: "?string", values: {$addToSet: "$value"}}}
-        ],
-    }
-};
-
 let testQuerySettingsParameterized = ({find, distinct, aggregate}) => {
     // Testing find query settings.
     testQuerySettingsUsing({
         queryA: qsutils.makeFindQueryInstance({filter: {a: 15}}),
-        queryShapeA: {command: "find", filter: {a: {$eq: "?number"}}},
         queryB: qsutils.makeFindQueryInstance({filter: {b: "string"}}),
         queryBPrime: qsutils.makeFindQueryInstance({filter: {b: "another string"}}),
         ...find
@@ -131,7 +156,6 @@ let testQuerySettingsParameterized = ({find, distinct, aggregate}) => {
     // Same for distinct query settings.
     testQuerySettingsUsing({
         queryA: qsutils.makeDistinctQueryInstance({key: "k", query: {a: 1}}),
-        queryShapeA: {command: "distinct", key: "k", query: {a: {$eq: "?number"}}},
         queryB: qsutils.makeDistinctQueryInstance({key: "k", query: {b: "string"}}),
         queryBPrime: qsutils.makeDistinctQueryInstance({key: "k", query: {b: "another string"}}),
         ...distinct
@@ -142,7 +166,6 @@ let testQuerySettingsParameterized = ({find, distinct, aggregate}) => {
         queryA: qsutils.makeAggregateQueryInstance({
             pipeline: buildPipeline(15),
         }),
-        queryShapeA: buildPipelineShape({$eq: "?number"}),
         queryB: qsutils.makeAggregateQueryInstance({
             pipeline: buildPipeline("string"),
         }),
@@ -211,6 +234,8 @@ testQuerySettingsParameterized({
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
 
     // Setting reject=false would make the existing QuerySettings empty; verify that this fails.
+    qsutils.assertQueryShapeConfiguration(
+        [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
     assert.commandFailedWithCode(
         db.adminCommand({setQuerySettings: query, settings: {reject: false}}), 8587402);
 

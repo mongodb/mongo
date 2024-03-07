@@ -383,7 +383,7 @@ public:
 
         // Propagate the query settings with the request to the shards if present.
         const auto& querySettings = canonicalDistinct.getQuery()->getExpCtx()->getQuerySettings();
-        if (!query_settings::utils::isEmpty(querySettings)) {
+        if (!query_settings::utils::isDefault(querySettings)) {
             viewAggRequest.setQuerySettings(querySettings);
         }
 

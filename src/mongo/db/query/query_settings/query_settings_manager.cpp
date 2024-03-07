@@ -90,33 +90,16 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettingsServerStatusSection::_mutex");
 } querySettingsServerStatusSection;
 
-NamespaceString extractNamespaceString(const QueryInstance& representativeQuery,
-                                       const boost::optional<TenantId>& tenantId) {
-    static auto const kSerializationContext =
-        SerializationContext{SerializationContext::Source::Command,
-                             SerializationContext::CallerType::Request,
-                             SerializationContext::Prefix::Default,
-                             true /* nonPrefixedTenantId */};
-    bool isCollectionless = representativeQuery.firstElement().type() != BSONType::String;
-    auto coll = isCollectionless ? "$cmd.aggregate" : representativeQuery.firstElement().String();
-    auto db = representativeQuery.getField("$db"_sd).String();
-    return NamespaceStringUtil::deserialize(tenantId, db, coll, kSerializationContext);
-}
-
 auto computeTenantConfiguration(std::vector<QueryShapeConfiguration>&& settingsArray,
                                 const boost::optional<TenantId>& tenantId) {
-    stdx::unordered_map<NamespaceString, QueryShapeConfigurationsMap> nssToQueryConfigurationsMap;
+    QueryShapeConfigurationsMap queryShapeConfigurationMap;
     for (auto&& queryShapeConfiguration : settingsArray) {
-        auto nss =
-            extractNamespaceString(queryShapeConfiguration.getRepresentativeQuery(), tenantId);
-        auto insertResultPair =
-            nssToQueryConfigurationsMap.try_emplace(nss, QueryShapeConfigurationsMap{});
-        auto& queryShapeConfigurationsMap = insertResultPair.first->second;
-        queryShapeConfigurationsMap.insert({queryShapeConfiguration.getQueryShapeHash(),
-                                            {queryShapeConfiguration.getSettings(),
-                                             queryShapeConfiguration.getRepresentativeQuery()}});
+        queryShapeConfigurationMap.insert({queryShapeConfiguration.getQueryShapeHash(),
+                                           {queryShapeConfiguration.getSettings(),
+                                            queryShapeConfiguration.getRepresentativeQuery()}});
     }
-    return nssToQueryConfigurationsMap;
+    return stdx::unordered_map<NamespaceString, QueryShapeConfigurationsMap>(
+        {{NamespaceString(), queryShapeConfigurationMap}});
 }
 }  // namespace
 
@@ -133,7 +116,7 @@ void QuerySettingsManager::create(
     getQuerySettingsManager(service).emplace(service, clusterParameterRefreshFn);
 }
 
-boost::optional<std::pair<QuerySettings, QueryInstance>>
+boost::optional<std::pair<QuerySettings, boost::optional<QueryInstance>>>
 QuerySettingsManager::getQuerySettingsForQueryShapeHash(
     OperationContext* opCtx,
     const query_shape::QueryShapeHash& queryShapeHash,
@@ -199,7 +182,8 @@ std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfi
     for (const auto& it :
          versionedQueryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap) {
         for (const auto& [queryShapeHash, value] : it.second) {
-            configurations.emplace_back(queryShapeHash, value.first, value.second);
+            auto& newConfiguration = configurations.emplace_back(queryShapeHash, value.first);
+            newConfiguration.setRepresentativeQuery(value.second);
         }
     }
     return configurations;

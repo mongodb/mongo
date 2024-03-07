@@ -588,7 +588,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // By attaching the query settings to the original request object we can re-use the query
     // settings even though the original 'expCtx' object has been already destroyed.
     const auto& querySettings = expCtx->getQuerySettings();
-    if (!query_settings::utils::isEmpty(querySettings)) {
+    if (!query_settings::utils::isDefault(querySettings)) {
         request.setQuerySettings(querySettings);
     }
 

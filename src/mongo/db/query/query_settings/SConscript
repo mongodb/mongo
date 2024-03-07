@@ -24,19 +24,17 @@ env.Library(
         'query_settings_cluster_parameter.idl',
         'query_settings_manager.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-        'query_settings',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha256_block',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'query_settings',
     ],
 )
 

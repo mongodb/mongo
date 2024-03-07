@@ -98,4 +98,6 @@ structs:
     fields:
       queryShapeHash: QueryShapeHash
       settings: QuerySettings
-      representativeQuery: object_owned
+      representativeQuery:
+        type: object_owned
+        optional: true

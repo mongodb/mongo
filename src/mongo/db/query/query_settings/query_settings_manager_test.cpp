@@ -79,7 +79,9 @@ QueryShapeConfiguration makeQueryShapeConfiguration(const QuerySettings& setting
                                                     OperationContext* opCtx,
                                                     boost::optional<TenantId> tenantId) {
     auto queryShapeHash = createRepresentativeInfo(query, opCtx, tenantId).queryShapeHash;
-    return QueryShapeConfiguration(queryShapeHash, settings, query);
+    QueryShapeConfiguration result(queryShapeHash, settings);
+    result.setRepresentativeQuery(query);
+    return result;
 }
 
 // QueryShapeConfiguration is not comparable, therefore comparing the corresponding
@@ -224,7 +226,7 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
 }
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
-    using Result = boost::optional<std::pair<QuerySettings, QueryInstance>>;
+    using Result = boost::optional<std::pair<QuerySettings, boost::optional<QueryInstance>>>;
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     // Helper function for ensuring that two
@@ -240,11 +242,18 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
 
         // Otherwise, ensure that both pair components are equal.
         ASSERT_BSONOBJ_EQ(r0->first.toBSON(), r1->first.toBSON());
-        ASSERT_BSONOBJ_EQ(r0->second, r1->second);
+        ASSERT_EQ(r0->second.has_value(), r1->second.has_value());
+
+        // Early exit if query instances are missing.
+        if (!r0->second.has_value()) {
+            return;
+        }
+        ASSERT_BSONOBJ_EQ(*r0->second, *r1->second);
     };
 
     TenantId tenantId(OID::fromTerm(1));
     auto configs = getExampleQueryShapeConfigurations(opCtx(), tenantId);
+
     manager().setQueryShapeConfigurations(
         opCtx(), std::vector<QueryShapeConfiguration>(configs), LogicalTime(), tenantId);
 
@@ -252,7 +261,6 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
     assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
                         opCtx(), query_shape::QueryShapeHash(), tenantId),
                     boost::none);
-
 
     // Ensure QuerySettingsManager returns a valid (QuerySettings, QueryInstance) pair on lookup.
     assertResultsEq(manager().getQuerySettingsForQueryShapeHash(

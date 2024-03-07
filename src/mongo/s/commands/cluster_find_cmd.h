@@ -160,7 +160,7 @@ public:
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
             findCommand = std::move(parsedFind->findCommandRequest);
-            if (!query_settings::utils::isEmpty(querySettings)) {
+            if (!query_settings::utils::isDefault(querySettings)) {
                 findCommand->setQuerySettings(std::move(querySettings));
             }
 

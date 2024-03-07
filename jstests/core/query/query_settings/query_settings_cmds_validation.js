@@ -21,9 +21,6 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 {
     // Ensure that setQuerySettings command fails for invalid input.
     assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: nonExistentQueryShapeHash, settings: querySettingsA}),
-        7746401);
-    assert.commandFailedWithCode(
         db.adminCommand({setQuerySettings: {notAValid: "query"}, settings: querySettingsA}),
         7746402);
     assert.commandFailedWithCode(
@@ -178,4 +175,19 @@ const nonExistentQueryShapeHash = "0".repeat(64);
         }
     }),
                                  8584901);
+}
+
+{
+    // Ensure that inserting empty settings fails.
+    let query = qsutils.makeFindQueryInstance({filter: {a: 15}});
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 7746604);
+
+    // Insert some settings.
+    assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
+
+    // Ensure that updating with empty settings fails.
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 7746604);
+
+    // Clean-up after the end of the test.
+    qsutils.removeAllQuerySettings();
 }

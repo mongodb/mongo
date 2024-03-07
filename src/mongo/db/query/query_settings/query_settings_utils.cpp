@@ -438,11 +438,14 @@ bool allowQuerySettingsFromClient(const Client* client) {
     return client->isInternalClient() || client->isInDirectClient();
 }
 
-bool isEmpty(const QuerySettings& settings) {
-    // The `serialization_context` field is not significant.
-    static_assert(
-        QuerySettings::fieldNames.size() == 4,
-        "A new field has been added to QuerySettings, isEmpty should be updated appropriately.");
+bool isDefault(const QuerySettings& settings) {
+    // The 'serialization_context' field is not significant.
+    static_assert(QuerySettings::fieldNames.size() == 4,
+                  "A new field has been added to the QuerySettings structure, isDefault should be "
+                  "updated appropriately.");
+
+    // For the 'reject' field of type OptionalBool, consider both 'false' and missing value as
+    // default.
     return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject());
 }
 
@@ -518,7 +521,7 @@ void validateQuerySettingsNamespacesNotAmbiguous(
  * Validates that QueryShapeConfiguration is not specified for queries with queryable encryption.
  */
 void validateQuerySettingsEncryptionInformation(
-    const QueryShapeConfiguration& config, const RepresentativeQueryInfo& representativeQueryInfo) {
+    const RepresentativeQueryInfo& representativeQueryInfo) {
     uassert(7746600,
             "Queries with encryption information are not allowed on setQuerySettings commands",
             !representativeQueryInfo.encryptionInformation);
@@ -544,12 +547,7 @@ void validateQuerySettings(const QueryShapeConfiguration& config,
             "setQuerySettings command cannot be used on system collections",
             !representativeQueryInfo.namespaceString.isSystem());
 
-    // Validates that the settings field for query settings is not empty.
-    uassert(7746604,
-            "settings field in setQuerySettings command cannot be empty",
-            !config.getSettings().toBSON().isEmpty());
-
-    validateQuerySettingsEncryptionInformation(config, representativeQueryInfo);
+    validateQuerySettingsEncryptionInformation(representativeQueryInfo);
 
     // Validates that the query settings' representative is not eligible for IDHACK.
     uassert(7746606,

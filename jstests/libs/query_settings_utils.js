@@ -66,27 +66,19 @@ export class QuerySettingsUtils {
     /**
      * Return queryShapeHash for a given query from querySettings.
      */
-    getQueryHashFromQuerySettings(shape) {
-        print("looking for hash for the shape: \n" + tojson(shape))
+    getQueryHashFromQuerySettings(representativeQuery) {
         const settings = this.adminDB
                              .aggregate([
-                                 {$querySettings: {showDebugQueryShape: true}},
-                                 {$project: {"debugQueryShape.cmdNs": 0}},
-                                 {$match: {debugQueryShape: shape}},
+                                 {$querySettings: {}},
+                                 {$match: {representativeQuery}},
                              ])
                              .toArray();
-        if (settings.length == 0) {
-            const allSettings = this.adminDB
-                                    .aggregate([
-                                        {$querySettings: {showDebugQueryShape: true}},
-                                        {$project: {"debugQueryShape.cmdNs": 0}},
-                                    ])
-                                    .toArray();
-            print("Couldn't find any. All settings:\n" + tojson(allSettings));
-            return undefined;
-        }
-        assert.eq(settings.length, 1);
-        return settings[0].queryShapeHash;
+        assert.lte(
+            settings.length,
+            1,
+            `query ${tojson(representativeQuery)} is expected to have 0 or 1 settings, but got ${
+                tojson(settings)}`);
+        return settings.length === 0 ? undefined : settings[0].queryShapeHash;
     }
 
     /**
