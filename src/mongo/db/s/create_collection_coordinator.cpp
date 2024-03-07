@@ -273,10 +273,6 @@ bool isSharded(const ShardsvrCreateCollectionRequest& request) {
     return !isUnsplittable(request);
 }
 
-bool isTimeseries(const ShardsvrCreateCollectionRequest& request) {
-    return request.getTimeseries().has_value();
-}
-
 // NOTES on the 'collation' optional parameter contained by the shardCollection() request:
 // 1. It specifies the ordering criteria that will be applied when comparing chunk boundaries
 // during sharding operations (such as move/mergeChunks).
@@ -902,6 +898,16 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
             AutoGetCollection::Options{}.expectedUUID(request.getCollectionUUID())};
     };
 
+    const auto makeTranslateRequestParams =
+        [](const NamespaceString& nss,
+           const KeyPattern& keyPattern,
+           const BSONObj& collation,
+           const boost::optional<TimeseriesOptions>& timeseries) {
+            auto translatedRequestParams = TranslatedRequestParams(nss, keyPattern, collation);
+            translatedRequestParams.setTimeseries(timeseries);
+            return translatedRequestParams;
+        };
+
     auto bucketsNs = originalNss.makeTimeseriesBucketsNamespace();
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
@@ -917,11 +923,12 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
                               << resolvedNamespace.toStringForErrorMsg()
                               << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
                 resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
-        return TranslatedRequestParams(
+        return makeTranslateRequestParams(
             resolvedNamespace,
             *request.getShardKey(),
             resolveCollationForUserQueries(
-                opCtx, resolvedNamespace, request.getCollation(), request.getUnsplittable()));
+                opCtx, resolvedNamespace, request.getCollation(), request.getUnsplittable()),
+            boost::none /* timeseries */);
     }
 
     // The request is targeting a new or existing Timeseries collection and the request has not been
@@ -948,27 +955,33 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
         return existingBucketsColl->getTimeseriesOptions();
     }();
 
-    if (request.getTimeseries() && existingTimeseriesOptions) {
-        uassert(5731500,
+    auto timeseriesOptions = [&]() -> boost::optional<TimeseriesOptions> {
+        if (request.getTimeseries() && existingTimeseriesOptions) {
+            uassert(
+                5731500,
                 str::stream() << "the 'timeseries' spec provided must match that of exists '"
                               << originalNss.toStringForErrorMsg() << "' collection",
                 timeseries::optionsAreEqual(*request.getTimeseries(), *existingTimeseriesOptions));
-    } else if (!request.getTimeseries()) {
-        request.setTimeseries(existingTimeseriesOptions);
-    }
+            return request.getTimeseries();
+        } else if (!request.getTimeseries()) {
+            return existingTimeseriesOptions;
+        }
+        return request.getTimeseries();
+    }();
 
     if (request.getUnsplittable()) {
-        return TranslatedRequestParams(
+        return makeTranslateRequestParams(
             resolvedNamespace,
             request.getShardKey().value(),
             resolveCollationForUserQueries(
-                opCtx, resolvedNamespace, request.getCollation(), request.getUnsplittable()));
+                opCtx, resolvedNamespace, request.getCollation(), request.getUnsplittable()),
+            timeseriesOptions);
     }
 
     // check that they are consistent with the requested shard key before creating the key pattern
     // object.
-    auto timeFieldName = request.getTimeseries()->getTimeField();
-    auto metaFieldName = request.getTimeseries()->getMetaField();
+    auto timeFieldName = timeseriesOptions->getTimeField();
+    auto metaFieldName = timeseriesOptions->getMetaField();
     BSONObjIterator shardKeyElems{*request.getShardKey()};
     while (auto elem = shardKeyElems.next()) {
         if (elem.fieldNameStringData() == timeFieldName) {
@@ -987,12 +1000,13 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
     }
     KeyPattern keyPattern(
         uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-            *request.getTimeseries(), *request.getShardKey())));
-    return TranslatedRequestParams(
+            *timeseriesOptions, *request.getShardKey())));
+    return makeTranslateRequestParams(
         resolvedNamespace,
         keyPattern,
         resolveCollationForUserQueries(
-            opCtx, resolvedNamespace, request.getCollation(), request.getUnsplittable()));
+            opCtx, resolvedNamespace, request.getCollation(), request.getUnsplittable()),
+        timeseriesOptions);
 }
 
 /**
@@ -1119,6 +1133,11 @@ boost::optional<UUID> createCollectionAndIndexes(
     bool isUpdatedCoordinatorDoc) {
     LOGV2_DEBUG(5277903, 2, "Create collection createCollectionAndIndexes", logAttrs(nss));
 
+    // TODO (SERVER-87284): We can remove this tassert once translatedRequestParams stops being
+    // optional.
+    tassert(
+        8679502, "Expecting translated request params to not be empty.", translatedRequestParams);
+
     // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
     boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
         allowCollectionCreation;
@@ -1128,12 +1147,13 @@ boost::optional<UUID> createCollectionAndIndexes(
         allowCollectionCreation.emplace(opCtx);
     }
 
-    const auto collationBSON = translatedRequestParams->getCollation();
-    if (isTimeseries(request) || isUnsplittable(request)) {
-        const auto localNss = isTimeseries(request) ? nss.getTimeseriesViewNamespace() : nss;
+    if (isUnsplittable(request) || translatedRequestParams->getTimeseries()) {
+        const auto localNss =
+            translatedRequestParams->getTimeseries() ? nss.getTimeseriesViewNamespace() : nss;
 
         auto translatedRequest = request;
-        translatedRequest.setCollation(collationBSON);
+        translatedRequest.setCollation(translatedRequestParams->getCollation());
+        translatedRequest.setTimeseries(translatedRequestParams->getTimeseries());
         auto createStatus = createCollectionLocally(opCtx, localNss, translatedRequest);
         if (!createStatus.isOK() && createStatus.code() == ErrorCodes::NamespaceExists) {
             LOGV2_DEBUG(5909400, 3, "Collection namespace already exists", logAttrs(localNss));
@@ -1150,11 +1170,11 @@ boost::optional<UUID> createCollectionAndIndexes(
             opCtx,
             nss,
             shardKeyPattern,
-            collationBSON,
+            translatedRequestParams->getCollation(),
             request.getUnique().value_or(false),
             request.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard),
-            request.getTimeseries(),
+            translatedRequestParams->getTimeseries(),
             isUpdatedCoordinatorDoc);
     } else {
         uassert(6373200,
@@ -1163,7 +1183,7 @@ boost::optional<UUID> createCollectionAndIndexes(
                     opCtx,
                     nss,
                     shardKeyPattern,
-                    collationBSON,
+                    translatedRequestParams->getCollation(),
                     request.getUnique().value_or(false) &&
                         request.getEnforceUniquenessCheck().value_or(true),
                     shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard)));
@@ -1259,13 +1279,13 @@ void commit(OperationContext* opCtx,
 
     const auto& placementVersion = initialChunks->chunks.back().getVersion();
 
-    if (request.getTimeseries()) {
+    if (translatedRequestParams->getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;
         auto tsOptions = [&] {
             // TODO SERVER-85251: We can replace all of this with:
-            //    return *request.getTimeseries();
+            //    return *translatedRequestParams->getTimeseries();
             // Once the next LTS is made.
-            TimeseriesOptions timeseriesOptions = *request.getTimeseries();
+            TimeseriesOptions timeseriesOptions = *(translatedRequestParams->getTimeseries());
             (void)timeseries::validateAndSetBucketingParameters(timeseriesOptions);
             return timeseriesOptions;
         }();

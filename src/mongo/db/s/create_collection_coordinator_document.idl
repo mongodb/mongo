@@ -80,6 +80,10 @@ structs:
                 type: object_owned
                 description: "Collation value from the targeted unsharded collection if this exists; otherwise, simple-collation"
                 optional: false
+            timeseries:
+                type: TimeseriesOptions
+                description: "The options to create the time-series collection with."
+                optional: true
 
     # TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
     CreateCollectionCoordinatorDocumentLegacy:
