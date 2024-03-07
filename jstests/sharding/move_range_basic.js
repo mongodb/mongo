@@ -148,7 +148,7 @@ function test(collName, skPattern) {
 }
 
 // Test running running moveRange on an unsplittable collection will fail
-if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsOnShardingCatalog")) {
+if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsUponCreation")) {
     const collName = "unsplittable_collection"
     const ns = kDbName + '.' + collName;
 

@@ -324,7 +324,7 @@ rst0.awaitReplication();
 
 // TODO SERVER-82316: currently we don't have full compatibility for direct connections.
 if (!FeatureFlagUtil.isPresentAndEnabled(rst0.getPrimary(),
-                                         "TrackUnshardedCollectionsOnShardingCatalog")) {
+                                         "TrackUnshardedCollectionsUponCreation")) {
     checkCRUDCommands(rst0.getPrimary().getDB(dbName));
     checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 

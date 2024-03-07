@@ -297,8 +297,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 allowCollectionCreation;
             const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             if (!fcvSnapshot.isVersionInitialized() ||
-                !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
-                    fcvSnapshot) ||
+                !feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot) ||
                 !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
                 (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
                 allowCollectionCreation.emplace(opCtx);
@@ -797,7 +796,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
             allowCollectionCreation;
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         if (!fcvSnapshot.isVersionInitialized() ||
-            !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(fcvSnapshot) ||
+            !feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot) ||
             !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
             (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
             allowCollectionCreation.emplace(opCtx);

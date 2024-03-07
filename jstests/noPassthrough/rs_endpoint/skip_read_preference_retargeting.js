@@ -24,7 +24,7 @@ const rst = new ReplSetTest({
             // involves running _flushDatabaseCacheUpdates on the primary and then waiting for the
             // refreshed metadata to get replicated. This test later pauses replication on one of
             // the secondaries. So the refresh on that secondary is expected to hang.
-            featureFlagTrackUnshardedCollectionsOnShardingCatalog: false,
+            featureFlagTrackUnshardedCollectionsUponCreation: false,
             logComponentVerbosity: tojson({sharding: 2}),
         }
     },

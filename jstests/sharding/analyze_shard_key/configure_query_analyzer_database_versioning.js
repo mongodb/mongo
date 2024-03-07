@@ -10,7 +10,7 @@ const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
 
 // Database versioning tests only make sense when all collections are not tracked.
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 if (isTrackUnshardedEnabled) {
     st.stop();
     quit();

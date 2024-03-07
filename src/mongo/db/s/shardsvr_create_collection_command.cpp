@@ -171,7 +171,7 @@ public:
                 // always be local
                 if (isUnsplittable) {
                     bool isTrackUnshardedDisabled =
-                        !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                        !feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
                             (*optFixedFcvRegion)->acquireFCVSnapshot());
                     if (isTrackUnshardedDisabled) {
                         auto cmd = create_collection_util::makeCreateCommand(

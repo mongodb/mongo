@@ -3,7 +3,7 @@
  * @tags: [
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
- *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  featureFlagTrackUnshardedCollectionsUponCreation,
  *  requires_sharding
  * ]
  */

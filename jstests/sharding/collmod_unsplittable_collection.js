@@ -1,7 +1,7 @@
 /*
  * Test the collmod command against unsplittable collections.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   # createUnsplittableCollection doesn't exist on versions previous to v7.1
  *   multiversion_incompatible,
  * ]

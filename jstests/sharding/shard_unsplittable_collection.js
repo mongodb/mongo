@@ -1,7 +1,7 @@
 /*
  * Test that unsplittable collections can be sharded.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagAuthoritativeShardCollection,
  *   multiversion_incompatible,
  *   assumes_balancer_off,

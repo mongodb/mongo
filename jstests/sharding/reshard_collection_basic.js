@@ -115,7 +115,7 @@ assert.commandFailedWithCode(mongos.adminCommand({
 // now always tracked. A temporary db.system.resharding.collection must now exist as unsplittable as
 // well to support moveCollection
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 if (!isTrackUnshardedEnabled) {
     jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
     assert.commandFailedWithCode(

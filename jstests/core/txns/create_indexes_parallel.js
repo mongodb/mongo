@@ -153,7 +153,7 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     // within a transaction will always serialize with any other collection creation by taking the
     // DDLLock
     const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
-        db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
     if (isTrackUnshardedDisabled) {
         jsTest.log(
             "Testing createIndexes inside txn and createCollection on conflicting collection " +

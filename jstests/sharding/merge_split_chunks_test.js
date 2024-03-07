@@ -18,7 +18,7 @@ var coll = mongos.getCollection(dbname + ".bar");
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 // Make sure split is correctly disabled for unsplittable collection
-if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsOnShardingCatalog")) {
+if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsUponCreation")) {
     jsTest.log("Trying to split an unsplittable collection ...")
     const collNameUnsplittable = "unsplittable_bar";
     const nsUnsplittable = dbname + '.' + collNameUnsplittable;

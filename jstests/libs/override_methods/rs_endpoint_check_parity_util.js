@@ -38,7 +38,7 @@ function checkCanRun(dbName, commandName, commandObj) {
     }
     if (commandName === 'cloneCollectionAsCapped' || commandName === 'convertToCapped') {
         // TODO (SERVER-86360): Converting an unsharded collection to capped leads to inconsistent
-        // metadata when featureFlagTrackUnshardedCollectionsOnShardingCatalog is enabled.
+        // metadata when featureFlagTrackUnshardedCollectionsUponCreation is enabled.
         throw Error("Cannot run " + commandName + " command since currently running it would lead" +
                     "to inconsistent metadata and cause the CheckMetadataConsistencyInBackground " +
                     "hook to fail");
@@ -47,7 +47,7 @@ function checkCanRun(dbName, commandName, commandObj) {
         commandObj[commandName].includes("system.resharding.") &&
         !readCommandNames.has(commandName)) {
         // TODO (SERVER-86487): Writing to system.resharding.* collection is allowed when
-        // featureFlagTrackUnshardedCollectionsOnShardingCatalog is enabled and leads to
+        // featureFlagTrackUnshardedCollectionsUponCreation is enabled and leads to
         // incomplete placement metadata.
         throw Error("Cannot write to a resharding temporary collection since it would result in " +
                     "a collection with incomplete placement metadata");

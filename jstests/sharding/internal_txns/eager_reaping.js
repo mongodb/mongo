@@ -65,7 +65,7 @@ function runTest(conn, shardConn) {
     // TODO SERVER-85296 remove this early return once the test will take into account the extra
     // session opened by the implicit creation of the collection at the beginning of the test
     const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
     if (isTrackUnshardedEnabled)
         return;
     // Lower the threshold to speed up the test and verify it's respected.

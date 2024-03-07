@@ -135,7 +135,7 @@ let st = new ShardingTest({shards: 1});
 checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
 
 // TODO SERVER-77915: remove once 8.0 becomes last-lts
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsOnShardingCatalog")) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
     // changePrimary
     checkCommandMongos({changePrimary: dbName, to: st.shard0.shardName},
                        setupFuncs.createDatabase,

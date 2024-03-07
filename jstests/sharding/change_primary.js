@@ -3,7 +3,7 @@
  * views.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagBalanceUnshardedCollections,
  * ]
  */

@@ -164,7 +164,7 @@ newShard.initiate();
     // Check that the new primary has cloned the data. The data will only be moved if the collection
     // is untracked.
     const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
     if (isTrackUnshardedDisabled) {
         assert.eq(1, toShard.getDB(dbName)[unshardedCollName].find().itcount());
     }

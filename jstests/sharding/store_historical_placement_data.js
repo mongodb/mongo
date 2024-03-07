@@ -16,7 +16,7 @@ const shard2 = st.shard2.shardName;
 // TODO SERVER-77915 Remove checkUnsplittableMetadata once 8.0 becomes last LTS. Update the test as
 // this variable is now always "true"
 const checkUnsplittableMetadata = FeatureFlagUtil.isPresentAndEnabled(
-    st.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    st.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 function getInfoFromConfigDatabases(dbName) {
     const configDBsQueryResults = configDB.databases.find({_id: dbName}).toArray();

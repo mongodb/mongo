@@ -96,9 +96,8 @@ void cloneDatabase(OperationContext* opCtx,
     bool forceSameUUIDAsSource = false;
     {
         FixedFCVRegion fcvRegion{opCtx};
-        forceSameUUIDAsSource =
-            feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
-                (*fcvRegion).acquireFCVSnapshot());
+        forceSameUUIDAsSource = feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
+            (*fcvRegion).acquireFCVSnapshot());
     }
 
     Cloner cloner;

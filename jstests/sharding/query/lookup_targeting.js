@@ -2,7 +2,7 @@
  * Test that the targeting of $lookup queries and any sub-queries works correctly.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   assumes_balancer_off,

@@ -77,7 +77,7 @@ function bulkWriteBasicTest(ordered) {
     const db_s1 = st.s1.getDB("test");
 
     const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
     // Case 3: Move the 'test2' DB back and forth across shards. This will result in bulkWrite
     // getting a StaleDbVersion error. We run this on s1 so s0 doesn't know about the change.

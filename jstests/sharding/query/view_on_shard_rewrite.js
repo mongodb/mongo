@@ -75,7 +75,7 @@ assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {_id: 1}})
 // Read view on sharded collection.
 assertReadOnView(mongosView, true /* expectKickBackToMongos */);
 
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, 'TrackUnshardedCollectionsOnShardingCatalog')) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, 'TrackUnshardedCollectionsUponCreation')) {
     // Recreate the collection as unsplittable on the db-primary shard.
     mongosDB[collName].drop();
     mongosDB.runCommand({createUnsplittableCollection: collName});

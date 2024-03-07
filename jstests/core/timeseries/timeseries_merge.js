@@ -18,9 +18,8 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const isMultiversion =
     jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
 if (isMultiversion ||
-    FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsOnShardingCatalog")) {
-    jsTest.log(
-        "Skipping test since featureFlagTrackUnshardedCollectionsOnShardingCatalog is enabled");
+    FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
+    jsTest.log("Skipping test since featureFlagTrackUnshardedCollectionsUponCreation is enabled");
     quit();
 }
 

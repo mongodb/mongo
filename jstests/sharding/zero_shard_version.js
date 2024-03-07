@@ -79,7 +79,7 @@ assert.commandWorked(testDB_s1.user.insert({x: 10}));
 // TODO SERVER-77915 Remove the feature flag. Now that user unsharded collection are tracked we no
 // longer store them with UNSHARDED version
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedEnabled ? 1 : 0);
 
 // mongos0 still thinks { x: 10 } belong to st.shard0.shardName, but since coll is dropped,

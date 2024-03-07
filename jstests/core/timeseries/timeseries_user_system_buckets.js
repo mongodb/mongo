@@ -21,7 +21,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const isTrackingUnsplittableCollections = FeatureFlagUtil.isPresentAndEnabled(
-    db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 // TODO SERVER-85382 re-enable this test with tracked collection once create collection coordinator
 // support all timeseries/bucket namespace cases

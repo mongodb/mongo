@@ -469,7 +469,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_un
 // tracked, the aggregation is sent using ShardVersion, which is never stale due to an
 // AutoGetCollection in the pipeline execution path that causes always to refresh if not installed.
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 if (!isTrackUnshardedEnabled) {
     // Test $lookup when it is routed to a secondary which is not yet aware of the foreign
     // collection.

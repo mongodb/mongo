@@ -83,12 +83,12 @@ public:
                 !nss.isFLE2StateCollection());
 
             bool isTrackUnshardedEnabled =
-                feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
             uassert(ErrorCodes::IllegalOperation,
                     "cannot create an unsplittable collection if "
-                    "featureFlagTrackUnshardedCollectionsOnShardingCatalog is unset",
+                    "featureFlagTrackUnshardedCollectionsUponCreation is unset",
                     isTrackUnshardedEnabled);
 
             ShardsvrCreateCollection shardsvrCollRequest(nss);

@@ -1,7 +1,7 @@
 /*
  * Test that the targeting of $graphLookup queries and any sub-queries works correctly.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   assumes_balancer_off,
  *   requires_sharding,
  *   requires_spawning_own_processes,

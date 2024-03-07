@@ -801,7 +801,7 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
 
 // Make sure split  is correctly disabled for unsplittable collection
 (() => {
-    if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsOnShardingCatalog")) {
+    if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsUponCreation")) {
         jsTest.log("Make sure refine shard key for unsplittable collection is correctly disabled");
         const kCollNameUnsplittable = "unsplittable_bar";
         const kNsNameUnsplittable = kDbName + "." + kCollNameUnsplittable;

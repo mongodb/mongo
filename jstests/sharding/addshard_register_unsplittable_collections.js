@@ -2,7 +2,7 @@
  * Checks that addShard succesfully register any unsharded collection as an unsplitted collection.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]

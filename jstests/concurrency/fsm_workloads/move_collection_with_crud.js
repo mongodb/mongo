@@ -8,7 +8,7 @@
  *  featureFlagUnshardCollection,
  *  featureFlagMoveCollection,
  *  featureFlagReshardingImprovements,
- *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  featureFlagTrackUnshardedCollectionsUponCreation,
  *  multiversion_incompatible,
  *  requires_fcv_72
  * ]

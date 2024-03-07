@@ -10,7 +10,7 @@
  *   requires_timeseries,
  *   requires_fcv_80,
  *   featureFlagTimeseriesUpdatesSupport,
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  * ]
  */
 await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');

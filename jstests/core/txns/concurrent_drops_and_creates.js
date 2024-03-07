@@ -17,7 +17,7 @@ import {
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // TODO SERVER-86104: adapt the test for tracked collections
-if (FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsOnShardingCatalog")) {
+if (FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
     quit();
 }
 

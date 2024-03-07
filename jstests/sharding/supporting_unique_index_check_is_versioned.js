@@ -84,7 +84,7 @@ const sourceCollName = "sourceFoo";
 const targetCollName = "targetFoo";
 
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    st.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 //
 // Verify database versions are used to detect when the primary shard changes for an unsharded

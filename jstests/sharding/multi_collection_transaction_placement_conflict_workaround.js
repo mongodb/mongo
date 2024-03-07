@@ -102,7 +102,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     // These tests only make sense with untracked collections since movePrimary does not affect
     // tracked collections
     const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
     if (!isTrackUnshardedEnabled) {
         runTest('majority');
 
@@ -159,7 +159,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     // These tests only make sense with tracked, unsharded collections since moveCollection does not
     // affect untracked collections
     const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
     if (isTrackUnshardedEnabled) {
         runTest('majority');
 

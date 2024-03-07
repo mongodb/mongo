@@ -5,7 +5,7 @@
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
  *  featureFlagUnshardCollection,
- *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  featureFlagTrackUnshardedCollectionsUponCreation,
  *  multiversion_incompatible,
  *  assumes_balancer_off,
  * ]

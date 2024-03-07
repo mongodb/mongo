@@ -6,7 +6,7 @@
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
  *  featureFlagUnshardCollection,
- *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  featureFlagTrackUnshardedCollectionsUponCreation,
  *  multiversion_incompatible,
  *  assumes_balancer_off,
  * ]

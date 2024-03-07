@@ -3,7 +3,7 @@
  * collection is unsplittable.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagMoveCollection,
  *   multiversion_incompatible,
  *   assumes_balancer_off,

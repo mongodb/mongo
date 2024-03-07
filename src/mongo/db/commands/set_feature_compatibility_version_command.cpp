@@ -620,11 +620,11 @@ private:
 
         // TODO SERVER-77915: Remove once v8.0 branches out
         if ((isUpgrading &&
-             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+             feature_flags::gTrackUnshardedCollectionsUponCreation
                  .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                originalVersion)) ||
             (isDowngrading &&
-             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+             feature_flags::gTrackUnshardedCollectionsUponCreation
                  .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                originalVersion))) {
             ShardingDDLCoordinatorService::getService(opCtx)
@@ -674,11 +674,11 @@ private:
 
         // TODO SERVER-77915: Remove once trackUnshardedCollections becomes lastLTS.
         if ((isUpgrading &&
-             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+             feature_flags::gTrackUnshardedCollectionsUponCreation
                  .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                originalVersion)) ||
             (isDowngrading &&
-             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+             feature_flags::gTrackUnshardedCollectionsUponCreation
                  .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                originalVersion))) {
             ShardingDDLCoordinatorService::getService(opCtx)

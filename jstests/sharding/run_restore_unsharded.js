@@ -18,7 +18,7 @@ let db = s.getDB("test");
 // TODO SERVER-77915 Remove isTrackUnshardedEnabled. Update the test as
 // this variable is now always "true".
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    s.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    s.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 // Create an unsharded collection.
 assert.commandWorked(db.createCollection("a"));

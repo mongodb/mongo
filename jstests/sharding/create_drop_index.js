@@ -3,7 +3,7 @@
  * created on a db's primary/non-primary shard.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  * ]
  *
  */

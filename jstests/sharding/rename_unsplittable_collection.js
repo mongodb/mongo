@@ -1,7 +1,7 @@
 /*
  * Test the rename command against unsplittable collections.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]

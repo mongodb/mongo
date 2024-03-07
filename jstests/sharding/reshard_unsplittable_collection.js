@@ -1,7 +1,7 @@
 /*
  * Tests resharding and moveCollection behaviour on unsplittable collections.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagReshardingImprovements,
  *   featureFlagMoveCollection,
  *   multiversion_incompatible,

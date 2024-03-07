@@ -82,7 +82,7 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     // within a transaction will always serialize with any other collection creation by taking the
     // DDLLock
     const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
-        db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
     if (isTrackUnshardedDisabled) {
         jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
         session.startTransaction({writeConcern: {w: "majority"}});

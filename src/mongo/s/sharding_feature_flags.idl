@@ -62,10 +62,10 @@ feature_flags:
     default: true
     version: 7.1
     shouldBeFCVGated: true
-  # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
-  featureFlagTrackUnshardedCollectionsOnShardingCatalog:
-    description: "Feature flag for enabling the tracking of user unsharded collection by turning them into a fixed-1-chunk sharded collections"
-    cpp_varname: feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+  # TODO (SERVER-87189): Remove once 9.0 becomes last LTS.
+  featureFlagTrackUnshardedCollectionsUponCreation:
+    description: "Feature flag for enabling the tracking of user unsharded collection on creation"
+    cpp_varname: feature_flags::gTrackUnshardedCollectionsUponCreation
     default: false
     shouldBeFCVGated: true
   # TODO (SERVER-68132): Remove once 8.0 becomes last LTS.
@@ -135,5 +135,11 @@ feature_flags:
   featureFlagCreateCollectionInPreparedTransactions:
     description: "Feature flag protecting the codepath allowing to create collections in prepared transactions "
     cpp_varname: feature_flags::gCreateCollectionInPreparedTransactions
+    default: false
+    shouldBeFCVGated: true
+  # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+  featureFlagTrackUnshardedCollectionsUponMoveCollection:
+    description: "Feature flag for enabling the tracking of user unsharded collection upon moveCollection"
+    cpp_varname: feature_flags::gTrackUnshardedCollectionsUponMoveCollection
     default: false
     shouldBeFCVGated: true

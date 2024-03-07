@@ -2,7 +2,7 @@
  * Tests that moveCollection works on unsplittable collections with unique indexes that are not
  * prefix of _id.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   featureFlagReshardingImprovements,

@@ -337,7 +337,7 @@ rst.stop();
 // Test on a sharded cluster
 const st = new ShardingFixture();
 // TODO (SERVER-83924) Remove once feature flag checks are not necessary.
-if (!st.checkFailPointEnabled("TrackUnshardedCollectionsOnShardingCatalog")) {
+if (!st.checkFailPointEnabled("TrackUnshardedCollectionsUponCreation")) {
     runTest(st);
 }
 st.stop();

@@ -39,9 +39,8 @@ const isMultiversion =
     jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
 if (isMultiversion ||
     FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"),
-                                        "TrackUnshardedCollectionsOnShardingCatalog")) {
-    jsTest.log(
-        "Skipping test since featureFlagTrackUnshardedCollectionsOnShardingCatalog is enabled");
+                                        "TrackUnshardedCollectionsUponCreation")) {
+    jsTest.log("Skipping test since featureFlagTrackUnshardedCollectionsUponCreation is enabled");
     st.stop();
     quit();
 }

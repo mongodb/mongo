@@ -25,8 +25,7 @@ const coll4NS = dbName + '.' + coll4Name;
 const isMultiversion =
     jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
 const ffTrackUnsharded = !isMultiversion &&
-    FeatureFlagUtil.isEnabled(st.configRS.getPrimary(),
-                              "TrackUnshardedCollectionsOnShardingCatalog");
+    FeatureFlagUtil.isEnabled(st.configRS.getPrimary(), "TrackUnshardedCollectionsUponCreation");
 
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
 assert.commandWorked(mongos.getCollection(coll1NS).insert({name: 'Tom'}));

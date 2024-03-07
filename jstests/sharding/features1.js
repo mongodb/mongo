@@ -3,7 +3,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
 
 const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    s.s0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    s.s0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
