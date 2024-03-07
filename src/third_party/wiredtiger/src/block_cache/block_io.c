@@ -122,6 +122,8 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
 
         dsk = ip->data;
         WT_STAT_CONN_DATA_INCR(session, cache_read);
+        if (WT_SESSION_IS_CHECKPOINT(session))
+            WT_STAT_CONN_DATA_INCR(session, cache_read_checkpoint);
         if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
             WT_STAT_DATA_INCR(session, compress_read);
         WT_STAT_CONN_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
