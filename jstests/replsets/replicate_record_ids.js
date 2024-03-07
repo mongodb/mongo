@@ -8,6 +8,7 @@
  */
 import {
     getRidForDoc,
+    validateShowRecordIdReplicatesAcrossNodes,
 } from "jstests/libs/replicated_record_ids_utils.js";
 
 const replSet = new ReplSetTest({nodes: 2});
@@ -45,9 +46,7 @@ const validateRidInOplogs = function(oplogQuery, expectedRid) {
                   tojson(expectedRid)}`);
 };
 
-const docA = {
-    _id: "a"
-};
+let docA = {"a": 1};
 
 // Create a collection without the 'recordIdsReplicated' param set. This shouldn't
 // insert the recordId (rid) into the oplog.
@@ -66,6 +65,18 @@ assert.eq(docAReplRid, getRidForDoc(secDB, replRidCollName, docA));
 // For the replRecIdColl the recordId should be in the oplog, and should match
 // the actual recordId on disk.
 validateRidInOplogs({ns: `${replRidNs}`, ...docAInsertOpTime}, docAReplRid);
+
+primDB.setLogLevel(3);
+const newDocA = {
+    "a": 2
+};
+const docAUpdateOpTime =
+    assert
+        .commandWorked(
+            primDB.runCommand({update: replRidCollName, updates: [{q: docA, u: {$set: {'a': 2}}}]}))
+        .opTime;
+docA = newDocA;
+validateRidInOplogs({ns: `${replRidNs}`, ...docAUpdateOpTime}, docAReplRid);
 
 // The recordId should also be in the oplog entry for the delete.
 const docARemoveOpTime =
@@ -95,10 +106,6 @@ assert.commandWorked(primDB[replRidCollName].insertMany(docs));
 assert.eq(primDB[replRidCollName].count(), 500);
 
 // Ensure that the on disk data on both nodes has the same recordIds.
-let primCursor = primDB[replRidCollName].find().sort({_id: 1}).showRecordId();
-let secCursor = secDB[replRidCollName].find().sort({_id: 1}).showRecordId();
-
-assert.eq({docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
-          DataConsistencyChecker.getDiff(primCursor, secCursor));
+validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidCollName);
 
 replSet.stopSet();

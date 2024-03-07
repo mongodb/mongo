@@ -14,6 +14,7 @@ export function validateShowRecordIdReplicatesAcrossNodes(nodes, dbName, replica
     for (let i = 1; i < nodes.length; i++) {
         const curNode = nodes[i];
         const curNodeCursor = getShowRecordIdsCursor(curNode, dbName, replicatedCollName);
+        assert(curNodeCursor.hasNext(), `Expected to validate non-empty results`);
         const actualDiff = DataConsistencyChecker.getDiff(node0Cursor, curNodeCursor);
 
         assert.eq({docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},

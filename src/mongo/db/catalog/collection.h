@@ -124,6 +124,10 @@ struct CollectionUpdateArgs {
     // Set if the diff insert operation needs to check for the field's existence.
     bool mustCheckExistenceForInsertOperations = false;
 
+    // If not null, stores the replicated RecordId of the document - the RecordId is expected to
+    // replicated across nodes with the update.
+    RecordId replicatedRecordId;
+
     // Set if OpTimes were reserved for the update ahead of time.
     std::vector<OplogSlot> oplogSlots;
 };

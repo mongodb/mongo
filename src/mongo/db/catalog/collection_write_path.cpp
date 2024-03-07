@@ -654,6 +654,10 @@ void updateDocument(OperationContext* opCtx,
     args->changeStreamPreAndPostImagesEnabledForCollection =
         collection->isChangeStreamPreAndPostImagesEnabled();
 
+    if (collection->areRecordIdsReplicated()) {
+        args->replicatedRecordId = oldLocation;
+    }
+
     OplogUpdateEntryArgs onUpdateArgs(args, collection);
     const bool setNeedsRetryImageOplogField =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
@@ -729,6 +733,10 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
     invariant(oldDoc.snapshotId() == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
     invariant(collection->updateWithDamagesSupported());
+
+    if (collection->areRecordIdsReplicated()) {
+        args->replicatedRecordId = loc;
+    }
 
     OplogUpdateEntryArgs onUpdateArgs(args, collection);
     const bool setNeedsRetryImageOplogField =

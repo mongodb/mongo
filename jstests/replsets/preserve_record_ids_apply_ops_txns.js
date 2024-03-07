@@ -79,17 +79,20 @@ const validateMostRecentApplyOpsInOplogs = function() {
             assert.eq(
                 aggRes._id.hasRid,
                 true,
-                `Expected for all 'ops' for the replicated ns to have the rid field. Most recent applyOps entry ${
+                `Expected all 'ops' for the replicated ns to have the rid field. Missing 'rid' field for op ${
+                    tojson(aggRes)}. Most recent applyOps entry ${
                     tojson(getLatestApplyOpsForError())}`);
             containsReplNs = true;
         } else {
             assert.neq(
                 aggRes._id.hasRid,
                 true,
-                `Expected for all 'ops' for ns without replciate recordIds to omit the 'rid' field. Most recent applyOps entry ${
+                `Expected all 'ops' for the ns without replicated recordIds to omit the 'rid' field. Found in op ${
+                    tojson(aggRes)}. Most recent applyOps entry ${
                     tojson(getLatestApplyOpsForError())}`);
         }
     }
+
     assert(
         containsReplNs,
         `Expected for aggregate to contain entries for the namespace with replicated recordIds. Got agg results: ${
@@ -120,6 +123,16 @@ session.commitTransaction();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
+jsTestLog(
+    "Testing that within a transaction the recordIds are preserved on update, upsert, and multi-update.");
+session.startTransaction();
+assert.commandWorked(replRidColl.update({a: 0}, {$set: {a: 101}}));
+assert.commandWorked(replRidColl.update({b: 300}, {$set: {a: 300}}, {upsert: true}));
+assert.commandWorked(replRidColl.update({a: {$gt: 80}}, {$inc: {a: 1}}, {multi: true}));
+session.commitTransaction();
+validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
+validateMostRecentApplyOpsInOplogs();
+
 jsTestLog("Testing that within a transaction the recordIds are preserved on delete.");
 session.startTransaction();
 assert.commandWorked(replRidColl.remove({}));
@@ -134,6 +147,18 @@ assert.commandWorked(unReplRidColl.insertMany(docs));
 assert.commandWorked(replRidColl.insertMany(docs));
 assert.commandWorked(unReplRidColl.insertMany(docs));
 assert.commandWorked(replRidColl.insertMany(docs));
+session.commitTransaction();
+validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
+validateMostRecentApplyOpsInOplogs();
+
+jsTestLog("Test writing updates on multiple collections.");
+session.startTransaction();
+assert.commandWorked(replRidColl.update({a: 0}, {$set: {a: 101}}));
+assert.commandWorked(unReplRidColl.update({a: 0}, {$set: {a: 101}}));
+assert.commandWorked(replRidColl.update({b: 400}, {$set: {a: 300}}, {upsert: true}));
+assert.commandWorked(unReplRidColl.update({b: 400}, {$set: {a: 300}}, {upsert: true}));
+assert.commandWorked(replRidColl.update({a: {$gt: 80}}, {$inc: {a: 1}}, {multi: true}));
+assert.commandWorked(unReplRidColl.update({a: {$gt: 80}}, {$inc: {a: 1}}, {multi: true}));
 session.commitTransaction();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
@@ -186,6 +211,20 @@ for (let i = 0; i < numIters; i++) {
         op: "i",
         ns: replRidColl.getFullName(),
         o: {_id: i},
+        o2: {_id: i},
+        rid: NumberLong(2000 + i)
+    });
+
+    ops.push({
+        op: "u",
+        ns: unReplRidColl.getFullName(),
+        o: {$v: 2, diff: {u: {a: i + 1}}},
+        o2: {_id: i},
+    });
+    ops.push({
+        op: "u",
+        ns: replRidColl.getFullName(),
+        o: {$v: 2, diff: {u: {a: i + 1}}},
         o2: {_id: i},
         rid: NumberLong(2000 + i)
     });

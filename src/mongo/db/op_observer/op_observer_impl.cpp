@@ -939,6 +939,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         if (args.updateArgs->mustCheckExistenceForInsertOperations) {
             operation.setCheckExistenceForDiffInsert(true);
         }
+        if (!args.updateArgs->replicatedRecordId.isNull()) {
+            operation.setRecordId(args.updateArgs->replicatedRecordId);
+        }
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =
@@ -977,6 +980,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                     operation.setNeedsRetryImage(repl::RetryImageEnum::kPostImage);
                 }
             }
+        }
+
+        if (!args.updateArgs->replicatedRecordId.isNull()) {
+            operation.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
@@ -1019,6 +1026,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
                 // Or if we're storing a postImage.
                 oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPostImage});
             }
+        }
+
+        if (!args.updateArgs->replicatedRecordId.isNull()) {
+            oplogEntry.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
         opTime = replLogUpdate(opCtx, args, &oplogEntry, _operationLogger.get());
