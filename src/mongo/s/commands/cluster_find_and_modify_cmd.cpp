@@ -74,6 +74,8 @@
 namespace mongo {
 namespace {
 
+constexpr size_t kMaxDatabaseCreationAttempts = 3u;
+
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
@@ -532,15 +534,38 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     // Collect metrics.
     _updateMetrics.collectMetrics(cmdObj);
 
-    // Technically, findAndModify should only be creating database if upsert is true, but this
-    // would require that the parsing be pulled into this function.
-    cluster::createDatabase(opCtx, nss.db());
+
+    auto cri = [&]() {
+        size_t attempts = 1u;
+        while (true) {
+            try {
+                // Technically, findAndModify should only be creating database if upsert is true,
+                // but this would require that the parsing be pulled into this function.
+                cluster::createDatabase(opCtx, nss.db());
+                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                LOGV2_INFO(8584300,
+                           "Failed initialization of routing info because the database has been "
+                           "concurrently dropped",
+                           logAttrs(nss.dbName()),
+                           "attemptNumber"_attr = attempts,
+                           "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+
+                if (attempts++ >= kMaxDatabaseCreationAttempts) {
+                    // The maximum number of attempts has been reached, so the procedure fails as it
+                    // could be a logical error. At this point, it is unlikely that the error is
+                    // caused by concurrent drop database operations.
+                    throw;
+                }
+            }
+        }
+    }();
+
+    const auto& cm = cri.cm;
 
     // Append mongoS' runtime constants to the command object before forwarding it to the shard.
     auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
-    const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-    const auto& cm = cri.cm;
     if (cm.isSharded()) {
         const BSONObj query = cmdObjForShard.getObjectField("query");
         const bool isUpsert = cmdObjForShard.getBoolField("upsert");
