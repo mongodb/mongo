@@ -11,6 +11,7 @@
 //   cqf_incompatible,
 //   # 'planCacheClear' command is not allowed with the security token.
 //   not_allowed_with_signed_security_token,
+//   requires_fcv_80,
 // ]
 //
 

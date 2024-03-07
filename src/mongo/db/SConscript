@@ -2267,6 +2267,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/unittest/unittest',
         'service_context',

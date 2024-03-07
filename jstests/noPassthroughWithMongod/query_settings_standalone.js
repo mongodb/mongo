@@ -3,6 +3,7 @@
  * 'VectorClock').
  * @tags: [
  *   featureFlagQuerySettings,
+ *   requires_fcv_80,
  * ]
  */
 

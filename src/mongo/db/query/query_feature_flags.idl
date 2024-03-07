@@ -91,7 +91,8 @@ feature_flags:
     featureFlagQuerySettings:
       description: "Feature flag for enabling persistent query settings"
       cpp_varname: gFeatureFlagQuerySettings
-      default: false
+      default: true
+      version: 8.0
       shouldBeFCVGated: true
 
     featureFlagVectorSearchPublicPreview:

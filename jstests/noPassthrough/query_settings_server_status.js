@@ -5,7 +5,8 @@
 // * are restored to their previous values on upon restarts
 //
 // @tags: [
-//   featureFlagQuerySettings
+//   featureFlagQuerySettings,
+//   requires_fcv_80,
 // ]
 
 import "jstests/multiVersion/libs/multi_cluster.js";

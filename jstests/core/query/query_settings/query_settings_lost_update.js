@@ -8,6 +8,7 @@
  *   featureFlagQuerySettings,
  *   tenant_migration_incompatible,
  *   uses_parallel_shell,
+ *   requires_fcv_80,
  * ]
  */
 
