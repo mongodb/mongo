@@ -49,6 +49,8 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -162,9 +164,53 @@ public:
         _wtIncompatible = true;
     }
 
+    /**
+     * If WT is setting _wtConnReady to true or WT is idle (one of the readers is not generating
+     * sections), the following function returns immediately. Otherwise (if WT is active and
+     * WT_CONN_CLOSE event is trying to set it _wtConnReady to false), this function waits until WT
+     * is idle and WT Connection is allowed to be closed.
+     */
+    void setWtConnReadyStatus(bool status);
+
+    /**
+     * If WT connection is ready and it is not shutting down, WT
+     * WiredTigerServerStatusSection::generateSection acitivity is permitted. When this function
+     * returns true, the caller may safely collect metrics, but this blocks storage engine shutdown.
+     * The caller *must* make a subsequent call to `releaseSectionActivityPermit` to allow the
+     * storage engine to shut down.
+     */
+    bool getSectionActivityPermit();
+
+    /**
+     * The following call releases section generation activity permits. When there is no section
+     * generation activity, WT connection is allowed to shut down cleanly.
+     */
+    void releaseSectionActivityPermit();
+
+    /**
+     * Each successful ongoing WiredTigerServerStatusSection::generateSection call is counted as a
+     * single active section. The number of current active sections are returned by this call.
+     */
+    int32_t getActiveSections() {
+        stdx::lock_guard<mongo::Mutex> lock(_mutex);
+        return _activeSections;
+    }
+
+    /**
+     * If WT connection is made and there is no outstanding shutdown, WT Connection Ready Status is
+     * true. This function should only be used for tests.
+     */
+    bool getWtConnReadyStatus() {
+        return _wtConnReady;
+    }
+
 private:
     bool _startupSuccessful = false;
     bool _wtIncompatible = false;
+    mongo::Mutex _mutex = MONGO_MAKE_LATCH("mongo::WiredTigerEventHandler::_mutex");
+    bool _wtConnReady = false;
+    stdx::condition_variable _idleCondition;
+    int32_t _activeSections{0};
 };
 
 class WiredTigerUtil {

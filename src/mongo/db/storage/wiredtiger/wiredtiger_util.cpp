@@ -83,7 +83,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
-
 // From src/third_party/wiredtiger/src/include/txn.h
 #define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
     "oldest pinned transaction ID rolled back for eviction"
@@ -91,6 +90,36 @@
 #define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
     "transaction is too large and will not fit in the storage engine cache"
 namespace mongo {
+
+void WiredTigerEventHandler::setWtConnReadyStatus(bool status) {
+    stdx::unique_lock<mongo::Mutex> lock(_mutex);
+    _wtConnReady = status;
+    if (_activeSections == 0 || _wtConnReady) {
+        return;
+    }
+    LOGV2(7003100,
+          "WiredTiger connection close is waiting for active statistics readers to finish",
+          "activeReaders"_attr = _activeSections);
+    _idleCondition.wait(lock, [this]() { return _activeSections != 0; });
+}
+
+bool WiredTigerEventHandler::getSectionActivityPermit() {
+    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    if (_wtConnReady) {
+        _activeSections++;
+        return true;
+    }
+    return false;
+}
+
+void WiredTigerEventHandler::releaseSectionActivityPermit() {
+    stdx::unique_lock<mongo::Mutex> lock(_mutex);
+    _activeSections--;
+    if (_activeSections == 0 && !_wtConnReady) {
+        _idleCondition.notify_all();
+        return;
+    }
+}
 
 namespace {
 
@@ -829,6 +858,12 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
                        WT_SESSION* session,
                        WT_EVENT_TYPE type,
                        void* arg) {
+    WiredTigerEventHandler* wtHandler = reinterpret_cast<WiredTigerEventHandler*>(handler);
+    if (type == WT_EVENT_CONN_READY) {
+        wtHandler->setWtConnReadyStatus(true);
+    } else if (type == WT_EVENT_CONN_CLOSE) {
+        wtHandler->setWtConnReadyStatus(false);
+    }
     if (type != WT_EVENT_COMPACT_CHECK || session == nullptr || session->app_private == nullptr) {
         return 0;
     }
