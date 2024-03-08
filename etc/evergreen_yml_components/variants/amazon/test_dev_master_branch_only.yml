@@ -82,6 +82,27 @@ buildvariants:
     - name: scons_compile_smoke_test_TG
     - name: ninja_compile_smoke_test_TG
 
+# Caching is purposefully disabled on this variant so we can benchmark consistent build times.
+- name: &amazon-linux2-arm64-local-compile amazon-linux2-arm64-local-compile
+  display_name: "Amazon Linux 2 arm64 Local Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - amazon2-arm64-large
+  expansions:
+    scons_cache_scope: none
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=amazon2
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --link-model=dynamic
+      --use-diagnostic-latches=on
+      BAZEL_FLAGS=--config=local
+    compile_variant: *amazon-linux2-arm64-local-compile
+  tasks:
+    - name: compile_test_parallel_unittest_stream_TG
+    - name: compile_test_parallel_core_stream_TG
+
 # Note that this task is currently optional;
 # This will eventually become suggested, then required.
 - name: &amazon-linux-2023-arm64-bazel-compile amazon-linux-2023-arm64-bazel-compile
