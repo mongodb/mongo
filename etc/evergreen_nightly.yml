@@ -19,6 +19,8 @@ include:
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/classic_engine.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
+- filename: etc/evergreen_yml_components/variants/query_stats.yml
+### Uncomment when using this file for a LTS or Rapid release branch. ###
 # TODO: (SERVER-86211) Re-enable config shard evergreen variant.
 # - filename: etc/evergreen_yml_components/variants/config_shard.yml
 
