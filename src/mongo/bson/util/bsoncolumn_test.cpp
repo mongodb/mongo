@@ -704,9 +704,9 @@ public:
             // combinations of dividing the ranges so this test has quadratic complexity. Limit it
             // to binaries with a limited number of elements.
             size_t num = BSONColumn(columnBinary).size();
-            if (num > 0 && num < 100) {
+            if (num > 0 && num < 1000) {
                 // Iterate over all elements and validate intermediate in all combinations
-                for (size_t i = 1; i < num; ++i) {
+                for (size_t i = 1; i <= num; ++i) {
                     BufBuilder buffer;
                     BSONColumnBuilder cb;
                     BSONColumnBuilder reference;
@@ -754,7 +754,7 @@ public:
             // Validate the BSONColumnBuilder constructor that initializes from a compressed binary.
             // Its state should be identical to a builder that never called finalize() for these
             // elements.
-            for (size_t i = 0; i < num; ++i) {
+            for (size_t i = 0; i <= num; ++i) {
                 BSONColumnBuilder before;
                 auto it = c.begin();
                 for (size_t j = 0; j < i; ++j, ++it) {

@@ -417,7 +417,8 @@ void Simple8bBuilder<T>::_handleRleTermination(F&& writeFn) {
         --_rleCount;
     }
 
-    // Reset which selectors are possible to use for next word
+    // Reset last for RLE and which selectors are possible to use for next word
+    _lastValueInPrevWord = 0;
     isSelectorPossible.fill(true);
 }
 
