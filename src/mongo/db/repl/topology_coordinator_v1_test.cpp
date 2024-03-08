@@ -295,9 +295,9 @@ protected:
     }
 
     // Make the OplogQueryMetadata coming from sync source.
-    // Only set lastAppliedOpTime, primaryIndex and syncSourceIndex
-    OplogQueryMetadata makeOplogQueryMetadata(OpTime lastAppliedOpTime = OpTime(),
-                                              OpTime lastWrittenOpTime = OpTime(),
+    // Only set lastAppliedOpTime, lastWrittenOpTime, primaryIndex, and syncSourceIndex
+    OplogQueryMetadata makeOplogQueryMetadata(OpTime lastWrittenOpTime = OpTime(),
+                                              OpTime lastAppliedOpTime = OpTime(),
                                               int primaryIndex = -1,
                                               int syncSourceIndex = -1,
                                               std::string syncSourceHost = "",
@@ -1708,6 +1708,7 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAStaleNode) {
     heartbeatFromMember(
         HostAndPort("h5"), "rs0", MemberState::RS_SECONDARY, staleOpTime, Milliseconds(100));
 
+    topoCoordSetMyLastWrittenOpTime(ourOpTime, Date_t(), false);
     topoCoordSetMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), &response, &result);
     ASSERT_OK(result);
@@ -4125,20 +4126,22 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // while the host is up, we should want to change to its sync source
-    ASSERT(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                 makeReplSetMetadata(),
-                                                 makeOplogQueryMetadata(syncSourceOpTime),
-                                                 lastOpTimeFetched,
-                                                 now()));
+    ASSERT(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 
     // set up complete, time for actual check
     nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
     ASSERT_NO_ACTION(nextAction.getAction());
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(syncSourceOpTime),
-                                                       lastOpTimeFetched,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsDenyListed) {
@@ -4161,28 +4164,31 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsDen
     getTopoCoord().denylistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
 
     // set up complete, time for actual check
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(syncSourceOpTime),
-                                                       lastOpTimeFetched,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 
     // undenylist with too early a time (node should remained denylisted)
     getTopoCoord().undenylistSyncSource(HostAndPort("host3"), now() + Milliseconds(90));
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(syncSourceOpTime),
-                                                       lastOpTimeFetched,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 
     // undenylist and it should succeed
     getTopoCoord().undenylistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
     startCapturingLogMessages();
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                      makeReplSetMetadata(),
-                                                      makeOplogQueryMetadata(syncSourceOpTime),
-                                                      lastOpTimeFetched,
-                                                      now()));
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
     ASSERT_EQUALS(1, countLogLinesWithId(21834));
@@ -4237,11 +4243,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsStaleByHeartbea
 
     // set up complete, time for actual check
     startCapturingLogMessages();
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(freshOpTime),
-                                                       staleOpTime,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(freshOpTime /* lastWrittenOpTime =*/),
+        staleOpTime,
+        now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
@@ -4363,11 +4370,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberHasYetToHeart
     // Set lastOpTimeFetched to be before the sync source's OpTime.
     OpTime lastOpTimeFetched = OpTime(Timestamp(3, 0), 0);
 
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(syncSourceOpTime),
-                                                       lastOpTimeFetched,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenMemberNotInConfig) {
@@ -7950,11 +7958,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberDoesNo
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(syncSourceOpTime),
-                                                       lastOpTimeFetched,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotReadable) {
@@ -7974,11 +7983,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotR
     ASSERT_NO_ACTION(nextAction.getAction());
 
     // set up complete, time for actual check
-    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                                       makeReplSetMetadata(),
-                                                       makeOplogQueryMetadata(syncSourceOpTime),
-                                                       lastOpTimeFetched,
-                                                       now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferentConfigVersion) {
@@ -8002,15 +8012,15 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferen
 
     // We should not want to change our sync source from "host2" even though it has a different
     // config version.
-    ASSERT_FALSE(
-        getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
-                                              makeReplSetMetadata(OpTime(),
-                                                                  false /* isPrimary */,
-                                                                  -1 /* syncSourceIndex */,
-                                                                  8 /* different config version */),
-                                              makeOplogQueryMetadata(syncSourceOpTime),
-                                              lastOpTimeFetched,
-                                              now()));
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(OpTime(),
+                            false /* isPrimary */,
+                            -1 /* syncSourceIndex */,
+                            8 /* different config version */),
+        makeOplogQueryMetadata(syncSourceOpTime /* lastWrittenOpTime= */),
+        lastOpTimeFetched,
+        now()));
 }
 
 class HeartbeatResponseTestOneRetryV1 : public HeartbeatResponseTestV1 {

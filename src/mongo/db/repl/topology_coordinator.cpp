@@ -425,7 +425,7 @@ OpTime TopologyCoordinator::_getOldestSyncOpTime() const {
     // Find primary's oplog time. We will reject sync candidates that are more than
     // _options.maxSyncSourceLagSecs seconds behind this optime.
     if (_currentPrimaryIndex != -1) {
-        OpTime primaryOpTime = _memberData.at(_currentPrimaryIndex).getHeartbeatAppliedOpTime();
+        OpTime primaryOpTime = _memberData.at(_currentPrimaryIndex).getHeartbeatWrittenOpTime();
 
         // Check if primaryOpTime is still close to 0 because we haven't received
         // our first heartbeat from a new primary yet.
@@ -500,12 +500,12 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
         // Candidates cannot be excessively behind, if we are checking for staleness.
         if (shouldCheckStaleness) {
             const auto oldestSyncOpTime = _getOldestSyncOpTime();
-            if (memberData.getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
+            if (memberData.getHeartbeatWrittenOpTime() < oldestSyncOpTime) {
                 LOGV2_INFO(3873110,
                            "Cannot select sync source because it is too far behind",
                            "syncSourceCandidate"_attr = syncSourceCandidate,
-                           "syncSourceCandidateOpTime"_attr =
-                               memberData.getHeartbeatAppliedOpTime(),
+                           "syncSourceCandidateLastWrittenOpTime"_attr =
+                               memberData.getHeartbeatWrittenOpTime(),
                            "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
                 return false;
             }
@@ -531,12 +531,12 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
         }
     }
     // Only select a candidate that is ahead of me, if we are checking for staleness.
-    if (shouldCheckStaleness && memberData.getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
+    if (shouldCheckStaleness && memberData.getHeartbeatWrittenOpTime() <= lastOpTimeFetched) {
         LOGV2_INFO(3873113,
                    "Cannot select sync source which is not ahead of me",
                    "syncSourceCandidate"_attr = syncSourceCandidate,
-                   "syncSourceCandidateLastAppliedOpTime"_attr =
-                       memberData.getHeartbeatAppliedOpTime().toBSON(),
+                   "syncSourceCandidateLastWrittenOpTime"_attr =
+                       memberData.getHeartbeatWrittenOpTime().toBSON(),
                    "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
         return false;
     }
@@ -811,14 +811,14 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
                    str::stream() << "I cannot reach the requested member: " << target.toString());
         return;
     }
-    const OpTime lastOpApplied = getMyLastAppliedOpTime();
-    if (hbdata.getHeartbeatAppliedOpTime().getSecs() + 10 < lastOpApplied.getSecs()) {
+    const OpTime lastOpWritten = getMyLastWrittenOpTime();
+    if (hbdata.getHeartbeatWrittenOpTime().getSecs() + 10 < lastOpWritten.getSecs()) {
         LOGV2_WARNING(
             21837,
             "Attempting to sync from sync source, but it is more than 10 seconds behind us",
             "syncSource"_attr = target,
-            "syncSourceHeartbeatAppliedOpTime"_attr = hbdata.getHeartbeatAppliedOpTime().getSecs(),
-            "lastOpApplied"_attr = lastOpApplied.getSecs());
+            "syncSourceHeartbeatWrittenOpTime"_attr = hbdata.getHeartbeatWrittenOpTime().getSecs(),
+            "lastOpWritten"_attr = lastOpWritten.getSecs());
         response->append("warning",
                          str::stream() << "requested member \"" << target.toString()
                                        << "\" is more than 10 seconds behind us");
@@ -3167,8 +3167,8 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     }
 
     OpTime currentSourceOpTime =
-        std::max(oqMetadata.getLastOpApplied(),
-                 _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
+        std::max(oqMetadata.getLastOpWritten(),
+                 _memberData.at(currentSourceIndex).getHeartbeatWrittenOpTime());
 
     fassert(4612000, !currentSourceOpTime.isNull());
 
@@ -3341,7 +3341,7 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToLag(const HostAndPort& cur
 
         for (size_t i = 0; i < _memberData.size(); i++) {
             const auto& member = _memberData[i];
-            if (currentSourceLagThresholdSecs < member.getHeartbeatAppliedOpTime().getSecs() &&
+            if (currentSourceLagThresholdSecs < member.getHeartbeatWrittenOpTime().getSecs() &&
                 _isEligibleSyncSource(i,
                                       now,
                                       lastOpTimeFetched,
@@ -3358,8 +3358,8 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToLag(const HostAndPort& cur
                       "syncSourceOpTime"_attr = currentSourceOpTime.toString(),
                       "maxSyncSourceLagSecs"_attr = _options.maxSyncSourceLagSecs,
                       "otherMember"_attr = member.getHostAndPort().toString(),
-                      "otherMemberHearbeatAppliedOpTime"_attr =
-                          member.getHeartbeatAppliedOpTime().toString());
+                      "otherMemberHearbeatWrittenOpTime"_attr =
+                          member.getHeartbeatWrittenOpTime().toString());
                 return true;
             }
         }
