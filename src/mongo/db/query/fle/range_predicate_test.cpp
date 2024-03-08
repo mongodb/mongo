@@ -172,8 +172,8 @@ TEST_F(RangePredicateRewriteTest, AggRangeRewrite_Stub) {
         _predicate.isStubPayload = true;
         auto actual = _predicate.rewrite(inputExpr.get());
         ASSERT(actual);
-        ASSERT_BSONOBJ_EQ(actual->serialize(SerializationOptions{}).getDocument().toBson(),
-                          expected->serialize(SerializationOptions{}).getDocument().toBson());
+        ASSERT_BSONOBJ_EQ(actual->serialize().getDocument().toBson(),
+                          expected->serialize().getDocument().toBson());
     }
 }
 
@@ -188,8 +188,8 @@ TEST_F(RangePredicateRewriteTest, AggRangeRewrite) {
 
         auto actual = _predicate.rewrite(inputExpr.get());
 
-        ASSERT_BSONOBJ_EQ(actual->serialize(SerializationOptions{}).getDocument().toBson(),
-                          expected->serialize(SerializationOptions{}).getDocument().toBson());
+        ASSERT_BSONOBJ_EQ(actual->serialize().getDocument().toBson(),
+                          expected->serialize().getDocument().toBson());
     }
 }
 
@@ -269,16 +269,15 @@ TEST_F(RangePredicateRewriteTest, CollScanRewriteMatch) {
             ]
         }
     })");
-#define ASSERT_REWRITE_TO_INTERNAL_BETWEEN(T)                                                \
-    {                                                                                        \
-        auto input = generateOpWithFFP<T>("age", 23, 35);                                    \
-        auto result = _predicate.rewrite(input.get());                                       \
-        ASSERT(result);                                                                      \
-        ASSERT_EQ(result->matchType(), MatchExpression::EXPRESSION);                         \
-        auto* expr = static_cast<ExprMatchExpression*>(result.get());                        \
-        auto aggExpr = expr->getExpression();                                                \
-        ASSERT_BSONOBJ_EQ(aggExpr->serialize(SerializationOptions{}).getDocument().toBson(), \
-                          expected);                                                         \
+#define ASSERT_REWRITE_TO_INTERNAL_BETWEEN(T)                                     \
+    {                                                                             \
+        auto input = generateOpWithFFP<T>("age", 23, 35);                         \
+        auto result = _predicate.rewrite(input.get());                            \
+        ASSERT(result);                                                           \
+        ASSERT_EQ(result->matchType(), MatchExpression::EXPRESSION);              \
+        auto* expr = static_cast<ExprMatchExpression*>(result.get());             \
+        auto aggExpr = expr->getExpression();                                     \
+        ASSERT_BSONOBJ_EQ(aggExpr->serialize().getDocument().toBson(), expected); \
     }
     ASSERT_REWRITE_TO_INTERNAL_BETWEEN(GTMatchExpression);
     ASSERT_REWRITE_TO_INTERNAL_BETWEEN(GTEMatchExpression);
@@ -322,8 +321,7 @@ TEST_F(RangePredicateRewriteTest, CollScanRewriteAgg) {
         auto input = generateBetweenWithFFP(&_expCtx, op, "age", 23, 35);
         auto result = _predicate.rewrite(input.get());
         ASSERT(result);
-        ASSERT_BSONOBJ_EQ(result->serialize(SerializationOptions{}).getDocument().toBson(),
-                          expected);
+        ASSERT_BSONOBJ_EQ(result->serialize().getDocument().toBson(), expected);
     }
 }
 

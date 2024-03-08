@@ -64,7 +64,7 @@ TEST(ExpressionObjectParse, ShouldAcceptEmptyObject) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
     auto object = ExpressionObject::parse(&expCtx, BSONObj(), vps);
-    ASSERT_VALUE_EQ(Value(Document{}), object->serialize(SerializationOptions{}));
+    ASSERT_VALUE_EQ(Value(Document{}), object->serialize());
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
@@ -77,7 +77,7 @@ TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
                                           vps);
     auto expectedResult =
         Value(Document{{"a", literal(5)}, {"b", literal("string"_sd)}, {"c", literal(BSONNULL)}});
-    ASSERT_VALUE_EQ(expectedResult, object->serialize(SerializationOptions{}));
+    ASSERT_VALUE_EQ(expectedResult, object->serialize());
 }
 
 TEST(ExpressionObjectParse, ShouldAccept_idAsFieldName) {
@@ -85,7 +85,7 @@ TEST(ExpressionObjectParse, ShouldAccept_idAsFieldName) {
     VariablesParseState vps = expCtx.variablesParseState;
     auto object = ExpressionObject::parse(&expCtx, BSON("_id" << 5), vps);
     auto expectedResult = Value(Document{{"_id", literal(5)}});
-    ASSERT_VALUE_EQ(expectedResult, object->serialize(SerializationOptions{}));
+    ASSERT_VALUE_EQ(expectedResult, object->serialize());
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptFieldNameContainingDollar) {
@@ -93,7 +93,7 @@ TEST(ExpressionObjectParse, ShouldAcceptFieldNameContainingDollar) {
     VariablesParseState vps = expCtx.variablesParseState;
     auto object = ExpressionObject::parse(&expCtx, BSON("a$b" << 5), vps);
     auto expectedResult = Value(Document{{"a$b", literal(5)}});
-    ASSERT_VALUE_EQ(expectedResult, object->serialize(SerializationOptions{}));
+    ASSERT_VALUE_EQ(expectedResult, object->serialize());
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptNestedObjects) {
@@ -104,7 +104,7 @@ TEST(ExpressionObjectParse, ShouldAcceptNestedObjects) {
     auto expectedResult =
         Value(Document{{"a", Document{{"b", literal(1)}}},
                        {"c", Document{{"d", Document{{"e", literal(1)}, {"f", literal(1)}}}}}});
-    ASSERT_VALUE_EQ(expectedResult, object->serialize(SerializationOptions{}));
+    ASSERT_VALUE_EQ(expectedResult, object->serialize());
 }
 
 TEST(ExpressionObjectParse, ShouldAcceptArrays) {
@@ -113,15 +113,14 @@ TEST(ExpressionObjectParse, ShouldAcceptArrays) {
     auto object = ExpressionObject::parse(&expCtx, fromjson("{a: [1, 2]}"), vps);
     auto expectedResult =
         Value(Document{{"a", vector<Value>{Value(literal(1)), Value(literal(2))}}});
-    ASSERT_VALUE_EQ(expectedResult, object->serialize(SerializationOptions{}));
+    ASSERT_VALUE_EQ(expectedResult, object->serialize());
 }
 
 TEST(ObjectParsing, ShouldAcceptExpressionAsValue) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
     auto object = ExpressionObject::parse(&expCtx, BSON("a" << BSON("$and" << BSONArray())), vps);
-    ASSERT_VALUE_EQ(object->serialize(SerializationOptions{}),
-                    Value(Document{{"a", Document{{"$and", BSONArray()}}}}));
+    ASSERT_VALUE_EQ(object->serialize(), Value(Document{{"a", Document{{"$and", BSONArray()}}}}));
 }
 
 //

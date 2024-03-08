@@ -75,19 +75,27 @@ using std::pair;
 using std::string;
 using std::vector;
 
-/// Helper function to easily wrap constants with $const.
-Value ExpressionConstant::serializeConstant(const SerializationOptions& opts, Value val) {
+Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
+                                            Value val,
+                                            bool wrapRepresentativeValue) {
     if (val.missing()) {
         return Value("$$REMOVE"_sd);
     }
-    if (opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
-        return opts.serializeLiteral(val);
+    // Debug and representative serialization policies do not wrap constants with $const in order to
+    // reduce verbosity/size of the resulting query shape. The $const is not usually needed to
+    // disambiguate in these cases, since we almost never choose a value which could be misconstrued
+    // as an expression, such as a string starting with a '$' or an object with a $-prefixed field
+    // name. One of the few cases where wrapping is necessary is when you pass an array to an
+    // accumulator through a $literal, e.g. $push: {$literal: [1, a]}, as removing the wrapper would
+    // cause the query to error out as accumulators are unary operators.
+    if ((opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) ||
+        (wrapRepresentativeValue &&
+         opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue &&
+         val.isArray())) {
+        return Value(DOC("$const" << opts.serializeLiteral(val)));
     }
 
-    // Other serialization policies need to include this $const in order to be unambiguous for
-    // re-parsing this output later. If for example the constant was '$cashMoney' - we don't want to
-    // misinterpret it as a field path when parsing.
-    return Value(DOC("$const" << opts.serializeLiteral(val)));
+    return opts.serializeLiteral(val);
 }
 
 /* --------------------------- Expression ------------------------------ */

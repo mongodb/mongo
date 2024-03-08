@@ -192,7 +192,7 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         fcr->setMaxTimeMS(1000);
         fcr->setNoCursorTimeout(false);
         opCtx->setComment(BSON("comment"
-                               << " foo"));
+                               << " foo bar baz"));
         fcr->setSingleBatch(false);
         fcr->setAllowDiskUse(false);
         fcr->setAllowPartialResults(true);
@@ -265,8 +265,9 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     // RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
     // RAIIServerParameterControllerForTest queryKnobController{"internalQueryStatsRateLimit", -1};
 
-    // auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());
-    // globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
+    // auto&& globalQueryStatsStoreManager =
+    // QueryStatsStoreManager::get(opCtx->getServiceContext()); globalQueryStatsStoreManager =
+    // std::make_unique<QueryStatsStoreManager>(500000, 1000);
 
     // // The shapification process will bloat the input query over the 16 MB memory limit. Assert
     // that
@@ -511,6 +512,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setAllowDiskUse(false);
     fcr.setShowRecordId(true);
     fcr.setMirrored(true);
+    auto readPreference = BSON("mode"
+                               << "nearest"
+                               << "tags"
+                               << BSON_ARRAY(BSON("some"
+                                                  << "tag")
+                                             << BSON("some"
+                                                     << "other tag")));
+    ReadPreferenceSetting::get(expCtx->opCtx) =
+        uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreference));
     key = makeQueryStatsKeyFindRequest(fcr, expCtx, true);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -551,6 +561,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "allowDiskUse": false,
                 "showRecordId": true,
                 "mirrored": true
+            },
+            "$readPreference": { 
+                "mode": "nearest", 
+                "tags": [ { "some": "other tag" }, { "some": "tag" } ], 
+                "hedge": { "enabled": true } 
             },
             "collectionType": "collection",
             "hint": {
@@ -606,6 +621,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "showRecordId": true,
                 "mirrored": true
             },
+            "$readPreference": { 
+                "mode": "nearest", 
+                "tags": [ { "some": "other tag" }, { "some": "tag" } ], 
+                "hedge": { "enabled": true } 
+            },
             "collectionType": "collection",
             "hint": {
                 "HASH<z>": 1,
@@ -617,12 +637,17 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "batchSize": "?number"
         })",
         key);
+}
 
-    FindCommandRequest fcr2(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
-    fcr2.setAwaitData(true);
-    fcr2.setTailable(true);
-    fcr2.setSort(BSON("$natural" << 1));
-    key = makeQueryStatsKeyFindRequest(fcr2, expCtx, true);
+TEST_F(QueryStatsStoreTest, CorrectlyRedactsTailableFindCommandRequest) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    FindCommandRequest fcr(
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
+    fcr.setAwaitData(true);
+    fcr.setTailable(true);
+    fcr.setSort(BSON("$natural" << 1));
+    auto key = makeQueryStatsKeyFindRequest(fcr, expCtx, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1205,12 +1230,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     "locale": "simple"
                 },
                 "let": {
-                    "HASH<var1>": {
-                        "$const": "?"
-                    },
-                    "HASH<var2>": {
-                        "$const": "?"
-                    }
+                    "HASH<var1>": "?",
+                    "HASH<var2>": "?"
                 },
                 "command": "aggregate",
                 "pipeline": [
@@ -1244,9 +1265,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                                 "$first": "$HASH<d>.HASH<e>"
                             },
                             "HASH<f>": {
-                                "$sum": {
-                                    "$const": 1
-                                }
+                                "$sum": 1
                             }
                         }
                     },

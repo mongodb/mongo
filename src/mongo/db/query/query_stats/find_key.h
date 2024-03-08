@@ -49,8 +49,8 @@ struct FindCmdComponents : public SpecificKeyComponents {
           } {}
 
 
-    std::int64_t size() const {
-        return 0;
+    std::size_t size() const {
+        return sizeof(FindCmdComponents);
     }
 
     void HashValue(absl::HashState state) const final {
@@ -90,10 +90,10 @@ struct FindCmdComponents : public SpecificKeyComponents {
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
 static_assert(
-    // Expecting a BSONObj and two bytes for allowPartialResults and noCursorTimeout, and another
+    // Expecting two bytes for allowPartialResults and noCursorTimeout, and another
     // byte for _hasField. For alignment reasons (alignment is 8 bytes here), this means the trailer
     // will bring up the total bytecount to a multiple of 8.
-    sizeof(FindCmdComponents) <= sizeof(BSONObj) + 8,
+    sizeof(FindCmdComponents) <= sizeof(SpecificKeyComponents) + 8,
     "Size of FindCmdComponents is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new "
@@ -124,7 +124,6 @@ public:
         return H::combine(std::move(h), *key);
     }
 
-protected:
     const SpecificKeyComponents& specificComponents() const {
         return _components;
     }
@@ -142,10 +141,8 @@ private:
 
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
-static_assert(
-    sizeof(FindKey) <= sizeof(Key) + sizeof(BSONObj) + 2 * sizeof(int64_t),
-    "Size of FindKey is too large! "
-    "Make sure that the struct has been align- and padding-optimized. "
-    "If the struct's members have changed, this assert may need to be updated with a new value.");
+static_assert(sizeof(FindKey) == sizeof(Key) + sizeof(FindCmdComponents),
+              "If the class' members have changed, this assert may need to be updated with a new "
+              "value and the size calcuation will need to be changed.");
 
 }  // namespace mongo::query_stats

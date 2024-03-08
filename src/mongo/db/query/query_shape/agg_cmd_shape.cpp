@@ -104,18 +104,11 @@ void AggCmdShapeComponents::appendTo(BSONObjBuilder& bob) const {
     }
 }
 
-namespace {
-
-int64_t _size(const std::vector<BSONObj>& objects) {
-    return std::accumulate(objects.begin(), objects.end(), 0, [](int64_t total, const auto& obj) {
-        // Include the 'sizeof' to account for the variable number in the vector.
-        return total + sizeof(BSONObj) + obj.objsize();
-    });
-}
-}  // namespace
-
-int64_t AggCmdShapeComponents::size() const {
-    return sizeof(*this) + _size(representativePipeline);
+// As part of the size, we must track the allocation of elements in the representative
+// pipeline, as well as the elements in the unordered set of involved namespaces.
+size_t AggCmdShapeComponents::size() const {
+    return sizeof(AggCmdShapeComponents) + shape_helpers::containerSize(representativePipeline) +
+        shape_helpers::containerSize(involvedNamespaces);
 }
 
 AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
@@ -133,5 +126,11 @@ AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
                   pipeline.serializeToBson(
                       SerializationOptions::kRepresentativeQueryShapeSerializeOptions)),
       _inMongos(expCtx->inMongos) {}
+
+size_t AggCmdShape::extraSize() const {
+    // To account for possible padding, we calculate the extra space with the difference instead of
+    // using sizeof(bool);
+    return sizeof(AggCmdShape) - sizeof(CmdWithLetShape) - sizeof(AggCmdShapeComponents);
+}
 
 }  // namespace mongo::query_shape

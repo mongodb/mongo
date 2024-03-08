@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/query_stats_utils.js");  // For getQueryStats.
+load("jstests/libs/query_stats_utils.js");  // For getLatestQueryStatsEntry.
 
 // Turn on the collecting of queryStats metrics.
 let options = {
@@ -27,9 +27,15 @@ assert.commandWorked(bulk.execute());
 
 {
     coll.find({foo: {$regex: "/^ABC/i"}}).itcount();
-    let queryStats = getQueryStats(testDB);
-    assert.eq(1, queryStats.length, queryStats);
-    assert.eq({"foo": {"$regex": "?string"}}, queryStats[0].key.queryShape.filter);
+    const queryStats = getLatestQueryStatsEntry(testDB);
+    assert.eq({"foo": {"$regex": "?string"}}, queryStats.key.queryShape.filter);
+}
+
+{
+    coll.find({foo: {$regex: ".*", $options: "m"}}).itcount();
+    const queryStats = getLatestQueryStatsEntry(testDB);
+    assert.eq({"foo": {"$regex": "?string", "$options": "?string"}},
+              queryStats.key.queryShape.filter);
 }
 
 MongoRunner.stopMongod(conn);

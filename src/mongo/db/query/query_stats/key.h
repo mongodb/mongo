@@ -63,15 +63,15 @@ struct UniversalKeyComponents {
                            query_shape::CollectionType collectionType,
                            bool maxTimeMS);
     /**
-     * Returns a copy of the read concern object. If there is an "afterClusterTime" component, the
-     * timestamp is shapified according to 'opts'.
+     * Returns a copy of the read concern object. If there is an "afterClusterTime" or
+     * "atClusterTime" component, the timestamp is shapified according to 'opts'.
      */
     static BSONObj shapifyReadConcern(
         const BSONObj& readConcern,
         const SerializationOptions& opts =
             SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
-    int64_t size() const;
+    size_t size() const;
 
     void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
 
@@ -79,29 +79,31 @@ struct UniversalKeyComponents {
     // struct. Since each QueryStatsEntry has its own Key subclass, it's better to minimize
     // the struct's size as much as possible.
 
-    std::unique_ptr<query_shape::Shape> _queryShape;
     BSONObj _clientMetaData;  // Preserve this value.
     BSONObj _commentObj;      // Shapify this value.
     BSONObj _hintObj;         // Preserve this value.
-    BSONObj _readPreference;  // Preserve this value.
     BSONObj _writeConcern;    // Preserve this value.
 
-    // Preserved literal except afterClusterTime is shapified.
+    // Preserved literal except value of 'tags' field is sorted.
+    BSONObj _shapifiedReadPreference;
+    // Preserved literal except 'afterClusterTime' and 'atClusterTime' are shapified.
     BSONObj _shapifiedReadConcern;
 
     // Separate the possibly-enormous BSONObj from the remaining members
 
-    std::unique_ptr<APIParameters> _apiParams;  // Preserve this value in the query shape.
     BSONElement _comment;
 
-    // This value is not known when run a query is run on mongos over an unsharded collection, so it
-    // is not set through that code path.
-    query_shape::CollectionType _collectionType;
+    std::unique_ptr<query_shape::Shape> _queryShape;
+    std::unique_ptr<APIParameters> _apiParams;  // Preserve this value in the query shape.
 
     // Simple hash of the client metadata object. This value is stored separately because it is
     // cached on the client to avoid re-computing on every operation. If no client metadata is
     // present, this will be the hash of an empty BSON object (otherwise known as 0).
     const unsigned long _clientMetaDataHash;
+
+    // This value is not known when run a query is run on mongos over an unsharded collection, so it
+    // is not set through that code path.
+    query_shape::CollectionType _collectionType;
 
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
@@ -139,7 +141,7 @@ struct SpecificKeyComponents {
      * We cannot just use sizeof() because there are some variable size data members (like BSON
      * objects) which depend on the particular instance.
      */
-    virtual int64_t size() const = 0;
+    virtual size_t size() const = 0;
 };
 
 template <typename H>
@@ -156,7 +158,7 @@ H AbslHashValue(H h, const UniversalKeyComponents& components) {
                       // Note we use the comment's type in the hash function.
                       components._comment.type(),
                       simpleHash(components._hintObj),
-                      simpleHash(components._readPreference),
+                      simpleHash(components._shapifiedReadPreference),
                       simpleHash(components._writeConcern),
                       simpleHash(components._shapifiedReadConcern),
                       components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
@@ -239,8 +241,8 @@ public:
         return _universalComponents._queryShape->sha256Hash(opCtx);
     }
 
-    int64_t size() const {
-        return specificComponents().size() + _universalComponents.size();
+    size_t size() const {
+        return sizeof(Key) + specificComponents().size() + _universalComponents.size();
     }
 
     template <typename H>
@@ -287,5 +289,7 @@ protected:
 private:
     UniversalKeyComponents _universalComponents;
 };
-
+static_assert(
+    sizeof(Key) == sizeof(void*) /*vtable ptr*/ + sizeof(UniversalKeyComponents),
+    "If the class' members have changed, this assert may need to be updated with a new value.");
 }  // namespace mongo::query_stats

@@ -255,6 +255,11 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
         if (fieldName == "$geometry") {
             if (e.isABSONObj()) {
                 BSONObj embeddedObj = e.embeddedObject();
+                // TODO SERVER-84598: $geoNear queries don't do a type check on the type of the
+                // geometry provided into the query. This is different than the behaviour we see for
+                // other GeoExpressions that use a GeometryContainer. GeoNear is a special case that
+                // only ever has type 'Point', however it may be a good idea to consider removing
+                // this silent acceptance of invalid "type" in the long term.
                 Status status = GeoParser::parseQueryPoint(e, centroid.get());
                 if (!status.isOK()) {
                     return Status(ErrorCodes::BadValue,
@@ -446,7 +451,7 @@ void GeoMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
                                                        const SerializationOptions& opts,
                                                        bool includePath) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        geoCustomSerialization(bob, _rawObj, opts, includePath);
+        geoExpressionCustomSerialization(*bob, _rawObj, opts, includePath);
         return;
     }
     bob->appendElements(_rawObj);
@@ -503,7 +508,7 @@ void GeoNearMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
                                                            const SerializationOptions& opts,
                                                            bool includePath) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        geoCustomSerialization(bob, _rawObj, opts, includePath);
+        geoNearExpressionCustomSerialization(*bob, _rawObj, opts, includePath);
         return;
     }
     bob->appendElements(_rawObj);

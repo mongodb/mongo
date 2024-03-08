@@ -1681,12 +1681,11 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
             if (idx > 0) {
                 *ss << ", ";
             }
-            *ss << "{" << groupName << ": " << exprObj->serialize(SerializationOptions{}).toString()
-                << "}";
+            *ss << "{" << groupName << ": " << exprObj->serialize().toString() << "}";
             ++idx;
         }
     } else {
-        *ss << "{_id: " << groupByExpression->serialize(SerializationOptions{}).toString() << "}";
+        *ss << "{_id: " << groupByExpression->serialize().toString() << "}";
     }
     *ss << '\n';
     addIndent(ss, indent + 1);

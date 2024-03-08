@@ -201,6 +201,44 @@ ExpressionContext::ExpressionContext(
         variables.seedVariablesWithLetParameters(this, *letParameters);
 }
 
+ExpressionContext::ExpressionContext(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const boost::optional<BSONObj>& letParameters)
+    : explain(boost::none),
+      allowDiskUse(false),
+      ns(nss),
+      opCtx(opCtx),
+      jsHeapLimitMB(internalQueryJavaScriptHeapSizeLimitMB.load()),
+      mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
+      timeZoneDatabase(opCtx && opCtx->getServiceContext()
+                           ? TimeZoneDatabase::get(opCtx->getServiceContext())
+                           : nullptr),
+      variablesParseState(variables.useIdGenerator()),
+      maxFeatureCompatibilityVersion(boost::none),  // Ensure all features are allowed.
+      mayDbProfile(true),
+      _collator(nullptr),
+      _documentComparator(_collator.get()),
+      _valueComparator(_collator.get()) {
+    // This is a shortcut to avoid reading the clock and the vector clock, since we don't actually
+    // care about their values for this 'blank' ExpressionContext codepath.
+    variables.setLegacyRuntimeConstants({Date_t::min(), Timestamp()});
+    // Expression counters are reported in serverStatus to indicate how often clients use certain
+    // expressions/stages, so it's a side effect tied to parsing. We must stop expression counters
+    // before re-parsing to avoid adding to the counters more than once per a given query.
+    stopExpressionCounters();
+    if (letParameters)
+        variables.seedVariablesWithLetParameters(this, *letParameters);
+}
+
+boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionContext(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    boost::optional<BSONObj> shapifiedLet) {
+    const auto nss = nssOrUUID.isNamespaceString() ? nssOrUUID.nss() : NamespaceString{};
+    // This constructor is private, so we can't use `boost::make_instrusive()`.
+    return new ExpressionContext(opCtx, nss, shapifiedLet);
+}
+
 void ExpressionContext::checkForInterruptSlow() {
     // This check could be expensive, at least in relative terms, so don't check every time.
     invariant(opCtx);

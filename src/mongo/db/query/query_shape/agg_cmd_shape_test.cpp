@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -47,22 +48,51 @@ public:
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
-    auto makeShapeFromPipeline(std::vector<StringData> stagesJson,
-                               boost::optional<StringData> letJson = boost::none) {
+    std::unique_ptr<AggregateCommandRequest> makeAggregateCommandRequest(
+        std::vector<StringData> stagesJson,
+        boost::optional<StringData> letJson = boost::none,
+        boost::optional<StringData> collationJson = boost::none) {
         std::vector<BSONObj> pipeline;
         for (auto&& stage : stagesJson) {
             pipeline.push_back(fromjson(stage));
         }
-        AggregateCommandRequest aggRequest(kDefaultTestNss, pipeline);
-        if (letJson)
-            aggRequest.setLet(fromjson(*letJson));
-        auto parsedPipeline = Pipeline::parse(std::move(pipeline), _expCtx);
 
-        return std::make_unique<AggCmdShape>(aggRequest,
+        auto aggRequest =
+            std::make_unique<AggregateCommandRequest>(kDefaultTestNss, std::move(pipeline));
+        if (letJson) {
+            aggRequest->setLet(fromjson(*letJson));
+        }
+        if (collationJson) {
+            aggRequest->setCollation(fromjson(*collationJson));
+        }
+        return aggRequest;
+    }
+
+    std::unique_ptr<AggCmdShape> makeShapeFromPipeline(
+        std::vector<StringData> stagesJson,
+        boost::optional<StringData> letJson = boost::none,
+        boost::optional<StringData> collationJson = boost::none) {
+
+        auto aggRequest = makeAggregateCommandRequest(
+            std::move(stagesJson), std::move(letJson), std::move(collationJson));
+
+        auto parsedPipeline = Pipeline::parse(aggRequest->getPipeline(), _expCtx);
+        return std::make_unique<AggCmdShape>(*aggRequest,
                                              kDefaultTestNss,
                                              stdx::unordered_set<NamespaceString>{kDefaultTestNss},
                                              *parsedPipeline,
                                              _expCtx);
+    }
+    std::unique_ptr<AggCmdShapeComponents> makeShapeComponentsFromPipeline(
+        std::vector<StringData> stagesJson, OptionalBool allowDiskUse = {}) {
+        auto aggRequest = makeAggregateCommandRequest(std::move(stagesJson));
+
+        auto parsedPipeline = Pipeline::parse(aggRequest->getPipeline(), _expCtx);
+        return std::make_unique<AggCmdShapeComponents>(
+            *aggRequest,
+            stdx::unordered_set<NamespaceString>{kDefaultTestNss},
+            parsedPipeline->serializeToBson(
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
     }
 
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
@@ -153,12 +183,8 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
                 "coll": "testColl"
             },
             "let": {
-                "x": {
-                    "$const": 1
-                },
-                "y": {
-                    "$const": "?"
-                }
+                "x":  1,
+                "y": "?"
             },
             "command": "aggregate",
             "pipeline": [
@@ -177,6 +203,61 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
         shape->toBson(_operationContext.get(),
                       SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
 }
-}  // namespace
 
+TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
+    auto aggComponents = makeShapeComponentsFromPipeline(
+        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+         R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
+        false /*allowDiskUse*/);
+
+    // The sizes of any members of AggCmdShapeComponents are typically accounted for by
+    // sizeof(AggCmdShapeComponents). The important part of the test here is to ensure that any
+    // additional memory allocations are also included in the size() operation. In our case,
+    // we expect additional memory use from the representative pipeline and the involved
+    // namespaces set.
+    const auto pipelineSize = shape_helpers::containerSize(aggComponents->representativePipeline);
+    const auto involvedNamespacesSize = sizeof(kDefaultTestNss) +
+        kDefaultTestNss.size();  // kDefaultTestNss is the only value in the unordered set.
+
+    ASSERT_EQ(aggComponents->size(),
+              sizeof(AggCmdShapeComponents) + pipelineSize + involvedNamespacesSize);
+}
+
+TEST_F(AggCmdShapeTest, EquivalentAggCmdShapeComponentSizes) {
+    auto aggComponentsDiskUseFalse = makeShapeComponentsFromPipeline(
+        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+         R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
+        false /*allowDiskUse*/);
+    auto aggComponentsDiskUseTrue = makeShapeComponentsFromPipeline(
+        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+         R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
+        true /*allowDiskUse*/);
+    ASSERT_EQ(aggComponentsDiskUseFalse->size(), aggComponentsDiskUseTrue->size());
+}
+
+TEST_F(AggCmdShapeTest, DifferentAggCmdShapeComponentSizes) {
+    auto smallAggComponents = makeShapeComponentsFromPipeline({R"({$match: {x: 3, y: {$lte: 3}}})"},
+                                                              false /*allowDiskUse*/);
+    auto largeAggComponents = makeShapeComponentsFromPipeline(
+        {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
+         R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
+        false /*allowDiskUse*/);
+    ASSERT_LT(smallAggComponents->size(), largeAggComponents->size());
+}
+
+TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeWithAndWithoutLet) {
+    auto shapeWithoutLet = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd});
+    auto shapeWithLet = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd},
+                                              R"({x: 4, y: "str"})"_sd);
+    ASSERT_LT(shapeWithoutLet->size(), shapeWithLet->size());
+}
+
+TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeWithAndWithoutCollation) {
+    auto shapeWithoutCollation =
+        makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd});
+    auto shapeWithCollation = makeShapeFromPipeline(
+        {R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd}, boost::none, R"({locale: "en_US"})"_sd);
+    ASSERT_LT(shapeWithoutCollation->size(), shapeWithCollation->size());
+}
+}  // namespace
 }  // namespace mongo::query_shape
