@@ -57,12 +57,8 @@ executor:
   - class: MagicRestoreEveryN
     n: 20
   fixture:
-    class: MagicRestoreFixture
-    cluster_options:
-      class: ReplicaSetFixture
-      settings:
-        mongod_options:
-          set_parameters:
-            enableTestCommands: 1
-        num_nodes: 1
-        use_replica_set_connection_string: true
+    class: ReplicaSetFixture
+    mongod_options:
+    all_nodes_electable: true
+    num_nodes: 1
+    use_replica_set_connection_string: true

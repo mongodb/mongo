@@ -38,7 +38,16 @@ class MagicRestoreEveryN(interface.Hook):
         hook_test_case.run_dynamic_test(test_report)
 
         # Run the magic restore procedure and run a data consistency check
-        # TODO SERVER-87172: Make a new test case to run a different js file.
+        magic_restore_test_case = MagicRestoreTestCase.create_after_test(test.logger, test, self)
+        magic_restore_test_case.configure(self.fixture)
+        magic_restore_test_case.run_dynamic_test(test_report)
+
+        self.logger.info("Tearing the fixture down to clear its data.")
+        self.fixture.teardown()
+
+        self.logger.info("Starting the fixture back up again.")
+        self.fixture.setup()
+        self.fixture.await_ready()
 
 
 class BackupCursorTestCase(jsfile.DynamicJSTestCase):
@@ -56,3 +65,20 @@ class BackupCursorTestCase(jsfile.DynamicJSTestCase):
         self.logger.info("Beginning backup cursor capture")
         self._js_test_case.run_test()
         self.logger.info("Backup cursor capture complete")
+
+
+class MagicRestoreTestCase(jsfile.DynamicJSTestCase):
+    """MagicRestoreTestCase class."""
+
+    JS_FILENAME = os.path.join("jstests", "hooks", "magic_restore.js")
+
+    def __init__(self, logger, test_name, description, base_test_name, hook):
+        """Initialize MagicRestoreTestCase."""
+        jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
+                                          hook, self.JS_FILENAME)
+
+    def run_test(self):
+        """Execute test hook."""
+        self.logger.info("Beginning magic restore")
+        self._js_test_case.run_test()
+        self.logger.info("Magic restore complete")
