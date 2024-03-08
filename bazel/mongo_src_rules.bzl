@@ -5,65 +5,261 @@ load("@poetry//:dependencies.bzl", "dependency")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
-# === Windows-specific compilation settings ===
 
-# /RTC1              Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
-# /O1                optimize for size
-# /O2                optimize for speed (as opposed to size)
-# /Oy-               disable frame pointer optimization (overrides /O2, only affects 32-bit)
-# /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function calls
+# https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
+#   /MD defines _MT and _DLL and links in MSVCRT.lib into each .obj file
+#   /MDd defines _DEBUG, _MT, and _DLL and link MSVCRTD.lib into each .obj file
+WINDOWS_MULTITHREAD_RUNTIME_COPTS = select({
+    "//bazel/config:windows_dbg_enabled": [
+        "/MDd",
+    ],
+    "//bazel/config:windows_dbg_disabled": [
+        "/MD",
+    ],
+    "//conditions:default": [],
+})
 
-# /pdbpagesize:16384
-#     windows non optimized builds will cause the PDB to blow up in size,
-#     this allows a larger PDB. The flag is undocumented at the time of writing
-#     but the microsoft thread which brought about its creation can be found here:
-#     https://developercommunity.visualstudio.com/t/pdb-limit-of-4-gib-is-likely-to-be-a-problem-in-a/904784
+# /O1 optimize for size
+# /O2 optimize for speed (as opposed to size)
+# /Oy- disable frame pointer optimization (overrides /O2, only affects 32-bit)
+# /Zo enables optimizations with modifications to make debugging easier
+WINDOWS_OPT_COPTS = select({
+    "//bazel/config:windows_opt_off": [
+        "/Od",
+    ],
+    "//bazel/config:windows_opt_on": [
+        "/O2",
+        "/Oy-",
+    ],
+    "//bazel/config:windows_opt_size": [
+        "/Os",
+        "/Oy-",
+    ],
+    # This is opt=debug, not to be confused with (opt=on && dbg=on)
+    "//bazel/config:windows_opt_debug": [
+        "/Ox",
+        "/Zo",
+        "/Oy-",
+    ],
+    "//conditions:default": [],
+})
+
+# Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
+WINDOWS_RUNTIME_ERROR_CHECK_COPTS = select({
+    "//bazel/config:windows_opt_off_dbg_enabled": [
+        "/RTC1",
+    ],
+    "//conditions:default": [],
+})
+
+WINDOWS_GENERAL_COPTS = select({
+    "@platforms//os:windows": [
+        # /EHsc exception handling style for visual studio
+        # /W3 warning level
+        "/EHsc",
+        "/W3",
+
+        # Support large object files since some unit-test sources contain a lot of code
+        "/bigobj",
+
+        # Set Source and Executable character sets to UTF-8, this will produce a warning C4828 if the
+        # file contains invalid UTF-8.
+        "/utf-8",
+
+        # Specify standards conformance mode to the compiler.
+        "/permissive-",
+
+        # Enables the __cplusplus preprocessor macro to report an updated value for recent C++ language
+        # standards support.
+        "/Zc:__cplusplus",
+
+        # Tells the compiler to preferentially call global operator delete or operator delete[]
+        # functions that have a second parameter of type size_t when the size of the object is available.
+        "/Zc:sizedDealloc",
+
+        # Treat volatile according to the ISO standard and do not guarantee acquire/release semantics.
+        "/volatile:iso",
+
+        # Tell CL to produce more useful error messages.
+        "/diagnostics:caret",
+
+        # Don't send error reports in case of internal compiler error
+        "/errorReport:none",
+    ],
+    "//conditions:default": [],
+})
+
+# Suppress some warnings we don't like, or find necessary to
+# suppress. Please keep this list alphabetized and commented.
+WINDOWS_SUPRESSED_WARNINGS_COPTS = select({
+    "@platforms//os:windows": [
+        # C4068: unknown pragma. added so that we can specify unknown
+        # pragmas for other compilers.
+        "/wd4068",
+
+        # C4244: 'conversion' conversion from 'type1' to 'type2',
+        # possible loss of data. An integer type is converted to a
+        # smaller integer type.
+        "/wd4244",
+
+        # C4267: 'var' : conversion from 'size_t' to 'type', possible
+        # loss of data. When compiling with /Wp64, or when compiling
+        # on a 64-bit operating system, type is 32 bits but size_t is
+        # 64 bits when compiling for 64-bit targets. To fix this
+        # warning, use size_t instead of a type.
+        "/wd4267",
+
+        # C4290: C++ exception specification ignored except to
+        # indicate a function is not __declspec(nothrow). A function
+        # is declared using exception specification, which Visual C++
+        # accepts but does not implement.
+        "/wd4290",
+
+        # C4351: On extremely old versions of MSVC (pre 2k5), default
+        # constructing an array member in a constructor's
+        # initialization list would not zero the array members "in
+        # some cases". Since we don't target MSVC versions that old,
+        # this warning is safe to ignore.
+        "/wd4351",
+
+        # C4355: 'this' : used in base member initializer list. The
+        # this pointer is valid only within nonstatic member
+        # functions. It cannot be used in the initializer list for a
+        # base class.
+        "/wd4355",
+
+        # C4373: Older versions of MSVC would fail to make a function
+        # in a derived class override a virtual function in the
+        # parent, when defined inline and at least one of the
+        # parameters is made const. The behavior is incorrect under
+        # the standard. MSVC is fixed now, and the warning exists
+        # merely to alert users who may have relied upon the older,
+        # non-compliant behavior. Our code should not have any
+        # problems with the older behavior, so we can just disable
+        # this warning.
+        "/wd4373",
+
+        # C4800: 'type' : forcing value to bool 'true' or 'false'
+        # (performance warning). This warning is generated when a
+        # value that is not bool is assigned or coerced into type
+        # bool.
+        "/wd4800",
+
+        # C4251: This warning attempts to prevent usage of CRT (C++
+        # standard library) types in DLL interfaces. That is a good
+        # idea for DLLs you ship to others, but in our case, we know
+        # that all DLLs are built consistently. Suppress the warning.
+        "/wd4251",
+
+        # mozjs requires the following
+        #  'declaration' : no matching operator delete found; memory will not be freed if
+        #  initialization throws an exception
+        "/wd4291",
+    ],
+    "//conditions:default": [],
+})
+
+WINDOWS_WARNINGS_AS_ERRORS_COPTS = select({
+    "@platforms//os:windows": [
+        # some warnings we should treat as errors:
+        # c4013
+        #  'function' undefined; assuming extern returning int
+        #    This warning occurs when files compiled for the C language use functions not defined
+        #    in a header file.
+        "/we4013",
+
+        # c4099
+        #  'identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
+        #    This warning occurs when classes and structs are declared with a mix of struct and class
+        #    which can cause linker failures
+        "/we4099",
+
+        # c4930
+        #  'identifier': prototyped function not called (was a variable definition intended?)
+        #     This warning indicates a most-vexing parse error, where a user declared a function that
+        #     was probably intended as a variable definition.  A common example is accidentally
+        #     declaring a function called lock that takes a mutex when one meant to create a guard
+        #     object called lock on the stack.
+        "/we4930",
+    ],
+    "//conditions:default": [],
+})
+
+WINDOWS_COPTS = WINDOWS_GENERAL_COPTS + WINDOWS_OPT_COPTS + WINDOWS_MULTITHREAD_RUNTIME_COPTS + WINDOWS_RUNTIME_ERROR_CHECK_COPTS + WINDOWS_SUPRESSED_WARNINGS_COPTS + WINDOWS_WARNINGS_AS_ERRORS_COPTS
+
+# Windows non optimized builds will cause the PDB to blow up in size,
+# this allows a larger PDB. The flag is undocumented at the time of writing
+# but the microsoft thread which brought about its creation can be found here:
+# https://developercommunity.visualstudio.com/t/pdb-limit-of-4-gib-is-likely-to-be-a-problem-in-a/904784
 #
-#     Without this flag MSVC will report a red herring error message, about disk space or invalid path.
+# Without this flag MSVC will report a red herring error message, about disk space or invalid path.
+WINDOWS_PDB_PAGE_SIZE_LINKOPT = select({
+    "//bazel/config:windows_opt_off": [
+        "/pdbpagesize:16384",
+    ],
+    "//conditions:default": [],
+})
 
-WINDOWS_DBG_COPTS = [
-    "/MDd",
-    "/RTC1",
-    "/Od",
-]
+# Disable incremental link - avoid the level of indirection for function calls
+WINDOWS_INCREMENTAL_LINKOPT = select({
+    "//bazel/config:windows_opt_any": [
+        "/INCREMENTAL:NO",
+    ],
+    "//conditions:default": [],
+})
 
-WINDOWS_OPT_ON_COPTS = [
-    "/MD",
-    "/O2",
-    "/Oy-",
-]
+# This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds.
+WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG = select({
+    "@platforms//os:windows": [
+        "/LARGEADDRESSAWARE",
+    ],
+    "//conditions:default": [],
+})
 
-WINDOWS_OPT_OFF_COPTS = [
-    "/MD",
-    "/Od",
-]
+WINDOWS_LINKFLAGS = WINDOWS_PDB_PAGE_SIZE_LINKOPT + WINDOWS_INCREMENTAL_LINKOPT + WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG
 
-WINDOWS_OPT_DBG_COPTS = [
-    "/MD",
-    "/RTC1",
-    "/Ox",
-    "/Zo",
-    "/Oy-",
-]
+WINDOWS_DEFINES = select({
+    "@platforms//os:windows": [
+        # This tells the Windows compiler not to link against the .lib files
+        # and to use boost as a bunch of header-only libraries
+        "BOOST_ALL_NO_LIB",
+        "_UNICODE",
+        "UNICODE",
 
-WINDOWS_OPT_SIZE_COPTS = [
-    "/MD",
-    "/Os",
-    "/Oy-",
-]
+        # Temporary fixes to allow compilation with VS2017
+        "_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING",
+        "_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING",
+        "_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING",
 
-WINDOWS_RELEASE_COPTS = [
-    "/MD",
-    "/Od",
-]
+        # TODO(SERVER-60151): Until we are fully in C++20 mode, it is
+        # easier to simply suppress C++20 deprecations. After we have
+        # switched over we should address any actual deprecated usages
+        # and then remove this flag.
+        "_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS",
+        "_CONSOLE",
+        "_CRT_SECURE_NO_WARNINGS",
+        "_ENABLE_EXTENDED_ALIGNED_STORAGE",
+        "_SCL_SECURE_NO_WARNINGS",
+    ],
+    "//conditions:default": [],
+})
 
-WINDOWS_DBG_LINKFLAGS = [
-    "/pdbpagesize:16384",
-]
-
-WINDOWS_OPT_OFF_LINKFLAGS = [
-    "/pdbpagesize:16384",
-]
+LINUX_OPT_COPTS = select({
+    "//bazel/config:linux_opt_off": [
+        "-O0",
+    ],
+    "//bazel/config:linux_opt_on": [
+        "-O2",
+    ],
+    "//bazel/config:linux_opt_size": [
+        "-Os",
+    ],
+    # This is opt=debug, not to be confused with (opt=on && dbg=on)
+    "//bazel/config:linux_opt_debug": [
+        "-Og",
+    ],
+    "//conditions:default": [],
+})
 
 # TODO SERVER-85340 fix this error message when libc++ is readded to the toolchain
 LIBCXX_ERROR_MESSAGE = (
@@ -88,24 +284,8 @@ LIBCXX_DEFINES = select({
     ("//bazel/config:use_libcxx_disabled"): [],
 }, no_match_error = LIBCXX_ERROR_MESSAGE)
 
-WINDOWS_COPTS = select({
-    "//bazel/config:windows_dbg": WINDOWS_DBG_COPTS,
-    "//bazel/config:windows_opt_on": WINDOWS_OPT_ON_COPTS,
-    "//bazel/config:windows_opt_off": WINDOWS_OPT_OFF_COPTS,
-    "//bazel/config:windows_opt_debug": WINDOWS_OPT_DBG_COPTS,
-    "//bazel/config:windows_opt_size": WINDOWS_OPT_SIZE_COPTS,
-    "//bazel/config:windows_release": WINDOWS_RELEASE_COPTS,
-    "//conditions:default": [],
-})
-
-WINDOWS_LINKFLAGS = select({
-    "//bazel/config:windows_dbg": WINDOWS_DBG_LINKFLAGS,
-    "//bazel/config:windows_opt_off": WINDOWS_OPT_OFF_LINKFLAGS,
-    "//conditions:default": [],
-})
-
 DEBUG_DEFINES = select({
-    "//bazel/config:dbg": ["MONGO_CONFIG_DEBUG_BUILD"],
+    "//bazel/config:dbg_enabled": ["MONGO_CONFIG_DEBUG_BUILD"],
     "//conditions:default": ["NDEBUG"],
 })
 
@@ -142,7 +322,7 @@ REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE = (
     "\nError:\n" +
     "    any sanitizer requires these configurations:\n" +
     "    --//bazel/config:compiler_type=clang\n" +
-    "    --//bazel/config:build_mode=opt_on [OR] --//bazel/config:build_mode=opt_debug [OR] --//bazel/config:build_mode=dbg"
+    "    --//bazel/config:opt=on [OR] --//bazel/config:opt=debug"
 )
 
 # -fno-omit-frame-pointer should be added if any sanitizer flag is used by user
@@ -324,7 +504,7 @@ TCMALLOC_DEPS = select({
 GLIBCXX_DEBUG_ERROR_MESSAGE = (
     "\nError:\n" +
     "    glibcxx_debug requires these configurations:\n" +
-    "    --//bazel/config:build_mode=dbg\n" +
+    "    --//bazel/config:dbg=True\n" +
     "    --//bazel/config:use_libcxx=False"
 )
 
@@ -336,7 +516,7 @@ GLIBCXX_DEBUG_DEFINES = select({
 DETECT_ODR_VIOLATIONS_ERROR_MESSAGE = (
     "\nError:\n" +
     "    detect_odr_violations requires these configurations:\n" +
-    "    --//bazel/config:build_mode=opt_off\n" +
+    "    --//bazel/config:opt=off\n" +
     "    --//bazel/config:linker=gold\n"
 )
 
@@ -346,11 +526,12 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
 }, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
 
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES + \
-                       THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES
+                       THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES + \
+                       WINDOWS_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \
-                     THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
+                     THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + LINUX_OPT_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + \
                          UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS + \

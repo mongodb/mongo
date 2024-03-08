@@ -4,8 +4,8 @@ load(
     "asan",
     "build_enterprise",
     "build_grpc",
-    "build_mode",
     "compiler_type",
+    "dbg",
     "detect_odr_violations",
     "fsan",
     "http_client",
@@ -14,6 +14,8 @@ load(
     "linkstatic",
     "lsan",
     "msan",
+    "opt",
+    "release",
     "separate_debug",
     "shared_archive",
     "spider_monkey_dbg",
@@ -143,142 +145,257 @@ selects.config_setting_group(
 )
 
 # ==========
-# build_mode
+# opt
 # ==========
 
-build_mode(
-    name = "build_mode",
-    build_setting_default = "dbg",
+opt(
+    name = "opt",
+    build_setting_default = "auto",
 )
 
 config_setting(
+    name = "_opt_on",
+    flag_values = {
+        "//bazel/config:opt": "on",
+    },
+)
+
+config_setting(
+    name = "_opt_off",
+    flag_values = {
+        "//bazel/config:opt": "off",
+    },
+)
+
+config_setting(
+    name = "_opt_auto",
+    flag_values = {
+        "//bazel/config:opt": "auto",
+    },
+)
+
+selects.config_setting_group(
+    name = "_opt_on_set_by_auto",
+    match_all = [
+        ":_opt_auto",
+        ":dbg_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_opt_off_set_by_auto",
+    match_all = [
+        ":_opt_auto",
+        ":dbg_enabled",
+    ],
+)
+
+# opt=on || (opt=auto && !dbg)
+selects.config_setting_group(
     name = "opt_on",
-    flag_values = {"//bazel/config:build_mode": "opt_on"},
+    match_any = [
+        ":_opt_on_set_by_auto",
+        ":_opt_on",
+    ],
 )
 
-config_setting(
+# opt=off || (opt=auto && dbg)
+selects.config_setting_group(
     name = "opt_off",
-    flag_values = {"//bazel/config:build_mode": "opt_off"},
-)
-
-config_setting(
-    name = "opt_debug",
-    flag_values = {"//bazel/config:build_mode": "opt_debug"},
+    match_any = [
+        ":_opt_off_set_by_auto",
+        ":_opt_off",
+    ],
 )
 
 config_setting(
     name = "opt_size",
-    flag_values = {"//bazel/config:build_mode": "opt_size"},
+    flag_values = {
+        "//bazel/config:opt": "size",
+    },
 )
 
 config_setting(
+    name = "opt_debug",
+    flag_values = {
+        "//bazel/config:opt": "debug",
+    },
+)
+
+selects.config_setting_group(
+    name = "opt_any",
+    match_any = [
+        ":opt_on",
+        ":opt_size",
+        ":opt_debug",
+    ],
+)
+
+# ==========
+# dbg
+# ==========
+
+dbg(
     name = "dbg",
-    flag_values = {"//bazel/config:build_mode": "dbg"},
+    build_setting_default = True,
 )
 
 config_setting(
+    name = "dbg_enabled",
+    flag_values = {
+        "//bazel/config:dbg": "True",
+    },
+)
+
+config_setting(
+    name = "dbg_disabled",
+    flag_values = {
+        "//bazel/config:dbg": "False",
+    },
+)
+
+# ==========
+# release
+# ==========
+
+release(
     name = "release",
-    flag_values = {"//bazel/config:build_mode": "release"},
+    build_setting_default = False,
 )
 
 config_setting(
+    name = "release_enabled",
+    flag_values = {
+        "//bazel/config:release": "True",
+    },
+)
+
+config_setting(
+    name = "release_disabled",
+    flag_values = {
+        "//bazel/config:release": "False",
+    },
+)
+
+selects.config_setting_group(
     name = "linux_dbg",
-    constraint_values = [
+    match_all = [
         "@platforms//os:linux",
+        ":dbg_enabled",
     ],
-    flag_values = {"//bazel/config:build_mode": "dbg"},
 )
 
-config_setting(
-    name = "linux_opt_on",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    flag_values = {"//bazel/config:build_mode": "opt_on"},
-)
-
-config_setting(
+selects.config_setting_group(
     name = "linux_opt_off",
-    constraint_values = [
+    match_all = [
         "@platforms//os:linux",
+        ":opt_off",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_off"},
 )
 
-# TODO(SERVER-80614): Revisit why we need "optimized + debug" in the first place.
-# Note that we have an unusual setting of "optimized + debug"
-config_setting(
-    name = "linux_opt_debug",
-    constraint_values = [
+selects.config_setting_group(
+    name = "linux_opt_on",
+    match_all = [
         "@platforms//os:linux",
+        ":opt_on",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_debug"},
 )
 
-config_setting(
+selects.config_setting_group(
+    name = "linux_opt_any",
+    match_all = [
+        "@platforms//os:linux",
+        ":opt_any",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux_opt_size",
-    constraint_values = [
+    match_all = [
         "@platforms//os:linux",
+        ":opt_size",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_size"},
 )
 
-config_setting(
+selects.config_setting_group(
+    name = "linux_opt_debug",
+    match_all = [
+        "@platforms//os:linux",
+        ":opt_debug",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux_release",
-    constraint_values = [
+    match_all = [
         "@platforms//os:linux",
+        ":release_enabled",
     ],
-    flag_values = {"//bazel/config:build_mode": "release"},
 )
 
-config_setting(
-    name = "windows_dbg",
-    constraint_values = [
+selects.config_setting_group(
+    name = "windows_dbg_enabled",
+    match_all = [
         "@platforms//os:windows",
+        ":dbg_enabled",
     ],
-    flag_values = {"//bazel/config:build_mode": "dbg"},
 )
 
-config_setting(
-    name = "windows_opt_on",
-    constraint_values = [
+selects.config_setting_group(
+    name = "windows_dbg_disabled",
+    match_all = [
         "@platforms//os:windows",
+        ":dbg_disabled",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_on"},
 )
 
-config_setting(
+selects.config_setting_group(
     name = "windows_opt_off",
-    constraint_values = [
+    match_all = [
         "@platforms//os:windows",
+        ":opt_off",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_off"},
 )
 
-# TODO(SERVER-80614): Revisit why we need "optimized + debug" in the first place.
-# Note that we have an unusual setting of "optimized + debug"
-config_setting(
-    name = "windows_opt_debug",
-    constraint_values = [
+selects.config_setting_group(
+    name = "windows_opt_on",
+    match_all = [
         "@platforms//os:windows",
+        ":opt_on",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_debug"},
 )
 
-config_setting(
+selects.config_setting_group(
+    name = "windows_opt_any",
+    match_all = [
+        "@platforms//os:windows",
+        ":opt_any",
+    ],
+)
+
+selects.config_setting_group(
     name = "windows_opt_size",
-    constraint_values = [
+    match_all = [
         "@platforms//os:windows",
+        ":opt_size",
     ],
-    flag_values = {"//bazel/config:build_mode": "opt_size"},
 )
 
-config_setting(
-    name = "windows_release",
-    constraint_values = [
+selects.config_setting_group(
+    name = "windows_opt_debug",
+    match_all = [
         "@platforms//os:windows",
+        ":opt_debug",
     ],
-    flag_values = {"//bazel/config:build_mode": "release"},
+)
+
+selects.config_setting_group(
+    name = "windows_opt_off_dbg_enabled",
+    match_all = [
+        "@platforms//os:windows",
+        ":opt_off",
+        ":dbg_enabled",
+    ],
 )
 
 # --------------------------------------
@@ -612,7 +729,7 @@ selects.config_setting_group(
     #TODO SERVER-84714 add check to ensure we are using the toolchain version of C++ libs
     match_all = [
         ":use_glibcxx_debug_enabled",
-        ":dbg",
+        ":dbg_enabled",
         ":use_libcxx_disabled",
     ],
 )
@@ -842,7 +959,6 @@ selects.config_setting_group(
     match_any = [
         ":opt_on",
         ":opt_debug",
-        ":dbg",
     ],
 )
 

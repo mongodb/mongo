@@ -616,15 +616,6 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         linkstatic = env.GetOption("link-model") in ["auto", "static"]
 
-        if env.GetOption("release") is not None:
-            build_mode = "release"
-        elif env.GetOption("dbg") == "on" and mongo_generators.get_opt_options(env) == "off":
-            build_mode = "dbg"
-        elif env.GetOption("dbg") == "on" and mongo_generators.get_opt_options(env) == "on":
-            build_mode = "opt_debug"
-        else:
-            build_mode = f"opt_{mongo_generators.get_opt_options(env)}"  # one of "on", "size", "off"
-
         # TODO SERVER-86472 make bazel support both tcmalloc implementations
         if env.GetOption("allocator") == "tcmalloc-google":
             env.ConfError("Bazel build currently does not support tcmalloc-google allocator.")
@@ -641,7 +632,8 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         bazel_internal_flags = [
             f'--//bazel/config:compiler_type={env.ToolchainName()}',
-            f'--//bazel/config:build_mode={build_mode}',
+            f'--//bazel/config:opt={env.GetOption("opt")}',
+            f'--//bazel/config:dbg={env.GetOption("dbg") == "on"}',
             f'--//bazel/config:separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
             f'--//bazel/config:libunwind={env.GetOption("use-libunwind")}',
             f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',

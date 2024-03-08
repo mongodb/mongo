@@ -31,6 +31,7 @@ mongo_cc_library(
     ] + select({
         "@platforms//os:windows": [
             "dist/src/fake_stacktrace_scope.cc",
+            "dist/src/tcmalloc.cc",
             "dist/src/windows/port.cc",
             "dist/src/windows/system-alloc.cc",
         ],
@@ -75,7 +76,7 @@ mongo_cc_library(
     local_defines = [
         "NO_HEAP_CHECK",
     ] + select({
-        "@//bazel/config:dbg": [],
+        "@//bazel/config:dbg_enabled": [],
         "//conditions:default": [
             # For debug builds we want to capture stacks during (de)allocations,
             # but we don't want to pay that cost for release builds.
@@ -93,9 +94,6 @@ mongo_cc_library(
         # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
         "@platforms//cpu:ppc": ["__linux"],
         "//conditions:default": [],
-    }) + select({
-        "@//bazel/config:dbg": [],
-        "//conditions:default": ["NDEBUG"],
     }),
 )
 

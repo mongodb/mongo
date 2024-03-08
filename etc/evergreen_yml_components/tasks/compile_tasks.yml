@@ -390,11 +390,8 @@ tasks:
       target: >-
         //src/mongo/platform:visibility_test1
       # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
-      # TODO DEVPROD-2513 remove "--copt /std:c++20" flag when toolchain sets this automatically
       args: >-
         --compilation_mode=dbg
-        --//bazel/config:build_mode=dbg
-        --copt /std:c++20
   teardown_task:
   - func: "attach bazel invocation"
 
