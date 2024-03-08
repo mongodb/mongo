@@ -71,6 +71,12 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     BSONElement groupByField;
     Value defaultValue;
 
+    // Validating the input boundaries and default value requires a correct collation. We may not
+    // have this at parse time if we are not parsing for the purpose of executing the queries (see
+    // SERVER-87166), so we should skip the validation for that case.
+    const bool shouldValidateInputRanges =
+        pExpCtx->mongoProcessInterface->isExpectedToExecuteQueries();
+
     bool outputFieldSpecified = false;
     for (auto&& argument : bucketObj) {
         const auto argName = argument.fieldNameStringData();
@@ -129,7 +135,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                             << "The 'boundaries' option to $bucket must be sorted, but elements "
                             << i - 1 << " and " << i << " are not in ascending order ("
                             << lower.toString() << " is not less than " << upper.toString() << ").",
-                        pExpCtx->getValueComparator().evaluate(lower < upper));
+                        !shouldValidateInputRanges ||
+                            pExpCtx->getValueComparator().evaluate(lower < upper));
             }
         } else if ("default" == argName) {
             // If there is a default, make sure that it parses to a constant expression then add
@@ -166,8 +173,9 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
 
     Value lowerValue = boundaryValues.front();
     Value upperValue = boundaryValues.back();
-    if (canonicalizeBSONType(defaultValue.getType()) ==
-        canonicalizeBSONType(lowerValue.getType())) {
+    if (shouldValidateInputRanges &&
+        canonicalizeBSONType(defaultValue.getType()) ==
+            canonicalizeBSONType(lowerValue.getType())) {
         // If the default has the same canonical type as the bucket's boundaries, then make sure the
         // default is less than the lowest boundary or greater than or equal to the highest
         // boundary.

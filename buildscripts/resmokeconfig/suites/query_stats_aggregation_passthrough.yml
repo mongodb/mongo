@@ -11,9 +11,6 @@ description: |
 selector:
   roots:
   - jstests/aggregation/**/*.js
-  exclude_files:
-  # TODO: Remove when SERVER-87166 is fixed.
-  - jstests/aggregation/sources/bucket/collation_bucket.js
   exclude_with_any_tags:
   # Running $queryStats will increment these counters which can screw up some test assertions.
   - inspects_command_opcounters
