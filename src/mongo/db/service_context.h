@@ -900,7 +900,7 @@ public:
         /**
          * Returns the next client in the enumeration, or nullptr if there are no more clients.
          */
-        Client* next();
+        LockedClient next();
 
     private:
         ServiceContext::LockedClientsCursor _serviceCtxCursor;

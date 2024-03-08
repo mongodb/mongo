@@ -373,11 +373,13 @@ Client* ServiceContext::LockedClientsCursor::next() {
 Service::LockedClientsCursor::LockedClientsCursor(Service* service)
     : _serviceCtxCursor(service->getServiceContext()), _service(service) {}
 
-Client* Service::LockedClientsCursor::next() {
-    Client* client = _serviceCtxCursor.next();
-    for (; client && client->getService() != _service;)
-        client = _serviceCtxCursor.next();
-    return client;
+LockedClient Service::LockedClientsCursor::next() {
+    for (Client* client; (client = _serviceCtxCursor.next());) {
+        LockedClient lc(client);
+        if (lc->getService() == _service)
+            return lc;
+    }
+    return {};
 }
 
 void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedClients) {
