@@ -3,6 +3,7 @@
  * after addShard and removeShard commands.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkClusterParameter} from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
@@ -27,14 +28,21 @@ checkClusterParameter(shard1Rst, true);
 
 removeShard(st, shard1Name);
 
-// The removeShard command should set to cluster parameter to false if the binVersion is >= 7.3.
-const expectedHasTwoOrMoreShards = jsTestOptions().shardMixedBinVersions == null;
+jsTest.log("Checking the cluster parameter while the cluster contains one shard again");
+// The removeShard command should set to cluster parameter to false if the config server primary's
+// binVersion is 7.3 or the replica set endpoint feature flag is enabled.
+let binVersion =
+    assert.commandWorked(st.configRS.getPrimary().adminCommand({serverStatus: 1})).version;
+let rsEndpointEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.configRS.getPrimary(), "RSEndpointClusterCardinalityParameter");
+const expectedHasTwoOrMoreShards =
+    MongoRunner.compareBinVersions(binVersion, "7.3") != 0 && !rsEndpointEnabled;
 checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);
 checkClusterParameter(st.rs0, expectedHasTwoOrMoreShards);
 
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
-jsTest.log("Checking the cluster parameter while the cluster contains one shard again");
+jsTest.log("Checking the cluster parameter while the cluster contains two shards again");
 // The addShard command should set the cluster parameter to true again.
 checkClusterParameter(st.configRS, true);
 checkClusterParameter(st.rs0, true);

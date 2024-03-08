@@ -38,3 +38,11 @@ feature_flags:
         cpp_varname: gFeatureFlagReplicaSetEndpoint
         default: false
         shouldBeFCVGated: true
+    featureFlagRSEndpointClusterCardinalityParameter:
+        description: >-
+            When enabled, this feature flag will allow the cluster cardinality cluster parameter to
+            reset its value to false when the second shard is removed from a cluster. This feature
+            flag should be enabled at the same time as the replica set endpoint feature flag.
+        cpp_varname: gFeatureFlagRSEndpointClusterCardinalityParameter
+        default: false
+        shouldBeFCVGated: true

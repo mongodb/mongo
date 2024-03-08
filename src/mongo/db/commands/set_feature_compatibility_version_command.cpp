@@ -99,6 +99,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
@@ -234,22 +235,29 @@ void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
 
 void _setShardedClusterCardinalityParameter(
     OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-    // The config.shards collection is stable during FCV changes, so query that to discover the
-    // current number of shards.
-    DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
-    findRequest.setLimit(2);
-    auto numShards = client.find(std::move(findRequest))->itcount();
+    // If the replica set endpoint is not active, then it isn't safe to allow direct connections
+    // again after a second shard has been added. The replica set endpoint requires the cluster
+    // parameter to be correct (go back to false when the second shard is removed) so we will need
+    // to update the cluster parameter whenever replica set endpoint is enabled.
+    if (feature_flags::gFeatureFlagRSEndpointClusterCardinalityParameter.isEnabledOnVersion(
+            requestedVersion)) {
+        // The config.shards collection is stable during FCV changes, so query that to discover the
+        // current number of shards.
+        DBDirectClient client(opCtx);
+        FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
+        findRequest.setLimit(2);
+        auto numShards = client.find(std::move(findRequest))->itcount();
 
-    // Prior to 7.3, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
-    // of shards goes from 1 to 2 but doesn't get set to false when the number of shards goes down
-    // to 1.
-    if (numShards >= 2) {
-        return;
+        // Prior to 7.3, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
+        // of shards goes from 1 to 2 but doesn't get set to false when the number of shards goes
+        // down to 1.
+        if (numShards >= 2) {
+            return;
+        }
+
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameter(
+            opCtx, numShards));
     }
-
-    uassertStatusOK(
-        ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameter(opCtx, numShards));
 }
 
 void uassertStatusOKIgnoreNSNotFound(Status status) {

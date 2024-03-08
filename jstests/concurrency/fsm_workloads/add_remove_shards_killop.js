@@ -9,6 +9,7 @@
  *  catches_command_failures,
  *  uses_curop_agg_stage,
  *  antithesis_incompatible,
+ *  featureFlagRSEndpointClusterCardinalityParameter,
  * ]
  */
 

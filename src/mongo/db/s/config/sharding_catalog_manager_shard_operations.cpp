@@ -100,6 +100,7 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -819,6 +820,16 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterAddShardIf
 Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
     const Lock::ExclusiveLock&, OperationContext* opCtx) {
     if (MONGO_unlikely(skipUpdatingClusterCardinalityParameterAfterRemoveShard.shouldFail())) {
+        return Status::OK();
+    }
+
+    // If the replica set endpoint is not active, then it isn't safe to allow direct connections
+    // again after a second shard has been added. Unsharded collections are allowed to be tracked
+    // and moved as soon as a second shard is added to the cluster, and these collections will not
+    // handle direct connections properly.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        !feature_flags::gFeatureFlagRSEndpointClusterCardinalityParameter.isEnabled(fcvSnapshot)) {
         return Status::OK();
     }
 
