@@ -569,7 +569,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createAdditionalPipeline
         pipelines.push_back(std::move(pipeline));
 
         if (auto metadataPipe = getSearchHelpers(opCtx->getServiceContext())
-                                    ->generateMetadataPipelineForSearch(
+                                    ->generateMetadataPipelineAndAttachCursorsForSearch(
                                         opCtx, expCtx, request, pipelines.back().get(), collUUID)) {
             pipelines.push_back(std::move(metadataPipe));
         }

@@ -61,7 +61,8 @@ public:
      *
      * This can modify the passed in pipeline but does not take ownership of it.
      */
-    virtual std::unique_ptr<Pipeline, PipelineDeleter> generateMetadataPipelineForSearch(
+    virtual std::unique_ptr<Pipeline, PipelineDeleter>
+    generateMetadataPipelineAndAttachCursorsForSearch(
         OperationContext* opCtx,
         boost::intrusive_ptr<ExpressionContext> expCtx,
         const AggregateCommandRequest& request,

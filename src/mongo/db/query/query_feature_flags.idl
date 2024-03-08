@@ -103,13 +103,12 @@ feature_flags:
       cpp_varname: gFeatureFlagShardedSearchCustomSort
       default: true
       version: 7.0
-    
+
     featureFlagUserRoles:
       description: "Feature flag to enable usage of $$USER_ROLES."
       cpp_varname: gFeatureFlagUserRoles
       default: true
       version: 7.0
-
 
     featureFlagApproxPercentiles:
       description: "Feature flag to enable approximate $percentile accumulator/expression."
@@ -139,3 +138,8 @@ feature_flags:
       cpp_varname: gFeatureFlagAggOutTimeseries
       default: true
       version: 7.0
+
+    featureFlagTrimExtraSearchMetaCursors:
+      description: "Feature flag for enabling support for the requiresSearchMetaCursor field in sharded $search queries (see SERVER-86757)"
+      cpp_varname: gFeatureFlagTrimExtraSearchMetaCursors
+      default: false
