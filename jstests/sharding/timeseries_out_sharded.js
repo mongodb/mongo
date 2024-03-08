@@ -37,15 +37,14 @@ function runTest({
     observer: observerPipeline,
     timeseries: timeseriesPipeline,
     drop: shouldDrop = true,
-    value: valueToCheck = null,
-    outputDB: outputDB = testDB
+    value: valueToCheck = null
 }) {
     let expectedTSOptions = null;
     if (!shouldDrop) {
         // To test if an index is preserved by $out when replacing an existing collection.
-        assert.commandWorked(outputDB[targetCollName].createIndex({usage_guest: 1}));
+        assert.commandWorked(testDB[targetCollName].createIndex({usage_guest: 1}));
         // To test if $out preserves the original collection options.
-        let collections = outputDB.getCollectionInfos({name: targetCollName});
+        let collections = testDB.getCollectionInfos({name: targetCollName});
         assert.eq(collections.length, 1, collections);
         expectedTSOptions = collections[0]["options"]["timeseries"];
     } else {
@@ -68,7 +67,7 @@ function runTest({
         }
     }
 
-    let collections = outputDB.getCollectionInfos({name: targetCollName});
+    let collections = testDB.getCollectionInfos({name: targetCollName});
     assert.eq(collections.length, 1, collections);
 
     // Verifies a time-series collection was not made, if that is expected.
@@ -85,7 +84,7 @@ function runTest({
 
     // Verifies the original index is maintained, if $out is replacing an existing collection.
     if (!shouldDrop) {
-        let indexSpecs = outputDB[targetCollName].getIndexes();
+        let indexSpecs = testDB[targetCollName].getIndexes();
         assert.eq(indexSpecs.filter(index => index.name == "usage_guest_1").length, 1);
     }
 }
@@ -117,6 +116,14 @@ runTest({observer: observerPipeline, timeseries: timeseriesPipeline, drop: false
 // Test that an error is raised if the target collection is a sharded time-series collection.
 assert.throwsWithCode(() => observerInColl.aggregate([{$out: inColl.getName()}]),
                       ErrorCodes.IllegalOperation);
+
+// Test that an error is raised if the database does not exist.
+const destDB = testDB.getSiblingDB("outDifferentDB");
+assert.commandWorked(destDB.dropDatabase());
+assert.throwsWithCode(
+    () => inColl.aggregate(
+        {$out: {db: destDB.getName(), coll: targetCollName, timeseries: {timeField: "time"}}}),
+    ErrorCodes.NamespaceNotFound);
 
 // Tests that an error is raised when trying to create a time-series collection from a non
 // time-series collection.
@@ -161,20 +168,5 @@ assert.commandWorked(testDB.createCollection("view_out", {viewOn: "out"}));
 pipeline = TimeseriesAggTests.generateOutPipeline("view_out", dbName, {timeField: "time"});
 assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268703);
 assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268703);
-
-// Test that we can output to a non existant database. non-timeseries output
-const destDB = testDB.getSiblingDB("outDifferentDB");
-assert.commandWorked(destDB.dropDatabase());
-runTest({observer: [{$out: "observer_out"}], timeseries: [{$out: targetCollName}]});
-
-// Test that we can output to a non existant database. timeseries output
-assert.commandWorked(destDB.dropDatabase());
-timeseriesPipeline = TimeseriesAggTests.generateOutPipeline(
-    targetCollName, destDB.getName(), {timeField: "time", metaField: "tags"});
-runTest({
-    observer: [{$out: {db: destDB.getName(), coll: "observer_out"}}],
-    timeseries: timeseriesPipeline,
-    outputDB: destDB
-});
 
 st.stop();

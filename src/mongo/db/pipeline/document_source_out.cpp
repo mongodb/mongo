@@ -71,7 +71,6 @@ using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
-MONGO_FAIL_POINT_DEFINE(outWaitBeforeTempCollectionRename);
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson,
@@ -224,29 +223,22 @@ void DocumentSourceOut::initialize() {
         getOutputNs().dbName(),
         str::stream() << NamespaceString::kOutTmpCollectionPrefix << UUID::gen());
 
-    try {
-        // Save the original collection options and index specs so we can check they didn't change
-        // during computation.
-        _originalOutOptions =
-            // The uuid field is considered an option, but cannot be passed to createCollection.
-            pExpCtx->mongoProcessInterface->getCollectionOptions(pExpCtx->opCtx, outputNs)
-                .removeField("uuid");
-        _originalIndexes = pExpCtx->mongoProcessInterface->getIndexSpecs(
-            pExpCtx->opCtx, outputNs, false /* includeBuildUUIDs */);
+    // Save the original collection options and index specs so we can check they didn't change
+    // during computation.
+    _originalOutOptions =
+        // The uuid field is considered an option, but cannot be passed to createCollection.
+        pExpCtx->mongoProcessInterface->getCollectionOptions(pExpCtx->opCtx, outputNs)
+            .removeField("uuid");
+    _originalIndexes = pExpCtx->mongoProcessInterface->getIndexSpecs(
+        pExpCtx->opCtx, outputNs, false /* includeBuildUUIDs */);
 
-        // Check if it's capped to make sure we have a chance of succeeding before we do all the
-        // work. If the collection becomes capped during processing, the collection options will
-        // have changed, and the $out will fail.
-        uassert(17152,
-                "namespace '{}' is capped so it can't be used for {}"_format(
-                    outputNs.toStringForErrorMsg(), kStageName),
-                _originalOutOptions["capped"].eoo());
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        LOGV2_DEBUG(7585601,
-                    5,
-                    "Database for $out target collection doesn't exist. Assuming default indexes "
-                    "and options");
-    }
+    // Check if it's capped to make sure we have a chance of succeeding before we do all the work.
+    // If the collection becomes capped during processing, the collection options will have changed,
+    // and the $out will fail.
+    uassert(17152,
+            "namespace '{}' is capped so it can't be used for {}"_format(
+                outputNs.toStringForErrorMsg(), kStageName),
+            _originalOutOptions["capped"].eoo());
 
     {
         BSONObjBuilder collectionOptions;
@@ -267,6 +259,7 @@ void DocumentSourceOut::initialize() {
         // owns the output collection.
         auto targetShard = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
             pExpCtx->opCtx, getOutputNs());
+
         pExpCtx->mongoProcessInterface->createTempCollection(
             pExpCtx->opCtx, _tempNs, collectionOptions.done(), targetShard);
     }
@@ -298,6 +291,7 @@ void DocumentSourceOut::initialize() {
 
 void DocumentSourceOut::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+
     uassert(7406101,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
             feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
@@ -307,14 +301,7 @@ void DocumentSourceOut::finalize() {
     // If the collection is time-series, we must rename to the "real" buckets collection.
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
     const NamespaceString fromNs = makeBucketNsIfTimeseries(_tempNs);
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &outWaitBeforeTempCollectionRename,
-        pExpCtx->opCtx,
-        "outWaitBeforeTempCollectionRename",
-        []() {
-            LOGV2(7585602,
-                  "Hanging aggregation due to 'outWaitBeforeTempCollectionRename' failpoint");
-        });
+
     pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(pExpCtx->opCtx,
                                                                             fromNs,
                                                                             outputNs,
