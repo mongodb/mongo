@@ -6921,5 +6921,98 @@ TEST_F(TransactionRouterTest, TxnLevelShouldBePreservedWithNoCmdReadConcern) {
     ASSERT_EQ(Timestamp(20, 1), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
 }
 
+TEST_F(TransactionRouterTest, ParticipantCanBeAddedOnNonRetryableStmtInRetryableInternalTxn) {
+    TxnNumber txnNum{3};
+    auto lsid = makeLogicalSessionIdForTest();
+    lsid.setTxnNumber(txnNum);
+    operationContext()->setLogicalSessionId(lsid);
+    operationContext()->setInMultiDocumentTransaction();
+    operationContext()->setActiveTransactionParticipant();
+
+    RouterOperationContextSession scopedSession(operationContext());
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    ASSERT(isInternalSessionForRetryableWrite(*operationContext()->getLogicalSessionId()));
+
+    {
+        BSONObj cmdObj = BSON("insert"
+                              << "test"
+                              << "stmtId" << -1);
+        BSONObj expectedNewObj = BSON("insert"
+                                      << "test"
+                                      << "stmtId" << -1 << "readConcern"
+                                      << BSON("level"
+                                              << "snapshot"
+                                              << "atClusterTime"
+                                              << kInMemoryLogicalTime.asTimestamp())
+                                      << "startTransaction" << true << "coordinator" << true
+                                      << "autocommit" << false << "txnNumber" << txnNum);
+
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+    }
+
+    {
+        BSONArray stmtIds(BSON_ARRAY(-1 << -1 << -1));
+        BSONObj cmdObj = BSON("insert"
+                              << "test"
+                              << "stmtIds" << stmtIds);
+        BSONObj expectedNewObj = BSON("insert"
+                                      << "test"
+                                      << "stmtIds" << stmtIds << "coordinator" << true
+                                      << "autocommit" << false << "txnNumber" << txnNum);
+        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
+        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+    }
+}
+
+TEST_F(TransactionRouterTest, ParticipantCannotBeAddedOnRetryableStmtInRetryableInternalTxn) {
+    TxnNumber txnNum{3};
+    auto lsid = makeLogicalSessionIdForTest();
+    lsid.setTxnNumber(txnNum);
+    operationContext()->setLogicalSessionId(lsid);
+    operationContext()->setInMultiDocumentTransaction();
+    operationContext()->setActiveTransactionParticipant();
+
+    RouterOperationContextSession scopedSession(operationContext());
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    ASSERT(isInternalSessionForRetryableWrite(*operationContext()->getLogicalSessionId()));
+
+    {
+        BSONObj cmdObj = BSON("insert"
+                              << "test"
+                              << "stmtId" << 3);
+        ASSERT_THROWS_CODE(txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj),
+                           DBException,
+                           ErrorCodes::IllegalOperation);
+    }
+
+    {
+        BSONArray stmtIds(BSON_ARRAY(0 << 1 << 2));
+        BSONObj cmdObj = BSON("insert"
+                              << "test"
+                              << "stmtIds" << stmtIds);
+        ASSERT_THROWS_CODE(txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj),
+                           DBException,
+                           ErrorCodes::IllegalOperation);
+    }
+
+    {
+        BSONArray stmtIds(BSON_ARRAY(-1 << 0 << 1));
+        BSONObj cmdObj = BSON("insert"
+                              << "test"
+                              << "stmtIds" << stmtIds);
+        ASSERT_THROWS_CODE(txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj),
+                           DBException,
+                           ErrorCodes::IllegalOperation);
+    }
+}
 }  // unnamed namespace
 }  // namespace mongo

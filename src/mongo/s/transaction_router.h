@@ -753,6 +753,12 @@ public:
          */
         bool _errorAllowsRetryOnStaleShardOrDb(const Status& status) const;
 
+        /**
+         * Returns true if the router is currently processing a retryable statement in a retryable
+         * internal transaction.
+         */
+        bool _isRetryableStmtInARetryableInternalTxn(const BSONObj& cmdObj) const;
+
         TransactionRouter::PrivateState& p() {
             return _tr->_p;
         }

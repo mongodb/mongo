@@ -808,9 +808,33 @@ TransactionRouter::Router::getAdditionalParticipantsForResponse(
     return participants;
 }
 
+bool TransactionRouter::Router::_isRetryableStmtInARetryableInternalTxn(
+    const BSONObj& cmdObj) const {
+    if (!isInternalSessionForRetryableWrite(_sessionId())) {
+        return false;
+    } else if (cmdObj.hasField("stmtId") &&
+               (cmdObj.getIntField("stmtId") != kUninitializedStmtId)) {
+        return true;
+    } else if (cmdObj.hasField("stmtIds")) {
+        BSONObj stmtIdsObj = cmdObj.getField("stmtIds").Obj();
+        return std::any_of(stmtIdsObj.begin(), stmtIdsObj.end(), [](const BSONElement& stmtIdElem) {
+            return stmtIdElem.numberInt() != kUninitializedStmtId;
+        });
+    }
+    return false;
+}
+
 BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                                            const ShardId& shardId,
                                                            const BSONObj& cmdObj) {
+    if (opCtx->isActiveTransactionParticipant()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "The participant cannot add a participant shard while executing a "
+                "retryable statement in a retryable internal "
+                "transaction.",
+                !_isRetryableStmtInARetryableInternalTxn(cmdObj));
+    }
+
     RouterTransactionsMetrics::get(opCtx)->incrementTotalRequestsTargeted();
     const bool hasTxnCreatedAnyDatabase = !p().createdDatabases.empty();
     if (auto txnPart = getParticipant(shardId)) {
