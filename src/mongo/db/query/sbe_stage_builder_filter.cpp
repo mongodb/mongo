@@ -1425,19 +1425,6 @@ EvalExpr generateBitTestExpr(StageBuilderState& state,
         MONGO_UNREACHABLE_TASSERT(5610200);
     }();
 
-    // We round NumberDecimal values to the nearest integer to match the classic execution engine's
-    // behavior for now. Note that this behavior is _not_ consistent with MongoDB's documentation.
-    // At some point, we should consider removing this call to round() to make SBE's behavior
-    // consistent with MongoDB's documentation.
-    auto numericBitTestInputExpr = sbe::makeE<sbe::EIf>(
-        makeFunction("typeMatch",
-                     inputExpr.getExpr(state.slotVarMap, *state.data->env),
-                     makeConstant(sbe::value::TypeTags::NumberInt64,
-                                  sbe::value::bitcastFrom<int64_t>(
-                                      getBSONTypeMask(sbe::value::TypeTags::NumberDecimal)))),
-        makeFunction("round"_sd, inputExpr.getExpr(state.slotVarMap, *state.data->env)),
-        inputExpr.getExpr(state.slotVarMap, *state.data->env));
-
     std::unique_ptr<sbe::EExpression> bitMaskExpr = [&]() -> std::unique_ptr<sbe::EExpression> {
         if (auto bitMaskParamId = expr->getBitMaskParamId()) {
             auto bitMaskSlotId = state.registerInputParamSlot(*bitMaskParamId);
@@ -1449,11 +1436,11 @@ EvalExpr generateBitTestExpr(StageBuilderState& state,
     // Convert the value to a 64-bit integer, and then pass the converted value along with the mask
     // to the appropriate bit-test function. If the value cannot be losslessly converted to a 64-bit
     // integer, this expression will return Nothing.
-    auto numericBitTestExpr =
-        makeFunction(numericBitTestFnName,
-                     std::move(bitMaskExpr),
-                     sbe::makeE<sbe::ENumericConvert>(std::move(numericBitTestInputExpr),
-                                                      sbe::value::TypeTags::NumberInt64));
+    auto numericBitTestExpr = makeFunction(
+        numericBitTestFnName,
+        std::move(bitMaskExpr),
+        sbe::makeE<sbe::ENumericConvert>(inputExpr.getExpr(state.slotVarMap, *state.data->env),
+                                         sbe::value::TypeTags::NumberInt64));
 
     // For the AnyClear and AnySet cases, negate the output of the bit-test function.
     if (bitOp == sbe::BitTestBehavior::AnyClear || bitOp == sbe::BitTestBehavior::AnySet) {
