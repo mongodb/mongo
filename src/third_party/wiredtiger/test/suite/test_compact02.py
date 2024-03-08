@@ -57,7 +57,11 @@ class test_compact02(wttest.WiredTigerTestCase):
         ('64KB', dict(fileConfig='leaf_page_max=64KB')),
         ('128KB', dict(fileConfig='leaf_page_max=128KB')),
     ]
-    scenarios = make_scenarios(types, cacheSize, fileConfig)
+    dryrun = [
+        ('dryrun', dict(dryrun=True)),
+        ('no-dryrun', dict(dryrun=False))
+    ]
+    scenarios = make_scenarios(types, cacheSize, fileConfig, dryrun)
 
     # We want about 22K records that total about 130Mb.  That is an average
     # of 6196 bytes per record.  Half the records should be smaller, about
@@ -87,6 +91,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
         statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
         statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
+        statDict["rewritten_expected"] = cstat[stat.dsrc.btree_compact_pages_rewritten_expected][2]
         cstat.close()
         return statDict
 
@@ -164,6 +169,9 @@ class test_compact02(wttest.WiredTigerTestCase):
         # a long time, the check for EBUSY means we're not retrying on any real
         # errors. Set the minimum threshold to make sure compaction can be executed.
         compact_cfg = "free_space_target=1MB"
+        if (self.dryrun):
+            compact_cfg += ",dryrun=true"
+
         for i in range(1, 100):
             if not self.raisesBusy(
               lambda: self.session.compact(self.uri, compact_cfg)):
@@ -174,13 +182,17 @@ class test_compact02(wttest.WiredTigerTestCase):
         sz = self.getSize()
         self.pr('After compact ' + str(sz // mb) + 'MB')
 
+        statDict = self.getCompactProgressStats()
         # After compact, the file size should be less than half the full size.
-        if not self.runningHook('tiered'):
+        if not self.runningHook('tiered') and not self.dryrun:
             self.assertLess(sz, self.fullsize // 2)
 
             # Verify compact progress stats.
-            statDict = self.getCompactProgressStats()
             self.assertGreater(statDict["pages_reviewed"],0)
             self.assertGreater(statDict["pages_rewritten"],0)
             self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
                             statDict["pages_reviewed"])
+
+        # Dryrun uses the estimation phase which only works after reviewing at least 1000 pages.
+        if self.dryrun and statDict["pages_reviewed"] > 1000:
+            self.assertGreater(statDict["rewritten_expected"], 0)

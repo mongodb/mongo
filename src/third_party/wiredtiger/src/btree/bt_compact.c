@@ -316,10 +316,7 @@ __wt_compact(WT_SESSION_IMPL *session)
     u_int i;
     bool first, skip;
 
-    uint64_t stats_pages_reviewed;           /* Pages reviewed */
-    uint64_t stats_pages_rewritten;          /* Pages rewritten */
-    uint64_t stats_pages_rewritten_expected; /* How much pages we expect to rewrite */
-    uint64_t stats_pages_skipped;            /* Pages skipped */
+    uint64_t stats_pages_reviewed; /* Pages reviewed */
 
     bm = S2BT(session)->bm;
     ref = NULL;
@@ -339,8 +336,7 @@ __wt_compact(WT_SESSION_IMPL *session)
          * Print the "skipping compaction" message only if this is the first time we are working on
          * this table.
          */
-        __wt_block_compact_get_progress_stats(session, bm, &stats_pages_reviewed,
-          &stats_pages_skipped, &stats_pages_rewritten, &stats_pages_rewritten_expected);
+        __wt_block_compact_get_progress_stats(session, bm, &stats_pages_reviewed);
         if (stats_pages_reviewed == 0)
             __wt_verbose_info(session, WT_VERB_COMPACT,
               "%s: there is no useful work to do - skipping compaction", bm->block->name);
@@ -351,15 +347,6 @@ __wt_compact(WT_SESSION_IMPL *session)
     /* Walk the tree reviewing pages to see if they should be re-written. */
     first = true;
     for (i = 0;;) {
-
-        /* Track progress. */
-        __wt_block_compact_get_progress_stats(session, bm, &stats_pages_reviewed,
-          &stats_pages_skipped, &stats_pages_rewritten, &stats_pages_rewritten_expected);
-        WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, stats_pages_reviewed);
-        WT_STAT_DATA_SET(session, btree_compact_pages_skipped, stats_pages_skipped);
-        WT_STAT_DATA_SET(session, btree_compact_pages_rewritten, stats_pages_rewritten);
-        WT_STAT_DATA_SET(
-          session, btree_compact_pages_rewritten_expected, stats_pages_rewritten_expected);
 
         /*
          * Periodically check if compaction has been interrupted or if eviction is stuck, quit if
@@ -403,6 +390,9 @@ __wt_compact(WT_SESSION_IMPL *session)
             bm->block->compact_internal_pages_reviewed++;
             WT_WITH_PAGE_INDEX(session, ret = __compact_walk_internal(session, ref));
         }
+
+        /* Track progress. */
+        __wt_block_compact_get_progress_stats(session, bm, &stats_pages_reviewed);
 
         WT_ERR(ret);
     }

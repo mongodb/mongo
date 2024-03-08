@@ -1413,6 +1413,7 @@ struct __wt_session {
      * @configstart{WT_SESSION.compact, see dist/api_data.py}
      * @config{background, enable/disabled the background compaction server., a boolean flag;
      * default empty.}
+     * @config{dryrun, run only the estimation phase of compact., a boolean flag; default \c false.}
      * @config{exclude, list of table objects to be excluded from background compaction.  The list
      * is immutable and only applied when the background compaction gets enabled.  The list is not
      * saved between the calls and needs to be reapplied each time the service is enabled.  The
