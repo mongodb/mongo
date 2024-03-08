@@ -44,7 +44,7 @@ assert(
     () =>
         "Response should have an 'electionCandidateMetrics.lastCommittedOpTimeAtElection' field: " +
         tojson(originalPrimaryElectionCandidateMetrics));
-if (FeatureFlagUtil.isPresentAndEnabled(originalPrimary, "featureFlagReduceMajorityWriteLatency")) {
+if (FeatureFlagUtil.isPresentAndEnabled(originalPrimary, "ReduceMajorityWriteLatency")) {
     assert(
         originalPrimaryElectionCandidateMetrics.lastSeenWrittenOpTimeAtElection,
         () =>
@@ -153,7 +153,7 @@ assert.eq(originalPrimaryElectionParticipantMetrics.electionCandidateMemberId, 1
 // Since the node voted for the new primary, we directly assert that its voteReason is equal to
 // empty string.
 assert.eq(originalPrimaryElectionParticipantMetrics.voteReason, "");
-if (FeatureFlagUtil.isPresentAndEnabled(originalPrimary, "featureFlagReduceMajorityWriteLatency")) {
+if (FeatureFlagUtil.isPresentAndEnabled(originalPrimary, "ReduceMajorityWriteLatency")) {
     assert(
         originalPrimaryElectionParticipantMetrics.lastWrittenOpTimeAtElection,
         () =>

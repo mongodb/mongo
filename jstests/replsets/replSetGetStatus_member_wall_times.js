@@ -11,8 +11,8 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 // We use GTE to account for the possibility of other writes in the system (e.g. HMAC).
 // Comparison is GTE by default, GT if 'strict' is specified.
 function checkWallTimes(primary, greaterMemberIndex, lesserMemberIndex, strict = false) {
-    const featureFlagReduceMajorityWriteLatency =
-        FeatureFlagUtil.isPresentAndEnabled(primary, "featureFlagReduceMajorityWriteLatency");
+    const ReduceMajorityWriteLatency =
+        FeatureFlagUtil.isPresentAndEnabled(primary, "ReduceMajorityWriteLatency");
     assert.soonNoExcept(function() {
         let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
         assert(res.members, () => tojson(res));
@@ -21,11 +21,10 @@ function checkWallTimes(primary, greaterMemberIndex, lesserMemberIndex, strict =
         assert(greater, () => tojson(res));
         const greaterApplied = greater.lastAppliedWallTime;
         const greaterDurable = greater.lastAppliedWallTime;
-        const greaterWritten =
-            (featureFlagReduceMajorityWriteLatency) ? greater.lastWrittenWallTime : null;
+        const greaterWritten = (ReduceMajorityWriteLatency) ? greater.lastWrittenWallTime : null;
         assert(greaterApplied, () => tojson(res));
         assert(greaterDurable, () => tojson(res));
-        // If featureFlagReduceMajorityWriteLatency is set, greaterWritten will not be null, so
+        // If ReduceMajorityWriteLatency is set, greaterWritten will not be null, so
         // it'll be truthy.
         if (greaterWritten) {
             assert(greaterWritten, () => tojson(res));
@@ -35,8 +34,7 @@ function checkWallTimes(primary, greaterMemberIndex, lesserMemberIndex, strict =
         assert(lesser, () => tojson(res));
         const lesserApplied = lesser.lastAppliedWallTime;
         const lesserDurable = lesser.lastDurableWallTime;
-        const lesserWritten =
-            (featureFlagReduceMajorityWriteLatency) ? lesser.lastWrittenWallTime : null;
+        const lesserWritten = (ReduceMajorityWriteLatency) ? lesser.lastWrittenWallTime : null;
         assert(lesserApplied, () => tojson(res));
         assert(lesserDurable, () => tojson(res));
         if (lesserWritten) {

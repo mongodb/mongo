@@ -30,8 +30,8 @@ function wallTimeCompare(d1, d2) {
 }
 
 function optimesAndWallTimesAreEqual(replTest, isPersistent) {
-    const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(
-        replTest.getPrimary(), "featureFlagReduceMajorityWriteLatency");
+    const reduceMajorityWriteLatency =
+        FeatureFlagUtil.isPresentAndEnabled(replTest.getPrimary(), "ReduceMajorityWriteLatency");
     let prevReplStatus = replTest.nodes[0].getDB('admin').runCommand({replSetGetStatus: 1});
     let prevOptime = prevReplStatus.optimes.appliedOpTime.ts;
     let prevAppliedWallTime = prevReplStatus.optimes.lastAppliedWallTime;
@@ -47,7 +47,7 @@ function optimesAndWallTimesAreEqual(replTest, isPersistent) {
             (reduceMajorityWriteLatency) ? currentReplStatus.optimes.lastWrittenWallTime : null;
         if (timestampCompare(prevOptime, currOptime) != 0 ||
             wallTimeCompare(prevAppliedWallTime, currAppliedWallTime) != 0 ||
-            // If featureFlagReduceMajorityWriteLatency is set, the prevWrittenWallTime and
+            // If ReduceMajorityWriteLatency is set, the prevWrittenWallTime and
             // currWrittenWallTime will not be null, so they'll be truthy.
             (prevWrittenWallTime && currWrittenWallTime &&
              wallTimeCompare(prevWrittenWallTime, currWrittenWallTime) != 0) ||
