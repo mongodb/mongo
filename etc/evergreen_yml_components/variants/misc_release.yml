@@ -434,7 +434,6 @@ buildvariants:
     - amazon2-arm64-large
   - name: disk_wiredtiger
   - name: .encrypt
-  - name: feature_flag_multiversion_gen
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
