@@ -115,11 +115,13 @@ void prepareWriteBatchForCommit(TrackingContext& trackingContext,
         batch.max = bucket.minmax.max();
     }
 
-    batch.generateCompressedDiff = bucket.usingAlwaysCompressedBuckets &&
-        bucket.movableState.uncompressedBucketDoc.get().get().isEmpty();
-
+    // Move BSONColumnBuilders from Bucket to WriteBatch.
     // See corollary in finish().
-    batch.movableState = std::move(bucket.movableState);
+    batch.intermediateBuilders = std::move(bucket.intermediateBuilders);
+    batch.uncompressedBucketDoc = std::move(bucket.uncompressedBucketDoc);
+    batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
+    batch.generateCompressedDiff =
+        bucket.usingAlwaysCompressedBuckets && batch.uncompressedBucketDoc.get().get().isEmpty();
 }
 
 /**
@@ -573,14 +575,10 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
                                                   batch->bucketHandle.bucketId,
                                                   internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
+        // Move BSONColumnBuilders from WriteBatch to Bucket.
         // See corollary in prepareWriteBatchForCommit().
-        bucket->movableState = std::move(batch->movableState);
-
-        // Re-opened V1 buckets get compressed during commit so we no longer need the uncompressed
-        // bucket document.
-        // TODO SERVER-86542: remove this line.
-        bucket->movableState.uncompressedBucketDoc = makeTrackedBson(catalog.trackingContext, {});
-
+        bucket->bucketIsSortedByTime = batch->bucketIsSortedByTime;
+        bucket->intermediateBuilders = std::move(batch->intermediateBuilders);
         bucket->preparedBatch.reset();
     }
 

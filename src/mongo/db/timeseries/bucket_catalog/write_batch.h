@@ -45,7 +45,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
-#include "mongo/db/timeseries/bucket_catalog/movable_state.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/future.h"
@@ -95,16 +94,27 @@ struct WriteBatch {
     static constexpr std::size_t kNumStaticBatchMeasurements = 10;
     using BatchMeasurements = boost::container::small_vector<BSONObj, kNumStaticBatchMeasurements>;
 
-    // Members owned by the bucket catalog but transferred between the bucket and a prepared batch
-    // for commit.
-    bucket_catalog_internal::MovableState movableState;
-
     BatchMeasurements measurements;
     BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
     uint32_t numPreviouslyCommittedMeasurements = 0;
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
+    TrackedBSONObj uncompressedBucketDoc;
     bool generateCompressedDiff = false;
+
+    /**
+     * In-memory data fields. Allows for quick compression of bucket data.
+     *
+     * Initially these are for committed data fields, but this will be the working set of builders
+     * for the current WriteBatch and will contain uncommitted data fields in
+     * makeTimeseriesCompressedDiffUpdateOp.
+     */
+    MeasurementMap intermediateBuilders;
+
+    // Whether the measurements in the bucket are sorted by timestamp or not.
+    // True by default, if a v2 buckets gets promoted to v3 this is set to false.
+    // It should not be used for v1 buckets.
+    bool bucketIsSortedByTime = true;
 
     bool openedDueToMetadata =
         false;  // If true, bucket has been opened due to the inserted measurement having different

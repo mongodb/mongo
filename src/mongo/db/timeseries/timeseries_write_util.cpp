@@ -250,7 +250,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
         BSONObjBuilder newDataFieldsBuilder;
         BSONObjBuilder updatedDataFieldsBuilder;
 
-        for (auto& entry : batch->movableState.intermediateBuilders.getBuilders()) {
+        for (auto& entry : batch->intermediateBuilders.getBuilders()) {
             auto& cBuilder = std::get<1>(entry.second);
             auto cDiff = cBuilder.intermediate();
 
@@ -721,7 +721,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
 
         // Initialize BSONColumnBuilders which will later get transferred into the Bucket class.
         BSONObj bucketDataDoc = bucketDoc.compressedBucket->getObjectField(kBucketDataFieldName);
-        batch->movableState.intermediateBuilders.initBuilders(
+        batch->intermediateBuilders.initBuilders(
             bucketDataDoc,
             batch->measurements.size());  // i.e. number of to-insert measurements in bucketDataDoc
     }
@@ -774,7 +774,7 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
         BSONObj bucketControlDoc =
             compressionResult.compressedBucket->getObjectField(kBucketControlFieldName);
         int bucketCount = bucketControlDoc.getIntField(kBucketControlCountFieldName);
-        batch->movableState.intermediateBuilders.initBuilders(bucketDataDoc, bucketCount);
+        batch->intermediateBuilders.initBuilders(bucketDataDoc, bucketCount);
     }
 
     auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
@@ -812,15 +812,15 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     invariant(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-    auto& batchBuilders = batch->movableState.intermediateBuilders;
+    auto& batchBuilders = batch->intermediateBuilders;
 
     bool changedToUnsorted = false;
     Timestamp maxCommittedTime =
-        batch->movableState.intermediateBuilders.getBuilder(batch->timeField).last().timestamp();
+        batch->intermediateBuilders.getBuilder(batch->timeField).last().timestamp();
     std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
-    if (batch->movableState.bucketIsSortedByTime &&
+    if (batch->bucketIsSortedByTime &&
         sortedMeasurements.begin()->timeField.timestamp() < maxCommittedTime) {
-        batch->movableState.bucketIsSortedByTime = false;
+        batch->bucketIsSortedByTime = false;
         changedToUnsorted = true;
         batch->stats.incNumBucketsPromoted();
     }
