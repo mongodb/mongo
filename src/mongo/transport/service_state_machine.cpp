@@ -465,7 +465,9 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
             // Format our response, if we have one
             Message& toSink = dbresponse.response;
             if (!toSink.empty()) {
-                invariant(!OpMsg::isFlagSet(_inMessage, OpMsg::kMoreToCome));
+                tassert(ErrorCodes::InternalError,
+                        "Attempted to respond to fire-and-forget request",
+                        !OpMsg::isFlagSet(_inMessage, OpMsg::kMoreToCome));
                 invariant(!OpMsg::isFlagSet(toSink, OpMsg::kChecksumPresent));
 
                 // Update the header for the response message.
