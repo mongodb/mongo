@@ -27,9 +27,31 @@ export function validateShowRecordIdReplicatesAcrossNodes(nodes, dbName, replica
 // Returns the '$recordId' associated with the 'doc' when a find() with 'showRecordId()' is
 // performed.
 export function getRidForDoc(db, collName, doc) {
-    const res = db[collName].find(doc).showRecordId().toArray()[0];
+    assert(db[collName].exists(),
+           `Collection ${db[collName].getFullName()} not found on ${db.getMongo().host}`);
+    const docs = db[collName].find(doc).showRecordId().toArray();
+    assert.eq(docs.length,
+              1,
+              `Document ${tojson(doc)} not found in collection ${db[collName].getFullName()} on ${
+                  db.getMongo().host}`);
+    const res = docs[0];
     assert.neq(res["$recordId"], null);
     return res["$recordId"];
+}
+
+// Generates a map of recordIds keyed by provided field name.
+// 'docs' is an array returned by a find query that must contain both '$recordId' and the field
+// name of the key.
+export function mapFieldToMatchingDocRid(docs, fieldName) {
+    return docs.reduce((m, doc) => {
+        assert(doc.hasOwnProperty(fieldName),
+               `Missing key ${fieldName} in query results: ${tojson(doc)}`);
+        assert(doc.hasOwnProperty('$recordId'),
+               `Missing record ID in query results: ${tojson(doc)}`);
+        const recordId = doc['$recordId'];
+        m[doc[fieldName]] = recordId;
+        return m;
+    }, {});
 }
 
 // Tests that recordIds are preserved during initial sync for collections with
