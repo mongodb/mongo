@@ -1173,6 +1173,10 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
 
         individualSlots = outSlots;
 
+        // Remove the block projections that have been prepared, we are going to build the scalar
+        // version now.
+        blockAccArgExprs.clear();
+
         // buildBlockToRow() just made a bunch of changes to 'childOutputs', so we need
         // to re-generate 'accArgsVec', 'sbAggExprs', and 'accNumSbAggExprs'.
         accArgsVec = generateAllAccumulatorArgs(_state, *groupNode, childOutputs);
