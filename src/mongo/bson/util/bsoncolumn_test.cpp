@@ -3270,6 +3270,92 @@ TEST_F(BSONColumnTest, StringMultiType) {
                         true);
 }
 
+TEST_F(BSONColumnTest, Int64FullControlWithPendingAtFinalize) {
+    BSONColumnBuilder cb;
+
+    // This test completely fills up a control byte with 16 simple8b blocks with the append calls
+    // while leaving the last element in pending. Finalizing will create a new control byte for this
+    // last element. For bucket reopen, we will overflow in the last control byte and but fill it
+    // completely again when appending the pending values. While the overflow code is triggered the
+    // end result should be identical to as-if we just looked at the current control and never
+    // overflowed.
+    std::vector<BSONElement> elems = {
+        createElementInt64(0x3230373139),   createElementInt64(0x3234373139),
+        createElementInt64(0x3236373138),   createElementInt64(0x3238393138),
+        createElementInt64(0x323c393137),   createElementInt64(0x323e393137),
+        createElementInt64(0x323e3b3137),   createElementInt64(0x32403b3136),
+        createElementInt64(0x32443b3136),   createElementInt64(0x642e42293136),
+        createElementInt64(0x643242293136), createElementInt64(0x643442293135),
+        createElementInt64(0x6434422b3135), createElementInt64(0x6436422b3134),
+        createElementInt64(0x643a422b3134), createElementInt64(0x643e42293133),
+        createElementInt64(0x644242293133), createElementInt64(0x644442293132),
+        createElementInt64(0x644642273131), createElementInt64(0x644842273131),
+        createElementInt64(0x644a42273131), createElementInt64(0x644a42293131),
+        createElementInt64(0x644c42293130), createElementInt64(0x644e4229312f)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + 1, elems.begin() + elems.size() - 1, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, deltaInt64(elems.back(), elems.at(22)));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems, true);
+}
+
+TEST_F(BSONColumnTest, StringFullControlWithPendingAtFinalize) {
+    BSONColumnBuilder cb;
+
+    // This test completely fills up a control byte with 16 simple8b blocks with the append calls
+    // while leaving the last element in pending. Finalizing will create a new control byte for this
+    // last element. For bucket reopen, we will overflow in the last control byte and but fill it
+    // completely again when appending the pending values. While the overflow code is triggered the
+    // end result should be identical to as-if we just looked at the current control and never
+    // overflowed.
+    std::vector<BSONElement> elems = {
+        createElementString("20719"_sd),  createElementString("22719"_sd),
+        createElementString("21719"_sd),  createElementString("22819"_sd),
+        createElementString("20819"_sd),  createElementString("21819"_sd),
+        createElementString("21919"_sd),  createElementString("20919"_sd),
+        createElementString("22919"_sd),  createElementString("201019"_sd),
+        createElementString("221019"_sd), createElementString("211019"_sd),
+        createElementString("211119"_sd), createElementString("201119"_sd),
+        createElementString("221119"_sd), createElementString("201219"_sd),
+        createElementString("221219"_sd), createElementString("211219"_sd),
+        createElementString("201319"_sd), createElementString("211319"_sd),
+        createElementString("221319"_sd), createElementString("221419"_sd),
+        createElementString("211419"_sd), createElementString("201419"_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks128(
+        expected,
+        deltaString(elems.begin() + 1, elems.begin() + elems.size() - 1, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elems.back(), elems.at(22)));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems, true);
+}
+
 TEST_F(BSONColumnTest, CodeBase) {
     BSONColumnBuilder cb;
     auto elem = createElementCode("test");

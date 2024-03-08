@@ -813,8 +813,16 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
         }
     }
 
-    if (lastControl == bsoncolumn::kInvalidControlByte &&
-        regular._controlByteOffset != kNoSimple8bControl) {
+    if (regular._controlByteOffset == kNoSimple8bControl) {
+        // Appending pending values can flush out the control byte and leave all remaining values as
+        // pending. We can discard our buffer in this case as this is equivalent to overflowing in
+        // the last simple8b of the 'last' control block.
+        offset += buffer.len();
+        buffer.setlen(0);
+        lastControl = kInvalidControlByte;
+    } else if (lastControl == bsoncolumn::kInvalidControlByte) {
+        // Set last control to current if still unset. This can happen if we never overflowed but
+        // created a control byte when appending the pending values.
         lastControl = *control;
     }
 }
@@ -958,12 +966,6 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
                                 lastForS8b));
     }
 
-    // If we did not overflow earlier we might have written a control byte when appending all
-    // pending values, if this was the case make sure it is recorded.
-    if (regular._controlByteOffset != kNoSimple8bControl) {
-        lastControl = *control;
-    }
-
     // Reset last value if RLE is not possible due to the values appended above
     encoder.simple8bBuilder.resetLastForRLEIfNeeded();
 
@@ -982,6 +984,17 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
         return d128.materialize(*allocator, lastUncompressed, ""_sd);
     }());
     encoder.initialize(regular._previous());
+
+    if (regular._controlByteOffset == kNoSimple8bControl) {
+        // Appending pending values can flush out the control byte and leave all remaining values as
+        // pending. We can discard our buffer in this case as this is equivalent to overflowing in
+        // the last simple8b of the 'last' control block.
+        offset += buffer.len();
+        buffer.setlen(0);
+    } else {
+        // Set last control to current if still unset.
+        lastControl = *control;
+    }
 }
 
 template <typename T>
