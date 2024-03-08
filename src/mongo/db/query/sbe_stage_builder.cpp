@@ -1142,7 +1142,7 @@ std::unique_ptr<sbe::EExpression> SlotBasedStageBuilder::buildLimitSkipSumExpres
                 makeFunction(
                     "typeMatch",
                     sum.clone(),
-                    makeInt32Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
+                    makeInt64Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
                 sum.clone(),
                 makeInt64Constant(std::numeric_limits<int64_t>::max()));
         },
