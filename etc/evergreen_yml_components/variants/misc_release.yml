@@ -2940,7 +2940,6 @@ buildvariants:
   - name: fle
   - name: fle2
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
