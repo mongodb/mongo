@@ -28,7 +28,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
     // Set secondaryOk=true so that we can run commands against any secondaries.
     conn.setSecondaryOk();
 
-    let dbNames;
+    let dbs;
     let result =
         new CommandSequenceWithRetriesImpl(conn)
             .then("running the isMaster command",
@@ -100,13 +100,24 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
                   })
             .then("getting the list of databases",
                   function(conn) {
-                      const res = conn.adminCommand({listDatabases: 1});
+                      const multitenancyRes =
+                          conn.adminCommand({getParameter: 1, multitenancySupport: 1});
+                      const multitenancy =
+                          multitenancyRes.ok && multitenancyRes["multitenancySupport"];
+
+                      const cmdObj =
+                          multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
+                      const res = conn.adminCommand(cmdObj);
                       if (!res.ok) {
                           assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
                           return {shouldStop: true, reason: "cannot run listDatabases"};
                       }
                       assert.commandWorked(res);
-                      dbNames = res.databases.map(dbInfo => dbInfo.name);
+                      dbs = res.databases.map(dbInfo => {
+                          return {
+                              name: dbInfo.name, tenant: dbInfo.tenantId
+                          }
+                      });
                   })
             .execute();
 
@@ -116,8 +127,9 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
     }
 
     const cmds = new CommandSequenceWithRetriesImpl(conn);
-    for (let i = 0; i < dbNames.length; ++i) {
-        const dbName = dbNames[i];
+    for (let i = 0; i < dbs.length; ++i) {
+        const dbName = dbs[i].name;
+        const tenant = dbs[i].tenant;
         cmds.then("validating " + dbName, function(conn) {
             const validateOptions = {
                 full: true,
@@ -135,12 +147,18 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
                 validateOptions.enforceTimeseriesBucketsAreAlwaysCompressed = false;
             }
 
-            const validate_res = validateCollectionsImpl(conn.getDB(dbName), validateOptions);
-            if (!validate_res.ok) {
-                return {
-                    shouldStop: true,
-                    reason: "collection validation failed " + tojson(validate_res)
-                };
+            try {
+                const token = tenant ? _createTenantToken({tenant}) : undefined;
+                conn._setSecurityToken(token);
+                const validate_res = validateCollectionsImpl(conn.getDB(dbName), validateOptions);
+                if (!validate_res.ok) {
+                    return {
+                        shouldStop: true,
+                        reason: "collection validation failed " + tojson(validate_res)
+                    };
+                }
+            } finally {
+                conn._setSecurityToken(undefined);
             }
         });
     }

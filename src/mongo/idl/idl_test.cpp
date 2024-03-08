@@ -4338,7 +4338,8 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
     auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName
                         << nssWithPrefixedTenantId << "field1" << 3 << "$db" << prefixedAdminDb);
 
-    auto testStruct = CommandTypeNamespaceCommand::parse(ctxt, makeOMR(testDoc));
+    auto testStruct = CommandTypeNamespaceCommand::parse(
+        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy));
 
     ASSERT_EQUALS(testStruct.getDbName(),
                   DatabaseName::createDatabaseName_forTest(tenantId, "admin"));

@@ -222,44 +222,6 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequir
 // Command Reply as this is a defaulted parameter where tests that don't specify this parameter
 // already test the default codepath.
 
-TEST(NamespaceStringUtilTest, SerializeMissingExpectPrefix_CommandReply) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    TenantId tenantId(OID::gen());
-    const std::string nsString = "foo.bar";
-    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
-
-    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
-    ctxt_noTenantId.setTenantIdSource(false);
-    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
-    ctxt_withTenantId.setTenantIdSource(true);
-
-    {  // No prefix, no tenantId.
-        // request --> { ns: database.coll }
-        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsString);
-        ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_noTenantId), nsString);
-    }
-
-    {  // Has prefix, no tenantId.
-        // request --> { ns: tenantId_database.coll }
-        auto nss = NamespaceString::createNamespaceString_forTest(boost::none, nsPrefixString);
-        ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_noTenantId), nsPrefixString);
-    }
-
-    {  // No prefix, has tenantId.
-        // request --> { ns: database.coll }
-        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsString);
-        ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_withTenantId), nsString);
-    }
-
-    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll }
-        // in this test, we're getting the toString() for ns, but we also have a tenantId. This
-        // means if we called ns.toStringWithTenantId(), we would see two tenantId prefixes
-        auto nss = NamespaceString::createNamespaceString_forTest(tenantId, nsPrefixString);
-        ASSERT_EQ(NamespaceStringUtil::serialize(nss, ctxt_withTenantId), nsPrefixString);
-    }
-}
-
 TEST(NamespaceStringUtilTest, SerializeExpectPrefixFalse_CommandReply) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
@@ -268,10 +230,8 @@ TEST(NamespaceStringUtilTest, SerializeExpectPrefixFalse_CommandReply) {
 
     SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
     ctxt_noTenantId.setTenantIdSource(false);
-    ctxt_noTenantId.setPrefixState(false);
     SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
     ctxt_withTenantId.setTenantIdSource(true);
-    ctxt_withTenantId.setPrefixState(false);
 
     {  // No prefix, no tenantId.
         // request --> { ns: database.coll }
@@ -339,46 +299,6 @@ TEST(NamespaceStringUtilTest, SerializeExpectPrefixTrue_CommandReply) {
     }
 }
 
-TEST(NamespaceStringUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    TenantId tenantId(OID::gen());
-    const std::string nsString = "foo.bar";
-    const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
-
-    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
-    ctxt_noTenantId.setTenantIdSource(false);
-    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
-    ctxt_withTenantId.setTenantIdSource(true);
-
-    {  // No prefix, no tenantId.   *** we shouldn't see this from Atlas Proxy in MT mode
-        // request --> { ns: database.coll }
-        ASSERT_THROWS_CODE(NamespaceStringUtil::deserialize(boost::none, nsString, ctxt_noTenantId),
-                           AssertionException,
-                           8423387);
-    }
-
-    {  // Has prefix, no tenantId.
-        // request --> { ns: tenantId_database.coll }
-        auto nss = NamespaceStringUtil::deserialize(boost::none, nsPrefixString, ctxt_noTenantId);
-        ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString_forTest(), nsString);
-    }
-
-    {  // No prefix, has tenantId.
-        // request --> { ns: database.coll }
-        auto nss = NamespaceStringUtil::deserialize(tenantId, nsString, ctxt_withTenantId);
-        ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString_forTest(), nsString);
-    }
-
-    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll }
-        auto nss = NamespaceStringUtil::deserialize(tenantId, nsPrefixString, ctxt_withTenantId);
-        ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString_forTest(), nsPrefixString);
-    }
-}
-
 TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
@@ -387,10 +307,8 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
 
     SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
     ctxt_noTenantId.setTenantIdSource(false);
-    ctxt_noTenantId.setPrefixState(false);
     SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
     ctxt_withTenantId.setTenantIdSource(true);
-    ctxt_withTenantId.setPrefixState(false);
 
     {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
         // request --> { ns: database.coll }
@@ -401,12 +319,10 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll }
-        auto nss = NamespaceStringUtil::deserialize(boost::none, nsPrefixString, ctxt_noTenantId);
-        // This is an anomaly, when no tenantId is supplied, we actually ignore expectPrefix, so we
-        // can't expect nss.toString == nsPrefixString as we will still attempt to parse the prefix
-        // as usual.
-        ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString_forTest(), nsString);
+        ASSERT_THROWS_CODE(
+            NamespaceStringUtil::deserialize(boost::none, nsPrefixString, ctxt_noTenantId),
+            AssertionException,
+            8233501);
     }
 
     {  // No prefix, has tenantId.
@@ -416,9 +332,14 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
         ASSERT_EQ(nss.toString_forTest(), nsString);
     }
 
-    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+    {  // Has prefix, has tenantId.  ** Allowed but the prefix is *NOT* stripped (even if it's a
+        // valid tenant ID).
         // request --> { ns: tenantId_database.coll }
-        auto nss = NamespaceStringUtil::deserialize(tenantId, nsPrefixString, ctxt_withTenantId);
+        auto nss = NamespaceStringUtil::deserialize(tenantId, "foo_bar.baz", ctxt_withTenantId);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+        ASSERT_EQ(nss.toString_forTest(), "foo_bar.baz");
+
+        nss = NamespaceStringUtil::deserialize(tenantId, nsPrefixString, ctxt_withTenantId);
         ASSERT_EQ(nss.tenantId(), tenantId);
         ASSERT_EQ(nss.toString_forTest(), nsPrefixString);
     }
@@ -444,11 +365,12 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
                            8423387);
     }
 
-    {  // Has prefix, no tenantId.
+    {  // Has prefix, no tenantId.  Not valid.
         // request --> { ns: tenantId_database.coll, expectPrefix: true }
-        auto nss = NamespaceStringUtil::deserialize(boost::none, nsPrefixString, ctxt_noTenantId);
-        ASSERT_EQ(nss.tenantId(), tenantId);
-        ASSERT_EQ(nss.toString_forTest(), nsString);
+        ASSERT_THROWS_CODE(
+            NamespaceStringUtil::deserialize(boost::none, nsPrefixString, ctxt_noTenantId),
+            AssertionException,
+            8233501);
     }
 
     {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy

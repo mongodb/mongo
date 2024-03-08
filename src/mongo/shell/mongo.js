@@ -93,7 +93,14 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
     return function(driverSession, filter, nameOnly, authorizedDatabases) {
         'use strict';
 
-        let cmdObj = {listDatabases: 1};
+        const multitenancyRes = this.adminCommand({getParameter: 1, multitenancySupport: 1});
+        const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
+
+        // Calling listDatases is only valid if we have a security token in multitenancy mode.
+        // Otherwise we call listDatabasesForAllTenants which list db.name and db.tenantId
+        // separately. The result never has a tenant prefix.
+        let cmdObj = multitenancy && !this._securityToken ? {listDatabasesForAllTenants: 1}
+                                                          : {listDatabases: 1};
         if (filter !== undefined) {
             cmdObj.filter = filter;
         }

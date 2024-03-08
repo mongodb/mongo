@@ -46,7 +46,7 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
             rst = new ReplSetTest(hosts[0]);
         });
 
-        const dbNames = new Set();
+        const dbs = new Map();
         const primary = rst.getPrimary();
 
         const version = assert
@@ -61,24 +61,43 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
         print("Running dbCheck for: " + rst.getURL());
 
         const adminDb = primary.getDB('admin');
-        let res = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
+
+        const multitenancyRes = adminDb.adminCommand({getParameter: 1, multitenancySupport: 1});
+        const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
+
+        const cmdObj = multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
+
+        let res = assert.commandWorked(adminDb.runCommand(cmdObj));
         for (let dbInfo of res.databases) {
-            dbNames.add(dbInfo.name);
+            const key = `${dbInfo.tenantId}_${dbInfo.name}`;
+            const obj = {name: dbInfo.name, tenant: dbInfo.tenantId};
+            dbs.set(key, obj);
         }
 
         // Transactions cannot be run on the following databases so we don't attempt to read at a
         // clusterTime on them either. (The "local" database is also not replicated.)
         // The config.transactions collection is different between primaries and secondaries.
-        dbNames.delete('config');
-        dbNames.delete('local');
+        dbs.forEach((db, key) => {
+            if (["config", "local"].includes(db.name)) {
+                dbs.delete(key);
+            }
+        });
 
-        dbNames.forEach((dbName) => {
-            jsTestLog("dbCheck is starting on database " + dbName + " for RS: " + rst.getURL());
-            runDbCheckForDatabase(rst,
-                                  primary.getDB(dbName),
-                                  true /*awaitCompletion*/,
-                                  20 * 60 * 1000 /*awaitCompletionTimeoutMs*/);
-            jsTestLog("dbCheck is done on database " + dbName + " for RS: " + rst.getURL());
+        dbs.forEach((db, key) => {
+            jsTestLog("dbCheck is starting on database " + (db.tenant ? db.tenant + "_" : "") +
+                      db.name + " for RS: " + rst.getURL());
+            try {
+                const token = db.tenant ? _createTenantToken({tenant: db.tenant}) : undefined;
+                rst.nodes.forEach(node => node._setSecurityToken(token));
+
+                runDbCheckForDatabase(rst,
+                                      primary.getDB(db.name),
+                                      true /*awaitCompletion*/,
+                                      20 * 60 * 1000 /*awaitCompletionTimeoutMs*/);
+            } finally {
+                rst.nodes.forEach(node => node._setSecurityToken(undefined));
+            }
+            jsTestLog("dbCheck is done on database " + db.name + " for RS: " + rst.getURL());
         });
 
         assertForDbCheckErrorsForAllNodes(

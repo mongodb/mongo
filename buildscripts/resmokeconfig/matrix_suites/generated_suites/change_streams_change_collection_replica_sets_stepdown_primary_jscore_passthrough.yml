@@ -36,6 +36,7 @@ executor:
           enableMajorityReadConcern: ''
           hashTestNamesForMultitenancy: true
           logRetryAttempts: true
+          multitenancyExpectPrefix: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 6

@@ -74,7 +74,7 @@ function checkReplDbhashBackgroundThread(hosts) {
 
     const resetFns = [];
     const kForeverSeconds = 1e9;
-    const dbNames = new Set();
+    const dbs = new Map();
 
     // We enable the "WTPreserveSnapshotHistoryIndefinitely" failpoint to ensure that the same
     // snapshot will be available to read at on the primary and secondaries.
@@ -102,14 +102,21 @@ function checkReplDbhashBackgroundThread(hosts) {
         });
     }
 
+    const multitenancyRes =
+        rst.getPrimary().adminCommand({getParameter: 1, multitenancySupport: 1});
+    const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
+
     for (let session of sessions) {
         // Use the session's client directly so FSM workloads that kill random sessions won't
         // interrupt these operations.
         const dbNoSession = session.getClient().getDB('admin');
-        const res =
-            assert.commandWorked(dbNoSession.runCommand({listDatabases: 1, nameOnly: true}));
+
+        const cmdObj = multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
+        const res = assert.commandWorked(dbNoSession.runCommand(cmdObj));
         for (let dbInfo of res.databases) {
-            dbNames.add(dbInfo.name);
+            const key = `${dbInfo.tenantId}_${dbInfo.name}`;
+            const obj = {name: dbInfo.name, tenant: dbInfo.tenantId};
+            dbs.set(key, obj);
         }
         debugInfo.push({
             "node": dbNoSession.getMongo(),
@@ -120,9 +127,11 @@ function checkReplDbhashBackgroundThread(hosts) {
 
     // Transactions cannot be run on the following databases so we don't attempt to read at a
     // clusterTime on them either. (The "local" database is also not replicated.)
-    dbNames.delete('admin');
-    dbNames.delete('config');
-    dbNames.delete('local');
+    dbs.forEach((db, key) => {
+        if (["admin", "config", "local"].includes(db.name)) {
+            dbs.delete(key);
+        }
+    });
 
     const results = [];
 
@@ -258,6 +267,19 @@ function checkReplDbhashBackgroundThread(hosts) {
         return result;
     };
 
+    // When token is not empty, set it on each connection before calling checkCollectionHashesForDB.
+    const checkCollectionHashesForDBWithToken = (dbName, clusterTime, token) => {
+        try {
+            jsTestLog(`About to run setSecurity token on ${rst}`);
+            rst.nodes.forEach(node => node._setSecurityToken(token));
+
+            jsTestLog(`Running checkcollection for ${dbName} with token ${token}`)
+            return checkCollectionHashesForDB(dbName, clusterTime);
+        } finally {
+            rst.nodes.forEach(node => node._setSecurityToken(undefined));
+        }
+    };
+
     // Outside of checkCollectionHashesForDB(), operations in this function are not resilient to
     // their session being killed by a concurrent FSM workload, so the driver sessions started above
     // have not been used and will have contain null logical time values. The process for selecting
@@ -265,12 +287,15 @@ function checkReplDbhashBackgroundThread(hosts) {
     // through each session to populate its logical times.
     sessions.forEach(session => session.getDatabase('admin').runCommand({ping: 1}));
 
-    for (let dbName of dbNames) {
+    for (const [key, db] of dbs) {
         let result;
         let clusterTime;
         let previousClusterTime;
         let hasTransientError;
         let performNoopWrite;
+
+        const dbName = db.name;
+        const token = db.tenant ? _createTenantToken({tenant: db.tenant}) : undefined;
 
         // The isTransientError() function is responsible for setting hasTransientError to true.
         const isTransientError = (e) => {
@@ -346,7 +371,7 @@ function checkReplDbhashBackgroundThread(hosts) {
                     });
                 }
 
-                result = checkCollectionHashesForDB(dbName, clusterTime);
+                result = checkCollectionHashesForDBWithToken(dbName, clusterTime, token);
             } catch (e) {
                 if (isTransientError(e)) {
                     if (performNoopWrite) {

@@ -248,7 +248,7 @@ public:
             reqSerializationCtx.setTenantIdSource(vts->hasTenantId());
             // TODO SERVER-82320 we should no longer need to check here once expectPrefix only comes
             // from the unsigned security token.
-            if (reqSerializationCtx.getPrefix() == SerializationContext::Prefix::Default) {
+            if (reqSerializationCtx.getPrefix() == SerializationContext::Prefix::ExcludePrefix) {
                 reqSerializationCtx.setPrefixState(vts->isFromAtlasProxy());
             }
         }

@@ -78,39 +78,50 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
 
     // Validate all collections in every database.
 
-    const dbNames =
-        assert
-            .commandWorked(conn.adminCommand(
-                {"listDatabases": 1, "nameOnly": true, "$readPreference": {"mode": "nearest"}}))
-            .databases.map(function(z) {
+    const multitenancyRes = conn.adminCommand({getParameter: 1, multitenancySupport: 1});
+    const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
+
+    const cmdObj = multitenancy
+        ? {"listDatabasesForAllTenants": 1, "$readPreference": {"mode": "nearest"}}
+        : {"listDatabases": 1, "nameOnly": true, "$readPreference": {"mode": "nearest"}};
+
+    const dbs = assert.commandWorked(conn.adminCommand(cmdObj)).databases.map(function(z) {
+        return {name: z.name, tenant: z.tenantId};
+    });
+
+    conn.adminCommand({configureFailPoint: "crashOnMultikeyValidateFailure", mode: "alwaysOn"});
+    for (let dbInfo of dbs) {
+        const dbName = dbInfo.name;
+        const token = dbInfo.tenant ? _createTenantToken({tenant: dbInfo.tenant}) : undefined;
+
+        try {
+            conn._setSecurityToken(token);
+            let db = conn.getDB(dbName);
+
+            // TODO (SERVER-25493): Change filter to {type: 'collection'}.
+            const listCollRes = assert.commandWorked(db.runCommand({
+                "listCollections": 1,
+                "nameOnly": true,
+                "filter": {$or: [{type: 'collection'}, {type: {$exists: false}}]},
+                "$readPreference": {"mode": "nearest"},
+            }));
+            const collectionNames = new DBCommandCursor(db, listCollRes).map(function(z) {
                 return z.name;
             });
 
-    conn.adminCommand({configureFailPoint: "crashOnMultikeyValidateFailure", mode: "alwaysOn"});
-    for (let dbName of dbNames) {
-        let db = conn.getDB(dbName);
+            for (let collectionName of collectionNames) {
+                let res = conn.getDB(dbName).getCollection(collectionName).runCommand({
+                    "validate": collectionName,
+                    background: true,
+                    "$readPreference": {"mode": "nearest"}
+                });
 
-        // TODO (SERVER-25493): Change filter to {type: 'collection'}.
-        const listCollRes = assert.commandWorked(db.runCommand({
-            "listCollections": 1,
-            "nameOnly": true,
-            "filter": {$or: [{type: 'collection'}, {type: {$exists: false}}]},
-            "$readPreference": {"mode": "nearest"},
-        }));
-        const collectionNames = new DBCommandCursor(db, listCollRes).map(function(z) {
-            return z.name;
-        });
-
-        for (let collectionName of collectionNames) {
-            let res = conn.getDB(dbName).getCollection(collectionName).runCommand({
-                "validate": collectionName,
-                background: true,
-                "$readPreference": {"mode": "nearest"}
-            });
-
-            if ((!res.ok && !isIgnorableErrorFunc(res.codeName)) || (res.valid === false)) {
-                failedValidateResults.push({"ns": dbName + "." + collectionName, "res": res});
+                if ((!res.ok && !isIgnorableErrorFunc(res.codeName)) || (res.valid === false)) {
+                    failedValidateResults.push({"ns": dbName + "." + collectionName, "res": res});
+                }
             }
+        } finally {
+            conn._setSecurityToken(undefined);
         }
     }
     conn.adminCommand({configureFailPoint: "crashOnMultikeyValidateFailure", mode: "off"});

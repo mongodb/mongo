@@ -52,7 +52,7 @@ namespace {
 // infer the `tenantId`.
 auto const kSerializationContext = SerializationContext{SerializationContext::Source::Command,
                                                         SerializationContext::CallerType::Request,
-                                                        SerializationContext::Prefix::Default,
+                                                        SerializationContext::Prefix::ExcludePrefix,
                                                         true /* nonPrefixedTenantId */};
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,

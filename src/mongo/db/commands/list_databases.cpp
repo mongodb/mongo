@@ -111,6 +111,7 @@ public:
             const bool nameOnly = cmd.getNameOnly();
 
             const auto& tenantId = cmd.getDbName().tenantId();
+
             // {authorizedDatabases: bool} - Dynamic default based on permissions.
             const bool authorizedDatabases = ([as, tenantId](const boost::optional<bool>& authDB) {
                 const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
@@ -142,6 +143,11 @@ public:
             std::vector<ListDatabasesReplyItem> items;
             SerializationContext scReply =
                 SerializationContext::stateCommandReply(cmd.getSerializationContext());
+            if (gMultitenancySupport && !tenantId) {
+                // During the multitenancy upgrade process a mongod might receive listDatabases from
+                // a non-multitenant node (with prefix and without token) during initial sync.
+                scReply.setPrefixState(true);
+            }
             int64_t totalSize = list_databases::setReplyItems(opCtx,
                                                               dbNames,
                                                               items,

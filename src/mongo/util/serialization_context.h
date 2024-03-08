@@ -76,11 +76,11 @@ struct SerializationContext {
      * tenant ID in the reply.  This field in the request can either be true, false, or not present,
      * the latter represented by the default state.
      */
-    enum class Prefix { Default, IncludePrefix, ExcludePrefix };
+    enum class Prefix { IncludePrefix, ExcludePrefix };
 
     SerializationContext(Source source = Source::Default,
                          CallerType callerType = CallerType::None,
-                         Prefix prefixState = Prefix::Default,
+                         Prefix prefixState = Prefix::ExcludePrefix,
                          bool nonPrefixedTenantId = false)
         : _source(source),
           _callerType(callerType),

@@ -60,15 +60,7 @@ assert(adminDb.auth('admin', 'pwd'));
     fad = assert.commandWorked(
         testDb.runCommand({findAndModify: "myColl0", query: {a: 11}, update: {$inc: {a: 10}}}));
     assert.eq({_id: 0, a: 11, b: 1}, fad.value, tojson(fad));
-
-    // Check that we do find the doc when the tenantId was passed as a prefix.  Without a security
-    // token, the tenantId MUST be prefixed in a multitenant environment.
     primary._setSecurityToken(undefined);
-    const findAndModPrefixed =
-        primary.getDB(kTenant + '_myDb0')
-            .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}});
-    assert.commandWorked(findAndModPrefixed);
-    assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value, tojson(findAndModPrefixed));
 }
 
 rst.stopSet();

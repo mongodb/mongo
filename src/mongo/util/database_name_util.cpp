@@ -86,8 +86,6 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
     if (context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
-                // fallthrough
-            case SerializationContext::Prefix::Default:
                 return dbName.toString();
             case SerializationContext::Prefix::IncludePrefix:
                 return dbName.toStringWithTenantId();
@@ -100,8 +98,6 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return dbName.toString();
-        case SerializationContext::Prefix::Default:
-            // fallthrough
         case SerializationContext::Prefix::IncludePrefix:
             return dbName.toStringWithTenantId();
         default:
@@ -197,10 +193,9 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
     // We received a tenantId from $tenant or the security token.
     if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
-            case SerializationContext::Prefix::ExcludePrefix:
-                // fallthrough
-            case SerializationContext::Prefix::Default:
+            case SerializationContext::Prefix::ExcludePrefix: {
                 return DatabaseName(std::move(tenantId), db);
+            }
             case SerializationContext::Prefix::IncludePrefix: {
                 auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
                 if (!dbName.tenantId() && dbName.isInternalDb()) {
@@ -229,8 +224,13 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
 
     // We received the tenantId from the prefix.
     auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
-    if (!dbName.isInternalDb() && !dbName.isExternalDB())
-        uassert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
+    uassert(8233503,
+            str::stream() << "Atlas Proxy protocol must be true when there is a tenantId prefix "
+                          << db,
+            !dbName.hasTenantId());
+    uassert(8423388,
+            str::stream() << "TenantId must be set on " << db,
+            dbName.isInternalDb() || dbName.isExternalDB());
 
     return dbName;
 }

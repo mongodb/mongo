@@ -57,6 +57,7 @@ executor:
           hashTestNamesForMultitenancy: true
           useSecurityToken: true
           useResponsePrefixChecking: true
+          multitenancyExpectPrefix: true
   hooks:
   - class: CheckReplOplogs
   - class: CheckReplDBHash

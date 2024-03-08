@@ -32,8 +32,7 @@ function createAndSetSecurityToken(primary) {
 
 function securityTokenMissing(primary) {
     const db = primary.getDB(tenant + "_SecTokenMissing");
-    // TODO SERVER-82335: test with assert.commandFailed instead of assert.commandWork.
-    assert.commandWorked(db.runCommand(insertCmd));
+    assert.commandFailedWithCode(db.runCommand(insertCmd), 8233503);
 }
 
 function tenantPrefixMissing(primary) {

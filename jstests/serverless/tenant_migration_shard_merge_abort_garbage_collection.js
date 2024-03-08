@@ -120,6 +120,7 @@ function runTest({multitenancySupport}) {
     tenantMigrationTest.stop();
 }
 
-runTest({multitenancySupport: true});
+// TODO SERVER-87536 Re-enable this test when multitenancy is enabled.
+// runTest({multitenancySupport: true});
 
 runTest({multitenancySupport: false});

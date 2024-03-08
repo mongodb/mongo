@@ -310,7 +310,7 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
         // reportCurrentOpForClient.
         auto sc = SerializationContext(SerializationContext::Source::Command,
                                        SerializationContext::CallerType::Reply,
-                                       SerializationContext::Prefix::Default,
+                                       SerializationContext::Prefix::ExcludePrefix,
                                        true);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 
@@ -373,10 +373,10 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
         command,
         NetworkOp::dbQuery);
 
-    // Test without using the expectPrefix field.
-    for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
+    // Test expectPrefix field.
+    for (bool expectPrefix : {false, true}) {
         SerializationContext sc = SerializationContext::stateCommandReply();
-        sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
+        sc.setPrefixState(expectPrefix);
 
         BSONObjBuilder builder;
         {
@@ -385,9 +385,7 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
         }
         auto bsonObj = builder.done();
 
-        std::string serializedNs = tenantIdFromDollarTenantOrSecurityToken
-            ? "testDb.coll"
-            : tid.toString() + "_testDb.coll";
+        std::string serializedNs = expectPrefix ? tid.toString() + "_testDb.coll" : "testDb.coll";
         ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
     }
 }

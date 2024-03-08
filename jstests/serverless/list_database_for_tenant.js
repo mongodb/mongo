@@ -50,10 +50,14 @@ function runTests() {
     const tenant2 = ObjectId();
     const tenant3 = ObjectId();
 
-    createAndSetSecurityToken(primary, tenant, false);
-    insertDb(primary, tenant + "_firstRegDb");
-    checkDbNum(primary, 1);
-    resetSecurityToken(primary)
+    {
+        const conn = Mongo(primary.host);
+        assert(conn.getDB("admin").auth('admin', 'pwd'));
+        createAndSetSecurityToken(conn, tenant, true);
+        insertDb(conn, tenant + "_firstRegDb");
+        checkDbNum(conn, 1);
+        resetSecurityToken(conn)
+    }
 
     createAndSetSecurityToken(primary, tenant2, false);
     insertDb(primary, "secondRegDb");

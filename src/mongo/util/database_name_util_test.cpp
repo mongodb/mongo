@@ -179,42 +179,6 @@ TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequireTe
 // Command Reply as this is a defaulted parameter where tests that don't specify this parameter
 // already test the default codepath.
 
-TEST(DatabaseNameUtilTest, SerializeMissingExpectPrefix_CommandReply) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    TenantId tenantId(OID::gen());
-    const std::string dbnString = "foo";
-    const std::string dbnPrefixString = str::stream() << tenantId.toString() << "_" << dbnString;
-
-    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
-    ctxt_noTenantId.setTenantIdSource(false);
-    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
-    ctxt_withTenantId.setTenantIdSource(true);
-
-    {  // No prefix, no tenantId.
-        // request --> { ns: database.coll }
-        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnString);
-    }
-
-    {  // Has prefix, no tenantId.
-        // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnPrefixString);
-    }
-
-    {  // No prefix, has tenantId.
-        // request --> { ns: database.coll }
-        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnString);
-    }
-
-    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnPrefixString);
-    }
-}
-
 TEST(DatabaseNameUtilTest, SerializeExpectPrefixFalse_CommandReply) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
@@ -223,10 +187,8 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixFalse_CommandReply) {
 
     SerializationContext ctxt_noTenantId(SerializationContext::stateCommandReply());
     ctxt_noTenantId.setTenantIdSource(false);
-    ctxt_noTenantId.setPrefixState(false);
     SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
     ctxt_withTenantId.setTenantIdSource(true);
-    ctxt_withTenantId.setPrefixState(false);
 
     {  // No prefix, no tenantId.
         // request --> { ns: database.coll }
@@ -342,46 +304,6 @@ TEST(DatabaseNameUtilTest, Serialize_StorageCatalog) {
     }
 }
 
-TEST(DatabaseNameUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    TenantId tenantId(OID::gen());
-    const std::string dbnString = "foo";
-    const std::string dbnPrefixString = str::stream() << tenantId.toString() << "_" << dbnString;
-
-    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
-    ctxt_noTenantId.setTenantIdSource(false);
-    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
-    ctxt_withTenantId.setTenantIdSource(true);
-
-    {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
-        // request --> { ns: database.coll }
-        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId),
-                           AssertionException,
-                           8423388 /*"TenantId must be set"*/);
-    }
-
-    {  // Has prefix, no tenantId.
-        // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId);
-        ASSERT_EQ(dbName.tenantId(), tenantId);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
-    }
-
-    {  // No prefix, has tenantId.
-        // request --> { ns: database.coll }
-        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnString, ctxt_withTenantId);
-        ASSERT_EQ(dbName.tenantId(), tenantId);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
-    }
-
-    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
-        ASSERT_EQ(dbName.tenantId(), tenantId);
-        ASSERT_EQ(dbName.toString_forTest(), dbnPrefixString);
-    }
-}
-
 TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
@@ -390,10 +312,8 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
 
     SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
     ctxt_noTenantId.setTenantIdSource(false);
-    ctxt_noTenantId.setPrefixState(false);
     SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
     ctxt_withTenantId.setTenantIdSource(true);
-    ctxt_withTenantId.setPrefixState(false);
 
     {
         // No prefix, no tenantId.
@@ -405,12 +325,10 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId);
-        // This is an anomaly, when no tenantId is supplied, we actually ignore expectPrefix, so we
-        // can't expect dbName.toString == dbnPrefixString as we will still attempt to parse the
-        // prefix as usual.
-        ASSERT_EQ(dbName.tenantId(), tenantId);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
+        ASSERT_THROWS_CODE(
+            DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId),
+            AssertionException,
+            8233503);
     }
 
     {  // No prefix, has tenantId.
@@ -420,9 +338,14 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 
-    {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: tenantId_database.coll }
-        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
+    {
+        // Has prefix, has tenantId. ** Allowed however the prefix is *not* extracted.
+        auto dbName = DatabaseNameUtil::deserialize(tenantId, "foo_bar", ctxt_withTenantId);
+        ASSERT_EQ(dbName.tenantId(), tenantId);
+        ASSERT_EQ(dbName.toString_forTest(), "foo_bar");
+
+        // The prefix could be a valid tenant string.
+        dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnPrefixString);
     }
@@ -449,11 +372,12 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
                            8423388 /*"TenantId must be set"*/);
     }
 
-    {  // Has prefix, no tenantId.
+    {  // Has prefix, no tenantId. Not Valid.
         // request --> { ns: tenantId_database.coll, expectPrefix: true }
-        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId);
-        ASSERT_EQ(dbName.tenantId(), tenantId);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
+        ASSERT_THROWS_CODE(
+            DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId),
+            AssertionException,
+            8233503);
     }
 
     {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy

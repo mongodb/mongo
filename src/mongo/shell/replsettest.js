@@ -2593,7 +2593,14 @@ var ReplSetTest = function ReplSetTest(opts) {
             // Use '_primary' instead of getPrimary() to avoid the detection of a new primary.
             // '_primary' must have been populated.
             const primary = rst._primary;
-            let combinedDBs = new Set(primary.getDBNames());
+
+            let combinedDBs = new Map();
+            primary.getDBs().databases.map(db => {
+                const key = `${db.tenantId}_${db.name}`;
+                const obj = {"name": db.name, "tenant": db.tenantId};
+                combinedDBs.set(key, obj);
+            });
+
             const replSetConfig = rst.getReplSetConfigFromNode();
 
             print("checkDBHashesForReplSet waiting for secondaries to be ready: " +
@@ -2610,59 +2617,77 @@ var ReplSetTest = function ReplSetTest(opts) {
                 }
                 print("checkDBHashesForReplSet going to check data hashes on secondary: " +
                       node.host);
-                node.getDBNames().forEach(dbName => combinedDBs.add(dbName));
+                node.getDBs().databases.forEach(db => {
+                    const key = `${db.tenantId}_${db.name}`;
+                    const obj = {"name": db.name, "tenant": db.tenantId};
+                    combinedDBs.set(key, obj);
+                });
             });
 
-            for (const dbName of combinedDBs) {
+            for (const [key, db] of combinedDBs) {
+                const expectPrefix = TestData.multitenancyExpectPrefix ? true : false;
+                const tenant = db.tenant;
+                const dbName = expectPrefix && tenant ? tenant + '_' + db.name : db.name;
+
                 if (Array.contains(dbDenylist, dbName)) {
                     continue;
                 }
 
-                const dbHashes = rst.getHashes(dbName, secondaries);
-                const primaryDBHash = dbHashes.primary;
-                const primaryCollections = Object.keys(primaryDBHash.collections);
-                assert.commandWorked(primaryDBHash);
+                const token = db.tenant ? _createTenantToken({tenant, expectPrefix}) : undefined;
+                try {
+                    primary._setSecurityToken(token);
+                    secondaries.forEach(node => node._setSecurityToken(token));
 
-                // Filter only collections that were retrieved by the dbhash. listCollections
-                // may include non-replicated collections like system.profile.
-                const primaryCollInfos = new CollInfos(primary, 'primary', dbName);
-                primaryCollInfos.filter(primaryCollections);
+                    const dbHashes = rst.getHashes(dbName, secondaries);
+                    const primaryDBHash = dbHashes.primary;
+                    const primaryCollections = Object.keys(primaryDBHash.collections);
+                    assert.commandWorked(primaryDBHash);
 
-                dbHashes.secondaries.forEach(secondaryDBHash => {
-                    assert.commandWorked(secondaryDBHash);
+                    // Filter only collections that were retrieved by the dbhash.
+                    // listCollections may include non-replicated collections like
+                    // system.profile.
+                    const primaryCollInfos = new CollInfos(primary, 'primary', dbName);
+                    primaryCollInfos.filter(primaryCollections);
 
-                    const secondary = secondaryDBHash._mongo;
-                    const secondaryCollections = Object.keys(secondaryDBHash.collections);
-                    // Check that collection information is consistent on the primary and
-                    // secondaries.
-                    const secondaryCollInfos = new CollInfos(secondary, 'secondary', dbName);
-                    secondaryCollInfos.filter(secondaryCollections);
+                    dbHashes.secondaries.forEach(secondaryDBHash => {
+                        assert.commandWorked(secondaryDBHash);
 
-                    const hasSecondaryIndexes =
-                        replSetConfig.members[rst.getNodeId(secondary)].buildIndexes !== false;
+                        const secondary = secondaryDBHash._mongo;
+                        const secondaryCollections = Object.keys(secondaryDBHash.collections);
+                        // Check that collection information is consistent on the primary and
+                        // secondaries.
+                        const secondaryCollInfos = new CollInfos(secondary, 'secondary', dbName);
+                        secondaryCollInfos.filter(secondaryCollections);
 
-                    print(`checking db hash between primary: ${primary.host}, and secondary: ${
-                        secondary.host}`);
-                    success = DataConsistencyChecker.checkDBHash(primaryDBHash,
-                                                                 primaryCollInfos,
-                                                                 secondaryDBHash,
-                                                                 secondaryCollInfos,
-                                                                 msgPrefix,
-                                                                 ignoreUUIDs,
-                                                                 hasSecondaryIndexes,
-                                                                 collectionPrinted) &&
-                        success;
+                        const hasSecondaryIndexes =
+                            replSetConfig.members[rst.getNodeId(secondary)].buildIndexes !== false;
 
-                    if (!success) {
-                        if (!hasDumpedOplog) {
-                            print("checkDBHashesForReplSet dumping oplogs from all nodes");
-                            this.dumpOplog(primary, {}, 100);
-                            rst.getSecondaries().forEach(secondary =>
-                                                             this.dumpOplog(secondary, {}, 100));
-                            hasDumpedOplog = true;
+                        print(`checking db hash between primary: ${primary.host}, and secondary: ${
+                            secondary.host}`);
+                        success = DataConsistencyChecker.checkDBHash(primaryDBHash,
+                                                                     primaryCollInfos,
+                                                                     secondaryDBHash,
+                                                                     secondaryCollInfos,
+                                                                     msgPrefix,
+                                                                     ignoreUUIDs,
+                                                                     hasSecondaryIndexes,
+                                                                     collectionPrinted) &&
+                            success;
+
+                        if (!success) {
+                            if (!hasDumpedOplog) {
+                                print("checkDBHashesForReplSet dumping oplogs from all nodes");
+                                this.dumpOplog(primary, {}, 100);
+                                rst.getSecondaries().forEach(
+                                    secondary => this.dumpOplog(secondary, {}, 100));
+                                hasDumpedOplog = true;
+                            }
                         }
-                    }
-                });
+                    });
+                } finally {
+                    primary._setSecurityToken(undefined);
+                    secondaries.forEach(node => node._setSecurityToken(undefined));
+                }
             }
 
             assert(success, 'dbhash mismatch between primary and secondary');
@@ -3062,8 +3087,10 @@ var ReplSetTest = function ReplSetTest(opts) {
     }
 
     function checkTenantChangeCollection(
-        rst, secondaries, tenantDatabaseName, msgPrefix = 'checkTenantChangeCollection') {
-        print(`${msgPrefix} -- starting check on ${tenantDatabaseName}.system.change_collection`);
+        rst, secondaries, db, msgPrefix = 'checkTenantChangeCollection') {
+        const tenantDatabaseName = db.name;
+        print(`${msgPrefix} -- starting check on ${db.tenantId} ${
+            tenantDatabaseName}.system.change_collection`);
 
         // Prepare reverse read from the primary and specified secondaries.
         const nodes = [rst.getPrimary(), ...secondaries];
@@ -3148,9 +3175,21 @@ var ReplSetTest = function ReplSetTest(opts) {
         rst.awaitSecondaryNodes(rst.kDefaultTimeoutMS, secondaries);
 
         // Get all change_collections for all tenants.
-        let dbNames = rst.getPrimary().getDBNames();
-        dbNames = dbNames.filter((name) => name.endsWith("_config") || name == "config");
-        dbNames.forEach(dbName => checkTenantChangeCollection(rst, secondaries, dbName));
+        let dbs = rst.getPrimary().getDBs();
+        dbs = dbs.databases.filter((db) => db.name.endsWith("_config") || db.name == "config");
+        dbs.forEach(db => {
+            if (db.tenantId) {
+                try {
+                    const token = _createTenantToken({tenant: db.tenantId})
+                    rst.nodes.forEach(node => node._setSecurityToken(token));
+                    checkTenantChangeCollection(rst, secondaries, db);
+                } finally {
+                    rst.nodes.forEach(node => node._setSecurityToken(undefined));
+                }
+            } else {
+                checkTenantChangeCollection(rst, secondaries, db);
+            }
+        });
         print(`${msgPrefix} -- change_collection check complete.`);
     }
 

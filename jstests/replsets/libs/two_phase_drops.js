@@ -87,20 +87,29 @@ export class TwoPhaseDropCollectionTest {
      */
     static waitForAllCollectionDropsToComplete(conn) {
         assert.soon(function() {
-            const dbNames = conn.getDBNames();
-            for (let dbName of dbNames) {
-                const currDB = conn.getDB(dbName);
-                let collectionsWithPending =
-                    TwoPhaseDropCollectionTest.listCollections(currDB, {includePendingDrops: true});
-                let collectionsNoPending = TwoPhaseDropCollectionTest.listCollections(currDB);
-                if (!arrayEq(collectionsWithPending, collectionsNoPending)) {
-                    // Do a write on the primary to ensure that the commit point advances.
-                    let cmd = {
-                        appendOplogNote: 1,
-                        data: {id: "waitForAllCollectionDropsToCompleteHelper"}
-                    };
-                    FixtureHelpers.runCommandOnEachPrimary({db: conn.getDB("admin"), cmdObj: cmd});
-                    return false;
+            const dbs = conn.getDBs().databases;
+            for (let db of dbs) {
+                const dbName = db.name;
+                const tenant = db.tenantId;
+                const token = tenant ? _createTenantToken({tenant}) : undefined;
+                try {
+                    conn._setSecurityToken(token);
+                    const currDB = conn.getDB(dbName);
+                    let collectionsWithPending = TwoPhaseDropCollectionTest.listCollections(
+                        currDB, {includePendingDrops: true});
+                    let collectionsNoPending = TwoPhaseDropCollectionTest.listCollections(currDB);
+                    if (!arrayEq(collectionsWithPending, collectionsNoPending)) {
+                        // Do a write on the primary to ensure that the commit point advances.
+                        let cmd = {
+                            appendOplogNote: 1,
+                            data: {id: "waitForAllCollectionDropsToCompleteHelper"}
+                        };
+                        FixtureHelpers.runCommandOnEachPrimary(
+                            {db: conn.getDB("admin"), cmdObj: cmd});
+                        return false;
+                    }
+                } finally {
+                    conn._setSecurityToken(undefined);
                 }
             }
             return true;

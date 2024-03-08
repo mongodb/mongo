@@ -77,18 +77,29 @@ export const awaitDbCheckCompletion =
             "dbCheck timed out for database: " + db.getName() + " for RS: " + replSet.getURL(),
             awaitCompletionTimeoutMs);
 
-        replSet.awaitSecondaryNodes();
-        replSet.awaitReplication();
+        const tokens = replSet.nodes.map(node => node._securityToken);
+        try {
+            // This function might be called with a security token (to specify a tenant) on a
+            // connection. Calling tenant agnostic commands to await replication conflict with this
+            // token so temporarily remove it.
+            replSet.nodes.forEach(node => node._setSecurityToken(undefined));
+            replSet.awaitSecondaryNodes();
+            replSet.awaitReplication();
 
-        if (waitForHealthLogDbCheckStop) {
-            forEachNonArbiterNode(replSet, function(node) {
-                const healthlog = node.getDB('local').system.healthlog;
-                assert.soon(
-                    function() {
-                        return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
-                    },
-                    "dbCheck command didn't complete for database: " + db.getName() +
-                        " for RS: " + replSet.getURL());
+            if (waitForHealthLogDbCheckStop) {
+                forEachNonArbiterNode(replSet, function(node) {
+                    const healthlog = node.getDB('local').system.healthlog;
+                    assert.soon(
+                        function() {
+                            return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
+                        },
+                        "dbCheck command didn't complete for database: " + db.getName() +
+                            " for RS: " + replSet.getURL());
+                });
+            }
+        } finally {
+            replSet.nodes.forEach((node, idx) => {
+                node._setSecurityToken(tokens[idx]);
             });
         }
     };

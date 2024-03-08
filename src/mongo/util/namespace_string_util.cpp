@@ -114,8 +114,6 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
     if (context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
-                // fallthrough
-            case SerializationContext::Prefix::Default:
                 return ns.toString();
             case SerializationContext::Prefix::IncludePrefix:
                 return ns.toStringWithTenantId();
@@ -128,8 +126,6 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return ns.toString();
-        case SerializationContext::Prefix::Default:
-            // fallthrough
         case SerializationContext::Prefix::IncludePrefix:
             return ns.toStringWithTenantId();
         default:
@@ -215,10 +211,9 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
     // We received a tenantId from $tenant or the security token.
     if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
-            case SerializationContext::Prefix::ExcludePrefix:
-                // fallthrough
-            case SerializationContext::Prefix::Default:
+            case SerializationContext::Prefix::ExcludePrefix: {
                 return NamespaceString(std::move(tenantId), ns);
+            }
             case SerializationContext::Prefix::IncludePrefix: {
                 auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
                 massert(8423385,
@@ -241,12 +236,13 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
 
     // We received the tenantId from the prefix.
     auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
-    if ((nss.dbName() != DatabaseName::kAdmin) && (nss.dbName() != DatabaseName::kLocal) &&
-        (nss.dbName() != DatabaseName::kConfig)) {
-        massert(8423387,
-                str::stream() << "TenantId must be set on nss " << ns,
-                nss.tenantId() != boost::none);
-    }
+    uassert(8233501,
+            str::stream() << "The tenantId must be passed explicitely " << ns,
+            !nss.hasTenantId());
+    uassert(8423387,
+            str::stream() << "TenantId must be set on nss " << ns,
+            nss.dbName() == DatabaseName::kAdmin || nss.dbName() == DatabaseName::kLocal ||
+                nss.dbName() == DatabaseName::kConfig);
 
     return nss;
 }

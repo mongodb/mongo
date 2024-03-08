@@ -257,16 +257,6 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
-  name: concurrency_multitenancy_replication_with_atlas_proxy_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-      resmoke_args: --numClientsPerFixture=2 --useTenantClient
-
-- <<: *gen_task_template
   name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
   commands:
@@ -407,22 +397,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: libunwind
-
-- <<: *gen_task_template
-  name: multitenancy_shard_merge_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_shard_merge_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: multitenancy_with_atlas_proxy_jscore_passthrough_gen

@@ -38,6 +38,7 @@ const testDb = primary.getDB(kPrefixedDbName);
 const otherTestDb = primary.getDB(kDbOtherName);
 const testColl = testDb.getCollection(kCollName);
 
+TestData.multitenancyExpectPrefix = true;
 const securityToken = _createTenantToken({tenant: kTenant, expectPrefix: true});
 const otherSecurityToken = _createTenantToken({tenant: kOtherTenant, expectPrefix: true});
 
@@ -551,7 +552,7 @@ const otherSecurityToken = _createTenantToken({tenant: kOtherTenant, expectPrefi
 
     assert.commandFailedWithCode(
         testDb.runCommand({mapReduce: kCollA, map: mapFunc, reduce: reduceFunc, out: {inline: 1}}),
-        31264);
+        8233503);
 }
 
 primary._setSecurityToken(undefined);
