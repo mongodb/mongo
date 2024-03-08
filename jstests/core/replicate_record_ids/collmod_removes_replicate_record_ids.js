@@ -7,6 +7,7 @@
  * @tags: [
  *   assumes_no_implicit_collection_creation_on_get_collection,
  *   assumes_no_implicit_collection_creation_after_drop,  # common tag in collMod tests.
+ *   expects_explicit_underscore_id_index,
  *   requires_non_retryable_commands, # common tag in collMod tests.
  *   featureFlagRecordIdsReplicated,
  * ]
@@ -18,7 +19,7 @@ coll.drop();
 
 // Create a collection with the param set.
 jsTestLog('Creating collection ' + coll.getFullName());
-db.runCommand({create: collName, recordIdsReplicated: true});
+assert.commandWorked(db.runCommand({create: collName, recordIdsReplicated: true}));
 jsTestLog('Created collection ' + coll.getFullName());
 
 let collInfo = coll.exists();

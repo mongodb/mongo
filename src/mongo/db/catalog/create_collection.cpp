@@ -679,6 +679,12 @@ Status _createCollection(
                               "The 'clusteredIndex' option does not support {autoIndexId: false}");
             }
 
+            if (collectionOptions.recordIdsReplicated) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "The 'clusteredIndex' option is not supported with the "
+                              "'recordIdsReplicated' option");
+            }
+
             auto clusteredIndexStatus = validateClusteredIndexSpec(
                 opCtx, nss, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
             if (!clusteredIndexStatus.isOK()) {
