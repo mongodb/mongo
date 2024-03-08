@@ -37,10 +37,39 @@ function ignoreErrorsIfInNonTransactionalStepdownSuite(fn) {
     }
 }
 
+function createUpdateBatch(self) {
+    const updates = [{q: {tid: self.tid}, u: {$inc: {counter: 1}}, multi: true}];
+    let expectedUpdateCount = self.initialDocs.length;
+    const batchSize = Random.randInt(2);
+    for (let i = 0; i < batchSize; i++) {
+        const multi = Random.rand() > 0.5;
+        updates.push({q: {tid: self.tid}, u: {$inc: {ignoredCounter: 1}}, multi});
+        expectedUpdateCount += multi ? self.initialDocs.length : 1;
+    }
+    Array.shuffle(updates);
+    return {
+        updates, expectedUpdateCount
+    }
+}
+
+function createDeleteBatch(self) {
+    const deletes = [{q: {tid: self.tid}, limit: 0}];
+    const batchSize = Random.randInt(2);
+    for (let i = 0; i < batchSize; i++) {
+        deletes.push({q: {tid: self.tid}, limit: 1});
+    }
+    Array.shuffle(deletes);
+    return deletes;
+}
+
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
     $config.data.partitionSize = 100;
+
+    $config.data.isMoveChunkErrorAcceptable = (err) => {
+        return err.code === ErrorCodes.Interrupted;
+    };
 
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
@@ -56,9 +85,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
 
+        // Ensure mongos for this thread has refreshed cluster parameter after being set.
+        assert.commandWorked(
+            db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+
         this.expectedCount = 0;
         findFirstBatch(db, collName, {tid: this.tid}, 1000).forEach(doc => {
-            db[collName].update({_id: doc._id}, {$set: {counter: this.expectedCount}});
+            db[collName].update({_id: doc._id},
+                                {$set: {counter: this.expectedCount, ignoredCounter: 0}});
         });
 
         this.initialDocs = findFirstBatch(db, collName, {tid: this.tid}, 1000);
@@ -66,12 +100,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.multiUpdate = function multiUpdate(db, collName, connCache) {
         ignoreErrorsIfInNonTransactionalStepdownSuite(() => {
-            const result = db.runCommand({
-                update: collName,
-                updates: [{q: {tid: this.tid}, u: {$inc: {counter: 1}}, multi: true}]
-            })
+            const {updates, expectedUpdateCount} = createUpdateBatch(this);
+            jsTestLog("Executing updates: " + tojson(updates));
+            const result = db.runCommand({update: collName, updates})
+            jsTestLog("Result: " + tojson(result));
             assert.commandWorked(result);
-            assert.eq(result.n, this.initialDocs.length);
+            assert.eq(result.n, expectedUpdateCount);
             assert.eq(result.n, result.nModified);
             this.expectedCount++;
         });
@@ -79,8 +113,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.multiDelete = function multiDelete(db, collName, connCache) {
         ignoreErrorsIfInNonTransactionalStepdownSuite(() => {
-            const result =
-                db.runCommand({delete: collName, deletes: [{q: {tid: this.tid}, limit: 0}]});
+            const deletes = createDeleteBatch(this);
+            jsTestLog("Executing deletes: " + tojson(deletes));
+            const result = db.runCommand({delete: collName, deletes});
+            jsTestLog("Result: " + tojson(result));
             assert.commandWorked(result);
             assert.eq(result.n, this.initialDocs.length);
 
