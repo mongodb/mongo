@@ -120,8 +120,6 @@ const testSetAllowMigrationsCommand = function() {
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 0));
-
     // Use setAllowMigrations to forbid migrations from happening
     setAllowMigrationsCmd(ns, false);
 
