@@ -337,17 +337,23 @@ Status querySatisfiesCsiPlanningHeuristics(size_t nReferencedFields,
 Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
                                          const QueryPlannerParams& params) {
     if (params.columnStoreIndexes.empty()) {
-        return {ErrorCodes::InvalidOptions, "No columnstore indexes available"};
+        static const auto status =
+            Status{ErrorCodes::InvalidOptions, "No columnstore indexes available"_sd};
+        return status;
     }
     if (!query.isSbeCompatible()) {
-        return {ErrorCodes::NotImplemented,
-                "A columnstore index can only be used with queries in the SBE engine. The given "
-                "query is not eligible for this engine (yet)"};
+        static const auto status = Status{
+            ErrorCodes::NotImplemented,
+            "A columnstore index can only be used with queries in the SBE engine. The given "_sd
+            "query is not eligible for this engine (yet)"_sd};
+        return status;
     }
     if (QueryKnobConfiguration::decoration(query.getOpCtx()).isForceClassicEngineEnabled()) {
-        return {ErrorCodes::InvalidOptions,
-                "A columnstore index can only be used with queries in the SBE engine, but the "
-                "query specified to force the classic engine"};
+        static const auto status = Status{
+            ErrorCodes::InvalidOptions,
+            "A columnstore index can only be used with queries in the SBE engine, but the "_sd
+            "query specified to force the classic engine"_sd};
+        return status;
     }
     return Status::OK();
 }
@@ -422,9 +428,11 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     if (filterDeps.needWholeDocument || outputDeps.needWholeDocument) {
         // TODO SERVER-66284 Would like to enable a plan when hinted, even if we need the whole
         // document. Something like COLUMN_SCAN -> FETCH.
-        return {ErrorCodes::Error{6298501},
-                "cannot use column store index because the query requires seeing the entire "
-                "document"};
+        static const auto status =
+            Status{ErrorCodes::Error{6298501},
+                   "cannot use column store index because the query requires seeing the entire "_sd
+                   "document"_sd};
+        return status;
     } else if (!hintedIndex && expression::containsOverlappingPaths(allFieldsReferenced)) {
         // The query needs a path and a parent or ancestor path. For example, the query needs to
         // access both "a" and "a.b". This is a heuristic, but generally we would not expect this to
@@ -444,8 +452,10 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
 
     // Ensures that hinted index is eligible for the column scan.
     if (hintedIndex && !checkProjectionCoversQuery(allFieldsReferenced, *hintedIndex)) {
-        return {ErrorCodes::Error{6714002},
-                "the hinted column store index cannot be used because it does not cover the query"};
+        static const auto status = Status{
+            ErrorCodes::Error{6714002},
+            "the hinted column store index cannot be used because it does not cover the query"_sd};
+        return status;
     }
 
     // Check that union of the dependency fields can be successfully projected by at least one
@@ -455,9 +465,11 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
 
     // If not columnar index can support the projection, we will not use column scan.
     if (numValid == 0) {
-        return {ErrorCodes::Error{6714001},
-                "cannot use column store index because there exists no column store index for this "
-                "collection that covers the query"};
+        static const auto status = Status{
+            ErrorCodes::Error{6714001},
+            "cannot use column store index because there exists no column store index for this "_sd
+            "collection that covers the query"_sd};
+        return status;
     }
     invariant(selectedColumnStoreIndex);
 
@@ -543,18 +555,20 @@ bool canUseClusteredCollScan(QuerySolutionNode* node,
 StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
     const QueryPlannerParams& params, const CanonicalQuery& query) {
     if (query.cqPipeline().empty()) {
-        return {ErrorCodes::InvalidOptions,
-                "not building $search node because the query pipeline is empty"};
+        static const auto status =
+            Status{ErrorCodes::InvalidOptions,
+                   "not building $search node because the query pipeline is empty"_sd};
+        return status;
     }
 
     if (query.isSearchQuery()) {
         tassert(
             7816300,
-            "Pushing down $search into SBE but forceClassicEngine is on",
+            "Pushing down $search into SBE but forceClassicEngine is on"_sd,
             !QueryKnobConfiguration::decoration(query.getOpCtx()).isForceClassicEngineEnabled());
 
         tassert(7816301,
-                "Pushing down $search into SBE but featureFlagSearchInSbe is disabled.",
+                "Pushing down $search into SBE but featureFlagSearchInSbe is disabled."_sd,
                 feature_flags::gFeatureFlagSearchInSbe.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
@@ -571,7 +585,11 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
         return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(searchNode));
     }
 
-    return {ErrorCodes::InvalidOptions, "no search stage found at front of pipeline"};
+    {
+        static const auto status =
+            Status{ErrorCodes::InvalidOptions, "no search stage found at front of pipeline"_sd};
+        return status;
+    }
 }
 }  // namespace
 
