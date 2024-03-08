@@ -207,9 +207,18 @@ public:
     void drain() override {
         ThreadIdGuard threadIdGuard(this);
         _ioContext.restart();
-        while (_ioContext.poll()) {
-            LOGV2_DEBUG(23012, 2, "Draining remaining work in reactor.");
-        }
+        /**
+         * Do a single drain before setting the bit that prevents further scheduling because some
+         * outstanding work might spawn and schedule additional work. Once all the current and
+         * immediately subsequent work is drained, we can set the flag that prevents further
+         * scheduling. Then, we drain once more to catch any stragglers that got scheduled between
+         * returning from poll and setting the _closedForScheduling bit.
+         */
+        do {
+            while (_ioContext.poll()) {
+                LOGV2_DEBUG(23012, 2, "Draining remaining work in reactor.");
+            }
+        } while (!_closedForScheduling.swap(true));
         _ioContext.stop();
     }
 
@@ -222,7 +231,12 @@ public:
     }
 
     void schedule(Task task) override {
-        asio::post(_ioContext, [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
+        if (_closedForScheduling.load()) {
+            task({ErrorCodes::ShutdownInProgress, "Shutdown in progress"});
+        } else {
+            asio::post(_ioContext,
+                       [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
+        }
     }
 
     void dispatch(Task task) override {
@@ -281,6 +295,8 @@ private:
     ExecutorStats _stats;
 
     asio::io_context _ioContext;
+
+    AtomicWord<bool> _closedForScheduling{false};
 };
 
 thread_local AsioReactor* AsioReactor::_reactorForThread = nullptr;

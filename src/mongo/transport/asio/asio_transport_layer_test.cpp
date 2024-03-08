@@ -745,6 +745,36 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
           "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
 }
 
+DEATH_TEST_REGEX(AsioTransportLayer, ScheduleOnReactorAfterShutdownFails, "Shutdown in progress") {
+    TestFixture tf;
+
+    Notification<void> shutdown;
+    auto reactor = tf.tla().getReactor(TransportLayer::kNewReactor);
+    auto reactorThread = stdx::thread([reactor, &shutdown] {
+        LOGV2(8703700, "running reactor");
+        reactor->run();
+        LOGV2(8703701, "reactor stopped, draining");
+        reactor->drain();
+        LOGV2(8703702, "reactor drain complete");
+        shutdown.set();
+    });
+    Notification<void> firstTask;
+    reactor->schedule([&](Status s) {
+        LOGV2(8703703, "first task scheduled", "status"_attr = s);
+        firstTask.set();
+    });
+    firstTask.get();
+
+    LOGV2(8703704, "shutting down reactor");
+    reactor->stop();
+    shutdown.get();
+
+    auto guaranteedReactor = makeGuaranteedExecutor(reactor);
+    guaranteedReactor->schedule(
+        [](Status s) { LOGV2(8703705, "task scheduled after stop", "status"_attr = s); });
+    reactorThread.join();
+}
+
 class AsioTransportLayerWithServiceContextTest : public ServiceContextTest {
 public:
     class ThreadCounter {
