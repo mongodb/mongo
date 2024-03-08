@@ -80,6 +80,8 @@
  * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
  * options are appended to existing content, whereas STRING options overwrite.
  */
+DEF_OPT_AS_UINT32(backup_complete, 0,
+  "when doing backups, either just perform source-side reading or take a complete backup")
 DEF_OPT_AS_UINT32(backup_interval, 0,
   "backup the database every interval seconds during the workload phase, 0 to disable")
 DEF_OPT_AS_UINT32(

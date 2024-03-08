@@ -1,0 +1,28 @@
+# Run many tables with a lot of entries spread out.
+conn_config="cache_size=200M,eviction=(threads_max=8)"
+# Mimic MongoDB index file setup.
+table_config="type=file,internal_page_max=16k,leaf_page_max=16k"
+# Spread out 50M keys.
+icount=50000000
+report_interval=5
+populate_threads=2
+checkpoint_threads=1
+checkpoint_interval=10
+# Take actual backups, not just the read-side.
+backup_complete=1
+backup_interval=30
+# Have enough tables to spread out the work.
+table_count=5
+run_time=300
+# Turn on create/drop of idle tables to have some backup changes.
+# Set the cycle time to just over the backup interval but small enough
+# to have several cycles in the run time. We want some backups to
+# not have create/drop changes but most to have them.
+table_count_idle=5
+max_idle_table_cycle=2
+threads=((count=10,update=1),(count=2,read=1))
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5
+value_sz=500
+random_value=true

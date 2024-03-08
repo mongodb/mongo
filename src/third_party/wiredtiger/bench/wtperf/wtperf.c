@@ -28,6 +28,8 @@
 
 #include "wtperf.h"
 
+#define BACKUP_RETAIN 4
+
 /* Default values. */
 #define DEFAULT_HOME "WT_TEST"
 #define DEFAULT_MONITOR_DIR "WT_TEST"
@@ -1240,10 +1242,8 @@ backup_worker(void *arg)
     WTPERF *wtperf;
     WTPERF_THREAD *thread;
     WT_CONNECTION *conn;
-    WT_CURSOR *backup_cursor;
     WT_DECL_RET;
     WT_SESSION *session;
-    const char *key;
     uint32_t i;
 
     thread = (WTPERF_THREAD *)arg;
@@ -1270,27 +1270,16 @@ backup_worker(void *arg)
 
         wtperf->backup = true;
 
-        /*
-         * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
-         */
-        while (
-          (ret = session->open_cursor(session, "backup:", NULL, NULL, &backup_cursor)) == EBUSY)
-            __wt_yield();
-        if (ret != 0)
-            goto err;
-
-        while ((ret = backup_cursor->next(backup_cursor)) == 0) {
-            testutil_check(backup_cursor->get_key(backup_cursor, &key));
-            backup_read(wtperf, key);
+        /* Take the kind of backup configured. */
+        if (opts->backup_complete == 0)
+            backup_read(wtperf, session);
+        else {
+            testutil_backup_create_full(
+              conn, wtperf->home, (int)thread->backup.ops, false, 1024, NULL);
+            testutil_delete_old_backups(BACKUP_RETAIN);
         }
-
-        if (ret != WT_NOTFOUND) {
-            testutil_check(backup_cursor->close(backup_cursor));
-            goto err;
-        }
-
-        testutil_check(backup_cursor->close(backup_cursor));
         wtperf->backup = false;
+        ++wtperf->backup_ops;
         ++thread->backup.ops;
     }
 
@@ -2691,6 +2680,12 @@ main(int argc, char *argv[])
     /* If creating, remove and re-create the home and tiered bucket directories. */
     if (opts->create != 0) {
         testutil_recreate_dir(wtperf->home);
+        /* If running backups move down a directory level. */
+        if (opts->backup_interval != 0 && opts->backup_complete != 0) {
+            if (chdir(wtperf->home) != 0)
+                testutil_die(errno, "backup chdir: %s", wtperf->home);
+            testutil_recreate_dir(wtperf->home);
+        }
         testutil_check(create_tiered_bucket(wtperf));
     }
 
