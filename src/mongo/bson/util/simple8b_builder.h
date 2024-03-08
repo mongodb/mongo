@@ -161,6 +161,11 @@ public:
     void resetLastForRLEIfNeeded();
 
     /**
+     * Initialize RLE state from another builder
+     */
+    void initializeRLEFrom(const Simple8bBuilder<T>& other);
+
+    /**
      * Validates that the internal state of this Simple8bBuilder is identical to the provided one.
      * This guarantees that appending more data to either of them would produce the same binary.
      */

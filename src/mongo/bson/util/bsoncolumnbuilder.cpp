@@ -707,11 +707,6 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
         // then add everything in this control as pending which might write a control block again
         // because the values are now added in the correct order.
         offset += control - scannedBinary;
-
-        if (type == NumberDouble) {
-            // Set last value from last in block before previous
-            encoder.lastValueInPrevBlock = last.lastAtEndOfBlock;
-        }
     } else {
         // Overflow, copy everything from the control byte up to the overflow point
         buffer.appendBuf(control, 1 + (currIndex + 1) * sizeof(uint64_t));
@@ -725,29 +720,6 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
         char* lastControlToUpdate = buffer.buf() + regular._controlByteOffset;
         *lastControlToUpdate =
             kControlByteForScaleIndex[encoder.scaleIndex] | (currIndex & kCountMask);
-
-        // Set last value from last in previous control block
-        encoder.lastValueInPrevBlock = current.lastAtEndOfBlock;
-
-        // Calculate correct last in previous control, we need to account for our pending
-        // values.
-        if (type == NumberDouble) {
-            Simple8b<uint64_t> s8b(control + sizeof(uint64_t) * (currIndex + 1) + 1,
-                                   (currNumBlocks - currIndex - 1) * sizeof(uint64_t));
-
-            int64_t delta = 0;
-            for (auto&& elem : s8b) {
-                if (elem) {
-                    delta = expandDelta(delta, Simple8bTypeUtil::decodeInt64(*elem));
-                }
-            }
-
-            auto encoded =
-                Simple8bTypeUtil::encodeDouble(encoder.lastValueInPrevBlock, encoder.scaleIndex);
-            uassert(8288105, "Invalid double encoding in BSON Column", encoded);
-            encoder.lastValueInPrevBlock =
-                Simple8bTypeUtil::decodeDouble(calcDelta(*encoded, delta), encoder.scaleIndex);
-        }
     }
 
     // Append remaining values from our current control block and add all from the next
@@ -822,7 +794,28 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
     } else {
         if (type == NumberDouble) {
             encoder.prevEncoded64 = d64.lastEncodedValue;
+
+            // Calculate last double in previous block by reversing the final pending state and
+            // final delta.
+            auto current = encoder.prevEncoded64;
+            for (auto it = encoder.simple8bBuilder.rbegin(), end = encoder.simple8bBuilder.rend();
+                 it != end;
+                 ++it) {
+                if (const boost::optional<uint64_t>& encoded = *it) {
+                    // As we're going backwards we need to 'expandDelta' backwards which is the same
+                    // as 'calcDelta'.
+                    current = calcDelta(current, Simple8bTypeUtil::decodeInt64(*encoded));
+                }
+            }
+
+            encoder.lastValueInPrevBlock =
+                Simple8bTypeUtil::decodeDouble(current, encoder.scaleIndex);
         }
+    }
+
+    if (lastControl == bsoncolumn::kInvalidControlByte &&
+        regular._controlByteOffset != kNoSimple8bControl) {
+        lastControl = *control;
     }
 }
 
@@ -1822,6 +1815,7 @@ bool EncodingState::Encoder64::_appendDouble(double value,
 
     // Create a new Simple8bBuilder.
     Simple8bBuilder<uint64_t> builder;
+    builder.initializeRLEFrom(simple8bBuilder);
     std::swap(simple8bBuilder, builder);
 
     // Iterate over previous pending values and re-add them recursively. That will increase the

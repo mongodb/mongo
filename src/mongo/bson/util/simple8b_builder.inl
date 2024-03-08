@@ -255,6 +255,13 @@ void Simple8bBuilder<T>::resetLastForRLEIfNeeded() {
 }
 
 template <typename T>
+void Simple8bBuilder<T>::initializeRLEFrom(const Simple8bBuilder<T>& other) {
+    if (other._rlePossible()) {
+        _lastValueInPrevWord = other._lastValueInPrevWord;
+    }
+}
+
+template <typename T>
 boost::optional<typename Simple8bBuilder<T>::PendingValue>
 Simple8bBuilder<T>::_calculatePendingValue(T value) {
     using namespace simple8b_internal;

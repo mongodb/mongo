@@ -1589,6 +1589,43 @@ TEST_F(BSONColumnTest, BasicDouble) {
     verifyDecompression(binData, {d1, d2}, true);
 }
 
+TEST_F(BSONColumnTest, DoubleIdenticalDeltas) {
+    BSONColumnBuilder cb;
+
+    // This test is using identical deltas for the double type. During binary reopen it will lead to
+    // a belief we can pack all these into an RLE block due to how overflow detection works (no
+    // overflow in this case). However, as the value is non-zero a simple8b block will be flushed
+    // when appending values and the end of the reopen process while leaving one value in pending.
+    // We make sure that special double state such as the last double value in previous block is
+    // stored and calculated correctly.
+    std::vector<BSONElement> elems = {createElementDouble(0.0),
+                                      createElementDouble(40.0),
+                                      createElementDouble(80.0),
+                                      createElementDouble(120.0),
+                                      createElementDouble(160.0),
+                                      createElementDouble(200.0),
+                                      createElementDouble(240.0),
+                                      createElementDouble(280.0),
+                                      createElementDouble(320.0),
+                                      createElementDouble(360.0)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1001, 0b0001);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 1.0), 2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems, true);
+}
+
 TEST_F(BSONColumnTest, DoubleSameScale) {
     BSONColumnBuilder cb;
 
