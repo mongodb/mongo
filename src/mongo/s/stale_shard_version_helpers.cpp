@@ -67,12 +67,6 @@ void checkErrorStatusAndMaxRetries(const Status& status,
     if (status == ErrorCodes::StaleDbVersion) {
         auto staleInfo = status.extraInfo<
             error_details::ErrorExtraInfoForImpl<ErrorCodes::StaleDbVersion>::type>();
-        tassert(7891700,
-                str::stream() << "StaleDbVersion error on unexpected database. Expected "
-                              << nss.dbName().toStringForErrorMsg() << ", received "
-                              << staleInfo->getDb().toStringForErrorMsg(),
-                staleInfo->getDb() == nss.dbName());
-
         // If the database version is stale, refresh its entry in the catalog cache.
         catalogCache->onStaleDatabaseVersion(staleInfo->getDb(), staleInfo->getVersionWanted());
 
@@ -85,13 +79,6 @@ void checkErrorStatusAndMaxRetries(const Status& status,
         // If the cache currently considers the collection to be unsharded, this will trigger an
         // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
         if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
-            tassert(7891701,
-                    str::stream() << "StaleConfig error on unexpected namespace. Expected "
-                                  << nss.toStringForErrorMsg() << ", received "
-                                  << staleInfo->getNss().toStringForErrorMsg(),
-                    staleInfo->getNss() == nss ||
-                        staleInfo->getNss() == nss.makeTimeseriesBucketsNamespace());
-
             catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
                 staleInfo->getNss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
         } else {
