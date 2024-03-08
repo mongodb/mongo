@@ -250,41 +250,52 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
 
         BatchedObjects batch;
         size_t bufferedBytes = 0;
-        auto nextInput = pSource->getNext();
-        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-            waitWhileFailPointEnabled();
+        try {
+            // TODO SERVER-87422 this throws StaleConfig with
+            // featureFlagTrackUnshardedCollectionsOnShardingCatalog
+            auto nextInput = pSource->getNext();
+            for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+                waitWhileFailPointEnabled();
 
-            auto doc = nextInput.releaseDocument();
-            auto [obj, objSize] = makeBatchObject(std::move(doc));
+                auto doc = nextInput.releaseDocument();
+                auto [obj, objSize] = makeBatchObject(std::move(doc));
 
-            bufferedBytes += objSize;
-            if (!batch.empty() &&
-                (bufferedBytes > maxBatchSizeBytes ||
-                 batch.size() >= write_ops::kMaxWriteBatchSize)) {
+                bufferedBytes += objSize;
+                if (!batch.empty() &&
+                    (bufferedBytes > maxBatchSizeBytes ||
+                     batch.size() >= write_ops::kMaxWriteBatchSize)) {
+                    flush(std::move(batchWrite), std::move(batch));
+                    batch.clear();
+                    batchWrite = makeBatchedWriteRequest();
+                    bufferedBytes = objSize;
+                }
+                batch.push_back(std::move(obj));
+            }
+            if (!batch.empty()) {
                 flush(std::move(batchWrite), std::move(batch));
                 batch.clear();
-                batchWrite = makeBatchedWriteRequest();
-                bufferedBytes = objSize;
             }
-            batch.push_back(std::move(obj));
-        }
-        if (!batch.empty()) {
-            flush(std::move(batchWrite), std::move(batch));
-            batch.clear();
-        }
 
-        switch (nextInput.getStatus()) {
-            case GetNextResult::ReturnStatus::kAdvanced: {
-                MONGO_UNREACHABLE;  // We consumed all advances above.
+            switch (nextInput.getStatus()) {
+                case GetNextResult::ReturnStatus::kAdvanced: {
+                    MONGO_UNREACHABLE;  // We consumed all advances above.
+                }
+                case GetNextResult::ReturnStatus::kPauseExecution: {
+                    return nextInput;  // Propagate the pause.
+                }
+                case GetNextResult::ReturnStatus::kEOF: {
+                    _done = true;
+                    finalize();
+                    return nextInput;
+                }
             }
-            case GetNextResult::ReturnStatus::kPauseExecution: {
-                return nextInput;  // Propagate the pause.
-            }
-            case GetNextResult::ReturnStatus::kEOF: {
-                _done = true;
-                finalize();
-                return nextInput;
-            }
+        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "database involved in aggregation write no longer exists: "
+                                  << e->getDb().toStringForErrorMsg(),
+                    e->getVersionWanted());
+            // let the usual code path handle this error.
+            throw;
         }
     }
     MONGO_UNREACHABLE;

@@ -361,10 +361,12 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
                     std::make_move_iterator(indexes.end())};
         });
 }
+
 void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCtx,
                                                           const DatabaseName& dbName,
                                                           const BSONObj& cmdObj,
                                                           boost::optional<ShardId> dataShard) {
+    cluster::createDatabase(opCtx, dbName);
     // TODO SERVER-85437: remove this check and keep only the 'else' branch.
     if (serverGlobalParams.upgradeBackCompat || serverGlobalParams.downgradeBackCompat) {
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
