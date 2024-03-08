@@ -797,10 +797,9 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
         if (_state != ProducerState::Running) {
             return;
         }
+        _rollback = std::make_unique<RollbackImpl>(
+            localOplog, &remoteOplog, storageInterface, _replicationProcess, _replCoord);
     }
-
-    _rollback = std::make_unique<RollbackImpl>(
-        localOplog, &remoteOplog, storageInterface, _replicationProcess, _replCoord);
 
     LOGV2(21104, "Scheduling rollback", "syncSource"_attr = source);
     auto status = _rollback->runRollback(opCtx);
