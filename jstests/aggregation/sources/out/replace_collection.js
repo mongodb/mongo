@@ -23,18 +23,11 @@ coll.aggregate(pipeline);
 const targetColl = db.target;
 assert.eq(1, targetColl.find().itcount());
 
-// Test $out with a non-existent database. This is only expected to work in a
-// non-sharded environment.
+// Test $out with a non-existent database. Sharded pass throughs will implicitly shard accessed
+// collections so we skip this test here cause you can't out to a sharded collecti
 const destDB = db.getSiblingDB("outDifferentDB");
 destDB.dropDatabase();
-if (FixtureHelpers.isMongos(db)) {
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: coll.getName(),
-        cursor: {},
-        pipeline: [{$out: {db: destDB.getName(), coll: 'outDifferentColl'}}]
-    }),
-                                 ErrorCodes.NamespaceNotFound);
-} else {
+if (!FixtureHelpers.isMongos(db)) {
     coll.aggregate({$out: {db: destDB.getName(), coll: destDB.outDifferentColl.getName()}});
     assert.eq(1, destDB.outDifferentColl.find().itcount());
 }

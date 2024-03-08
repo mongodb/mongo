@@ -398,8 +398,16 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             !request.getRequestResumeToken() && !request.getResumeAfter());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
-        const auto [resolvedNsCM, _] =
-            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        auto criSW = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
+
+        // If the ns is not found we assume its unsharded. It might be implicitly created as
+        // unsharded if this query does writes. An existing collection could also be concurrently
+        // sharded in between here and lock acquisition elsewhere reguardless so shardedness still
+        // needs to be checked after parsing too.
+        if (criSW.getStatus().code() == ErrorCodes::NamespaceNotFound) {
+            return false;
+        }
+        const auto [resolvedNsCM, _] = uassertStatusOK(criSW);
         return resolvedNsCM.isSharded();
     };
 

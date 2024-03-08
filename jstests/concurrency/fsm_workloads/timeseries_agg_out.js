@@ -63,6 +63,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.NamespaceExists,
             // $out can't be executed while there is a move primary in progress
             ErrorCodes.MovePrimaryInProgress,
+            // TODO SERVER-87422 potentially remove this error since there are no concurrent drops
+            ErrorCodes.NamespaceNotFound,
         ];
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
         if (res.ok) {
