@@ -15,11 +15,10 @@ export var RoutingTableConsistencyChecker = (function() {
         return true;
     };
 
-    const fetchRoutingTableData =
-        (mongos) => {
-            // Group docs in config.chunks by coll UUID (sorting by minKey), then join with docs in
-            // config.collections.
-            return mongos.getDB('config')
+    const fetchRoutingTableData = (mongos) => {
+        // Group docs in config.chunks by coll UUID (sorting by minKey), then join with docs in
+        // config.collections.
+        return mongos.getDB('config')
                 .chunks
                 .aggregate([
                     { $sort: { min: 1 } },
@@ -37,8 +36,8 @@ export var RoutingTableConsistencyChecker = (function() {
                             as: 'details'
                         },
                     }
-                ]);
-        };
+                ], {readConcern: {level: "snapshot"}});
+    };
 
     const checkCollRoutingTable = (nss, shardKeyPattern, routingTable) => {
         if (!routingTable) {
