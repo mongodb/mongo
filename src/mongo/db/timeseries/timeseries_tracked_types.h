@@ -88,6 +88,51 @@ public:
         return *get();
     }
 
+    T* release() noexcept {
+        return _uniquePtr.release();
+    }
+
+    void reset(T* ptr = nullptr) noexcept {
+        _uniquePtr.reset(ptr);
+    }
+
+    void swap(const unique_tracked_ptr<T>& other) noexcept {
+        _uniquePtr.swap(other._uniquePtr);
+    }
+
+    bool operator==(const unique_tracked_ptr<T>& other) {
+        return _uniquePtr == other._uniquePtr;
+    }
+
+    bool operator<(const unique_tracked_ptr<T>& other) {
+        return _uniquePtr < other._uniquePtr;
+    }
+
+    bool operator<=(const unique_tracked_ptr<T>& other) {
+        return _uniquePtr <= other._uniquePtr;
+    }
+
+    bool operator>(const unique_tracked_ptr<T>& other) {
+        return _uniquePtr > other._uniquePtr;
+    }
+
+    bool operator>=(const unique_tracked_ptr<T>& other) {
+        return _uniquePtr >= other._uniquePtr;
+    }
+
+    bool operator<=>(const unique_tracked_ptr<T>& other) {
+        return _uniquePtr <=> other._uniquePtr;
+    }
+
+    explicit operator bool() const noexcept {
+        return static_cast<bool>(_uniquePtr.get());
+    }
+
+    unique_tracked_ptr<T>& operator=(unique_tracked_ptr<T>&& other) noexcept {
+        _uniquePtr = other._uniquePtr;
+        return *this;
+    }
+
 private:
     std::unique_ptr<T, boost::alloc_deleter<T, TrackingAllocator<T>>> _uniquePtr;
 };
