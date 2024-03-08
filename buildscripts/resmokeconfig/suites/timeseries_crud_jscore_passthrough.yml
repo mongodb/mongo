@@ -186,6 +186,7 @@ selector:
   - jstests/core/testminmax.js # min
   # Different field ordering.
   - jstests/core/query/basica.js
+  - jstests/core/query/group_lookup_with_canonical_query_prefix.js
   - jstests/core/query/objid/objid3.js
   - jstests/core/query/or/or1.js
   - jstests/core/query/or/or2.js
