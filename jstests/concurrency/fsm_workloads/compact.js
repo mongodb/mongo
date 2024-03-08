@@ -27,6 +27,7 @@ import {
     assertWorkedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
 // checkpoint through compaction.
@@ -82,8 +83,13 @@ export const $config = (function() {
         }
 
         function compact(db, collName) {
-            var res =
-                db.runCommand({compact: this.threadCollName, force: true, freeSpaceTargetMB: 1});
+            let res;
+            if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'CompactOptions')) {
+                res = db.runCommand(
+                    {compact: this.threadCollName, force: true, freeSpaceTargetMB: 1});
+            } else {
+                res = db.runCommand({compact: this.threadCollName, force: true});
+            }
 
             // The compact command can be successful or interrupted because of cache pressure.
             if (!isEphemeral(db)) {

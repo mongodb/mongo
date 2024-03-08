@@ -48,6 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 
@@ -105,15 +106,10 @@ public:
             ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
             : SerializationContext::stateCommandRequest();
 
-        repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto params = CompactCommand::parse(
             IDLParserContext("compact", false /*apiStrict*/, vts, dbName.tenantId(), sc), cmdObj);
-        bool force = params.getForce() && *params.getForce();
 
-        uassert(ErrorCodes::IllegalOperation,
-                "will not run compact on an active replica set primary as this will slow down "
-                "other running operations. use force:true to force",
-                !replCoord->getMemberState().primary() || force);
+        _assertCanRunCompact(opCtx, params);
 
         StatusWith<int64_t> status = compactCollection(opCtx, params.getFreeSpaceTargetMB(), nss);
         uassertStatusOK(status.getStatus());
@@ -128,6 +124,22 @@ public:
         result.appendNumber("bytesFreed", static_cast<long long>(bytesFreed));
 
         return true;
+    }
+
+private:
+    void _assertCanRunCompact(OperationContext* opCtx, const CompactCommand& params) {
+        repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool force = params.getForce() && *params.getForce();
+        uassert(ErrorCodes::IllegalOperation,
+                "will not run compact on an active replica set primary as this will slow down "
+                "other running operations. use force:true to force",
+                !replCoord->getMemberState().primary() || force);
+
+        uassert(ErrorCodes::IllegalOperation,
+                "Compact command with extra options requires its feature flag to be enabled",
+                !params.getFreeSpaceTargetMB() ||
+                    gFeatureFlagCompactOptions.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
 };
 
