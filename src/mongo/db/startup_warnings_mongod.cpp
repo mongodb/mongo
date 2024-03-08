@@ -62,98 +62,10 @@
 
 
 namespace mongo {
-namespace {
-
-#define TRANSPARENT_HUGE_PAGES_DIR "/sys/kernel/mm/transparent_hugepage"
-
-}  // namespace
 
 using std::ios_base;
 using std::string;
 using namespace fmt::literals;
-
-StatusWith<std::string> readSystemParameterFile(const std::string& parameter,
-                                                const std::string& directory) {
-    try {
-        boost::filesystem::path directoryPath(directory);
-        if (!boost::filesystem::exists(directoryPath)) {
-            return {ErrorCodes::NonExistentPath, "Missing directory: {}"_format(directory)};
-        }
-
-        boost::filesystem::path parameterPath(directoryPath / parameter);
-        if (!boost::filesystem::exists(parameterPath)) {
-            return {ErrorCodes::NonExistentPath, "Missing file: {}"_format(parameterPath.string())};
-        }
-
-        std::string filename(parameterPath.string());
-        std::ifstream ifs(filename.c_str());
-        if (!ifs) {
-            return {ErrorCodes::FileNotOpen, "Unable to open file: {}"_format(filename)};
-        }
-
-        std::string line;
-        if (!std::getline(ifs, line)) {
-            auto ec = lastSystemError();
-            return {ErrorCodes::FileStreamFailed,
-                    "Failed to read from {}: {}"_format(filename,
-                                                        (ifs.eof()) ? "EOF" : errorMessage(ec))};
-        }
-
-        return std::move(line);
-    } catch (const boost::filesystem::filesystem_error& err) {
-        return {
-            ErrorCodes::UnknownError,
-            "Failed to probe \"{}\": {}"_format(err.path1().string(), errorMessage(err.code()))};
-    }
-}
-
-// static
-StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter(
-    const std::string& parameter) {
-    return readTransparentHugePagesParameter(parameter, TRANSPARENT_HUGE_PAGES_DIR);
-}
-
-// static
-StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter(
-    const std::string& parameter, const std::string& directory) {
-    std::string opMode;
-    auto lineRes = readSystemParameterFile(parameter, directory);
-    if (!lineRes.isOK()) {
-        return lineRes.getStatus();
-    }
-
-    auto line = lineRes.getValue();
-
-    std::string::size_type posBegin = line.find('[');
-    std::string::size_type posEnd = line.find(']');
-    if (posBegin == string::npos || posEnd == string::npos || posBegin >= posEnd) {
-        return {ErrorCodes::FailedToParse, "Cannot parse line: '{}'"_format(line)};
-    }
-
-    opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
-    if (opMode.empty()) {
-        return {ErrorCodes::BadValue,
-                "Invalid mode in {}/{}: '{}'"_format(directory, parameter, line)};
-    }
-
-    // Check against acceptable values of opMode.
-    static constexpr std::array acceptableValues{
-        "always"_sd,
-        "defer"_sd,
-        "defer+madvise"_sd,
-        "madvise"_sd,
-        "never"_sd,
-    };
-    if (std::find(acceptableValues.begin(), acceptableValues.end(), opMode) ==
-        acceptableValues.end()) {
-        return {
-            ErrorCodes::BadValue,
-            "** WARNING: unrecognized transparent Huge Pages mode of operation in {}/{}: '{}'"_format(
-                directory, parameter, opMode)};
-    }
-
-    return std::move(opMode);
-}
 
 void checkMultipleNumaNodes() {
     bool hasMultipleNumaNodes = false;
@@ -214,14 +126,15 @@ void checkMultipleNumaNodes() {
     }
 }
 
+#ifdef __linux__
 void checkTHPSettings() {
-    auto thpParameterPath = [](StringData parameter) {
-        return "{}/{}"_format(TRANSPARENT_HUGE_PAGES_DIR, parameter);
+    auto thpParameterPath = [](StringData parameter) -> std::string {
+        return "{}/{}"_format(ProcessInfo::kTranparentHugepageDirectory, parameter);
     };
 
     // Transparent Hugepages checks
     StatusWith<std::string> transparentHugePagesEnabledResult =
-        StartupWarningsMongod::readTransparentHugePagesParameter("enabled");
+        ProcessInfo::readTransparentHugePagesParameter("enabled");
     bool shouldWarnAboutDefrag = true;
     if (transparentHugePagesEnabledResult.isOK()) {
         StringData thpEnabledValue = transparentHugePagesEnabledResult.getValue();
@@ -260,7 +173,7 @@ void checkTHPSettings() {
 
     if (shouldWarnAboutDefrag) {
         StatusWith<std::string> transparentHugePagesDefragResult =
-            StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
+            ProcessInfo::readTransparentHugePagesParameter("defrag");
         if (transparentHugePagesDefragResult.isOK()) {
             auto defragValue = transparentHugePagesDefragResult.getValue();
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
@@ -309,6 +222,7 @@ void checkTHPSettings() {
     }
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 }
+#endif  // __linux__
 
 void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               const ServerGlobalParams& serverParams,

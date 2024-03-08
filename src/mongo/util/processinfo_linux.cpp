@@ -831,6 +831,47 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
+StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringData parameter,
+                                                                       StringData directory) {
+    using namespace fmt::literals;
+    auto line = LinuxSysHelper::parseLineFromFile("{}/{}"_format(directory, parameter).c_str());
+    if (line.empty()) {
+        return {ErrorCodes::NonExistentPath,
+                "Empty or non-existent file at {}/{}"_format(directory, parameter)};
+    }
+
+    std::string opMode;
+    std::string::size_type posBegin = line.find('[');
+    std::string::size_type posEnd = line.find(']');
+    if (posBegin == std::string::npos || posEnd == std::string::npos || posBegin >= posEnd) {
+        return {ErrorCodes::FailedToParse, "Cannot parse line: '{}'"_format(line)};
+    }
+
+    opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
+    if (opMode.empty()) {
+        return {ErrorCodes::BadValue,
+                "Invalid mode in {}/{}: '{}'"_format(directory, parameter, line)};
+    }
+
+    // Check against acceptable values of opMode.
+    static constexpr std::array acceptableValues{
+        "always"_sd,
+        "defer"_sd,
+        "defer+madvise"_sd,
+        "madvise"_sd,
+        "never"_sd,
+    };
+    if (std::find(acceptableValues.begin(), acceptableValues.end(), opMode) ==
+        acceptableValues.end()) {
+        return {
+            ErrorCodes::BadValue,
+            "** WARNING: unrecognized transparent Huge Pages mode of operation in {}/{}: '{}'"_format(
+                directory, parameter, opMode)};
+    }
+
+    return std::move(opMode);
+}
+
 bool ProcessInfo::checkGlibcRseqTunable() {
     using namespace fmt::literals;
 
@@ -1038,6 +1079,22 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     appendIfExists(&bExtra, "cpuVariant", cpuVariant);
     appendIfExists(&bExtra, "cpuPart", cpuPart);
     appendIfExists(&bExtra, "cpuRevision", cpuRevision);
+
+    if (auto res = ProcessInfo::readTransparentHugePagesParameter("enabled"); res.isOK()) {
+        appendIfExists(&bExtra, "thp_enabled", res.getValue());
+    }
+
+    if (auto res = ProcessInfo::readTransparentHugePagesParameter("defrag"); res.isOK()) {
+        appendIfExists(&bExtra, "thp_defrag", res.getValue());
+    }
+
+    appendIfExists(&bExtra,
+                   "thp_max_ptes_none",
+                   LinuxSysHelper::parseLineFromFile(
+                       "{}/khugepaged/max_ptes_none"_format(kTranparentHugepageDirectory).c_str()));
+    appendIfExists(&bExtra,
+                   "overcommit_memory",
+                   LinuxSysHelper::parseLineFromFile("/proc/sys/vm/overcommit_memory"));
 
 #if defined(MONGO_CONFIG_GLIBC_RSEQ)
     bExtra.append("glibc_rseq_present", true);

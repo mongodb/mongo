@@ -28,6 +28,7 @@
  */
 
 #include <cstdint>
+#include <fstream>
 #include <map>
 
 #include <boost/optional/optional.hpp>
@@ -38,9 +39,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/util/processinfo.h"
 
 using boost::optional;
+using mongo::unittest::TempDir;
 
 namespace mongo {
 
@@ -116,6 +119,100 @@ TEST(ProcessInfo, GetNumAvailableCores) {
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
     ASSERT_GREATER_THAN(ProcessInfo::getNumLogicalCores(), 0u);
 }
+
+#if defined(__linux__)
+TEST(ProcessInfo, ReadTransparentHugePagesParameterInvalidDirectory) {
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("no_such_directory", "param");
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterInvalidFile) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterInvalidFile");
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterEmptyFile) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterInvalidFile");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream(filename.c_str());
+    }
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterBlankLine) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterBlankLine");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << std::endl;
+    }
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterInvalidFormat) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterBlankLine");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise never" << std::endl;
+    }
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterEmptyOpMode) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterEmptyOpMode");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise [] never" << std::endl;
+    }
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterUnrecognizedOpMode) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterUnrecognizedOpMode");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise never [unknown]" << std::endl;
+    }
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+}
+
+TEST(ProcessInfo, ReadTransparentHugePagesParameterValidFormat) {
+    TempDir tempDir("ProcessInfo_ReadTransparentHugePagesParameterBlankLine");
+    {
+        std::string filename(tempDir.path() + "/param");
+        std::ofstream ofs(filename.c_str());
+        ofs << "always madvise [never]" << std::endl;
+    }
+    StatusWith<std::string> result =
+        ProcessInfo::readTransparentHugePagesParameter("param", tempDir.path());
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQUALS("never", result.getValue());
+}
+#endif  // __linux__
 
 #if defined(__linux__) && defined(MONGO_CONFIG_GLIBC_RSEQ)
 TEST(ProcessInfo, GLIBCRseqTunable) {

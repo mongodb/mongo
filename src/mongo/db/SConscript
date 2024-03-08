@@ -2827,7 +2827,6 @@ if wiredtiger:
             'session/session_catalog_test.cpp',
             'shard_id_test.cpp',
             'shard_role_test.cpp',
-            'startup_warnings_mongod_test.cpp',
             'thread_client_test.cpp',
             'time_proof_service_test.cpp',
             'ttl_collection_cache_test.cpp',

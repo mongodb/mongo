@@ -27,37 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
 struct StorageGlobalParams;
 struct ServerGlobalParams;
-
-class StartupWarningsMongod {
-private:
-    StartupWarningsMongod();
-
-public:
-    /**
-     * Reads Transparent HugePages kernel parameter in sysfs directory.
-     * Linux only.
-     */
-    static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter);
-
-    /**
-     * For testing only.
-     * Supports alternate directory for transparent huge pages files.
-     */
-    static StatusWith<std::string> readTransparentHugePagesParameter(const std::string& parameter,
-                                                                     const std::string& directory);
-};
 
 // Checks various startup conditions and logs any necessary warnings that
 // are specific to the mongod process.
