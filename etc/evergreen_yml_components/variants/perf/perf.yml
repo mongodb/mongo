@@ -1965,6 +1965,7 @@ buildvariants:
   name: perf-mongo-perf-standalone-sampling-bonsai.intel.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (Bonsai with Sampling CE) Intel AWS 2023-11
   cron: *cron_query_perf_schedule
+  modules: *perf_modules
   expansions:
     <<: *standalone-intel-expansions
     mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
@@ -1990,6 +1991,7 @@ buildvariants:
   name: perf-mongo-perf-repl-all-feature-flags.intel.aws.2023-01
   display_name: PERF Mongo-Perf 1-Node ReplSet inMemory (all feature flags) Intel AWS 2023-11
   cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  modules: *perf_modules
   expansions:
     <<: *repl-intel-expansions
     mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
