@@ -20,7 +20,7 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer,requires_increased_memlock_limits
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
