@@ -155,7 +155,8 @@ private:
     /**
      * Releases a ticket back into the ticketing pool.
      */
-    virtual void _releaseToTicketPool(AdmissionContext* admCtx) noexcept;
+    virtual void _releaseToTicketPool(AdmissionContext* admCtx,
+                                      AdmissionContext::Priority ticketPriority) noexcept;
 
     virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
 
@@ -168,10 +169,10 @@ private:
     virtual void _appendImplStats(BSONObjBuilder& b) const {}
 
     /**
-     * Fetches the queueing statistics corresponding to the 'admCtx'. All statistics that are queue
+     * Fetches the queueing statistics for the given priority. All statistics that are queue
      * specific should be updated through the resulting 'QueueStats'.
      */
-    virtual QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept = 0;
+    virtual QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept = 0;
 
     void _updatePeakUsed();
 
@@ -243,7 +244,7 @@ private:
                                                     AdmissionContext* admCtx,
                                                     Date_t until) override;
 
-    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override {
+    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept override {
         return _stats;
     }
 
@@ -264,7 +265,10 @@ class Ticket {
     friend class MockTicketHolder;
 
 public:
-    Ticket(Ticket&& t) : _ticketholder(t._ticketholder), _admissionContext(t._admissionContext) {
+    Ticket(Ticket&& t)
+        : _ticketholder(t._ticketholder),
+          _admissionContext(t._admissionContext),
+          _priority(t._priority) {
         t._ticketholder = nullptr;
         t._admissionContext = nullptr;
     }
@@ -276,6 +280,7 @@ public:
         invariant(!valid(), "Attempting to overwrite a valid ticket with another one");
         _ticketholder = t._ticketholder;
         _admissionContext = t._admissionContext;
+        _priority = t._priority;
         t._ticketholder = nullptr;
         t._admissionContext = nullptr;
         return *this;
@@ -283,7 +288,7 @@ public:
 
     ~Ticket() {
         if (_ticketholder) {
-            _ticketholder->_releaseToTicketPool(_admissionContext);
+            _ticketholder->_releaseToTicketPool(_admissionContext, _priority);
         }
     }
 
@@ -296,7 +301,9 @@ public:
 
 private:
     Ticket(TicketHolder* ticketHolder, AdmissionContext* admissionContext)
-        : _ticketholder(ticketHolder), _admissionContext(admissionContext) {}
+        : _ticketholder(ticketHolder), _admissionContext(admissionContext) {
+        _priority = admissionContext->getPriority();
+    }
 
     /**
      * Discards the ticket without releasing it back to the ticketholder.
@@ -312,5 +319,6 @@ private:
 
     TicketHolder* _ticketholder;
     AdmissionContext* _admissionContext;
+    AdmissionContext::Priority _priority;
 };
 }  // namespace mongo

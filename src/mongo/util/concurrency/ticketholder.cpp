@@ -115,8 +115,9 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
     _appendImplStats(b);
 }
 
-void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
-    if (admCtx->getPriority() == AdmissionContext::Priority::kExempt) {
+void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx,
+                                        AdmissionContext::Priority ticketPriority) noexcept {
+    if (ticketPriority == AdmissionContext::Priority::kExempt) {
         updateQueueStatsOnRelease(_serviceContext, _exemptQueueStats, admCtx);
         return;
     }
@@ -128,7 +129,7 @@ void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
         hangTicketRelease.pauseWhileSet();
     }
 
-    auto& queueStats = _getQueueStatsToUse(admCtx);
+    auto& queueStats = _getQueueStatsToUse(ticketPriority);
     updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
     _releaseToTicketPoolImpl(admCtx);
 }
@@ -149,7 +150,7 @@ boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
 
     auto ticket = _tryAcquireImpl(admCtx);
     if (ticket) {
-        auto& queueStats = _getQueueStatsToUse(admCtx);
+        auto& queueStats = _getQueueStatsToUse(admCtx->getPriority());
         updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
         _updatePeakUsed();
     }
@@ -166,7 +167,7 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interrup
         return ticket;
     }
 
-    auto& queueStats = _getQueueStatsToUse(admCtx);
+    auto& queueStats = _getQueueStatsToUse(admCtx->getPriority());
     auto tickSource = _serviceContext->getTickSource();
     auto currentWaitTime = tickSource->getTicks();
     auto updateQueuedTime = [&]() {

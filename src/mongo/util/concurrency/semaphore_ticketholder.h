@@ -74,7 +74,7 @@ private:
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
-    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final {
+    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept override final {
         return _semaphoreStats;
     }
 #if defined(__linux__)

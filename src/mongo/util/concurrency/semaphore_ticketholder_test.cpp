@@ -71,4 +71,25 @@ TEST_F(SemaphoreTicketHolderTest, Interruption) {
         std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */));
 }
 
+TEST_F(SemaphoreTicketHolderTest, PriorityBookkeeping) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    priorityBookkeepingTest(
+        _opCtx.get(),
+        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */),
+        AdmissionContext::Priority::kExempt,
+        [](auto statsWhileProcessing, auto statsWhenFinished) {
+            ASSERT_EQ(statsWhileProcessing.getObjectField("normalPriority")
+                          .getIntField("startedProcessing"),
+                      0);
+            ASSERT_EQ(
+                statsWhileProcessing.getObjectField("exempt").getIntField("startedProcessing"), 1);
+            ASSERT_EQ(statsWhenFinished.getObjectField("normalPriority")
+                          .getIntField("finishedProcessing"),
+                      0);
+            ASSERT_EQ(statsWhenFinished.getObjectField("exempt").getIntField("finishedProcessing"),
+                      1);
+        });
+}
+
 }  // namespace

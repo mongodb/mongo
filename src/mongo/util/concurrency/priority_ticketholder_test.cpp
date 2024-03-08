@@ -707,6 +707,92 @@ TEST_F(PriorityTicketHolderTest, Interruption) {
                       getServiceContext(), 1 /* tickets */, 0, false /* trackPeakUsed */));
 }
 
+TEST_F(PriorityTicketHolderTest, PriorityBookkeepingNormalToExempt) {
+    priorityBookkeepingTest(
+        _opCtx.get(),
+        std::make_unique<PriorityTicketHolder>(
+            getServiceContext(), 1 /* tickets */, 0, false /* trackPeakUsed */),
+        AdmissionContext::Priority::kExempt,
+        [](auto statsWhileProcessing, auto statsWhenFinished) {
+            ASSERT_EQ(statsWhileProcessing.getObjectField("normalPriority")
+                          .getIntField("startedProcessing"),
+                      0);
+            ASSERT_EQ(
+                statsWhileProcessing.getObjectField("exempt").getIntField("startedProcessing"), 1);
+            ASSERT_EQ(statsWhenFinished.getObjectField("normalPriority")
+                          .getIntField("finishedProcessing"),
+                      0);
+            ASSERT_EQ(statsWhenFinished.getObjectField("exempt").getIntField("finishedProcessing"),
+                      1);
+        });
+}
+
+TEST_F(PriorityTicketHolderTest, PriorityBookkeepingNormalToLow) {
+    priorityBookkeepingTest(
+        _opCtx.get(),
+        std::make_unique<PriorityTicketHolder>(
+            getServiceContext(), 1 /* tickets */, 0, false /* trackPeakUsed */),
+        AdmissionContext::Priority::kLow,
+        [](auto statsWhileProcessing, auto statsWhenFinished) {
+            ASSERT_EQ(statsWhileProcessing.getObjectField("normalPriority")
+                          .getIntField("startedProcessing"),
+                      0);
+            ASSERT_EQ(
+                statsWhileProcessing.getObjectField("lowPriority").getIntField("startedProcessing"),
+                1);
+            ASSERT_EQ(statsWhenFinished.getObjectField("normalPriority")
+                          .getIntField("finishedProcessing"),
+                      0);
+            ASSERT_EQ(
+                statsWhenFinished.getObjectField("lowPriority").getIntField("finishedProcessing"),
+                1);
+        });
+}
+
+TEST_F(PriorityTicketHolderTest, PriorityBookkeepingLowToExempt) {
+    ScopedAdmissionPriority lowPriority(_opCtx.get(), AdmissionContext::Priority::kLow);
+    priorityBookkeepingTest(
+        _opCtx.get(),
+        std::make_unique<PriorityTicketHolder>(
+            getServiceContext(), 1 /* tickets */, 0, false /* trackPeakUsed */),
+        AdmissionContext::Priority::kExempt,
+        [](auto statsWhileProcessing, auto statsWhenFinished) {
+            ASSERT_EQ(
+                statsWhileProcessing.getObjectField("lowPriority").getIntField("startedProcessing"),
+                0);
+            ASSERT_EQ(
+                statsWhileProcessing.getObjectField("exempt").getIntField("startedProcessing"), 1);
+            ASSERT_EQ(
+                statsWhenFinished.getObjectField("lowPriority").getIntField("finishedProcessing"),
+                0);
+            ASSERT_EQ(statsWhenFinished.getObjectField("exempt").getIntField("finishedProcessing"),
+                      1);
+        });
+}
+
+TEST_F(PriorityTicketHolderTest, PriorityBookkeepingLowToNormal) {
+    ScopedAdmissionPriority lowPriority(_opCtx.get(), AdmissionContext::Priority::kLow);
+    priorityBookkeepingTest(
+        _opCtx.get(),
+        std::make_unique<PriorityTicketHolder>(
+            getServiceContext(), 1 /* tickets */, 0, false /* trackPeakUsed */),
+        AdmissionContext::Priority::kNormal,
+        [](auto statsWhileProcessing, auto statsWhenFinished) {
+            ASSERT_EQ(
+                statsWhileProcessing.getObjectField("lowPriority").getIntField("startedProcessing"),
+                0);
+            ASSERT_EQ(statsWhileProcessing.getObjectField("normalPriority")
+                          .getIntField("startedProcessing"),
+                      1);
+            ASSERT_EQ(
+                statsWhenFinished.getObjectField("lowPriority").getIntField("finishedProcessing"),
+                0);
+            ASSERT_EQ(statsWhenFinished.getObjectField("normalPriority")
+                          .getIntField("finishedProcessing"),
+                      1);
+        });
+}
+
 TEST_F(PriorityTicketHolderTest, PriorityQueuedTimeTracker) {
     PriorityTicketHolder holder(getServiceContext(),
                                 1 /* tickets */,

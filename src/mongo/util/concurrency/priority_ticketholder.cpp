@@ -125,8 +125,8 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
 }
 
 TicketHolder::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(
-    const AdmissionContext* admCtx) noexcept {
-    auto queueType = _getQueueType(admCtx);
+    AdmissionContext::Priority priority) noexcept {
+    auto queueType = _getQueueType(priority);
     return _stats[_enumToInt(queueType)];
 }
 

@@ -87,12 +87,11 @@ private:
 
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
 
-    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
+    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept override final;
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
-    static QueueType _getQueueType(const AdmissionContext* admCtx) {
-        auto priority = admCtx->getPriority();
+    static QueueType _getQueueType(AdmissionContext::Priority priority) {
         switch (priority) {
             case AdmissionContext::Priority::kLow:
                 return QueueType::kLowPriority;
