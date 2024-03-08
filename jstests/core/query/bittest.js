@@ -166,6 +166,13 @@ assert.commandWorked(coll.insert({a: 1.1}));
 assert.commandWorked(coll.insert({a: -1.1}));
 assert.commandWorked(coll.insert({a: -Infinity}));
 assert.commandWorked(coll.insert({a: +Infinity}));
+assert.commandWorked(coll.insert({a: NumberDecimal("Infinity")}));
+assert.commandWorked(coll.insert({a: NumberDecimal("-Infinity")}));
+assert.commandWorked(coll.insert({a: NumberDecimal("NaN")}));
+assert.commandWorked(coll.insert({a: NumberDecimal(Number.MAX_SAFE_LONG + 1)}));
+assert.commandWorked(coll.insert({a: NumberDecimal(Number.MIN_SAFE_LONG - 1)}));
+assert.commandWorked(coll.insert({a: NumberDecimal(1.1)}));
+assert.commandWorked(coll.insert({a: NumberDecimal(-1.1)}));
 assert.commandWorked(coll.createIndex({a: 1}));
 
 assertQueryCorrect({a: {$bitsAllSet: 0}}, 5);
