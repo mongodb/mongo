@@ -133,9 +133,9 @@ public:
     void clearParticipantNewTermDates();
 
 
-private:
     class ElectionMetricsSSS;
 
+private:
     void _updateAverageCatchUpOps(WithLock lk);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationMetrics::_mutex");

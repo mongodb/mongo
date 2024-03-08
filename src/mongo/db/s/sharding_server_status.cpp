@@ -64,7 +64,7 @@ namespace {
 
 class ShardingServerStatus final : public ServerStatusSection {
 public:
-    ShardingServerStatus() : ServerStatusSection("sharding") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
@@ -126,12 +126,12 @@ public:
 
 private:
     ClusterServerParameterServerStatus _clusterParameterStatus;
-
-} shardingServerStatus;
+};
+auto& shardingServerStatus = *ServerStatusSectionBuilder<ShardingServerStatus>("sharding");
 
 class ShardingStatisticsServerStatus final : public ServerStatusSection {
 public:
-    ShardingStatisticsServerStatus() : ServerStatusSection("shardingStatistics") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
@@ -191,8 +191,9 @@ public:
             Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
         }
     }
-
-} shardingStatisticsServerStatus;
+};
+auto& shardingStatisticsServerStatus =
+    *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics");
 
 }  // namespace
 }  // namespace mongo

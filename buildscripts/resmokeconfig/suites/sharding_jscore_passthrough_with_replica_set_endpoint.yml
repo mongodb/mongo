@@ -42,7 +42,7 @@ selector:
   - jstests/core/**/explain_upsert.js
 
   # The tests below are disabled because of embedded router role and replica set endpoint.
-  # TODO (SERVER-79353): Support role-aware serverStatus on mongod with router role.
+  # TODO (SERVER-87512): Support role-aware serverStatus on mongod with router role.
   - jstests/core/write/find_and_modify/find_and_modify_metrics.js
   - jstests/core/write/update/update_metrics.js
   # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID

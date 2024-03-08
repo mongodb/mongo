@@ -60,7 +60,8 @@ public:
         ServiceContextTest::setUp();
         oldDiagnosticsFlag = gTestingDiagnosticsEnabledAtStartup;
         tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
-        instance = std::make_unique<FLEStatusSection>(tickSource.get());
+        instance =
+            std::make_unique<FLEStatusSection>("test section", ClusterRole::None, tickSource.get());
     }
 
     void tearDown() final {

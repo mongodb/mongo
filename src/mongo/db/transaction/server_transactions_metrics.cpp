@@ -187,7 +187,7 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, bool inclu
 namespace {
 class TransactionsSSS : public ServerStatusSection {
 public:
-    TransactionsSSS() : ServerStatusSection("transactions") {}
+    using ServerStatusSection::ServerStatusSection;
 
     ~TransactionsSSS() override = default;
 
@@ -212,8 +212,8 @@ public:
         ServerTransactionsMetrics::get(opCtx)->updateStats(&stats, includeLastCommitted);
         return stats.toBSON();
     }
-
-} transactionsSSS;
+};
+auto& transactionsSSS = *ServerStatusSectionBuilder<TransactionsSSS>("transactions");
 }  // namespace
 
 }  // namespace mongo

@@ -65,8 +65,9 @@ public:
 
     void observe(const std::shared_ptr<transport::Session>& ts, Date_t now, const Message& message);
 
-private:
     class TrafficRecorderSSS;
+
+private:
     class Recording;
 
     std::shared_ptr<Recording> _getCurrentRecording() const;

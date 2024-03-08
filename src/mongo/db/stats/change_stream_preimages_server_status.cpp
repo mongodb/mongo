@@ -103,7 +103,7 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
  */
 class ChangeStreamPreImagesServerStatus final : public ServerStatusSection {
 public:
-    ChangeStreamPreImagesServerStatus() : ServerStatusSection("changeStreamPreImages") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -130,6 +130,8 @@ public:
 
         return builder.obj();
     }
-} changeStreamPreImagesServerStatus;
+};
+auto& changeStreamPreImagesServerStatus =
+    *ServerStatusSectionBuilder<ChangeStreamPreImagesServerStatus>("changeStreamPreImages");
 
 }  // namespace mongo

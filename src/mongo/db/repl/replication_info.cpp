@@ -221,7 +221,7 @@ class ReplicationInfoServerStatus : public ServerStatusSection {
 public:
     enum class UserWriteBlockState { kUnknown = 0, kDisabled = 1, kEnabled = 2 };
 
-    ReplicationInfoServerStatus() : ServerStatusSection("repl") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -271,12 +271,13 @@ public:
 
         return result.obj();
     }
-
-} replicationInfoServerStatus;
+};
+auto& replicationInfoServerStatus =
+    *ServerStatusSectionBuilder<ReplicationInfoServerStatus>("repl");
 
 class OplogInfoServerStatus : public ServerStatusSection {
 public:
-    OplogInfoServerStatus() : ServerStatusSection("oplog") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return false;
@@ -338,7 +339,8 @@ public:
 
         return result.obj();
     }
-} oplogInfoServerStatus;
+};
+auto& oplogInfoServerStatus = *ServerStatusSectionBuilder<OplogInfoServerStatus>("oplog");
 
 const std::string kAutomationServiceDescriptorFieldName =
     HelloCommandReply::kAutomationServiceDescriptorFieldName.toString();
@@ -699,7 +701,9 @@ protected:
 };
 MONGO_REGISTER_COMMAND(CmdIsMaster).forShard();
 
-OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
+auto& replOpCounterServerStatusSection =
+    *ServerStatusSectionBuilder<OpCounterServerStatusSection>("opcountersRepl")
+         .bind(&replOpCounters);
 
 }  // namespace
 

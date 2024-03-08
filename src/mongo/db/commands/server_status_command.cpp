@@ -150,9 +150,9 @@ public:
         bool includeAllSections = allElem.type() ? allElem.trueValue() : false;
 
         // --- all sections
-        auto registry = ServerStatusSectionRegistry::get();
+        auto registry = ServerStatusSectionRegistry::instance();
         for (auto i = registry->begin(); i != registry->end(); ++i) {
-            ServerStatusSection* section = i->second;
+            auto& section = i->second;
 
             if (!section->checkAuthForOperation(opCtx).isOK()) {
                 continue;
@@ -220,7 +220,8 @@ MONGO_REGISTER_COMMAND(CmdServerStatus).forRouter().forShard();
 
 }  // namespace
 
-OpCounterServerStatusSection globalOpCounterServerStatusSection("opcounters", &globalOpCounters);
+auto& globalOpCounterServerStatusSection =
+    *ServerStatusSectionBuilder<OpCounterServerStatusSection>("opcounters").bind(&globalOpCounters);
 
 namespace {
 
@@ -228,7 +229,7 @@ namespace {
 
 class ExtraInfo : public ServerStatusSection {
 public:
-    ExtraInfo() : ServerStatusSection("extra_info") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -244,12 +245,12 @@ public:
 
         return bb.obj();
     }
-
-} extraInfo;
+};
+auto extraInfo = *ServerStatusSectionBuilder<ExtraInfo>("extra_info");
 
 class Asserts : public ServerStatusSection {
 public:
-    Asserts() : ServerStatusSection("asserts") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -266,8 +267,8 @@ public:
         asserts.append("rollovers", assertionCount.rollovers.loadRelaxed());
         return asserts.obj();
     }
-
-} asserts;
+};
+auto asserts = *ServerStatusSectionBuilder<Asserts>("asserts");
 
 struct MemBaseMetricPolicy {
     void appendTo(BSONObjBuilder& bob, StringData leafName) const {
@@ -295,7 +296,7 @@ auto& memBase = *CustomMetricBuilder<MemBaseMetricPolicy>{".mem"};
 
 class HttpClientServerStatus : public ServerStatusSection {
 public:
-    HttpClientServerStatus() : ServerStatusSection("http_client") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const final {
         return false;
@@ -304,7 +305,8 @@ public:
     BSONObj generateSection(OperationContext*, const BSONElement& configElement) const final {
         return HttpClient::getServerStatus();
     }
-} httpClientServerStatus;
+};
+auto httpClientServerStatus = *ServerStatusSectionBuilder<HttpClientServerStatus>("http_client");
 
 }  // namespace
 

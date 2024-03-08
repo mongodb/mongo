@@ -59,7 +59,7 @@ const auto getQuerySettingsManager =
 
 class QuerySettingsServerStatusSection final : public ServerStatusSection {
 public:
-    QuerySettingsServerStatusSection() : ServerStatusSection("querySettings") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         // Only include if Query Settings are enabled.
@@ -88,7 +88,10 @@ private:
     int _size = 0;
     int _numSettingsWithReject = 0;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettingsServerStatusSection::_mutex");
-} querySettingsServerStatusSection;
+};
+
+auto& querySettingsServerStatusSection =
+    *ServerStatusSectionBuilder<QuerySettingsServerStatusSection>("querySettings");
 
 auto computeTenantConfiguration(std::vector<QueryShapeConfiguration>&& settingsArray,
                                 const boost::optional<TenantId>& tenantId) {

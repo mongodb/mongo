@@ -37,7 +37,8 @@
 
 namespace mongo {
 
-TransactionCoordinatorsSSS transactionCoordinatorsSSS;
+auto& transactionCoordinatorSSS =
+    *ServerStatusSectionBuilder<TransactionCoordinatorsSSS>("twoPhaseCommitCoordinator");
 
 namespace {
 const auto ServerTransactionCoordinatorsMetricsDecoration =

@@ -1343,7 +1343,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     const StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName,
+        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
                                                     nss,
                                                     "",
                                                     CollectionOptions(),
@@ -1366,7 +1366,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.nss = nss;
     params.uuid = boost::none;
     params.ident = ns;
-    params.engineName = kWiredTigerEngineName;
+    params.engineName = std::string{kWiredTigerEngineName};
     params.isCapped = false;
     params.keyFormat = KeyFormat::String;
     params.overwrite = false;

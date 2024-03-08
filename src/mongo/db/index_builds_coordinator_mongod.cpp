@@ -919,7 +919,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                                 << replState->buildUUID);
 
         auto const nextAction = [&] {
-            indexBuildsSSS.waitForCommitQuorum.addAndFetch(1);
+            _incWaitForCommitQuorum();
             // Future wait can be interrupted.
             return _drainSideWritesUntilNextActionIsAvailable(opCtx, replState);
         }();

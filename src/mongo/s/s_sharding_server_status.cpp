@@ -51,7 +51,7 @@ namespace {
 
 class ShardingServerStatus final : public ServerStatusSection {
 public:
-    ShardingServerStatus() : ServerStatusSection("sharding") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -95,12 +95,12 @@ public:
 
 private:
     ClusterServerParameterServerStatus _clusterParameterStatus;
-
-} shardingServerStatus;
+};
+auto& shardingServerStatus = *ServerStatusSectionBuilder<ShardingServerStatus>("sharding");
 
 class ShardingStatisticsServerStatus final : public ServerStatusSection {
 public:
-    ShardingStatisticsServerStatus() : ServerStatusSection("shardingStatistics") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -118,12 +118,13 @@ public:
         catalogCache->report(&result);
         return result.obj();
     }
-
-} shardingStatisticsServerStatus;
+};
+auto& shardingStatisitcsServerStatus =
+    *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics");
 
 class HedgingMetricsServerStatus : public ServerStatusSection {
 public:
-    HedgingMetricsServerStatus() : ServerStatusSection("hedgingMetrics") {}
+    using ServerStatusSection::ServerStatusSection;
 
     ~HedgingMetricsServerStatus() override = default;
 
@@ -135,8 +136,9 @@ public:
                             const BSONElement& configElement) const override {
         return HedgingMetrics::get(opCtx)->toBSON();
     }
-
-} hedgingMetricsServerStatus;
+};
+auto& hedgingMetricsServerStatus =
+    *ServerStatusSectionBuilder<HedgingMetricsServerStatus>("hedgingMetrics");
 
 }  // namespace
 }  // namespace mongo

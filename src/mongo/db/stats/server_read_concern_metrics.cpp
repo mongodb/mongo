@@ -182,7 +182,7 @@ void ServerReadConcernMetrics::updateStats(ReadConcernStats* stats, OperationCon
 namespace {
 class ReadConcernCountersSSS : public ServerStatusSection {
 public:
-    ReadConcernCountersSSS() : ServerStatusSection("readConcernCounters") {}
+    using ServerStatusSection::ServerStatusSection;
 
     ~ReadConcernCountersSSS() override = default;
 
@@ -196,8 +196,9 @@ public:
         ServerReadConcernMetrics::get(opCtx)->updateStats(&stats, opCtx);
         return stats.toBSON();
     }
-
-} ReadConcernCountersSSS;
+};
+auto readConcernCountersSSS =
+    *ServerStatusSectionBuilder<ReadConcernCountersSSS>("readConcernCounters");
 }  // namespace
 
 }  // namespace mongo

@@ -83,9 +83,9 @@ void cacheToBSON(SCRAMClientCache<HashBlock>* cache, StringData name, BSONObjBui
 /**
  * Output stats about the SCRAM client cache to server status.
  */
-class ScramCacheStatsStatusSection : ServerStatusSection {
+class ScramCacheStatsStatusSection : public ServerStatusSection {
 public:
-    ScramCacheStatsStatusSection() : ServerStatusSection("scramCache") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -97,9 +97,10 @@ public:
         cacheToBSON(scramsha1ClientCache, "SCRAM-SHA-1", &builder);
         cacheToBSON(scramsha256ClientCache, "SCRAM-SHA-256", &builder);
         return builder.obj();
-    };
+    }
+};
 
-} scramCacheStatusSection;
+auto& scramCacheSection = *ServerStatusSectionBuilder<ScramCacheStatsStatusSection>("scramCache");
 
 }  // namespace
 

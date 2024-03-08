@@ -49,7 +49,8 @@ namespace {
 
 class GlobalLockServerStatusSection : public ServerStatusSection {
 public:
-    GlobalLockServerStatusSection() : ServerStatusSection("globalLock") {
+    GlobalLockServerStatusSection(std::string name, ClusterRole role)
+        : ServerStatusSection(name, role) {
         _started = curTimeMillis64();
     }
 
@@ -108,13 +109,14 @@ public:
 
 private:
     unsigned long long _started;
-
-} globalLockServerStatusSection;
+};
+auto& globalLockServerStatusSection =
+    *ServerStatusSectionBuilder<GlobalLockServerStatusSection>("globalLock");
 
 
 class LockStatsServerStatusSection : public ServerStatusSection {
 public:
-    LockStatsServerStatusSection() : ServerStatusSection("locks") {}
+    using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
         return true;
@@ -131,8 +133,9 @@ public:
 
         return ret.obj();
     }
-
-} lockStatsServerStatusSection;
+};
+auto& lockStatsServerStatusSection =
+    *ServerStatusSectionBuilder<LockStatsServerStatusSection>("locks");
 
 }  // namespace
 }  // namespace mongo
