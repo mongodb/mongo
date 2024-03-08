@@ -233,7 +233,11 @@ if (typeof _threadInject != "undefined") {
             "timeseries/timeseries_delete_hint.js",
             "timeseries/timeseries_update_hint.js",
             "timeseries/timeseries_delete_concurrent.js",
-            "timeseries/timeseries_update_concurrent.js"
+            "timeseries/timeseries_update_concurrent.js",
+
+            // This test requires latches to be enabled, which isn't true for all variants.
+            "latch_analyzer.js",
+            "currentop_waiting_for_latch.js"
         ]);
 
         // Get files, including files in subdirectories.
