@@ -7,9 +7,7 @@
  *   does_not_support_retryable_writes,
  *   # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *   does_not_support_transactions,
- *   multiversion_incompatible,
  *   no_selinux,
- *   requires_fcv_61,
  *   requires_non_retryable_writes,
  *   # TODO SERVER-87044: re-enable test in suites that perform random migrations
  *   assumes_balancer_off,
