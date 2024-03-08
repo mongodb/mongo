@@ -1493,6 +1493,15 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     BSONObj notMatch8 = fromjson("{a: 1e100}");  // Too-Large Double
     BSONObj notMatch9 = fromjson("{a: ObjectId('000000000000000000000000')}");  // OID
     BSONObj notMatch10 = fromjson("{a: Date(54)}");                             // Date
+    BSONObj notMatch11 = fromjson("{a: NumberDecimal(\"Infinity\")}");  // Infinity NumberDecimal
+    BSONObj notMatch12 =
+        fromjson("{a: NumberDecimal(\"-Infinity\")}");  // Negative infinity NumberDecimal
+    BSONObj notMatch13 = fromjson("{a: NumberDecimal(\"NaN\")}");     // NaN NumberDecimal
+    BSONObj notMatch14 = fromjson("{a: NumberDecimal(\"1e100\")}");   // Too-Large NumberDecimal
+    BSONObj notMatch15 = fromjson("{a: NumberDecimal(\"-1e100\")}");  // Too-Small NumberDecimal
+    BSONObj notMatch16 = fromjson("{a: NumberDecimal(\"5.5\")}");     // Non-integral NumberDecimal
+    BSONObj notMatch17 =
+        fromjson("{a: NumberDecimal(\"-5.5\")}");  // Negative-integral NumberDecimal
 
     BitsAllSetMatchExpression balls("a"_sd, bitPositions);
     BitsAllClearMatchExpression ballc("a"_sd, bitPositions);
@@ -1513,6 +1522,13 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     ASSERT(!balls.matchesSingleElement(notMatch8["a"]));
     ASSERT(!balls.matchesSingleElement(notMatch9["a"]));
     ASSERT(!balls.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch11["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch12["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch13["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch14["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch15["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch16["a"]));
+    ASSERT(!balls.matchesSingleElement(notMatch17["a"]));
     ASSERT(!ballc.matchesSingleElement(notMatch1["a"]));
     ASSERT(!ballc.matchesSingleElement(notMatch2["a"]));
     ASSERT(!ballc.matchesSingleElement(notMatch3["a"]));
@@ -1523,6 +1539,13 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     ASSERT(!ballc.matchesSingleElement(notMatch8["a"]));
     ASSERT(!ballc.matchesSingleElement(notMatch9["a"]));
     ASSERT(!ballc.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch11["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch12["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch13["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch14["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch15["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch16["a"]));
+    ASSERT(!ballc.matchesSingleElement(notMatch17["a"]));
     ASSERT(!banys.matchesSingleElement(notMatch1["a"]));
     ASSERT(!banys.matchesSingleElement(notMatch2["a"]));
     ASSERT(!banys.matchesSingleElement(notMatch3["a"]));
@@ -1533,6 +1556,13 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     ASSERT(!banys.matchesSingleElement(notMatch8["a"]));
     ASSERT(!banys.matchesSingleElement(notMatch9["a"]));
     ASSERT(!banys.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch11["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch12["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch13["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch14["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch15["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch16["a"]));
+    ASSERT(!banys.matchesSingleElement(notMatch17["a"]));
     ASSERT(!banyc.matchesSingleElement(notMatch1["a"]));
     ASSERT(!banyc.matchesSingleElement(notMatch2["a"]));
     ASSERT(!banyc.matchesSingleElement(notMatch3["a"]));
@@ -1543,6 +1573,13 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     ASSERT(!banyc.matchesSingleElement(notMatch8["a"]));
     ASSERT(!banyc.matchesSingleElement(notMatch9["a"]));
     ASSERT(!banyc.matchesSingleElement(notMatch10["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch11["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch12["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch13["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch14["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch15["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch16["a"]));
+    ASSERT(!banyc.matchesSingleElement(notMatch17["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {

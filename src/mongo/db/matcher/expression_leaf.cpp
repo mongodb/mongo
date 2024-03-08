@@ -796,6 +796,25 @@ bool BitTestMatchExpression::matchesSingleElement(const BSONElement& e,
         if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
             return false;
         }
+    } else if (e.type() == BSONType::NumberDecimal) {
+        Decimal128 eDecimal = e.numberDecimal();
+
+        // NaN NumberDecimals are rejected.
+        if (eDecimal.isNaN()) {
+            return false;
+        }
+
+        // NumberDecimals that are too large or small to be represented as a 64-bit signed
+        // integer are treated as 0.
+        if (eDecimal > Decimal128(std::numeric_limits<long long>::max()) ||
+            eDecimal < Decimal128(std::numeric_limits<long long>::min())) {
+            return false;
+        }
+
+        // This checks if e is an integral NumberDecimal.
+        if (eDecimal != eDecimal.round(Decimal128::kRoundTowardZero)) {
+            return false;
+        }
     }
 
     long long eValue = e.numberLong();

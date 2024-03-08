@@ -11,6 +11,7 @@ selector:
   - jstests/core/query/distinct/distinct_semantics.js
   - jstests/core/query/double_decimal_compare.js
   - jstests/core/query/nan.js
+  - jstests/core/query/bittest.js
   # v:1 index does not support wildcard.
   - jstests/core/index/wildcard/**/*.js
   # v:1 index does not support collation.

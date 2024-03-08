@@ -581,6 +581,8 @@ last-continuous:
     ticket: SERVER-82349
   - test_file: jstests/sharding/view_query_readConcern_available.js
     ticket: SERVER-86667
+  - test_file: jstests/core/query/bittest.js
+    ticket: SERVER-86419
   suites: null
 last-lts:
   all:
@@ -1220,4 +1222,6 @@ last-lts:
     ticket: SERVER-82349
   - test_file: jstests/sharding/view_query_readConcern_available.js
     ticket: SERVER-86667
+  - test_file: jstests/core/query/bittest.js
+    ticket: SERVER-86419
   suites: null
