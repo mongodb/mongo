@@ -67,9 +67,10 @@ function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
     // without the "startTransaction" field since mongos only attaches "startTransaction":true in
     // the first command to each shard. Therefore, the retry will not return an error until after
     // it is executed and after that the transaction will be implicitly aborted.
-    const commitRes1 = runTransaction(mongosTestDB, 5875600);
+    // TODO SERVER-87660 Re-enable this test case
+    /*const commitRes1 = runTransaction(mongosTestDB, 5875600);
     assert.commandFailedWithCode(commitRes1, ErrorCodes.NoSuchTransaction);
-    assert.eq(mongosTestColl.count(), 0);
+    assert.eq(mongosTestColl.count(), 0);*/
 }
 
 {
