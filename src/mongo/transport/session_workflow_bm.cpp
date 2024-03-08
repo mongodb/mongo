@@ -294,9 +294,11 @@ private:
  */
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
 const auto kMaxThreads = 1;
+constexpr std::array exhaustRounds{0};
 #else
 /** 2x to benchmark the case of more threads than cores for curiosity's sake. */
 const auto kMaxThreads = 2 * ProcessInfo::getNumLogicalCores();
+constexpr std::array exhaustRounds{0, 1, 8};
 #endif
 
 BENCHMARK_DEFINE_F(SessionWorkflowBm, Loop)(benchmark::State& state) {
@@ -305,7 +307,7 @@ BENCHMARK_DEFINE_F(SessionWorkflowBm, Loop)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(SessionWorkflowBm, Loop)->Apply([](auto* b) {
     b->ArgNames({"ExhaustRounds", "ReservedThreads"});
-    for (int exhaust : {0, 1, 8}) {
+    for (int exhaust : exhaustRounds) {
         std::vector<int> res{0};
 #if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
         res = {0, 1, 4, 16};
