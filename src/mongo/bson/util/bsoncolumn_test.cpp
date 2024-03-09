@@ -7275,22 +7275,28 @@ TEST_F(BSONColumnTest, InvalidDelta) {
 
 TEST_F(BSONColumnTest, AppendMinKey) {
     BSONColumnBuilder cb;
-    ASSERT_THROWS_CODE(cb.append(createElementMinKey()), DBException, ErrorCodes::InvalidBSONType);
+    cb.append(createElementMinKey());
 
     BufBuilder expected;
+    appendLiteral(expected, createElementMinKey());
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {createElementMinKey()});
 }
 
 TEST_F(BSONColumnTest, AppendMaxKey) {
     BSONColumnBuilder cb;
-    ASSERT_THROWS_CODE(cb.append(createElementMaxKey()), DBException, ErrorCodes::InvalidBSONType);
+    cb.append(createElementMaxKey());
 
     BufBuilder expected;
+    appendLiteral(expected, createElementMaxKey());
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {createElementMaxKey()});
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
@@ -7302,13 +7308,43 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
         builder.append(createElementMinKey());
     }
 
-    ASSERT_THROWS_CODE(
-        cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
+    BSONObj ref = obj.obj();
+    cb.append(createElementObj(ref));
 
     BufBuilder expected;
+    appendInterleavedStart(expected, ref);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
     appendEOO(expected);
 
-    verifyBinary(cb.finalize(), expected);
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {createElementObj(ref)});
+}
+
+TEST_F(BSONColumnTest, AppendMaxKeyInSubObj) {
+    BSONColumnBuilder cb;
+
+    BSONObjBuilder obj;
+    {
+        BSONObjBuilder builder = obj.subobjStart("root");
+        builder.append(createElementMaxKey());
+    }
+
+    BSONObj ref = obj.obj();
+    cb.append(createElementObj(ref));
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, ref);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {createElementObj(ref)});
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStart) {
@@ -7320,9 +7356,24 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStart) {
         builder.append(createElementMinKey());
     }
 
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    ASSERT_THROWS_CODE(
-        cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
+    std::vector<BSONElement> elems = {createElementObj(BSON("root" << BSON("0" << 1))),
+                                      createElementObj(obj.obj())};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
@@ -7334,15 +7385,32 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
         builder.append(createElementMinKey());
     }
 
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    ASSERT_THROWS_CODE(
-        cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
+    std::vector<BSONElement> elems(7, createElementObj(BSON("root" << BSON("0" << 1))));
+    elems.push_back(createElementObj(obj.obj()));
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues},
+                           1);
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
@@ -7355,11 +7423,40 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
         builder.append(createElementMinKey());
     }
 
-    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
-    // Make sure we throw InvalidBSONType even if we would detect that "a" needs to be merged before
+    // Make sure we handle MinKey even if we would detect that "a" needs to be merged before
     // observing the MinKey.
-    ASSERT_THROWS_CODE(
-        cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
+    std::vector<BSONElement> elems = {createElementObj(BSON("root" << BSON("0" << 1))),
+                                      createElementObj(obj.obj())};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected,
+                           BSON("root" << BSON("a"
+                                               << "asd"
+                                               << "0" << 1)));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {
+                               boost::none,
+                               kDeltaForBinaryEqualValues,
+                           },
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {
+                               kDeltaForBinaryEqualValues,
+                           },
+                           1);
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DecompressMinKey) {

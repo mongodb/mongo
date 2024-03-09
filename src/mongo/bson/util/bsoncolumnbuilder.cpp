@@ -129,21 +129,9 @@ bool objectIdDeltaPossible(const OID& elem, const OID& prev) {
         prev.getInstanceUnique().bytes, elem.getInstanceUnique().bytes, OID::kInstanceUniqueSize);
 }
 
-// Traverses object and calls 'ElementFunc' on every scalar subfield encountered.
-template <typename ElementFunc>
-void _traverse(const BSONObj& reference, const ElementFunc& elemFunc) {
-    for (const auto& elem : reference) {
-        if (elem.type() == Object || elem.type() == Array) {
-            _traverse(elem.Obj(), elemFunc);
-        } else {
-            elemFunc(elem, BSONElement());
-        }
-    }
-}
-
-// Internal recursion function for traverseLockStep() when we just need to traverse reference
-// object. Like '_traverse' above but exits when an empty sub object is encountered. Returns 'true'
-// if empty subobject found.
+// Internal recursion function for traverseLockStep() when we need to traverse the reference
+// object. Exits and returns 'true' when an empty sub object is encountered. Returns 'false'
+// otherwise.
 template <typename ElementFunc>
 bool _traverseUntilEmptyObj(const BSONObj& obj, const ElementFunc& elemFunc) {
     for (const auto& elem : obj) {
@@ -162,6 +150,20 @@ bool _traverseUntilEmptyObj(const BSONObj& obj, const ElementFunc& elemFunc) {
 // Helper function for mergeObj() to detect if Object contain subfields of empty Objects
 bool _hasEmptyObj(const BSONObj& obj) {
     return _traverseUntilEmptyObj(obj, [](const BSONElement&, const BSONElement&) {});
+}
+
+// Helper function to determine if provided Object contains any scalar subfields
+bool _containsScalars(const BSONObj& reference) {
+    for (const auto& elem : reference) {
+        if (elem.type() == Object || elem.type() == Array) {
+            if (_containsScalars(elem.Obj())) {
+                return true;
+            }
+        } else {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Internal recursion function for traverseLockStep(). See documentation for traverseLockStep.
@@ -1142,10 +1144,6 @@ BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
 
 BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     auto type = elem.type();
-    uassert(ErrorCodes::InvalidBSONType,
-            "MinKey or MaxKey is not valid for storage",
-            type != MinKey && type != MaxKey);
-
     if (elem.eoo()) {
         return skip();
     }
@@ -1172,19 +1170,10 @@ BSONColumnBuilder& BSONColumnBuilder::append(const BSONArray& arr) {
 BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
     auto type = elem.type;
     auto obj = elem.value.Obj();
-    // First validate that we don't store MinKey or MaxKey anywhere in the Object. If this is the
-    // case, throw exception before we modify any state.
-    uint32_t numElements = 0;
-    auto perElement = [&numElements](const BSONElement& elem, const BSONElement&) {
-        ++numElements;
-        uassert(ErrorCodes::InvalidBSONType,
-                "MinKey or MaxKey is not valid for storage",
-                elem.type() != MinKey && elem.type() != MaxKey);
-    };
-    _traverse(obj, perElement);
+    bool containsScalars = _containsScalars(obj);
 
     if (_is.mode == Mode::kRegular) {
-        if (numElements == 0) {
+        if (!containsScalars) {
             _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
         } else {
             _startDetermineSubObjReference(obj, type);
@@ -1218,7 +1207,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
 
                 // If we only contain empty subobj (no value elements) then append in regular mode
                 // instead of re-starting subobj compression.
-                if (numElements == 0) {
+                if (!containsScalars) {
                     _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
                     return *this;
                 }
@@ -1245,7 +1234,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
     if (!_appendSubElements(obj)) {
         // If we were not compatible restart subobj compression unless our object contain no value
         // fields (just empty subobjects)
-        if (numElements == 0) {
+        if (!containsScalars) {
             _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
         } else {
             _startDetermineSubObjReference(obj, type);
@@ -1851,8 +1840,9 @@ bool EncodingState::Encoder64::_appendDouble(double value,
 
 Element EncodingState::_previous() const {
     // The first two bytes are type and field name null terminator
-    return {
-        BSONType(*_prev.buffer.get()), BSONElementValue(_prev.buffer.get() + 2), _prev.size - 2};
+    return {static_cast<BSONType>(static_cast<signed char>(*_prev.buffer.get())),
+            BSONElementValue(_prev.buffer.get() + 2),
+            _prev.size - 2};
 }
 
 void EncodingState::_storePrevious(Element elem) {
