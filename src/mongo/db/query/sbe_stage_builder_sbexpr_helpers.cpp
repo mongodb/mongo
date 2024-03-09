@@ -498,7 +498,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     const VariableTypes* varTypes,
     const SbSlotVector& gbs,
     SbAggExprVector sbAggExprs,
-    boost::optional<SbSlot> selectivityBitmapSlot,
+    SbSlot selectivityBitmapSlot,
     const SbSlotVector& blockAccArgSbSlots,
     const SbSlotVector& blockAccInternalArgSbSlots,
     SbSlot bitmapInternalSlot,
@@ -511,8 +511,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
     SbSlot groupBySlot = gbs[0];
 
-    const auto selectivityBitmapSlotId =
-        selectivityBitmapSlot ? boost::make_optional(selectivityBitmapSlot->getId()) : boost::none;
+    const auto selectivityBitmapSlotId = selectivityBitmapSlot.getId();
 
     sbe::BlockHashAggStage::BlockAndRowAggs aggExprsMap;
     SbSlotVector aggSlots;

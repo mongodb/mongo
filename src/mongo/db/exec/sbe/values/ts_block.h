@@ -58,14 +58,19 @@ class TsBlock;
  */
 class TsBucketPathExtractor {
 public:
+    struct ExtractResult {
+        size_t numMeasurements = 0;
+        std::vector<std::unique_ptr<TsBlock>> storageBlocks;
+        std::vector<std::unique_ptr<CellBlock>> cellBlocks;
+    };
+
     TsBucketPathExtractor(std::vector<CellBlock::PathRequest> reqs, StringData timeField);
 
     /*
      * Returns one CellBlock per path given in the constructor. A CellBlock represents all of the
      * values at a path, along with information on their position.
      */
-    std::pair<std::vector<std::unique_ptr<TsBlock>>, std::vector<std::unique_ptr<CellBlock>>>
-    extractCellBlocks(const BSONObj& bucket);
+    ExtractResult extractCellBlocks(const BSONObj& bucket);
 
 private:
     std::vector<CellBlock::PathRequest> _pathReqs;

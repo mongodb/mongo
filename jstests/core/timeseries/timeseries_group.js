@@ -806,6 +806,42 @@ TimeseriesTest.run((insert) => {
                 expectedResults: [{a: null}, {a: null}],
                 usesBlockProcessing: false
             },
+            {
+                name: "GroupWithProjectedOutFieldInAccumulator",
+                pipeline: [
+                    {$project: {_id: 0}},
+                    {$match: {[metaFieldName]: "foo"}},
+                    {$group: {_id: null, minY: {$min: "$y"}}},
+                ],
+                expectedResults: [{_id: null, minY: 11}],
+                usesBlockProcessing: false,
+            },
+            {
+                name: "GroupWithProjectedOutFieldInGb",
+                pipeline: [
+                    {$project: {_id: 0}},
+                    {$match: {[metaFieldName]: "foo"}},
+                    {$group: {_id: "$y", a: {$min: "$x"}}},
+                ],
+                expectedResults: [
+                    {_id: 11, a: 456},
+                    {_id: 42, a: 123},
+                    {_id: 73, a: 123},
+                    {_id: 99, a: 456},
+                    {_id: null, a: null}
+                ],
+                usesBlockProcessing: false,
+            },
+            {
+                name: "GroupWithMixOfProjectedOutField",
+                pipeline: [
+                    {$project: {_id: 0, x: 1 /* y not included */}},
+                    {$match: {[metaFieldName]: "foo"}},
+                    {$group: {_id: "$y", a: {$min: "$x"}}},
+                ],
+                expectedResults: [],
+                usesBlockProcessing: false,
+            }
         ];
 
         function compareResultEntries(lhs, rhs) {

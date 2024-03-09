@@ -40,15 +40,19 @@ namespace mongo::sbe {
  * Debug string representations:
  *
  *  ts_bucket_to_cellblock bucketSlot pathReqs[blocksOut[0] = paths[0], ...,
- *      blocksOut[N] = paths[N]] metaOut = meta?
+ *      blocksOut[N] = paths[N]] metaOut = meta? bitmapSlotId
+ *
+ * The 'meta' slot contains the bucket's 'meta' field. The 'bitmapSlotId' contains an all 1s
+ * bitmap which has 'numMeasurements' entries.
  */
 class TsBucketToCellBlockStage final : public PlanStage {
 public:
     TsBucketToCellBlockStage(std::unique_ptr<PlanStage> input,
-                             value::SlotId bucketSlot,
+                             value::SlotId bucketSlotId,
                              std::vector<value::CellBlock::PathRequest> pathReqs,
                              value::SlotVector blocksOut,
-                             boost::optional<value::SlotId> metaOut,
+                             boost::optional<value::SlotId> metaOutSlotId,
+                             value::SlotId bitmapOutSlotId,
                              const std::string& timeField,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking = true);
@@ -78,6 +82,7 @@ private:
     const std::vector<value::CellBlock::PathRequest> _pathReqs;
     const value::SlotVector _blocksOutSlotId;
     const boost::optional<value::SlotId> _metaOutSlotId;
+    const value::SlotId _bitmapOutSlotId;
     const std::string _timeField;
 
     value::TsBucketPathExtractor _pathExtractor;
@@ -85,6 +90,7 @@ private:
     value::SlotAccessor* _bucketAccessor = nullptr;
     std::vector<value::OwnedValueAccessor> _blocksOutAccessor;
     value::OwnedValueAccessor _metaOutAccessor;
+    value::OwnedValueAccessor _bitmapOutAccessor;
 
     std::vector<std::unique_ptr<value::TsBlock>> _tsBlockStorage;
 };

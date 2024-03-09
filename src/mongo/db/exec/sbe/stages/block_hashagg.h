@@ -47,9 +47,10 @@ namespace sbe {
  * is not supported).
  *
  * Debug string representation:
- * block_hashagg [<groupby slot>] [slot_1 = block_expr_1, ..., slot_n = block_expr_n]
+ * block_group bitset=bitmapSlotId [<groupby slot>]
+ *     [slot_1 = block_expr_1, ..., slot_n = block_expr_n]
  *     [slot_1 = row_expr_1, ..., slot_n = row_expr_n] [_rowAccSlotId]
- * childStage
+ *     childStage
  */
 class BlockHashAggStage final : public HashAggBaseStage<BlockHashAggStage> {
 public:
@@ -63,7 +64,7 @@ public:
 
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotVector groupSlotIds,
-                      boost::optional<value::SlotId> blockBitsetInSlotId,
+                      value::SlotId blockBitsetInSlotId,
                       value::SlotVector blockDataInSlotIds,
                       value::SlotId rowAccSlotId,
                       value::SlotId accumulatorBitsetSlotId,
@@ -144,13 +145,22 @@ private:
     boost::optional<value::MaterializedRow> getNextSpilledHelper();
     PlanState getNextSpilled();
 
+    /*
+     * Populates the bitmap out-slot with a block of 'nElements' true values.
+     */
+    void populateBitmapSlot(size_t nElements);
+
     // Groupby key slots.
     const value::SlotVector _groupSlots;
     std::vector<value::SlotAccessor*> _idInAccessors;
 
-    // Input slot for bitset corresponding to data input.
-    const boost::optional<value::SlotId> _blockBitsetInSlotId;
+    // Input/output slot for bitset corresponding to data input.
+    // On input, this indicates which rows are to be included in the group by.
+    // On output, this slot contains a bitset of all 1s, for use by additional block
+    // operations.
+    const value::SlotId _blockBitsetInSlotId;
     value::SlotAccessor* _blockBitsetInAccessor = nullptr;
+    value::OwnedValueAccessor _blockBitsetOutAccessor;
 
     // Input slots for data, eventually passed to the accumulator data slots.
     value::SlotVector _blockDataInSlotIds;

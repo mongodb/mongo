@@ -69,18 +69,18 @@ TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest>
     }
 }
 
-std::pair<std::vector<std::unique_ptr<TsBlock>>, std::vector<std::unique_ptr<CellBlock>>>
-TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
+TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
+    const BSONObj& bucketObj) {
 
     BSONElement bucketControl = bucketObj[timeseries::kBucketControlFieldName];
     invariant(!bucketControl.eoo());
 
-    const int noOfMeasurements = [&]() {
+    const size_t noOfMeasurements = [&]() {
         if (auto ct = bucketControl.Obj()[timeseries::kBucketControlCountFieldName]) {
-            return static_cast<int>(ct.numberLong());
+            return static_cast<size_t>(ct.numberLong());
         }
-        return timeseries::BucketUnpacker::computeMeasurementCount(bucketObj,
-                                                                   StringData(_timeField));
+        return static_cast<size_t>(
+            timeseries::BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField)));
     }();
 
     const int bucketVersion = bucketObj.getIntField(timeseries::kBucketControlVersionFieldName);
@@ -197,7 +197,7 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
         // that BSON to produce the results for nested paths.
 
         auto extracted = tsBlock->extract();
-        invariant(extracted.count() == static_cast<size_t>(noOfMeasurements));
+        invariant(extracted.count() == noOfMeasurements);
 
         std::vector<CellBlock::PathRequest> reqs;
         for (auto idx : nonTopLevelIdxesForCurrentField) {
@@ -222,7 +222,7 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
             cellBlock = std::move(emptyBlock);
         }
     }
-    return std::pair(std::move(outBlocks), std::move(outCells));
+    return ExtractResult{noOfMeasurements, std::move(outBlocks), std::move(outCells)};
 }
 
 TsBlock::TsBlock(size_t ncells,

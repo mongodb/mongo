@@ -55,7 +55,7 @@ public:
     BlockToRowStage(std::unique_ptr<PlanStage> input,
                     value::SlotVector blocks,
                     value::SlotVector valsOut,
-                    boost::optional<value::SlotId> bitmapSlotId,
+                    value::SlotId bitmapSlotId,
                     PlanNodeId nodeId,
                     PlanYieldPolicy* yieldPolicy = nullptr,
                     bool participateInTrialRunTracking = true);
@@ -87,7 +87,7 @@ private:
 
     const value::SlotVector _blockSlotIds;
     const value::SlotVector _valsOutSlotIds;
-    const boost::optional<value::SlotId> _bitmapSlotId;
+    const value::SlotId _bitmapSlotId;
 
     // Values extracted from the blocks. The memory for these values are owned by the blocks in the
     // '_blocks' member.

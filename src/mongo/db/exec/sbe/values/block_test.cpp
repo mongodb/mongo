@@ -191,7 +191,8 @@ public:
             // Now call into the time series extractor.
 
             value::TsBucketPathExtractor extractor(paths, "time");
-            return extractor.extractCellBlocks(_bucketStorage);
+            auto [n, storageBlocks, cellBlocks] = extractor.extractCellBlocks(_bucketStorage);
+            return {std::move(storageBlocks), std::move(cellBlocks)};
         } else {
             return std::pair(std::vector<std::unique_ptr<value::TsBlock>>(),
                              value::extractCellBlocksFromBsons(paths, bsons));

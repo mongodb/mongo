@@ -41,7 +41,7 @@ namespace mongo::sbe {
 BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
                                  value::SlotVector blocks,
                                  value::SlotVector valsOut,
-                                 boost::optional<value::SlotId> bitmapSlotId,
+                                 value::SlotId bitmapSlotId,
                                  PlanNodeId nodeId,
                                  PlanYieldPolicy* yieldPolicy,
                                  bool participateInTrialRunTracking)
@@ -86,9 +86,7 @@ void BlockToRowStage::prepare(CompileCtx& ctx) {
         _blockAccessors.push_back(_children[0]->getAccessor(ctx, id));
     }
 
-    if (_bitmapSlotId) {
-        _bitmapAccessor = _children[0]->getAccessor(ctx, *_bitmapSlotId);
-    }
+    _bitmapAccessor = _children[0]->getAccessor(ctx, _bitmapSlotId);
 
     _valsOutAccessors.resize(_blockSlotIds.size());
 }
@@ -282,9 +280,7 @@ std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
-    if (_bitmapSlotId) {
-        DebugPrinter::addIdentifier(ret, *_bitmapSlotId);
-    }
+    DebugPrinter::addIdentifier(ret, _bitmapSlotId);
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());

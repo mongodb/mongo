@@ -62,7 +62,7 @@ protected:
     std::tuple<std::unique_ptr<PlanStage>, value::SlotVector /*outSlots*/> makeBlockToRow(
         std::unique_ptr<PlanStage> input,
         value::SlotVector blockSlots,
-        boost::optional<value::SlotId> bitsetSlotId) {
+        value::SlotId bitsetSlotId) {
         auto outSlots = generateMultipleSlotIds(blockSlots.size());
         auto blockToRowStage = makeS<BlockToRowStage>(std::move(input),
                                                       std::move(blockSlots),
@@ -75,6 +75,7 @@ protected:
 
     std::tuple<std::unique_ptr<PlanStage>,
                value::SlotVector /*blockSlots*/,
+               value::SlotId /*bitmapSlot*/,
                boost::optional<value::SlotId> /*metaSlot*/>
     makeTsBucketToCellBlock(std::unique_ptr<PlanStage> input,
                             value::SlotId inSlot,
@@ -85,6 +86,8 @@ protected:
         const auto metaSlot = tsOptions.getMetaField()
             ? boost::make_optional<value::SlotId>(generateSlotId())
             : boost::none;
+
+        auto bitmapSlot = generateSlotId();
 
         std::vector<value::CellBlock::PathRequest> pathRequests;
         for (const auto& cellPath : cellPaths) {
@@ -98,13 +101,17 @@ protected:
                                                              pathRequests,
                                                              blockSlots,
                                                              metaSlot,
+                                                             bitmapSlot,
                                                              tsOptions.getTimeField().toString(),
                                                              1 /*nodeId*/);
 
-        return {std::move(tsBucketStage), std::move(blockSlots), metaSlot};
+        return {std::move(tsBucketStage), std::move(blockSlots), bitmapSlot, metaSlot};
     }
 
-    std::tuple<std::unique_ptr<PlanStage>, value::SlotVector, boost::optional<value::SlotId>>
+    std::tuple<std::unique_ptr<PlanStage>,
+               value::SlotVector,
+               value::SlotId,
+               boost::optional<value::SlotId>>
     generateTsBucketToCellBlockOnVirtualScan(const BSONArray& inputDocs,
                                              const TimeseriesOptions& tsOptions,
                                              const std::vector<std::string>& cellPaths) {
@@ -123,12 +130,12 @@ protected:
         auto [scanSlot, scanStage] = generateVirtualScan(inputDocs);
 
         // Builds a TsBucketToCellBlockStage on top of the scan.
-        auto [tsBucketStage, blockSlots, metaSlot] =
+        auto [tsBucketStage, blockSlots, bitmapSlotId, metaSlot] =
             makeTsBucketToCellBlock(std::move(scanStage), scanSlot, cellPaths, tsOptions);
 
         // Builds a BlockToRowStage on top of the TsBucketToCellBlockStage.
         auto [bucketToRow, outSlots] =
-            makeBlockToRow(std::move(tsBucketStage), std::move(blockSlots), boost::none);
+            makeBlockToRow(std::move(tsBucketStage), std::move(blockSlots), bitmapSlotId);
 
         return {std::move(bucketToRow), std::move(outSlots), metaSlot};
     }
@@ -246,8 +253,9 @@ TEST_F(BlockStagesTest, TsBucketToCellBlockStageTest) {
     auto tsOptions =
         TimeseriesOptions::parse(IDLParserContext{"BlockStagesTest::TsBucketToCellBlockStageTest"},
                                  fromjson(R"({timeField: "time", metaField: "tag"})"));
-    auto [tsBucketStage, blockSlots, metaSlot] = generateTsBucketToCellBlockOnVirtualScan(
-        BSON_ARRAY(bucketWithMeta1 << bucketWithMeta2), tsOptions, cellPaths);
+    auto [tsBucketStage, blockSlots, bitmapSlot, metaSlot] =
+        generateTsBucketToCellBlockOnVirtualScan(
+            BSON_ARRAY(bucketWithMeta1 << bucketWithMeta2), tsOptions, cellPaths);
 
     // Prepares the execution tree.
     auto ctx = makeCompileCtx();

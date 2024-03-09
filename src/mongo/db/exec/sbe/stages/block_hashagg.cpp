@@ -153,7 +153,7 @@ using KeyTableType = stdx::
 
 BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotVector groupSlotIds,
-                                     boost::optional<value::SlotId> blockBitsetInSlotId,
+                                     value::SlotId blockBitsetInSlotId,
                                      value::SlotVector blockDataInSlotIds,
                                      value::SlotId rowAccSlotId,
                                      value::SlotId accumulatorBitsetSlotId,
@@ -226,10 +226,8 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
         }
     };
 
-    if (_blockBitsetInSlotId) {
-        _blockBitsetInAccessor = _children[0]->getAccessor(ctx, *_blockBitsetInSlotId);
-        invariant(_blockBitsetInAccessor);
-    }
+    _blockBitsetInAccessor = _children[0]->getAccessor(ctx, _blockBitsetInSlotId);
+    invariant(_blockBitsetInAccessor);
 
     for (size_t i = 0; i < _blockDataInSlotIds.size(); i++) {
         _blockDataInAccessors[i] = _children[0]->getAccessor(ctx, _blockDataInSlotIds[i]);
@@ -288,6 +286,11 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
 }
 
 value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    if (slot == _blockBitsetInSlotId) {
+        // Re-map the bitset slot to our output bitset accessor.
+        return &_blockBitsetOutAccessor;
+    }
+
     if (_compiled && _outAccessorsMap.count(slot)) {
         return _outAccessorsMap[slot];
     } else {
@@ -336,13 +339,9 @@ void BlockHashAggStage::executeAccumulatorCode(value::MaterializedRow key) {
 }
 
 void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys) {
-    auto bitmapInTag = value::TypeTags::Nothing;
-    auto bitmapInVal = value::Value{0};
-
-    if (_blockBitsetInAccessor) {
-        std::tie(bitmapInTag, bitmapInVal) = _blockBitsetInAccessor->getViewOfValue();
-        invariant(bitmapInTag == value::TypeTags::valueBlock);
-    }
+    invariant(_blockBitsetInAccessor);
+    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
+    invariant(bitmapInTag == value::TypeTags::valueBlock);
 
     // Process the accumulators for each partition rather than one element at a time.
     for (size_t partition = 0; partition < tokenizedKeys.keys.size(); ++partition) {
@@ -352,13 +351,12 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
         // TODO SERVER-85739 we can avoid allocating a new bitset for every input. We
         // can potentially reuse the same bitset. It also might not be worth the
         // additional code complexity.
-        if (tokenizedKeys.keys.size() > 1 || !_blockBitsetInAccessor) {
+        if (tokenizedKeys.keys.size() > 1) {
             // Combine the partition bitmap and input bitmap using bitAnd().
             auto partitionBitset = computeBitmapForPartition(tokenizedKeys.idxs, partition);
 
-            auto accBitset = _blockBitsetInAccessor
-                ? bitAnd(partitionBitset.get(), value::bitcastTo<value::ValueBlock*>(bitmapInVal))
-                : std::move(partitionBitset);
+            auto accBitset =
+                bitAnd(partitionBitset.get(), value::bitcastTo<value::ValueBlock*>(bitmapInVal));
 
             _accumulatorBitsetAccessor.reset(
                 true,
@@ -380,17 +378,13 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
 }
 
 void BlockHashAggStage::runAccumulatorsElementWise(size_t blockSize) {
-    auto bitmapInTag = value::TypeTags::Nothing;
-    auto bitmapInVal = value::Value{0};
-    boost::optional<value::DeblockedTagVals> extractedBitmap;
+    invariant(_blockBitsetInAccessor);
+    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
+    invariant(bitmapInTag == value::TypeTags::valueBlock);
 
-    if (_blockBitsetInAccessor) {
-        std::tie(bitmapInTag, bitmapInVal) = _blockBitsetInAccessor->getViewOfValue();
-        invariant(bitmapInTag == value::TypeTags::valueBlock);
-
-        extractedBitmap.emplace(value::bitcastTo<value::ValueBlock*>(bitmapInVal)->extract());
-        invariant(extractedBitmap->count() == blockSize);
-    }
+    value::DeblockedTagVals extractedBitmap =
+        value::bitcastTo<value::ValueBlock*>(bitmapInVal)->extract();
+    invariant(extractedBitmap.count() == blockSize);
 
     std::vector<value::DeblockedTagVals> extractedGbInputs;
     extractedGbInputs.reserve(_idInAccessors.size());
@@ -437,13 +431,11 @@ void BlockHashAggStage::runAccumulatorsElementWise(size_t blockSize) {
             key.reset(i, false, idTag, idVal);
         }
 
-        if (extractedBitmap) {
-            auto [bitTag, bitVal] = (*extractedBitmap)[blockIndex];
-            invariant(bitTag == value::TypeTags::Boolean);
+        auto [bitTag, bitVal] = extractedBitmap[blockIndex];
+        invariant(bitTag == value::TypeTags::Boolean);
 
-            if (!value::bitcastTo<bool>(bitVal)) {
-                continue;
-            }
+        if (!value::bitcastTo<bool>(bitVal)) {
+            continue;
         }
 
         // Update our accessors (via the blocks) with the current value.
@@ -682,7 +674,9 @@ boost::optional<value::MaterializedRow> BlockHashAggStage::getNextSpilledHelper(
 }
 
 PlanState BlockHashAggStage::getNextSpilled() {
-    for (size_t resultIdx = 0; resultIdx < kBlockOutSize; resultIdx++) {
+
+    size_t resultIdx = 0;
+    for (; resultIdx < kBlockOutSize; resultIdx++) {
         auto nextKey = getNextSpilledHelper();
         // If we have a key, add the value to our result. If not, break because we won't get anymore
         // values from the record store.
@@ -702,9 +696,10 @@ PlanState BlockHashAggStage::getNextSpilled() {
     }
 
     // If we didn't put any new values in the blocks, we must have no more spilled values.
-    if (_outIdBlocks[0].size() == 0) {
+    if (resultIdx == 0) {
         return trackPlanState(PlanState::IS_EOF);
     }
+    populateBitmapSlot(resultIdx);
     return trackPlanState(PlanState::ADVANCED);
 }
 
@@ -731,7 +726,11 @@ PlanState BlockHashAggStage::getNext() {
         return getNextSpilled();
     }
 
+    // When we return, populate our bitmap slot with an block of all 1s, with size equal to the
+    // number of rows in the block we produce.
     size_t numRows = 0;
+    ON_BLOCK_EXIT([&]() { populateBitmapSlot(numRows); });
+
     while (numRows < kBlockOutSize) {
         if (_htIt == _ht->end()) {
             _htIt = _ht->begin();
@@ -830,6 +829,9 @@ void BlockHashAggStage::close() {
 std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
+    ret.emplace_back(DebugPrinter::Block("bitset ="));
+    DebugPrinter::addIdentifier(ret, _blockBitsetInSlotId);
+
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _groupSlots.size(); ++idx) {
         if (idx) {
@@ -862,6 +864,20 @@ std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
     DebugPrinter::addIdentifier(ret, _rowAccSlotId);
     ret.emplace_back(DebugPrinter::Block("`]"));
 
+    {
+        bool first = true;
+        ret.emplace_back(DebugPrinter::Block("[`"));
+        for (auto slot : _accumulatorDataSlotIds) {
+            if (!first) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+
+            DebugPrinter::addIdentifier(ret, slot);
+            first = false;
+        }
+        ret.emplace_back(DebugPrinter::Block("`]"));
+    }
+
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
@@ -876,5 +892,14 @@ size_t BlockHashAggStage::estimateCompileTimeSize() const {
     return size;
 }
 
+void BlockHashAggStage::populateBitmapSlot(size_t n) {
+    _blockBitsetOutAccessor.reset(
+        true,
+        value::TypeTags::valueBlock,
+        value::bitcastFrom<value::ValueBlock*>(
+            std::make_unique<value::MonoBlock>(
+                n, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
+                .release()));
+}
 }  // namespace sbe
 }  // namespace mongo

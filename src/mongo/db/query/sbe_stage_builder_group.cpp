@@ -723,13 +723,11 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
             tassert(
                 8448604, "Expected 'accInternalSlot' to be defined", accInternalSlot.has_value());
 
-            auto bitmapInSlot = childOutputs.getIfExists(kBlockSelectivityBitmap);
-
             return b.makeBlockHashAgg(std::move(stage),
                                       buildVariableTypes(childOutputs, individualSlots),
                                       groupBySlots,
                                       std::move(sbAggExprs),
-                                      bitmapInSlot,
+                                      childOutputs.get(kBlockSelectivityBitmap),
                                       blockAccArgSlots,
                                       blockAccInternalArgSlots,
                                       *bitmapInternalSlot,
@@ -1262,7 +1260,9 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                 "Expected at least one group by slot or agg out slot",
                 !groupBySlots.empty() || !groupOutSlots.empty());
 
-        outputs.setBlockSlot(!groupBySlots.empty() ? groupBySlots[0] : groupOutSlots[0]);
+        // This stage re-maps the selectivity bitset slot.
+        outputs.set(PlanStageSlots::kBlockSelectivityBitmap,
+                    childOutputs.get(PlanStageSlots::kBlockSelectivityBitmap));
     }
 
     // For now we unconditionally end the block processing pipeline here.

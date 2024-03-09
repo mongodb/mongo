@@ -208,12 +208,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
         processSlot(slot, boost::none);
     }
 
-    // If there aren't any required block slots, use the default block slot as a fallback.
+    // If there aren't any required block slots, use the bitmap.
     if (blockSlots.empty()) {
-        invariant(outputs.getBlockSlot());
-        auto slot = *outputs.getBlockSlot();
+        // If we have no block slots, tell block_to_row to unwind the bitset itself.
+        auto slotId = outputs.get(PlanStageSlots::kBlockSelectivityBitmap).getId();
 
-        blockSlots.push_back(slot.getId());
+        blockSlots.push_back(slotId);
         unpackedSlots.push_back(state.slotId());
     }
 
@@ -223,7 +223,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
         std::move(stage),
         blockSlots,
         unpackedSlots,
-        outputs.getSlotIfExists(PlanStageSlots::kBlockSelectivityBitmap),
+        outputs.get(PlanStageSlots::kBlockSelectivityBitmap).getId(),
         nodeId,
         state.yieldPolicy);
     printPlan(*stage);
@@ -263,8 +263,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
             slot = unpackedSlot;
         }
     }
-
-    outputs.clearBlockSlot();
 
     return {std::move(stage), std::move(individualSlots)};
 }
@@ -399,14 +397,21 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     auto traversedCellSlots =
         sbe::value::SlotVector(allCellSlots.begin() + topLevelReqs.size(), allCellSlots.end());
 
+    // The TsBucketToCellBlock stage generates a "default" bitmap of all 1s in to this slot.
+    // The bitmap represents which documents are present (1) and which have been filtered (0).
+    // This bitmap is carried around until the block_to_row stage.
+    const auto bitmapSlotId = _slotIdGenerator.generate();
+
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(childStage),
                                                         bucketSlot.slotId,
                                                         allReqs,
                                                         allCellSlots,
                                                         boost::none /* metaField slot*/,
+                                                        bitmapSlotId,
                                                         unpackNode->bucketSpec.timeField(),
                                                         unpackNode->nodeId());
+    outputs.set(PlanStageSlots::kBlockSelectivityBitmap, bitmapSlotId);
     printPlan(*stage);
 
     // Declare the top level fields produced as block values.
@@ -422,10 +427,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             slot = TypedSlot{allCellSlots[i],
                              TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)};
             outputs.set(key, slot);
-        }
-        if (!outputs.hasBlockOutput()) {
-            // Initalize the fallback block slot id.
-            outputs.setBlockSlot(slot);
         }
     }
     // Declare the traversed fields which can be used for evaluating $match.
@@ -460,7 +461,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
     }
 
-    boost::optional<sbe::value::SlotId> bitmapSlotId;
     if (eventFilter) {
         auto eventFilterSbExpr =
             generateFilter(_state, eventFilter, boost::none /* rootSlot */, outputs);
@@ -512,6 +512,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
         auto resultSlot = _slotIdGenerator.generate();
         outputs.setResultObj(resultSlot);
+        outputs.clear(PlanStageSlots::kBlockSelectivityBitmap);
 
         stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
                                                   resultSlot,                  // objSlot
