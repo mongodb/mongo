@@ -1626,6 +1626,39 @@ TEST_F(BSONColumnTest, DoubleIdenticalDeltas) {
     verifyDecompression(binData, elems, true);
 }
 
+TEST_F(BSONColumnTest, DoubleOverflowEndsWithSkip) {
+    BSONColumnBuilder cb;
+
+    // Simple8b block that cause overflow when running the binary reopen constructor ends with a
+    // skip
+    std::vector<BSONElement> elems = {createElementDouble(41.0),
+                                      BSONElement(),
+                                      BSONElement(),
+                                      createElementDouble(77.0),
+                                      createElementDouble(51.0),
+                                      createElementDouble(53.0),
+                                      BSONElement(),
+                                      createElementDouble(83.0),
+                                      BSONElement(),
+                                      BSONElement()};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1001, 0b0001);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 1.0), 2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems, true);
+}
+
 TEST_F(BSONColumnTest, DoubleSameScale) {
     BSONColumnBuilder cb;
 

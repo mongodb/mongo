@@ -1050,8 +1050,8 @@ int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& ov
                         lastValForRLE);
         boost::optional<T> last;
         for (auto&& elem : s8b) {
+            last = elem;
             if (elem) {
-                last = elem;
                 overflowDetector.append(*last, writeFn);
             } else {
                 overflowDetector.skip(writeFn);
