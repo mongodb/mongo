@@ -1658,7 +1658,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     }
 
     std::unique_ptr<WiredTigerRecordStore> ret;
-    ret = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
+    ret = std::make_unique<WiredTigerRecordStore>(this, opCtx, params);
     ret->postConstructorInit(opCtx, nss);
 
     // Sizes should always be checked when creating a collection during rollback or replication
@@ -1843,7 +1843,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     params.forceUpdateWithFullDocument = false;
 
     std::unique_ptr<WiredTigerRecordStore> rs;
-    rs = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
+    rs = std::make_unique<WiredTigerRecordStore>(this, opCtx, params);
     rs->postConstructorInit(opCtx, params.nss);
 
     return std::move(rs);

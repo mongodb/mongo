@@ -95,10 +95,6 @@ class WiredTigerSizeStorer;
 inline constexpr auto kWiredTigerEngineName = "wiredTiger"_sd;
 
 class WiredTigerRecordStore : public RecordStore {
-    friend class WiredTigerRecordStoreCursorBase;
-
-    friend class StandardWiredTigerRecordStore;
-
 public:
     /**
      * Parses collections options for wired tiger configuration string for table creation.
@@ -145,103 +141,113 @@ public:
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
 
-    virtual void getOplogTruncateStats(BSONObjBuilder& builder) const;
-
     virtual ~WiredTigerRecordStore();
 
-    // Pass in NamespaceString, it is not possible to resolve the UUID to NamespaceString yet.
-    virtual void postConstructorInit(OperationContext* opCtx, const NamespaceString& ns);
+    void getOplogTruncateStats(BSONObjBuilder& builder) const override;
 
     // name of the RecordStore implementation
-    virtual const char* name() const;
+    const char* name() const override;
 
-    virtual KeyFormat keyFormat() const;
+    KeyFormat keyFormat() const override;
 
-    virtual long long dataSize(OperationContext* opCtx) const;
+    long long dataSize(OperationContext* opCtx) const override;
 
-    virtual long long numRecords(OperationContext* opCtx) const;
+    long long numRecords(OperationContext* opCtx) const override;
 
-    virtual bool selfManagedOplogTruncation() const {
+    bool selfManagedOplogTruncation() const override {
         return true;
     }
 
-    virtual int64_t storageSize(OperationContext* opCtx,
-                                BSONObjBuilder* extraInfo = nullptr,
-                                int infoLevel = 0) const;
+    int64_t storageSize(OperationContext* opCtx,
+                        BSONObjBuilder* extraInfo = nullptr,
+                        int infoLevel = 0) const override;
 
-    virtual int64_t freeStorageSize(OperationContext* opCtx) const;
+    int64_t freeStorageSize(OperationContext* opCtx) const override;
 
-    // CRUD related
-
-    virtual bool findRecord(OperationContext* opCtx, const RecordId& id, RecordData* out) const;
-
-    void doDeleteRecord(OperationContext* opCtx, const RecordId& id) final;
+    void doDeleteRecord(OperationContext* opCtx, const RecordId& id) override;
 
     Status doInsertRecords(OperationContext* opCtx,
                            std::vector<Record>* records,
-                           const std::vector<Timestamp>& timestamps) final;
+                           const std::vector<Timestamp>& timestamps) override;
 
     Status doUpdateRecord(OperationContext* opCtx,
                           const RecordId& recordId,
                           const char* data,
-                          int len) final;
+                          int len) override;
 
-    virtual bool updateWithDamagesSupported() const;
+    bool updateWithDamagesSupported() const override;
 
     StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
                                                const RecordId& id,
                                                const RecordData& oldRec,
                                                const char* damageSource,
-                                               const mutablebson::DamageVector& damages) final;
+                                               const mutablebson::DamageVector& damages) override;
 
-    virtual void printRecordMetadata(OperationContext* opCtx,
-                                     const RecordId& recordId,
-                                     std::set<Timestamp>* recordTimestamps) const;
+    void printRecordMetadata(OperationContext* opCtx,
+                             const RecordId& recordId,
+                             std::set<Timestamp>* recordTimestamps) const override;
 
-    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
-                                                            bool forward) const = 0;
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                    bool forward) const override;
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const final;
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const override;
 
-    Status doTruncate(OperationContext* opCtx) final;
+    Status doTruncate(OperationContext* opCtx) override;
     Status doRangeTruncate(OperationContext* opCtx,
                            const RecordId& minRecordId,
                            const RecordId& maxRecordId,
                            int64_t hintDataSizeDiff,
-                           int64_t hintNumRecordsDiff) final;
+                           int64_t hintNumRecordsDiff) override;
 
-    virtual bool compactSupported() const {
+    bool compactSupported() const override {
         return !_isEphemeral;
     }
-    virtual bool supportsOnlineCompaction() const {
+
+    bool supportsOnlineCompaction() const override {
         return true;
     }
 
-    virtual Timestamp getPinnedOplog() const final;
+    Status doCompact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) override;
 
-    Status doCompact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) final;
+    void validate(OperationContext* opCtx, bool full, ValidateResults* results) override;
 
-    virtual void validate(OperationContext* opCtx, bool full, ValidateResults* results);
+    void appendNumericCustomStats(OperationContext* opCtx,
+                                  BSONObjBuilder* result,
+                                  double scale) const override;
 
-    virtual void appendNumericCustomStats(OperationContext* opCtx,
-                                          BSONObjBuilder* result,
-                                          double scale) const;
-
-    virtual void appendAllCustomStats(OperationContext* opCtx,
-                                      BSONObjBuilder* result,
-                                      double scale) const;
+    void appendAllCustomStats(OperationContext* opCtx,
+                              BSONObjBuilder* result,
+                              double scale) const override;
 
     void doCappedTruncateAfter(OperationContext* opCtx,
                                const RecordId& end,
                                bool inclusive,
-                               const AboutToDeleteRecordCallback& aboutToDelete) final;
+                               const AboutToDeleteRecordCallback& aboutToDelete) override;
 
-    virtual void updateStatsAfterRepair(OperationContext* opCtx,
-                                        long long numRecords,
-                                        long long dataSize);
+    void updateStatsAfterRepair(OperationContext* opCtx,
+                                long long numRecords,
+                                long long dataSize) override;
 
+    NamespaceString ns(OperationContext* opCtx) const override;
 
-    Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) final;
+    Status updateOplogSize(OperationContext* opCtx, long long newOplogSize) override;
+
+    bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) override;
+
+    /**
+     * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
+     * if the oplog is at capacity and the maximum retention time has elapsed.
+     */
+    void reclaimOplog(OperationContext* opCtx) override;
+
+    StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const override;
+    StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) override;
+
+    RecordId getLargestKey(OperationContext* opCtx) const override;
+
+    void reserveRecordIds(OperationContext* opCtx,
+                          std::vector<RecordId>* out,
+                          size_t nRecords) override;
 
     const std::string& getURI() const {
         return _uri;
@@ -251,7 +257,10 @@ public:
         return _tableId;
     }
 
-    NamespaceString ns(OperationContext* opCtx) const final;
+    Timestamp getPinnedOplog() const;
+
+    // Pass in NamespaceString, it is not possible to resolve the UUID to NamespaceString yet.
+    void postConstructorInit(OperationContext* opCtx, const NamespaceString& ns);
 
     /*
      * Check the size information for this RecordStore. This function opens a cursor on the
@@ -276,17 +285,6 @@ public:
 
     bool isOpHidden_forTest(const RecordId& id) const;
 
-    bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) override;
-
-    /**
-     * Attempts to truncate oplog entries before the pinned oplog timestamp. Truncation will occur
-     * if the oplog is at capacity and the maximum retention time has elapsed.
-     */
-    void reclaimOplog(OperationContext* opCtx) override;
-
-    StatusWith<Timestamp> getLatestOplogTimestamp(OperationContext* opCtx) const override;
-    StatusWith<Timestamp> getEarliestOplogTimestamp(OperationContext* opCtx) override;
-
     class OplogTruncateMarkers;
 
     // Exposed only for testing.
@@ -296,17 +294,7 @@ public:
 
     typedef std::variant<int64_t, WiredTigerItem> CursorKey;
 
-    RecordId getLargestKey(OperationContext* opCtx) const final;
-
-    void reserveRecordIds(OperationContext* opCtx,
-                          std::vector<RecordId>* out,
-                          size_t nRecords) final;
-
 protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
-
-    virtual void setKey(WT_CURSOR* cursor, const CursorKey* key) const = 0;
-
     Status oplogDiskLocRegisterImpl(OperationContext* opCtx,
                                     const Timestamp& opTime,
                                     bool orderedCommit) override;
@@ -397,44 +385,31 @@ private:
 };
 
 
-class StandardWiredTigerRecordStore final : public WiredTigerRecordStore {
+class WiredTigerRecordStoreCursor : public SeekableRecordCursor {
 public:
-    StandardWiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
-                                  OperationContext* opCtx,
-                                  Params params);
+    WiredTigerRecordStoreCursor(OperationContext* opCtx,
+                                const WiredTigerRecordStore& rs,
+                                bool forward);
 
-    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
-                                                            bool forward) const override;
+    boost::optional<Record> next() override;
 
-protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const override;
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
 
-    virtual void setKey(WT_CURSOR* cursor, const CursorKey* key) const override;
-};
+    boost::optional<Record> seekExact(const RecordId& id) override;
 
-class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {
-public:
-    WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
-                                    const WiredTigerRecordStore& rs,
-                                    bool forward);
+    boost::optional<Record> seekNear(const RecordId& start) override {
+        MONGO_UNIMPLEMENTED;
+    }
 
-    boost::optional<Record> next();
+    void save() override;
 
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion);
+    void saveUnpositioned() override;
 
-    boost::optional<Record> seekExact(const RecordId& id);
+    bool restore(bool tolerateCappedRepositioning = true) override;
 
-    boost::optional<Record> seekNear(const RecordId& start);
+    void detachFromOperationContext() override;
 
-    void save();
-
-    void saveUnpositioned();
-
-    bool restore(bool tolerateCappedRepositioning = true);
-
-    void detachFromOperationContext();
-
-    void reattachToOperationContext(OperationContext* opCtx);
+    void reattachToOperationContext(OperationContext* opCtx) override;
 
     void setSaveStorageCursorOnDetachFromOperationContext(bool saveCursor) override {
         _saveStorageCursorOnDetachFromOperationContext = saveCursor;
@@ -448,45 +423,157 @@ public:
     }
 
 protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
-
-    virtual void setKey(WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) const = 0;
+    /**
+     * Resets the cursor.
+     */
+    void resetCursor();
 
     /**
-     * Called when restoring a cursor that has not been advanced.
+     * For next() implementations, ensures that keys are returned in-order. Should be called before
+     * trackReturn().
      */
-    virtual void initCursorToBeginning() = 0;
+    void checkOrder(const RecordId& id) const;
+
+    /**
+     * For public functions that return data, must be called before returning a Record.
+     */
+    void trackReturn(const Record& record);
+
+    /**
+     * Advances the cursor and returns the next RecordId, if one exists.
+     */
+    RecordId nextIdCommon();
+
+    /**
+     * Perform a bounded seek on the cursor, and return the next matching RecordId, if one exists.
+     *
+     * If countSeekMetric is false, does not record this seek towards metrics collection.
+     */
+    RecordId seekIdCommon(const RecordId& id, BoundInclusion boundInclusion, bool countSeekMetric);
+
+    /**
+     * Perform an exact seek on the cursor, and return the Record, if one exists.
+     */
+    boost::optional<Record> seekExactCommon(const RecordId& id);
 
     const uint64_t _tableId;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
     OperationContext* _opCtx;
-    ResourceConsumption::MetricsCollector* _metrics;
+    ResourceConsumption::MetricsCollector* _metrics = nullptr;
     const std::string _uri;
     const std::string _ident;
     boost::optional<WiredTigerCursor> _cursor;
     const KeyFormat _keyFormat;
     const bool _forward;
-    const bool _isOplog;
-    const bool _isCapped;
     const boost::optional<UUID> _uuid;
     bool _skipNextAdvance = false;
     bool _eof = false;
     bool _hasRestored = true;
+    bool _boundSet = false;
+    // Whether or not the underlying WT cursor is positioned on a record.
+    bool _positioned = false;
+    const bool _assertOutOfOrderForTest = false;
 
 private:
-    bool isVisible(const RecordId& id);
-    void initCappedVisibility(OperationContext* opCtx);
-    void reportOutOfOrderRead(RecordId& id, bool failWithOutOfOrderForTest);
-    Record getRecord(WT_CURSOR* c, const RecordId& id);
-    void resetCursor();
+    void reportOutOfOrderRead(const RecordId& id, bool failWithOutOfOrderForTest) const;
 
+    bool _saveStorageCursorOnDetachFromOperationContext = false;
+};
+
+/**
+ * WiredTigerCappedCursorBase is an abstract class for a capped cursors. Derived classes must
+ * implement a few "visibility" functions to ensure Records are returned correctly following a set
+ * of implementation rules.
+ *
+ * Note: forward cursors respect visibility rules, reverse cursors do not.
+ */
+class WiredTigerCappedCursorBase : public WiredTigerRecordStoreCursor {
+public:
+    WiredTigerCappedCursorBase(OperationContext* opCtx,
+                               const WiredTigerRecordStore& rs,
+                               bool forward);
+
+    boost::optional<Record> next() override;
+
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
+
+    boost::optional<Record> seekExact(const RecordId& id) override;
+
+    boost::optional<Record> seekNear(const RecordId& start) override;
+
+    void save() override;
+
+    bool restore(bool tolerateCappedRepositioning = true) override;
+
+protected:
+    /**
+     * Initialize any state required to enforce visibility constraints on this cursor.
+     */
+    virtual void initVisibility(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns true if a RecordId should be visible to this cursor.
+     */
+    virtual bool isVisible(const RecordId& id) = 0;
+
+    /**
+     * Reset any visibility state on the cursor.
+     */
+    virtual void resetVisibility() = 0;
+
+    /**
+     * Given a requested start RecordId for seekNear, returns a modified RecordId that fits within
+     * any visibility constraints.
+     */
+    virtual RecordId getStartForSeekNear(const RecordId& id) const = 0;
+};
+
+/**
+ * WiredTigerStandardCappedCursor implements a cursor on a non-oplog capped collection.
+ *
+ * Note: forward cursors respect visibility rules, reverse cursors do not.
+ */
+class WiredTigerStandardCappedCursor : public WiredTigerCappedCursorBase {
+public:
+    WiredTigerStandardCappedCursor(OperationContext* opCtx,
+                                   const WiredTigerRecordStore& rs,
+                                   bool forward);
+
+protected:
+    void initVisibility(OperationContext* opCtx) override;
+    bool isVisible(const RecordId& id) override;
+    void resetVisibility() override;
+    RecordId getStartForSeekNear(const RecordId& id) const override;
+
+private:
+    boost::optional<CappedVisibilitySnapshot> _cappedSnapshot;
+};
+
+/**
+ * WiredTigerStandardCappedCursor implements a cursor on the oplog.
+ *
+ * Note: forward cursors respect visibility rules, reverse cursors do not.
+ */
+class WiredTigerOplogCursor : public WiredTigerCappedCursorBase {
+public:
+    WiredTigerOplogCursor(OperationContext* opCtx, const WiredTigerRecordStore& rs, bool forward);
+
+    boost::optional<Record> next() override;
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
+
+protected:
+    void initVisibility(OperationContext* opCtx) override;
+    bool isVisible(const RecordId& id) override;
+    void resetVisibility() override;
+    RecordId getStartForSeekNear(const RecordId& id) const override;
+
+private:
     /**
      * This value is used for visibility calculations on what oplog entries can be returned to a
      * client. This value *must* be initialized/updated *before* a WiredTiger snapshot is
      * established.
      */
     boost::optional<std::int64_t> _oplogVisibleTs = boost::none;
-    boost::optional<CappedVisibilitySnapshot> _cappedSnapshot;
 
     /**
      * With WT-8601, WiredTiger no longer maintains commit_timestamp information on writes to logged
@@ -496,23 +583,6 @@ private:
      * timestamp to apply a visibility check.
      */
     boost::optional<std::int64_t> _readTimestampForOplog = boost::none;
-    bool _saveStorageCursorOnDetachFromOperationContext = false;
-    bool _boundSet = false;
-};
-
-class WiredTigerRecordStoreStandardCursor final : public WiredTigerRecordStoreCursorBase {
-public:
-    WiredTigerRecordStoreStandardCursor(OperationContext* opCtx,
-                                        const WiredTigerRecordStore& rs,
-                                        bool forward = true);
-
-protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const override;
-
-    virtual void setKey(WT_CURSOR* cursor,
-                        const WiredTigerRecordStore::CursorKey* key) const override;
-
-    virtual void initCursorToBeginning() override{};
 };
 
 // WT failpoint to throw write conflict exceptions randomly

@@ -237,6 +237,8 @@ public:
      *
      * For reverse cursors, returns the Record with the lowest RecordId greater than or equal to
      * 'start'. If no such record exists, positions on the next lowest RecordId before 'start'.
+     *
+     * Note: Only supported on capped collections.
      */
     virtual boost::optional<Record> seekNear(const RecordId& start) = 0;
 

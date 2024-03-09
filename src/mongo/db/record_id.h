@@ -246,11 +246,16 @@ public:
      * Returns true if this RecordId is not suitable for storage in a RecordStore.
      */
     bool isNull() const {
-        // In the the int64_t format, null can also be represented by '0'.
-        if (_format == Format::kLong) {
-            return getLong() == 0;
+        switch (_format) {
+            case Format::kNull:
+                return true;
+            case Format::kLong:
+                // In the the int64_t format, null can also be represented by '0'.
+                return getLong() == 0;
+            default:
+                return false;
         }
-        return _format == Format::kNull;
+        MONGO_UNREACHABLE;
     }
 
     /**

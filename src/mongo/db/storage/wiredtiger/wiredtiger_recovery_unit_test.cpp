@@ -146,7 +146,7 @@ public:
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;
 
-        auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx, params);
+        auto ret = std::make_unique<WiredTigerRecordStore>(&_engine, opCtx, params);
         ret->postConstructorInit(opCtx, nss);
         return std::move(ret);
     }

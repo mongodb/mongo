@@ -230,22 +230,24 @@ void appendSample(const BSONObj& preImageObj, const RecordId& rId, NsUUIDToSampl
 void sampleLastRecordPerNsUUID(OperationContext* opCtx,
                                RecordStore* rs,
                                NsUUIDToSamplesMap& samplesMap) {
-    auto cursor = rs->getCursor(opCtx, true /** forward **/);
-    boost::optional<Record> record{};
-    while ((record = cursor->next())) {
+    auto cursor = rs->getCursor(opCtx, false /** forward **/);
+    boost::optional<Record> record = cursor->next();
+    while (record) {
+        // As a reverse cursor, the first record we see for a namespace is the highest.
         UUID currentNsUUID = change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson());
-        RecordId maxRecordIdForCurrentNsUUID =
-            change_stream_pre_image_util::getAbsoluteMaxPreImageRecordIdBoundForNs(currentNsUUID)
+        appendSample(record->data.toBson(), record->id, samplesMap);
+
+        RecordId minRecordIdForNsUUID =
+            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(currentNsUUID)
                 .recordId();
 
-        // A forward 'seekNear' will return the previous entry if one does not match exactly. This
-        // should ensure that the 'record's id is greater than the 'maxRecordIdForCurrentNsUUID' and
-        // no less than the initial record for 'currentNsUUID'.
-        record = cursor->seekNear(maxRecordIdForCurrentNsUUID);
-        invariant(record);
-        invariant(currentNsUUID ==
-                  change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson()));
-        appendSample(record->data.toBson(), record->id, samplesMap);
+        // A reverse exclusive 'seek' will return the previous entry in the collection. This should
+        // ensure that the record's id is less than the 'minRecordIdForNsUUID', which positions it
+        // exactly at the highest record of the previous collection UUID.
+        record = cursor->seek(minRecordIdForNsUUID, SeekableRecordCursor::BoundInclusion::kExclude);
+        invariant(!record ||
+                  currentNsUUID !=
+                      change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson()));
     }
 }
 

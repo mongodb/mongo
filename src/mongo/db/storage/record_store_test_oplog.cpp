@@ -296,7 +296,9 @@ TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
 
 TEST(RecordStoreTestHarness, SeekNearOnNonOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("local.NOT_oplog.foo"));
+    CollectionOptions options;
+    options.capped = true;
+    auto rs = harnessHelper->newRecordStore("local.NOT_oplog.foo", options);
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
@@ -393,6 +395,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         // now we insert 2 docs, but commit the 2nd one first.
         // we make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(earlyReader.get(), MODE_IS);
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
@@ -544,6 +547,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         // Now we insert 2 docs with timestamps earlier than before, but commit the 2nd one first.
         // We make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(earlyReader.get(), MODE_IS);
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();

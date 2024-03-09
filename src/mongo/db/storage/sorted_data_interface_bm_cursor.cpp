@@ -103,11 +103,11 @@ struct Fixture {
     size_t itemsProcessed = 0;
 };
 
-void BM_Advance(benchmark::State& state,
-                Direction direction,
-                Cursor::KeyInclusion keyInclusion,
-                Uniqueness uniqueness,
-                KeyFormat keyFormat = KeyFormat::Long) {
+void BM_SDIAdvance(benchmark::State& state,
+                   Direction direction,
+                   Cursor::KeyInclusion keyInclusion,
+                   Uniqueness uniqueness,
+                   KeyFormat keyFormat = KeyFormat::Long) {
 
     Fixture fix(uniqueness, direction, 100'000, keyFormat);
 
@@ -121,10 +121,10 @@ void BM_Advance(benchmark::State& state,
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_Seek(benchmark::State& state,
-             Direction direction,
-             Cursor::KeyInclusion keyInclusion,
-             Uniqueness uniqueness) {
+void BM_SDISeek(benchmark::State& state,
+                Direction direction,
+                Cursor::KeyInclusion keyInclusion,
+                Uniqueness uniqueness) {
 
     Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
     for (auto _ : state) {
@@ -134,7 +134,7 @@ void BM_Seek(benchmark::State& state,
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_SaveRestore(benchmark::State& state, Direction direction, Uniqueness uniqueness) {
+void BM_SDISaveRestore(benchmark::State& state, Direction direction, Uniqueness uniqueness) {
 
     Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
 
@@ -147,10 +147,10 @@ void BM_SaveRestore(benchmark::State& state, Direction direction, Uniqueness uni
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_AdvanceWithEnd(benchmark::State& state,
-                       Direction direction,
-                       Uniqueness uniqueness,
-                       KeyFormat keyFormat = KeyFormat::Long) {
+void BM_SDIAdvanceWithEnd(benchmark::State& state,
+                          Direction direction,
+                          Uniqueness uniqueness,
+                          KeyFormat keyFormat = KeyFormat::Long) {
 
     Fixture fix(uniqueness, direction, 100'000, keyFormat);
 
@@ -167,34 +167,35 @@ void BM_AdvanceWithEnd(benchmark::State& state,
 };
 
 
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardLoc, kForward, kRecordId, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardLocUnique, kForward, kRecordId, kUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardKeyAndLocUnique, kForward, kRecordIdAndKey, kUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceForwardLoc, kForward, kRecordId, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceForwardLocUnique, kForward, kRecordId, kUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceForwardKeyAndLocUnique, kForward, kRecordIdAndKey, kUnique);
 BENCHMARK_CAPTURE(
-    BM_Advance, AdvanceForwardStringLoc, kForward, kRecordId, kNonUnique, KeyFormat::String);
+    BM_SDIAdvance, AdvanceForwardStringLoc, kForward, kRecordId, kNonUnique, KeyFormat::String);
 
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLoc, kBackward, kRecordId, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLoc, kBackward, kRecordIdAndKey, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLocUnique, kBackward, kRecordId, kUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLocUnique, kBackward, kRecordIdAndKey, kUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceBackwardLoc, kBackward, kRecordId, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceBackwardKeyAndLoc, kBackward, kRecordIdAndKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceBackwardLocUnique, kBackward, kRecordId, kUnique);
 BENCHMARK_CAPTURE(
-    BM_Advance, AdvanceBackwardStringLoc, kForward, kRecordId, kNonUnique, KeyFormat::String);
-
-BENCHMARK_CAPTURE(BM_Seek, SeekForwardKey, kForward, kRecordId, kNonUnique);
-BENCHMARK_CAPTURE(BM_Seek, SeekForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
-BENCHMARK_CAPTURE(BM_Seek, SeekForwardKeyUnique, kForward, kRecordId, kUnique);
-BENCHMARK_CAPTURE(BM_Seek, SeekForwardKeyAndLocUnique, kForward, kRecordIdAndKey, kUnique);
-
-BENCHMARK_CAPTURE(BM_SaveRestore, SaveRestore, kForward, kNonUnique);
-BENCHMARK_CAPTURE(BM_SaveRestore, SaveRestoreUnique, kForward, kUnique);
-
-BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceForward, kForward, kNonUnique);
-BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceForwardUnique, kForward, kUnique);
-BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceBackward, kBackward, kNonUnique);
-BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceBackwardUnique, kBackward, kUnique);
+    BM_SDIAdvance, AdvanceBackwardKeyAndLocUnique, kBackward, kRecordIdAndKey, kUnique);
 BENCHMARK_CAPTURE(
-    BM_AdvanceWithEnd, AdvanceForwardStringLoc, kForward, kNonUnique, KeyFormat::String);
+    BM_SDIAdvance, AdvanceBackwardStringLoc, kForward, kRecordId, kNonUnique, KeyFormat::String);
+
+BENCHMARK_CAPTURE(BM_SDISeek, SeekForwardKey, kForward, kRecordId, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDISeek, SeekForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDISeek, SeekForwardKeyUnique, kForward, kRecordId, kUnique);
+BENCHMARK_CAPTURE(BM_SDISeek, SeekForwardKeyAndLocUnique, kForward, kRecordIdAndKey, kUnique);
+
+BENCHMARK_CAPTURE(BM_SDISaveRestore, SaveRestore, kForward, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDISaveRestore, SaveRestoreUnique, kForward, kUnique);
+
+BENCHMARK_CAPTURE(BM_SDIAdvanceWithEnd, AdvanceForward, kForward, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvanceWithEnd, AdvanceForwardUnique, kForward, kUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvanceWithEnd, AdvanceBackward, kBackward, kNonUnique);
+BENCHMARK_CAPTURE(BM_SDIAdvanceWithEnd, AdvanceBackwardUnique, kBackward, kUnique);
+BENCHMARK_CAPTURE(
+    BM_SDIAdvanceWithEnd, AdvanceForwardStringLoc, kForward, kNonUnique, KeyFormat::String);
 
 }  // namespace
 }  // namespace mongo

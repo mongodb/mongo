@@ -1377,7 +1377,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.forceUpdateWithFullDocument = false;
 
     const auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
-    auto rs = std::make_unique<StandardWiredTigerRecordStore>(wtKvEngine, opCtx.get(), params);
+    auto rs = std::make_unique<WiredTigerRecordStore>(wtKvEngine, opCtx.get(), params);
     rs->postConstructorInit(opCtx.get(), nss);
 
     const auto id = StringData{"1"};

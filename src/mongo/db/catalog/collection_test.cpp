@@ -993,6 +993,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     // Setup the cursor that should rollover.
     auto otherClient = getServiceContext()->getService()->makeClient("otherClient");
     auto otherOpCtx = otherClient->makeOperationContext();
+    Lock::GlobalLock globalLock{otherOpCtx.get(), MODE_IS};
     auto cursor = rs->getCursor(otherOpCtx.get());
     ASSERT(cursor->next());
     cursor->save();

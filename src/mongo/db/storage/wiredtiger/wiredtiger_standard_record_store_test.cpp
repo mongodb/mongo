@@ -130,7 +130,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;
 
-        auto ret = new StandardWiredTigerRecordStore(nullptr, opCtx.get(), params);
+        auto ret = new WiredTigerRecordStore(nullptr, opCtx.get(), params);
         ret->postConstructorInit(opCtx.get(), params.nss);
         rs.reset(ret);
     }

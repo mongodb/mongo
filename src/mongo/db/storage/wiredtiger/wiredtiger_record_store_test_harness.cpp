@@ -125,7 +125,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
 
-    auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx.get(), params);
+    auto ret = std::make_unique<WiredTigerRecordStore>(&_engine, opCtx.get(), params);
     ret->postConstructorInit(opCtx.get(), nss);
     return std::move(ret);
 }
@@ -133,6 +133,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
     dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(
         opCtx.get(), NamespaceString::kRsOplogNamespace);
     return ret;
@@ -140,6 +141,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
     WiredTigerRecoveryUnit* ru =
         checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     std::string ident = redactTenant(NamespaceString::kRsOplogNamespace).toString();
@@ -181,7 +183,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = false;
-    return std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx.get(), params);
+    return std::make_unique<WiredTigerRecordStore>(&_engine, opCtx.get(), params);
 }
 
 std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {

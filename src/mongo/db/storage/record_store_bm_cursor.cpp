@@ -63,10 +63,10 @@ const auto kIncludeBound = SeekableRecordCursor::BoundInclusion::kInclude;
 const auto kExcludeBound = SeekableRecordCursor::BoundInclusion::kExclude;
 
 struct Fixture {
-    Fixture(Direction direction, int nToInsert)
+    Fixture(Direction direction, int nToInsert, bool capped = false)
         : nToInsert(nToInsert),
           harness(newRecordStoreHarnessHelper()),
-          rs(harness->newRecordStore()),
+          rs(harness->newRecordStore("ns", CollectionOptions{.capped = capped})),
           opCtx(harness->newOperationContext()),
           globalLock(opCtx.get(), MODE_X),
           cursor(rs->getCursor(opCtx.get(), direction == kForward)) {
@@ -92,9 +92,25 @@ struct Fixture {
     size_t itemsProcessed = 0;
 };
 
-void BM_Seek(benchmark::State& state,
-             Direction direction,
-             SeekableRecordCursor::BoundInclusion boundInclusion) {
+void BM_RecordStoreSeek(benchmark::State& state,
+                        Direction direction,
+                        SeekableRecordCursor::BoundInclusion boundInclusion) {
+    Fixture fix(direction, 100'000);
+    for (auto _ : state) {
+        fix.cursor->seek(RecordId(50'000), boundInclusion);
+
+        state.PauseTiming();
+        fix.itemsProcessed += 1;
+        fix.cursor->saveUnpositioned();
+        fix.cursor->restore();
+        state.ResumeTiming();
+    }
+    state.SetItemsProcessed(fix.itemsProcessed);
+};
+
+void BM_RecordStoreMultiSeek(benchmark::State& state,
+                             Direction direction,
+                             SeekableRecordCursor::BoundInclusion boundInclusion) {
     Fixture fix(direction, 100'000);
     for (auto _ : state) {
         fix.cursor->seek(RecordId(1), boundInclusion);
@@ -105,7 +121,16 @@ void BM_Seek(benchmark::State& state,
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_SeekExact(benchmark::State& state, Direction direction) {
+void BM_RecordStoreSeekExact(benchmark::State& state, Direction direction) {
+    Fixture fix(direction, 100'000);
+    for (auto _ : state) {
+        fix.cursor->seekExact(RecordId(50'000));
+        fix.itemsProcessed += 1;
+    }
+    state.SetItemsProcessed(fix.itemsProcessed);
+};
+
+void BM_RecordStoreMultiSeekExact(benchmark::State& state, Direction direction) {
     Fixture fix(direction, 100'000);
     for (auto _ : state) {
         fix.cursor->seekExact(RecordId(1));
@@ -116,8 +141,8 @@ void BM_SeekExact(benchmark::State& state, Direction direction) {
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_SeekNear(benchmark::State& state, Direction direction) {
-    Fixture fix(direction, 100'000);
+void BM_RecordStoreSeekNear(benchmark::State& state, Direction direction) {
+    Fixture fix(direction, 100'000, true /* capped */);
     for (auto _ : state) {
         fix.cursor->seekNear(RecordId(1));
         fix.cursor->seekNear(RecordId(50'000));
@@ -127,7 +152,7 @@ void BM_SeekNear(benchmark::State& state, Direction direction) {
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_Advance(benchmark::State& state, Direction direction) {
+void BM_RecordStoreAdvance(benchmark::State& state, Direction direction) {
     Fixture fix(direction, 100'000);
     int start;
     if (direction == kBackward) {
@@ -145,7 +170,7 @@ void BM_Advance(benchmark::State& state, Direction direction) {
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_SaveRestore(benchmark::State& state) {
+void BM_RecordStoreSaveRestore(benchmark::State& state) {
     Fixture fix(kForward, 100'000);
     for (auto _ : state) {
         fix.cursor->seekExact(RecordId(1));
@@ -156,21 +181,24 @@ void BM_SaveRestore(benchmark::State& state) {
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-BENCHMARK_CAPTURE(BM_Seek, SeekForwardIncludeBound, kForward, kIncludeBound);
-BENCHMARK_CAPTURE(BM_Seek, SeekForwardExcludeBound, kForward, kExcludeBound);
-BENCHMARK_CAPTURE(BM_Seek, SeekBackwardIncludeBound, kBackward, kIncludeBound);
-BENCHMARK_CAPTURE(BM_Seek, SeekBackwardExcludeBound, kBackward, kExcludeBound);
+BENCHMARK_CAPTURE(BM_RecordStoreSeek, SeekForwardIncludeBound, kForward, kIncludeBound);
+BENCHMARK_CAPTURE(BM_RecordStoreSeek, SeekForwardExcludeBound, kForward, kExcludeBound);
+BENCHMARK_CAPTURE(BM_RecordStoreSeek, SeekBackwardIncludeBound, kBackward, kIncludeBound);
+BENCHMARK_CAPTURE(BM_RecordStoreSeek, SeekBackwardExcludeBound, kBackward, kExcludeBound);
 
-BENCHMARK_CAPTURE(BM_SeekExact, SeekExactForward, kForward);
-BENCHMARK_CAPTURE(BM_SeekExact, SeekExactBackward, kBackward);
+BENCHMARK_CAPTURE(BM_RecordStoreMultiSeek, MultiSeekForwardIncludeBound, kForward, kIncludeBound);
+BENCHMARK_CAPTURE(BM_RecordStoreMultiSeekExact, MultiSeekExactForward, kForward);
 
-BENCHMARK_CAPTURE(BM_SeekNear, SeekNearForward, kForward);
-BENCHMARK_CAPTURE(BM_SeekNear, SeekNearBackward, kBackward);
+BENCHMARK_CAPTURE(BM_RecordStoreSeekExact, SeekExactForward, kForward);
+BENCHMARK_CAPTURE(BM_RecordStoreSeekExact, SeekExactBackward, kBackward);
 
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForward, kForward);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackward, kForward);
+BENCHMARK_CAPTURE(BM_RecordStoreSeekNear, SeekNearForward, kForward);
+BENCHMARK_CAPTURE(BM_RecordStoreSeekNear, SeekNearBackward, kBackward);
 
-BENCHMARK(BM_SaveRestore);
+BENCHMARK_CAPTURE(BM_RecordStoreAdvance, AdvanceForward, kForward);
+BENCHMARK_CAPTURE(BM_RecordStoreAdvance, AdvanceBackward, kBackward);
+
+BENCHMARK(BM_RecordStoreSaveRestore);
 
 }  // namespace
 }  // namespace mongo

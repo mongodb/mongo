@@ -416,6 +416,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
     {
         int x = 0;
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto cursor = rs->getCursor(opCtx.get());
         while (auto record = cursor->next()) {
             std::string s = str::stream() << "eliot" << x++;
@@ -428,6 +429,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
     {
         int x = N;
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         auto cursor = rs->getCursor(opCtx.get(), false);
         while (auto record = cursor->next()) {
             std::string s = str::stream() << "eliot" << --x;
@@ -444,6 +446,9 @@ TEST(RecordStoreTestHarness, CursorRestoreForward) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+
     {
         WriteUnitOfWork uow(opCtx.get());
         std::string s = "test";
@@ -486,6 +491,8 @@ TEST(RecordStoreTestHarness, CursorRestoreReverse) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+
     {
         WriteUnitOfWork uow(opCtx.get());
         std::string s = "test";
@@ -528,6 +535,9 @@ TEST(RecordStoreTestHarness, CursorRestoreDeletedDoc) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+
     {
         WriteUnitOfWork uow(opCtx.get());
         std::string s = "test";
@@ -592,6 +602,8 @@ TEST(RecordStoreTestHarness, CursorSaveRestoreSeek) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+
     {
         WriteUnitOfWork uow(opCtx.get());
         std::string s = "test";
@@ -626,6 +638,9 @@ TEST(RecordStoreTestHarness, CursorSaveUnpositionedRestoreSeek) {
 
     auto rs = harnessHelper->newRecordStore(ns, {});
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+
     {
         WriteUnitOfWork uow(opCtx.get());
         std::string s = "test";
@@ -772,10 +787,11 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreCreation) {
     invariant(rs->keyFormat() == KeyFormat::String);
 }
 
-TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
+TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeekNear) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
+    options.capped = true;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
     std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
     invariant(rs->keyFormat() == KeyFormat::String);
