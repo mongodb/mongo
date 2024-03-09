@@ -642,6 +642,10 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
 
     auto opCtx = cc().makeOperationContext();
 
+    // Wait for enough space.
+    // This should be called outside of the mutex to avoid deadlocks.
+    _oplogApplier->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+
     {
         // Don't add more to the buffer if we are in shutdown. Continue holding the lock until we
         // are done to prevent going into shutdown.
