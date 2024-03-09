@@ -493,10 +493,22 @@ SEPARATE_DEBUG_ENABLED = select({
     "//conditions:default": False,
 })
 
+TCMALLOC_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    Build failed due to unsupported platform for current allocator selection:\n" +
+    "    '--//bazel/config:allocator=tcmalloc-google' is supported on linux with aarch64 or x86_64\n" +
+    "    '--//bazel/config:allocator=tcmalloc-gperf' is supported on windows or linux, but not macos\n" +
+    "    '--//bazel/config:allocator=system' can be used on any platform\n"
+)
+
 TCMALLOC_DEPS = select({
-    "//bazel/config:tcmalloc_allocator": ["//src/third_party/gperftools:tcmalloc_minimal"],
-    "//bazel/config:auto_allocator_windows": ["//src/third_party/gperftools:tcmalloc_minimal"],
-    "//bazel/config:auto_allocator_linux": ["//src/third_party/gperftools:tcmalloc_minimal"],
+    "//bazel/config:tcmalloc_google_enabled": ["//src/third_party/tcmalloc:tcmalloc"],
+    "//bazel/config:tcmalloc_gperf_enabled": ["//src/third_party/gperftools:tcmalloc_minimal"],
+    "//bazel/config:system_allocator_enabled": [],
+}, no_match_error = TCMALLOC_ERROR_MESSAGE)
+
+TCMALLOC_DEFINES = select({
+    "//bazel/config:tcmalloc_google_enabled": ["ABSL_ALLOCATOR_NOTHROW"],
     "//conditions:default": [],
 })
 
@@ -527,7 +539,7 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
 
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES + \
                        THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES + \
-                       WINDOWS_DEFINES
+                       WINDOWS_DEFINES + TCMALLOC_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \
@@ -615,7 +627,8 @@ def mongo_cc_library(
         includes = [],
         linkstatic = False,
         local_defines = [],
-        mongo_api_name = None):
+        mongo_api_name = None,
+        target_compatible_with = []):
     """Wrapper around cc_library.
 
     Args:
@@ -642,14 +655,14 @@ def mongo_cc_library(
         This can be configured via //config/bazel:linkstatic.""")
 
     # Avoid injecting into unwind/libunwind_asm to avoid a circular dependency.
-    if name not in ["unwind", "tcmalloc_minimal"]:
+    if name not in ["unwind", "tcmalloc_minimal"] and not native.package_name().startswith("src/third_party/tcmalloc") and not native.package_name().startswith("src/third_party/abseil-cpp"):
         deps += LIBUNWIND_DEPS
         local_defines += LIBUNWIND_DEFINES
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
 
-    if name != "tcmalloc_minimal":
+    if name != "tcmalloc_minimal" and not name.startswith("tcmalloc") and not name.startswith("absl"):
         deps += TCMALLOC_DEPS
 
     if mongo_api_name:
@@ -751,6 +764,7 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
             "//conditions:default": ["pie"],
         }),
+        target_compatible_with = target_compatible_with,
     )
 
     # Creates a shared library version of our target only if //bazel/config:linkstatic_disabled is true.
@@ -793,7 +807,8 @@ def mongo_cc_binary(
         linkopts = [],
         includes = [],
         linkstatic = False,
-        local_defines = []):
+        local_defines = [],
+        target_compatible_with = []):
     """Wrapper around cc_binary.
 
     Args:
@@ -854,6 +869,7 @@ def mongo_cc_binary(
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
+        target_compatible_with = target_compatible_with,
     )
 
     extract_debuginfo_binary(

@@ -3,6 +3,18 @@ load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONT
 
 package(default_visibility = ["//visibility:public"])
 
+constraint_setting(name = "tcmalloc_kernel_version")
+
+constraint_value(
+    name = "kernel_version_4_4_or_greater",
+    constraint_setting = ":tcmalloc_kernel_version",
+)
+
+constraint_value(
+    name = "kernel_version_less_than_4_4",
+    constraint_setting = ":tcmalloc_kernel_version",
+)
+
 [
     platform(
         name = distro_or_os + "_" + arch + "_" + compiler,
@@ -10,6 +22,7 @@ package(default_visibility = ["//visibility:public"])
             "@platforms//os:linux",
             "@platforms//cpu:arm64" if arch == "arm64" else "@platforms//cpu:x86_64",
             "@bazel_tools//tools/cpp:" + compiler,
+            ":kernel_version_4_4_or_greater",  # remote execution platforms assume a given kernel version
         ],
         exec_properties = {
             "container-image": REMOTE_EXECUTION_CONTAINERS[distro_or_os + "_" + arch]["container-image"],

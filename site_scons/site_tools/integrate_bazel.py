@@ -615,14 +615,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         # === Build settings ===
 
         linkstatic = env.GetOption("link-model") in ["auto", "static"]
-
-        # TODO SERVER-86472 make bazel support both tcmalloc implementations
-        if env.GetOption("allocator") == "tcmalloc-google":
-            env.ConfError("Bazel build currently does not support tcmalloc-google allocator.")
-        if env.GetOption("allocator") == "tcmalloc-gperf":
-            allocator = "tcmalloc"
-        else:
-            allocator = env.GetOption("allocator")
+        allocator = env.get('MONGO_ALLOCATOR', 'tcmalloc-google')
 
         distro_or_os = normalized_os
         if normalized_os == "linux":

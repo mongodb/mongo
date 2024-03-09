@@ -37,6 +37,7 @@ build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
+build --jobs=200
 common --remote_upload_local_results=False
 
 # if you don't have access to the remote execution cluster above, use the local config
@@ -54,6 +55,8 @@ build:local --tls_client_key=
 build:local --experimental_remote_cache_compression=false
 build:local --grpc_keepalive_time=0s
 build:local --legacy_important_outputs
+build:local --//bazel/config:local_build=True
+build:local --jobs=auto
 
 # Disable remote execution and caching for public releases
 --config=public-release

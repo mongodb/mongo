@@ -160,7 +160,7 @@ def slurpBlaze(target, source, exports, env):
         for cf in libDef.get('copts', []):
             kwargs.setdefault('CCFLAGS', [e for e in env.get('CCFLAGS', [])]).append(cf)
         tcmalloc_scons_print(f'env.Library(**{json.dumps(kwargs, indent=4)})', file=sys.stderr)
-        env.Library(**kwargs)
+        env.BazelLibrary(**kwargs)
 
     return 0
 

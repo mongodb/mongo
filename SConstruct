@@ -1808,7 +1808,7 @@ env.AddMethod(conf_error, 'ConfError')
 # Normalize the VERBOSE Option, and make its value available as a
 # function.
 if env['VERBOSE'] == "auto":
-    env['VERBOSE'] = not sys.stdout.isatty()
+    env['VERBOSE'] = not sys.stdout.isatty() and env.get('__NINJA_NO') != "1"
 else:
     try:
         env['VERBOSE'] = to_boolean(env['VERBOSE'])
@@ -2138,12 +2138,7 @@ except (ValueError, IndexError):
 
 if get_option('allocator') == "auto":
     if env.TargetOSIs('linux') and env['TARGET_ARCH'] in ('x86_64', 'aarch64'):
-
-        # TODO SERVER-86472 make bazel support both tcmalloc implementations
-        if env.get("BAZEL_BUILD_ENABLED"):
-            env['MONGO_ALLOCATOR'] = "tcmalloc-gperf"
-        else:
-            env['MONGO_ALLOCATOR'] = "tcmalloc-google"
+        env['MONGO_ALLOCATOR'] = "tcmalloc-google"
 
         # googles tcmalloc uses the membarrier() system call which was added in Linux 4.3,
         # so fall back to gperf implementation for older kernels

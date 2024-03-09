@@ -87,7 +87,7 @@ spider_monkey_dbg = rule(
 # allocator
 # =========
 
-allocator_values = ["auto", "system", "tcmalloc"]
+allocator_values = ["auto", "system", "tcmalloc-gperf", "tcmalloc-google"]
 
 allocator_provider = provider(
     doc = "Allocator to use (use \"auto\" for best choice for current platform)",
@@ -438,5 +438,18 @@ release_provider = provider(
 
 release = rule(
     implementation = lambda ctx: release_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# local_build
+# =========
+local_build_provider = provider(
+    doc = """Allows configurations based on local builds""",
+    fields = ["enabled"],
+)
+
+local_build = rule(
+    implementation = lambda ctx: local_build_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )

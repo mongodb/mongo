@@ -12,6 +12,7 @@ load(
     "libunwind",
     "linker",
     "linkstatic",
+    "local_build",
     "lsan",
     "msan",
     "opt",
@@ -576,44 +577,122 @@ allocator(
 )
 
 config_setting(
-    name = "auto_allocator_linux",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
+    name = "_tcmalloc_google",
     flag_values = {
-        "//bazel/config:allocator": "auto",
+        "//bazel/config:allocator": "tcmalloc-google",
     },
 )
 
 config_setting(
-    name = "auto_allocator_windows",
-    constraint_values = [
-        "@platforms//os:windows",
-    ],
+    name = "_tcmalloc_gperf",
     flag_values = {
-        "//bazel/config:allocator": "auto",
+        "//bazel/config:allocator": "tcmalloc-gperf",
     },
 )
 
 config_setting(
-    name = "auto_allocator",
-    flag_values = {
-        "//bazel/config:allocator": "auto",
-    },
-)
-
-config_setting(
-    name = "system_allocator",
+    name = "_system_allocator",
     flag_values = {
         "//bazel/config:allocator": "system",
     },
 )
 
 config_setting(
-    name = "tcmalloc_allocator",
+    name = "_auto_allocator",
     flag_values = {
-        "//bazel/config:allocator": "tcmalloc",
+        "//bazel/config:allocator": "auto",
     },
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_google_supported_archs",
+    match_any = [
+        "@platforms//cpu:aarch64",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_google_selected_by_auto",
+    match_all = [
+        ":_auto_allocator",
+        "@platforms//os:linux",
+        ":_tcmalloc_google_supported_archs",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_gperf_auto_supported",
+    match_any = [
+        "@platforms//os:windows",
+        "@platforms//cpu:ppc64le",
+        "@platforms//cpu:s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_gperf_supported_os",
+    match_any = [
+        "@platforms//os:windows",
+        "@platforms//os:linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_gperf_selected_by_auto",
+    match_all = [
+        ":_auto_allocator",
+        ":_tcmalloc_gperf_auto_supported",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_system_allocator_enabled_by_auto",
+    match_all = [
+        ":_auto_allocator",
+        "@platforms//os:macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_google_selected",
+    match_any = [
+        ":_tcmalloc_google_selected_by_auto",
+        ":_tcmalloc_google",
+    ],
+)
+
+selects.config_setting_group(
+    name = "_tcmalloc_gperf_selected",
+    match_any = [
+        ":_tcmalloc_gperf_selected_by_auto",
+        ":_tcmalloc_gperf",
+    ],
+)
+
+selects.config_setting_group(
+    name = "system_allocator_enabled",
+    match_any = [
+        ":_system_allocator_enabled_by_auto",
+        ":_system_allocator",
+    ],
+)
+
+selects.config_setting_group(
+    name = "tcmalloc_google_enabled",
+    match_all = [
+        ":_tcmalloc_google_selected",
+        "@platforms//os:linux",
+        ":_tcmalloc_google_supported_archs",
+    ],
+)
+
+selects.config_setting_group(
+    name = "tcmalloc_gperf_enabled",
+    match_all = [
+        ":_tcmalloc_gperf_selected",
+        ":_tcmalloc_gperf_supported_os",
+    ],
 )
 
 # --------------------------------------
@@ -1006,7 +1085,7 @@ selects.config_setting_group(
     name = "sanitize_address_required_settings",
     match_all = [
         ":asan_enabled",
-        ":system_allocator",
+        ":system_allocator_enabled",
     ],
 )
 
@@ -1014,7 +1093,7 @@ selects.config_setting_group(
     name = "sanitize_memory_required_settings",
     match_all = [
         ":msan_enabled",
-        ":system_allocator",
+        ":system_allocator_enabled",
     ],
 )
 
@@ -1295,4 +1374,20 @@ selects.config_setting_group(
         ":visibility_support_enabled_setting",
         ":linkstatic_disabled",
     ],
+)
+
+# --------------------------------------
+# local_build
+# --------------------------------------
+
+local_build(
+    name = "local_build",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "local_build_enabled",
+    flag_values = {
+        "//bazel/config:local_build": "True",
+    },
 )

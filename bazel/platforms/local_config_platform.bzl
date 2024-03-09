@@ -48,7 +48,7 @@ def _setup_local_config_platform(ctx):
 
     if distro != None and distro + "_" + arch in REMOTE_EXECUTION_CONTAINERS:
         container_url = REMOTE_EXECUTION_CONTAINERS[distro + "_" + arch]["container-image"]
-        print("Using remote execution container: {}".format(container_url))
+        print("Local host platform is configured to use this container if doing remote execution: {}".format(container_url))
         exec_props = """
     exec_properties = {
         "container-image": "%s",
@@ -58,8 +58,19 @@ def _setup_local_config_platform(ctx):
     else:
         exec_props = ""
 
+    result = ctx.execute([
+        "uname",
+        "-r",
+    ])
+    version_numbers = result.stdout.split(".")
+    if int(version_numbers[0]) > 4 or (int(version_numbers[0]) == 4 and int(version_numbers[1]) > 3):
+        platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_4_4_or_greater"'
+    else:
+        platform_constraints_str = constraints_str + ',\n        "@//bazel/platforms:kernel_version_less_than_4_4"'
+
     substitutions = {
         "{constraints}": constraints_str,
+        "{platform_constraints}": platform_constraints_str,
         "{exec_props}": exec_props,
     }
 
