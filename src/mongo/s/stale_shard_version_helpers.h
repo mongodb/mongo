@@ -71,10 +71,6 @@ auto shardVersionRetry(OperationContext* opCtx,
         try {
             return callbackFn();
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-            invariant(ex->getDb() == nss.db(),
-                      str::stream() << "StaleDbVersion error on unexpected database. Expected "
-                                    << nss.db() << ", received " << ex->getDb());
-
             // If the database version is stale, refresh its entry in the catalog cache.
             Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
                                                                      ex->getVersionWanted());
@@ -87,11 +83,8 @@ auto shardVersionRetry(OperationContext* opCtx,
             // If the cache currently considers the collection to be unsharded, this will trigger an
             // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
             if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
-                invariant(staleInfo->getNss() == nss,
-                          str::stream() << "StaleConfig error on unexpected namespace. Expected "
-                                        << nss << ", received " << staleInfo->getNss());
                 catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
+                    staleInfo->getNss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
             } else {
                 catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
             }
