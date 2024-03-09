@@ -34,7 +34,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_compression',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_metadata',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_tracked_types',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/util/fail_point',
     ],

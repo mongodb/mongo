@@ -706,6 +706,16 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='tracking_allocator_test',
+    source=[
+        'tracking_allocator_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ],
+)
+
 env.Benchmark(
     target='hash_table_bm',
     source='hash_table_bm.cpp',

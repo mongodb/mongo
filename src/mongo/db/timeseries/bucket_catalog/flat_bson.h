@@ -45,9 +45,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/timeseries/timeseries_tracked_types.h"
-#include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/tracked_types.h"
+#include "mongo/util/tracking_context.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

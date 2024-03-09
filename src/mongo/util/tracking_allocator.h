@@ -35,7 +35,7 @@
 
 #include "mongo/platform/atomic_word.h"
 
-namespace mongo::timeseries {
+namespace mongo {
 
 struct TrackingAllocatorStats {
     AtomicWord<uint64_t> bytesAllocated;
@@ -89,4 +89,4 @@ bool operator!=(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs
     return lhs.getStats() != rhs.getStats();
 }
 
-}  // namespace mongo::timeseries
+}  // namespace mongo

@@ -31,9 +31,9 @@
 
 #include <functional>
 
-#include "mongo/db/timeseries/timeseries_tracking_allocator.h"
+#include "mongo/util/tracking_allocator.h"
 
-namespace mongo::timeseries {
+namespace mongo {
 
 template <class T>
 class Tracked {
@@ -104,4 +104,4 @@ private:
     TrackingAllocatorStats _stats;
 };
 
-}  // namespace mongo::timeseries
+}  // namespace mongo

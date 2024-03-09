@@ -32,9 +32,9 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/timeseries/timeseries_tracked_types.h"
-#include "mongo/db/timeseries/timeseries_tracking_allocator.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/tracked_types.h"
+#include "mongo/util/tracking_allocator.h"
 
 namespace mongo {
 
@@ -46,11 +46,11 @@ TEST_F(TrackingAllocatorTest, STLContainerSimple) {
     return;
 #endif
 
-    timeseries::TrackingContext trackingContext;
+    TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
-        std::vector<int64_t, timeseries::TrackingAllocator<int64_t>> vec(
+        std::vector<int64_t, TrackingAllocator<int64_t>> vec(
             trackingContext.makeAllocator<int64_t>());
         ASSERT_EQ(0, trackingContext.allocated());
 
@@ -83,18 +83,18 @@ TEST_F(TrackingAllocatorTest, STLContainerCopy) {
     return;
 #endif
 
-    timeseries::TrackingContext trackingContext;
+    TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
-        std::vector<int64_t, timeseries::TrackingAllocator<int64_t>> vec(
+        std::vector<int64_t, TrackingAllocator<int64_t>> vec(
             trackingContext.makeAllocator<int64_t>());
         ASSERT_EQ(0, trackingContext.allocated());
 
         vec.push_back(1);
         ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
 
-        std::vector<int64_t, timeseries::TrackingAllocator<int64_t>> vecCopy = vec;
+        std::vector<int64_t, TrackingAllocator<int64_t>> vecCopy = vec;
         vecCopy.shrink_to_fit();
         ASSERT_EQ(2 * sizeof(int64_t), trackingContext.allocated());
 
@@ -112,18 +112,18 @@ TEST_F(TrackingAllocatorTest, STLContainerMove) {
     return;
 #endif
 
-    timeseries::TrackingContext trackingContext;
+    TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
-        std::vector<int64_t, timeseries::TrackingAllocator<int64_t>> vec(
+        std::vector<int64_t, TrackingAllocator<int64_t>> vec(
             trackingContext.makeAllocator<int64_t>());
         ASSERT_EQ(0, trackingContext.allocated());
 
         vec.push_back(1);
         ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
 
-        std::vector<int64_t, timeseries::TrackingAllocator<int64_t>> vecMove = std::move(vec);
+        std::vector<int64_t, TrackingAllocator<int64_t>> vecMove = std::move(vec);
         vecMove.shrink_to_fit();
         ASSERT_EQ(sizeof(int64_t), trackingContext.allocated());
 
@@ -141,16 +141,15 @@ TEST_F(TrackingAllocatorTest, STLContainerNested) {
     return;
 #endif
 
-    timeseries::TrackingContext trackingContext;
+    TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
         // The scoped_allocator_adaptor is necessary for multilevel containers to use the same
         // allocator.
         using Key = int64_t;
-        using Value = std::vector<int64_t, timeseries::TrackingAllocator<int64_t>>;
-        timeseries::tracked_map<Key, Value> map(
-            timeseries::make_tracked_map<Key, Value>(trackingContext));
+        using Value = std::vector<int64_t, TrackingAllocator<int64_t>>;
+        tracked_map<Key, Value> map(make_tracked_map<Key, Value>(trackingContext));
 
         map[1].emplace_back(1);
         ASSERT_GT(trackingContext.allocated(), sizeof(std::pair<const Key, Value>));
@@ -172,13 +171,12 @@ TEST_F(TrackingAllocatorTest, STLContainerNested) {
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
-        using Key = timeseries::tracked_string;
-        using Value = std::vector<timeseries::tracked_string>;
-        timeseries::tracked_map<Key, Value> map(
-            timeseries::make_tracked_map<Key, Value>(trackingContext));
+        using Key = tracked_string;
+        using Value = std::vector<tracked_string>;
+        tracked_map<Key, Value> map(make_tracked_map<Key, Value>(trackingContext));
 
         // Use a long string to avoid small-string optimization which would have no allocation.
-        const timeseries::tracked_string str = timeseries::make_tracked_string(
+        const tracked_string str = make_tracked_string(
             trackingContext,
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         map[str].emplace_back(str);
@@ -200,20 +198,18 @@ TEST_F(TrackingAllocatorTest, ManagedObject) {
         int64_t z;
     };
 
-    timeseries::TrackingContext trackingContext;
+    TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
-        timeseries::shared_tracked_ptr<MockClass> mockClass =
-            timeseries::make_shared_tracked<MockClass>(trackingContext);
+        shared_tracked_ptr<MockClass> mockClass = make_shared_tracked<MockClass>(trackingContext);
         ASSERT_GTE(trackingContext.allocated(), sizeof(MockClass));
     }
 
     ASSERT_EQ(0, trackingContext.allocated());
 
     {
-        timeseries::unique_tracked_ptr<MockClass> mockClass =
-            timeseries::make_unique_tracked<MockClass>(trackingContext);
+        unique_tracked_ptr<MockClass> mockClass = make_unique_tracked<MockClass>(trackingContext);
         ASSERT_GTE(trackingContext.allocated(), sizeof(MockClass));
     }
 

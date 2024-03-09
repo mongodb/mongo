@@ -36,12 +36,12 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/timeseries/timeseries_tracking_allocator.h"
-#include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/tracking_allocator.h"
+#include "mongo/util/tracking_context.h"
 
-namespace mongo::timeseries {
+namespace mongo {
 
 template <class T>
 using shared_tracked_ptr = std::shared_ptr<T>;
@@ -144,11 +144,8 @@ unique_tracked_ptr<T> make_unique_tracked(TrackingContext& trackingContext, Args
 
 
 template <class Key, class T, class Compare = std::less<Key>>
-using tracked_map =
-    std::map<Key,
-             T,
-             Compare,
-             std::scoped_allocator_adaptor<timeseries::TrackingAllocator<std::pair<const Key, T>>>>;
+using tracked_map = std::
+    map<Key, T, Compare, std::scoped_allocator_adaptor<TrackingAllocator<std::pair<const Key, T>>>>;
 
 template <class Key, class T, class Compare = std::less<Key>>
 tracked_map<Key, T, Compare> make_tracked_map(TrackingContext& trackingContext) {
@@ -164,7 +161,7 @@ using tracked_unordered_map = stdx::unordered_map<
     Value,
     Hasher,
     KeyEqual,
-    std::scoped_allocator_adaptor<timeseries::TrackingAllocator<std::pair<const Key, Value>>>>;
+    std::scoped_allocator_adaptor<TrackingAllocator<std::pair<const Key, Value>>>>;
 
 template <class Key,
           class Value,
@@ -176,8 +173,7 @@ tracked_unordered_map<Key, Value, Hasher> make_tracked_unordered_map(
         trackingContext.makeAllocator<Value>());
 }
 
-using tracked_string =
-    std::basic_string<char, std::char_traits<char>, timeseries::TrackingAllocator<char>>;
+using tracked_string = std::basic_string<char, std::char_traits<char>, TrackingAllocator<char>>;
 
 template <class... Args>
 tracked_string make_tracked_string(TrackingContext& trackingContext, Args... args) {
@@ -260,13 +256,12 @@ struct TrackedStringMapEq {
 };
 
 template <class Value>
-using TrackedStringMap =
-    absl::flat_hash_map<tracked_string,
-                        Value,
-                        TrackedStringMapHasher,
-                        TrackedStringMapEq,
-                        std::scoped_allocator_adaptor<
-                            timeseries::TrackingAllocator<std::pair<const tracked_string, Value>>>>;
+using TrackedStringMap = absl::flat_hash_map<
+    tracked_string,
+    Value,
+    TrackedStringMapHasher,
+    TrackedStringMapEq,
+    std::scoped_allocator_adaptor<TrackingAllocator<std::pair<const tracked_string, Value>>>>;
 
 template <class Value>
 TrackedStringMap<Value> makeTrackedStringMap(TrackingContext& trackingContext) {
@@ -275,17 +270,19 @@ TrackedStringMap<Value> makeTrackedStringMap(TrackingContext& trackingContext) {
             .makeAllocator<typename TrackedStringMap<Value>::allocator_type::value_type>());
 }
 
-using TrackedStringSet = absl::flat_hash_set<
-    tracked_string,
-    TrackedStringMapHasher,
-    TrackedStringMapEq,
-    std::scoped_allocator_adaptor<timeseries::TrackingAllocator<tracked_string>>>;
+using TrackedStringSet =
+    absl::flat_hash_set<tracked_string,
+                        TrackedStringMapHasher,
+                        TrackedStringMapEq,
+                        std::scoped_allocator_adaptor<TrackingAllocator<tracked_string>>>;
 
-TrackedStringSet makeTrackedStringSet(TrackingContext&);
+inline TrackedStringSet makeTrackedStringSet(TrackingContext& trackingContext) {
+    return TrackedStringSet(
+        trackingContext.makeAllocator<typename TrackedStringSet::allocator_type::value_type>());
+}
 
 template <class T>
-using tracked_vector =
-    std::vector<T, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<T>>>;
+using tracked_vector = std::vector<T, std::scoped_allocator_adaptor<TrackingAllocator<T>>>;
 
 template <class T, class... Args>
 tracked_vector<T> make_tracked_vector(TrackingContext& trackingContext, Args... args) {
@@ -293,7 +290,7 @@ tracked_vector<T> make_tracked_vector(TrackingContext& trackingContext, Args... 
 }
 
 template <class T>
-using tracked_list = std::list<T, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<T>>>;
+using tracked_list = std::list<T, std::scoped_allocator_adaptor<TrackingAllocator<T>>>;
 
 template <class T>
 tracked_list<T> make_tracked_list(TrackingContext& trackingContext) {
@@ -301,8 +298,8 @@ tracked_list<T> make_tracked_list(TrackingContext& trackingContext) {
 }
 
 template <class Key>
-using tracked_set = std::
-    set<Key, std::less<Key>, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<Key>>>;
+using tracked_set =
+    std::set<Key, std::less<Key>, std::scoped_allocator_adaptor<TrackingAllocator<Key>>>;
 
 template <class Key>
 tracked_set<Key> make_tracked_set(TrackingContext& trackingContext) {
@@ -311,7 +308,7 @@ tracked_set<Key> make_tracked_set(TrackingContext& trackingContext) {
 
 template <class T, std::size_t N>
 using tracked_inlined_vector =
-    absl::InlinedVector<T, N, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<T>>>;
+    absl::InlinedVector<T, N, std::scoped_allocator_adaptor<TrackingAllocator<T>>>;
 
 template <class T, std::size_t N>
 tracked_inlined_vector<T, N> make_tracked_inlined_vector(TrackingContext& trackingContext) {
@@ -341,6 +338,8 @@ private:
 };
 using TrackedBSONObj = Tracked<TrackableBSONObj>;
 
-TrackedBSONObj makeTrackedBson(TrackingContext& trackingContext, BSONObj obj);
+inline TrackedBSONObj makeTrackedBson(TrackingContext& trackingContext, BSONObj obj) {
+    return trackingContext.makeTracked(TrackableBSONObj{std::move(obj)});
+}
 
-}  // namespace mongo::timeseries
+}  // namespace mongo

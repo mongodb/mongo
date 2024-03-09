@@ -32,8 +32,8 @@
 #include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/timeseries/timeseries_tracked_types.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/tracked_types.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
