@@ -60,8 +60,6 @@ namespace repl {
 
 NoopOplogApplierObserver noopOplogApplierObserver;
 
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
-
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,
                            Observer* observer,
@@ -76,8 +74,8 @@ OplogBuffer* OplogApplier::getBuffer() const {
 
 Future<void> OplogApplier::startup() {
     auto pf = makePromiseFuture<void>();
-    auto callback = [this,
-                     promise = std::move(pf.promise)](const CallbackArgs& args) mutable noexcept {
+    auto callback = [this, promise = std::move(pf.promise)](
+                        const executor::TaskExecutor::CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         LOGV2(21224, "Starting oplog application");
         _run(_oplogBuffer);
@@ -127,8 +125,10 @@ void OplogApplier::enqueue(OperationContext* opCtx,
                            boost::optional<std::size_t> bytes) {
     static Occasionally sampler;
     if (sampler.tick()) {
-        LOGV2_DEBUG(
-            21226, 2, "Oplog buffer size", "oplogBufferSizeBytes"_attr = _oplogBuffer->getSize());
+        LOGV2_DEBUG(21226,
+                    2,
+                    "Oplog apply buffer size",
+                    "oplogApplyBufferSizeBytes"_attr = _oplogBuffer->getSize());
     }
     _oplogBuffer->push(opCtx, begin, end, bytes);
 }

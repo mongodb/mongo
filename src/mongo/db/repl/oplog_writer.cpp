@@ -34,18 +34,22 @@
 namespace mongo {
 namespace repl {
 
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+NoopOplogWriterObserver noopOplogWriterObserver;
 
 OplogWriter::OplogWriter(executor::TaskExecutor* executor,
                          OplogBuffer* writeBuffer,
                          const Options& options)
     : _batcher(writeBuffer), _executor(executor), _writeBuffer(writeBuffer), _options(options) {}
 
+OplogBuffer* OplogWriter::getBuffer() const {
+    return _writeBuffer;
+}
+
 Future<void> OplogWriter::startup() {
     auto pf = makePromiseFuture<void>();
 
-    auto callback = [this,
-                     promise = std::move(pf.promise)](const CallbackArgs& args) mutable noexcept {
+    auto callback = [this, promise = std::move(pf.promise)](
+                        const executor::TaskExecutor::CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         LOGV2(8543100, "Starting oplog write");
         _run();
@@ -65,6 +69,20 @@ void OplogWriter::shutdown() {
 bool OplogWriter::inShutdown() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _inShutdown;
+}
+
+void OplogWriter::enqueue(OperationContext* opCtx,
+                          OplogBuffer::Batch::const_iterator begin,
+                          OplogBuffer::Batch::const_iterator end,
+                          boost::optional<std::size_t> bytes) {
+    static Occasionally sampler;
+    if (sampler.tick()) {
+        LOGV2_DEBUG(8569804,
+                    2,
+                    "Oplog write buffer size",
+                    "oplogWriteBufferSizeBytes"_attr = _writeBuffer->getSize());
+    }
+    _writeBuffer->push(opCtx, begin, end, bytes);
 }
 
 const OplogWriter::Options& OplogWriter::getOptions() const {

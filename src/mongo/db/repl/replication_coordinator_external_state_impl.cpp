@@ -79,8 +79,10 @@
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/repl/oplog_buffer_batched_queue.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -162,8 +164,17 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 
-// The maximum size of the oplog buffer is set to 256MB.
-constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
+// The maximum size of the oplog write buffer is set to 256MB.
+constexpr std::size_t kOplogWriteBufferSize = 256 * 1024 * 1024;
+
+// The maximum size of the oplog apply buffer is set to 100MB,
+// equal to the maximum value of 'replBatchLimitBytes'.
+constexpr std::size_t kOplogApplyBufferSize = 100 * 1024 * 1024;
+
+// The maximum size of the oplog apply buffer is set to 256MB,
+// for the old architecture with no oplog write buffer.
+constexpr std::size_t kOplogApplyBufferSizeLegacy = 256 * 1024 * 1024;
+
 
 // The count of items in the buffer
 OplogBuffer::Counters bufferGauge("repl.buffer");
@@ -254,33 +265,65 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     invariant(storageEngine);
 
-    _oplogBuffer = std::make_unique<OplogBufferBlockingQueue>(kOplogBufferSize, &bufferGauge);
+    const auto useOplogWriter = feature_flags::gReduceMajorityWriteLatency.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const auto applyBufferSize =
+        useOplogWriter ? kOplogApplyBufferSize : kOplogApplyBufferSizeLegacy;
 
-    // No need to log OplogBuffer::startup because the blocking queue implementation
-    // does not start any threads or access the storage layer.
-    _oplogBuffer->startup(opCtx);
+    if (useOplogWriter) {
+        // TODO (SERVER-85720): Add write buffer metrics to serverStatus.
+        _oplogWriteBuffer = std::make_unique<OplogBufferBatchedQueue>(kOplogWriteBufferSize);
+    }
+    _oplogApplyBuffer = std::make_unique<OplogBufferBlockingQueue>(applyBufferSize, &bufferGauge);
 
+    // No need to log OplogBuffer::startup because the blocking queue and batched queue
+    // implementations does not start any threads or access the storage layer.
+    if (useOplogWriter) {
+        _oplogWriteBuffer->startup(opCtx);
+    }
+    _oplogApplyBuffer->startup(opCtx);
+
+    invariant(!_oplogWriter);
     invariant(!_oplogApplier);
 
-    // Using noop observer now that BackgroundSync no longer implements the
-    // OplogApplier::Observer interface. During steady state replication, there is no need to
-    // log details on every batch we apply.
-    _oplogApplier = std::make_unique<OplogApplierImpl>(
-        _oplogApplierTaskExecutor.get(),
-        _oplogBuffer.get(),
-        &noopOplogApplierObserver,
-        replCoord,
-        _replicationProcess->getConsistencyMarkers(),
-        _storageInterface,
-        OplogApplier::Options(OplogApplication::Mode::kSecondary),
-        _writerPool.get());
+    // Using noop observer for both writer and applier. During steady state replication,
+    // there is no need to log details on every batch we apply.
+    // TODO (SERVER-87674): use a different thread pool.
+    if (useOplogWriter) {
+        _oplogWriter = std::make_unique<OplogWriterImpl>(_oplogWriterTaskExecutor.get(),
+                                                         _oplogWriteBuffer.get(),
+                                                         _oplogApplyBuffer.get(),
+                                                         replCoord,
+                                                         _storageInterface,
+                                                         _writerPool.get(),
+                                                         &noopOplogWriterObserver,
+                                                         OplogWriter::Options());
+    }
+
+    // TODO (SERVER-85697): clean up the applier options.
+    OplogApplier::Options applierOptions(OplogApplication::Mode::kSecondary,
+                                         useOplogWriter /* skipWritesToOplog */,
+                                         useOplogWriter /* skipWritesToChangeCollection */);
+    _oplogApplier = std::make_unique<OplogApplierImpl>(_oplogApplierTaskExecutor.get(),
+                                                       _oplogApplyBuffer.get(),
+                                                       &noopOplogApplierObserver,
+                                                       replCoord,
+                                                       _replicationProcess->getConsistencyMarkers(),
+                                                       _storageInterface,
+                                                       applierOptions,
+                                                       _writerPool.get());
 
     invariant(!_bgSync);
-    _bgSync =
-        std::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogApplier.get());
+    _bgSync = std::make_unique<BackgroundSync>(
+        replCoord, this, _replicationProcess, _oplogWriter.get(), _oplogApplier.get());
 
     LOGV2(21299, "Starting replication fetcher thread");
     _bgSync->startup(opCtx);
+
+    if (useOplogWriter) {
+        LOGV2(8569800, "Starting replication writer thread");
+        _oplogWriterShutdownFuture = _oplogWriter->startup();
+    }
 
     LOGV2(21300, "Starting replication applier thread");
     _oplogApplierShutdownFuture = _oplogApplier->startup();
@@ -310,10 +353,13 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     _stoppingDataReplication = true;
 
     auto oldSSF = std::move(_syncSourceFeedbackThread);
-    auto oldOplogBuffer = std::move(_oplogBuffer);
+    auto oldWriteBuffer = std::move(_oplogWriteBuffer);
+    auto oldApplyBuffer = std::move(_oplogApplyBuffer);
     auto oldBgSync = std::move(_bgSync);
+    auto oldWriter = std::move(_oplogWriter);
     auto oldApplier = std::move(_oplogApplier);
     auto oldWriterPool = std::move(_writerPool);
+    auto oldWriterExecutor = std::move(_oplogWriterTaskExecutor);
     auto oldApplierExecutor = std::move(_oplogApplierTaskExecutor);
     lock.unlock();
 
@@ -330,28 +376,38 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
         oldBgSync->shutdown(opCtx);
     }
 
+    if (oldWriter) {
+        LOGV2(8569801, "Stopping replication writer thread");
+        oldWriter->shutdown();
+    }
+
     if (oldApplier) {
         LOGV2(21304, "Stopping replication applier thread");
         oldApplier->shutdown();
     }
 
-    // Clear the buffer. This unblocks the OplogFetcher if it is blocked with a full queue, but
-    // ensures that it won't add anything. It will also unblock the OplogApplier pipeline if it
-    // is waiting for an operation to be past the secondaryDelaySecs point.
-    if (oldOplogBuffer) {
-        oldOplogBuffer->clear(opCtx);
+    // Shutdown the buffers. This unblocks the OplogFetcher if it is blocked with a full queue,
+    // but ensures that it won't add anything. It will also unblock the OplogApplier pipeline
+    // if it is waiting for an operation to be past the secondaryDelaySecs point.
+    // TODO (SERVER-87720): Drain apply buffer on clean shutdown.
+    if (oldWriteBuffer) {
+        oldWriteBuffer->shutdown(opCtx);
+    }
+
+    if (oldApplyBuffer) {
+        oldApplyBuffer->shutdown(opCtx);
     }
 
     if (oldBgSync) {
         oldBgSync->join(opCtx);
     }
 
-    if (oldApplier) {
-        _oplogApplierShutdownFuture.get();
+    if (oldWriter) {
+        _oplogWriterShutdownFuture.get();
     }
 
-    if (oldOplogBuffer) {
-        oldOplogBuffer->shutdown(opCtx);
+    if (oldApplier) {
+        _oplogApplierShutdownFuture.get();
     }
 
     // Once the writer pool's shutdown() is called, scheduling new tasks will return error, so
@@ -362,8 +418,14 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
         oldWriterPool->join();
     }
 
+    if (oldWriterExecutor) {
+        LOGV2(8569802, "Stopping replication writer executor threads");
+        oldWriterExecutor->shutdown();
+        oldWriterExecutor->join();
+    }
+
     if (oldApplierExecutor) {
-        LOGV2(21307, "Stopping replication storage threads");
+        LOGV2(8569803, "Stopping replication applier executor threads");
         oldApplierExecutor->shutdown();
         oldApplierExecutor->join();
     }
@@ -392,11 +454,14 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     LOGV2(21306, "Starting replication storage threads");
     _service->getStorageEngine()->setJournalListener(this);
 
+    _oplogWriterTaskExecutor = makeTaskExecutor(_service, "OplogWriterExecutorPool", "OplogWriter");
+    _oplogWriterTaskExecutor->startup();
+
     _oplogApplierTaskExecutor =
-        makeTaskExecutor(_service, "OplogApplierThreadPool", "OplogApplier");
+        makeTaskExecutor(_service, "OplogApplierExecutorPool", "OplogApplier");
     _oplogApplierTaskExecutor->startup();
 
-    _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternThreadPool", "ReplCoordExtern");
+    _taskExecutor = makeTaskExecutor(_service, "ReplCoordExternExecutorPool", "ReplCoordExtern");
     _taskExecutor->startup();
 
     _writerPool = makeReplWriterPool();
@@ -413,6 +478,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     _stopDataReplication_inlock(opCtx, lk);
 
+    LOGV2(21307, "Stopping replication storage threads");
     _taskExecutor->shutdown();
     lk.unlock();
 
@@ -509,9 +575,11 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(AdmissionContext::get(opCtx).getPriority() == AdmissionContext::Priority::kExempt,
               "Replica Set state changes are critical to the cluster and should not be throttled");
-    // TODO(SERVER-85698): Also exit drain mode for the writer buffer.
-    if (_oplogBuffer) {
-        _oplogBuffer->exitDrainMode();
+
+    if (_oplogWriteBuffer) {
+        _oplogWriteBuffer->exitDrainMode();
+    } else if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->exitDrainMode();
     }
 }
 
@@ -1161,17 +1229,26 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
     if (_bgSync) {
         _bgSync->stop(false);
     }
-    // TODO(SERVER-85698): Only drain the writer buffer here.
-    if (_oplogBuffer) {
-        _oplogBuffer->enterDrainMode();
+
+    // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
+    // We only need to put write buffer in drain mode in this case as the apply buffer will
+    // be put into drain mode by the writer when it sees that the write buffer is drained.
+    if (_oplogWriteBuffer) {
+        _oplogWriteBuffer->enterDrainMode();
+    } else if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->enterDrainMode();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
     stdx::lock_guard<Latch> lk(_threadMutex);
-    // TODO(SERVER-85698): Also exit drain mode for the writer buffer.
-    if (_oplogBuffer) {
-        _oplogBuffer->exitDrainMode();
+    // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
+    // We only need to call exitDrainMode() on write buffer in this case as the apply buffer
+    // will call exitDrainMode() by the writer after it exits drain mode.
+    if (_oplogWriteBuffer) {
+        _oplogWriteBuffer->exitDrainMode();
+    } else if (_oplogApplyBuffer) {
+        _oplogApplyBuffer->exitDrainMode();
     }
     if (_bgSync) {
         _bgSync->startProducerIfStopped();

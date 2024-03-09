@@ -43,6 +43,7 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
+#include "mongo/db/repl/oplog_writer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
@@ -97,6 +98,7 @@ public:
     BackgroundSync(ReplicationCoordinator* replicationCoordinator,
                    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    ReplicationProcess* replicationProcess,
+                   OplogWriter* oplogWriter,
                    OplogApplier* oplogApplier);
 
     // stop syncing (when this node becomes a primary, e.g.)
@@ -232,6 +234,11 @@ private:
     // Internal version of notifySyncSourceSelectionDataChanged(), to be used by callers
     // which already hold _mutex.
     void _notifySyncSourceSelectionDataChanged(WithLock);
+
+    // This OplogWriter writes oplog entries fetched from the sync source and
+    // feeds them to the OplogApplier.
+    // Note: Could be null if featureFlagReduceMajorityWriteLatency is not enabled.
+    OplogWriter* const _oplogWriter;
 
     // This OplogApplier applies oplog entries fetched from the sync source.
     OplogApplier* const _oplogApplier;

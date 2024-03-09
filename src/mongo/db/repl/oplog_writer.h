@@ -57,12 +57,20 @@ public:
         const bool skipWritesToOplogColl;
     };
 
+    // Used to report oplog write progress.
+    class Observer;
+
     /**
      * Constructs this OplogWriter with specific options.
      */
     OplogWriter(executor::TaskExecutor* executor, OplogBuffer* writeBuffer, const Options& options);
 
     virtual ~OplogWriter() = default;
+
+    /**
+     * Returns this writer's input buffer.
+     */
+    OplogBuffer* getBuffer() const;
 
     /**
      * Starts this OplogWriter.
@@ -80,6 +88,14 @@ public:
      * Returns true if this OplogWriter is shutting down.
      */
     bool inShutdown() const;
+
+    /**
+     * Pushes operations read into oplog buffer.
+     */
+    void enqueue(OperationContext* opCtx,
+                 OplogBuffer::Batch::const_iterator begin,
+                 OplogBuffer::Batch::const_iterator end,
+                 boost::optional<std::size_t> bytes = boost::none);
 
     /**
      * Writes a batch of oplog entries to the oplog and/or the change collection.
@@ -123,6 +139,28 @@ private:
     // Configures this OplogWriter.
     const Options _options;
 };
+
+/**
+ * The OplogWriter reports its progress using the Observer interface.
+ */
+class OplogWriter::Observer {
+public:
+    virtual ~Observer() = default;
+
+    virtual void onWriteOplogCollection(const std::vector<InsertStatement>& docs) = 0;
+    virtual void onWriteChangeCollection(const std::vector<InsertStatement>& docs) = 0;
+};
+
+/**
+ * An Observer implementation that does nothing.
+ */
+class NoopOplogWriterObserver : public OplogWriter::Observer {
+public:
+    void onWriteOplogCollection(const std::vector<InsertStatement>& docs) final {}
+    void onWriteChangeCollection(const std::vector<InsertStatement>& docs) final {}
+};
+
+extern NoopOplogWriterObserver noopOplogWriterObserver;
 
 }  // namespace repl
 }  // namespace mongo

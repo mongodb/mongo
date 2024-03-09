@@ -219,8 +219,9 @@ public:
 
         repl::OplogApplier::Options oplogApplierOptions(
             repl::OplogApplication::Mode::kSecondary,
-            false /*allowNamespaceNotFoundErrorsOnCrudOps*/,
-            false /*skipWritesToOplog*/);  // Write oplog
+            false /* allowNamespaceNotFoundErrorsOnCrudOps */,
+            false /* skipWritesToOplog */,
+            false /* skipWritesToChangeCollection */);
         _oplogApplier = std::make_unique<repl::OplogApplierImpl>(nullptr,
                                                                  _oplogBuffer.get(),
                                                                  &repl::noopOplogApplierObserver,

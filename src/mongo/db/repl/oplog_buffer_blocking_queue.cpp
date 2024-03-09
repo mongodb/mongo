@@ -235,6 +235,11 @@ void OplogBufferBlockingQueue::exitDrainMode() {
     _drainMode = false;
 }
 
+bool OplogBufferBlockingQueue::inDrainModeAndEmpty() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _drainMode && _queue.empty();
+}
+
 void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk,
                                                     std::size_t size) {
     invariant(size > 0);

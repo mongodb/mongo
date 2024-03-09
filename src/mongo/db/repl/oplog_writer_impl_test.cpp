@@ -160,14 +160,13 @@ JournalListenerMock* OplogWriterImplTest::getJournalListener() const {
 }
 
 DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
-    OplogWriterImpl::NoopObserver noopObserver;
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
                                 _writerPool.get(),
-                                &noopObserver,
+                                &noopOplogWriterObserver,
                                 OplogWriter::Options());
 
     // Writing an empty batch should hit an invariant.
@@ -264,14 +263,13 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollection) {
 }
 
 TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
-    OplogWriterImpl::NoopObserver noopObserver;
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
                                 _writerPool.get(),
-                                &noopObserver,
+                                &noopOplogWriterObserver,
                                 OplogWriter::Options());
 
     auto curOpTime = OpTime(Timestamp(2, 2), 1);
@@ -286,7 +284,7 @@ TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
     Date_t newWallTime = curWallTime + Seconds(10);
     OpTimeAndWallTime newOpTimeAndWallTime{newOpTime, newWallTime};
 
-    oplogWriter.finalizeOplogBatch(opCtx(), newOpTimeAndWallTime);
+    oplogWriter.finalizeOplogBatch(opCtx(), newOpTimeAndWallTime, true);
 
     // The finalizeOplogBatch() function only triggers the journal flusher but does not
     // wait for it, so we sleep for a while and verify that the lastWritten opTime has

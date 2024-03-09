@@ -136,9 +136,9 @@ public:
         _drainMode = false;
     }
 
-    bool inDrainMode() {
+    bool inDrainModeAndEmpty() {
         stdx::lock_guard<Latch> lk(_mutex);
-        return _drainMode;
+        return _drainMode && _queue.empty();
     }
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogWriterBufferMock::mutex");
@@ -189,6 +189,7 @@ public:
 protected:
     ServiceContext* _serviceContext;
     ServiceContext::UniqueOperationContext _opCtxHolder;
+    OplogWriterBatcher::BatchLimits _limits;
 };
 
 void OplogWriterBatcherTest::setUp() {
@@ -199,9 +200,13 @@ void OplogWriterBatcherTest::setUp() {
     ReplicationCoordinator::set(_serviceContext,
                                 std::make_unique<ReplicationCoordinatorMock>(_serviceContext));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    _limits.minBytes = 16 * 1024 * 1024;             // 16MB
+    _limits.maxBytes = _limits.minBytes + 4 * 1024;  // 16MB + 4K
 }
 
 void OplogWriterBatcherTest::tearDown() {
+    _limits = {};
     _opCtxHolder = {};
     ServiceContextMongoDTest::tearDown();
 }
@@ -218,7 +223,7 @@ TEST_F(OplogWriterBatcherTest, EmptyBuffer) {
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
 
-    ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1)).empty());
+    ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).empty());
 }
 
 TEST_F(OplogWriterBatcherTest, MergeBatches) {
@@ -231,7 +236,7 @@ TEST_F(OplogWriterBatcherTest, MergeBatches) {
     writerBuffer.push_forTest(batch1);
     writerBuffer.push_forTest(batch2);
 
-    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1)).releaseBatch();
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).releaseBatch();
     ASSERT_EQ(3, batch.size());
 }
 
@@ -242,33 +247,26 @@ TEST_F(OplogWriterBatcherTest, WriterBatchSizeInBytes) {
     OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
     OplogWriterBatch batch2({makeNoopOplogEntry(Seconds(123))}, 1);
     OplogWriterBatch batch3({makeNoopOplogEntry(Seconds(123))}, 1);
-    OplogWriterBatch batch4({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
+    OplogWriterBatch batch4({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes);
     writerBuffer.push_forTest(batch1);
     writerBuffer.push_forTest(batch2);
     writerBuffer.push_forTest(batch3);
     writerBuffer.push_forTest(batch4);
 
-    // Once we can form a batch whose bytes size in (16MB, 32MB], we return immediately.
-    ASSERT_EQ(16 * 1024 * 1024 + 1, writerBatcher.getNextBatch(opCtx(), Seconds(1)).byteSize());
-    ASSERT_EQ(16 * 1024 * 1024 + 1, writerBatcher.getNextBatch(opCtx(), Seconds(1)).byteSize());
-    ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1)).empty());
-}
-
-DEATH_TEST_F(OplogWriterBatcherTest, BatchFromBufferSizeLimit, "batchSize <= kMinWriterBatchSize") {
-    OplogWriterBufferMock writerBuffer;
-    OplogWriterBatcher writerBatcher(&writerBuffer);
-
-    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/ + 1);
-    writerBuffer.push_forTest(batch1);
-
-    writerBatcher.getNextBatch(opCtx(), Seconds(1));
+    // Once we can form a batch with byte size in (_limits.minBytes, _limits.maxBytes], we should
+    // return immediately.
+    ASSERT_EQ(_limits.minBytes + 1,
+              writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).byteSize());
+    ASSERT_EQ(_limits.minBytes + 1,
+              writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).byteSize());
+    ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).empty());
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherWillReturnNewBatchInBufferWhenNoDataAvailable) {
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
 
-    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
+    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes);
 
     stdx::thread pushBufferThread([&]() {
         Client::initThread("pushBufferThread", getGlobalServiceContext()->getService());
@@ -278,19 +276,19 @@ TEST_F(OplogWriterBatcherTest, BatcherWillReturnNewBatchInBufferWhenNoDataAvaila
     });
 
     // Make the maxWaitTime longer to give another thread enough time to push data into buffer.
-    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(10));
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(10), _limits);
 
     pushBufferThread.join();
 
-    ASSERT_EQ(16 * 1024 * 1024, batch.byteSize());
+    ASSERT_EQ(_limits.minBytes, batch.byteSize());
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherWillNotWaitForMoreDataWhenAlreadyHaveBatch) {
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
 
-    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
-    OplogWriterBatch batch2({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
+    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes);
+    OplogWriterBatch batch2({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes);
     writerBuffer.push_forTest(batch1);
 
     stdx::thread pushBufferThread([&]() {
@@ -301,12 +299,12 @@ TEST_F(OplogWriterBatcherTest, BatcherWillNotWaitForMoreDataWhenAlreadyHaveBatch
     });
 
     // Make the maxWaitTime longer to give another thread enough time to push data into buffer.
-    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(10));
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(10), _limits);
 
     pushBufferThread.join();
 
     // The batcher should not wait for the batch pushed by pushBufferThread.
-    ASSERT_EQ(16 * 1024 * 1024, batch.byteSize());
+    ASSERT_EQ(_limits.minBytes, batch.byteSize());
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecs) {
@@ -321,17 +319,17 @@ TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecs) {
     // all entries pass secondaryDelaySecs to return.
     OplogWriterBatch batch1(
         {makeNoopOplogEntry(Seconds(startTime - 100)), makeNoopOplogEntry(Seconds(startTime))},
-        16 * 1024 * 1024 /*16MB*/);
+        _limits.minBytes);
     writerBuffer.push_forTest(batch1);
 
     for (auto i = 0; i < 5; i++) {
-        ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1)).empty());
+        ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits).empty());
     }
 
     // Set SecondaryDelaySecs to a small number, then we can get the batch.
     dynamic_cast<ReplicationCoordinatorMock*>(getReplCoord())->setSecondaryDelaySecs(Seconds(5));
 
-    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
     auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
     ASSERT_TRUE(endTime - startTime >= 5);
 }
@@ -345,14 +343,13 @@ TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecsReturnFirstBatch) {
 
     // If we have two batches from the buffer that can be merged into one and the second batch
     // doesn't meet secondaryDelaySecs, we should return the first batch immediately.
-    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(startTime - 100))},
-                            16 * 1024 * 1024 /*16MB*/);
-    OplogWriterBatch batch2({makeNoopOplogEntry(Seconds(startTime))}, 16 * 1024 * 1024 /*16MB*/);
+    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(startTime - 100))}, _limits.minBytes);
+    OplogWriterBatch batch2({makeNoopOplogEntry(Seconds(startTime))}, _limits.minBytes);
     writerBuffer.push_forTest(batch1);
     writerBuffer.push_forTest(batch2);
 
-    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
-    ASSERT_EQ(16 * 1024 * 1024, batch.byteSize());
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
+    ASSERT_EQ(_limits.minBytes, batch.byteSize());
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherCheckDraining) {
@@ -364,7 +361,7 @@ TEST_F(OplogWriterBatcherTest, BatcherCheckDraining) {
     // inside.
     for (auto i = 0; i < 5; i++) {
         auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
-        auto drainedBatch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+        auto drainedBatch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
         ASSERT_TRUE(drainedBatch.exhausted());
         auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
         ASSERT_TRUE(endTime - startTime >= 1);
@@ -372,17 +369,17 @@ TEST_F(OplogWriterBatcherTest, BatcherCheckDraining) {
 
     // Exit drain mode and the batcher should be able to get the batch from the buffer.
     writerBuffer.exitDrainMode();
-    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
+    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes);
     writerBuffer.push_forTest(batch1);
-    auto batch = writerBatcher.getNextBatch(opCtx(), Days(1));
+    auto batch = writerBatcher.getNextBatch(opCtx(), Days(1), _limits);
     ASSERT_FALSE(batch.exhausted());
-    ASSERT_EQ(16 * 1024 * 1024, batch.byteSize());
+    ASSERT_EQ(_limits.minBytes, batch.byteSize());
 
     // Draining again, should still work.
     writerBuffer.enterDrainMode();
     for (auto i = 0; i < 5; i++) {
         auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
-        auto drainedBatch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+        auto drainedBatch = writerBatcher.getNextBatch(opCtx(), Seconds(1), _limits);
         ASSERT_TRUE(drainedBatch.exhausted());
         auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
         ASSERT_TRUE(endTime - startTime >= 1);

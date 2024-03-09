@@ -53,26 +53,6 @@ class OplogWriterImpl : public OplogWriter {
 
 public:
     /**
-     * The OplogWriter reports its progress using the Observer interface.
-     */
-    class Observer {
-    public:
-        virtual ~Observer() = default;
-
-        virtual void onWriteOplogCollection(const std::vector<InsertStatement>& docs) = 0;
-        virtual void onWriteChangeCollection(const std::vector<InsertStatement>& docs) = 0;
-    };
-
-    /**
-     * An Observer implementation that does nothing.
-     */
-    class NoopObserver : public Observer {
-    public:
-        void onWriteOplogCollection(const std::vector<InsertStatement>& docs) final {}
-        void onWriteChangeCollection(const std::vector<InsertStatement>& docs) final {}
-    };
-
-    /**
      * Constructs this OplogWriter with specific options.
      */
     OplogWriterImpl(executor::TaskExecutor* executor,
@@ -105,7 +85,8 @@ public:
      * components that care about the opTime of the last op written in this batch.
      */
     void finalizeOplogBatch(OperationContext* opCtx,
-                            const OpTimeAndWallTime& lastOpTimeAndWallTime);
+                            const OpTimeAndWallTime& lastOpTimeAndWallTime,
+                            bool flushJournal);
 
 private:
     using writeDocsFn = std::function<Status(OperationContext*,
@@ -139,6 +120,8 @@ private:
 
     // Not owned by us.
     Observer* const _observer;
+
+    bool _applyBufferInDrainMode = false;
 };
 
 }  // namespace repl

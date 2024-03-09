@@ -225,8 +225,9 @@ public:
         // do not include in the benchmark the time to write to the oplog.
         repl::OplogApplier::Options oplogApplierOptions(
             repl::OplogApplication::Mode::kSecondary,
-            false /*allowNamespaceNotFoundErrorsOnCrudOps*/,
-            true /*skipWritesToOplog*/);
+            false /* allowNamespaceNotFoundErrorsOnCrudOps */,
+            true /* skipWritesToOplog */,
+            true /* skipWritesToChangeCollection */);
         _oplogApplier = std::make_unique<repl::OplogApplierImpl>(nullptr,
                                                                  _oplogBuffer.get(),
                                                                  &repl::noopOplogApplierObserver,

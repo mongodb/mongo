@@ -112,6 +112,7 @@ void OplogWriterImpl::_run() {
     // arbiterOnly field for any member.
     invariant(!_replCoord->getMemberState().arbiter());
 
+    const auto flushJournal = !getGlobalServiceContext()->getStorageEngine()->isEphemeral();
     const auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
@@ -129,25 +130,30 @@ void OplogWriterImpl::_run() {
         }
 
         // Transition to SECONDARY state, if possible.
+        // TODO (SERVER-87675): investigate if this should be called here.
         _replCoord->finishRecoveryIfEligible(opCtx);
 
         auto batch = _batcher.getNextBatch(opCtx, Seconds(1));
-        auto ops = batch.releaseBatch();
+
+        // Signal the apply buffer to enter or exit drain mode if it is not.
+        if (_applyBufferInDrainMode != batch.exhausted()) {
+            if (_applyBufferInDrainMode) {
+                _applyBuffer->exitDrainMode();
+            } else {
+                _applyBuffer->enterDrainMode();
+            }
+            _applyBufferInDrainMode = batch.exhausted();
+        }
+
         if (batch.empty()) {
             if (inShutdown()) {
                 return;
             }
-
-            if (batch.exhausted()) {
-                // The batcher is seeing the writer buffer in draining mode, so we signal the
-                // applier buffer to enter drain mode.
-                _applyBuffer->enterDrainMode();
-            }
-
             continue;
         }
 
         // Extract the opTime and wallTime of the last op in the batch.
+        auto ops = batch.releaseBatch();
         auto lastOpTimeAndWallTime =
             invariantStatusOK(OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(ops.back()));
 
@@ -161,7 +167,7 @@ void OplogWriterImpl::_run() {
         invariant(swLastOpTime.getValue() == lastOpTimeAndWallTime.opTime);
 
         // Update various things that care about our last written optime.
-        finalizeOplogBatch(opCtx, lastOpTimeAndWallTime);
+        finalizeOplogBatch(opCtx, lastOpTimeAndWallTime, flushJournal);
 
         // Push the entries to the applier's buffer, may be blocked if buffer is full.
         _applyBuffer->push(opCtx, ops.begin(), ops.end());
@@ -183,35 +189,26 @@ StatusWith<OpTime> OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
         docs.emplace_back(InsertStatement{op, opTime.getTimestamp(), opTime.getTerm()});
     }
 
-    // Write to the change collection in a separate thread and separate storage transaction.
-    // This step can be skipped if not running in serverless.
-    if (writeChangeCollection) {
-        _writerPool->schedule([this, &docs](auto status) {
-            invariant(status);
-            auto newOpCtx = cc().makeOperationContext();
-            _writeOplogBatchImpl(newOpCtx.get(), docs, changeCollNss, insertDocsToChangeCollection);
-            _observer->onWriteChangeCollection(docs);
-        });
-    }
-
-    // Write to the oplog collection in the current thread to avoid thread pool overheads.
-    // This step can be skipped during startup recovery.
+    // Write to the oplog collection, this step will be skipped during startup recovery.
     if (!getOptions().skipWritesToOplogColl) {
         _writeOplogBatchImpl(
             opCtx, docs, NamespaceString::kRsOplogNamespace, insertDocsToOplogCollection);
         _observer->onWriteOplogCollection(docs);
     }
 
-    // Wait for writes to the serverless change collection to complete.
+    // Write to the change collection in a separate storage transaction, this step can be
+    // skipped if not running in serverless.
     if (writeChangeCollection) {
-        _writerPool->waitForIdle();
+        _writeOplogBatchImpl(opCtx, docs, changeCollNss, insertDocsToChangeCollection);
+        _observer->onWriteChangeCollection(docs);
     }
 
     return docs.back().oplogSlot;
 }
 
 void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
-                                         const OpTimeAndWallTime& lastOpTimeAndWallTime) {
+                                         const OpTimeAndWallTime& lastOpTimeAndWallTime,
+                                         bool flushJournal) {
     // 1. Update oplog visibility by notifying the storage engine of the latest opTime.
     _storageInterface->oplogDiskLocRegister(
         opCtx, lastOpTimeAndWallTime.opTime.getTimestamp(), true /* orderedCommit */);
@@ -219,10 +216,13 @@ void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
     // 2. Advance the lastWritten opTime to the last opTime in batch.
     _replCoord->setMyLastWrittenOpTimeAndWallTimeForward(lastOpTimeAndWallTime);
 
-    // 3. Trigger the journal flusher. This should be done after the lastWritten opTime
-    // is advanced because the journal flusher will first read lastWritten and advances
-    // lastDurable to lastWritten upon finish.
-    JournalFlusher::get(opCtx)->triggerJournalFlush();
+    // 3. Trigger the journal flusher.
+    // This should be done after the lastWritten opTime is advanced because the journal
+    // flusher will first read lastWritten and later advance lastDurable to lastWritten
+    // upon finish.
+    if (flushJournal) {
+        JournalFlusher::get(opCtx)->triggerJournalFlush();
+    }
 }
 
 void OplogWriterImpl::_writeOplogBatchImpl(OperationContext* opCtx,

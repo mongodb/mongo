@@ -78,6 +78,7 @@ public:
     // that no items are added to the queue while in drain mode; this is enforced by invariant().
     void enterDrainMode() final;
     void exitDrainMode() final;
+    bool inDrainModeAndEmpty() final;
 
 private:
     void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size);

@@ -349,8 +349,12 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
     while (true) {
         globalFailPointRegistry().find("rsSyncApplyStop")->pauseWhileSet();
 
-        batchLimits.secondaryDelaySecsLatestTimestamp =
-            _calculateSecondaryDelaySecsLatestTimestamp();
+        // When featureFlagReduceMajorityWriteLatency is enabled, OplogWriter takes care of this.
+        if (!feature_flags::gReduceMajorityWriteLatency.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            batchLimits.secondaryDelaySecsLatestTimestamp =
+                _calculateSecondaryDelaySecsLatestTimestamp();
+        }
 
         // Check the limits once per batch since users can change them at runtime.
         batchLimits.ops = getBatchLimitOplogEntries();
@@ -409,23 +413,27 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
         // draining the OplogBuffer and should notify the OplogApplier to signal draining is
         // complete.
         if (ops.empty() && !ops.mustShutdown()) {
-            // Store the current term. It's checked in signalDrainComplete() to detect if the node
-            // has stepped down and stepped back up again. See the declaration of
-            // signalDrainComplete() for more details.
-            auto replCoord = ReplicationCoordinator::get(cc().getServiceContext());
-            auto termWhenBufferIsEmpty = replCoord->getTerm();
-
             // Draining state guarantees the producer has already been fully stopped and no more
             // operations will be pushed in to the oplog buffer until the applier state changes.
-            auto isDraining =
-                replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining ||
-                replCoord->getApplierState() ==
-                    ReplicationCoordinator::ApplierState::DrainingForShardSplit;
-
             // Check the oplog buffer after the applier state to ensure the producer is stopped.
-            if (isDraining && _oplogBuffer->isEmpty()) {
-                ops.setTermWhenExhausted(termWhenBufferIsEmpty);
-                LOGV2(21239, "Oplog buffer has been drained", "term"_attr = termWhenBufferIsEmpty);
+            if (_oplogBuffer->inDrainModeAndEmpty()) {
+                // Store the current term. It's checked in signalDrainComplete() to detect if the
+                // node has stepped down and stepped back up again. See the declaration of
+                // signalDrainComplete() for more details.
+                auto replCoord = ReplicationCoordinator::get(cc().getServiceContext());
+                auto termWhenExhausted = replCoord->getTerm();
+                auto applierState = replCoord->getApplierState();
+
+                // Normally checking the oplog buffer in drain mode and empty is sufficient, but
+                // when featureFlagReduceMajorityWriteLatency is enabled, the OplogWriter might
+                // take up to 1 second to notify this buffer to exit drain mode. So we check the
+                // source of truth here as well to avoid unnecessarily setting termWhenExhausted
+                // that causes a flood of log lines and signalDrainComplete() calls.
+                if (applierState == ReplicationCoordinator::ApplierState::Draining ||
+                    applierState == ReplicationCoordinator::ApplierState::DrainingForShardSplit) {
+                    ops.setTermWhenExhausted(termWhenExhausted);
+                    LOGV2(21239, "Oplog buffer has been drained", "term"_attr = termWhenExhausted);
+                }
             } else {
                 // Don't emit empty batches.
                 continue;

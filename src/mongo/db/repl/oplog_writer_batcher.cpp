@@ -38,8 +38,13 @@ namespace mongo {
 namespace repl {
 
 namespace {
-const auto kMinWriterBatchSize = 16 * 1024 * 1024;  // 16MB
-const auto kMaxWriterBatchSize = 32 * 1024 * 1024;  // 32MB
+
+// The default batch limits used for steady state replication.
+const OplogWriterBatcher::BatchLimits defaultBatchLimits{
+    BSONObjMaxInternalSize,                          // 16MB + margin
+    BSONObjMaxInternalSize + BSONObjMaxInternalSize  // 32MB + margin
+};
+
 }  // namespace
 
 OplogWriterBatcher::OplogWriterBatcher(OplogBuffer* oplogBuffer) : _oplogBuffer(oplogBuffer) {}
@@ -47,37 +52,45 @@ OplogWriterBatcher::OplogWriterBatcher(OplogBuffer* oplogBuffer) : _oplogBuffer(
 OplogWriterBatcher::~OplogWriterBatcher() {}
 
 OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seconds maxWaitTime) {
+    return getNextBatch(opCtx, maxWaitTime, defaultBatchLimits);
+}
+
+OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx,
+                                                  Seconds maxWaitTime,
+                                                  const BatchLimits& batchLimits) {
     std::vector<OplogWriterBatch> batches;
     OplogWriterBatch batch;
     size_t totalBytes = 0;
     size_t totalOps = 0;
+    bool exhausted = false;
     auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp();
-    bool drained = false;
 
     while (true) {
         while (_pollFromBuffer(opCtx, &batch, delaySecsLatestTimestamp)) {
             auto batchSize = batch.byteSize();
-            invariant(batchSize <= kMinWriterBatchSize);
+            if (batchSize > BSONObjMaxInternalSize) {
+                LOGV2_WARNING(8569805,
+                              "Received an oplog batch larger than maximum",
+                              "batchSizeBytes"_attr = batchSize,
+                              "maxBatchSizeBytes"_attr = BSONObjMaxInternalSize);
+            }
             totalBytes += batchSize;
             totalOps += batch.count();
             batches.push_back(std::move(batch));
             // Once the total bytes is between 16MB and 32MB, we return it as a writer batch. This
             // may not be optimistic on size but we can avoid waiting the next batch coming before
             // deciding whether we can return.
-            if (totalBytes > kMinWriterBatchSize) {
-                invariant(totalBytes <= kMaxWriterBatchSize);
+            if (totalBytes > batchLimits.minBytes) {
                 break;
             }
         }
 
         if (!batches.empty()) {
-            // Once we get a non-empty batch, meaning the buffer is no longer in draining mode.
-            _enteredDraining = false;
             break;
         }
 
         if (!_waitForData(opCtx, maxWaitTime)) {
-            drained = _processDrainingIfNecessary();
+            exhausted = _oplogBuffer->inDrainModeAndEmpty();
             break;
         }
     }
@@ -85,7 +98,7 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Secon
     // We can't wait for any data from the buffer, return an empty batch.
     if (batches.empty()) {
         OplogWriterBatch batch;
-        if (drained) {
+        if (exhausted) {
             batch.setExhausted();
         }
         return batch;
@@ -178,20 +191,6 @@ boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTi
     }
     auto fastClockSource = service->getFastClockSource();
     return fastClockSource->now() - secondaryDelaySecs;
-}
-
-bool OplogWriterBatcher::_processDrainingIfNecessary() {
-    if (_oplogBuffer->inDrainMode() && _oplogBuffer->isEmpty()) {
-        if (_enteredDraining) {
-            // If we are already in drain mode, the underlying buffer will return an empty batch
-            // immediately, so we sleep 1s to avoid the writer thread busy waiting on the buffer.
-            sleepsecs(1);
-        } else {
-            _enteredDraining = true;
-        }
-        return true;
-    }
-    return false;
 }
 
 }  // namespace repl

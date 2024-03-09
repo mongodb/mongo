@@ -204,7 +204,10 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    virtual bool inDrainMode() {
+    /**
+     * Returns true if this buffer is in drain mode and empty.
+     */
+    virtual bool inDrainModeAndEmpty() {
         MONGO_UNIMPLEMENTED;
     }
 };

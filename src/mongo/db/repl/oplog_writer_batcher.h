@@ -40,6 +40,12 @@ class OplogWriterBatcher {
     OplogWriterBatcher& operator=(const OplogWriterBatcher&) = delete;
 
 public:
+    class BatchLimits {
+    public:
+        size_t minBytes;
+        size_t maxBytes;
+    };
+
     OplogWriterBatcher(OplogBuffer* oplogBuffer);
     ~OplogWriterBatcher();
 
@@ -47,6 +53,9 @@ public:
     // buffer is empty, the batcher will wait for the next batch until the maxWaitTime timeout is
     // hit, so this function can return an empty batch.
     OplogWriterBatch getNextBatch(OperationContext* opCtx, Seconds maxWaitTime);
+    OplogWriterBatch getNextBatch(OperationContext* opCtx,
+                                  Seconds maxWaitTime,
+                                  const BatchLimits& batchLimits);
 
 private:
     /**
@@ -77,11 +86,6 @@ private:
                          OplogWriterBatch* batch,
                          boost::optional<Date_t>& delaySecsLatestTimestamp);
 
-    /**
-     * Check if applier is Draining. If so, wait to avoid caller busy waiting if needed.
-     */
-    bool _processDrainingIfNecessary();
-
 private:
     // This should be a OplogBuffer that supports batch operations.
     // Not owned by us.
@@ -90,9 +94,6 @@ private:
     // Keep the last batch from buffer when the batch is not passing secondaryDelaySecs. This will
     // be reset to null once that batch passes secondaryDelaySecs and return to the caller.
     boost::optional<OplogWriterBatch> _stashedBatch = boost::none;
-
-    // Indicates whether we already see the oplogBuffer in drain mode.
-    bool _enteredDraining = false;
 };
 
 }  // namespace repl
