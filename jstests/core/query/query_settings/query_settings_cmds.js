@@ -207,24 +207,43 @@ testQuerySettingsParameterized({
     aggregate: {querySettingsA: {reject: true}, querySettingsB: {reject: true}}
 });
 
-// Test changing reject, with an unrelated setting present to allow it to be changed to false.
-const unrelated = {
-    indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}
-};
-testQuerySettingsParameterized({
-    find: {
-        querySettingsA: {...unrelated, reject: true},
-        querySettingsB: {...unrelated, reject: false}
-    },
-    distinct: {
-        querySettingsA: {...unrelated, reject: true},
-        querySettingsB: {...unrelated, reject: false}
-    },
-    aggregate: {
-        querySettingsA: {...unrelated, reject: true},
-        querySettingsB: {...unrelated, reject: false}
+// Test changing reject with an unrelated setting present. Additionally test that 'setQuerySettings'
+// with 'reject' is idempotent.
+{
+    const unrelatedSettings = {indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}};
+    const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
+
+    for (const reject of [true, false]) {
+        qsutils.assertQueryShapeConfiguration([]);
+
+        // Repeat the following 'setQuerySettings' command twice to test the retryability. The first
+        // call inserts new query settings for 'query'. The second call updates the query
+        // settings with the same value.
+        for (const op in [`insert with reject: ${reject}`, `update with reject: ${reject}`]) {
+            assert.commandWorked(
+                db.adminCommand(
+                    {setQuerySettings: query, settings: {...unrelatedSettings, reject}}),
+                `the 'setQuerySettings' ${op} operation failed`);
+            qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(
+                {...unrelatedSettings, ...(reject && {reject})}, query)]);
+        }
+
+        // Repeat the following 'setQuerySettings' command twice to test the retryability. The first
+        // command updates the 'reject' setting with the opposite value. The second call updates the
+        // query settings with the same value.
+        for (const op in [`update with reject: ${!reject}`, `update with reject: ${!reject}`]) {
+            assert.commandWorked(
+                db.adminCommand(
+                    {setQuerySettings: query, settings: {...unrelatedSettings, reject: !reject}}),
+                `the 'setQuerySettings' ${op} operation failed`);
+            qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(
+                {...unrelatedSettings, ...(!reject && {reject: !reject})}, query)]);
+        }
+
+        db.adminCommand({removeQuerySettings: query});
+        qsutils.assertQueryShapeConfiguration([]);
     }
-});
+}
 
 // Test that making QuerySettings empty via setQuerySettings fails.
 {

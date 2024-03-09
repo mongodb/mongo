@@ -112,9 +112,7 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
 
 void simplifyQuerySettings(QuerySettings& settings) {
     // If reject is present, but is false, set to an empty optional.
-    // This is not strictly necessary, as isEmpty treats OptionalBool(false)
-    // as empty.
-    if (!settings.getReject().has_value()) {
+    if (settings.getReject().has_value() && !settings.getReject()) {
         settings.setReject({});
     }
 }
