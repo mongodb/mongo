@@ -61,6 +61,9 @@ export var FeatureFlagUtil = (function() {
             conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
         assert(fcvDoc.hasOwnProperty("featureCompatibilityVersion"), fcvDoc);
 
+        assert(!featureFlag.startsWith("featureFlag"),
+               `unexpected prefix in feature flag name: "${featureFlag}". Use "${
+                   featureFlag.replace(/^featureFlag/, '')}" instead.`);
         const fullFlagName = `featureFlag${featureFlag}`;
         const flagDoc = conn.adminCommand({getParameter: 1, [fullFlagName]: 1});
         if (!flagDoc.ok || !flagDoc.hasOwnProperty(fullFlagName)) {
