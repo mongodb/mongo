@@ -2918,6 +2918,10 @@ protected:
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
 
+        // Enable retryable writes in this operation context.
+        _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+        _opCtx->setTxnNumber(5);
+
         auto targeter = MockWriteWithoutShardKeyWithIdTargeter(
             kNss1,
             {

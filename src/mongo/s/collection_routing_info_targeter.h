@@ -141,6 +141,11 @@ public:
                              const ShardEndpoint& endpoint,
                              const StaleDbRoutingVersion& staleInfo) override;
 
+    /**
+     * Returns if _lastError is StaleConfig type.
+     */
+    bool hasStaleShardResponse() override;
+
 
     void noteCannotImplicitlyCreateCollectionResponse(
         OperationContext* optCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override;

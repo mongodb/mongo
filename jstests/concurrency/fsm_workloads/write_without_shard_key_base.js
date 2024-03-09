@@ -199,13 +199,27 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                   "updateType: " + updateType + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs);
 
+        // If the suite runs this function as a txn with retries already as in
+        // concurrency_sharded_multi_stmt_txn suites, we skip creating a retryable writes session.
+        // In this case the write is run as WriteType::Ordinary in a txn. In all other cases, we
+        // create a new retryable writes session to test WriteType::WithoutShardKeyWithId as
+        // currently we only categorize non transactional retryable writes into this write type.
+        let session;
+        let collection;
+        if (!db.getSession()._serverSession.isTxnActive()) {
+            session = db.getMongo().startSession({retryWrites: true});
+            collection = session.getDatabase(db.getName()).getCollection(collName);
+        } else {
+            collection = db[collName];
+        }
+
         let res;
         if (updateType === 0 /* Update operator document */) {
             const update = {[this.secondaryDocField]: newValue};
-            res = db[collName].updateOne(query, {$set: update});
+            res = collection.updateOne(query, {$set: update});
         } else { /* Aggregation pipeline update */
             const update = {[this.secondaryDocField]: newValue};
-            res = db[collName].updateOne(query, [{$set: update}]);
+            res = collection.updateOne(query, [{$set: update}]);
         }
         assert.commandWorked(res);
 
@@ -220,6 +234,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // In case the modification results in no change to the document, matched may be higher
         // than modified.
         assert.gte(res.matchedCount, res.modifiedCount, res);
+        if (session) {
+            session.endSession();
+        }
     };
 
     /**
@@ -505,17 +522,31 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             tid: this.tid
         };
 
+        // If the suite runs this function as a txn with retries already as in
+        // concurrency_sharded_multi_stmt_txn suites, we skip creating a retryable writes session.
+        // In this case the write is run as WriteType::Ordinary in a txn. In all other cases, we
+        // create a new retryable writes session to test WriteType::WithoutShardKeyWithId as
+        // currently we only categorize non transactional retryable writes into this write type.
+        let session;
+        let collection;
+        if (!db.getSession()._serverSession.isTxnActive()) {
+            session = db.getMongo().startSession({retryWrites: true});
+            collection = session.getDatabase(db.getName()).getCollection(collName);
+        } else {
+            collection = db[collName];
+        }
+
         // Used for validation after running the write operation.
-        const containsMatchedDocs = db[collName].findOne(query) != null;
-        const numMatchedDocsBefore = db[collName].countDocuments(query);
+        const containsMatchedDocs = collection.findOne(query) != null;
+        const numMatchedDocsBefore = collection.countDocuments(query);
 
         jsTestLog("deleteOneWithId state running with query: " + tojson(query) + "\n" +
                   "containsMatchedDocs: " + containsMatchedDocs + "\n" +
                   "numMatchedDocsBefore: " + numMatchedDocsBefore);
 
-        let res = assert.commandWorked(db[collName].deleteOne(query));
+        let res = assert.commandWorked(collection.deleteOne(query));
 
-        const numMatchedDocsAfter = db[collName].countDocuments(query);
+        const numMatchedDocsAfter = collection.countDocuments(query);
 
         if (containsMatchedDocs) {
             assert.eq(res.deletedCount, 1, res);
@@ -525,6 +556,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             // The count should both be 0.
             assert.eq(numMatchedDocsAfter, numMatchedDocsBefore);
+        }
+        if (session) {
+            session.endSession();
         }
         jsTestLog("Finished deleteOneWithId state");
     };

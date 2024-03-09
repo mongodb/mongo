@@ -29,6 +29,7 @@
 
 #include "mongo/s/collection_routing_info_targeter.h"
 
+#include "mongo/s/transaction_router.h"
 #include <fmt/format.h>
 #include <memory>
 #include <string>
@@ -448,6 +449,15 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
     return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec, chunkRanges));
 }
 
+bool isUpdateOneWithIdWithoutShardKeyEnabled(OperationContext* opCtx) {
+    return feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+bool isRetryableWrite(OperationContext* opCtx) {
+    return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
+}
+
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     OperationContext* opCtx,
     const BatchItemRef& itemRef,
@@ -632,8 +642,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             if (isUpsert && useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
             } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
-                       feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                       isUpdateOneWithIdWithoutShardKeyEnabled(opCtx) && isRetryableWrite(opCtx)) {
                 *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             }
         } else {
@@ -645,6 +654,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
 
     return endPoints;
 }
+
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     OperationContext* opCtx,
@@ -739,8 +749,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         deleteOneNonTargetedShardedCount.increment(1);
         if (isExactId) {
             if (isNonTargetedWriteWithoutShardKeyWithExactId &&
-                feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                isUpdateOneWithIdWithoutShardKeyEnabled(opCtx) && isRetryableWrite(opCtx)) {
                 *isNonTargetedWriteWithoutShardKeyWithExactId = true;
                 deleteOneWithoutShardKeyWithIdCount.increment(1);
             }
@@ -874,6 +883,12 @@ void CollectionRoutingInfoTargeter::noteStaleDbResponse(OperationContext* opCtx,
     Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.dbName(),
                                                              staleInfo.getVersionWanted());
     _lastError = LastErrorType::kStaleDbVersion;
+}
+
+bool CollectionRoutingInfoTargeter::hasStaleShardResponse() {
+    return _lastError &&
+        (_lastError.value() == LastErrorType::kStaleShardVersion ||
+         _lastError.value() == LastErrorType::kStaleDbVersion);
 }
 
 void CollectionRoutingInfoTargeter::noteCannotImplicitlyCreateCollectionResponse(

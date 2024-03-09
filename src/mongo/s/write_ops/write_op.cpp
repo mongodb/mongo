@@ -29,7 +29,9 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include <absl/container/flat_hash_set.h>
 #include <algorithm>
 #include <boost/none.hpp>
@@ -159,6 +161,7 @@ void WriteOp::targetWrites(OperationContext* opCtx,
                            std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
                            bool* useTwoPhaseWriteProtocol,
                            bool* isNonTargetedWriteWithoutShardKeyWithExactId) {
+    invariant(_childOps.empty());
     auto endpoints = [&] {
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
@@ -201,8 +204,8 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         // Outside of a transaction, multiple endpoints currently imply no versioning, since we
         // can't retry half a regular multi-write.
         if (endpoints.size() > 1u && !inTransaction) {
-            // Do not ignore shard version if this is an updateOne/deleteOne with exact _id
-            // equality.
+            // Do not ignore shard version if this is WriteType::WithoutShardKeyWithId
+            // TODO: PM-3673 for non-retryable writes.
             if (!feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 (isNonTargetedWriteWithoutShardKeyWithExactId &&
@@ -235,7 +238,7 @@ size_t WriteOp::getNumTargeted() {
  * This is the core function which aggregates all the results of a write operation on multiple
  * shards and updates the write operation's state.
  */
-void WriteOp::_updateOpState() {
+void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithIdComplete) {
     std::vector<ChildWriteOp const*> childErrors;
     std::vector<BulkWriteReplyItem const*> childSuccesses;
     // Stores the result of a child update/delete that is in _Deferred state.
@@ -292,7 +295,11 @@ void WriteOp::_updateOpState() {
             // invalidate previous deferred responses.
             _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
         }
+        if (_writeType == WriteType::WithoutShardKeyWithId) {
+            _incWriteWithoutShardKeyWithIdMetrics();
+        }
         _state = WriteOpState_Ready;
+        _childOps.clear();
     } else if (!childErrors.empty()) {
         _error = combineOpErrors(childErrors);
         if (!childSuccesses.empty()) {
@@ -306,19 +313,81 @@ void WriteOp::_updateOpState() {
     } else {
         // If we made it here, we finished all the child ops and thus this deferred
         // response is now a final response.
-        if (deferredChildSuccess) {
-            childSuccesses.push_back(deferredChildSuccess.value());
+        if (markWriteWithoutShardKeyWithIdComplete.value()) {
+            if (deferredChildSuccess) {
+                childSuccesses.push_back(deferredChildSuccess.value());
+            }
+            _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
+            _state = WriteOpState_Completed;
+        } else {
+            _state = WriteOpState_Deferred;
         }
-        _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
-        _state = WriteOpState_Completed;
     }
 
     invariant(_state != WriteOpState_Pending);
-    _childOps.clear();
+}
+
+void WriteOp::_noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
+    const TargetedWrite& targetedWrite,
+    int n,
+    boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
+    const WriteOpRef& ref = targetedWrite.writeOpRef;
+    auto& currentChildOp = _childOps[ref.second];
+    dassert(n == 0 || n == 1);
+    if (n == 0) {
+        // Defer the completion of this child WriteOp until later when we are sure that we do not
+        // need to retry them due to StaleConfig or StaleDBVersion.
+        currentChildOp.state = WriteOpState_Deferred;
+        currentChildOp.bulkWriteReplyItem = bulkWriteReplyItem;
+        _updateOpState();
+    } else {
+        for (auto& childOp : _childOps) {
+            dassert(childOp.parentOp->_writeType == WriteType::WithoutShardKeyWithId);
+            if (childOp.state == WriteOpState_Pending &&
+                childOp.pendingWrite->writeOpRef != targetedWrite.writeOpRef) {
+                childOp.state = WriteOpState_NoOp;
+            } else if (childOp.state == WriteOpState_Error) {
+                // When n equals 1, the write operation without a shard key with _id
+                // equality has successfully occurred on the intended shard. In this case, any
+                // errors from other shards can be safely disregarded. These errors will not
+                // impact the parent write operation for us or the user.
+                LOGV2_DEBUG(8083900,
+                            4,
+                            "Ignoring write without shard key with id child op error.",
+                            "error"_attr = childOp.error->serialize());
+                childOp.state = WriteOpState_Completed;
+                childOp.error = boost::none;
+            }
+        }
+        noteWriteComplete(targetedWrite, bulkWriteReplyItem);
+        if (MONGO_unlikely(hangAfterCompletingWriteWithoutShardKeyWithId.shouldFail())) {
+            hangAfterCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
+        }
+    }
+}
+
+void WriteOp::_incWriteWithoutShardKeyWithIdMetrics() {
+    invariant(_writeType == WriteType::WithoutShardKeyWithId);
+    if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
+        updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+    } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
+        deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+    } else {
+        MONGO_UNREACHABLE;
+    }
 }
 
 void WriteOp::resetWriteToReady() {
-    invariant(_state == WriteOpState_Pending || _state == WriteOpState_Ready);
+    if (_writeType == WriteType::WithoutShardKeyWithId) {
+        // It is possible that one of the child write op received a non-retryable error marking the
+        // write op state as WriteOpState_Error. We reset it to ready if we find some other child
+        // write op in the same batch returns a retryable error.
+        invariant(_state < WriteOpState_Completed || _state == WriteOpState_Error);
+        _incWriteWithoutShardKeyWithIdMetrics();
+    } else {
+        invariant(_state == WriteOpState_Pending || _state == WriteOpState_Ready);
+    }
+
     _state = WriteOpState_Ready;
     _childOps.clear();
 }
@@ -353,42 +422,32 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
 void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
     const TargetedWrite& targetedWrite,
     int n,
+    int batchSize,
     boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
-    dassert(n == 0 || n == 1);
     tassert(8346300,
             "BulkWriteReplyItem 'n' value does not match supplied 'n' value",
             !bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
+    if (batchSize == 1) {
+        _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
+            targetedWrite, n, bulkWriteReplyItem);
+        return;
+    }
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& currentChildOp = _childOps[ref.second];
-    if (n == 0) {
-        // Defer the completion of this child WriteOp until later when we are sure that we do not
-        // need to retry them due to StaleConfig or StaleDBVersion.
+    if (_state == WriteOpState::WriteOpState_Deferred ||
+        _state == WriteOpState::WriteOpState_Completed) {
+        noteWriteComplete(targetedWrite, bulkWriteReplyItem);
+    } else if (_state == WriteOpState::WriteOpState_Pending) {
         currentChildOp.state = WriteOpState_Deferred;
         currentChildOp.bulkWriteReplyItem = bulkWriteReplyItem;
-        _updateOpState();
+        _updateOpState(false);
+        return;
     } else {
-        for (auto& childOp : _childOps) {
-            dassert(childOp.parentOp->_writeType == WriteType::WithoutShardKeyWithId);
-            if (childOp.state == WriteOpState_Pending &&
-                childOp.pendingWrite->writeOpRef != targetedWrite.writeOpRef) {
-                childOp.state = WriteOpState_NoOp;
-            } else if (childOp.state == WriteOpState_Error) {
-                // When n equals 1, the write operation without a shard key with _id
-                // equality has successfully occurred on the intended shard. In this case, any
-                // errors from other shards can be safely disregarded. These errors will not
-                // impact the parent write operation for us or the user.
-                LOGV2_DEBUG(8083900,
-                            4,
-                            "Ignoring write without shard key with id child op error.",
-                            "error"_attr = childOp.error->serialize());
-                childOp.state = WriteOpState_Completed;
-                childOp.error = boost::none;
-            }
-        }
-        noteWriteComplete(targetedWrite, bulkWriteReplyItem);
-        if (MONGO_unlikely(hangAfterCompletingWriteWithoutShardKeyWithId.shouldFail())) {
-            hangAfterCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
-        }
+        MONGO_UNREACHABLE;
+    }
+
+    if (MONGO_unlikely(hangAfterCompletingWriteWithoutShardKeyWithId.shouldFail())) {
+        hangAfterCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
     }
 }
 

@@ -1,6 +1,6 @@
 /**
  * Tests updateOne with id without shard key uses PM-3190 for retryable
- * writes and doesn't for transactions.
+ * writes and doesn't for transactions or non-retryable writes.
  *
  * @tags: [featureFlagUpdateOneWithIdWithoutShardKey, requires_fcv_73]
  */
@@ -44,33 +44,48 @@ session.commitTransaction();
 session.endSession();
 
 // Test that retryable internal transactions do not use broadcast protocol per PM-3190.
-const lsidWithUUID2 = {
+const lsidWithUUID = {
     id: UUID(),
     txnUUID: UUID()
 };
 assert.commandWorked(db.runCommand({
     update: coll.getName(),
     updates: [{q: {_id: -1}, u: {$inc: {counter: 1}}}],
-    lsid: lsidWithUUID2,
+    lsid: lsidWithUUID,
     txnNumber: NumberLong(1),
     startTransaction: true,
     autocommit: false
 }));
 
-// Test that retryable transactions do not use broadcast protocol per PM-3190.
-session = st.s.startSession({retryWrites: true});
-session.startTransaction();
+const lsidWithUUIDAndTxnNum = {
+    id: UUID(),
+    txnUUID: UUID(),
+    txnNumber: NumberLong(2),
+};
+
+assert.commandWorked(db.runCommand({
+    update: coll.getName(),
+    updates: [{q: {_id: -5}, u: {$inc: {counter: 1}}}],
+    lsid: lsidWithUUIDAndTxnNum,
+    txnNumber: NumberLong(1),
+    startTransaction: true,
+    autocommit: false
+}));
+
+// Test that non-retryable writes do not use broadcast protocol per PM-3190.
+assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {counter: 1}}));
+
+// Test that non-retryable write sessions do not use broadcast protocol per PM-3190.
+session = st.s.startSession({retryWrites: false});
 
 sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
 updateCmd = {
     updates: [
         {q: {_id: 1}, u: {$inc: {counter: 1}}},
-    ],
-    txnNumber: NumberLong(0),
+    ]
 };
 
 assert.commandWorked(sessionColl.runCommand("update", updateCmd));
-session.commitTransaction();
 session.endSession();
 
 // Test that retryable writes use broadcast protocol per PM-3190

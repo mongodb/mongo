@@ -137,6 +137,11 @@ public:
         // No-op
     }
 
+    bool hasStaleShardResponse() override {
+        // No-op
+        return false;
+    }
+
     void noteCannotImplicitlyCreateCollectionResponse(
         OperationContext* opCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override {
         // No-op
