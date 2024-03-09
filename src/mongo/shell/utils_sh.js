@@ -3,9 +3,15 @@ var sh = function() {
 };
 
 sh._checkMongos = function() {
+    if (TestData.testingReplicaSetEndpoint) {
+        // When testing the replica set endpoint, the test connects directly to a mongod on the
+        // config shard which returns mongod hello responses (i.e. do not have "isdbgrid").
+        return;
+    }
     var x = globalThis.db._helloOrLegacyHello();
-    if (x.msg != "isdbgrid")
+    if (x.msg != "isdbgrid") {
         throw Error("not connected to a mongos");
+    }
 };
 
 sh._checkFullName = function(fullName) {

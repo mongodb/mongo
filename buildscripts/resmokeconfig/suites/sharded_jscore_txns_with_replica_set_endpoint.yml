@@ -8,6 +8,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/txns/**/*.js
+  - jstests/core_sharding/**/*.js
   exclude_files:
   # Profile can only be run against the admin database on mongos.
   - jstests/core/txns/transactions_profiling.js
