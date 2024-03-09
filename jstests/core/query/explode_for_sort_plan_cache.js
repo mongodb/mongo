@@ -27,20 +27,11 @@ import {
     getPlanStages,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSbeFullyEnabled(db);
 const coll = db.explode_for_sort_plan_cache;
 coll.drop();
-
-// TODO SERVER-87376: Remove this check once the issue resolved when Classic multi-planner for SBE
-// is enabled. The current investigation indicates it is due to isExplainAndCacheIneligible
-// returning true when $in has max elements for scans to explode.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    quit();
-}
 
 // Create two indexes to ensure the multi-planner kicks in and the query plan gets cached when the
 // classic engine is in use.
@@ -128,11 +119,11 @@ function assertQueryParameterizedCorrectly(
 }
 
 // Insert documents into the collection in a way that we can deduce query result count by the query
-// parameters.
+// parameters. The number of documents = a * b * 10.
 for (let a = 1; a <= 3; a++) {
     for (let aIdx = 0; aIdx < a; aIdx++) {
         for (let b = 1; b <= 3; b++) {
-            for (let bIdx = 0; bIdx < b; bIdx++) {
+            for (let bIdx = 0; bIdx < b * 10; bIdx++) {
                 assert.commandWorked(coll.insert({a, b}));
             }
         }
@@ -146,9 +137,9 @@ assertIsNotExplodeForSort({a: {$gte: 1, $lte: 1}, b: {$in: [1, 2]}});
 // Changing the $eq predicate value should reuse the plan cache and gives correct results.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {a: {$eq: 2}, b: {$in: [1, 2]}},
-    newQueryCount: 6,
+    newQueryCount: 60,
     reuseEntry: true,
 });
 
@@ -156,9 +147,9 @@ assertQueryParameterizedCorrectly({
 // is not parameterized.
 assertQueryParameterizedCorrectly({
     query: {$and: [{$expr: {$eq: ["$a", 1]}}, {b: {$in: [1, 2]}}]},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {$and: [{$expr: {$eq: ["$a", 2]}}, {b: {$in: [1, 2]}}]},
-    newQueryCount: 6,
+    newQueryCount: 60,
     // The plan cache entry is always reused for the classic engine but never reused for the SBE
     // engine.
     reuseEntry: !isSBEEnabled,
@@ -167,9 +158,9 @@ assertQueryParameterizedCorrectly({
 // Rewriting the $in predicate with $or should reuse the plan cache and gives correct results.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {$and: [{a: {$eq: 2}}, {$or: [{b: {$eq: 1}}, {b: {$eq: 2}}]}]},
-    newQueryCount: 6,
+    newQueryCount: 60,
     reuseEntry: true,
 });
 
@@ -177,9 +168,9 @@ assertQueryParameterizedCorrectly({
 // is rewritten as $in.
 assertQueryParameterizedCorrectly({
     query: {$and: [{a: {$eq: 1}}, {$or: [{b: {$eq: 1}}, {b: {$eq: 2}}]}]},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {$and: [{a: {$eq: 1}}, {$or: [{b: {$eq: 1}}, {b: {$eq: 3}}]}]},
-    newQueryCount: 4,
+    newQueryCount: 40,
     reuseEntry: true,
 });
 
@@ -187,9 +178,9 @@ assertQueryParameterizedCorrectly({
 // results.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 3]}},
-    newQueryCount: 4,
+    newQueryCount: 40,
     reuseEntry: true,
 });
 
@@ -197,9 +188,9 @@ assertQueryParameterizedCorrectly({
 // results.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {a: {$eq: 1}, b: {$in: [1, 2, 3]}},
-    newQueryCount: 6,
+    newQueryCount: 60,
     reuseEntry: !isSBEEnabled,
 });
 
@@ -208,14 +199,14 @@ assertQueryParameterizedCorrectly({
 for (let specialValue of [null, {x: 1}, [1]]) {
     assertQueryParameterizedCorrectly({
         query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-        queryCount: 3,
+        queryCount: 30,
         newQuery: {a: {$eq: specialValue}, b: {$in: [1, 2]}},
         newQueryCount: 0,
         reuseEntry: !isSBEEnabled,
     });
     assertQueryParameterizedCorrectly({
         query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-        queryCount: 3,
+        queryCount: 30,
         newQuery: {a: {$eq: 1}, b: {$in: [0, specialValue]}},
         newQueryCount: 0,
         reuseEntry: !isSBEEnabled,
@@ -225,7 +216,7 @@ for (let specialValue of [null, {x: 1}, [1]]) {
 // Regex in $in predicate will not reuse plan cache.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: [1, 2]}},
-    queryCount: 3,
+    queryCount: 30,
     newQuery: {a: {$eq: 1}, b: {$in: [0, /a|regex/]}},
     newQueryCount: 0,
     reuseEntry: false,
@@ -245,9 +236,9 @@ const evenLargerIn = tooLargeToExplodeIn.concat([maxScansToExplode + 1]);
 // sort and is parameterized correctly.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: maxExplodeIn}},
-    queryCount: 6,
+    queryCount: 60,
     newQuery: {a: {$eq: 2}, b: {$in: maxExplodeIn}},
-    newQueryCount: 12,
+    newQueryCount: 120,
     reuseEntry: true,
 });
 
@@ -255,9 +246,9 @@ assertQueryParameterizedCorrectly({
 // entry than the same query with too many scans to explode.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: maxExplodeIn}},
-    queryCount: 6,
+    queryCount: 60,
     newQuery: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
-    newQueryCount: 6,
+    newQueryCount: 60,
     reuseEntry: !isSBEEnabled,
 });
 
@@ -265,9 +256,9 @@ assertQueryParameterizedCorrectly({
 // entry for any number of elements in $in.
 assertQueryParameterizedCorrectly({
     query: {a: {$eq: 1}, b: {$in: tooLargeToExplodeIn}},
-    queryCount: 6,
+    queryCount: 60,
     newQuery: {a: {$eq: 1}, b: {$in: evenLargerIn}},
-    newQueryCount: 6,
+    newQueryCount: 60,
     reuseEntry: true,
     isExplode: false
 });
