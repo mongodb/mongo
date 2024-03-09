@@ -5,6 +5,7 @@
  */
 
 import "jstests/libs/sbe_assert_error_override.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
@@ -50,7 +51,8 @@ const mongos = st.s;
 const testDb = mongos.getDB(dbName);
 
 // TODO SERVER-87335 Make this work for SBE
-if (checkSbeRestrictedOrFullyEnabled(testDb)) {
+if (checkSbeRestrictedOrFullyEnabled(testDb) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'SearchInSbe')) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     stWithMock.stop();
     quit();
@@ -75,24 +77,36 @@ const protocolVersion = NumberInt(1);
 
 const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
 const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
-function mockShardZero() {
+
+function mockShardZero(metaCursorWillBeKilled = false) {
     const exampleCursor = searchShardedExampleCursors1(
         dbName,
         collNS,
         collName,
         mongotCommandForQuery(mongotQuery, collName, dbName, collUUID0, protocolVersion));
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
+    // The getMore will be pre-fetched, but if the meta cursor is deemed unnecessary, we'll issue a
+    // killCursors on the meta cursor. If the connection is pinned, we'll try to cancel the getMore
+    // as we killCursors, so the getMore may go unused. (When the connection isn't pinned, we don't
+    // try to cancel the in-flight getMore).
+    if (metaCursorWillBeKilled) {
+        exampleCursor.historyMeta[0].maybeUnused = true;
+    }
     s0Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
     s0Mongot.setMockResponses(exampleCursor.historyMeta, exampleCursor.metaID);
 }
 
-function mockShardOne() {
+function mockShardOne(metaCursorWillBeKilled = false) {
     const exampleCursor = searchShardedExampleCursors2(
         dbName,
         collNS,
         collName,
         mongotCommandForQuery(mongotQuery, collName, dbName, collUUID1, protocolVersion));
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
+    // See comment in mockShardZero().
+    if (metaCursorWillBeKilled) {
+        exampleCursor.historyMeta[0].maybeUnused = true;
+    }
     s1Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
     s1Mongot.setMockResponses(exampleCursor.historyMeta, exampleCursor.metaID);
 }
@@ -224,7 +238,7 @@ runTestRequiresMetaCursorOnConn(
 mockShardZero();
 runTestRequiresMetaCursorOnConn(
     shardZeroDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
-mockShardZero();
+mockShardZero(/*metaCursorWillBeKilled*/ true);
 runTestNoMetaCursorOnConn(shardZeroDB, expectedDocs);
 
 // Repeat for second shard.
@@ -242,7 +256,7 @@ runTestRequiresMetaCursorOnConn(
 mockShardOne();
 runTestRequiresMetaCursorOnConn(
     shardOneDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
-mockShardOne();
+mockShardOne(/*metaCursorWillBeKilled*/ true);
 runTestNoMetaCursorOnConn(shardOneDB, expectedDocs);
 
 // Check that if exchange is set on a search query it fails.
