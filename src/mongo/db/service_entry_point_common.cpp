@@ -2372,8 +2372,6 @@ void HandleRequest::completeOperation(DbResponse& response) {
         } else if (executionContext.client().isInDirectClient()) {
             LOGV2_DEBUG(21971, 1, "Note: not profiling because we are in DBDirectClient");
         } else if (executionContext.behaviors.lockedForWriting()) {
-            // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
-            // lockedForWriting() call but prior to profile collection lock acquisition.
             LOGV2_DEBUG(21972, 1, "Note: not profiling because doing fsync+lock");
         } else if (opCtx->readOnly()) {
             LOGV2_DEBUG(21973, 1, "Note: not profiling because server is read-only");
