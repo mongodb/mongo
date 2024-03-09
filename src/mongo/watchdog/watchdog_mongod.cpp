@@ -136,7 +136,7 @@ public:
     }
 };
 auto& watchdogServerStatusSection =
-    *ServerStatusSectionBuilder<WatchdogServerStatusSection>("watchdog");
+    *ServerStatusSectionBuilder<WatchdogServerStatusSection>("watchdog").forShard();
 
 void startWatchdog(ServiceContext* service) {
     // Check three paths if set

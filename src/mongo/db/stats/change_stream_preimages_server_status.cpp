@@ -132,6 +132,7 @@ public:
     }
 };
 auto& changeStreamPreImagesServerStatus =
-    *ServerStatusSectionBuilder<ChangeStreamPreImagesServerStatus>("changeStreamPreImages");
+    *ServerStatusSectionBuilder<ChangeStreamPreImagesServerStatus>("changeStreamPreImages")
+         .forShard();
 
 }  // namespace mongo

@@ -273,7 +273,7 @@ public:
     }
 };
 auto& replicationInfoServerStatus =
-    *ServerStatusSectionBuilder<ReplicationInfoServerStatus>("repl");
+    *ServerStatusSectionBuilder<ReplicationInfoServerStatus>("repl").forShard();
 
 class OplogInfoServerStatus : public ServerStatusSection {
 public:
@@ -340,7 +340,8 @@ public:
         return result.obj();
     }
 };
-auto& oplogInfoServerStatus = *ServerStatusSectionBuilder<OplogInfoServerStatus>("oplog");
+auto& oplogInfoServerStatus =
+    *ServerStatusSectionBuilder<OplogInfoServerStatus>("oplog").forShard();
 
 const std::string kAutomationServiceDescriptorFieldName =
     HelloCommandReply::kAutomationServiceDescriptorFieldName.toString();
@@ -703,6 +704,7 @@ MONGO_REGISTER_COMMAND(CmdIsMaster).forShard();
 
 auto& replOpCounterServerStatusSection =
     *ServerStatusSectionBuilder<OpCounterServerStatusSection>("opcountersRepl")
+         .forShard()
          .bind(&replOpCounters);
 
 }  // namespace

@@ -218,7 +218,7 @@ public:
     }
 };
 auto& opWriteConcernCountersSSS =
-    *ServerStatusSectionBuilder<OpWriteConcernCountersSSS>("opWriteConcernCounters");
+    *ServerStatusSectionBuilder<OpWriteConcernCountersSSS>("opWriteConcernCounters").forShard();
 }  // namespace
 
 }  // namespace mongo

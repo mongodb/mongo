@@ -119,6 +119,6 @@ public:
         return builder.obj();
     }
 };
-auto catalogStatsSSS = *ServerStatusSectionBuilder<CatalogStatsSSS>("catalogStats");
+auto catalogStatsSSS = *ServerStatusSectionBuilder<CatalogStatsSSS>("catalogStats").forShard();
 }  // namespace
 }  // namespace mongo::catalog_stats

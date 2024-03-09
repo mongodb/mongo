@@ -420,7 +420,8 @@ public:
     }
 };
 auto electionMetricsSSS =
-    *ServerStatusSectionBuilder<ReplicationMetrics::ElectionMetricsSSS>("electionMetrics");
+    *ServerStatusSectionBuilder<ReplicationMetrics::ElectionMetricsSSS>("electionMetrics")
+         .forShard();
 
 }  // namespace repl
 }  // namespace mongo

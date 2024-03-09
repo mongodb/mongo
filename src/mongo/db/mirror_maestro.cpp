@@ -279,7 +279,8 @@ public:
     AtomicWord<CounterT> processedAsSecondary;
 };
 auto& gMirroredReadsSection = *ServerStatusSectionBuilder<MirroredReadsSection>(
-    MirrorMaestro::kServerStatusSectionName.toString());
+                                   MirrorMaestro::kServerStatusSectionName.toString())
+                                   .forShard();
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
     IDLParserContext ctx("mirrorReads");

@@ -56,7 +56,8 @@ public:
         return result.obj();
     }
 };
-auto& serverlessServerStatus = *ServerStatusSectionBuilder<ServerlessServerStatus>("serverless");
+auto& serverlessServerStatus =
+    *ServerStatusSectionBuilder<ServerlessServerStatus>("serverless").forShard();
 
 }  // namespace
 }  // namespace mongo

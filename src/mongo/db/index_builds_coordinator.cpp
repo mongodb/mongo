@@ -182,7 +182,7 @@ public:
     AtomicWord<int> commit{0};
 };
 
-auto& indexBuildsSSS = *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds");
+auto& indexBuildsSSS = *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
 
 namespace {
 

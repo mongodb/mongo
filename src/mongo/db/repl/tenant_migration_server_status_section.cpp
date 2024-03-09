@@ -56,6 +56,6 @@ public:
     }
 };
 auto tenantMigrationServerStatus =
-    *ServerStatusSectionBuilder<TenantMigrationServerStatus>("tenantMigrations");
+    *ServerStatusSectionBuilder<TenantMigrationServerStatus>("tenantMigrations").forShard();
 }  // namespace
 }  // namespace mongo

@@ -149,7 +149,8 @@ public:
         // stateless.
         std::call_once(initializeServerStatusSectionFlag, [] {
             *ServerStatusSectionBuilder<WiredTigerServerStatusSection>(
-                std::string{kWiredTigerEngineName});
+                 std::string{kWiredTigerEngineName})
+                 .forShard();
         });
 
         StorageEngineOptions options;

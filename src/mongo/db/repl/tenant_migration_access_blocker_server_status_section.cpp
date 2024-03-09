@@ -57,6 +57,7 @@ public:
 };
 auto& tenantMigrationAccessBlockerServerStatus =
     *ServerStatusSectionBuilder<TenantMigrationAccessBlockerServerStatus>(
-        "tenantMigrationAccessBlocker");
+         "tenantMigrationAccessBlocker")
+         .forShard();
 }  // namespace
 }  // namespace mongo

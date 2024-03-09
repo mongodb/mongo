@@ -79,7 +79,7 @@ public:
     }
 };
 auto& fcvServerStatusMetrics =
-    *ServerStatusSectionBuilder<FCVServerStatusMetrics>("featureCompatibilityVersion");
+    *ServerStatusSectionBuilder<FCVServerStatusMetrics>("featureCompatibilityVersion").forShard();
 
 }  // namespace
 }  // namespace mongo

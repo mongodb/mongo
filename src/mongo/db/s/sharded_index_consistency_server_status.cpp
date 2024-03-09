@@ -70,7 +70,8 @@ public:
     }
 };
 auto& indexConsistencyServerStatus =
-    *ServerStatusSectionBuilder<ShardedIndexConsistencyServerStatus>("shardedIndexConsistency");
+    *ServerStatusSectionBuilder<ShardedIndexConsistencyServerStatus>("shardedIndexConsistency")
+         .forShard();
 
 }  // namespace
 }  // namespace mongo

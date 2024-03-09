@@ -80,7 +80,7 @@ public:
         return bob.obj();
     }
 };
-auto& storageSSS = *ServerStatusSectionBuilder<StorageSSS>("storageEngine");
+auto& storageSSS = *ServerStatusSectionBuilder<StorageSSS>("storageEngine").forShard();
 
 }  // namespace
 }  // namespace mongo

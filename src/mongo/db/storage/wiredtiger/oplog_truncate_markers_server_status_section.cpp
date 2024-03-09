@@ -77,7 +77,8 @@ public:
     }
 };
 auto oplogTruncateMarkersStats =
-    *ServerStatusSectionBuilder<OplogTruncateMarkersServerStatusSection>("oplogTruncation");
+    *ServerStatusSectionBuilder<OplogTruncateMarkersServerStatusSection>("oplogTruncation")
+         .forShard();
 
 }  // namespace
 }  // namespace mongo

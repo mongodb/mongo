@@ -65,6 +65,6 @@ public:
     }
 };
 auto& changeCollectionServerStatus =
-    *ServerStatusSectionBuilder<ChangeCollectionServerStatus>("changeCollections");
+    *ServerStatusSectionBuilder<ChangeCollectionServerStatus>("changeCollections").forShard();
 
 }  // namespace mongo

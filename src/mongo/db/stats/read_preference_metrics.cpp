@@ -139,7 +139,7 @@ public:
     }
 };
 auto& readPreferenceMetricsSSS =
-    *ServerStatusSectionBuilder<ReadPreferenceMetricsSSS>("readPreferenceCounters");
+    *ServerStatusSectionBuilder<ReadPreferenceMetricsSSS>("readPreferenceCounters").forShard();
 }  // namespace
 
 }  // namespace mongo

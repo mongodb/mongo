@@ -82,6 +82,7 @@ public:
         return result.obj();
     }
 };
-auto shardSplitServerStatus = *ServerStatusSectionBuilder<ShardSplitServerStatus>("shardSplits");
+auto shardSplitServerStatus =
+    *ServerStatusSectionBuilder<ShardSplitServerStatus>("shardSplits").forShard();
 
 }  // namespace mongo
