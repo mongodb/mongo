@@ -78,6 +78,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
@@ -211,7 +212,7 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
     return requests;
 }
 
-// If the network response is OK then we process the response from the resmote shard. The returned
+// If the network response is OK then we process the response from the remote shard. The returned
 // boolean dictates if we should abort rest of the batch.
 bool processResponseFromRemote(OperationContext* opCtx,
                                NSTargeter& targeter,
@@ -619,6 +620,34 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                                      abortBatch);
 }
 
+void coordinateMultiUpdate(OperationContext* opCtx,
+                           NSTargeter& targeter,
+                           BatchWriteOp& batchOp,
+                           TargetedBatchMap& childBatches,
+                           BatchWriteExecStats* stats,
+                           const BatchedCommandRequest& clientRequest,
+                           bool& abortBatch) {
+    // Each shard in childBatches has the same write batch containing a single
+    // multi write. Regardless of how many shards are targeted here, we only
+    // send a single _shardsvrCoordinateMultiUpdate command to the db primary
+    // shard. The db primary will actually execute the writes via the
+    // MultiUpdateCoordinator and return their results via a field in the
+    // _shardsvrCoordinateMultiUpdate response. This means that we only need to
+    // process the response for the first batch, since it contains the results
+    // for all batches.
+    auto batchWriteResponse = coordinate_multi_update_util::executeCoordinateMultiUpdate(
+        opCtx, batchOp, childBatches, clientRequest);
+
+    processResponseForOnlyFirstBatch(opCtx,
+                                     targeter,
+                                     batchOp,
+                                     childBatches,
+                                     batchWriteResponse,
+                                     batchWriteResponse.getTopLevelStatus(),
+                                     stats,
+                                     abortBatch);
+}
+
 void executeTwoPhaseOrTimeSeriesWriteChildBatches(OperationContext* opCtx,
                                                   NSTargeter& targeter,
                                                   BatchWriteOp& batchOp,
@@ -667,6 +696,10 @@ void executeTwoPhaseOrTimeSeriesWriteChildBatches(OperationContext* opCtx,
             // a retryable time-series update request. We will run it in the internal
             // transaction api and collect the response.
             executeRetryableTimeseriesUpdate(
+                opCtx, targeter, batchOp, childBatches, stats, clientRequest, abortBatch);
+            break;
+        case WriteType::MultiWriteBlockingMigrations:
+            coordinateMultiUpdate(
                 opCtx, targeter, batchOp, childBatches, stats, clientRequest, abortBatch);
             break;
         default:

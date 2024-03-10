@@ -96,6 +96,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
 
         this.initialDocs = findFirstBatch(db, collName, {tid: this.tid}, 1000);
+        jsTestLog(`Thread with tid ${this.tid} owns ${this.initialDocs.length} documents`);
     };
 
     $config.states.multiUpdate = function multiUpdate(db, collName, connCache) {
@@ -131,7 +132,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.verify = function verify(db, collName, connCache) {
         ignoreErrorsIfInNonTransactionalStepdownSuite(() => {
-            db[collName].find({tid: this.tid}).forEach(doc => {
+            findFirstBatch(db, collName, {tid: this.tid}, 1000).forEach(doc => {
                 assert.eq(doc.counter, this.expectedCount);
             });
         });

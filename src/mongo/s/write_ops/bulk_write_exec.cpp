@@ -88,6 +88,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/bulk_write_command_modifier.h"
+#include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
@@ -532,16 +533,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
     }
     if (!responseStatus.isOK()) {
         // Set an error for the operation.
-        bulkWriteResponse.setCursor(BulkWriteCommandResponseCursor(
-            0,  // cursorId
-            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0, responseStatus)},
-            NamespaceString::makeBulkWriteNSS(boost::none)));
-        bulkWriteResponse.setNErrors(1);
-        bulkWriteResponse.setNInserted(0);
-        bulkWriteResponse.setNMatched(0);
-        bulkWriteResponse.setNModified(0);
-        bulkWriteResponse.setNUpserted(0);
-        bulkWriteResponse.setNDeleted(0);
+        bulkWriteResponse = createEmulatedErrorReply(responseStatus, 1, boost::none);
     }
 
     // We should only get back one reply item for the single update, unless we are in errorsOnly
@@ -672,16 +664,7 @@ void executeWriteWithoutShardKey(
 
         if (!responseStatus.isOK()) {
             // Set an error for the operation.
-            bulkWriteResponse.setCursor(BulkWriteCommandResponseCursor(
-                0,  // cursorId
-                std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0, responseStatus)},
-                NamespaceString::makeBulkWriteNSS(boost::none)));
-            bulkWriteResponse.setNErrors(1);
-            bulkWriteResponse.setNInserted(0);
-            bulkWriteResponse.setNMatched(0);
-            bulkWriteResponse.setNModified(0);
-            bulkWriteResponse.setNUpserted(0);
-            bulkWriteResponse.setNDeleted(0);
+            bulkWriteResponse = createEmulatedErrorReply(responseStatus, 1, boost::none);
         }
 
         // We should get back just one reply item for the single update we are running.
@@ -724,6 +707,29 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
                         /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
     bulkWriteOp.finishExecutingWriteWithoutShardKeyWithId(childBatches);
+}
+
+void coordinateMultiUpdate(OperationContext* opCtx,
+                           TargetedBatchMap& childBatches,
+                           BulkWriteOp& bulkWriteOp) {
+    auto bulkWriteResponse = coordinate_multi_update_util::executeCoordinateMultiUpdate(
+        opCtx, childBatches, bulkWriteOp);
+
+    const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
+    tassert(8127600,
+            "Unexpected reply for coordinateMultiUpdate",
+            replyItems.size() == 1 || replyItems.size() == 0);
+    boost::optional<BulkWriteReplyItem> replyItem = boost::none;
+    if (replyItems.size() == 1) {
+        replyItem = replyItems[0];
+    }
+
+    bulkWriteOp.noteWriteOpFinalResponse(
+        coordinate_multi_update_util::getWriteOpIndex(childBatches),
+        replyItem,
+        bulkWriteResponse,
+        ShardWCError(childBatches.begin()->first, WriteConcernErrorDetail{}),
+        bulkWriteResponse.getRetriedStmtIds());
 }
 
 BulkWriteReplyInfo execute(OperationContext* opCtx,
@@ -780,6 +786,8 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
             } else if (targetStatus.getValue() == WriteType::WithoutShardKeyWithId) {
                 executeNonTargetedSingleWriteWithoutShardKeyWithId(
                     opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
+            } else if (targetStatus.getValue() == WriteType::MultiWriteBlockingMigrations) {
+                coordinateMultiUpdate(opCtx, childBatches, bulkWriteOp);
             } else {
                 // Send the child batches and wait for responses.
                 executeChildBatches(opCtx,
@@ -864,6 +872,28 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
 
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");
     return bulkWriteOp.generateReplyInfo();
+}
+
+BulkWriteCommandReply createEmulatedErrorReply(const Status& error,
+                                               int errorCount,
+                                               const boost::optional<TenantId>& tenantId) {
+    std::vector<BulkWriteReplyItem> emulatedReplies;
+    emulatedReplies.reserve(errorCount);
+
+    for (int i = 0; i < errorCount; i++) {
+        emulatedReplies.emplace_back(i, error);
+    }
+
+    BulkWriteCommandReply emulatedReply;
+    emulatedReply.setCursor(BulkWriteCommandResponseCursor(
+        0, emulatedReplies, NamespaceString::makeBulkWriteNSS(tenantId)));
+    emulatedReply.setNErrors(errorCount);
+    emulatedReply.setNDeleted(0);
+    emulatedReply.setNModified(0);
+    emulatedReply.setNInserted(0);
+    emulatedReply.setNUpserted(0);
+    emulatedReply.setNMatched(0);
+    return emulatedReply;
 }
 
 BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest)
@@ -1474,23 +1504,8 @@ void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
                                       const Status& status) {
     // Treat an error to get a batch response as failures of the contained write(s).
     const int numErrors = _clientRequest.getOrdered() ? 1 : targetedBatch.getWrites().size();
-
-    std::vector<BulkWriteReplyItem> emulatedReplies;
-    emulatedReplies.reserve(numErrors);
-
-    for (int i = 0; i < numErrors; i++) {
-        emulatedReplies.emplace_back(i, status);
-    }
-
-    auto emulatedReply = BulkWriteCommandReply();
-    emulatedReply.setCursor(BulkWriteCommandResponseCursor(
-        0, emulatedReplies, NamespaceString::makeBulkWriteNSS(_clientRequest.getDollarTenant())));
-    emulatedReply.setNErrors(numErrors);
-    emulatedReply.setNDeleted(0);
-    emulatedReply.setNModified(0);
-    emulatedReply.setNInserted(0);
-    emulatedReply.setNUpserted(0);
-    emulatedReply.setNMatched(0);
+    auto emulatedReply =
+        createEmulatedErrorReply(status, numErrors, _clientRequest.getDollarTenant());
 
     // This error isn't actually specific to any namespaces and so we do not want to track it.
     noteChildBatchResponse(targetedBatch,

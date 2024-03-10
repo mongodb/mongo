@@ -67,6 +67,7 @@ MultiUpdateCoordinatorExternalStateImpl::MultiUpdateCoordinatorExternalStateImpl
 
 Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCommandToShards(
     OperationContext* opCtx, const Message& message) const {
+    opCtx->setCommandForwardedFromRouter();
     return ServiceEntryPointMongos::handleRequestImpl(opCtx, message);
 }
 

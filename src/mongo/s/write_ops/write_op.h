@@ -85,6 +85,7 @@ enum class WriteType {
     // We only categorize non transactional retryable writes into this write type.
     // TODO: PM-3673 for non-retryable writes.
     WithoutShardKeyWithId,
+    MultiWriteBlockingMigrations,
 };
 
 /**

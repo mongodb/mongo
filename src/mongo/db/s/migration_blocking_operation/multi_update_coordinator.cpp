@@ -271,12 +271,14 @@ Message MultiUpdateCoordinatorInstance::getUpdateAsClusterCommand() const {
     auto cmdName = updateCmdObj.firstElement().fieldNameStringData();
     uassert(8126601,
             str::stream() << "Unsupported cmd specified for multi update: " << cmdName,
-            (cmdName == "update"_sd) || (cmdName == "delete"_sd));
+            (cmdName == "update"_sd) || (cmdName == "delete"_sd) || (cmdName == "bulkWrite"_sd));
 
     auto modifiedCmdObj =
         cluster::cmd::translations::replaceCommandNameWithClusterCommandName(updateCmdObj);
     auto opMsgRequest = OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::kNotRequired, _metadata.getNss().dbName(), modifiedCmdObj);
+        auth::ValidatedTenancyScope::kNotRequired,
+        cmdName == "bulkWrite" ? DatabaseName::kAdmin : _metadata.getNss().dbName(),
+        modifiedCmdObj);
     return opMsgRequest.serialize();
 }
 
@@ -460,6 +462,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
                   "oldPhase"_attr = MultiUpdateCoordinatorPhase_serializer(oldPhase),
                   "newPhase"_attr = MultiUpdateCoordinatorPhase_serializer(newPhase),
                   "id"_attr = _metadata.getId(),
+                  "command"_attr = redact(_metadata.getUpdateCommand()),
                   "namespace"_attr = _metadata.getNss());
 
             pauseDuringPhaseTransitions.evaluate(PhaseTransitionProgressEnum::kAfter, newPhase);

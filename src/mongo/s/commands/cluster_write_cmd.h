@@ -287,10 +287,12 @@ private:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
         auto parsedRequest = BatchedCommandRequest::parseUpdate(request);
-        uassert(51195,
-                "Cannot specify runtime constants option to a mongos",
-                !parsedRequest.hasLegacyRuntimeConstants());
-        parsedRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+        if (!opCtx->isCommandForwardedFromRouter()) {
+            uassert(51195,
+                    "Cannot specify runtime constants option to a mongos",
+                    !parsedRequest.hasLegacyRuntimeConstants());
+            parsedRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+        }
         return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 

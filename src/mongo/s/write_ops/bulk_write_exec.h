@@ -133,6 +133,11 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
                            const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                            const BulkWriteCommandRequest& clientRequest);
 
+
+BulkWriteCommandReply createEmulatedErrorReply(const Status& error,
+                                               int errorCount,
+                                               const boost::optional<TenantId>& tenantId);
+
 /**
  * The BulkWriteOp class manages the lifecycle of a bulkWrite request received by mongos. Each op in
  * the ops array is tracked via a WriteOp, and the function of the BulkWriteOp is to aggregate the

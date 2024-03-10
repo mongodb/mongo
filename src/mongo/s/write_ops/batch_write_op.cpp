@@ -60,6 +60,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/collection_uuid_mismatch.h"
+#include "mongo/s/migration_blocking_operation/migration_blocking_operation_cluster_parameters_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
@@ -241,6 +242,26 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
+bool shouldCoordinateMultiUpdate(OperationContext* opCtx, bool isMultiWrite) {
+    if (opCtx->isCommandForwardedFromRouter() || !isMultiWrite) {
+        return false;
+    }
+
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* clusterPauseMigrationsParam = clusterParameters->get<ClusterParameterWithStorage<
+        migration_blocking_operation::PauseMigrationsDuringMultiUpdatesParam>>(
+        "pauseMigrationsDuringMultiUpdates");
+    if (!clusterPauseMigrationsParam->getValue(boost::none).getEnabled()) {
+        return false;
+    };
+
+    if (TransactionRouter::get(opCtx)) {
+        return false;
+    }
+
+    return true;
+}
+
 // 'baseCommandSizeBytes' specifies the base size of a batch command request prior to adding any
 // individual operations to it. This function will ensure that 'baseCommandSizeBytes' plus the
 // result of calling 'getWriteSizeFn' on each write added to a batch will not result in a command
@@ -309,7 +330,8 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         // If we got a WithoutShardKeyOrId or TimeseriesRetryableUpdate write in the previous
         // iteration, it should be sent in its own batch.
         if (writeType == WriteType::WithoutShardKeyOrId ||
-            writeType == WriteType::TimeseriesRetryableUpdate) {
+            writeType == WriteType::TimeseriesRetryableUpdate ||
+            writeType == WriteType::MultiWriteBlockingMigrations) {
             break;
         }
 
@@ -415,7 +437,8 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             }
         }
 
-        // Check if an updateOne or deleteOne necessitates using the two phase write in the case
+        // Check if an update or delete requires using a non ordinary writeType.
+        // An updateOne or deleteOne necessitates using the two phase write in the case
         // where the query does not contain a shard key or _id to target by.
         if (auto writeItem = writeOp.getWriteItem();
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
@@ -430,6 +453,17 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                     return deleteReq.getMulti();
                 }
             }();
+
+            if (shouldCoordinateMultiUpdate(opCtx, isMultiWrite)) {
+                // Multi writes blocking migrations should be in their own batch.
+                if (!batchMap.empty()) {
+                    writeOp.resetWriteToReady();
+                    break;
+                } else {
+                    writeType = WriteType::MultiWriteBlockingMigrations;
+                    writeOp.setWriteType(writeType);
+                }
+            }
 
             auto writeWithoutShardKeyOrId = !isMultiWrite && useTwoPhaseWriteProtocol;
             // Handle time-series retryable updates using the two phase write protocol only when
