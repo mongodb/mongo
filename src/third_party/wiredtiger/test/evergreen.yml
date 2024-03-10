@@ -884,17 +884,16 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
+          configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+          compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+          test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
           posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=0
-      # FIXME-WT-11239 - Re-enable these tasks once libstdc++.so can be found by older versions of clang.
-      # - func: "compile wiredtiger"
-      #   vars:
-      #     posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=6.0 -DCLANG_CXX_VERSION=6.0 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
-      # - func: "compile wiredtiger"
-      #   vars:
-      #     posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=7 -DCLANG_CXX_VERSION=7 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
-      # - func: "compile wiredtiger"
-      #   vars:
-      #     posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=8 -DCLANG_CXX_VERSION=8 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=7 -DCLANG_CXX_VERSION=7 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=8 -DCLANG_CXX_VERSION=8 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
 
   - name: make-check-test
     commands:
@@ -4002,9 +4001,6 @@ buildvariants:
   run_on:
   - ubuntu2004-wt-build
   expansions:
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     posix_configure_flags: 
       -DHAVE_DIAGNOSTIC=1
       -DENABLE_STRICT=1
