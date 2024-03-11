@@ -1,0 +1,17 @@
+- name: embedded_router
+  value:
+    executor:
+      fixture:
+        embedded_router: 1
+        mongod_options:
+          set_parameters:
+            featureFlagEmbeddedRouter: 1
+
+- name: concurrency_embedded_router
+  value:
+    executor:
+      fixture:
+        mongos_options: null
+        mongod_options:
+          set_parameters:
+            queryAnalysisSamplerConfigurationRefreshSecs: 1

@@ -30,6 +30,11 @@ executor:
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
+    # Matrix embedded router suites depend on overrides to have mongos options reflected in mongod
+    # options. Whenever the mongos options in the base suite are changed, the matrix embedded router
+    # suites must be updated to reflect those changes.
+    # Update the embedded_router.concurrency_embedded_router override if the change is uniform across
+    # all concurrency_sharded suites, or create a new override for suite-specific changes.
     mongos_options:
       set_parameters:
         enableTestCommands: 1

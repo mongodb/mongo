@@ -1,0 +1,52 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_embedded_router_clusterwide_ops_add_remove_shards.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHashInBackground
+    - CheckReplDBHash
+    - CheckMetadataConsistencyInBackground
+    - ValidateCollections
+    tests: true
+  config: {}
+  fixture:
+    class: ShardedClusterFixture
+    embedded_router: 1
+    mongod_options:
+      set_parameters:
+        defaultConfigCommandTimeoutMS: 90000
+        enableTestCommands: 1
+        featureFlagEmbeddedRouter: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+    num_mongos: 2
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+  hooks:
+  - class: CheckShardFilteringMetadata
+  - class: CheckReplDBHashInBackground
+  - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
+  - class: CheckOrphansDeleted
+  - class: CheckRoutingTableConsistency
+  - class: ValidateCollections
+  - class: CleanupConcurrencyWorkloads
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+  - requires_replication
+  - requires_profiling
+  - does_not_support_add_remove_shards
+  roots:
+  - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
+test_kind: fsm_workload_test

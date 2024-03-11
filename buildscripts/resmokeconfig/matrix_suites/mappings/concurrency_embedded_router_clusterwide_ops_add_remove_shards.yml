@@ -1,0 +1,4 @@
+base_suite: concurrency_sharded_clusterwide_ops_add_remove_shards
+overrides:
+  - "embedded_router.embedded_router"
+  - "embedded_router.concurrency_embedded_router"
