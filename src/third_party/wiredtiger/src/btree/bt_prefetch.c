@@ -29,7 +29,7 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
      * Pre-fetch traverses the internal page, to do that safely it requires a split gen.
      */
     if (!(F_ISSET(ref, WT_REF_FLAG_LEAF) || __wt_session_gen(session, WT_GEN_SPLIT) == 0)) {
-        WT_STAT_CONN_INCR(session, block_prefetch_failed_start);
+        WT_STAT_CONN_INCR(session, prefetch_failed_start);
         return (0);
     }
 
@@ -51,8 +51,8 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     if (session->pf.prefetch_prev_ref_home == ref->home &&
       session->pf.prefetch_skipped_with_parent < WT_PREFETCH_QUEUE_PER_TRIGGER) {
         ++session->pf.prefetch_skipped_with_parent;
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped_same_ref);
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        WT_STAT_CONN_INCR(session, prefetch_skipped_same_ref);
+        WT_STAT_CONN_INCR(session, prefetch_skipped);
         return (0);
     }
 
@@ -91,7 +91,7 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_INTL_FOREACH_END;
     session->pf.prefetch_prev_ref_home = ref->home;
 
-    WT_STAT_CONN_INCRV(session, block_prefetch_pages_queued, block_preload);
+    WT_STAT_CONN_INCRV(session, prefetch_pages_queued, block_preload);
     return (ret);
 }
 
@@ -110,16 +110,16 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
         __wt_verbose(
           session, WT_VERB_PREFETCH, "The home changed while queued for pre-fetch %s", "");
 
-    WT_PREFETCH_ASSERT(session, pe->dhandle != NULL, block_prefetch_skipped_no_valid_dhandle);
+    WT_PREFETCH_ASSERT(session, pe->dhandle != NULL, prefetch_skipped_no_valid_dhandle);
     WT_PREFETCH_ASSERT(
-      session, !F_ISSET(pe->ref, WT_REF_FLAG_INTERNAL), block_prefetch_skipped_internal_page);
+      session, !F_ISSET(pe->ref, WT_REF_FLAG_INTERNAL), prefetch_skipped_internal_page);
 
     if (pe->ref->state != WT_REF_DISK) {
-        WT_STAT_CONN_INCR(session, block_prefetch_pages_fail);
+        WT_STAT_CONN_INCR(session, prefetch_pages_fail);
         return (0);
     }
 
-    WT_STAT_CONN_INCR(session, block_prefetch_pages_read);
+    WT_STAT_CONN_INCR(session, prefetch_pages_read);
 
     WT_ENTER_GENERATION(session, WT_GEN_SPLIT);
     if (__wt_ref_addr_copy(session, pe->ref, &addr)) {

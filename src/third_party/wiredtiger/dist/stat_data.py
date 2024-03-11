@@ -116,6 +116,10 @@ class PerfHistStat(Stat):
     prefix = 'perf'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, PerfHistStat.prefix, desc, flags)
+class PrefetchStat(Stat):
+    prefix = 'prefetch'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, PrefetchStat.prefix, desc, flags)
 class RecStat(Stat):
     prefix = 'reconciliation'
     def __init__(self, name, desc, flags=''):
@@ -243,21 +247,6 @@ conn_stats = [
     BlockCacheStat('block_cache_lookups', 'lookups'),
     BlockCacheStat('block_cache_misses', 'number of misses'),
     BlockCacheStat('block_cache_not_evicted_overhead', 'number of blocks not evicted due to overhead'),
-
-    BlockCacheStat('block_prefetch_attempts', 'pre-fetch triggered by page read'),
-    BlockCacheStat('block_prefetch_disk_one', 'pre-fetch not triggered after single disk read'),
-    BlockCacheStat('block_prefetch_pages_queued', 'pre-fetch pages queued'),
-    BlockCacheStat('block_prefetch_failed_start', 'number of times pre-fetch failed to start'),
-    BlockCacheStat('block_prefetch_pages_read', 'pre-fetch pages read in background'),
-    BlockCacheStat('block_prefetch_skipped', 'pre-fetch not triggered by page read'),
-    BlockCacheStat('block_prefetch_skipped_disk_read_count', 'pre-fetch not triggered due to disk read count'),
-    BlockCacheStat('block_prefetch_skipped_internal_page', 'could not perform pre-fetch on internal page'),
-    BlockCacheStat('block_prefetch_skipped_internal_session', 'pre-fetch not triggered due to internal session'),
-    BlockCacheStat('block_prefetch_skipped_no_flag_set', 'could not perform pre-fetch on ref without the pre-fetch flag set'),
-    BlockCacheStat('block_prefetch_skipped_no_valid_dhandle', 'pre-fetch not triggered as there is no valid dhandle'),
-    BlockCacheStat('block_prefetch_skipped_same_ref', 'pre-fetch not repeating for recently pre-fetched ref'),
-    BlockCacheStat('block_prefetch_skipped_special_handle', 'pre-fetch not triggered due to special btree handle'),
-    BlockCacheStat('block_prefetch_pages_fail', 'pre-fetch page not on disk when reading'),
 
     ##########################################
     # Block manager statistics
@@ -638,6 +627,24 @@ conn_stats = [
     PerfHistStat('perf_hist_opwrite_latency_lt1000', 'operation write latency histogram (bucket 4) - 500-999us'),
     PerfHistStat('perf_hist_opwrite_latency_lt10000', 'operation write latency histogram (bucket 5) - 1000-9999us'),
     PerfHistStat('perf_hist_opwrite_latency_total_usecs', 'operation write latency histogram total (usecs)'),
+
+    ##########################################
+    # Prefetch statistics
+    ##########################################
+    PrefetchStat('prefetch_attempts', 'pre-fetch triggered by page read'),
+    PrefetchStat('prefetch_disk_one', 'pre-fetch not triggered after single disk read'),
+    PrefetchStat('prefetch_pages_queued', 'pre-fetch pages queued'),
+    PrefetchStat('prefetch_failed_start', 'number of times pre-fetch failed to start'),
+    PrefetchStat('prefetch_pages_read', 'pre-fetch pages read in background'),
+    PrefetchStat('prefetch_skipped', 'pre-fetch not triggered by page read'),
+    PrefetchStat('prefetch_skipped_disk_read_count', 'pre-fetch not triggered due to disk read count'),
+    PrefetchStat('prefetch_skipped_internal_page', 'could not perform pre-fetch on internal page'),
+    PrefetchStat('prefetch_skipped_internal_session', 'pre-fetch not triggered due to internal session'),
+    PrefetchStat('prefetch_skipped_no_flag_set', 'could not perform pre-fetch on ref without the pre-fetch flag set'),
+    PrefetchStat('prefetch_skipped_no_valid_dhandle', 'pre-fetch not triggered as there is no valid dhandle'),
+    PrefetchStat('prefetch_skipped_same_ref', 'pre-fetch not repeating for recently pre-fetched ref'),
+    PrefetchStat('prefetch_skipped_special_handle', 'pre-fetch not triggered due to special btree handle'),
+    PrefetchStat('prefetch_pages_fail', 'pre-fetch page not on disk when reading'),
 
     ##########################################
     # Reconciliation statistics

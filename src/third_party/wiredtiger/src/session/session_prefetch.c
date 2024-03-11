@@ -31,39 +31,39 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
      * logic to determine if pre-fetching will be performed.
      */
     if (!F_ISSET(session, WT_SESSION_PREFETCH_ENABLED)) {
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        WT_STAT_CONN_INCR(session, prefetch_skipped);
         return (false);
     }
 
     if (F_ISSET(session, WT_SESSION_INTERNAL)) {
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped_internal_session);
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        WT_STAT_CONN_INCR(session, prefetch_skipped_internal_session);
+        WT_STAT_CONN_INCR(session, prefetch_skipped);
         return (false);
     }
 
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped_internal_page);
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        WT_STAT_CONN_INCR(session, prefetch_skipped_internal_page);
+        WT_STAT_CONN_INCR(session, prefetch_skipped);
         return (false);
     }
 
     if (F_ISSET(S2BT(session), WT_BTREE_SPECIAL_FLAGS) &&
       !F_ISSET(S2BT(session), WT_BTREE_VERIFY)) {
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped_special_handle);
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        WT_STAT_CONN_INCR(session, prefetch_skipped_special_handle);
+        WT_STAT_CONN_INCR(session, prefetch_skipped);
         return (false);
     }
 
     if (session->pf.prefetch_disk_read_count == 1)
-        WT_STAT_CONN_INCR(session, block_prefetch_disk_one);
+        WT_STAT_CONN_INCR(session, prefetch_disk_one);
 
     if (session->pf.prefetch_disk_read_count < 2) {
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped_disk_read_count);
-        WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+        WT_STAT_CONN_INCR(session, prefetch_skipped_disk_read_count);
+        WT_STAT_CONN_INCR(session, prefetch_skipped);
         return (false);
     }
 
-    WT_STAT_CONN_INCR(session, block_prefetch_attempts);
+    WT_STAT_CONN_INCR(session, prefetch_attempts);
 
     return (true);
 }

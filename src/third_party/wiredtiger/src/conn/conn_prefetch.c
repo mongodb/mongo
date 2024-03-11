@@ -103,7 +103,7 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         __wt_spin_unlock(session, &conn->prefetch_lock);
 
         WT_PREFETCH_ASSERT(
-          session, F_ISSET(pe->ref, WT_REF_FLAG_PREFETCH), block_prefetch_skipped_no_flag_set);
+          session, F_ISSET(pe->ref, WT_REF_FLAG_PREFETCH), prefetch_skipped_no_flag_set);
 
         /*
          * It's a weird case, but if verify is utilizing prefetch and encounters a corrupted block,
