@@ -42,6 +42,7 @@ selector:
     # within it from being read by the dbcheck process. Therefore, if the test keeps the transaction
     # in a prepared state for an extended period, it will result in a timeout for the dbcheck process.
     - jstests/core/txns/prepare_conflict.js
+    - jstests/core/txns/prepare_conflict_aggregation_behavior.js
 
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # Cannot specify "$_requestResumeToken" option to a mongos since it is internal-only.

@@ -43,16 +43,15 @@ assert.commandWorked(db.adminCommand({
 assert.commandWorked(coll.insert({_id: 0}));
 const collUUID = db.getCollectionInfos({name: collName})[0].info.uuid;
 replSet.awaitReplication();
-const fp = configureFailPoint(primary, "hangAndSetDBCheckReadTimestampToLastApplied");
+const fp = configureFailPoint(primary, "hangBeforeAddingDBCheckBatchToOplog");
 clearHealthLog(replSet);
 // Start dbCheck.
 runDbCheck(replSet, db, collName, {});
-// Wait until the dbCheck's read timestamp to be set with the lastApplied timestamp, ensuring that
-// it contains the collection with one document.
+// Wait until the dbCheck's finish the batch and blocked before adding the oplog.
 fp.wait();
 
 // Drop the collection and create a view with the same name and wait for it to be replicated to
-// secondaries.
+// secondaries before the dbcheck oplog.
 coll.drop();
 assert.commandWorked(db.createView(collName, coll2.getName(), []));
 replSet.awaitReplication();

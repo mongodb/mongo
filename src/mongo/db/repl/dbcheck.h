@@ -149,7 +149,6 @@ private:
     OperationContext* _opCtx;
 
 public:
-    const Lock::GlobalLock globalLock;
     const ReadSourceScope readSourceScope;
     const PrepareConflictBehavior prevPrepareConflictBehavior;
     const DataCorruptionDetectionMode prevDataCorruptionMode;

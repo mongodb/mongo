@@ -220,11 +220,6 @@ private:
                                                       const BSONObj& first);
 
     /**
-     * Return `true` iff the primary the check is running on has stepped down.
-     */
-    bool _stepdownHasOccurred(OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
      * Acquire the required locks for dbcheck to run on the given namespace.
      */
     std::unique_ptr<DbCheckAcquisition> _acquireDBCheckLocks(OperationContext* opCtx,

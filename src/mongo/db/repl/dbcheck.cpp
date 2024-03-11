@@ -328,8 +328,6 @@ DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
                                        ReadSourceWithTimestamp readSource,
                                        PrepareConflictBehavior prepareConflictBehavior)
     : _opCtx(opCtx),
-      // dbCheck writes to the oplog, so we need to take an IX global lock.
-      globalLock(opCtx, MODE_IX),
       // Set all of the RecoveryUnit parameters before the colleciton acquisition, which opens a
       // storage snapshot.
       readSourceScope(opCtx, readSource.readSource, readSource.timestamp),

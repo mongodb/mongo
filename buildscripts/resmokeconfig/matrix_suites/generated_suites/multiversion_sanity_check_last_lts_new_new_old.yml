@@ -50,6 +50,7 @@ selector:
   - jstests/core/administrative/current_op/currentop.js
   - jstests/core/fsync.js
   - jstests/core/txns/prepare_conflict.js
+  - jstests/core/txns/prepare_conflict_aggregation_behavior.js
   - jstests/core/ddl/collmod_convert_index_uniqueness.js
   exclude_with_any_tags:
   - assumes_standalone_mongod

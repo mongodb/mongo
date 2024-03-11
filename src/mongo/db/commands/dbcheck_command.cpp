@@ -114,11 +114,12 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangBeforeDbCheckLogOp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
-MONGO_FAIL_POINT_DEFINE(hangAndSetDBCheckReadTimestampToLastApplied);
+MONGO_FAIL_POINT_DEFINE(hangBeforeAddingDBCheckBatchToOplog);
 
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
 // the namespace is still the admin command namespace but the tenantId will be set using the
 // namespace that dbcheck is running for.
+// This will acquire the global lock in IX mode.
 repl::OpTime _logOp(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const boost::optional<TenantId>& tenantIdForStartStop,
@@ -505,6 +506,17 @@ void DbCheckJob::run() {
     auto uniqueOpCtx = tc->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
 
+    // DBcheck only acquires the collection in a lock-free read mode, which takes the global IS
+    // lock for most of its work. It only acquires the globalLock and RSTL
+    // in IX mode when writing to the oplog. Therefore, it doesn't prevent stepdown most of the
+    // time. However, it's crucial to ensure that this operation will be terminated by the
+    // RstlKillOpThread during stepdown, as we don't want the background thread to continue running
+    // after the node becomes secondary.
+    // It's safe if stepdown occurs before marking the operation as interruptible because we log
+    // 'dbcheckStart' to the oplog at the beginning. Therefore, even if a stepdown happens early,
+    // the operation fails at logging 'dbcheckStart', and no further work is done.
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     // DbCheckRun will be empty in a fullDatabaseRun where all collections are not replicated.
     // TODO SERVER-79132: Remove this logic once dbCheck no longer allows for a full database
     // run
@@ -815,132 +827,139 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         hangBeforeExtraIndexKeysHashing.pauseWhileSet(opCtx);
     }
     StringData indexName = _info.secondaryIndexCheckParameters.get().getSecondaryIndex();
-
-    const auto acquisition = _acquireDBCheckLocks(opCtx, _info.nss);
-    // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
-    // one location.
-    if (!acquisition->coll.exists() ||
-        acquisition->coll.getCollectionPtr().get()->uuid() != _info.uuid) {
-        Status status = Status(ErrorCodes::IndexNotFound,
-                               str::stream() << "cannot find collection for ns "
-                                             << _info.nss.toStringForErrorMsg() << " and uuid "
-                                             << _info.uuid.toString());
-        const auto logEntry = dbCheckWarningHealthLogEntry(
-            _info.nss,
-            _info.uuid,
-            "abandoning dbCheck extra index keys check because collection no longer exists",
-            ScopeEnum::Index,
-            OplogEntriesEnum::Batch,
-            status);
-        HealthLogInterface::get(opCtx)->log(*logEntry);
-        batchStats->finishedIndexBatch = true;
-        batchStats->finishedIndexCheck = true;
-
-        return status;
-    }
-    const CollectionPtr& collection = acquisition->coll.getCollectionPtr();
-
-    auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
-    uassert(ErrorCodes::SnapshotUnavailable,
-            "No snapshot available yet for dbCheck extra index keys check",
-            readTimestamp);
-    batchStats->readTimestamp = readTimestamp;
-
-
-    const IndexDescriptor* index = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    if (!index) {
+    DbCheckOplogBatch oplogBatch;
+    BSONObjBuilder builder;
+    {
+        // We need to release the acquisition by dbcheck before writing to the oplog. This is
+        // because dbcheck acquires the global lock in IS mode, and the oplog will attempt to
+        // acquire the global lock in IX mode. Since we don't allow upgrading the global lock,
+        // releasing the lock before writing to the oplog is essential.
+        const auto acquisition = _acquireDBCheckLocks(opCtx, _info.nss);
         // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
         // one location.
-        Status status = Status(ErrorCodes::IndexNotFound,
-                               str::stream() << "cannot find index " << indexName << " for ns "
-                                             << _info.nss.toStringForErrorMsg() << " and uuid "
-                                             << _info.uuid.toString());
-        const auto logEntry = dbCheckWarningHealthLogEntry(
-            _info.nss,
-            _info.uuid,
-            "abandoning dbCheck extra index keys check because index no longer exists",
-            ScopeEnum::Index,
-            OplogEntriesEnum::Batch,
-            status);
-        HealthLogInterface::get(opCtx)->log(*logEntry);
-        batchStats->finishedIndexBatch = true;
-        batchStats->finishedIndexCheck = true;
-        return status;
+        if (!acquisition->coll.exists() ||
+            acquisition->coll.getCollectionPtr().get()->uuid() != _info.uuid) {
+            Status status = Status(ErrorCodes::IndexNotFound,
+                                   str::stream() << "cannot find collection for ns "
+                                                 << _info.nss.toStringForErrorMsg() << " and uuid "
+                                                 << _info.uuid.toString());
+            const auto logEntry = dbCheckWarningHealthLogEntry(
+                _info.nss,
+                _info.uuid,
+                "abandoning dbCheck extra index keys check because collection no longer exists",
+                ScopeEnum::Index,
+                OplogEntriesEnum::Batch,
+                status);
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            batchStats->finishedIndexBatch = true;
+            batchStats->finishedIndexCheck = true;
+
+            return status;
+        }
+        const CollectionPtr& collection = acquisition->coll.getCollectionPtr();
+
+        auto readTimestamp =
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "No snapshot available yet for dbCheck extra index keys check",
+                readTimestamp);
+        batchStats->readTimestamp = readTimestamp;
+
+
+        const IndexDescriptor* index =
+            collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+        if (!index) {
+            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
+            // one location.
+            Status status = Status(ErrorCodes::IndexNotFound,
+                                   str::stream() << "cannot find index " << indexName << " for ns "
+                                                 << _info.nss.toStringForErrorMsg() << " and uuid "
+                                                 << _info.uuid.toString());
+            const auto logEntry = dbCheckWarningHealthLogEntry(
+                _info.nss,
+                _info.uuid,
+                "abandoning dbCheck extra index keys check because index no longer exists",
+                ScopeEnum::Index,
+                OplogEntriesEnum::Batch,
+                status);
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            batchStats->finishedIndexBatch = true;
+            batchStats->finishedIndexCheck = true;
+            return status;
+        }
+        const IndexCatalogEntry* indexCatalogEntry = collection->getIndexCatalog()->getEntry(index);
+        auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+        const auto ordering = iam->getSortedDataInterface()->getOrdering();
+        auto firstBson = key_string::toBsonSafe(
+            batchFirst.getBuffer(), batchFirst.getSize(), ordering, batchFirst.getTypeBits());
+        auto lastBson = key_string::toBsonSafe(
+            batchLast.getBuffer(), batchLast.getSize(), ordering, batchLast.getTypeBits());
+
+        // Create hasher.
+        boost::optional<DbCheckHasher> hasher;
+        try {
+            hasher.emplace(opCtx,
+                           *acquisition,
+                           firstBson,
+                           lastBson,
+                           _info.secondaryIndexCheckParameters,
+                           &_info.dataThrottle,
+                           indexName,
+                           std::min(_info.maxDocsPerBatch, _info.maxCount),
+                           _info.maxSize);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        Status status =
+            hasher->hashForExtraIndexKeysCheck(opCtx, collection.get(), batchFirst, batchLast);
+        if (!status.isOK()) {
+            return status;
+        }
+
+
+        // Send information on this batch over the oplog.
+        std::string md5 = hasher->total();
+        batchStats->md5 = md5;
+        oplogBatch.setType(OplogEntriesEnum::Batch);
+        oplogBatch.setNss(_info.nss);
+        oplogBatch.setReadTimestamp(*readTimestamp);
+        oplogBatch.setMd5(md5);
+        oplogBatch.setBatchStart(firstBson);
+        oplogBatch.setBatchEnd(lastBson);
+
+        if (_info.secondaryIndexCheckParameters) {
+            oplogBatch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
+        }
+
+        LOGV2_DEBUG(7844900,
+                    3,
+                    "hashed one batch on primary",
+                    "firstKeyString"_attr =
+                        key_string::rehydrateKey(index->keyPattern(), firstBson),
+                    "lastKeyString"_attr = key_string::rehydrateKey(index->keyPattern(), lastBson),
+                    "md5"_attr = md5,
+                    "keysHashed"_attr = hasher->keysSeen(),
+                    "bytesHashed"_attr = hasher->bytesSeen(),
+                    "readTimestamp"_attr = readTimestamp,
+                    "indexName"_attr = indexName,
+                    logAttrs(_info.nss),
+                    "uuid"_attr = _info.uuid);
+
+        builder.append("success", true);
+        builder.append("count", hasher->keysSeen());
+        builder.append("bytes", hasher->bytesSeen());
+        builder.append("md5", batchStats->md5);
+        builder.append("minKey", firstBson);
+        builder.append("maxKey", lastBson);
+        if (readTimestamp) {
+            builder.append("readTimestamp", *readTimestamp);
+        }
     }
-    const IndexCatalogEntry* indexCatalogEntry = collection->getIndexCatalog()->getEntry(index);
-    auto iam = indexCatalogEntry->accessMethod()->asSortedData();
-    const auto ordering = iam->getSortedDataInterface()->getOrdering();
-    auto firstBson = key_string::toBsonSafe(
-        batchFirst.getBuffer(), batchFirst.getSize(), ordering, batchFirst.getTypeBits());
-    auto lastBson = key_string::toBsonSafe(
-        batchLast.getBuffer(), batchLast.getSize(), ordering, batchLast.getTypeBits());
 
-    // Create hasher.
-    boost::optional<DbCheckHasher> hasher;
-    try {
-        hasher.emplace(opCtx,
-                       *acquisition,
-                       firstBson,
-                       lastBson,
-                       _info.secondaryIndexCheckParameters,
-                       &_info.dataThrottle,
-                       indexName,
-                       std::min(_info.maxDocsPerBatch, _info.maxCount),
-                       _info.maxSize);
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
+    batchStats->time = _logOp(
+        opCtx, _info.nss, boost::none /* tenantIdForStartStop */, _info.uuid, oplogBatch.toBSON());
 
-    Status status =
-        hasher->hashForExtraIndexKeysCheck(opCtx, collection.get(), batchFirst, batchLast);
-    if (!status.isOK()) {
-        return status;
-    }
-
-
-    // Send information on this batch over the oplog.
-    std::string md5 = hasher->total();
-    batchStats->md5 = md5;
-    DbCheckOplogBatch oplogBatch;
-    oplogBatch.setType(OplogEntriesEnum::Batch);
-    oplogBatch.setNss(_info.nss);
-    oplogBatch.setReadTimestamp(*readTimestamp);
-    oplogBatch.setMd5(md5);
-    oplogBatch.setBatchStart(firstBson);
-    oplogBatch.setBatchEnd(lastBson);
-
-    if (_info.secondaryIndexCheckParameters) {
-        oplogBatch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
-    }
-    batchStats->time = _logOp(opCtx,
-                              _info.nss,
-                              boost::none /* tenantIdForStartStop */,
-                              collection->uuid(),
-                              oplogBatch.toBSON());
-    LOGV2_DEBUG(7844900,
-                3,
-                "hashed one batch on primary",
-                "firstKeyString"_attr = key_string::rehydrateKey(index->keyPattern(), firstBson),
-                "lastKeyString"_attr = key_string::rehydrateKey(index->keyPattern(), lastBson),
-                "md5"_attr = md5,
-                "keysHashed"_attr = hasher->keysSeen(),
-                "bytesHashed"_attr = hasher->bytesSeen(),
-                "readTimestamp"_attr = readTimestamp,
-                "indexName"_attr = indexName,
-                logAttrs(_info.nss),
-                "uuid"_attr = _info.uuid);
-
-    BSONObjBuilder builder;
-    builder.append("success", true);
-    builder.append("count", hasher->keysSeen());
-    builder.append("bytes", hasher->bytesSeen());
-    builder.append("md5", batchStats->md5);
-    builder.append("minKey", firstBson);
-    builder.append("maxKey", lastBson);
-    if (readTimestamp) {
-        builder.append("readTimestamp", *readTimestamp);
-    }
     builder.append("optime", batchStats->time.toBSON());
     auto logEntry = dbCheckHealthLogEntry(_info.nss,
                                           _info.uuid,
@@ -1567,119 +1586,110 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
 
 StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* opCtx,
                                                              const BSONObj& first) {
-    const auto acquisition = _acquireDBCheckLocks(opCtx, _info.nss);
-    if (!acquisition->coll.exists()) {
-        const auto msg = "Collection under dbCheck no longer exists";
-        return {ErrorCodes::NamespaceNotFound, msg};
-    }
-    // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
-    const CollectionPtr& collectionPtr = acquisition->coll.getCollectionPtr();
-    if (collectionPtr.get()->uuid() != _info.uuid) {
-        const auto msg = "Collection under dbCheck no longer exists";
-        return {ErrorCodes::NamespaceNotFound, msg};
-    }
-
-    auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
-    uassert(
-        ErrorCodes::SnapshotUnavailable, "No snapshot available yet for dbCheck", readTimestamp);
-
-    boost::optional<DbCheckHasher> hasher;
-    Status status = Status::OK();
-    try {
-        hasher.emplace(opCtx,
-                       *acquisition,
-                       first,
-                       _info.end,
-                       _info.secondaryIndexCheckParameters,
-                       &_info.dataThrottle,
-                       boost::none,
-                       std::min(_info.maxDocsPerBatch, _info.maxCount),
-                       _info.maxSize);
-
-        const auto batchDeadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
-        status = hasher->hashForCollectionCheck(opCtx, collectionPtr, batchDeadline);
-    } catch (const DBException& e) {
-        return e.toStatus();
-    }
-
-    if (!status.isOK()) {
-        // dbCheck should still continue if we get an error fetching a record.
-        if (status.code() == ErrorCodes::NoSuchKey) {
-            std::unique_ptr<HealthLogEntry> healthLogEntry =
-                dbCheckErrorHealthLogEntry(_info.nss,
-                                           _info.uuid,
-                                           "Error fetching record from record id",
-                                           ScopeEnum::Index,
-                                           OplogEntriesEnum::Batch,
-                                           status);
-            HealthLogInterface::get(opCtx)->log(*healthLogEntry);
-        } else {
-            return status;
-        }
-    }
-
-    std::string md5 = hasher->total();
-
+    DbCheckCollectionBatchStats result;
     DbCheckOplogBatch batch;
-    batch.setType(OplogEntriesEnum::Batch);
-    batch.setNss(_info.nss);
-    batch.setMd5(md5);
-    batch.setReadTimestamp(*readTimestamp);
-    // TODO SERVER-78399: Remove special handling for BSONKey once feature flag is removed.
-    if (_info.secondaryIndexCheckParameters) {
-        batch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
+    {
+        // We need to release the acquisition by dbcheck before writing to the oplog. This is
+        // because dbcheck acquires the global lock in IS mode, and the oplog will attempt to
+        // acquire the global lock in IX mode. Since we don't allow upgrading the global lock,
+        // releasing the lock before writing to the oplog is essential.
+        const auto acquisition = _acquireDBCheckLocks(opCtx, _info.nss);
+        if (!acquisition->coll.exists()) {
+            const auto msg = "Collection under dbCheck no longer exists";
+            return {ErrorCodes::NamespaceNotFound, msg};
+        }
+        // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
+        const CollectionPtr& collectionPtr = acquisition->coll.getCollectionPtr();
+        if (collectionPtr.get()->uuid() != _info.uuid) {
+            const auto msg = "Collection under dbCheck no longer exists";
+            return {ErrorCodes::NamespaceNotFound, msg};
+        }
 
-        // Set batchStart/batchEnd only if feature flag is on
-        // (info.secondaryIndexCheckParameters is only boost::none if the feature flag is
-        // off).
-        batch.setBatchStart(first);
-        batch.setBatchEnd(hasher->lastKey());
-    } else {
-        // Otherwise set minKey/maxKey in BSONKey format.
-        batch.setMinKey(BSONKey::parseFromBSON(first.firstElement()));
-        batch.setMaxKey(BSONKey::parseFromBSON(hasher->lastKey().firstElement()));
+        auto readTimestamp =
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "No snapshot available yet for dbCheck",
+                readTimestamp);
+
+        boost::optional<DbCheckHasher> hasher;
+        Status status = Status::OK();
+        try {
+            hasher.emplace(opCtx,
+                           *acquisition,
+                           first,
+                           _info.end,
+                           _info.secondaryIndexCheckParameters,
+                           &_info.dataThrottle,
+                           boost::none,
+                           std::min(_info.maxDocsPerBatch, _info.maxCount),
+                           _info.maxSize);
+
+            const auto batchDeadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
+            status = hasher->hashForCollectionCheck(opCtx, collectionPtr, batchDeadline);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        if (!status.isOK()) {
+            // dbCheck should still continue if we get an error fetching a record.
+            if (status.code() == ErrorCodes::NoSuchKey) {
+                std::unique_ptr<HealthLogEntry> healthLogEntry =
+                    dbCheckErrorHealthLogEntry(_info.nss,
+                                               _info.uuid,
+                                               "Error fetching record from record id",
+                                               ScopeEnum::Index,
+                                               OplogEntriesEnum::Batch,
+                                               status);
+                HealthLogInterface::get(opCtx)->log(*healthLogEntry);
+            } else {
+                return status;
+            }
+        }
+
+        std::string md5 = hasher->total();
+
+        batch.setType(OplogEntriesEnum::Batch);
+        batch.setNss(_info.nss);
+        batch.setMd5(md5);
+        batch.setReadTimestamp(*readTimestamp);
+        // TODO SERVER-78399: Remove special handling for BSONKey once feature flag is removed.
+        if (_info.secondaryIndexCheckParameters) {
+            batch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
+
+            // Set batchStart/batchEnd only if feature flag is on
+            // (info.secondaryIndexCheckParameters is only boost::none if the feature flag is
+            // off).
+            batch.setBatchStart(first);
+            batch.setBatchEnd(hasher->lastKey());
+        } else {
+            // Otherwise set minKey/maxKey in BSONKey format.
+            batch.setMinKey(BSONKey::parseFromBSON(first.firstElement()));
+            batch.setMaxKey(BSONKey::parseFromBSON(hasher->lastKey().firstElement()));
+        }
+
+        if (MONGO_unlikely(hangBeforeDbCheckLogOp.shouldFail())) {
+            LOGV2(8230500, "Hanging dbcheck due to failpoint 'hangBeforeDbCheckLogOp'");
+            hangBeforeDbCheckLogOp.pauseWhileSet();
+        }
+
+        result.logToHealthLog = _shouldLogBatch(batch);
+        result.batchId = batch.getBatchId();
+        result.readTimestamp = readTimestamp;
+        result.nDocs = hasher->docsSeen();
+        result.nBytes = hasher->bytesSeen();
+        result.lastKey = hasher->lastKey();
+        result.md5 = md5;
     }
 
-    if (MONGO_unlikely(hangBeforeDbCheckLogOp.shouldFail())) {
-        LOGV2(8230500, "Hanging dbcheck due to failpoint 'hangBeforeDbCheckLogOp'");
-        hangBeforeDbCheckLogOp.pauseWhileSet();
+    if (MONGO_unlikely(hangBeforeAddingDBCheckBatchToOplog.shouldFail())) {
+        LOGV2(8589000, "Hanging dbCheck due to failpoint 'hangBeforeAddingDBCheckBatchToOplog'");
+        hangBeforeAddingDBCheckBatchToOplog.pauseWhileSet();
     }
 
     // Send information on this batch over the oplog.
-    DbCheckCollectionBatchStats result;
-    result.logToHealthLog = _shouldLogBatch(batch);
-    result.batchId = batch.getBatchId();
-    result.time = _logOp(opCtx,
-                         _info.nss,
-                         boost::none /* tenantIdForStartStop */,
-                         collectionPtr->uuid(),
-                         batch.toBSON());
-    result.readTimestamp = readTimestamp;
-    result.nDocs = hasher->docsSeen();
-    result.nBytes = hasher->bytesSeen();
-    result.lastKey = hasher->lastKey();
-    result.md5 = md5;
+    result.time = _logOp(
+        opCtx, _info.nss, boost::none /* tenantIdForStartStop */, _info.uuid, batch.toBSON());
     return result;
-}
-
-/**
- * Return `true` iff the primary the check is running on has stepped down.
- */
-bool DbChecker::_stepdownHasOccurred(OperationContext* opCtx, const NamespaceString& nss) {
-    Status status = opCtx->checkForInterruptNoAssert();
-
-    if (!status.isOK()) {
-        return true;
-    }
-
-    auto coord = repl::ReplicationCoordinator::get(opCtx);
-
-    if (!coord->canAcceptWritesFor(opCtx, nss)) {
-        return true;
-    }
-
-    return false;
 }
 
 std::unique_ptr<DbCheckAcquisition> DbChecker::_acquireDBCheckLocks(OperationContext* opCtx,
@@ -1691,17 +1701,6 @@ std::unique_ptr<DbCheckAcquisition> DbChecker::_acquireDBCheckLocks(OperationCon
     // time it processes the oplog entry.
     auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
 
-    if (MONGO_unlikely(hangAndSetDBCheckReadTimestampToLastApplied.shouldFail())) {
-        auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
-        readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kProvided,
-                                             lastAppliedOpTime.getTimestamp()};
-        LOGV2(8589000,
-              "Hanging dbCheck due to failpoint 'hangAndSetDBCheckReadTimestampToLastApplied' and "
-              "setting dbCheck's readTimestamp to lastAppliedOpTime.",
-              "lastAppliedOpTime"_attr = lastAppliedOpTime);
-        hangAndSetDBCheckReadTimestampToLastApplied.pauseWhileSet();
-    }
-
     // Acquires locks and sets appropriate state on the RecoveryUnit.
     auto acquisition = std::make_unique<DbCheckAcquisition>(
         opCtx,
@@ -1709,14 +1708,6 @@ std::unique_ptr<DbCheckAcquisition> DbChecker::_acquireDBCheckLocks(OperationCon
         readSource,
         // On the primary we must always block on prepared updates to guarantee snapshot isolation.
         PrepareConflictBehavior::kEnforce);
-
-    // At this point, we've secured the RSTL lock in IS mode, which prevents any stepdown from
-    // acquiring the RSTL lock in X mode. Hence, we need to verify that no stepdown has occurred and
-    // that we remain the primary.
-    if (_stepdownHasOccurred(opCtx, _info.nss)) {
-        iassert(Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown"));
-    }
-
     // At this point, we can be certain that no stepdown will occur throughout the lifespan of the
     // 'acquisition' object. Therefore, we should regularly check for interruption to prevent the
     // stepdown thread from waiting unnecessarily.
