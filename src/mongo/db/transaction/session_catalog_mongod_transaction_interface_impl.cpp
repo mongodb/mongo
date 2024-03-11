@@ -175,7 +175,8 @@ MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForStepUp(
     return [sessionKillTokens, sessionsToReacquireLocks](ObservableSession& session) {
         const auto txnParticipant = TransactionParticipant::get(session);
         if (!txnParticipant.transactionIsOpen()) {
-            sessionKillTokens->emplace_back(session.kill());
+            sessionKillTokens->emplace_back(
+                session.kill(ErrorCodes::InterruptedDueToReplStateChange));
         }
 
         if (txnParticipant.transactionIsPrepared()) {
