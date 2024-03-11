@@ -822,7 +822,7 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
         sortedMeasurements.begin()->timeField.timestamp() < maxCommittedTime) {
         batch->bucketIsSortedByTime = false;
         changedToUnsorted = true;
-        batch->stats.incNumBucketsPromoted();
+        batch->stats.incNumCompressedBucketsConvertedToUnsorted();
     }
 
     // Insert new measurements, and appropriate skips, into all column builders.

@@ -100,9 +100,9 @@ void ExecutionStatsController::incNumBucketsArchivedDueToTimeBackward(long long 
     _globalStats->numBucketsArchivedDueToTimeBackward.fetchAndAddRelaxed(increment);
 }
 
-void ExecutionStatsController::incNumBucketsPromoted(long long increment) {
-    _collectionStats->numBucketsPromoted.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsPromoted.fetchAndAddRelaxed(increment);
+void ExecutionStatsController::incNumCompressedBucketsConvertedToUnsorted(long long increment) {
+    _collectionStats->numCompressedBucketsConvertedToUnsorted.fetchAndAddRelaxed(increment);
+    _globalStats->numCompressedBucketsConvertedToUnsorted.fetchAndAddRelaxed(increment);
 }
 
 void ExecutionStatsController::incNumBucketsFrozen(long long increment) {
@@ -239,7 +239,8 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketsClosedDueToCachePressure",
                          stats.numBucketsClosedDueToCachePressure.load());
     builder.appendNumber("numBucketsFrozen", stats.numBucketsFrozen.load());
-    builder.appendNumber("numBucketsPromoted", stats.numBucketsPromoted.load());
+    builder.appendNumber("numCompressedBucketsConvertedToUnsorted",
+                         stats.numCompressedBucketsConvertedToUnsorted.load());
     builder.appendNumber("numBucketsFetched", stats.numBucketsFetched.load());
     builder.appendNumber("numBucketsQueried", stats.numBucketsQueried.load());
     builder.appendNumber("numBucketFetchesFailed", stats.numBucketFetchesFailed.load());
@@ -280,7 +281,8 @@ void addCollectionExecutionStats(ExecutionStatsController& stats, const Executio
     stats.incNumBucketsArchivedDueToTimeBackward(
         collStats.numBucketsArchivedDueToTimeBackward.load());
     stats.incNumBucketsFrozen(collStats.numBucketsFrozen.load());
-    stats.incNumBucketsPromoted(collStats.numBucketsPromoted.load());
+    stats.incNumCompressedBucketsConvertedToUnsorted(
+        collStats.numCompressedBucketsConvertedToUnsorted.load());
     stats.incNumCommits(collStats.numCommits.load());
     stats.incNumMeasurementsGroupCommitted(collStats.numMeasurementsGroupCommitted.load());
     stats.incNumWaits(collStats.numWaits.load());

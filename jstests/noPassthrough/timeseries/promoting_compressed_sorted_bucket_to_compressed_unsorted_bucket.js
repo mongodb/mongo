@@ -42,7 +42,7 @@ assert.eq(
 // Ensure that we have not yet incremented our metric tracking the number of buckets promoted
 // from v2 to v3.
 let stats = assert.commandWorked(coll.stats());
-assert.eq(stats.timeseries['numBucketsPromoted'], 0);
+assert.eq(stats.timeseries['numCompressedBucketsConvertedToUnsorted'], 0);
 
 // Insert second measurement, which will cause the measurements to be out of order time wise
 // and should cause the bucket to be promoted to v3.
@@ -54,9 +54,9 @@ assert.gte(bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCo
                .length(),
            1);
 
-// Check that the numBucketsPromoted metric is properly incremented.
+// Check that the numCompressedBucketsConvertedToUnsorted metric is properly incremented.
 stats = assert.commandWorked(coll.stats());
-assert.eq(stats.timeseries['numBucketsPromoted'], 1);
+assert.eq(stats.timeseries['numCompressedBucketsConvertedToUnsorted'], 1);
 
 // Verify that the bucket's measurements are unpacked out of order.
 let documents = coll.find().toArray();
