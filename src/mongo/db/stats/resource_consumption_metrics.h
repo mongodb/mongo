@@ -97,7 +97,7 @@ public:
          * when the unit size is large. This is desired behavior, and the extent to which small
          * datums are overstated is tunable by the unit size of the implementor.
          */
-        void observeOne(size_t datumBytes);
+        void observeOne(int64_t datumBytes);
 
     protected:
         /**
@@ -125,8 +125,8 @@ public:
      * observed. */
     class TotalUnitWriteCounter {
     public:
-        void observeOneDocument(size_t datumBytes);
-        void observeOneIndexEntry(size_t datumBytes);
+        void observeOneDocument(int64_t datumBytes);
+        void observeOneIndexEntry(int64_t datumBytes);
 
         TotalUnitWriteCounter& operator+=(TotalUnitWriteCounter other) {
             // Flush the accumulators, in case there is anything still pending.
@@ -348,7 +348,7 @@ public:
          * This should be called once per document read with the number of bytes read for that
          * document.  This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneDocRead(StringData uri, size_t docBytesRead) {
+        void incrementOneDocRead(StringData uri, int64_t docBytesRead) {
             if (!isCollecting()) {
                 return;
             }
@@ -360,7 +360,7 @@ public:
          * This should be called once per index entry read with the number of bytes read for that
          * entry. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneIdxEntryRead(StringData uri, size_t bytesRead) {
+        void incrementOneIdxEntryRead(StringData uri, int64_t bytesRead) {
             if (!isCollecting()) {
                 return;
             }
@@ -372,7 +372,7 @@ public:
          * Increments the number of keys sorted for a query operation. This is a no-op when metrics
          * collection is disabled on this operation.
          */
-        void incrementKeysSorted(size_t keysSorted) {
+        void incrementKeysSorted(int64_t keysSorted) {
             if (!isCollecting()) {
                 return;
             }
@@ -384,7 +384,7 @@ public:
          * Increments the number of number of individual spills to disk by the sorter for query
          * operations. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementSorterSpills(size_t spills) {
+        void incrementSorterSpills(int64_t spills) {
             if (!isCollecting()) {
                 return;
             }
@@ -409,7 +409,7 @@ public:
          * function should not be called when the operation is a write to the oplog. The metrics are
          * only for operations that are not oplog writes.
          */
-        void incrementOneDocWritten(StringData uri, size_t bytesWritten) {
+        void incrementOneDocWritten(StringData uri, int64_t bytesWritten) {
             if (!isCollecting()) {
                 return;
             }
@@ -421,7 +421,7 @@ public:
          * This should be called once per index entry written with the number of bytes written for
          * that entry. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneIdxEntryWritten(StringData uri, size_t bytesWritten) {
+        void incrementOneIdxEntryWritten(StringData uri, int64_t bytesWritten) {
             if (!isCollecting()) {
                 return;
             }
@@ -475,13 +475,13 @@ public:
 
         // These internal helpers allow us to inline the public functions when we aren't collecting
         // metrics and calls these costlier implementations when we are.
-        void _incrementOneDocRead(StringData uri, size_t docBytesRead);
-        void _incrementOneIdxEntryRead(StringData uri, size_t bytesRead);
-        void _incrementKeysSorted(size_t keysSorted);
-        void _incrementSorterSpills(size_t spills);
+        void _incrementOneDocRead(StringData uri, int64_t docBytesRead);
+        void _incrementOneIdxEntryRead(StringData uri, int64_t bytesRead);
+        void _incrementKeysSorted(int64_t keysSorted);
+        void _incrementSorterSpills(int64_t spills);
         void _incrementDocUnitsReturned(StringData ns, DocumentUnitCounter docUnits);
-        void _incrementOneDocWritten(StringData uri, size_t bytesWritten);
-        void _incrementOneIdxEntryWritten(StringData uri, size_t bytesWritten);
+        void _incrementOneDocWritten(StringData uri, int64_t bytesWritten);
+        void _incrementOneIdxEntryWritten(StringData uri, int64_t bytesWritten);
         void _incrementOneCursorSeek(StringData uri);
 
         /**
@@ -601,7 +601,7 @@ public:
     /**
      *  Returns the number of databases with aggregated metrics.
      */
-    size_t getNumDbMetrics() const;
+    int64_t getNumDbMetrics() const;
 
     /**
      * Returns the per-database metrics map and then clears the contents. This attempts to swap and

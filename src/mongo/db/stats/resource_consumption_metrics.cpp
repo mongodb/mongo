@@ -131,12 +131,12 @@ ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::ge
     return getMetricsCollector(opCtx);
 }
 
-void ResourceConsumption::UnitCounter::observeOne(size_t datumBytes) {
+void ResourceConsumption::UnitCounter::observeOne(int64_t datumBytes) {
     _units += std::ceil(datumBytes / static_cast<float>(unitSize()));
     _bytes += datumBytes;
 }
 
-void ResourceConsumption::TotalUnitWriteCounter::observeOneDocument(size_t datumBytes) {
+void ResourceConsumption::TotalUnitWriteCounter::observeOneDocument(int64_t datumBytes) {
     // If we have accumulated document bytes, calculate units along with any past index bytes.
     // Accumulate the current document bytes for use in a later unit calculation.
     if (_accumulatedDocumentBytes > 0) {
@@ -159,7 +159,7 @@ void ResourceConsumption::TotalUnitWriteCounter::observeOneDocument(size_t datum
     _accumulatedDocumentBytes = datumBytes;
 }
 
-void ResourceConsumption::TotalUnitWriteCounter::observeOneIndexEntry(size_t datumBytes) {
+void ResourceConsumption::TotalUnitWriteCounter::observeOneIndexEntry(int64_t datumBytes) {
     _accumulatedIndexBytes += datumBytes;
 }
 
@@ -246,7 +246,7 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
 }
 
 void ResourceConsumption::MetricsCollector::_incrementOneDocRead(StringData uri,
-                                                                 size_t docBytesRead) {
+                                                                 int64_t docBytesRead) {
     _metrics.readMetrics.docsRead.observeOne(docBytesRead);
     LOGV2_DEBUG(6523900,
                 2,
@@ -256,7 +256,7 @@ void ResourceConsumption::MetricsCollector::_incrementOneDocRead(StringData uri,
 }
 
 void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryRead(StringData uri,
-                                                                      size_t bytesRead) {
+                                                                      int64_t bytesRead) {
     _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead);
 
     LOGV2_DEBUG(6523901,
@@ -266,7 +266,7 @@ void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryRead(StringData
                 "bytes"_attr = bytesRead);
 }
 
-void ResourceConsumption::MetricsCollector::_incrementKeysSorted(size_t keysSorted) {
+void ResourceConsumption::MetricsCollector::_incrementKeysSorted(int64_t keysSorted) {
     _metrics.readMetrics.keysSorted += keysSorted;
     LOGV2_DEBUG(6523902,
                 2,
@@ -274,7 +274,7 @@ void ResourceConsumption::MetricsCollector::_incrementKeysSorted(size_t keysSort
                 "keysSorted"_attr = keysSorted);
 }
 
-void ResourceConsumption::MetricsCollector::_incrementSorterSpills(size_t spills) {
+void ResourceConsumption::MetricsCollector::_incrementSorterSpills(int64_t spills) {
     _metrics.readMetrics.sorterSpills += spills;
     LOGV2_DEBUG(6523903,
                 2,
@@ -293,7 +293,7 @@ void ResourceConsumption::MetricsCollector::_incrementDocUnitsReturned(
 }
 
 void ResourceConsumption::MetricsCollector::_incrementOneDocWritten(StringData uri,
-                                                                    size_t bytesWritten) {
+                                                                    int64_t bytesWritten) {
     _metrics.writeMetrics.docsWritten.observeOne(bytesWritten);
     _metrics.writeMetrics.totalWritten.observeOneDocument(bytesWritten);
     LOGV2_DEBUG(6523905,
@@ -304,7 +304,7 @@ void ResourceConsumption::MetricsCollector::_incrementOneDocWritten(StringData u
 }
 
 void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryWritten(StringData uri,
-                                                                         size_t bytesWritten) {
+                                                                         int64_t bytesWritten) {
     _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten);
     _metrics.writeMetrics.totalWritten.observeOneIndexEntry(bytesWritten);
     LOGV2_DEBUG(6523906,
@@ -442,7 +442,7 @@ ResourceConsumption::MetricsMap ResourceConsumption::getDbMetrics() const {
     return _dbMetrics;
 }
 
-size_t ResourceConsumption::getNumDbMetrics() const {
+int64_t ResourceConsumption::getNumDbMetrics() const {
     stdx::lock_guard<Mutex> lk(_mutex);
     return _dbMetrics.size();
 }

@@ -1335,18 +1335,6 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
                               *WiredTigerRecoveryUnit::get(opCtx), c, entries.data(), nentries)),
                 c->session);
 
-            size_t modifiedDataSize = 0;
-            // Don't perform a range-based for loop because there may be fewer calculated entries
-            // than the reserved maximum.
-            for (auto i = 0; i < nentries; i++) {
-                // Account for both the amount of old data we are overwriting (size) and new data we
-                // are inserting (data.size).
-                modifiedDataSize += entries[i].size + entries[i].data.size;
-            }
-
-            auto keyLength = computeRecordIdSize(id);
-            metricsCollector.incrementOneDocWritten(_uri, modifiedDataSize + keyLength);
-
             WT_ITEM new_value;
             dassert(nentries == 0 ||
                     (c->get_value(c, &new_value) == 0 && new_value.size == value.size &&
@@ -1360,13 +1348,15 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
     if (!skip_update) {
         c->set_value(c, value.Get());
         ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
-
-        auto keyLength = computeRecordIdSize(id);
-        metricsCollector.incrementOneDocWritten(_uri, value.size + keyLength);
     }
     invariantWTOK(ret, c->session);
 
-    _changeNumRecordsAndDataSize(opCtx, 0, len - old_length);
+    auto sizeDiff = len - old_length;
+
+    // For updates that don't modify the document size, they should count as at least one unit, so
+    // just attribute them as 1-byte modifications for simplicity.
+    metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
+    _changeNumRecordsAndDataSize(opCtx, 0, sizeDiff);
     return Status::OK();
 }
 
@@ -1385,16 +1375,11 @@ StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
     mutablebson::DamageVector::const_iterator where = damages.begin();
     const mutablebson::DamageVector::const_iterator end = damages.cend();
     std::vector<WT_MODIFY> entries(nentries);
-    size_t modifiedDataSize = 0;
     for (u_int i = 0; where != end; ++i, ++where) {
         entries[i].data.data = damageSource + where->sourceOffset;
         entries[i].data.size = where->sourceSize;
         entries[i].offset = where->targetOffset;
         entries[i].size = where->targetSize;
-        // Account for both the amount of old data we are overwriting (size) and new data we are
-        // inserting (data.size).
-        modifiedDataSize += entries[i].size;
-        modifiedDataSize += entries[i].data.size;
     }
 
     WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, true);
@@ -1412,16 +1397,17 @@ StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
                           *WiredTigerRecoveryUnit::get(opCtx), c, entries.data(), nentries)),
                       c->session);
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-
-    auto keyLength = computeRecordIdSize(id);
-    metricsCollector.incrementOneDocWritten(_uri, modifiedDataSize + keyLength);
 
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value), c->session);
 
-    _changeNumRecordsAndDataSize(
-        opCtx, 0, static_cast<int64_t>(value.size) - static_cast<int64_t>(oldRec.size()));
+    auto sizeDiff = static_cast<int64_t>(value.size) - static_cast<int64_t>(oldRec.size());
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+
+    // For updates that don't modify the document size, they should count as at least one unit, so
+    // just attribute them as 1-byte modifications for simplicity.
+    metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
+    _changeNumRecordsAndDataSize(opCtx, 0, sizeDiff);
 
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }

@@ -167,7 +167,7 @@ let nextId = nDocs;
     clearMetrics(primary);
     assert.commandWorked(primaryDB[collName].update(doc, {$set: {b: 0}}));
     assertMetrics(primary, (metrics) => {
-        assert.eq(metrics[dbName].docBytesWritten, 40);
+        assert.eq(metrics[dbName].docBytesWritten, 11);
         assert.eq(metrics[dbName].docUnitsWritten, 1);
         assert.eq(metrics[dbName].totalUnitsWritten, 1);
         assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 29);

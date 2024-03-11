@@ -253,7 +253,7 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
 }
 
 namespace {
-ResourceConsumption::DocumentUnitCounter makeDocUnits(size_t bytes) {
+ResourceConsumption::DocumentUnitCounter makeDocUnits(int64_t bytes) {
     ResourceConsumption::DocumentUnitCounter docUnitsReturned;
     docUnitsReturned.observeOne(bytes);
     return docUnitsReturned;
