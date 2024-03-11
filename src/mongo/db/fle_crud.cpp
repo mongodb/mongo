@@ -383,15 +383,13 @@ std::pair<mongo::StatusWith<mongo::txn_api::CommitResult>,
 insertSingleDocument(OperationContext* opCtx,
                      const write_ops::InsertCommandRequest& insertRequest,
                      BSONObj& document,
+                     const mongo::EncryptedFieldConfig& efc,
                      int32_t* stmtId,
                      GetTxnCallback getTxns) {
     auto edcNss = insertRequest.getNamespace();
-    auto ei = insertRequest.getEncryptionInformation().value();
 
     bool bypassDocumentValidation =
         insertRequest.getWriteCommandRequestBase().getBypassDocumentValidation();
-
-    auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 
     EDCServerCollection::validateEncryptedFieldInfo(document, efc, bypassDocumentValidation);
     auto serverPayload = std::make_shared<std::vector<EDCServerPayloadInfo>>(
@@ -478,9 +476,12 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
         }
     }
 
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+        insertRequest.getNamespace(), insertRequest.getEncryptionInformation().value());
+
     for (auto& document : documents) {
         const auto& [swResult, reply] =
-            insertSingleDocument(opCtx, insertRequest, document, &stmtId, getTxns);
+            insertSingleDocument(opCtx, insertRequest, document, efc, &stmtId, getTxns);
 
         writeBase.setElectionId(reply->getElectionId());
 
