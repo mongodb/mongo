@@ -165,8 +165,10 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     auto tokenRequest = tokenRequestSb.str();
 
     while (true) {
+        // SASLOIDCClientConversation::_step2() already checked that tokenEndpoint exists in
+        // discoveryReply and points to http://localhost or a https:// URL.
         BSONObj tokenResponseObj =
-            doPostRequest(httpClient.get(), discoveryReply.getTokenEndpoint(), tokenRequest);
+            doPostRequest(httpClient.get(), discoveryReply.getTokenEndpoint().get(), tokenRequest);
         auto tokenResponse =
             OIDCTokenResponse::parse(IDLParserContext{"oidcTokenResponse"}, tokenResponseObj);
 
@@ -307,12 +309,12 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
         auto tokenEndpoint = discoveryReply.getTokenEndpoint();
         uassert(ErrorCodes::BadValue,
                 "Missing or invalid token endpoint in server reply",
-                !tokenEndpoint.empty() &&
-                    (tokenEndpoint.startsWith("https://"_sd) ||
-                     tokenEndpoint.startsWith("http://localhost"_sd)));
+                tokenEndpoint && !tokenEndpoint->empty() &&
+                    (tokenEndpoint->startsWith("https://"_sd) ||
+                     tokenEndpoint->startsWith("http://localhost"_sd)));
 
         // Cache the token endpoint for potential reuse during the refresh flow.
-        oidcClientGlobalParams.oidcTokenEndpoint = tokenEndpoint.toString();
+        oidcClientGlobalParams.oidcTokenEndpoint = tokenEndpoint->toString();
 
         // Try device authorization grant flow first if provided, falling back to authorization code
         // flow.

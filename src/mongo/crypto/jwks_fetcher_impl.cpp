@@ -62,8 +62,7 @@ JWKSet JWKSFetcherImpl::fetch() {
         auto metadata = discoveryFactory.acquire(_issuer);
 
         auto jwksUri = metadata.getJwksUri();
-        uassert(ErrorCodes::BadValue, "JWKS not provided by issuer metadata", jwksUri.has_value());
-        auto getJWKs = makeHTTPClient()->get(*jwksUri);
+        auto getJWKs = makeHTTPClient()->get(jwksUri);
 
         ConstDataRange cdr = getJWKs.getCursor();
         StringData str;
