@@ -27,81 +27,47 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <functional>
+#include <benchmark/benchmark.h>
 
 #include "mongo/util/tracking_allocator.h"
 
 namespace mongo {
 
-template <class T>
-class Tracked {
-public:
-    Tracked(TrackingAllocatorStats& stats, T obj) : _stats(stats), _obj(std::move(obj)) {
-        _stats.get().bytesAllocated(_obj.allocated());
+namespace {
+
+constexpr size_t numIncsPerRead = 1000;
+
+}  // namespace
+
+class AllocatorFixture : public benchmark::Fixture {
+protected:
+    std::unique_ptr<TrackingAllocatorStats> _stats;
+};
+
+BENCHMARK_DEFINE_F(AllocatorFixture, counter)(benchmark::State& state) {
+    if (state.thread_index == 0) {
+        // Setup code
+        // state.range(0) --> Number of partitions
+        _stats = std::make_unique<TrackingAllocatorStats>(state.range(0));
     }
 
-    Tracked(Tracked&) = delete;
-    Tracked(Tracked&& other) : _stats(other._stats), _obj(std::move(other._obj)) {
-        invariant(other._obj.allocated() == 0);
-    }
-
-    Tracked& operator=(Tracked&) = delete;
-    Tracked& operator=(Tracked&& other) {
-        if (&other == this) {
-            return *this;
+    for (auto _ : state) {
+        for (size_t i = 0; i < numIncsPerRead; i++) {
+            _stats->bytesAllocated(1);
         }
-
-        _stats = other._stats;
-        _obj = std::move(other._obj);
-        invariant(other._obj.allocated() == 0);
-
-        return *this;
+        benchmark::DoNotOptimize(_stats->allocated());
     }
 
-    ~Tracked() {
-        _stats.get().bytesDeallocated(_obj.allocated());
+    if (state.thread_index == 0) {
+        // Teardown code
+        state.counters["numIncrements"] = _stats->allocated();
     }
+}
 
-    T& get() {
-        return _obj;
-    }
-
-    const T& get() const {
-        return _obj;
-    }
-
-private:
-    std::reference_wrapper<TrackingAllocatorStats> _stats;
-    T _obj;
-};
-
-/**
- * A TrackingContext is a factory style class that constructs TrackingAllocator objects under a
- * single instance of TrackingAllocatorStats and provides access to these stats.
- */
-class TrackingContext {
-public:
-    TrackingContext() = default;
-    ~TrackingContext() = default;
-
-    template <class T>
-    Tracked<T> makeTracked(T obj) {
-        return {_stats, std::move(obj)};
-    }
-
-    template <class T>
-    TrackingAllocator<T> makeAllocator() {
-        return TrackingAllocator<T>(&_stats);
-    }
-
-    uint64_t allocated() const {
-        return _stats.allocated();
-    }
-
-private:
-    TrackingAllocatorStats _stats;
-};
+BENCHMARK_REGISTER_F(AllocatorFixture, counter)
+    ->RangeMultiplier(2)
+    ->Ranges({{1, 64}})
+    ->ThreadRange(1, 64)
+    ->UseRealTime();
 
 }  // namespace mongo

@@ -34,11 +34,61 @@
 #include <type_traits>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/aligned.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 
-struct TrackingAllocatorStats {
-    AtomicWord<uint64_t> bytesAllocated;
+/**
+ * A minimal implementation of a partitioned counter for incrementing and decrementing allocations
+ * across multiple threads.
+ */
+class TrackingAllocatorStats {
+public:
+    // The counter will be partitioned based on the number of available cores.
+    TrackingAllocatorStats()
+        : _numPartitions(ProcessInfo::getNumLogicalCores() * 2), _bytesAllocated(_numPartitions) {}
+    TrackingAllocatorStats(size_t numPartitions)
+        : _numPartitions(numPartitions), _bytesAllocated(_numPartitions) {}
+
+    void bytesAllocated(size_t n) {
+        auto& counter = _bytesAllocated[_getSlot()];
+        counter.value.fetchAndAddRelaxed(n);
+    }
+
+    void bytesDeallocated(size_t n) {
+        auto& counter = _bytesAllocated[_getSlot()];
+        counter.value.fetchAndSubtractRelaxed(n);
+    }
+
+    uint64_t allocated() const {
+        int64_t sum = 0;
+        for (auto& counter : _bytesAllocated) {
+            sum += counter.value.loadRelaxed();
+        }
+
+        // After summing the memory usage, we should not have a negative number.
+        invariant(sum >= 0,
+                  str::stream() << "Tracking allocator memory usage was negative " << sum);
+        return static_cast<uint64_t>(sum);
+    }
+
+private:
+    size_t _getSlot() const {
+        return std::hash<std::thread::id>{}(stdx::this_thread::get_id()) % _numPartitions;
+    }
+
+    const size_t _numPartitions;
+
+    // The counter is signed to handle the case where a thread closes a time-series bucket that
+    // deallocates more memory than is going to be allocated.
+    struct AlignedAtomic {
+        alignas(stdx::hardware_destructive_interference_size) AtomicWord<int64_t> value;
+    };
+    static_assert(alignof(AlignedAtomic) == stdx::hardware_destructive_interference_size);
+
+    std::vector<AlignedAtomic> _bytesAllocated;
 };
 
 /**
@@ -61,13 +111,13 @@ public:
 
     T* allocate(size_t n) {
         const size_t allocation = n * sizeof(T);
-        _stats->bytesAllocated.fetchAndAddRelaxed(allocation);
+        _stats->bytesAllocated(allocation);
         return static_cast<T*>(::operator new(allocation));
     }
 
     void deallocate(T* p, size_t n) {
         auto size = n * sizeof(T);
-        _stats->bytesAllocated.fetchAndSubtractRelaxed(size);
+        _stats->bytesDeallocated(size);
         ::operator delete(p, size);
     }
 

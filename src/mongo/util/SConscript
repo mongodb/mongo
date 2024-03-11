@@ -706,6 +706,14 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='tracking_allocator_bm',
+    source=[
+        'tracking_allocator_bm.cpp',
+    ],
+    LIBDEPS=[],
+)
+
 env.CppUnitTest(
     target='tracking_allocator_test',
     source=[
