@@ -29,7 +29,7 @@ whitespace()
 # Parallel execution: if it's the main onvocation of the script, collect the file names
 # to process and run them in subprocesses.
 is_main_run && {
-    find bench examples ext src test \
+    find bench examples ext src test tools/checksum_bitflip \
         -name '*.[ch]' -o \
         -name '*.cpp' -o \
         -name '*.dox' -o \

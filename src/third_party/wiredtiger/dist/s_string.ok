@@ -510,6 +510,7 @@ binutils
 bitcnt
 bitfield
 bitfields
+bitflip
 bitstr
 bitstring
 bitwise
@@ -577,6 +578,7 @@ ciphertext
 ckpt
 ckptfrag
 ckptlist
+cksum
 cloexec
 closedir
 clsm
@@ -1431,6 +1433,7 @@ xX
 xdeadbeef
 xff
 xfff
+xxd
 xxpermdi
 xxxx
 xxxxx

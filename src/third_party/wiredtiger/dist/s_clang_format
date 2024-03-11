@@ -54,7 +54,8 @@ clang-format --version &> /dev/null || exit 1
 # Parallel execution: if it's the main onvocation of the script, collect the file names
 # to process and run them in subprocesses.
 if is_main_run; then
-    search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cpp' | filter_if_fast`
+    search=`find bench examples ext src test tools/checksum_bitflip -name '*.[ch]' \
+        -o -name '*.cpp' | filter_if_fast`
     for f in `cat dist/s_clang_format.list`; do
         search=`echo "$search" | sed "\#$f#d"`
     done

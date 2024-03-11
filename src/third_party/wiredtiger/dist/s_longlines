@@ -6,7 +6,7 @@ setup_trap
 cd_top
 check_fast_mode_flag
 
-l=`(find bench/wtperf examples ext src test -name '*.[chsy]' &&
+l=`(find bench/wtperf examples ext src test tools/checksum_bitflip -name '*.[chsy]' &&
     find dist -name '*.py' &&
     find src -name '*.in') |
     filter_if_fast |
