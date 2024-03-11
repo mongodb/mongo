@@ -70,9 +70,8 @@ for f in "$@"; do
     cat "$f" | \
             clang-format --fallback-style=none | \
             python3 dist/s_comment.py > "$t" || exit 1
-    cmp -s "$f" "$t"
-    if test $? -ne 0; then
-        if test $# -eq 0 ; then
+    if ! cmp -s "$f" "$t"; then
+        if [[ -n "$S_RECURSE" ]] ; then
             echo "Modifying $f"
         fi
         cp "$t" "$f"

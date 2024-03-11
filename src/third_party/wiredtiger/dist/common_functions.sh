@@ -140,6 +140,7 @@ check_xargs_P() {
 # Check if the script is run in a recursive mode (with files args).
 # File arguments are those that don't start with a "-".
 is_recursive_mode() {
+  export -n S_RECURSE      # Unexport S_RECURSE to stop propagation to child processes.
   [[ -n "${S_RECURSE:-}" ]] && return 0         # S_RECURSE is set.
   [[ ${BASH_ARGC:-} -eq 0 ]] && return 1        # No args at all
   for arg in "${BASH_ARGV[@]:-}"; do
@@ -184,8 +185,10 @@ do_in_parallel() {
   local name=$(basename $0)
   check_xargs_P
   filter_if_fast | xargs $XARGS_P -n $(( ${#WT_FAST} ? 5 : 30 )) "$@" -- bash -c "
-      bash $DIST_DIR/$name \"\$@\" 2>&1 > $t-$name-par-\$\$.out
+      bash $DIST_DIR/$name \"\$@\" 2>&1 > $t-$name-par-\$\$.out ; RET=\$?;
       cat $t-$name-par-\$\$.out 2>/dev/null
-      rm -f $t-$name-par-\$\$.out" -bash
+      rm -f $t-$name-par-\$\$.out
+      exit \$RET
+  " -bash
   # implicit: return $?
 }

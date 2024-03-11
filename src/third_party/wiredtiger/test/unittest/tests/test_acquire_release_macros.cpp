@@ -72,8 +72,8 @@ TEST_RELEASE_TYPE(uint8_t, 1);
  */
 TEST_CASE("Demonstrate hash define int size workaround", "[acqrel]")
 {
-    /* If we don't cast this value the test won't compile. */
-    #define TEST_VALUE ((int8_t)6)
+/* If we don't cast this value the test won't compile. */
+#define TEST_VALUE ((int8_t)6)
 
     int8_t a;
     int8_t *ap = &a;
