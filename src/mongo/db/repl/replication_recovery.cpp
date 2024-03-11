@@ -836,28 +836,19 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                                  << NamespaceString::kRsOplogNamespace.toStringForErrorMsg()));
     }
 
-    // Find an oplog entry <= truncateAfterTimestamp.
-    boost::optional<BSONObj> truncateAfterOplogEntryBSON =
-        _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
+    // Find an oplog entry optime <= truncateAfterTimestamp.
+    auto truncateAfterOpTimeAndWallTime =
+        _storageInterface->findOplogOpTimeLessThanOrEqualToTimestamp(
             opCtx, CollectionPtr(oplogCollection), truncateAfterTimestamp);
-    if (!truncateAfterOplogEntryBSON) {
+    if (!truncateAfterOpTimeAndWallTime) {
         LOGV2_FATAL_NOTRACE(40296,
                             "Reached end of oplog looking for an oplog entry lte to "
                             "oplogTruncateAfterPoint but did not find one",
                             "oplogTruncateAfterPoint"_attr = truncateAfterTimestamp.toBSON());
     }
 
-    // Parse the response.
-    auto truncateAfterOpTime =
-        fassert(51766, repl::OpTime::parseFromOplogEntry(truncateAfterOplogEntryBSON.value()));
-    auto truncateAfterOplogEntryTs = truncateAfterOpTime.getTimestamp();
+    auto truncateAfterOplogEntryTs = truncateAfterOpTimeAndWallTime->opTime.getTimestamp();
     auto truncateAfterRecordId = RecordId(truncateAfterOplogEntryTs.asULL());
-
-    invariant(truncateAfterRecordId <= RecordId(truncateAfterTimestamp.asULL()),
-              str::stream() << "Should have found a oplog entry timestamp lte to "
-                            << truncateAfterTimestamp.toString() << ", but instead found "
-                            << redact(truncateAfterOplogEntryBSON.value()) << " with timestamp "
-                            << Timestamp(truncateAfterRecordId.getLong()).toString());
 
     // Truncate the oplog AFTER the oplog entry found to be <= truncateAfterTimestamp.
     LOGV2(21553,
@@ -944,20 +935,17 @@ Timestamp ReplicationRecoveryImpl::_adjustStartPointIfNecessary(OperationContext
             "oplogNss"_attr = NamespaceString::kRsOplogNamespace);
     }
 
-    boost::optional<BSONObj> adjustmentOplogEntryBSON =
-        _storageInterface->findOplogEntryLessThanOrEqualToTimestamp(
-            opCtx, oplogCollection, startPoint);
+    auto adjustmentOpTimeAndWallTime = _storageInterface->findOplogOpTimeLessThanOrEqualToTimestamp(
+        opCtx, oplogCollection, startPoint);
 
-    if (!adjustmentOplogEntryBSON) {
+    if (!adjustmentOpTimeAndWallTime) {
         LOGV2_FATAL_NOTRACE(
             5466601,
             "Could not find LTE oplog entry for oplog application start point for recovery",
             "startPoint"_attr = startPoint);
     }
 
-    auto adjustmentOpTime =
-        fassert(5466602, OpTime::parseFromOplogEntry(adjustmentOplogEntryBSON.value()));
-    auto adjustmentTimestamp = adjustmentOpTime.getTimestamp();
+    auto adjustmentTimestamp = adjustmentOpTimeAndWallTime->opTime.getTimestamp();
 
     if (startPoint != adjustmentTimestamp) {
         LOGV2(5466603,

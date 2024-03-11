@@ -85,10 +85,10 @@ MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
 
 class StorageInterfaceMockTimestamp : public StorageInterfaceImpl {
 public:
-    boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) override {
         auto now = Date_t::now();
-        return BSON("ts" << Timestamp(now) << "t" << int64_t{5} << "wall" << now);
+        return OpTimeAndWallTime(OpTime(Timestamp(now), int64_t{5}), now);
     }
 
     Status upsertById(OperationContext* opCtx,

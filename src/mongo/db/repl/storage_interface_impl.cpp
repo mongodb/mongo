@@ -1199,7 +1199,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     });
 }
 
-boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestamp(
+boost::optional<OpTimeAndWallTime> StorageInterfaceImpl::findOplogOpTimeLessThanOrEqualToTimestamp(
     OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) {
     invariant(oplog);
     invariant(shard_role_details::getLocker(opCtx)->isLocked());
@@ -1215,13 +1215,16 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
                   "RecordId returned from seek (" + record->id.toString() +
                       ") is greater than the desired recordId (" + desiredRecordId.toString() +
                       ").");
-        return record->data.releaseToBson().getOwned();
+        return fassert(
+            8694200,
+            OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(record->data.toBson()));
     }
 
     return boost::none;
 }
 
-boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+boost::optional<OpTimeAndWallTime>
+StorageInterfaceImpl::findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
     OperationContext* opCtx, const CollectionPtr& oplogCollection, const Timestamp& timestamp) {
     // Oplog reads are specially done under only MODE_IS global locks, without database or
     // collection level intent locks. Therefore, reads can run concurrently with validate cmds that
@@ -1236,7 +1239,7 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     int retries = 0;
     while (true) {
         try {
-            return findOplogEntryLessThanOrEqualToTimestamp(opCtx, oplogCollection, timestamp);
+            return findOplogOpTimeLessThanOrEqualToTimestamp(opCtx, oplogCollection, timestamp);
         } catch (const StorageUnavailableException&) {
             // This will log a message about the conflict initially and then every 5 seconds, with
             // the current rather arbitrary settings.

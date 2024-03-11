@@ -539,13 +539,14 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // Fetch the oplog entry <= timestamp. all_durable may be set to a value between oplog entries.
     // We need an oplog entry in order to return term and wallclock time for an OpTimeAndWallTime
     // result.
-    auto truncateOplogEntryBSON =
-        _storageInterface->findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    _lastNoHolesOplogOpTimeAndWallTime =
+        _storageInterface->findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
             opCtx, oplogRead.getCollection(), truncateTimestamp);
 
     // The truncate point moves the Durable timestamp forward, so it should always exist in the
     // oplog.
-    invariant(truncateOplogEntryBSON, "Found no oplog entry lte " + truncateTimestamp.toString());
+    invariant(_lastNoHolesOplogOpTimeAndWallTime,
+              "Found no oplog entry lte " + truncateTimestamp.toString());
 
     // Note: the oplogTruncateAfterPoint is written to disk and updated periodically with WT's
     // all_durable timestamp, which tracks the oplog no holes point. The oplog entry associated with
@@ -554,9 +555,6 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // entry (it can be momentarily between oplog entry timestamps), _lastNoHolesOplogTimestamp
     // tracks the oplog entry so as to ensure we send out all updates before desisting until new
     // operations occur.
-    _lastNoHolesOplogOpTimeAndWallTime = fassert(
-        4455501,
-        OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.value()));
     _lastNoHolesOplogTimestamp = _lastNoHolesOplogOpTimeAndWallTime->opTime.getTimestamp();
 
     // Pass the _lastNoHolesOplogTimestamp timestamp down to the storage layer to prevent oplog

@@ -342,21 +342,21 @@ public:
                                   const BSONObj& filter) = 0;
 
     /**
-     * Searches for an oplog entry with a timestamp <= 'timestamp'. Returns boost::none if no
+     * Searches for an oplog optime with a timestamp <= 'timestamp'. Returns boost::none if no
      * matches are found.
      */
-    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
+    virtual boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestamp(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) = 0;
 
     /**
-     * Calls findOplogEntryLessThanOrEqualToTimestamp with endless WriteConflictException retries.
+     * Calls findOplogOpTimeLessThanOrEqualToTimestamp with endless WriteConflictException retries.
      * Other errors get thrown. Concurrent oplog reads with the validate cmd on the same collection
      * may throw WCEs. Obeys opCtx interrupts.
      *
-     * Call this function instead of findOplogEntryLessThanOrEqualToTimestamp if the caller cannot
+     * Call this function instead of findOplogOpTimeLessThanOrEqualToTimestamp if the caller cannot
      * fail, say for correctness.
      */
-    virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
+    virtual boost::optional<OpTimeAndWallTime> findOplogOpTimeLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) = 0;
 
     /**
