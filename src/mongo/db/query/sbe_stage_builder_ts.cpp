@@ -253,7 +253,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
 
 SbExpr buildVectorizedExpr(StageBuilderState& state,
                            SbExpr scalarExpression,
-                           PlanStageSlots& outputs,
+                           const PlanStageSlots& outputs,
                            bool forFilterStage) {
     if (!scalarExpression || scalarExpression.isFinishedOptimizing()) {
         // If this SbExpr is null or if it's marked as "finished optimizing", then do nothing

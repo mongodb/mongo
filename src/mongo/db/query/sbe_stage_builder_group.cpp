@@ -282,77 +282,135 @@ SbExpr getTopBottomNSortByExpr(StageBuilderState& state,
     return b.makeFunction("sortKeyComponentVectorToArray", std::move(key));
 }
 
-AccumulatorArgs generateAccumulatorArgs(StageBuilderState& state,
-                                        const AccumulationStatement& accStmt,
-                                        const PlanStageSlots& outputs) {
-    auto rootSlot = outputs.getResultObjIfExists();
-    auto collatorSlot = state.getCollatorSlot();
+Accum::InputsPtr generateAccumExprs(StageBuilderState& state,
+                                    const AccumulationStatement& accStmt,
+                                    const PlanStageSlots& outputs) {
+    auto accOp = Accum::Op{accStmt};
 
-    // For $topN and $bottomN, we need to pass multiple SbExprs to buildAccumulatorArgs()
+    auto rootSlot = outputs.getResultObjIfExists();
+
+    Accum::InputsPtr inputs;
+
+    // For $topN and $bottomN, we need to pass multiple SbExprs to buildAccumExprs()
     // (an "input" expression and a "sortBy" expression).
     if (isTopBottomN(accStmt)) {
-        StringDataMap<SbExpr> accArgs;
         auto spec = SbExpr{state.getSortSpecSlot(&accStmt)};
 
-        accArgs.emplace(AccArgs::kValue, getTopBottomNValueExpr(state, accStmt, outputs));
-        accArgs.emplace(AccArgs::kSortBy, getTopBottomNSortByExpr(state, outputs, std::move(spec)));
-        accArgs.emplace(AccArgs::kSortSpec, SbExpr{state.getSortSpecSlot(&accStmt)});
-
-        return buildAccumulatorArgs(state, accStmt, std::move(accArgs), collatorSlot);
+        inputs = std::make_unique<Accum::AccumTopBottomNInputs>(
+            getTopBottomNValueExpr(state, accStmt, outputs),
+            getTopBottomNSortByExpr(state, outputs, std::move(spec)),
+            SbExpr{state.getSortSpecSlot(&accStmt)});
+    } else {
+        // For all other accumulators, we call generateExpression() on 'argument' to create an
+        // SbExpr and then we pass this SbExpr as the kInput arg to buildAccumExprs().
+        inputs = std::make_unique<Accum::AccumSingleInput>(
+            generateExpression(state, accStmt.expr.argument.get(), rootSlot, outputs));
     }
 
-    // For all other accumulators, we call generateExpression() on 'argument' to create an SbExpr
-    // and then we pass this SbExpr to buildAccumulatorArgs().
-    auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, outputs);
-    return buildAccumulatorArgs(state, accStmt, std::move(argExpr), collatorSlot);
+    return accOp.buildAccumExprs(state, std::move(inputs));
 }
 
-std::vector<AccumulatorArgs> generateAllAccumulatorArgs(StageBuilderState& state,
-                                                        const GroupNode& groupNode,
-                                                        const PlanStageSlots& outputs) {
-    std::vector<AccumulatorArgs> accArgsVec;
+boost::optional<std::vector<Accum::InputsPtr>> generateAllAccumExprs(
+    StageBuilderState& state, const GroupNode& groupNode, const PlanStageSlots& outputs) {
+    boost::optional<std::vector<Accum::InputsPtr>> accExprsVec;
+    accExprsVec.emplace();
+
     for (const auto& accStmt : groupNode.accumulators) {
         // One accumulator may be translated to multiple accumulator expressions. For example, The
         // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
         // as sum(1).
-        accArgsVec.emplace_back(generateAccumulatorArgs(state, accStmt, outputs));
+        Accum::InputsPtr accExprs = generateAccumExprs(state, accStmt, outputs);
+        if (!accExprs) {
+            return boost::none;
+        }
+
+        accExprsVec->emplace_back(std::move(accExprs));
     }
 
-    return accArgsVec;
+    return accExprsVec;
+}
+
+boost::optional<Accum::AccumBlockExprs> generateAccumBlockExprs(
+    StageBuilderState& state, const AccumulationStatement& accStmt, const PlanStageSlots& outputs) {
+    auto accOp = Accum::Op{accStmt};
+
+    auto rootSlot = outputs.getResultObjIfExists();
+
+    Accum::InputsPtr inputs;
+
+    // For $topN and $bottomN, we need to pass multiple SbExprs to buildAccumExprs()
+    // (an "input" expression and a "sortBy" expression).
+    if (isTopBottomN(accStmt)) {
+        auto spec = SbExpr{state.getSortSpecSlot(&accStmt)};
+
+        inputs = std::make_unique<Accum::AccumTopBottomNInputs>(
+            getTopBottomNValueExpr(state, accStmt, outputs),
+            getTopBottomNSortByExpr(state, outputs, std::move(spec)),
+            SbExpr{state.getSortSpecSlot(&accStmt)});
+    } else {
+        // For all other accumulators, we call generateExpression() on 'argument' to create an
+        // SbExpr and then we pass this SbExpr as the kInput arg to buildAccumExprs().
+        inputs = std::make_unique<Accum::AccumSingleInput>(
+            generateExpression(state, accStmt.expr.argument.get(), rootSlot, outputs));
+    }
+
+    return accOp.buildAccumBlockExprs(state, std::move(inputs), outputs);
+}
+
+boost::optional<std::vector<Accum::AccumBlockExprs>> generateAllAccumBlockExprs(
+    StageBuilderState& state, const GroupNode& groupNode, const PlanStageSlots& outputs) {
+    boost::optional<std::vector<Accum::AccumBlockExprs>> blockAccumExprsVec;
+    blockAccumExprsVec.emplace();
+
+    for (const auto& accStmt : groupNode.accumulators) {
+        // One accumulator may be translated to multiple accumulator expressions. For example, The
+        // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
+        // as sum(1).
+        boost::optional<Accum::AccumBlockExprs> blockAccumExprs =
+            generateAccumBlockExprs(state, accStmt, outputs);
+
+        if (!blockAccumExprs) {
+            return boost::none;
+        }
+
+        blockAccumExprsVec->emplace_back(std::move(*blockAccumExprs));
+    }
+
+    return blockAccumExprsVec;
 }
 
 /**
  * This function generates one or more SbAggExprs for the specified accumulator ('accStmt')
- * and appends these SbAggExprs to the end of the 'sbAggExprs' vector. This function returns
- * a 'size_t' indicating how many SbAggExprs were appended to 'sbAggExprs'.
+ * and returns them.
  *
- * If 'genBlockAggs' is true, generateAccumulator() accumulator may fail, in which case it
- * will leave the 'sbAggExprs' vector unmodified and return 0.
+ * If 'genBlockAggs' is true, generateAccumAggs() accumulator may fail, in which case it
+ * will leave the 'sbAggExprs' vector unmodified and return boost::none.
  */
-size_t generateAccumulator(StageBuilderState& state,
-                           const AccumulationStatement& accStmt,
-                           const PlanStageSlots& outputs,
-                           AccumulatorArgs accArgs,
-                           boost::optional<SbSlot> initRootSlot,
-                           bool genBlockAggs,
-                           boost::optional<SbSlot> bitmapInternalSlot,
-                           boost::optional<SbSlot> accInternalSlot,
-                           SbAggExprVector& sbAggExprs) {
+boost::optional<SbAggExprVector> generateAccumAggs(StageBuilderState& state,
+                                                   const AccumulationStatement& accStmt,
+                                                   const PlanStageSlots& outputs,
+                                                   Accum::InputsPtr accExprs,
+                                                   boost::optional<SbSlot> initRootSlot,
+                                                   bool genBlockAggs,
+                                                   boost::optional<SbSlot> bitmapInternalSlot,
+                                                   boost::optional<SbSlot> accInternalSlot) {
     SbExprBuilder b(state);
 
+    auto accOp = Accum::Op{accStmt};
+
+    boost::optional<SbAggExprVector> sbAggExprs;
+    sbAggExprs.emplace();
+
     // Generate the agg expressions (and blockAgg expressions too if 'genBlockAggs' is true).
-    std::vector<BlockAggAndRowAgg> blockAggsAndRowAggs;
-    auto collatorSlot = state.getCollatorSlot();
+    std::vector<Accum::BlockAggAndRowAgg> blockAggsAndRowAggs;
 
     if (!genBlockAggs) {
         // Handle the case where we only want to generate "normal" aggs without blockAggs.
-        SbExpr::Vector aggs;
-
-        aggs = stage_builder::buildAccumulator(
-            accStmt, std::move(accArgs.first), std::move(accArgs.second), collatorSlot, state);
+        SbExpr::Vector aggs = accOp.buildAccumAggs(state, std::move(accExprs));
 
         for (size_t i = 0; i < aggs.size(); ++i) {
-            blockAggsAndRowAggs.emplace_back(BlockAggAndRowAgg{SbExpr{}, std::move(aggs[i])});
+            blockAggsAndRowAggs.emplace_back(
+                Accum::BlockAggAndRowAgg{SbExpr{}, std::move(aggs[i])});
         }
     } else {
         // Handle the case where we want to generate aggs _and_ blockAggs.
@@ -360,47 +418,36 @@ size_t generateAccumulator(StageBuilderState& state,
             8448600, "Expected 'bitmapInternalSlot' to be defined", bitmapInternalSlot.has_value());
         tassert(8448601, "Expected 'accInternalSlot' to be defined", accInternalSlot.has_value());
 
-        blockAggsAndRowAggs = stage_builder::buildBlockAccumulator(accStmt,
-                                                                   std::move(accArgs.first),
-                                                                   std::move(accArgs.second),
-                                                                   *bitmapInternalSlot,
-                                                                   *accInternalSlot,
-                                                                   collatorSlot,
-                                                                   state);
+        boost::optional<std::vector<Accum::BlockAggAndRowAgg>> aggs = accOp.buildAccumBlockAggs(
+            state, std::move(accExprs), *bitmapInternalSlot, *accInternalSlot);
 
         // If 'genBlockAggs' is true and we weren't able to generate block aggs for 'accStmt',
-        // then we return 0 to indicate failure.
-        if (blockAggsAndRowAggs.empty()) {
-            return 0;
+        // then we return boost::none to indicate failure.
+        if (!aggs) {
+            return boost::none;
         }
+
+        blockAggsAndRowAggs = std::move(*aggs);
     }
 
     // Generate the init expressions.
-    auto inits = [&]() {
+    SbExpr::Vector inits = [&]() {
         PlanStageSlots slots;
         if (initRootSlot) {
             slots.setResultObj(*initRootSlot);
         }
 
-        StringDataMap<SbExpr> initExprs;
+        Accum::InputsPtr initInputs;
+
         if (isAccumulatorN(accStmt)) {
-            initExprs.emplace(
-                AccArgs::kMaxSize,
-                generateExpression(state, accStmt.expr.initializer.get(), initRootSlot, slots));
-            initExprs.emplace(
-                AccArgs::kIsGroupAccum,
-                b.makeConstant(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true)));
-        } else {
-            initExprs.emplace(
-                "", generateExpression(state, accStmt.expr.initializer.get(), initRootSlot, slots));
+            auto expr =
+                generateExpression(state, accStmt.expr.initializer.get(), initRootSlot, slots);
+
+            initInputs = std::make_unique<Accum::InitAccumNInputs>(std::move(expr),
+                                                                   b.makeBoolConstant(true));
         }
 
-        if (initExprs.size() == 1) {
-            return stage_builder::buildInitialize(
-                accStmt, std::move(initExprs.begin()->second), state);
-        } else {
-            return stage_builder::buildInitialize(accStmt, std::move(initExprs), state);
-        }
+        return accOp.buildInitialize(state, std::move(initInputs));
     }();
 
     tassert(7567301,
@@ -410,66 +457,60 @@ size_t generateAccumulator(StageBuilderState& state,
     // For each 'init' / 'blockAgg' / 'agg' expression tuple, wrap the expressions in
     // an SbAggExpr and append the SbAggExpr to 'sbAggExprs'.
     for (size_t i = 0; i < blockAggsAndRowAggs.size(); i++) {
-        auto& init = inits[i];
-        auto& blockAgg = blockAggsAndRowAggs[i].blockAgg;
-        auto& rowAgg = blockAggsAndRowAggs[i].rowAgg;
+        SbExpr& init = inits[i];
+        SbExpr& blockAgg = blockAggsAndRowAggs[i].blockAgg;
+        SbExpr& rowAgg = blockAggsAndRowAggs[i].rowAgg;
 
-        sbAggExprs.emplace_back(SbAggExpr{std::move(init), std::move(blockAgg), std::move(rowAgg)},
-                                boost::none);
+        sbAggExprs->emplace_back(SbAggExpr{std::move(init), std::move(blockAgg), std::move(rowAgg)},
+                                 boost::none);
     }
 
-    // Return the number of SbAggExprs that we appended to 'sbAggExprs'.
-    return blockAggsAndRowAggs.size();
+    return sbAggExprs;
 }
 
 /**
  * This function generates a vector of SbAggExprs that correspond to the accumulators from
- * the specified GroupNode ('groupNode') and returns it, together with a 'vector<size_t>'
- * which indicates how many SbAggExprs were generated for each accumulator from 'groupNode'.
+ * the specified GroupNode ('groupNode') and returns it.
  *
- * If 'genBlockAggs' is true, generateAllAccumulators() accumulator may fail, in which case
- * it will return a pair of empty vectors.
+ * If 'genBlockAggs' is true, generateAllAccumAggs() accumulator may fail, in which case
+ * it will return boost::none.
  */
-std::pair<SbAggExprVector, std::vector<size_t>> generateAllAccumulators(
+boost::optional<std::vector<SbAggExprVector>> generateAllAccumAggs(
     StageBuilderState& state,
     const GroupNode& groupNode,
     const PlanStageSlots& childOutputs,
-    std::vector<AccumulatorArgs> accArgsVec,
+    std::vector<Accum::InputsPtr> accExprsVec,
     boost::optional<SbSlot> initRootSlot,
     bool genBlockAggs,
     boost::optional<SbSlot> bitmapInternalSlot,
     boost::optional<SbSlot> accInternalSlot) {
-    // Loop over 'groupNode.accumulators' and populate 'sbAggExprs' and 'accNumSbAggExprs'.
-    SbAggExprVector sbAggExprs;
-    std::vector<size_t> accNumSbAggExprs;
+    // Loop over 'groupNode.accumulators' and populate 'sbAggExprs'.
+    boost::optional<std::vector<SbAggExprVector>> sbAggExprs;
+    sbAggExprs.emplace();
 
     size_t i = 0;
     for (const auto& accStmt : groupNode.accumulators) {
-        size_t numSbAggExprs = generateAccumulator(state,
-                                                   accStmt,
-                                                   childOutputs,
-                                                   std::move(accArgsVec[i]),
-                                                   initRootSlot,
-                                                   genBlockAggs,
-                                                   bitmapInternalSlot,
-                                                   accInternalSlot,
-                                                   sbAggExprs);
+        boost::optional<SbAggExprVector> vec = generateAccumAggs(state,
+                                                                 accStmt,
+                                                                 childOutputs,
+                                                                 std::move(accExprsVec[i]),
+                                                                 initRootSlot,
+                                                                 genBlockAggs,
+                                                                 bitmapInternalSlot,
+                                                                 accInternalSlot);
 
-        // If 'genBlockAggs' is true and we weren't able to generate block aggs for 'accStmt',
-        // then we return a pair of empty vectors to indicate failure. The caller will check
-        // if the returned vectors are empty and deal with it as appropriate.
-        if (genBlockAggs && numSbAggExprs == 0) {
-            return {SbAggExprVector{}, std::vector<size_t>{}};
+        // If we weren't able to generate block aggs for 'accStmt', then we return boost::none
+        // to indicate failure. This should only happen when 'genBlockAggs' is true.
+        if (!vec.has_value()) {
+            return boost::none;
         }
 
-        tassert(8448602, "Expected accumulator to generate at least one agg", numSbAggExprs > 0);
-
-        accNumSbAggExprs.emplace_back(numSbAggExprs);
+        sbAggExprs->emplace_back(std::move(*vec));
 
         ++i;
     }
 
-    return {std::move(sbAggExprs), std::move(accNumSbAggExprs)};
+    return sbAggExprs;
 }
 
 /**
@@ -485,28 +526,30 @@ std::pair<SbAggExprVector, std::vector<size_t>> generateAllAccumulators(
 SbExprSbSlotVector generateMergingExpressions(StageBuilderState& state,
                                               const AccumulationStatement& accStmt,
                                               int numInputSlots) {
-    tassert(7039555, "'numInputSlots' must be positive", numInputSlots > 0);
     auto slotIdGenerator = state.slotIdGenerator;
-    tassert(7039556, "expected non-null 'slotIdGenerator' pointer", slotIdGenerator);
     auto frameIdGenerator = state.frameIdGenerator;
+
+    tassert(7039555, "'numInputSlots' must be positive", numInputSlots > 0);
+    tassert(7039556, "expected non-null 'slotIdGenerator' pointer", slotIdGenerator);
     tassert(7039557, "expected non-null 'frameIdGenerator' pointer", frameIdGenerator);
 
-    auto collatorSlot = state.getCollatorSlot();
+    auto accOp = Accum::Op{accStmt};
 
     SbSlotVector spillSlots;
     for (int i = 0; i < numInputSlots; ++i) {
         spillSlots.emplace_back(SbSlot{slotIdGenerator->generate()});
     }
 
-    auto mergingExprs = [&]() {
+    SbExpr::Vector mergingExprs = [&]() {
+        Accum::InputsPtr combineInputs;
+
         if (isTopBottomN(accStmt)) {
-            StringDataMap<SbExpr> mergeArgs;
-            mergeArgs.emplace(AccArgs::kSortSpec, SbExpr{state.getSortSpecSlot(&accStmt)});
-            return buildCombinePartialAggregates(
-                accStmt, spillSlots, std::move(mergeArgs), collatorSlot, state);
-        } else {
-            return buildCombinePartialAggregates(accStmt, spillSlots, collatorSlot, state);
+            auto sortSpec = SbExpr{state.getSortSpecSlot(&accStmt)};
+            combineInputs =
+                std::make_unique<Accum::CombineAggsTopBottomNInputs>(std::move(sortSpec));
         }
+
+        return accOp.buildCombineAggs(state, std::move(combineInputs), spillSlots);
     }();
 
     // Zip the slot vector and expression vector into a vector of pairs.
@@ -525,22 +568,20 @@ SbExprSbSlotVector generateMergingExpressions(StageBuilderState& state,
  * This function generates all of the merging expressions needed by the accumulators from the
  * specified GroupNode ('groupNode').
  */
-SbExprSbSlotVector generateAllMergingExprs(StageBuilderState& state,
-                                           const GroupNode& groupNode,
-                                           const std::vector<size_t>& accNumSbAggExprs) {
+std::vector<SbExprSbSlotVector> generateAllMergingExprs(StageBuilderState& state,
+                                                        const GroupNode& groupNode) {
     // Since partial accumulator state may be spilled to disk and then merged, we must construct not
     // only the basic agg expressions for each accumulator, but also agg expressions that are used
     // to combine partial aggregates that have been spilled to disk.
-    SbExprSbSlotVector mergingExprs;
+    std::vector<SbExprSbSlotVector> mergingExprs;
     size_t accIdx = 0;
 
     for (const auto& accStmt : groupNode.accumulators) {
-        size_t n = accNumSbAggExprs[accIdx];
-        SbExprSbSlotVector curMergingExprs = generateMergingExpressions(state, accStmt, n);
+        auto accOp = Accum::Op{accStmt};
+        size_t numAggs = accOp.getNumAggs();
 
-        mergingExprs.insert(mergingExprs.end(),
-                            std::make_move_iterator(curMergingExprs.begin()),
-                            std::make_move_iterator(curMergingExprs.end()));
+        mergingExprs.emplace_back(generateMergingExpressions(state, accStmt, numAggs));
+
         ++accIdx;
     }
 
@@ -562,7 +603,6 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> gene
     SbSlotVector& individualSlots,
     SbSlotVector groupBySlots,
     SbSlotVector groupOutSlots,
-    const std::vector<size_t>& accNumSbAggExprs,
     const GroupNode& groupNode,
     bool idIsSingleKey,
     SbExpr idConstantValue) {
@@ -598,41 +638,43 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> gene
         idFinalExpr = b.makeFunction("newObj"_sd, std::move(exprs));
     }
 
+    const auto& accStmts = groupNode.accumulators;
+
     std::vector<SbSlotVector> aggSlotsVec;
     auto groupOutSlotsIt = groupOutSlots.begin();
 
-    for (auto n : accNumSbAggExprs) {
-        aggSlotsVec.emplace_back(SbSlotVector(groupOutSlotsIt, groupOutSlotsIt + n));
-        groupOutSlotsIt += n;
-    }
+    for (size_t idxAcc = 0; idxAcc < accStmts.size(); ++idxAcc) {
+        auto accOp = Accum::Op{accStmts[idxAcc]};
+        size_t numAggs = accOp.getNumAggs();
 
-    auto collatorSlot = state.getCollatorSlot();
+        aggSlotsVec.emplace_back(SbSlotVector(groupOutSlotsIt, groupOutSlotsIt + numAggs));
+        groupOutSlotsIt += numAggs;
+    }
 
     // Prepare to project 'idFinalExpr' to a slot.
     SbExprOptSbSlotVector projects;
     projects.emplace_back(std::move(idFinalExpr), boost::none);
-
-    const auto& accStmts = groupNode.accumulators;
 
     // Generate all the finalize expressions and prepare to project all these expressions
     // to slots.
     std::vector<std::string> fieldNames{"_id"};
     size_t idxAccFirstSlot = 0;
     for (size_t idxAcc = 0; idxAcc < accStmts.size(); ++idxAcc) {
+        const AccumulationStatement& accStmt = accStmts[idxAcc];
+        auto accOp = Accum::Op{accStmt};
+
         // Gathers field names for the output object from accumulator statements.
         fieldNames.push_back(accStmts[idxAcc].fieldName);
 
-        const auto& accStmt = accStmts[idxAcc];
-        SbExpr finalExpr;
+        Accum::InputsPtr finalizeInputs;
 
         if (isTopBottomN(accStmt)) {
-            StringDataMap<SbExpr> finalArgs;
-            finalArgs.emplace(AccArgs::kSortSpec, SbExpr{state.getSortSpecSlot(&accStmt)});
-            finalExpr = buildFinalize(
-                state, accStmts[idxAcc], aggSlotsVec[idxAcc], std::move(finalArgs), collatorSlot);
-        } else {
-            finalExpr = buildFinalize(state, accStmts[idxAcc], aggSlotsVec[idxAcc], collatorSlot);
+            auto sortSpec = SbExpr{state.getSortSpecSlot(&accStmt)};
+            finalizeInputs = std::make_unique<Accum::FinalizeTopBottomNInputs>(std::move(sortSpec));
         }
+
+        SbExpr finalExpr =
+            accOp.buildFinalize(state, std::move(finalizeInputs), aggSlotsVec[idxAcc]);
 
         // buildFinalize() might not return an expression if the final step is trivial.
         // For example, $first and $last's final steps are trivial.
@@ -672,12 +714,11 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     SbStage stage,
     bool allowDiskUse,
     SbExpr::Vector groupByExprs,
-    SbAggExprVector sbAggExprs,
-    const std::vector<size_t>& accNumSbAggExprs,
-    SbExprSbSlotVector mergingExprs,
+    std::vector<SbAggExprVector> sbAggExprs,
+    std::vector<SbExprSbSlotVector> mergingExprs,
     bool useBlockHashAgg,
-    SbExpr::Vector blockAccArgExprs,
-    const SbSlotVector& blockAccInternalArgSlots,
+    std::vector<SbExpr::Vector> blockAccExprs,
+    std::vector<SbSlotVector> blockAccInternalArgSlots,
     boost::optional<SbSlot> bitmapInternalSlot,
     boost::optional<SbSlot> accInternalSlot,
     PlanYieldPolicy* yieldPolicy,
@@ -693,8 +734,10 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     for (auto& expr : groupByExprs) {
         projects.emplace_back(std::move(expr), boost::none);
     }
-    for (auto& expr : blockAccArgExprs) {
-        projects.emplace_back(std::move(expr), boost::none);
+    for (auto& vec : blockAccExprs) {
+        for (auto& expr : vec) {
+            projects.emplace_back(std::move(expr), boost::none);
+        }
     }
 
     auto [outStage, outSlots] = b.makeProject(
@@ -716,6 +759,16 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
 
     // Builds a group stage with accumulator expressions and group-by slot(s).
     auto [hashAggStage, groupByOutSlots, aggSlots] = [&] {
+        SbAggExprVector flattenedSbAggExprs;
+        for (auto& vec : sbAggExprs) {
+            std::move(vec.begin(), vec.end(), std::back_inserter(flattenedSbAggExprs));
+        }
+
+        SbExprSbSlotVector flattenedMergingExprs;
+        for (auto& vec : mergingExprs) {
+            std::move(vec.begin(), vec.end(), std::back_inserter(flattenedMergingExprs));
+        }
+
         if (useBlockHashAgg) {
             tassert(8448603,
                     "Expected 'bitmapInternalSlot' to be defined",
@@ -723,13 +776,19 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
             tassert(
                 8448604, "Expected 'accInternalSlot' to be defined", accInternalSlot.has_value());
 
+            SbSlotVector flattenedBlockAccInternalArgSlots;
+            for (auto& vec : blockAccInternalArgSlots) {
+                std::move(
+                    vec.begin(), vec.end(), std::back_inserter(flattenedBlockAccInternalArgSlots));
+            }
+
             return b.makeBlockHashAgg(std::move(stage),
                                       buildVariableTypes(childOutputs, individualSlots),
                                       groupBySlots,
-                                      std::move(sbAggExprs),
+                                      std::move(flattenedSbAggExprs),
                                       childOutputs.get(kBlockSelectivityBitmap),
                                       blockAccArgSlots,
-                                      blockAccInternalArgSlots,
+                                      std::move(flattenedBlockAccInternalArgSlots),
                                       *bitmapInternalSlot,
                                       *accInternalSlot,
                                       allowDiskUse,
@@ -738,10 +797,10 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
             return b.makeHashAgg(std::move(stage),
                                  buildVariableTypes(childOutputs, individualSlots),
                                  groupBySlots,
-                                 std::move(sbAggExprs),
+                                 std::move(flattenedSbAggExprs),
                                  state.getCollatorSlot(),
                                  allowDiskUse,
-                                 std::move(mergingExprs),
+                                 std::move(flattenedMergingExprs),
                                  yieldPolicy);
         }
     }();
@@ -768,12 +827,12 @@ std::pair<SbStage, SbSlot> generateGroupResultObject(SbStage stage,
     }
 
     StringData newObjFn = groupNode->shouldProduceBson ? "newBsonObj"_sd : "newObj"_sd;
-    auto outputExpr = b.makeFunction(newObjFn, std::move(funcArgs));
+    SbExpr outputExpr = b.makeFunction(newObjFn, std::move(funcArgs));
 
     auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(outputExpr));
     stage = std::move(outStage);
 
-    auto slot = outSlots[0];
+    SbSlot slot = outSlots[0];
     slot.setTypeSignature(TypeSignature::kObjectType);
 
     return {std::move(stage), slot};
@@ -831,7 +890,7 @@ std::tuple<SbStage, SbExpr::Vector, SbSlot> generateInitRootSlot(
     }();
 
     // Project 'groupByExpr' to a slot.
-    auto targetSlot = idIsKnownToBeObj ? slotIdForInitRoot : boost::none;
+    boost::optional<SbSlot> targetSlot = idIsKnownToBeObj ? slotIdForInitRoot : boost::none;
     auto [projectStage, projectOutSlots] =
         b.makeProject(std::move(stage),
                       buildVariableTypes(childOutputs),
@@ -850,9 +909,9 @@ std::tuple<SbStage, SbExpr::Vector, SbSlot> generateInitRootSlot(
         // If we're not sure whether '_id' is an object, then we need to project the
         // aforementioned expression to a slot and use that.
         auto [emptyObjTag, emptyObjVal] = sbe::value::makeNewObject();
-        auto idOrEmptyObjExpr = b.makeIf(b.makeFunction("isObject"_sd, groupByExpr.clone()),
-                                         groupByExpr.clone(),
-                                         b.makeConstant(emptyObjTag, emptyObjVal));
+        SbExpr idOrEmptyObjExpr = b.makeIf(b.makeFunction("isObject"_sd, groupByExpr.clone()),
+                                           groupByExpr.clone(),
+                                           b.makeConstant(emptyObjTag, emptyObjVal));
 
         auto [outStage, outSlots] =
             b.makeProject(std::move(stage),
@@ -921,7 +980,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildGroup(const Query
         buildGroupImpl(std::move(stage), reqs, std::move(childOutputs), groupNode);
     stage = std::move(outStage);
 
-    const auto& accStmts = groupNode->accumulators;
+    const std::vector<AccumulationStatement>& accStmts = groupNode->accumulators;
 
     tassert(5851605,
             "The number of final slots must be as 1 (the final group-by slot) + the number of acc "
@@ -965,6 +1024,10 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                       const PlanStageReqs& reqs,
                                       PlanStageSlots childOutputs,
                                       const GroupNode* groupNode) {
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    auto collatorSlot = _state.getCollatorSlot();
     const auto& idExpr = groupNode->groupByExpression;
     const auto nodeId = groupNode->nodeId();
     SbBuilder b(_state, nodeId);
@@ -988,9 +1051,11 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
             _state, *groupNode, std::move(stage), childOutputs, groupFieldMap);
     }
 
+    const std::vector<AccumulationStatement>& accs = groupNode->accumulators;
+
     // Check if any of the accumulators have a variable initializer.
     bool hasVariableGroupInit = false;
-    for (const auto& accStmt : groupNode->accumulators) {
+    for (const auto& accStmt : accs) {
         hasVariableGroupInit =
             hasVariableGroupInit || !ExpressionConstant::isNullOrConstant(accStmt.expr.initializer);
     }
@@ -1032,165 +1097,151 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
         }
     }
 
-    // Generate all the input arg expressions for all of the accumulators.
-    std::vector<AccumulatorArgs> accArgsVec =
-        generateAllAccumulatorArgs(_state, *groupNode, childOutputs);
+    // If one or more accumulators has a variable initializer, then we will eventually need
+    // need to set up 'initRootSlot' later in this function.
+    //
+    // For now we just reserve a slot ID for 'initRootSlot' so that we can pass the slot ID to
+    // generateAllAccumAggs(). Later we will make sure that 'initRootSlot' actually gets
+    // populated.
+    auto slotIdForInitRoot =
+        hasVariableGroupInit ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
 
     // The 'individualSlots' vector is used to keep track of all the slots that are currently
     // "active" that are not present in 'childOutputs'. This vector is used together with
     // 'childOutputs' when we need to do constant-folding / type analysis and vectorization.
     SbSlotVector individualSlots;
 
-    std::vector<AccumulatorArgs> blockAccArgsVec;
-    bool vectorizedAccumulatorArgs = false;
+    // Define a helper lambda for checking if all accumulators support buildAccumBlockAggs().
+    auto canBuildBlockExprsAndBlockAggs = [&]() -> bool {
+        return std::all_of(accs.begin(), accs.end(), [&](auto&& acc) {
+            auto accOp = Accum::Op{acc};
+            return accOp.hasBuildAccumBlockExprs() && accOp.hasBuildAccumBlockAggs();
+        });
+    };
+
+    // Below are the conditions for attempting to use BlockHashAggStage. When 'tryToUseBlockHashAgg'
+    // is true, we will try vectorize to the accumulator args, and if that succeeds then we will try
+    // to generate the block agg expressions. If all of that is successful, then we will set the
+    // 'useBlockHashAgg' flag to true and we will use BlockHashAggStage. Otherwise, we use the
+    // normal HashAggStage.
 
     // TODO SERVER-87560 re-enable block hashagg end-to-end.
-    bool tryToVectorizeAccumulatorArgs = false;
+    const bool disableBlockHashAgg = true;
 
-    // If the necessary conditions are met, try to vectorize 'accArgsVec'.
-    if (tryToVectorizeAccumulatorArgs) {
-        bool vectorizationFailed = false;
+    const bool tryToUseBlockHashAgg = sbeFullEnabled && childOutputs.hasBlockOutput() &&
+        idIsSingleKey && !hasVariableGroupInit && !collatorSlot && !_cq.getExpCtx()->allowDiskUse &&
+        canBuildBlockExprsAndBlockAggs() && !disableBlockHashAgg;
 
-        // Loop over 'accArgsVec' and try to vectorize each 'AccumulatorArgs' object.
-        for (const AccumulatorArgs& accArgs : accArgsVec) {
-            SbExpr blockAccArgExpr;
-            boost::optional<TypeSignature> typeSig;
-            bool isBlockType = false;
+    bool useBlockHashAgg = false;
 
-            if (accArgs.first.size() == 1) {
-                const SbExpr& accArgExpr = accArgs.first[0];
+    boost::optional<std::vector<Accum::InputsPtr>> accExprsVec;
+    boost::optional<std::vector<SbAggExprVector>> sbAggExprs;
+    std::vector<SbExpr::Vector> blockAccExprs;
+    std::vector<SbSlotVector> blockAccInternalArgSlots;
+    boost::optional<SbSlot> bitmapInternalSlot;
+    boost::optional<SbSlot> accInternalSlot;
 
-                blockAccArgExpr =
-                    buildVectorizedExpr(_state, accArgExpr.clone(), childOutputs, false);
-                typeSig = blockAccArgExpr.getTypeSignature();
-                isBlockType = typeSig && TypeSignature::kBlockType.isSubset(*typeSig);
+    if (tryToUseBlockHashAgg) {
+        // If 'tryToUseBlockHashAgg' is true, then generate block arg expressions for all of the
+        // accumulators.
+        boost::optional<std::vector<Accum::AccumBlockExprs>> accumBlockExprsVec =
+            generateAllAccumBlockExprs(_state, *groupNode, childOutputs);
+
+        // If generating block arg exprs for all the accumulators was successful, then proceed to
+        // generating block agg expressions for all the accumulators.
+        if (accumBlockExprsVec) {
+            // Unpack 'accumBlockExprsVec' and populate 'accExprsVec', 'blockAccExprs', and
+            // 'blockAccInternalArgSlots'.
+            accExprsVec.emplace();
+
+            for (auto& accumBlockExprs : *accumBlockExprsVec) {
+                accExprsVec->emplace_back(std::move(accumBlockExprs.inputs));
+                blockAccExprs.emplace_back(std::move(accumBlockExprs.exprs));
+                blockAccInternalArgSlots.emplace_back(std::move(accumBlockExprs.slots));
             }
 
-            if (blockAccArgExpr && isBlockType) {
-                const std::vector<std::string>& accArgNames = accArgs.second;
+            // When calling generateAllAccumAggs() with genBlockAggs=true, we have to pass in two
+            // additional "internal" slots.
+            bitmapInternalSlot.emplace(SbSlot{_state.slotId()});
+            accInternalSlot.emplace(SbSlot{_state.slotId()});
 
-                blockAccArgsVec.emplace_back(
-                    AccumulatorArgs{SbExpr::makeSeq(std::move(blockAccArgExpr)), accArgNames});
-            } else {
-                // If we couldn't vectorize one of the accumulator args, then we give up entirely
-                // on any further vectorization and fallback to using scalar values with the
-                // normal HashAggStage.
-                blockAccArgsVec.clear();
-                vectorizationFailed = true;
-                break;
-            }
-        }
-
-        vectorizedAccumulatorArgs = !vectorizationFailed;
-    }
-
-    // If one or more accumulators has a variable initializer, then we will eventually need
-    // need to set up 'initRootSlot' later in this function.
-    //
-    // For now we just reserve a slot ID for 'initRootSlot' so that we can pass the slot ID to
-    // generateAllAccumulators(). Later we will make sure that 'initRootSlot' actually gets
-    // populated.
-    auto slotIdForInitRoot =
-        hasVariableGroupInit ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
-
-    // Generate agg expressions and block agg expressions for all the accumulators.
-    bool genBlockAggs = vectorizedAccumulatorArgs;
-
-    // If we're generating block aggs, then for each SbExpr in 'blockAccArgsVec' we replace
-    // the SbExpr with an internal slot, we store the SbExpr into 'blockAccArgExprs', and we
-    // store the internal slot into 'blockAccInternalArgSlots'.
-    SbExpr::Vector blockAccArgExprs;
-    SbSlotVector blockAccInternalArgSlots;
-
-    if (genBlockAggs) {
-        for (auto& blockAccArgs : blockAccArgsVec) {
-            tassert(8448605, "Expected single expression", blockAccArgs.first.size() == 1);
-
-            blockAccArgExprs.emplace_back(std::move(blockAccArgs.first[0]));
-
-            auto internalSlot = SbSlot{_state.slotId()};
-            blockAccInternalArgSlots.emplace_back(internalSlot);
-
-            auto updatedArgsVector = SbExpr::makeSeq(SbExpr{internalSlot});
-            std::vector<std::string> accArgNames = std::move(blockAccArgs.second);
-
-            blockAccArgs = AccumulatorArgs{std::move(updatedArgsVector), std::move(accArgNames)};
+            // Generate the SbAggExprs for all the accumulators from 'groupNode'.
+            sbAggExprs = generateAllAccumAggs(_state,
+                                              *groupNode,
+                                              childOutputs,
+                                              std::move(*accExprsVec),
+                                              slotIdForInitRoot,
+                                              true /* genBlockAggs */,
+                                              bitmapInternalSlot,
+                                              accInternalSlot);
         }
     }
 
-    // If 'genBlockAggs' is false then we use the normal accumulator args, otherwise we use
-    // the transformed "block" args that we created above.
-    auto& accArgsParam = genBlockAggs ? blockAccArgsVec : accArgsVec;
+    if (sbAggExprs) {
+        // If generating block agg expressions for all the accumulators was successful, then we
+        // can use BlockHashAggStage.
+        useBlockHashAgg = true;
 
-    // If 'genBlockAggs' is true, then we need to generate a couple of internal slots for
-    // generateAllAccumulators().
-    auto bitmapInternalSlot =
-        genBlockAggs ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
-    auto accInternalSlot =
-        genBlockAggs ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
+        // Assert that the 'blockAgg' field is non-null for all SbAggExprs in 'sbAggExprs'.
+        const bool hasNullBlockAggs =
+            std::any_of(sbAggExprs->begin(), sbAggExprs->end(), [](auto&& v) {
+                return std::any_of(
+                    v.begin(), v.end(), [](auto&& e) { return e.first.blockAgg.isNull(); });
+            });
 
-    // Generate the SbAggExprs for all the accumulators from 'groupNode'.
-    auto [sbAggExprs, accNumSbAggExprs] = generateAllAccumulators(_state,
-                                                                  *groupNode,
-                                                                  childOutputs,
-                                                                  std::move(accArgsParam),
-                                                                  slotIdForInitRoot,
-                                                                  genBlockAggs,
-                                                                  bitmapInternalSlot,
-                                                                  accInternalSlot);
-
-    // Check if all aggs support block processing.
-    bool allAggsHaveBlockExprs = false;
-
-    if (genBlockAggs && !sbAggExprs.empty()) {
-        allAggsHaveBlockExprs = std::all_of(sbAggExprs.begin(), sbAggExprs.end(), [](auto&& e) {
-            return !e.first.blockAgg.isNull();
-        });
+        tassert(8751305, "Expected all blockAgg fields to be defined", !hasNullBlockAggs);
     }
 
-    bool useBlockHashAgg = childOutputs.hasBlockOutput() && allAggsHaveBlockExprs;
-
-    // If all the necessary conditions to use BlockHashAggStage are not met, then close the block
-    // processing pipeline here.
-    if (childOutputs.hasBlockOutput() && !useBlockHashAgg) {
-        SbExprOptSbSlotVector projects;
-        for (size_t i = 0; i < groupByExprs.size(); ++i) {
-            projects.emplace_back(std::move(groupByExprs[i]), boost::none);
-        }
-
-        auto [projectStage, groupBySlots] =
-            b.makeProject(std::move(stage), buildVariableTypes(childOutputs), std::move(projects));
-
-        auto [outStage, outSlots] =
-            buildBlockToRow(std::move(projectStage), _state, childOutputs, std::move(groupBySlots));
-        stage = std::move(outStage);
-
-        for (size_t i = 0; i < groupByExprs.size(); ++i) {
-            groupByExprs[i] = outSlots[i];
-        }
-
-        individualSlots = outSlots;
-
-        // Remove the block projections that have been prepared, we are going to build the scalar
-        // version now.
-        blockAccArgExprs.clear();
-
-        // buildBlockToRow() just made a bunch of changes to 'childOutputs', so we need
-        // to re-generate 'accArgsVec', 'sbAggExprs', and 'accNumSbAggExprs'.
-        accArgsVec = generateAllAccumulatorArgs(_state, *groupNode, childOutputs);
-
-        genBlockAggs = false;
+    // If we aren't not going to use BlockHashAggStage, then we need to close the block processing
+    // pipeline here.
+    if (!useBlockHashAgg) {
+        blockAccExprs.clear();
+        blockAccInternalArgSlots.clear();
         bitmapInternalSlot = boost::none;
         accInternalSlot = boost::none;
-        std::tie(sbAggExprs, accNumSbAggExprs) = generateAllAccumulators(_state,
-                                                                         *groupNode,
-                                                                         childOutputs,
-                                                                         std::move(accArgsVec),
-                                                                         slotIdForInitRoot,
-                                                                         genBlockAggs,
-                                                                         bitmapInternalSlot,
-                                                                         accInternalSlot);
+
+        if (childOutputs.hasBlockOutput()) {
+            SbExprOptSbSlotVector projects;
+            for (size_t i = 0; i < groupByExprs.size(); ++i) {
+                projects.emplace_back(std::move(groupByExprs[i]), boost::none);
+            }
+
+            auto [projectStage, groupBySlots] = b.makeProject(
+                std::move(stage), buildVariableTypes(childOutputs), std::move(projects));
+
+            auto [outStage, outSlots] = buildBlockToRow(
+                std::move(projectStage), _state, childOutputs, std::move(groupBySlots));
+            stage = std::move(outStage);
+
+            for (size_t i = 0; i < groupByExprs.size(); ++i) {
+                groupByExprs[i] = outSlots[i];
+            }
+
+            individualSlots = outSlots;
+        }
     }
+
+    // If we didn't try to generate block agg expressions for the accumulators, or if we tried
+    // and failed, then we need to generate scalar arg exprs and scalar agg expressions for all
+    // the accumulators.
+    if (!sbAggExprs) {
+        // Generate the scalar arg exprs.
+        accExprsVec = generateAllAccumExprs(_state, *groupNode, childOutputs);
+
+        tassert(8751300, "Expected accumulator arg exprs to be defined", accExprsVec.has_value());
+
+        // Generate the scalar agg expressions.
+        sbAggExprs = generateAllAccumAggs(_state,
+                                          *groupNode,
+                                          childOutputs,
+                                          std::move(*accExprsVec),
+                                          slotIdForInitRoot,
+                                          false /* genBlockAggs */,
+                                          boost::none /* bitmapInternalSlot */,
+                                          boost::none /* accInternalSlot */);
+    }
+
+    tassert(8751301, "Expected accumulator aggs to be defined", sbAggExprs.has_value());
 
     // If one or more accumulators has a variable initializer, then we need to set up
     // 'initRootSlot'.
@@ -1214,7 +1265,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     }
 
     // Generate merging expressions for all the accumulators.
-    auto mergingExprs = generateAllMergingExprs(_state, *groupNode, accNumSbAggExprs);
+    std::vector<SbExprSbSlotVector> mergingExprs = generateAllMergingExprs(_state, *groupNode);
 
     // If there is a single groupBy key that didn't get vectorized and is constant, and if none of
     // the accumulators had a variable initializer, then we set 'idConstantValue' and we clear the
@@ -1235,12 +1286,11 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                               std::move(stage),
                               _cq.getExpCtx()->allowDiskUse,
                               std::move(groupByExprs),
-                              std::move(sbAggExprs),
-                              accNumSbAggExprs,
+                              std::move(*sbAggExprs),
                               std::move(mergingExprs),
                               useBlockHashAgg,
-                              std::move(blockAccArgExprs),
-                              blockAccInternalArgSlots,
+                              std::move(blockAccExprs),
+                              std::move(blockAccInternalArgSlots),
                               bitmapInternalSlot,
                               accInternalSlot,
                               _yieldPolicy,
@@ -1295,7 +1345,6 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                    individualSlots,
                                    std::move(groupBySlots),
                                    std::move(groupOutSlots),
-                                   accNumSbAggExprs,
                                    *groupNode,
                                    idIsSingleKey,
                                    std::move(idConstantValue));

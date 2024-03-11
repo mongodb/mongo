@@ -35,6 +35,9 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
+namespace Accum {
+class Op;
+}
 
 /**
  * Build a list of window function init functions.
@@ -42,12 +45,8 @@ namespace mongo::stage_builder {
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    std::unique_ptr<sbe::EExpression> arg,
     boost::optional<sbe::value::SlotId> collatorSlot);
 
-/**
- * Similar to above but takes multiple arguments.
- */
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
@@ -107,4 +106,37 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(
     sbe::value::SlotVector values,
     StringDataMap<std::unique_ptr<sbe::EExpression>> arg,
     boost::optional<sbe::value::SlotId> collatorSlots);
+
+/**
+ * Given an Accum::Op 'acc' and a single input expression ('input'), these functions
+ * generate the accumulate expressions for 'acc'.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorForWindowFunc(
+    const Accum::Op& acc, std::unique_ptr<sbe::EExpression> input, StageBuilderState& state);
+
+/**
+ * Given an Accum::Op 'acc' and a set of input expressions ('inputs'), these functions
+ * generate the accumulate expressions for 'acc'.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorForWindowFunc(
+    const Accum::Op& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> inputs,
+    StageBuilderState& state);
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeForWindowFunc(const Accum::Op& acc,
+                                                                            StageBuilderState&);
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeForWindowFunc(
+    const Accum::Op& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    StageBuilderState&);
+
+SbExpr buildFinalizeForWindowFunc(const Accum::Op& acc,
+                                  StageBuilderState& state,
+                                  const sbe::value::SlotVector& aggSlots);
+
+SbExpr buildFinalizeForWindowFunc(const Accum::Op& acc,
+                                  StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+                                  StageBuilderState& state,
+                                  const sbe::value::SlotVector& aggSlots);
 }  // namespace mongo::stage_builder

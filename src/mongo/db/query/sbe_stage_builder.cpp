@@ -4880,21 +4880,19 @@ public:
                         return emaExpr->getAlpha().get();
                     }
                 }();
-                initExprArgs.emplace("", makeDecimalConstant(alpha));
+                initExprArgs.emplace(Accum::kInput, makeDecimalConstant(alpha));
             } else if (outputField.expr->getOpName() == AccumulatorIntegral::kName) {
-                initExprArgs.emplace("",
+                initExprArgs.emplace(Accum::kInput,
                                      getUnitArg(dynamic_cast<window_function::ExpressionWithUnit*>(
                                          outputField.expr.get())));
             } else if (isAccumulatorN(outputField)) {
                 auto nExprPtr = getNExprFromAccumulatorN(outputField);
                 initExprArgs.emplace(
-                    AccArgs::kMaxSize,
+                    Accum::kMaxSize,
                     generateExpression(_state, nExprPtr, rootSlotOpt, outputs).extractExpr(_state));
-                initExprArgs.emplace(AccArgs::kIsGroupAccum,
+                initExprArgs.emplace(Accum::kIsGroupAccum,
                                      makeConstant(sbe::value::TypeTags::Boolean,
                                                   sbe::value::bitcastFrom<bool>(false)));
-            } else {
-                initExprArgs.emplace("", std::unique_ptr<mongo::sbe::EExpression>(nullptr));
             }
             return initExprArgs;
         }();
@@ -4925,8 +4923,8 @@ public:
                 expr && expr->getChildren().size() == 2) {
                 auto argX = expr->getChildren()[0].get();
                 auto argY = expr->getChildren()[1].get();
-                argExprs.emplace(AccArgs::kCovarianceX, getArgExpr(argX));
-                argExprs.emplace(AccArgs::kCovarianceY, getArgExpr(argY));
+                argExprs.emplace(Accum::kCovarianceX, getArgExpr(argX));
+                argExprs.emplace(Accum::kCovarianceY, getArgExpr(argY));
             } else if (auto expr =
                            dynamic_cast<ExpressionConstant*>(outputField.expr->input().get());
                        expr && expr->getValue().isArray() &&
@@ -4935,26 +4933,24 @@ public:
                 auto bson = BSON("x" << array[0] << "y" << array[1]);
                 auto [argXTag, argXVal] =
                     sbe::bson::convertFrom<false /* View */>(bson.getField("x"));
-                argExprs.emplace(AccArgs::kCovarianceX, makeConstant(argXTag, argXVal));
+                argExprs.emplace(Accum::kCovarianceX, makeConstant(argXTag, argXVal));
                 auto [argYTag, argYVal] =
                     sbe::bson::convertFrom<false /* View */>(bson.getField("y"));
-                argExprs.emplace(AccArgs::kCovarianceY, makeConstant(argYTag, argYVal));
+                argExprs.emplace(Accum::kCovarianceY, makeConstant(argYTag, argYVal));
             } else {
-                argExprs.emplace(AccArgs::kCovarianceX,
-                                 makeConstant(sbe::value::TypeTags::Null, 0));
-                argExprs.emplace(AccArgs::kCovarianceY,
-                                 makeConstant(sbe::value::TypeTags::Null, 0));
+                argExprs.emplace(Accum::kCovarianceX, makeConstant(sbe::value::TypeTags::Null, 0));
+                argExprs.emplace(Accum::kCovarianceY, makeConstant(sbe::value::TypeTags::Null, 0));
             }
         } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
             auto [outStage, sortBySlot, _] = getSortBySlot(std::move(stage));
             stage = std::move(outStage);
 
-            argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
-            argExprs.emplace(AccArgs::kSortBy, makeVariable(sortBySlot));
+            argExprs.emplace(Accum::kInput, getArgExpr(outputField.expr->input().get()));
+            argExprs.emplace(Accum::kSortBy, makeVariable(sortBySlot));
         } else if (accName == "$rank" || accName == "$denseRank") {
             auto isAscending = windowNode->sortBy->front().isAscending;
-            argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
-            argExprs.emplace(AccArgs::kIsAscending,
+            argExprs.emplace(Accum::kInput, getArgExpr(outputField.expr->input().get()));
+            argExprs.emplace(Accum::kIsAscending,
                              makeConstant(sbe::value::TypeTags::Boolean,
                                           sbe::value::bitcastFrom<bool>(isAscending)));
         } else if (isTopBottomN(outputField)) {
@@ -4971,9 +4967,9 @@ public:
                                                        std::move(sortSpecExpr),
                                                        makeVariable(*rootSlotOpt));
 
-                argExprs.emplace(AccArgs::kSortBy, getArgExprFromSBEExpression(std::move(key)));
+                argExprs.emplace(Accum::kSortBy, getArgExprFromSBEExpression(std::move(key)));
             } else {
-                argExprs.emplace(AccArgs::kSortSpec, sortSpecExpr->clone());
+                argExprs.emplace(Accum::kSortSpec, sortSpecExpr->clone());
 
                 // Build the key expression
                 auto key = collatorSlot ? makeFunction("generateCheapSortKey",
@@ -4983,7 +4979,7 @@ public:
                                         : makeFunction("generateCheapSortKey",
                                                        std::move(sortSpecExpr),
                                                        makeVariable(*rootSlotOpt));
-                argExprs.emplace(AccArgs::kSortBy,
+                argExprs.emplace(Accum::kSortBy,
                                  makeFunction("sortKeyComponentVectorToArray", std::move(key)));
             }
 
@@ -4992,7 +4988,7 @@ public:
                     if (key == AccumulatorN::kFieldNameOutput) {
                         auto outputExpr =
                             generateExpression(_state, value.get(), rootSlotOpt, outputs);
-                        argExprs.emplace(AccArgs::kValue,
+                        argExprs.emplace(Accum::kValue,
                                          getArgExprFromSBEExpression(
                                              makeFillEmptyNull(outputExpr.extractExpr(_state))));
                         break;
@@ -5010,7 +5006,7 @@ public:
                     auto [outputTag, outputVal] =
                         sbe::bson::convertFrom<false /* View */>(outputField);
                     auto outputExpr = makeConstant(outputTag, outputVal);
-                    argExprs.emplace(AccArgs::kValue, makeFillEmptyNull(std::move(outputExpr)));
+                    argExprs.emplace(Accum::kValue, makeFillEmptyNull(std::move(outputExpr)));
                 }
             } else {
                 tasserted(8155717,
@@ -5020,10 +5016,9 @@ public:
             tassert(8155718,
                     str::stream() << accName
                                   << " window function must have an output field in the argument",
-                    argExprs.find(AccArgs::kValue) != argExprs.end());
-
+                    argExprs.find(Accum::kValue) != argExprs.end());
         } else {
-            argExprs.emplace("", getArgExpr(outputField.expr->input().get()));
+            argExprs.emplace(Accum::kInput, getArgExpr(outputField.expr->input().get()));
         }
 
         return {std::move(stage), std::move(initExprArgs), std::move(argExprs)};
@@ -5031,7 +5026,7 @@ public:
 
     SbStage generateInitsAddsAndRemoves(SbStage stage,
                                         const WindowFunctionStatement& outputField,
-                                        const AccumulationOp& acc,
+                                        const Accum::Op& acc,
                                         bool removable,
                                         StringDataEExprMap initExprArgs,
                                         const StringDataEExprMap& argExprs,
@@ -5045,9 +5040,8 @@ public:
             return exprMapClone;
         };
         if (removable) {
-            if (initExprArgs.size() == 1) {
-                window.initExprs = buildWindowInit(
-                    _state, outputField, std::move(initExprArgs.begin()->second), collatorSlot);
+            if (initExprArgs.size() == 0) {
+                window.initExprs = buildWindowInit(_state, outputField, collatorSlot);
             } else {
                 window.initExprs =
                     buildWindowInit(_state, outputField, std::move(initExprArgs), collatorSlot);
@@ -5063,18 +5057,18 @@ public:
                 window.removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
             }
         } else {
-            if (initExprArgs.size() == 1) {
-                window.initExprs =
-                    buildInitialize(acc, std::move(initExprArgs.begin()->second), _state);
+            if (initExprArgs.size() == 0) {
+                window.initExprs = buildInitializeForWindowFunc(acc, _state);
             } else {
-                window.initExprs = buildInitialize(acc, std::move(initExprArgs), _state);
+                window.initExprs =
+                    buildInitializeForWindowFunc(acc, std::move(initExprArgs), _state);
             }
             if (argExprs.size() == 1) {
                 window.addExprs =
-                    buildAccumulator(acc, argExprs.begin()->second->clone(), collatorSlot, _state);
+                    buildAccumulatorForWindowFunc(acc, argExprs.begin()->second->clone(), _state);
             } else {
                 window.addExprs =
-                    buildAccumulator(acc, cloneExprMap(argExprs), collatorSlot, _state);
+                    buildAccumulatorForWindowFunc(acc, cloneExprMap(argExprs), _state);
             }
             window.removeExprs =
                 std::vector<std::unique_ptr<sbe::EExpression>>{window.addExprs.size()};
@@ -5249,7 +5243,7 @@ public:
     }
 
     SlotId generateFinalExpr(const WindowFunctionStatement& outputField,
-                             const AccumulationOp& acc,
+                             const Accum::Op& acc,
                              bool removable,
                              StringDataEExprMap argExprs,
                              const sbe::WindowStage::Window& window) {
@@ -5273,15 +5267,14 @@ public:
             auto u = dynamic_cast<ExpressionWithUnit*>(outputField.expr.get())->unitInMillis();
             auto unit = u ? makeInt64Constant(*u) : makeNullConstant();
 
-            auto it = argExprs.find(AccArgs::kInput);
+            auto it = argExprs.find(Accum::kInput);
             tassert(7993401,
-                    str::stream() << "Window function expects '" << AccArgs::kInput << "' argument",
+                    str::stream() << "Window function expects '" << Accum::kInput << "' argument",
                     it != argExprs.end());
             auto inputExpr = it->second->clone();
-            it = argExprs.find(AccArgs::kSortBy);
+            it = argExprs.find(Accum::kSortBy);
             tassert(7993402,
-                    str::stream() << "Window function expects '" << AccArgs::kSortBy
-                                  << "' argument",
+                    str::stream() << "Window function expects '" << Accum::kSortBy << "' argument",
                     it != argExprs.end());
             auto sortByExpr = it->second->clone();
 
@@ -5291,11 +5284,11 @@ public:
             auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
             auto frameFirstSortBy = getModifiedExpr(sortByExpr->clone(), frameFirstSlots);
             auto frameLastSortBy = getModifiedExpr(sortByExpr->clone(), frameLastSlots);
-            finalArgExprs.emplace(AccArgs::kUnit, std::move(unit));
-            finalArgExprs.emplace(AccArgs::kInputFirst, std::move(frameFirstInput));
-            finalArgExprs.emplace(AccArgs::kInputLast, std::move(frameLastInput));
-            finalArgExprs.emplace(AccArgs::kSortByFirst, std::move(frameFirstSortBy));
-            finalArgExprs.emplace(AccArgs::kSortByLast, std::move(frameLastSortBy));
+            finalArgExprs.emplace(Accum::kUnit, std::move(unit));
+            finalArgExprs.emplace(Accum::kInputFirst, std::move(frameFirstInput));
+            finalArgExprs.emplace(Accum::kInputLast, std::move(frameLastInput));
+            finalArgExprs.emplace(Accum::kSortByFirst, std::move(frameFirstSortBy));
+            finalArgExprs.emplace(Accum::kSortByLast, std::move(frameLastSortBy));
         } else if (outputField.expr->getOpName() == "$first" && removable) {
             tassert(8085502,
                     str::stream() << "Window function $first expects 1 argument",
@@ -5304,8 +5297,8 @@ public:
             auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
             auto inputExpr = it->second->clone();
             auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
-            finalArgExprs.emplace(AccArgs::kInput, std::move(frameFirstInput));
-            finalArgExprs.emplace(AccArgs::kDefaultVal, makeNullConstant());
+            finalArgExprs.emplace(Accum::kInput, std::move(frameFirstInput));
+            finalArgExprs.emplace(Accum::kDefaultVal, makeNullConstant());
         } else if (outputField.expr->getOpName() == "$last" && removable) {
             tassert(8085503,
                     str::stream() << "Window function $last expects 1 argument",
@@ -5314,8 +5307,8 @@ public:
             auto inputExpr = it->second->clone();
             auto& frameLastSlots = windowFrameLastSlots[*windowFrameLastSlotIdx.back()];
             auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
-            finalArgExprs.emplace(AccArgs::kInput, std::move(frameLastInput));
-            finalArgExprs.emplace(AccArgs::kDefaultVal, makeNullConstant());
+            finalArgExprs.emplace(Accum::kInput, std::move(frameLastInput));
+            finalArgExprs.emplace(Accum::kDefaultVal, makeNullConstant());
         } else if (outputField.expr->getOpName() == "$linearFill") {
             finalArgExprs = std::move(argExprs);
         } else if (outputField.expr->getOpName() == "$shift") {
@@ -5330,10 +5323,10 @@ public:
             auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
             auto inputExpr = it->second->clone();
             auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
-            finalArgExprs.emplace(AccArgs::kInput, std::move(frameFirstInput));
-            finalArgExprs.emplace(AccArgs::kDefaultVal, getDefaultValueExpr(outputField));
+            finalArgExprs.emplace(Accum::kInput, std::move(frameFirstInput));
+            finalArgExprs.emplace(Accum::kDefaultVal, getDefaultValueExpr(outputField));
         } else if (isTopBottomN(outputField) && !removable) {
-            finalArgExprs.emplace(AccArgs::kSortSpec,
+            finalArgExprs.emplace(Accum::kSortSpec,
                                   sbe::makeE<sbe::EVariable>(_state.getSortSpecSlot(&outputField)));
         }
 
@@ -5349,10 +5342,10 @@ public:
                 : buildWindowFinalize(_state, outputField, window.windowExprSlots, collatorSlot);
         } else {
             finalExpr = finalArgExprs.size() > 0
-                ? buildFinalize(
-                      _state, acc, window.windowExprSlots, std::move(finalArgExprs), collatorSlot)
+                ? buildFinalizeForWindowFunc(
+                      acc, std::move(finalArgExprs), _state, window.windowExprSlots)
                       .extractExpr(_state)
-                : buildFinalize(_state, acc, window.windowExprSlots, collatorSlot)
+                : buildFinalizeForWindowFunc(acc, _state, window.windowExprSlots)
                       .extractExpr(_state);
         }
 
@@ -5450,8 +5443,8 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
         // Check whether window is removable or not.
         bool removable = isWindowRemovable(windowBounds);
 
-        // Create an AccumulationOp for non-removable window bounds.
-        auto acc = AccumulationOp{outputField.expr->getOpName()};
+        // Create an Accum::Op for non-removable window bounds.
+        auto acc = Accum::Op{outputField.expr->getOpName()};
 
         auto [outStage, initExprArgs, argExprs] =
             generateArgs(std::move(stage), outputField, removable);

@@ -46,9 +46,153 @@
 namespace mongo::stage_builder {
 class PlanStageSlots;
 
-using AccumulatorArgs = std::pair<SbExpr::Vector, std::vector<std::string>>;
+namespace Accum {
+struct OpInfo;
 
-namespace AccArgs {
+struct BlockAggAndRowAgg {
+    SbExpr blockAgg;
+    SbExpr rowAgg;
+};
+
+// This class serves as the base class for all the "Inputs" classes used by the build methods.
+struct Inputs {
+    Inputs() = default;
+
+    virtual ~Inputs();
+};
+
+using InputsPtr = std::unique_ptr<Inputs>;
+
+struct AccumBlockExprs {
+    InputsPtr inputs;
+    SbExpr::Vector exprs;
+    SbSlotVector slots;
+};
+
+class Op {
+public:
+    Op(std::string opName);
+
+    Op(StringData opName) : Op(opName.toString()) {}
+
+    Op(const AccumulationStatement& acc);
+
+    const std::string& getOpName() const {
+        return _opName;
+    }
+
+    bool countAddendIsIntegerOrDouble() const {
+        return _countAddendIsIntegerOrDouble;
+    }
+
+    /**
+     * This method returns the number of agg expressions that need to be generated for this
+     * Op.
+     *
+     * $avg generates 2 agg expressions, while most other ops only generate 1 agg expression.
+     */
+    size_t getNumAggs() const;
+
+    /**
+     * This method returns true if this Op supports buildAccumBlockExprs(), otherwise
+     * returns false.
+     *
+     * When hasBuildAccumBlockExprs() is false, calling buildAccumBlockExprs() will always
+     * return boost::none.
+     */
+    bool hasBuildAccumBlockExprs() const;
+
+    /**
+     * This method returns true if this Op supports buildAccumBlockAggs(), otherwise
+     * returns false.
+     *
+     * When hasBuildAccumBlockAggs() is false, calling buildAccumBlockAggs() will always
+     * return boost::none.
+     */
+    bool hasBuildAccumBlockAggs() const;
+
+    /**
+     * Given one or more input expressions ('input' / 'inputs'), these methods generate the
+     * arg expressions needed for this Op.
+     */
+    InputsPtr buildAccumExprs(StageBuilderState& state, InputsPtr inputs) const;
+
+    /**
+     * Given one or more input expressions ('input' / 'inputs'), these methods generate the
+     * "block" versions of the arg expressions needed for this Op.
+     */
+    boost::optional<AccumBlockExprs> buildAccumBlockExprs(StageBuilderState& state,
+                                                          InputsPtr inputs,
+                                                          const PlanStageSlots& outputs) const;
+
+    /**
+     * Given a vector of named arg expressions ('args' / 'argNames'), this method generates the
+     * accumulate expressions for this Op.
+     */
+    SbExpr::Vector buildAccumAggs(StageBuilderState& state, InputsPtr inputs) const;
+
+    /**
+     * Given a vector of the "block" versions of the arg expressions ('args' / 'argNames'), this
+     * method generates the "block" versions of the accumulate expressions for this Op.
+     */
+    boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggs(
+        StageBuilderState& state,
+        InputsPtr inputs,
+        SbSlot bitmapInternalSlot,
+        SbSlot accInternalSlot) const;
+
+    /**
+     * Given a map of input expressions ('argExprs'), these methods generate the initialize
+     * expressions for this Op.
+     */
+    SbExpr::Vector buildInitialize(StageBuilderState& state, InputsPtr inputs) const;
+
+    /**
+     * Given a map of input expressions ('argExprs'), this method generates the finalize
+     * expression for this Op.
+     */
+    SbExpr buildFinalize(StageBuilderState& state,
+                         InputsPtr inputs,
+                         const SbSlotVector& aggSlots) const;
+
+    /**
+     * When SBE hash aggregation spills to disk, it spills partial aggregates which need to be
+     * combined later. This method returns the expressions that can be used to combine partial
+     * aggregates for this Op. The aggregate-of-aggregates will be stored in a slots
+     * owned by the hash agg stage, while the new partial aggregates to combine can be read from
+     * the given 'inputSlots'.
+     */
+    SbExpr::Vector buildCombineAggs(StageBuilderState& state,
+                                    InputsPtr inputs,
+                                    const SbSlotVector& inputSlots) const;
+
+private:
+    // Static helper method for looking up the info for this Op in the global map.
+    // This method should only be used by Op's constructors.
+    static const OpInfo* lookupOpInfo(const std::string& opName);
+
+    // Non-static checked helper method for retrieving the value of '_opInfo'. This method will
+    // raise a tassert if '_opInfo' is null.
+    const OpInfo* getOpInfo() const {
+        uassert(8751302,
+                str::stream() << "Unrecognized AccumulatorOp name: " << _opName,
+                _opInfo != nullptr);
+
+        return _opInfo;
+    }
+
+    // Name of the specific accumulation op. This name is used to retrieve info about the op
+    // from the global map.
+    std::string _opName;
+
+    // Info about the specific accumulation op named by '_opName'.
+    const OpInfo* _opInfo = nullptr;
+
+    // Flag that indicates if this is a "$sum" op whose input is an integer constant or a
+    // double constant.
+    bool _countAddendIsIntegerOrDouble = false;
+};
+
 extern const StringData kCount;
 extern const StringData kCovarianceX;
 extern const StringData kCovarianceY;
@@ -74,171 +218,153 @@ extern const std::vector<std::string> kAccumulatorIntegralParams;
 extern const std::vector<std::string> kAccumulatorLinearFillParams;
 extern const std::vector<std::string> kAccumulatorRankParams;
 extern const std::vector<std::string> kAccumulatorTopBottomNParams;
-}  // namespace AccArgs
 
-class AccumulationOp {
-public:
-    AccumulationOp(std::string opName) : _opName(std::move(opName)) {}
+struct AccumSingleInput : public Inputs {
+    AccumSingleInput(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
 
-    AccumulationOp(StringData opName) : _opName(opName.toString()) {}
+    AccumSingleInput(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-    AccumulationOp(const AccumulationStatement& acc);
-
-    const std::string& getOpName() const {
-        return _opName;
-    }
-
-    bool countAddendIsIntegerOrDouble() const {
-        return _countAddendIsIntegerOrDouble;
-    }
-
-private:
-    std::string _opName;
-    bool _countAddendIsIntegerOrDouble = false;
+    SbExpr inputExpr;
 };
 
-struct BlockAggAndRowAgg {
-    SbExpr blockAgg;
-    SbExpr rowAgg;
+struct AccumAggsAvgInputs : public Inputs {
+    AccumAggsAvgInputs(SbExpr inputExpr, SbExpr count)
+        : inputExpr(std::move(inputExpr)), count(std::move(count)) {}
+
+    AccumAggsAvgInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr inputExpr;
+    SbExpr count;
 };
 
-/**
- * Given an AccumulationOp ('acc') and one or more input expressions ('input' / 'inputs'), these
- * functions generate the arg expressions needed for the op specified by 'acc'.
- */
-AccumulatorArgs buildAccumulatorArgs(StageBuilderState& state,
-                                     const AccumulationOp& acc,
-                                     SbExpr input,
-                                     boost::optional<sbe::value::SlotId> collatorSlot);
+struct AccumCovarianceInputs : public Inputs {
+    AccumCovarianceInputs(SbExpr covarianceX, SbExpr covarianceY)
+        : covarianceX(std::move(covarianceX)), covarianceY(std::move(covarianceY)) {}
 
-AccumulatorArgs buildAccumulatorArgs(StageBuilderState& state,
-                                     const AccumulationOp& acc,
-                                     StringDataMap<SbExpr> inputs,
-                                     boost::optional<sbe::value::SlotId> collatorSlot);
+    AccumCovarianceInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-/**
- * Given an AccumulationOp ('acc') and vector of named arg expressions ('args' / 'argNames'),
- * this function generates the accumulate expressions for 'acc'.
- */
-SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
-                                SbExpr::Vector args,
-                                const std::vector<std::string>& argNames,
-                                boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state);
+    SbExpr covarianceX;
+    SbExpr covarianceY;
+};
 
-/**
- * Given an AccumulationOp ('acc') and vector of named arg expressions ('args' / 'argNames'),
- * this function generates the "block" versions of the accumulate expressions for 'acc'.
- */
-std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
-    const AccumulationOp& acc,
-    SbExpr::Vector args,
-    const std::vector<std::string>& argNames,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state);
+struct AccumRankInputs : public Inputs {
+    AccumRankInputs(SbExpr inputExpr, SbExpr isAscending)
+        : inputExpr(std::move(inputExpr)), isAscending(std::move(isAscending)) {}
 
-/**
- * Given an AccumulationOp 'acc' and a single input expression ('input'), these functions
- * generate the accumulate expressions for 'acc'.
- */
-SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
-                                SbExpr input,
-                                boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state);
+    AccumRankInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    const AccumulationOp& acc,
-    std::unique_ptr<sbe::EExpression> input,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state);
+    SbExpr inputExpr;
+    SbExpr isAscending;
+};
 
-/**
- * Given an AccumulationOp 'acc' and a set of input expressions ('inputs'), these functions
- * generate the accumulate expressions for 'acc'.
- */
-SbExpr::Vector buildAccumulator(const AccumulationOp& acc,
-                                StringDataMap<SbExpr> inputs,
-                                boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state);
+struct AccumIntegralInputs : public Inputs {
+    AccumIntegralInputs(SbExpr inputExpr, SbExpr sortBy)
+        : inputExpr(std::move(inputExpr)), sortBy(std::move(sortBy)) {}
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    const AccumulationOp& acc,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> inputs,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state);
+    AccumIntegralInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-/**
- * When SBE hash aggregation spills to disk, it spills partial aggregates which need to be combined
- * later. This function returns the expressions that can be used to combine partial aggregates for
- * the given accumulator 'acc'. The aggregate-of-aggregates will be stored in a slots owned by the
- * hash agg stage, while the new partial aggregates to combine can be read from the given
- * 'inputSlots'.
- */
-SbExpr::Vector buildCombinePartialAggregates(const AccumulationOp& acc,
-                                             const SbSlotVector& inputSlots,
-                                             boost::optional<sbe::value::SlotId> collatorSlot,
-                                             StageBuilderState&);
+    SbExpr inputExpr;
+    SbExpr sortBy;
+};
 
-/**
- * Similar to above but takes multiple arguments.
- */
-SbExpr::Vector buildCombinePartialAggregates(const AccumulationOp& acc,
-                                             const SbSlotVector& inputSlots,
-                                             StringDataMap<SbExpr> argExprs,
-                                             boost::optional<sbe::value::SlotId> collatorSlot,
-                                             StageBuilderState&);
+struct AccumLinearFillInputs : public Inputs {
+    AccumLinearFillInputs(SbExpr inputExpr, SbExpr sortBy)
+        : inputExpr(std::move(inputExpr)), sortBy(std::move(sortBy)) {}
 
-/**
- * Translates an input AccumulationOp into an SBE EExpression that represents an
- * AccumulationOp's finalization step. The 'stage' parameter provides the input subtree to
- * build on top of.
- */
-SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationOp& acc,
-                     const SbSlotVector& aggSlots,
-                     boost::optional<sbe::value::SlotId> collatorSlot);
+    AccumLinearFillInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationOp& acc,
-                     const sbe::value::SlotVector& aggSlots,
-                     boost::optional<sbe::value::SlotId> collatorSlot);
+    SbExpr inputExpr;
+    SbExpr sortBy;
+};
 
-/**
- * Similar to above but takes multiple arguments.
- */
-SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationOp& acc,
-                     const SbSlotVector& aggSlots,
-                     StringDataMap<SbExpr> argExprs,
-                     boost::optional<sbe::value::SlotId> collatorSlot);
+struct AccumTopBottomNInputs : public Inputs {
+    AccumTopBottomNInputs(SbExpr value, SbExpr sortBy, SbExpr sortSpec)
+        : value(std::move(value)), sortBy(std::move(sortBy)), sortSpec(std::move(sortSpec)) {}
 
-SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationOp& acc,
-                     const sbe::value::SlotVector& aggSlots,
-                     StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
-                     boost::optional<sbe::value::SlotId> collatorSlot);
+    AccumTopBottomNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-/**
- * Translates an input AccumulationOp into an SBE EExpression for the initialization of the
- * accumulator state.
- */
-SbExpr::Vector buildInitialize(const AccumulationOp& acc, SbExpr initExpr, StageBuilderState&);
+    SbExpr value;
+    SbExpr sortBy;
+    SbExpr sortSpec;
+};
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationOp& acc, std::unique_ptr<sbe::EExpression> initExpr, StageBuilderState&);
+struct InitAccumNInputs : public Inputs {
+    InitAccumNInputs(SbExpr maxSize, SbExpr isGroupAccum)
+        : maxSize(std::move(maxSize)), isGroupAccum(std::move(isGroupAccum)) {}
 
-/**
- * Similar to above but takes multiple arguments
- */
-SbExpr::Vector buildInitialize(const AccumulationOp& acc,
-                               StringDataMap<SbExpr> argExprs,
-                               StageBuilderState&);
+    InitAccumNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationOp& acc,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
-    StageBuilderState&);
+    SbExpr maxSize;
+    SbExpr isGroupAccum;
+};
 
+struct InitExpMovingAvgInputs : public Inputs {
+    InitExpMovingAvgInputs(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
+
+    InitExpMovingAvgInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr inputExpr;
+};
+
+struct InitIntegralInputs : public Inputs {
+    InitIntegralInputs(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
+
+    InitIntegralInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr inputExpr;
+};
+
+struct FinalizeTopBottomNInputs : public Inputs {
+    FinalizeTopBottomNInputs(SbExpr sortSpec) : sortSpec(std::move(sortSpec)) {}
+
+    FinalizeTopBottomNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr sortSpec;
+};
+
+struct FinalizeDerivativeInputs : public Inputs {
+    FinalizeDerivativeInputs(
+        SbExpr unit, SbExpr inputFirst, SbExpr sortByFirst, SbExpr inputLast, SbExpr sortByLast)
+        : unit(std::move(unit)),
+          inputFirst(std::move(inputFirst)),
+          sortByFirst(std::move(sortByFirst)),
+          inputLast(std::move(inputLast)),
+          sortByLast(std::move(sortByLast)) {}
+
+    FinalizeDerivativeInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr unit;
+    SbExpr inputFirst;
+    SbExpr sortByFirst;
+    SbExpr inputLast;
+    SbExpr sortByLast;
+};
+
+struct FinalizeLinearFillInputs : public Inputs {
+    FinalizeLinearFillInputs(SbExpr sortBy) : sortBy(std::move(sortBy)) {}
+
+    FinalizeLinearFillInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr sortBy;
+};
+
+struct CombineAggsTopBottomNInputs : public Inputs {
+    CombineAggsTopBottomNInputs(SbExpr sortSpec) : sortSpec(std::move(sortSpec)) {}
+
+    CombineAggsTopBottomNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+    SbExpr sortSpec;
+};
+
+// This wrapper class exists so that the SBE window function implementation can pass in named
+// expr maps to Accum::Op's build methods. Once the SBE window function implementation has been
+// converted to use subclasses of Accum::Inputs, we can delete this wrapper (and any assoicated
+// logic needed to make it work).
+struct NamedExprsMapWrapper : public Inputs {
+    NamedExprsMapWrapper(StringDataMap<std::unique_ptr<sbe::EExpression>> args)
+        : args(std::move(args)) {}
+
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args;
+};
+}  // namespace Accum
 }  // namespace mongo::stage_builder

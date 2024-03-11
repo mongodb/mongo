@@ -696,7 +696,7 @@ VariableTypes excludeTypes(VariableTypes varTypes, TypeSignature typesToExclude)
 // expression isn't vectorizable.
 SbExpr buildVectorizedExpr(StageBuilderState& state,
                            SbExpr scalarExpression,
-                           PlanStageSlots& outputs,
+                           const PlanStageSlots& outputs,
                            bool forFilterStage);
 
 /**
