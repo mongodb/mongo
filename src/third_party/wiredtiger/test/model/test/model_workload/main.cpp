@@ -336,9 +336,9 @@ test_workload_parse(void)
     /* Convert to string, parse, and compare each operation. */
     for (size_t i = 0; i < workload.size(); i++) {
         std::stringstream ss;
-        ss << workload[i];
+        ss << workload[i].operation;
         model::operation::any op = model::operation::parse(ss.str());
-        testutil_assert(workload[i] == op);
+        testutil_assert(workload[i].operation == op);
     }
 
     /* Additional tests for different allowed parsing behaviors. */

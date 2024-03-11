@@ -88,6 +88,17 @@ public:
      *     Add an operation to the sequence.
      */
     inline kv_workload_sequence &
+    operator<<(const operation::any &op)
+    {
+        _operations.push_back(op);
+        return *this;
+    }
+
+    /*
+     * kv_workload_sequence::operator<< --
+     *     Add an operation to the sequence.
+     */
+    inline kv_workload_sequence &
     operator<<(operation::any &&op)
     {
         _operations.push_back(std::move(op));

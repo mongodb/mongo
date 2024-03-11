@@ -567,7 +567,7 @@ kv_workload_generator::run()
         if (s->next_operation_index >= s->sequence->size())
             throw model_exception("Internal error: No more operations left in a sequence");
         const operation::any &op = (*s->sequence)[s->next_operation_index++];
-        _workload << op;
+        _workload << kv_workload_operation(op, s->sequence->seq_no());
 
         /* Validate that we filled in the timestamps in the correct order. */
         assert_timestamps(*s->sequence, op, stable);

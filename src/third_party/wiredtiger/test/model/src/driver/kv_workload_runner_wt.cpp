@@ -144,13 +144,13 @@ kv_workload_runner_wt::run(const kv_workload &workload)
 
                 /* Run (or resume) the workload. */
                 for (; p < workload.size(); p++) {
-                    const operation::any &op = workload[p];
-                    if (std::holds_alternative<operation::crash>(op)) {
+                    const kv_workload_operation &op = workload[p];
+                    if (std::holds_alternative<operation::crash>(op.operation)) {
                         _state->expect_crash = true;
                         _state->crash_index = p;
                     }
                     _state->num_operations = p + 1;
-                    _state->return_codes[p] = run_operation(op);
+                    _state->return_codes[p] = run_operation(op.operation);
                 }
 
                 wiredtiger_close();

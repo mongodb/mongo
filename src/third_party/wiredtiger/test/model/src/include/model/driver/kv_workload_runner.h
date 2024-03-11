@@ -72,7 +72,7 @@ public:
     {
         std::vector<int> ret;
         for (size_t i = 0; i < workload.size(); i++)
-            ret.push_back(run_operation(workload[i]));
+            ret.push_back(run_operation(workload[i].operation));
         return ret;
     }
 
