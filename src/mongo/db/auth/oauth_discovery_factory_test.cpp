@@ -46,14 +46,47 @@ namespace {
 
 class OAuthDiscoveryFactoryFixture : public unittest::Test {
 public:
+    static constexpr auto kIssuer = "https://idp.example"_sd;
+    static constexpr auto kAuthorizationEndpoint = "https://idp.example/authorization"_sd;
+    static constexpr auto kTokenEndpoint = "https://idp.example/token"_sd;
+    static constexpr auto kDeviceAuthorizationEndpoint = "https://idp.example/dae"_sd;
+    static constexpr auto kJWKSUri = "https://idp.example/jwks"_sd;
+
+    // Includes every expected field in OIDC discovery document.
     OAuthAuthorizationServerMetadata makeDefaultMetadata() {
         OAuthAuthorizationServerMetadata metadata;
-        metadata.setIssuer("https://idp.example"_sd);
-        metadata.setAuthorizationEndpoint("https://idp.example/authorization"_sd);
-        metadata.setTokenEndpoint("https://idp.example/token"_sd);
-        metadata.setDeviceAuthorizationEndpoint("https://idp.example/dae"_sd);
-        metadata.setJwksUri("https://idp.example/jwks"_sd);
+        metadata.setIssuer(kIssuer);
+        metadata.setAuthorizationEndpoint(kAuthorizationEndpoint);
+        metadata.setTokenEndpoint(kTokenEndpoint);
+        metadata.setDeviceAuthorizationEndpoint(kDeviceAuthorizationEndpoint);
+        metadata.setJwksUri(kJWKSUri);
         return metadata;
+    }
+
+    // Includes only the required issuer and JWKS URI fields.
+    OAuthAuthorizationServerMetadata makeRequiredOnlyMetadata() {
+        OAuthAuthorizationServerMetadata metadata;
+        metadata.setIssuer(kIssuer);
+        metadata.setJwksUri(kJWKSUri);
+        return metadata;
+    }
+
+    // Omits the required JWKS URI field. Constructs BSON directly since serializing
+    // OAuthAuthorizationServerMetadata with missing required fields triggers an invariant.
+    BSONObj makeWithoutJWKSUriMetadata() {
+        return BSON("issuer"_sd << kIssuer << "authorization_endpoint"_sd << kAuthorizationEndpoint
+                                << "token_endpoint"_sd << kTokenEndpoint
+                                << "device_authorization_endpoint"_sd
+                                << kDeviceAuthorizationEndpoint);
+    }
+
+    // Omit the required issuer field. Constructs BSON directly since serializing
+    // OAuthAuthorizationServerMetadata with missing required fields triggers an invariant.
+    BSONObj makeWithoutIssuerMetadata() {
+        return BSON("authorization_endpoint"_sd
+                    << kAuthorizationEndpoint << "token_endpoint"_sd << kTokenEndpoint
+                    << "device_authorization_endpoint"_sd << kDeviceAuthorizationEndpoint
+                    << "jwks_uri" << kJWKSUri);
     }
 };
 
@@ -69,6 +102,44 @@ TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryQueriesOIDC) {
     OAuthAuthorizationServerMetadata metadata = factory.acquire("https://idp.example");
 
     ASSERT_EQ(defaultMetadata, metadata);
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryRequiredFieldsOnly) {
+    auto requiredMetadata = makeRequiredOnlyMetadata();
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+        {200, {}, requiredMetadata.toBSON().jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    OAuthAuthorizationServerMetadata metadata = factory.acquire("https://idp.example");
+
+    ASSERT_EQ(requiredMetadata, metadata);
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryMissingJWKSUri) {
+    auto missingJWKSUriMetadata = makeWithoutJWKSUriMetadata();
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+        {200, {}, missingJWKSUriMetadata.jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, DiscoveryMissingIssuer) {
+    auto missingIssuerMetadata = makeWithoutIssuerMetadata();
+
+    std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+    client->expect(
+        {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+        {200, {}, missingIssuerMetadata.jsonString()});
+
+    OAuthDiscoveryFactory factory(std::move(client));
+    ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
 }
 
 TEST_F(OAuthDiscoveryFactoryFixture, LookupsMustBeSecure) {
