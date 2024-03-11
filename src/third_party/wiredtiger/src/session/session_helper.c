@@ -37,7 +37,7 @@ __wt_session_array_walk(WT_SESSION_IMPL *session,
      * contents change during traversal. We expect the calling code to handle this. See the slotted
      * sessions docs for further details. FIXME-WT-10946 Add link to docs once they're added.
      */
-    session_cnt = *(volatile uint32_t *)&(conn->session_array.cnt);
+    WT_READ_ONCE(session_cnt, conn->session_array.cnt);
 
     for (i = 0, array_session = WT_CONN_SESSIONS_GET(conn); i < session_cnt; i++, array_session++) {
         /*

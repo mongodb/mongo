@@ -204,6 +204,26 @@ __wt_atomic_storebool(bool *vp, bool v)
 }
 
 /*
+ * __wt_atomic_loadvbool --
+ *     Atomically read a volatile boolean.
+ */
+static inline bool
+__wt_atomic_loadvbool(volatile bool *vp)
+{
+    return (__atomic_load_n(vp, __ATOMIC_RELAXED));
+}
+
+/*
+ * __wt_atomic_storevbool --
+ *     Atomically set a volatile boolean.
+ */
+static inline void
+__wt_atomic_storevbool(volatile bool *vp, bool v)
+{
+    __atomic_store_n(vp, v, __ATOMIC_RELAXED);
+}
+
+/*
  * Generic atomic functions that accept any type. The typed macros above should be preferred since
  * they provide better type checking.
  */

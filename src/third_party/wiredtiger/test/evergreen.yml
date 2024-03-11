@@ -1636,7 +1636,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: examples/c
-          extra_args: -R "(ex_access|ex_col_store|ex_config_parse|ex_cursor|ex_event_handler|ex_extending|ex_extra_diagnostics|ex_extractor|ex_hello|ex_pack|ex_process|ex_schema|ex_smoke|ex_verbose)" -j ${num_jobs}
+          extra_args: -R "(ex_access|ex_col_store|ex_config_parse|ex_cursor|ex_event_handler|ex_extending|ex_extra_diagnostics|ex_extractor|ex_hello|ex_pack|ex_process|ex_schema|ex_smoke|ex_thread|ex_tiered|ex_verbose)" -j ${num_jobs}
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]

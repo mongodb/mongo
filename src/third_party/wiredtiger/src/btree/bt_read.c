@@ -454,7 +454,7 @@ skip_evict:
                  * pre-fetch mechanism, count that as a page read directly from disk.
                  */
                 if (F_ISSET_ATOMIC_16(page, WT_PAGE_PREFETCH) ||
-                  page->read_gen == WT_READGEN_NOTSET)
+                  __wt_atomic_load64(&page->read_gen) == WT_READGEN_NOTSET)
                     ++session->pf.prefetch_disk_read_count;
                 else
                     session->pf.prefetch_disk_read_count = 0;
@@ -467,9 +467,9 @@ skip_evict:
              * generation and the page isn't already flagged for forced eviction, update the page
              * read generation.
              */
-            if (page->read_gen == WT_READGEN_NOTSET) {
+            if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_NOTSET) {
                 if (wont_need)
-                    page->read_gen = WT_READGEN_WONT_NEED;
+                    __wt_atomic_store64(&page->read_gen, WT_READGEN_WONT_NEED);
                 else
                     __wt_cache_read_gen_new(session, page);
             } else if (!LF_ISSET(WT_READ_NO_GEN))

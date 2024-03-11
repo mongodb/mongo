@@ -46,11 +46,11 @@ static WT_INLINE void
 __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /* Ignore pages set for forcible eviction. */
-    if (page->read_gen == WT_READGEN_OLDEST)
+    if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_OLDEST)
         return;
 
     /* Ignore pages already in the future. */
-    if (page->read_gen > __wt_cache_read_gen(session))
+    if (__wt_atomic_load64(&page->read_gen) > __wt_cache_read_gen(session))
         return;
 
     /*
@@ -60,7 +60,7 @@ __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
      * current global generation, we don't bother updating the page. In other words, the goal is to
      * avoid some number of updates immediately after each update we have to make.
      */
-    page->read_gen = __wt_cache_read_gen(session) + WT_READGEN_STEP;
+    __wt_atomic_store64(&page->read_gen, __wt_cache_read_gen(session) + WT_READGEN_STEP);
 }
 
 /*
@@ -73,7 +73,8 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_CACHE *cache;
 
     cache = S2C(session)->cache;
-    page->read_gen = (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
+    __wt_atomic_store64(
+      &page->read_gen, (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2);
 }
 
 /*
@@ -100,7 +101,7 @@ __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_UNUSED(session);
 
-    ref->page->read_gen = WT_READGEN_OLDEST;
+    __wt_atomic_store64(&ref->page->read_gen, WT_READGEN_OLDEST);
 }
 
 /*

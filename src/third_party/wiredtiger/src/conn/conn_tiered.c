@@ -366,7 +366,7 @@ __tier_storage_copy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
     /* There is nothing to do until the checkpoint after the flush completes. */
-    if (!conn->flush_ckpt_complete)
+    if (!__wt_atomic_loadbool(&conn->flush_ckpt_complete))
         return (0);
     entry = NULL;
     for (;;) {

@@ -33,7 +33,7 @@
 /*
  * The flush state is a simple counter we manipulate atomically.
  */
-#define WT_FLUSH_STATE_DONE(state) ((state) == 0)
+#define WT_FLUSH_STATE_DONE(state) (__wt_atomic_loadv32(&(state)) == 0)
 
 /*
  * Different types of work units for tiered trees.

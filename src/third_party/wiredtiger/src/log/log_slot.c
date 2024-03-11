@@ -40,7 +40,8 @@ __log_slot_dump(WT_SESSION_IMPL *session)
         __wt_errx(session, "    Release LSN: %" PRIu32 "/%" PRIu32, slot->slot_release_lsn.l.file,
           slot->slot_release_lsn.l.offset);
         __wt_errx(session, "    Offset: start: %" PRIuMAX " last:%" PRIuMAX,
-          (uintmax_t)slot->slot_start_offset, (uintmax_t)slot->slot_last_offset);
+          (uintmax_t)slot->slot_start_offset,
+          (uintmax_t)__wt_atomic_loadiv64(&slot->slot_last_offset));
         __wt_errx(session, "    Unbuffered: %" PRId64 " error: %" PRId32, slot->slot_unbuffered,
           slot->slot_error);
     }
@@ -72,7 +73,7 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
     WT_ASSIGN_LSN(&slot->slot_start_lsn, &log->alloc_lsn);
     WT_ASSIGN_LSN(&slot->slot_end_lsn, &slot->slot_start_lsn);
     slot->slot_start_offset = log->alloc_lsn.l.offset;
-    slot->slot_last_offset = log->alloc_lsn.l.offset;
+    __wt_atomic_storeiv64(&slot->slot_last_offset, log->alloc_lsn.l.offset);
     slot->slot_fh = log->log_fh;
     slot->slot_error = 0;
     WT_DIAGNOSTIC_YIELD;
@@ -649,7 +650,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
      * We maintain the last starting offset within this slot. This is used to know the offset of the
      * last record that was written rather than the beginning record of the slot.
      */
-    while ((cur_offset = slot->slot_last_offset) < my_start) {
+    while ((cur_offset = __wt_atomic_loadiv64(&slot->slot_last_offset)) < my_start) {
         /*
          * Set our offset if we are larger.
          */

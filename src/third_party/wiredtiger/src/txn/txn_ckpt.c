@@ -98,8 +98,8 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
      * - Do the work to create said objects.
      * - Move the objects.
      */
-    conn->flush_state = 0;
-    conn->flush_ckpt_complete = false;
+    __wt_atomic_storev32(&conn->flush_state, 0);
+    __wt_atomic_storebool(&conn->flush_ckpt_complete, false);
     /* Flushing is part of a checkpoint, use the session's checkpoint time. */
     conn->flush_most_recent = session->current_ckpt_sec;
     /* Storing the last flush timestamp here for the future and for debugging. */
@@ -852,7 +852,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
          */
         if (txn_global->has_stable_timestamp) {
             /* A checkpoint should never proceed when timestamps are out of order. */
-            if (txn_global->has_oldest_timestamp &&
+            if (__wt_atomic_loadbool(&txn_global->has_oldest_timestamp) &&
               txn_global->oldest_timestamp > txn_global->stable_timestamp) {
                 __wt_readunlock(session, &txn_global->rwlock);
                 WT_ASSERT_ALWAYS(session, false,
@@ -1546,7 +1546,7 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
-    txn_global->checkpoint_running = true;
+    __wt_atomic_storevbool(&txn_global->checkpoint_running, true);
 
     /*
      * FIXME-WT-11149: Some reading threads rely on the value of checkpoint running flag being
@@ -1557,14 +1557,14 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
     ret = __txn_checkpoint(session, cfg);
 
-    txn_global->checkpoint_running = false;
+    __wt_atomic_storevbool(&txn_global->checkpoint_running, false);
 
     /*
      * Signal the tiered storage thread because it waits for the checkpoint to complete to process
      * flush units. Indicate that the checkpoint has completed.
      */
     if (conn->tiered_cond != NULL) {
-        conn->flush_ckpt_complete = true;
+        __wt_atomic_storebool(&conn->flush_ckpt_complete, true);
         __wt_cond_signal(session, conn->tiered_cond);
     }
 

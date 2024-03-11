@@ -596,17 +596,17 @@ struct __wt_connection_impl {
     const char *stat_stamp; /* Statistics log entry timestamp */
     uint64_t stat_usecs;    /* Statistics log period */
 
-    WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
-    wt_thread_t tiered_tid;          /* Tiered thread */
-    bool tiered_tid_set;             /* Tiered thread set */
-    WT_CONDVAR *flush_cond;          /* Flush wait mutex */
-    WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
-    uint64_t tiered_interval;        /* Tiered work interval */
-    bool tiered_server_running;      /* Internal tiered server operating */
-    bool flush_ckpt_complete;        /* Checkpoint after flush completed */
-    uint64_t flush_most_recent;      /* Clock value of last flush_tier */
-    uint32_t flush_state;            /* State of last flush tier */
-    wt_timestamp_t flush_ts;         /* Timestamp of most recent flush_tier */
+    WT_SESSION_IMPL *tiered_session;    /* Tiered thread session */
+    wt_thread_t tiered_tid;             /* Tiered thread */
+    bool tiered_tid_set;                /* Tiered thread set */
+    WT_CONDVAR *flush_cond;             /* Flush wait mutex */
+    WT_CONDVAR *tiered_cond;            /* Tiered wait mutex */
+    uint64_t tiered_interval;           /* Tiered work interval */
+    bool tiered_server_running;         /* Internal tiered server operating */
+    wt_shared bool flush_ckpt_complete; /* Checkpoint after flush completed */
+    uint64_t flush_most_recent;         /* Clock value of last flush_tier */
+    uint32_t flush_state;               /* State of last flush tier */
+    wt_timestamp_t flush_ts;            /* Timestamp of most recent flush_tier */
 
     WT_SESSION_IMPL *chunkcache_metadata_session; /* Chunk cache metadata server thread session */
     wt_thread_t chunkcache_metadata_tid;          /* Chunk cache metadata thread */

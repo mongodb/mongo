@@ -94,6 +94,22 @@ __wt_page_is_empty(WT_PAGE *page)
 }
 
 /*
+ * __wt_readgen_evict_soon --
+ *     Return whether a page's read generation makes it eligible for immediate eviction. Read
+ *     generations reserve a range of low numbers for special meanings and currently - with the
+ *     exception of the generation not being set - these indicate the page may be evicted
+ *     immediately.
+ */
+static WT_INLINE bool
+__wt_readgen_evict_soon(uint64_t *readgen)
+{
+    uint64_t gen;
+
+    WT_READ_ONCE(gen, *readgen);
+    return (gen != WT_READGEN_NOTSET && gen < WT_READGEN_START_VALUE);
+}
+
+/*
  * __wt_page_evict_soon_check --
  *     Check whether the page should be evicted urgently.
  */
@@ -116,7 +132,7 @@ __wt_page_evict_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_sp
      * checkpointed, and no other thread can help with that. Checkpoints don't rely on this code for
      * dirty eviction: that is handled explicitly in __wt_sync_file.
      */
-    if (WT_READGEN_EVICT_SOON(page->read_gen) && btree->evict_disabled == 0 &&
+    if (__wt_readgen_evict_soon(&page->read_gen) && btree->evict_disabled == 0 &&
       __wt_page_can_evict(session, ref, inmem_split) &&
       (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page)))
         return (true);
@@ -728,7 +744,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
          * In the event we dirty a page which is flagged for eviction soon, we update its read
          * generation to avoid evicting a dirty page prematurely.
          */
-        if (page->read_gen == WT_READGEN_WONT_NEED)
+        if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_WONT_NEED)
             __wt_cache_read_gen_new(session, page);
 
         /*

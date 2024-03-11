@@ -124,6 +124,17 @@ __tiered_push_new_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
 }
 
 /*
+ * __tiered_queue_peek_empty --
+ *     Peek at the tiered queue to see if it's empty. This is an unsafe check to avoid claiming the
+ *     tiered lock when we don't need it. This is in it's own function to suppress the TSan warning.
+ */
+static inline bool
+__tiered_queue_peek_empty(WT_CONNECTION_IMPL *conn)
+{
+    return (TAILQ_EMPTY(&conn->tieredqh));
+}
+
+/*
  * __wt_tiered_pop_work --
  *     Pop a work unit of the given type from the queue. If a maximum value is given, only return a
  *     work unit that is less than the maximum value. The caller is responsible for freeing the
@@ -139,7 +150,7 @@ __wt_tiered_pop_work(
     *entryp = entry = NULL;
 
     conn = S2C(session);
-    if (TAILQ_EMPTY(&conn->tieredqh))
+    if (__tiered_queue_peek_empty(conn))
         return;
     __wt_spin_lock(session, &conn->tiered_lock);
 

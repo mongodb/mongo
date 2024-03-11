@@ -859,7 +859,8 @@ __session_blocking_checkpoint(WT_SESSION_IMPL *session)
          * This loop only checks objects that are declared volatile, therefore no barriers are
          * needed.
          */
-        if (!txn_global->checkpoint_running || txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
+        if (!__wt_atomic_loadvbool(&txn_global->checkpoint_running) ||
+          txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
             break;
     }
 

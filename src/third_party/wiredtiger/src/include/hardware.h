@@ -89,7 +89,7 @@
  * will be updated to use _Generic on all platforms.
  */
 #if defined(__GNUC__) || defined(__clang__)
-#define WT_READ_ONCE(v, val) (v) = (*(volatile __typeof__(val) *)&(val))
+#define WT_READ_ONCE(v, val) (v) = __wt_atomic_load_generic((volatile __typeof__(val) *)&(val))
 #else
 #define WT_READ_ONCE(v, val) WT_ACQUIRE_READ_WITH_BARRIER(v, val)
 #endif
@@ -106,7 +106,7 @@
  * will be updated to use _Generic on all platforms.
  */
 #if defined(__GNUC__) || defined(__clang__)
-#define WT_WRITE_ONCE(v, val) ((*(volatile __typeof__(v) *)&(v)) = (val))
+#define WT_WRITE_ONCE(v, val) __wt_atomic_store_generic((volatile __typeof__(v) *)&(v), (val))
 #else
 #define WT_WRITE_ONCE(v, val) WT_RELEASE_WRITE_WITH_BARRIER(v, val)
 #endif

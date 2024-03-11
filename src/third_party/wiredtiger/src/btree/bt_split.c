@@ -1381,7 +1381,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     WT_PAGE_MODIFY *mod;
     WT_SAVE_UPD *supd;
     WT_UPDATE *prev_onpage, *upd, *tmp;
-    uint64_t recno;
+    uint64_t orig_read_gen, recno;
     uint32_t i, slot;
     bool prepare;
 
@@ -1413,8 +1413,9 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      * was a forced eviction, in which case we leave the new page with the read generation unset.
      * Eviction will set the read generation next time it visits this page.
      */
-    if (!WT_READGEN_EVICT_SOON(orig->read_gen))
-        page->read_gen = orig->read_gen;
+    WT_READ_ONCE(orig_read_gen, orig->read_gen);
+    if (!__wt_readgen_evict_soon(&orig_read_gen))
+        __wt_atomic_store64(&page->read_gen, orig_read_gen);
 
     /*
      * If there are no updates to apply to the page, we're done. Otherwise, there are updates we

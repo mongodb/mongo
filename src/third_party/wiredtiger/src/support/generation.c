@@ -53,7 +53,7 @@ __wt_gen_init(WT_SESSION_IMPL *session)
      * All generations start at 1, a session with a generation of 0 isn't using the resource.
      */
     for (i = 0; i < WT_GENERATIONS; ++i)
-        S2C(session)->generations[i] = 1;
+        __wt_atomic_storev64(&S2C(session)->generations[i], 1);
 
     /* Ensure threads see the state change. */
     WT_RELEASE_BARRIER();
@@ -66,7 +66,7 @@ __wt_gen_init(WT_SESSION_IMPL *session)
 uint64_t
 __wt_gen(WT_SESSION_IMPL *session, int which)
 {
-    return (S2C(session)->generations[which]);
+    return (__wt_atomic_loadv64(&S2C(session)->generations[which]));
 }
 
 /*
@@ -338,7 +338,7 @@ __wt_gen_active(WT_SESSION_IMPL *session, int which, uint64_t generation)
 uint64_t
 __wt_session_gen(WT_SESSION_IMPL *session, int which)
 {
-    return (session->generations[which]);
+    return (__wt_atomic_loadv64(&session->generations[which]));
 }
 
 /*
@@ -352,7 +352,7 @@ __wt_session_gen_enter(WT_SESSION_IMPL *session, int which)
      * Don't enter a generation we're already in, it will likely result in code intended to be
      * protected by a generation running outside one.
      */
-    WT_ASSERT(session, session->generations[which] == 0);
+    WT_ASSERT(session, __wt_atomic_loadv64(&session->generations[which]) == 0);
     WT_ASSERT(session, session->active);
     WT_ASSERT(session, session->id < __wt_atomic_load32(&S2C(session)->session_array.cnt));
 
@@ -367,9 +367,9 @@ __wt_session_gen_enter(WT_SESSION_IMPL *session, int which)
      * can result in the generation drain and generation oldest code not working correctly.
      */
     do {
-        session->generations[which] = __wt_gen(session, which);
+        __wt_atomic_storev64(&session->generations[which], __wt_gen(session, which));
         WT_FULL_BARRIER();
-    } while (session->generations[which] != __wt_gen(session, which));
+    } while (__wt_atomic_loadv64(&session->generations[which]) != __wt_gen(session, which));
 }
 
 /*
