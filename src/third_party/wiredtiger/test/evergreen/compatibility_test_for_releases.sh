@@ -173,9 +173,10 @@ create_configs()
     echo "stress.checkpoint=0" >> $file_name        # Faster runs
     echo "timer=4" >> $file_name
     echo "verify=1" >> $file_name
-    # WT-8601 has not been backported to 4.2 and transactions are expected to be timestamped.
     if [ "$branch_name" == "mongodb-4.2" ] ; then
+        # WT-8601 has not been backported to 4.2 and transactions are expected to be timestamped.
         echo "transaction.timestamps=1" >> $file_name # WT-7545 - Older releases can't do non-timestamp transactions
+        echo "huffman_key=0" >> $file_name            # WT-6893 - Not supported by newer releases
     else
         echo "transaction.timestamps=0" >> $file_name # WT-8601 - Timestamps do not work with logged tables
     fi
