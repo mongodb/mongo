@@ -344,13 +344,14 @@ Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
     }
 
     auto shouldRoute = replica_set_endpoint::shouldRouteRequest(opCtx, opMsgReq);
-    LOGV2(8196801,
-          "Using replica set endpoint",
-          "opId"_attr = opCtx->getOpID(),
-          "cmdName"_attr = opMsgReq.getCommandName(),
-          "dbName"_attr = opMsgReq.getDatabaseNoThrow(),
-          "cmdObj"_attr = opMsgReq.body,
-          "shouldRoute"_attr = shouldRoute);
+    LOGV2_DEBUG(8555601,
+                3,
+                "Using replica set endpoint",
+                "opId"_attr = opCtx->getOpID(),
+                "cmdName"_attr = opMsgReq.getCommandName(),
+                "dbName"_attr = opMsgReq.getDatabaseNoThrow(),
+                "cmdObj"_attr = redact(opMsgReq.body.toString()),
+                "shouldRoute"_attr = shouldRoute);
     if (shouldRoute) {
         replica_set_endpoint::ScopedSetRouterService service(opCtx);
         return ServiceEntryPointMongos::handleRequestImpl(opCtx, m);
