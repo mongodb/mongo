@@ -211,7 +211,7 @@ function assertExpectedResults(results,
                                expectedDocsReturnedMin,
                                expectedDocsReturnedSumOfSq,
                                getMores) {
-    const {key, metrics, asOf} = results;
+    const {key, keyHash, metrics, asOf} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
     assert.docEq({
@@ -236,6 +236,7 @@ function assertExpectedResults(results,
     assert.neq(firstSeenTimestamp.getTime(), 0);
     assert.neq(latestSeenTimestamp.getTime(), 0);
     assert.neq(asOf.getTime(), 0);
+    assert.neq(keyHash.length, 0);
 
     const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
     for (const field of distributionFields) {
@@ -400,4 +401,24 @@ function runCommandAndValidateQueryStats({coll, commandName, commandObj, shapeFi
     assert.throwsWithCode(() => {
         coll.find({v: {$eq: 2}}).hint({'v': 60, $hint: -128}).itcount();
     }, ErrorCodes.BadValue);
+}
+
+/**
+ * Helper function to verify that each of the query stats entries has a unique hash and returns a
+ * list of the hashes.
+ * @param {list} entries - List of entries returned from $queryStats.
+ * @returns {list} list of unique hashes corresponding to the entries.
+ */
+function getQueryStatsKeyHashes(entries) {
+    const keyHashes = {};
+    for (const entry of entries) {
+        assert(entry.keyHash && entry.keyHash !== "",
+               `Entry does not have a 'keyHash' field: ${tojson(entry)}`);
+        keyHashes[entry.keyHash] = entry;
+    }
+    // We expect all keys and hashes to be unique, so assert that we have as many unique hashes as
+    // entries.
+    const keyHashArray = Object.keys(keyHashes);
+    assert.eq(keyHashArray.length, entries.length, tojson(entries));
+    return keyHashArray;
 }
