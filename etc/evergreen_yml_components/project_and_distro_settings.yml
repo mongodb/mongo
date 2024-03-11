@@ -25,11 +25,6 @@ patch_aliases:
     task: ".*"
     variant_tags: []
     task_tags: []
-  - alias: "security"
-    variant: "^(.*security-patch-only)$"
-    task: ".*"
-    variant_tags: []
-    task_tags: []
 
 commit_queue_aliases:
   - variant: "commit-queue"
