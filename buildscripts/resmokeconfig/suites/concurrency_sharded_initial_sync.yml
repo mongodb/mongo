@@ -160,6 +160,11 @@ selector:
   - jstests/concurrency/fsm_workloads/drop_database_sharded_setFCV.js
   - jstests/concurrency/fsm_workloads/random_DDL_setFCV_operations.js
 
+  # Resharding cannot succeed on a node which undergoes initial sync because initial sync
+  # does not preserve the ability to read at the cloneTimestamp in the past
+  - jstests/concurrency/fsm_workloads/write_without_shard_key_with_resharding.js
+  - jstests/concurrency/fsm_workloads/reshard_collection_crud_ops.js
+
   exclude_with_any_tags:
   - requires_non_retryable_writes
   - assumes_against_mongod_not_mongos
