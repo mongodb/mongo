@@ -285,6 +285,24 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_embedded_router_local_read_write_multi_stmt_txn_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: concurrency_embedded_router_multi_stmt_txn_gen
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "concurrency", "large", "sharded", "no_debug_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_embedded_router_replication_gen
   tags: ["assigned_to_jira_team_server_servicearch", "requires_large_host", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:

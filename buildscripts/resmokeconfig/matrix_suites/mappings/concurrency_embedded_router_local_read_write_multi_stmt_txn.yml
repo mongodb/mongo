@@ -1,0 +1,4 @@
+base_suite: concurrency_sharded_local_read_write_multi_stmt_txn
+overrides:
+  - "embedded_router.embedded_router"
+  - "embedded_router.concurrency_embedded_router"
