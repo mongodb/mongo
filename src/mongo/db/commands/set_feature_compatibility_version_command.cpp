@@ -1348,6 +1348,9 @@ private:
         } else {
             _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
         }
+        // TODO(SERVER-84271): Remove this when featureFlagReplicateVectoredInsertsTransactionally
+        // is removed.
+        _truncateRetryableWriteSessionsForDowngrade(opCtx);
     }
 
     void _dropInternalShardingIndexCatalogCollection(
@@ -1446,6 +1449,52 @@ private:
              fmt::format("FCV downgrading to {} and pauseMigrationsDuringMultiUpdates is not "
                          "supported on this version",
                          toString(requestedVersion))});
+    }
+
+    // Set config.transactions entries for retryable writes to appear to have a truncated oplog
+    // history.  This is to prevent attempting to read sessions which contain an oplog entry
+    // unparseable with an earlier binary, which would make that session unusable.
+    // TODO(SERVER-84271): Removed thi when featureFlagReplicateVectoredInsertsTransactionally
+    // is removed.
+    void _truncateRetryableWriteSessionsForDowngrade(OperationContext* opCtx) {
+        // Must use a new client/opCtx because the current one might have a session and direct
+        // writes to the config.transactions table are not permitted in a session.
+        auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+            "TruncateRetryableWriteSessionsForDowngradeClient");
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtx = cc().makeOperationContext();
+        DBDirectClient client(newOpCtx.get());
+        write_ops::UpdateCommandRequest update(NamespaceString::kSessionTransactionsTableNamespace);
+        update.setUpdates({[&]() {
+            write_ops::UpdateOpEntry entry;
+            // The relevant entries are not child sessions and have no state (only
+            // transactions have state).
+            BSONObjBuilder queryBuilder(BSON(SessionTxnRecord::kParentSessionIdFieldName
+                                             << BSON("$exists" << false)
+                                             << SessionTxnRecord::kStateFieldName
+                                             << BSON("$exists" << false)));
+            auto lsidToIgnore = opCtx->getLogicalSessionId();
+            if (lsidToIgnore) {
+                // Make sure we don't deadlock by trying to change the session of the opCtx
+                // which called setFeatureCompatibilityVersion.  It should be safe to leave
+                // this session alone because setFCV is not a retryable write.
+                queryBuilder.append(SessionTxnRecord::kSessionIdFieldName,
+                                    BSON("$ne" << lsidToIgnore->toBSON()));
+            }
+            entry.setQ(queryBuilder.obj());
+            // Set the last-write optime to something that won't appear in the oplog but
+            // also isn't null.  This will cause the TransactionParticipant to consider the
+            // transaction history truncated.  The fallbackOpObserver handles keeping the
+            // in-memory session catalog up to date.
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$set" << BSON(SessionTxnRecord::kLastWriteOpTimeFieldName
+                                    << repl::OpTime::max()))));
+            entry.setMulti(true);
+            return entry;
+        }()});
+        update.getWriteCommandRequestBase().setOrdered(false);
+        auto result = client.update(update);
+        LOGV2(8674100, "Truncated all retryable write sessions", "result"_attr = result);
     }
 
     /**
