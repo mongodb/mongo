@@ -1,6 +1,13 @@
-export function removeShard(st, shardName, timeout) {
+export function removeShard(shardingTestOrConn, shardName, timeout) {
     if (timeout == undefined) {
         timeout = 10 * 60 * 1000;  // 10 minutes
+    }
+
+    var s;
+    if (shardingTestOrConn instanceof ShardingTest) {
+        s = shardingTestOrConn.s;
+    } else {
+        s = shardingTestOrConn;
     }
 
     assert.soon(function() {
@@ -8,9 +15,9 @@ export function removeShard(st, shardName, timeout) {
         if (TestData.configShard && shardName == "config") {
             // Need to use transitionToDedicatedConfigServer if trying
             // to remove config server as a shard
-            res = st.s.adminCommand({transitionToDedicatedConfigServer: shardName});
+            res = s.adminCommand({transitionToDedicatedConfigServer: shardName});
         } else {
-            res = st.s.adminCommand({removeShard: shardName});
+            res = s.adminCommand({removeShard: shardName});
         }
         if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
             // If the config server primary steps down right after removing the config.shards doc

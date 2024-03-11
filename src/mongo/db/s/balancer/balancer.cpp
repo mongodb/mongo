@@ -127,6 +127,8 @@ using MigrationsAndResponses = std::vector<std::pair<const MigrateInfo&, SemiFut
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(forceBalancerWarningChecks);
+
 const Milliseconds kBalanceRoundDefaultInterval(10 * 1000);
 
 /**
@@ -136,9 +138,6 @@ static constexpr StringData kBalancerPolicyStatusDraining = "draining"_sd;
 static constexpr StringData kBalancerPolicyStatusZoneViolation = "zoneViolation"_sd;
 static constexpr StringData kBalancerPolicyStatusChunksImbalance = "chunksImbalance"_sd;
 static constexpr StringData kBalancerPolicyStatusDefragmentingChunks = "defragmentingChunks"_sd;
-
-// Time interval between checks on draining shards.
-constexpr Minutes kDrainingShardsCheckInterval{10};
 
 /**
  * Utility class to generate timing and statistics for a single balancer round.
@@ -354,6 +353,7 @@ std::vector<std::string> getDrainingShardNames(OperationContext* opCtx) {
 
     // Build the list of the draining shard names.
     std::vector<std::string> drainingShardNames;
+    drainingShardNames.reserve(drainingShardsDocs.size());
     std::transform(drainingShardsDocs.begin(),
                    drainingShardsDocs.end(),
                    std::back_inserter(drainingShardNames),
@@ -548,6 +548,99 @@ public:
 
 protected:
     BalancerDefragmentationPolicy& _defragmentationPolicy;
+};
+
+class BalancerWarning {
+    // Time interval between checks on draining shards.
+    constexpr static Minutes kDrainingShardsCheckInterval{10};
+
+public:
+    BalancerWarning() = default;
+
+    void warnIfRequired(OperationContext* opCtx, BalancerSettingsType::BalancerMode balancerMode) {
+        if (Date_t::now() - _lastDrainingShardsCheckTime < kDrainingShardsCheckInterval &&
+            MONGO_likely(!forceBalancerWarningChecks.shouldFail())) {
+            return;
+        }
+        _lastDrainingShardsCheckTime = Date_t::now();
+
+        LOGV2(7977401, "Performing balancer warning checks");
+
+        const auto drainingShardNames{getDrainingShardNames(opCtx)};
+        if (drainingShardNames.empty()) {
+            return;
+        }
+
+        if (balancerMode == BalancerSettingsType::BalancerMode::kOff) {
+            LOGV2_WARNING(
+                6434000,
+                "Draining of removed shards cannot be completed because the balancer is disabled",
+                "shards"_attr = drainingShardNames);
+            return;
+        }
+
+        _warnIfDrainingShardHasChunksForCollectionWithBalancingDisabled(opCtx, drainingShardNames);
+    }
+
+private:
+    void _warnIfDrainingShardHasChunksForCollectionWithBalancingDisabled(
+        OperationContext* opCtx, const std::vector<std::string>& drainingShardNames) {
+        // Balancer is on, emit warning if balancer is disabled for collections which have chunks in
+        // shards in draining mode.
+        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+        auto collections =
+            catalogClient->getShardedCollections(opCtx,
+                                                 DatabaseName::kEmpty,
+                                                 repl::ReadConcernLevel::kMajorityReadConcern,
+                                                 BSON(CollectionType::kNssFieldName << 1));
+        if (collections.empty()) {
+            return;
+        }
+
+        // Construct BSONArray of draining shard names.
+        const auto drainingShardNameArray = [&]() {
+            BSONArrayBuilder shardNameArrayBuilder;
+            std::for_each(drainingShardNames.begin(),
+                          drainingShardNames.end(),
+                          [&shardNameArrayBuilder](const auto& shardName) {
+                              shardNameArrayBuilder.append(shardName);
+                          });
+            return shardNameArrayBuilder.arr();
+        }();
+
+        // For each collection, check if the collection has balancing disabled. If it is disabled,
+        // checks if the collection has any chunks in any of the draining shards. In which case a
+        // warning is emitted.
+        for (const auto& collType : collections) {
+            if (!collType.getAllowBalance() || !collType.getAllowMigrations() ||
+                !collType.getPermitMigrations()) {
+                auto matchStage = BSON("$match" << BSON(ChunkType::collectionUUID()
+                                                        << collType.getUuid() << ChunkType::shard()
+                                                        << BSON("$in" << drainingShardNameArray)));
+                AggregateCommandRequest aggRequest{ChunkType::ConfigNS, {std::move(matchStage)}};
+
+                auto chunks = catalogClient->runCatalogAggregation(
+                    opCtx, aggRequest, {repl::ReadConcernLevel::kMajorityReadConcern});
+
+                if (!chunks.empty()) {
+                    stdx::unordered_set<std::string> shardsWithChunks;
+                    std::for_each(
+                        chunks.begin(), chunks.end(), [&shardsWithChunks](const BSONObj& chunkObj) {
+                            shardsWithChunks.emplace(chunkObj.getStringField(ChunkType::shard()));
+                        });
+                    LOGV2_WARNING(
+                        7977400,
+                        "Draining of removed shards cannot be completed because the balancer is "
+                        "disabled for a collection which has chunks in those shards",
+                        "uuid"_attr = collType.getUuid(),
+                        "nss"_attr = collType.getNss(),
+                        "shardsWithChunks"_attr = shardsWithChunks);
+                }
+            }
+        }
+    }
+
+    Date_t _lastDrainingShardsCheckTime{Date_t::fromMillisSinceEpoch(0)};
 };
 }  // namespace
 
@@ -951,7 +1044,7 @@ void Balancer::_mainThread() {
 
     // Main balancer loop
     auto lastMigrationTime = Date_t::fromMillisSinceEpoch(0);
-    auto lastDrainingShardsCheckTime{Date_t::fromMillisSinceEpoch(0)};
+    BalancerWarning balancerWarning;
     while (!_terminationRequested()) {
         BalanceRoundDetails roundDetails;
 
@@ -969,21 +1062,10 @@ void Balancer::_mainThread() {
                 continue;
             }
 
+            // Warn before we skip the iteration due to balancing being disabled.
+            balancerWarning.warnIfRequired(opCtx.get(), balancerConfig->getBalancerMode());
+
             if (!balancerConfig->shouldBalance() || _terminationRequested()) {
-
-                if (balancerConfig->getBalancerMode() == BalancerSettingsType::BalancerMode::kOff &&
-                    Date_t::now() - lastDrainingShardsCheckTime >= kDrainingShardsCheckInterval) {
-                    const auto drainingShardNames{getDrainingShardNames(opCtx.get())};
-                    if (!drainingShardNames.empty()) {
-                        LOGV2_WARNING(6434000,
-                                      "Draining of removed shards cannot be completed because the "
-                                      "balancer is disabled",
-                                      "shards"_attr = drainingShardNames);
-                    }
-
-                    lastDrainingShardsCheckTime = Date_t::now();
-                }
-
                 _autoMergerPolicy->disable(opCtx.get());
 
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
