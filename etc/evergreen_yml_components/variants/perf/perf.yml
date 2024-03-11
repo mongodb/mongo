@@ -500,7 +500,7 @@ buildvariants:
 - <<: *amazon_linux2_x86_streams_compile_variant_dependency
   name: perf-streams-single.intel.aws.2023-10
   display_name: PERF Streams-Single Intel AWS 2023-10
-  # cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+  cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
   modules: *perf_modules
   expansions:
     compile_variant: amazon2-x86-streams-compile
