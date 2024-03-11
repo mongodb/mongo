@@ -33,23 +33,6 @@ imports:
   - "mongo/db/basic_types.idl"
   - "mongo/s/sharding_types.idl"
 
-server_parameters:
-    KillSessionsMaxConcurrency:
-        description: >-
-            The maximum number of hosts to for killSessionsRemote to kill sessions on at the same time.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: gKillSessionsMaxConcurrency
-        default: 100
-
-    KillSessionsPerHostTimeoutMS:
-        description: >-
-            The maximum number of miliseconds for killSessionsRemote to wait for host to respond.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: gKillSessionsPerHostTimeoutMS
-        default: 60000
-
 structs:
 
     ClusterMulticast:

@@ -31,9 +31,6 @@ selector:
   - jstests/core/txns/create_indexes_parallel.js
   - jstests/core/txns/commands_in_txns_read_concern.js
 
-  # TODO SERVER-86590 Reenable after moving SessionKiller to decorate Service
-  - jstests/core/txns/kill_sessions_kills_transaction.js
-
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # This passthrough implicitly shards the accessed collections. Do not run tests where collections

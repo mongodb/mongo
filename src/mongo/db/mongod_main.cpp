@@ -198,6 +198,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/session/kill_sessions_remote.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
@@ -1040,8 +1041,15 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     PeriodicTask::startRunningPeriodicTasks();
 
-    SessionKiller::set(serviceContext,
-                       std::make_shared<SessionKiller>(serviceContext, killSessionsLocal));
+    auto shardService = serviceContext->getService(ClusterRole::ShardServer);
+    SessionKiller::set(shardService,
+                       std::make_shared<SessionKiller>(shardService, killSessionsLocal));
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        auto routerService = serviceContext->getService(ClusterRole::RouterServer);
+        SessionKiller::set(routerService,
+                           std::make_shared<SessionKiller>(routerService, killSessionsRemote));
+    }
 
     // Start up a background task to periodically check for and kill expired transactions; and a
     // background task to periodically check for and decrease cache pressure by decreasing the
@@ -2075,7 +2083,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     // SessionKiller relies on the network stack being cleanly shutdown which only occurs under
     // sanitizers
-    SessionKiller::shutdown(serviceContext);
+    SessionKiller::shutdown(serviceContext->getService(ClusterRole::ShardServer));
+    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        SessionKiller::shutdown(serviceContext->getService(ClusterRole::RouterServer));
+    }
 #endif
 
     FlowControl::shutdown(serviceContext);

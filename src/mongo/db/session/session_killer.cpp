@@ -50,15 +50,15 @@
 namespace mongo {
 
 namespace {
-const auto getSessionKiller = ServiceContext::declareDecoration<std::shared_ptr<SessionKiller>>();
+const auto getSessionKiller = Service::declareDecoration<std::shared_ptr<SessionKiller>>();
 }  // namespace
 
-SessionKiller::SessionKiller(ServiceContext* sc, KillFunc killer)
+SessionKiller::SessionKiller(Service* service, KillFunc killer)
     : _killFunc(std::move(killer)), _urbg(std::random_device{}()), _reapResults() {
-    _thread = stdx::thread([this, sc] {
+    _thread = stdx::thread([this, service] {
         // This is the background killing thread
 
-        ThreadClient tc("SessionKiller", sc->getService());
+        ThreadClient tc("SessionKiller", service);
 
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
         {
@@ -161,12 +161,12 @@ const KillAllSessionsByPattern* SessionKiller::Matcher::match(const LogicalSessi
     return nullptr;
 }
 
-SessionKiller* SessionKiller::get(ServiceContext* service) {
+SessionKiller* SessionKiller::get(Service* service) {
     return getSessionKiller(service).get();
 }
 
 SessionKiller* SessionKiller::get(OperationContext* ctx) {
-    return get(ctx->getServiceContext());
+    return get(ctx->getService());
 }
 
 std::shared_ptr<SessionKiller::Result> SessionKiller::kill(
@@ -245,14 +245,14 @@ void SessionKiller::_periodicKill(OperationContext* opCtx, stdx::unique_lock<Lat
     _callerCV.notify_all();
 };
 
-void SessionKiller::set(ServiceContext* sc, std::shared_ptr<SessionKiller> sk) {
-    getSessionKiller(sc) = sk;
+void SessionKiller::set(Service* service, std::shared_ptr<SessionKiller> sk) {
+    getSessionKiller(service) = sk;
 }
 
 
-void SessionKiller::shutdown(ServiceContext* sc) {
-    auto shared = getSessionKiller(sc);
-    getSessionKiller(sc).reset();
+void SessionKiller::shutdown(Service* service) {
+    auto shared = getSessionKiller(service);
+    getSessionKiller(service).reset();
 
     // Nuke
     shared.reset();

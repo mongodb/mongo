@@ -57,7 +57,7 @@
 namespace mongo {
 
 /**
- * The SessionKiller enforces a single thread for session killing for any given ServiceContext.
+ * The SessionKiller enforces a single thread for session killing for any given Service.
  *
  * The killer owns a background thread which actually does the work, and callers batch their kills
  * together each round, before the killer starts its dispatching, after which they batch up for the
@@ -109,19 +109,19 @@ public:
         std::function<Result(OperationContext*, const Matcher&, UniformRandomBitGenerator* urbg)>;
 
     /**
-     * The killer lives as a decoration on the service context.
+     * The killer lives as a decoration on the service.
      */
-    static SessionKiller* get(ServiceContext* service);
+    static SessionKiller* get(Service* service);
     static SessionKiller* get(OperationContext* opCtx);
 
     /**
-     * This method binds the SessionKiller to the ServiceContext.
+     * This method binds the SessionKiller to the Service.
      */
-    static void set(ServiceContext* ctx, std::shared_ptr<SessionKiller> sk);
+    static void set(Service* service, std::shared_ptr<SessionKiller> sk);
 
-    static void shutdown(ServiceContext* ctx);
+    static void shutdown(Service* service);
 
-    explicit SessionKiller(ServiceContext* sc, KillFunc killer);
+    explicit SessionKiller(Service* service, KillFunc killer);
     ~SessionKiller();
 
     /**

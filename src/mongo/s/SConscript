@@ -539,6 +539,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/serverinit',
+        '$BUILD_DIR/mongo/db/session/kill_sessions_remote',
         '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/startup_warnings_common',

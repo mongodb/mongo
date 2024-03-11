@@ -19,9 +19,6 @@ selector:
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
-  # TODO SERVER-86590 Reenable after moving SessionKiller to decorate Service
-  - jstests/core/txns/kill_sessions_kills_transaction.js
-
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Transactions are not allowed to operate on capped collections.

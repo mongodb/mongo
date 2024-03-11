@@ -9,7 +9,6 @@ env.Library(
         'session_catalog.cpp',
     ],
     LIBDEPS=[
-        'kill_sessions',
         'logical_session_id',
         'logical_session_id_helpers',
     ],
@@ -19,6 +18,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/fail_point',
+        'kill_sessions',
     ],
 )
 
@@ -157,9 +157,9 @@ env.Library(
     target='kill_sessions',
     source=[
         'kill_sessions.cpp',
+        'kill_sessions.idl',
         'kill_sessions_common.cpp',
         'session_killer.cpp',
-        'kill_sessions.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
@@ -180,11 +180,25 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query_exec',
-        'kill_sessions',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        'kill_sessions',
         'session_catalog',
+    ],
+)
+
+env.Library(
+    target='kill_sessions_remote',
+    source=[
+        'kill_sessions_remote.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query_exec',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/async_multicaster',
+        'kill_sessions',
     ],
 )
 
