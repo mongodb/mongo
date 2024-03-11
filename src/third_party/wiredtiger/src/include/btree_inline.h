@@ -1431,6 +1431,8 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
     unpack = &_unpack;
     page = ref->home;
 
+    WT_ASSERT(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0);
+
     /*
      * To look at an on-page cell, we need to look at the parent page's disk image, and that can be
      * dangerous. The problem is if the parent page splits, deepening the tree. As part of that
@@ -1479,15 +1481,20 @@ static inline int
 __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_ADDR_COPY addr;
+    WT_DECL_RET;
 
+    WT_ENTER_GENERATION(session, WT_GEN_SPLIT);
     if (!__wt_ref_addr_copy(session, ref, &addr))
-        return (0);
+        goto err;
 
-    WT_RET(__wt_btree_block_free(session, addr.addr, addr.size));
+    WT_ERR(__wt_btree_block_free(session, addr.addr, addr.size));
 
     /* Clear the address (so we don't free it twice). */
     __wt_ref_addr_free(session, ref);
-    return (0);
+
+err:
+    WT_LEAVE_GENERATION(session, WT_GEN_SPLIT);
+    return (ret);
 }
 
 /*
