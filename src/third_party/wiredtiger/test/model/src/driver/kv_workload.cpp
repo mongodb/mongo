@@ -206,25 +206,25 @@ parse(const char *str)
 
 /*
  * kv_workload::run --
- *     Run the workload in the model.
+ *     Run the workload in the model. Return the return codes of the workload operations.
  */
-void
+std::vector<int>
 kv_workload::run(kv_database &database) const
 {
     kv_workload_runner runner{database};
-    runner.run(*this);
+    return runner.run(*this);
 }
 
 /*
  * kv_workload::run_in_wiredtiger --
- *     Run the workload in WiredTiger.
+ *     Run the workload in WiredTiger. Return the return codes of the workload operations.
  */
-void
+std::vector<int>
 kv_workload::run_in_wiredtiger(
   const char *home, const char *connection_config, const char *table_config) const
 {
     kv_workload_runner_wt runner{home, connection_config, table_config};
-    runner.run(*this);
+    return runner.run(*this);
 }
 
 } /* namespace model */

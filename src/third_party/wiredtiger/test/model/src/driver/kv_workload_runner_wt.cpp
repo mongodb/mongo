@@ -98,16 +98,16 @@ kv_workload_runner_wt::~kv_workload_runner_wt()
 
 /*
  * kv_workload_runner_wt::run --
- *     Run the workload in WiredTiger.
+ *     Run the workload in WiredTiger. Return the return codes of the workload operations.
  */
-void
+std::vector<int>
 kv_workload_runner_wt::run(const kv_workload &workload)
 {
     /*
      * Initialize the shared memory state, that we will share between the controller (parent)
      * process, and the process that will actually run the workload.
      */
-    shared_memory shm_state(sizeof(shared_state));
+    shared_memory shm_state(sizeof(shared_state) + workload.size() * sizeof(int));
     _state = (shared_state *)shm_state.data();
 
     /* Clean up the pointer at the end, just before the actual shared memory gets cleaned up. */
@@ -149,7 +149,8 @@ kv_workload_runner_wt::run(const kv_workload &workload)
                         _state->expect_crash = true;
                         _state->crash_index = p;
                     }
-                    run_operation(op);
+                    _state->num_operations = p + 1;
+                    _state->return_codes[p] = run_operation(op);
                 }
 
                 wiredtiger_close();
@@ -185,7 +186,7 @@ kv_workload_runner_wt::run(const kv_workload &workload)
         if (_state->exception)
             /* The child process died due to an exception. */
             throw model_exception("Workload was terminated due to an exception at operation " +
-              std::to_string(_state->failed_operation) + ": " + _state->exception_message);
+              std::to_string(_state->failed_operation + 1) + ": " + _state->exception_message);
 
         if (WIFEXITED(pid_status))
             /* The child process exited with an error code. */
@@ -200,6 +201,13 @@ kv_workload_runner_wt::run(const kv_workload &workload)
         /* Otherwise the workload failed in some other way. */
         throw model_exception("The workload process terminated in an unexpected way.");
     }
+
+    /* Extract the return codes. */
+    std::vector<int> v;
+    for (size_t i = 0; i < _state->num_operations; i++)
+        v.push_back(_state->return_codes[i]);
+
+    return v;
 }
 
 /*

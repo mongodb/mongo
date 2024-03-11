@@ -75,8 +75,9 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
 {
     /* Run the workload in the model. */
     model::kv_database database;
+    std::vector<int> ret_model;
     try {
-        workload->run(database);
+        ret_model = workload->run(database);
 
         /* When we load the workload from WiredTiger, that would be after running recovery. */
         database.restart();
@@ -98,12 +99,26 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
         throw std::runtime_error("Failed to close file: " + workload_file);
 
     /* Run the workload in WiredTiger. */
+
+    std::vector<int> ret_wt;
     try {
-        workload->run_in_wiredtiger(home.c_str(), conn_config.c_str(), table_config.c_str());
+        ret_wt =
+          workload->run_in_wiredtiger(home.c_str(), conn_config.c_str(), table_config.c_str());
     } catch (std::exception &e) {
         throw std::runtime_error(
           "Failed to run the workload in WiredTiger: " + std::string(e.what()));
     }
+
+    /* Compare the return codes. */
+    size_t min_ret_length = std::min(ret_model.size(), ret_wt.size());
+    for (size_t i = 0; i < min_ret_length; i++)
+        if (ret_model[i] != ret_wt[i])
+            throw std::runtime_error("Return codes differ for operation " + std::to_string(i + 1) +
+              ": WiredTiger returned " + std::to_string(ret_wt[i]) + ", but " +
+              std::to_string(ret_model[i]) + " was expected.");
+    if (ret_model.size() != ret_wt.size())
+        throw std::runtime_error("WiredTiger executed " + std::to_string(ret_wt.size()) +
+          " operations, but " + std::to_string(ret_model.size()) + " was expected.");
 
     /* Open the WiredTiger database to verify. */
     WT_CONNECTION *conn;

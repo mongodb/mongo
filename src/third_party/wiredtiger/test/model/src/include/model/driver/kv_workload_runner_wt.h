@@ -31,6 +31,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <unordered_map>
+#include <vector>
 #include "model/driver/kv_workload.h"
 #include "model/core.h"
 #include "wiredtiger.h"
@@ -141,6 +142,10 @@ protected:
         /* The map of table IDs to URIs, needed to resume the workload from a crash. */
         size_t num_tables;
         table_state tables[256]; /* The table states; protected by the same lock as the URI map. */
+
+        /* Return codes. */
+        size_t num_operations; /* The number of executed operations. */
+        int return_codes[];    /* Must be last, as the size is variable. */
     };
 
 public:
@@ -164,30 +169,21 @@ public:
 
     /*
      * kv_workload::run --
-     *     Run the workload in WiredTiger.
+     *     Run the workload in WiredTiger. Return the return codes of the workload operations.
      */
-    void run(const kv_workload &workload);
+    std::vector<int> run(const kv_workload &workload);
 
 protected:
     /*
      * kv_workload_runner::run_operation --
      *     Run the given operation.
      */
-    inline void
+    inline int
     run_operation(const operation::any &op)
     {
-        std::visit(
-          [this](auto &&x) {
-              int ret = do_operation(x);
-              /*
-               * In the future, we would like to be able to test operations that can fail, at which
-               * point we would record and compare return codes. But we're not there yet, so just
-               * fail on error.
-               */
-              if (ret != 0 && ret != WT_NOTFOUND)
-                  throw wiredtiger_exception(ret);
-          },
-          op);
+        int ret;
+        std::visit([this, &ret](auto &&x) { ret = do_operation(x); }, op);
+        return ret;
     }
 
     /*
