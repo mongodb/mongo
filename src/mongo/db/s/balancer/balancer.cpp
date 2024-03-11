@@ -451,7 +451,8 @@ bool processRebalanceResponse(OperationContext* opCtx,
         LOGV2(21871,
               "Migration failed, going to try splitting the chunk",
               "migrateInfo"_attr = redact(migrateInfo.toString()),
-              "error"_attr = redact(status));
+              "error"_attr = redact(status),
+              logAttrs(migrateInfo.nss));
 
         auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         const CollectionType collection = catalogClient->getCollection(
@@ -476,7 +477,7 @@ bool processRebalanceResponse(OperationContext* opCtx,
                   "missing shardkey index",
                   "migrateInfo"_attr = redact(migrateInfo.toString()),
                   "error"_attr = redact(status),
-                  "collection"_attr = migrateInfo.nss);
+                  logAttrs(migrateInfo.nss));
 
             // Schedule writing to config.collections to turn off the balancer.
             commandScheduler.disableBalancerForCollection(opCtx, migrateInfo.nss);
@@ -487,7 +488,8 @@ bool processRebalanceResponse(OperationContext* opCtx,
     LOGV2(21872,
           "Migration failed",
           "migrateInfo"_attr = redact(migrateInfo.toString()),
-          "error"_attr = redact(status));
+          "error"_attr = redact(status),
+          logAttrs(migrateInfo.nss));
     return false;
 }
 
