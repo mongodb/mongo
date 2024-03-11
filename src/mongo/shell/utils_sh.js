@@ -3,7 +3,7 @@ var sh = function() {
 };
 
 sh._checkMongos = function() {
-    if (TestData.testingReplicaSetEndpoint) {
+    if (TestData !== undefined && TestData.testingReplicaSetEndpoint) {
         // When testing the replica set endpoint, the test connects directly to a mongod on the
         // config shard which returns mongod hello responses (i.e. do not have "isdbgrid").
         return;
