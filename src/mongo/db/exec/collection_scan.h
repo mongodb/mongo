@@ -105,10 +105,7 @@ private:
      * If the member (with id memberID) passes our filter, set *out to memberID and return that
      * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
-    StageState returnIfMatches(WorkingSetMember* member,
-                               WorkingSetID memberID,
-                               WorkingSetID* out,
-                               bool needsStartBoundCheck);
+    StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
     /**
      * Sets '_latestOplogEntryTimestamp' to the current read timestamp, if available. This is
@@ -124,9 +121,9 @@ private:
     void setLatestOplogEntryTimestamp(const Record& record);
 
     /**
-     * Asserts that the minimum timestamp in the query filter has not already fallen off the oplog.
+     * Set up the cursor.
      */
-    void assertTsHasNotFallenOff(const Record& record);
+    void initCursor(OperationContext* opCtx, const CollectionPtr& collPtr, bool forward);
 
     // WorkingSet is not owned by us.
     WorkingSet* _workingSet;

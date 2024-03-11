@@ -2381,86 +2381,6 @@ boost::optional<Record> WiredTigerCappedCursorBase::seek(const RecordId& start,
     return toReturn;
 }
 
-boost::optional<Record> WiredTigerCappedCursorBase::seekNear(const RecordId& id) {
-    invariant(_hasRestored);
-    dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
-
-    RecordId start = getStartForSeekNear(id);
-
-    _skipNextAdvance = false;
-    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
-    WT_CURSOR* c = _cursor->get();
-
-    // Reset the cursor before using it in case it has any saved bounds from a previous seek.
-    if (_boundSet) {
-        resetCursor();
-    }
-
-    auto key = makeCursorKey(start, _keyFormat);
-    setKey(c, &key);
-
-    int cmp;
-    int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
-    if (ret == WT_NOTFOUND) {
-        _positioned = false;
-        _eof = true;
-        return boost::none;
-    }
-    invariantWTOK(ret, c->session);
-
-    if (_metrics) {
-        _metrics->incrementOneCursorSeek(_uri);
-    }
-
-    RecordId curId = getKey(c, _keyFormat);
-
-    // Per the requirement of the API, return the lower (for forward) or higher (for reverse)
-    // record.
-    if (_forward && cmp > 0) {
-        ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
-    } else if (!_forward && cmp < 0) {
-        ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->next(c); });
-    }
-
-    if (ret != WT_NOTFOUND) {
-        curId = getKey(c, _keyFormat);
-        // If the curId is higher than the read timestamp, it must be for backward search. Per the
-        // requirement of the API, the largest smaller than the oplog read timestamp should be
-        // returned.
-        if (!isVisible(curId)) {
-            invariant(!_forward);
-            ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
-        }
-    }
-
-    // If we tried to return an earlier record but we found the end (for forward) or beginning (for
-    // reverse), go back to our original location so that we have something to return.
-    if (ret == WT_NOTFOUND) {
-        if (_forward) {
-            invariant(cmp > 0);
-            ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->next(c); });
-        } else if (!_forward) {
-            invariant(cmp < 0);
-            ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
-        }
-    }
-    invariantWTOK(ret, c->session);
-
-    _positioned = true;
-    curId = getKey(c, _keyFormat);
-
-    // After we've positioned to the first document to return, apply visibility rules again.
-    if (!isVisible(curId)) {
-        _eof = true;
-        return boost::none;
-    }
-
-    _eof = false;
-    Record toReturn = {std::move(curId), getRecordData(_cursor->get())};
-    trackReturn(toReturn);
-    return toReturn;
-}
-
 boost::optional<Record> WiredTigerCappedCursorBase::next() {
     auto id = nextIdCommon();
     if (id.isNull()) {
@@ -2570,14 +2490,6 @@ void WiredTigerStandardCappedCursor::resetVisibility() {
     _cappedSnapshot = boost::none;
 }
 
-RecordId WiredTigerStandardCappedCursor::getStartForSeekNear(const RecordId& start) const {
-    // Forward scanning oplog cursors must not see past holes.
-    if (_forward && _cappedSnapshot && !_cappedSnapshot->isRecordVisible(start)) {
-        return _cappedSnapshot->getHighestVisible();
-    }
-    return start;
-}
-
 WiredTigerOplogCursor::WiredTigerOplogCursor(OperationContext* opCtx,
                                              const WiredTigerRecordStore& rs,
                                              bool forward)
@@ -2614,20 +2526,6 @@ bool WiredTigerOplogCursor::isVisible(const RecordId& id) {
 void WiredTigerOplogCursor::resetVisibility() {
     _oplogVisibleTs = boost::none;
     _readTimestampForOplog = boost::none;
-}
-
-RecordId WiredTigerOplogCursor::getStartForSeekNear(const RecordId& id) const {
-    RecordId start = id;
-    // Oplog queries must manually implement read_timestamp visibility.
-    if (_readTimestampForOplog && start.getLong() > *_readTimestampForOplog) {
-        start = RecordId(*_readTimestampForOplog);
-    }
-
-    // Additionally, forward scanning oplog cursors must not see past holes.
-    if (_forward && _oplogVisibleTs && start.getLong() > *_oplogVisibleTs) {
-        start = RecordId(*_oplogVisibleTs);
-    }
-    return start;
 }
 
 boost::optional<Record> WiredTigerOplogCursor::next() {

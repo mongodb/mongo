@@ -152,11 +152,6 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
-    boost::optional<Record> seekNear(const RecordId& id) final {
-        // not implemented
-        return boost::none;
-    }
-
     void save() final {
         if (!_needFirstSeek && !_lastMoveWasRestore)
             _savedId = _it == _records.end() ? RecordId() : _it->first;
@@ -238,11 +233,6 @@ public:
         dassert(_it != _records.rend());
         dassert(_it->first == id);
         return {{_it->first, _it->second.toRecordData()}};
-    }
-
-    boost::optional<Record> seekNear(const RecordId& id) final {
-        // not implemented
-        return boost::none;
     }
 
     void save() final {

@@ -228,22 +228,6 @@ public:
     virtual boost::optional<Record> seekExact(const RecordId& id) = 0;
 
     /**
-     * Positions this cursor near 'start' or an adjacent record if 'start' does not exist. If there
-     * is not an exact match, the cursor is positioned on the directionally previous Record. If no
-     * earlier record exists, the cursor is positioned on the directionally following record.
-     * Returns boost::none if the RecordStore is empty.
-     *
-     * For forward cursors, returns the Record with the highest RecordId less than or equal to
-     * 'start'. If no such record exists, positions on the next highest RecordId after 'start'.
-     *
-     * For reverse cursors, returns the Record with the lowest RecordId greater than or equal to
-     * 'start'. If no such record exists, positions on the next lowest RecordId before 'start'.
-     *
-     * Note: Only supported on capped collections.
-     */
-    virtual boost::optional<Record> seekNear(const RecordId& start) = 0;
-
-    /**
      * Prepares for state changes in underlying data without necessarily saving the current
      * state.
      *
