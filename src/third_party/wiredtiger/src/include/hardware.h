@@ -20,6 +20,42 @@
 #define wt_shared
 
 /*
+ * WT_RELEASE_WRITE --
+ *
+ * Write to a memory location using the ARM stlr instruction. This is also known as a write-release
+ * operation, and has the following semantics: Release semantics prevent memory reordering of the
+ * write-release with any read or write operation that precedes it in program order.
+ *
+ * Usage of this macro should be paired with an associated WT_ACQUIRE_READ. As with the acquire
+ * version we avoid type checking loss by defining an unreachable if block, we also guard against
+ * misuse by statically asserting that the destination is the same size as the value being written.
+ */
+#ifdef HAVE_RCPC
+#ifndef TSAN_BUILD
+#define WT_RELEASE_WRITE(v, val)                                    \
+    do {                                                            \
+        if (0) {                                                    \
+            static_assert(sizeof((v)) == sizeof((val)));            \
+            (v) = (val);                                            \
+        }                                                           \
+        if (sizeof((v)) == 1) {                                     \
+            __asm__ volatile("stlrb %w1, %0" : "=Q"(v) : "r"(val)); \
+        } else if (sizeof((v)) == 2) {                              \
+            __asm__ volatile("stlrh %w1, %0" : "=Q"(v) : "r"(val)); \
+        } else if (sizeof((v)) == 4) {                              \
+            __asm__ volatile("stlr %w1, %0" : "=Q"(v) : "r"(val));  \
+        } else if (sizeof((v)) == 8) {                              \
+            __asm__ volatile("stlr %x1, %0" : "=Q"(v) : "r"(val));  \
+        }                                                           \
+    } while (0)
+#else
+#define WT_RELEASE_WRITE(v, val) __atomic_store_n(&(v), (val), __ATOMIC_RELEASE);
+#endif
+#else
+#define WT_RELEASE_WRITE(v, val) WT_RELEASE_WRITE_WITH_BARRIER(v, val);
+#endif
+
+/*
  * Release write a value to a shared location. All previous stores must complete before the value is
  * made public.
  */
@@ -76,6 +112,8 @@
 #endif
 
 /*
+ * WT_ACQUIRE_READ --
+ *
  * The below assembly implements the read-acquire semantic. Acquire semantics prevent memory
  * reordering of the read-acquire with any load or store that follows it in program order.
  *

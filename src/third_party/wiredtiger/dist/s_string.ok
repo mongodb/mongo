@@ -464,6 +464,7 @@ aaa
 abcdef
 abcdefghijklmnopqrstuvwxyz
 ackSstu
+acqrel
 addl
 addr
 addrs
@@ -1238,6 +1239,9 @@ stderr
 stdin
 stdout
 stepp
+stlr
+stlrb
+stlrh
 storebool
 str
 strace
