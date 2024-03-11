@@ -137,7 +137,7 @@ def convert_scons_node_to_bazel_target(scons_node: SCons.Node.FS.File) -> str:
         prefix = "lib"
 
     # now get just the file name without and prefix or suffix i.e.: libcommands.so -> 'commands'
-    prefix_suffix_removed = os.path.splitext(scons_node.name[len(prefix):])[0]
+    prefix_suffix_removed = scons_node.name[len(prefix):].split(".")[0]
 
     # i.e.: //src/mongo/db:commands>
     return f"//{bazel_dir}:{prefix_suffix_removed}"
@@ -614,7 +614,12 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         # === Build settings ===
 
-        linkstatic = env.GetOption("link-model") in ["auto", "static"]
+        # We don't support DLL generation on Windows, but need shared object generation in dynamic-sdk mode
+        # on linux.
+        linkstatic = env.GetOption("link-model") in [
+            "auto", "static"
+        ] or (normalized_os == "windows" and env.GetOption("link-model") == "dynamic-sdk")
+
         allocator = env.get('MONGO_ALLOCATOR', 'tcmalloc-google')
 
         distro_or_os = normalized_os

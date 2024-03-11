@@ -1205,22 +1205,6 @@ config_setting(
     },
 )
 
-selects.config_setting_group(
-    name = "shared_archive_enabled_windows",
-    match_all = [
-        ":shared_archive_enabled",
-        "@platforms//os:windows",
-    ],
-)
-
-selects.config_setting_group(
-    name = "shared_archive_enabled_linux",
-    match_all = [
-        ":shared_archive_enabled",
-        "@platforms//os:linux",
-    ],
-)
-
 # --------------------------------------
 # detect-odr-violations options
 # --------------------------------------

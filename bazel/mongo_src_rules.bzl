@@ -4,7 +4,7 @@ load("@poetry//:dependencies.bzl", "dependency")
 # config selection
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
-load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
+load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "SHARED_ARCHIVE_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
 #   /MD defines _MT and _DLL and links in MSVCRT.lib into each .obj file
@@ -695,9 +695,9 @@ def mongo_cc_library(
         "//bazel/config:macos_aarch64": macos_rpath_flags,
     })
 
-    # Create a cc_library entry to generate a shared archive of the target (linux).
+    # Create a cc_library entry to generate a shared archive of the target.
     native.cc_library(
-        name = name + ".so",
+        name = name + SHARED_ARCHIVE_SUFFIX,
         srcs = srcs,
         hdrs = hdrs + fincludes_hdr,
         deps = deps,
@@ -712,44 +712,16 @@ def mongo_cc_library(
         includes = includes,
         features = ["supports_pic", "pic"],
         target_compatible_with = select({
-            "//bazel/config:shared_archive_enabled_linux": [],
+            "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }),
     )
-
-    # Create a cc_library entry to generate a shared archive of the target (windows).
-    native.cc_library(
-        name = name + ".dll",
-        srcs = srcs,
-        hdrs = hdrs + fincludes_hdr,
-        deps = deps,
-        visibility = visibility,
-        testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
-        data = data,
-        tags = tags,
-        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
-        linkstatic = True,
-        local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
-        includes = includes,
-        features = ["supports_pic", "pic"],
-        target_compatible_with = select({
-            "//bazel/config:shared_archive_enabled_windows": [],
-            "//conditions:default": ["@platforms//:incompatible"],
-        }),
-    )
-
-    deps_with_shared_archive = deps + select({
-        "//bazel/config:shared_archive_enabled_linux": [":" + name + ".so"],
-        "//bazel/config:shared_archive_enabled_windows": [":" + name + ".dll"],
-        "//conditions:default": [],
-    })
 
     native.cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs,
         hdrs = hdrs + fincludes_hdr,
-        deps = deps_with_shared_archive,
+        deps = deps,
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
@@ -790,6 +762,10 @@ def mongo_cc_library(
         enabled = SEPARATE_DEBUG_ENABLED,
         cc_shared_library = select({
             "//bazel/config:linkstatic_disabled": ":" + name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
+            "//conditions:default": None,
+        }),
+        shared_archive = select({
+            "//bazel/config:shared_archive_enabled": ":" + name + SHARED_ARCHIVE_SUFFIX,
             "//conditions:default": None,
         }),
         deps = deps,
