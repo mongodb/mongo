@@ -784,4 +784,45 @@ TimeseriesTest.run((insert) => {
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
+
+    {
+        // Test the case where a field is projected out and then projected back in.
+        const res = coll.aggregate([
+                            {"$project": {"_id": 0, [metaFieldName]: 1}},
+                            {"$project": {"_id": 0, [timeFieldName]: "$" + timeFieldName}},
+                            {"$project": {"_id": 1, [timeFieldName]: 1}}
+                        ])
+                        .toArray();
+        assert.eq(res.length, coll.count(), res);
+        for (let doc of res) {
+            assert.eq(doc, {}, res);
+        }
+    }
+
+    {
+        // Test the case where a field is projected out and then projected back in.
+        const res = coll.aggregate([
+                            {"$project": {"_id": 0, [metaFieldName]: 1}},
+                            {"$project": {"_id": 0, [timeFieldName]: 1}}
+                        ])
+                        .toArray();
+        assert.eq(res.length, coll.count(), res);
+        for (let doc of res) {
+            assert.eq(doc, {}, res);
+        }
+    }
+
+    {
+        // Test the case where a field is projected out and then projected back in.
+        const res = coll.aggregate([
+                            {"$project": {"_id": 0, [metaFieldName]: 0}},
+                            {"$project": {"_id": 0, [metaFieldName]: 1}},
+                            {"$project": {"_id": 0, [timeFieldName]: 1}}
+                        ])
+                        .toArray();
+        assert.eq(res.length, coll.count(), res);
+        for (let doc of res) {
+            assert.eq(doc, {}, res);
+        }
+    }
 });

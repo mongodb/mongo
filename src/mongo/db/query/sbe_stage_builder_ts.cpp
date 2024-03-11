@@ -106,22 +106,6 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
         }
     }
 
-    // If there are no required paths, the parent is expecting the unpacking to produce the same
-    // number of results as there are events in the bucket but it doesn't care about the result's
-    // shape. For example, this comes up with "count-like" queries that for some reason failed to
-    // optimize unpacking away completely. Ideally, we would check the bucket's count and produce
-    // that many empty objects, but the block stages aren't setup to do this easily so we will
-    // instead unpack the known-to-always-exist 'timeField' from the bucket without adding it to the
-    // outputs.
-    if (ret.topLevelPaths.empty()) {
-        tassert(8032300,
-                "Should have no traverse fields if there are no top-level fields",
-                ret.traversePaths.empty());
-        ret.topLevelPaths.push_back(sv::CellBlock::PathRequest(
-            sv::CellBlock::kProject,
-            {sv::CellBlock::Get{unpackNode->bucketSpec.timeField()}, sv::CellBlock::Id{}}));
-    }
-
     return ret;
 }
 
@@ -494,12 +478,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     if (reqs.hasResult()) {
         std::vector<std::string> fieldNames;
         sbe::value::SlotVector fieldSlots;
-
-        // The outputs could contain the time field even when not requested, remove it.
-        if (!unpackNode->bucketSpec.fieldSet().contains(unpackNode->bucketSpec.timeField())) {
-            outputs.clear(
-                std::make_pair(PlanStageSlots::kField, unpackNode->bucketSpec.timeField()));
-        }
 
         for (auto&& p : outputs.getAllNameSlotPairsInOrder()) {
             auto& name = p.first;
