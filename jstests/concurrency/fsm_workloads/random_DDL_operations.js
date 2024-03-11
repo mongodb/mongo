@@ -31,6 +31,15 @@ function getRandomShard(connCache) {
 }
 
 export const $config = (function() {
+    let data = {
+        movePrimaryAllowedErrorCodes: [
+            ErrorCodes.ConflictingOperationInProgress,
+            // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
+            // occurs at this phase, the movePrimary operation does not recover.
+            7120202
+        ]
+    };
+
     let states = {
         create: function(db, collName, connCache) {
             db = getRandomDb(db);
@@ -46,6 +55,7 @@ export const $config = (function() {
             const coll = getRandomCollection(db);
 
             jsTestLog('Executing drop state: ' + coll.getFullName());
+
             assert.eq(coll.drop(), true);
         },
         rename: function(db, collName, connCache) {
@@ -69,12 +79,8 @@ export const $config = (function() {
 
             jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
             assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({movePrimary: db.getName(), to: shardId}), [
-                    ErrorCodes.ConflictingOperationInProgress,
-                    // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
-                    // occurs at this phase, the movePrimary operation does not recover.
-                    7120202
-                ]);
+                db.adminCommand({movePrimary: db.getName(), to: shardId}),
+                this.movePrimaryAllowedErrorCodes);
         },
         collMod: function(db, collName, connCache) {
             db = getRandomDb(db);
@@ -118,6 +124,7 @@ export const $config = (function() {
         threadCount: 12,
         iterations: 64,
         startState: 'create',
+        data: data,
         states: states,
         transitions: uniformDistTransitions(states),
         setup: setup,
