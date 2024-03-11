@@ -4373,19 +4373,6 @@ def doConfigure(myenv):
                 # can be found by the remote compiler.
                 env.Append(ICECC_CREATE_ENV_ADDFILES=supportedDenyfiles)
 
-            if 'CCACHE' in env and env['CCACHE']:
-                # Work around the fact that some versions of ccache either don't yet support
-                # -fsanitize-blacklist at all or only support one instance of it. This will
-                # work on any version of ccache because the point is only to ensure that the
-                # resulting hash for any compiled object is guaranteed to take into account
-                # the effect of any sanitizer denylist files used as part of the build.
-                # TODO: This will no longer be required when the following pull requests/
-                # issues have been merged and deployed.
-                # https://github.com/ccache/ccache/pull/258
-                # https://github.com/ccache/ccache/issues/318
-                env.Append(CCACHE_EXTRAFILES=supportedDenyfiles)
-                env['CCACHE_EXTRAFILES_USE_SOURCE_PATHS'] = True
-
             def CCSanitizerDenylistGenerator(source, target, env, for_signature):
                 # TODO: SERVER-60915 use new conftest API
                 if "conftest" in str(target[0]):
