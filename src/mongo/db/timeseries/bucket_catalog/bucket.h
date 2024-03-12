@@ -71,6 +71,13 @@ private:
     static constexpr std::size_t kNumStaticNewFields = 10;
 
 public:
+    // Before we hit our bucket minimum count, we will allow for large measurements to be inserted
+    // into buckets. Instead of packing the bucket to the BSON size limit, 16MB, we'll limit the max
+    // bucket size to 12MB. This is to leave some space in the bucket if we need to add new internal
+    // fields to existing, full buckets.
+    static constexpr int32_t kLargeMeasurementsMaxBucketSize =
+        BSONObjMaxUserSize - (4 * 1024 * 1024);
+
     using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
 
     Bucket(TrackingContext&,
@@ -112,7 +119,7 @@ public:
 
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
     // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
-    // intermediateBuilders.
+    // measurementMap.
     TrackedStringSet fieldNames;
 
     // Top-level hashed new field names that have not yet been committed into the bucket.
@@ -125,8 +132,10 @@ public:
     // measurements.
     Schema schema;
 
-    // The total size in bytes of the bucket's BSON serialization, including measurements to be
-    // inserted.
+    // For always compressed, the total compressed size in bytes of the bucket's BSON serialization,
+    // not including measurements to be inserted until a WriteBatch is committed. With the feature
+    // flag off, the total uncompressed size in bytes of the bucket's BSON serialization, including
+    // measurements to be inserted.
     int32_t size = 0;
 
     // The total number of measurements in the bucket, including uncommitted measurements and
@@ -144,6 +153,11 @@ public:
     // Whether this bucket was kept open after exceeding the bucket max size to improve
     // bucketing performance for large measurements.
     bool keptOpenDueToLargeMeasurements = false;
+
+    // Whether this bucket has a measurement that crossed the large measurement threshold. When this
+    // threshold is crossed, we use the uncompressed size towards the bucket size limit for all
+    // incoming measurements.
+    bool crossedLargeMeasurementThreshold = false;
 
     // The batch that has been prepared and is currently in the process of being committed, if
     // any.
@@ -174,7 +188,7 @@ public:
      * In-memory state of each committed data field. Enables fewer complete round-trips of
      * decompression + compression.
      */
-    MeasurementMap intermediateBuilders;
+    MeasurementMap measurementMap;
 };
 
 /**
@@ -197,13 +211,19 @@ bool schemaIncompatible(Bucket& bucket,
  * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
  * to overflow, we will create a new bucket and recalculate the change to the bucket size
  * and data fields.
+ *
+ * For always compressed, it is impossible to know how well a measurement will compress in the
+ * existing bucket ahead of time. We skip adding the element size to the calculation. The cost of
+ * adding one more measurement over the limit won't be much, especially as it will get compressed on
+ * commit. After committing, the Bucket is updated with the compressed size.
  */
 void calculateBucketFieldsAndSizeChange(TrackingContext&,
                                         const Bucket& bucket,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,
-                                        int32_t& sizeToBeAdded);
+                                        int32_t& sizeToBeAdded,
+                                        bool& crossedLargeMeasurementThreshold);
 
 /**
  * Return a pointer to the current, open batch for the operation. Opens a new batch if none exists.

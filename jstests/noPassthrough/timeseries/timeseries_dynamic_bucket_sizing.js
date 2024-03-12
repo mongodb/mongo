@@ -30,7 +30,10 @@ const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {wiredTigerCacheSizeGB: minWiredTigerCacheSizeGB},
 });
-replSet.startSet({setParameter: {timeseriesBucketMaxSize: defaultBucketMaxSize}});
+replSet.startSet({
+    setParameter:
+        {timeseriesBucketMaxSize: defaultBucketMaxSize, timeseriesLargeMeasurementThreshold: 1}
+});
 replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());

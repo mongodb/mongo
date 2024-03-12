@@ -61,7 +61,6 @@ selector:
   - jstests/core/timeseries/timeseries_id_range.js
   - jstests/core/timeseries/timeseries_insert_after_update.js
   - jstests/core/timeseries/timeseries_sparse.js
-  - jstests/core/timeseries/timeseries_large_measurements.js
   - jstests/core/timeseries/timeseries_min_max.js
   - jstests/core/timeseries/timeseries_simple.js
   - jstests/core/timeseries/timeseries_collation.js

@@ -58,7 +58,7 @@ WriteBatch::WriteBatch(TrackingContext& tc,
       stats(s),
       timeField(timeField),
       uncompressedBucketDoc(makeTrackedBson(tc, {})),
-      intermediateBuilders(trackingContext) {}
+      measurementMap(trackingContext) {}
 
 BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) {

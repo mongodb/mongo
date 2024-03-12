@@ -109,7 +109,10 @@ struct WriteBatch {
      * for the current WriteBatch and will contain uncommitted data fields in
      * makeTimeseriesCompressedDiffUpdateOp.
      */
-    MeasurementMap intermediateBuilders;
+    MeasurementMap measurementMap;
+
+    // For always compressed, adds the compressed measurement sizes while committing.
+    int32_t size = 0;
 
     // Whether the measurements in the bucket are sorted by timestamp or not.
     // True by default, if a v2 buckets gets promoted to v3 this is set to false.

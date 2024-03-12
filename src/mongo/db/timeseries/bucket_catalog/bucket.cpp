@@ -77,7 +77,7 @@ Bucket::Bucket(TrackingContext& trackingContext,
       uncompressedBucketDoc(makeTrackedBson(trackingContext, {})),
       usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
-      intermediateBuilders(trackingContext) {}
+      measurementMap(trackingContext) {}
 
 Bucket::~Bucket() {
     decrementBucketCountForEra(bucketStateRegistry, lastChecked);
@@ -100,7 +100,8 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,
-                                        int32_t& sizeToBeAdded) {
+                                        int32_t& sizeToBeAdded,
+                                        bool& crossedLargeMeasurementThreshold) {
     // BSON size for an object with an empty object field where field name is empty string.
     // We can use this as an offset to know the size when we have real field names.
     static constexpr int emptyObjSize = 12;
@@ -109,7 +110,21 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
 
     newFieldNamesToBeInserted.clear();
     sizeToBeAdded = 0;
+    crossedLargeMeasurementThreshold = bucket.crossedLargeMeasurementThreshold;
+    int32_t elementSizeToBeAdded = 0;
     auto numMeasurementsFieldLength = numDigits(bucket.numMeasurements);
+
+    // When a measurement larger than the threshold (in bytes) is being inserted into a bucket, we
+    // use the measurements uncompressed size towards the bucket size limit. Once the threshold is
+    // crossed for a bucket, all incoming measurements into that bucket use the uncompressed size.
+    // When set to 0 (the default), the threshold is computed as (12MB / (timeseriesBucketMaxCount
+    // +2)). +2 to account for min/max.
+    const int32_t largeMeasurementThresholdSetting = gTimeseriesLargeMeasurementThreshold.load();
+    const int32_t largeMeasurementThreshold =
+        (largeMeasurementThresholdSetting == 0
+             ? Bucket::kLargeMeasurementsMaxBucketSize / (gTimeseriesBucketMaxCount + 2)
+             : largeMeasurementThresholdSetting);
+
     for (const auto& elem : doc) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == metaField) {
@@ -138,10 +153,24 @@ void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
             }
         }
 
-        // Add the element size, taking into account that the name will be changed to its
-        // positional number. Add 1 to the calculation since the element's field name size
-        // accounts for a null terminator whereas the stringified position does not.
-        sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
+        // The element size, taking into account that the name will be changed to its positional
+        // number. Add 1 to the calculation since the element's field name size accounts for a null
+        // terminator whereas the stringified position does not.
+        const int32_t elementSize =
+            elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
+        elementSizeToBeAdded += elementSize;
+
+        if (!bucket.usingAlwaysCompressedBuckets || crossedLargeMeasurementThreshold) {
+            continue;
+        }
+
+        if (elementSize > largeMeasurementThreshold) {
+            crossedLargeMeasurementThreshold = true;
+        }
+    }
+
+    if (!bucket.usingAlwaysCompressedBuckets || crossedLargeMeasurementThreshold) {
+        sizeToBeAdded += elementSizeToBeAdded;
     }
 }
 

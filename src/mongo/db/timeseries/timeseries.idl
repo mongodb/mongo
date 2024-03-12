@@ -98,6 +98,17 @@ server_parameters:
         cpp_varname: "gTimeseriesInsertMaxRetriesOnDuplicates"
         default: 32
         validator: {gte: 1}
+    "timeseriesLargeMeasurementThreshold":
+        description: "When a measurement larger than the threshold (in bytes) is being inserted into
+                      a bucket, we use the measurements uncompressed size towards the bucket size
+                      limit. Once the threshold is crossed for a bucket, all incoming measurements
+                      into that bucket use the uncompressed size. When set to 0 (the default), the
+                      threshold is computed as (12MB / timeseriesBucketMaxCount)."
+        set_at: [ startup, runtime ]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: "gTimeseriesLargeMeasurementThreshold"
+        default: 0
+        validator: {gte: 0}
 
 enums:
     BucketGranularity:

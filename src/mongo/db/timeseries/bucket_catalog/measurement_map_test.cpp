@@ -132,13 +132,7 @@ TEST_F(MeasurementMapTest, IterationBasic) {
                                     << "5"));
     elems.emplace_back(m2_a.getField("a"));
     measurementMap.insertOne(elems);
-
-    // Check iteration works.
-    size_t i = 0;
-    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
-        ++i;
-    }
-    invariant(i == 2);
+    invariant(measurementMap.numFields() == 2);
 }
 
 TEST_F(MeasurementMapTest, FillSkipsDifferentField) {
@@ -159,12 +153,7 @@ TEST_F(MeasurementMapTest, FillSkipsDifferentField) {
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc2));
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocNewField));
-
-    size_t i = 0;
-    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
-        ++i;
-    }
-    invariant(i == 4);
+    invariant(measurementMap.numFields() == 4);
 }
 
 TEST_F(MeasurementMapTest, FillSkipsAddField) {
@@ -180,12 +169,7 @@ TEST_F(MeasurementMapTest, FillSkipsAddField) {
                     "c":{"0":1}})");
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocWithField));
-
-    size_t i = 0;
-    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
-        ++i;
-    }
-    invariant(i == 4);
+    invariant(measurementMap.numFields() == 4);
 }
 
 TEST_F(MeasurementMapTest, FillSkipsRemoveField) {
@@ -199,12 +183,7 @@ TEST_F(MeasurementMapTest, FillSkipsRemoveField) {
                     "a":{"0":4}})");
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
     measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocWithoutField));
-
-    size_t i = 0;
-    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
-        ++i;
-    }
-    invariant(i == 3);
+    invariant(measurementMap.numFields() == 3);
 }
 
 TEST_F(MeasurementMapTest, InitBuilders) {
@@ -253,30 +232,11 @@ TEST_F(MeasurementMapTest, InitBuilders) {
     dataBuilder.append("b", f2Binary);
 
     measurementMap.initBuilders(dataBuilder.done(), 3);
-
-    size_t i = 0;
-    for ([[maybe_unused]] auto& entry : measurementMap.getBuilders()) {
-        ++i;
-    }
-    invariant(i == 3);
+    invariant(measurementMap.numFields() == 3);
 }
 
-TEST_F(MeasurementMapTest, GetBuilder) {
-    std::vector<BSONElement> elems;
-    BSONObj bucketDocDataFields = genBucketDoc().getOwned();
-    for (auto dataField : bucketDocDataFields) {
-        elems.push_back(dataField);
-    }
-
-    measurementMap.insertOne(elems);
-
-    ASSERT_EQ(measurementMap.getBuilder("time").numInterleavedStartWritten(), 0);
-    ASSERT_EQ(measurementMap.getBuilder("a").numInterleavedStartWritten(), 0);
-    ASSERT_EQ(measurementMap.getBuilder("b").numInterleavedStartWritten(), 0);
-}
-
-DEATH_TEST_REGEX_F(MeasurementMapTest, GetBuilderForNonexistentField, "Invariant failure.*") {
-    measurementMap.getBuilder("time");
+DEATH_TEST_REGEX_F(MeasurementMapTest, GetTimeForNonexistentField, "Invariant failure.*") {
+    measurementMap.timeOfLastMeasurement("time");
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

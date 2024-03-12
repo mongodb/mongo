@@ -272,10 +272,6 @@ const checkIfBucketReopened = function(
     };
     const measurement4 = {
         [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "NonSuitableBucket4",
-    };
-    const measurement5 = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
         [metaField]: "Meta",
     };
 
@@ -299,23 +295,6 @@ const checkIfBucketReopened = function(
             "time": {"0": ISODate("2022-08-26T19:19:30Z")}
         }
     };
-    const compressedBucketDoc = {
-        "_id": ObjectId("05091c2c050b7495eaef4583"),
-        "control": {
-            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
-            "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
-            },
-            "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
-            },
-            "closed": false
-        },
-        "meta": "NonSuitableBucket2",
-        "data": {"_id": BinData(7, "BwBjCRwwE46SYf1wqQMA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
-    };
     const closedAndCompressedBucketDoc = {
         "_id": ObjectId("06091c2c050b7495eaef4584"),
         "control": {
@@ -330,7 +309,7 @@ const checkIfBucketReopened = function(
             },
             "closed": true
         },
-        "meta": "NonSuitableBucket3",
+        "meta": "NonSuitableBucket2",
         "data": {"_id": BinData(7, "BwBjCRwwE46SYf1wqQMA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
     };
     const year2000BucketDoc = {
@@ -347,7 +326,7 @@ const checkIfBucketReopened = function(
             },
             "closed": false
         },
-        "meta": "NonSuitableBucket4",
+        "meta": "NonSuitableBucket3",
         "data": {
             "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
             "time": {"0": ISODate("2022-08-26T19:19:30Z")}
@@ -378,22 +357,18 @@ const checkIfBucketReopened = function(
     // If an otherwise suitable bucket has the closed flag set, we expect to open a new bucket.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    assert.commandWorked(bucketsColl.insert(compressedBucketDoc));
-    // If an otherwise suitable bucket is compressed, we expect to open a new bucket.
-    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
-
     assert.commandWorked(bucketsColl.insert(closedAndCompressedBucketDoc));
     // If an otherwise suitable bucket is compressed and closed, we expect to open a new bucket.
-    checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     assert.commandWorked(bucketsColl.insert(year2000BucketDoc));
     // If an otherwise suitable bucket has an incompatible time range with the measurement, we
     // expect to open a new bucket.
-    checkIfBucketReopened(measurement4, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     assert.commandWorked(bucketsColl.insert(metaMismatchFieldBucketDoc));
     // If an otherwise suitable bucket has a mismatching meta field, we expect to open a new bucket.
-    checkIfBucketReopened(measurement5, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    checkIfBucketReopened(measurement4, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     jsTestLog("Exiting failToReopenNonSuitableBuckets.");
 })();

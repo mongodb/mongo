@@ -47,6 +47,7 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
         int binLength = 0;
         const char* binData = columnValue.binData(binLength);
 
+        _compressedSize += binLength;
         _builders.emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
                           std::make_pair(numMeasurements, BSONColumnBuilder(binData, binLength)));
     }
@@ -72,6 +73,26 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
             invariant(isInternalStateCorrect);
         }
     }
+}
+
+std::vector<std::pair<StringData, BSONColumnBuilder::BinaryDiff>> MeasurementMap::intermediate(
+    int32_t& size) {
+    // Remove the old compressed size.
+    size -= _compressedSize;
+    _compressedSize = 0;
+
+    std::vector<std::pair<StringData, BSONColumnBuilder::BinaryDiff>> intermediates;
+    for (auto& entry : _builders) {
+        auto& builder = std::get<1>(entry.second);
+        auto diff = builder.intermediate();
+
+        _compressedSize += (diff.offset() + diff.size());
+        intermediates.push_back(
+            {StringData(entry.first.c_str(), entry.first.size()), std::move(diff)});
+    }
+
+    size += _compressedSize;
+    return intermediates;
 }
 
 void MeasurementMap::_insertNewKey(StringData key,
@@ -122,10 +143,10 @@ void MeasurementMap::insertOne(std::vector<BSONElement> oneMeasurementDataFields
     _fillSkipsInMissingFields();
 }
 
-BSONColumnBuilder& MeasurementMap::getBuilder(StringData key) {
+Timestamp MeasurementMap::timeOfLastMeasurement(StringData key) const {
     auto it = _builders.find(key);
     invariant(it != _builders.end());
-    return std::get<1>(it->second);
+    return std::get<1>(it->second).last().timestamp();
 }
 
 void MeasurementMap::_assertInternalStateIdentical_forTest() {

@@ -66,10 +66,18 @@ public:
      */
     void initBuilders(BSONObj bucketDataDocWithCompressedBuilders, size_t numMeasurements);
 
-    BSONColumnBuilder& getBuilder(StringData key);
+    /**
+     * Calls BSONColumnBuilder::intermediate() for all builders and updates the compressed size.
+     */
+    std::vector<std::pair<StringData, BSONColumnBuilder::BinaryDiff>> intermediate(int32_t& size);
 
-    TrackedStringMap<std::tuple<size_t, BSONColumnBuilder>>& getBuilders() {
-        return _builders;
+    /**
+     * Returns the timestamp of the last measurement in the time column.
+     */
+    Timestamp timeOfLastMeasurement(StringData timeField) const;
+
+    size_t numFields() const {
+        return _builders.size();
     }
 
 private:
@@ -90,6 +98,10 @@ private:
 
     TrackedStringMap<std::tuple<size_t, BSONColumnBuilder>> _builders;
     size_t _measurementCount{0};
+
+    // The size of the compressed binary data across all builders since the last call to
+    // intermediate().
+    size_t _compressedSize{0};
 };
 
 }  // namespace mongo::timeseries::bucket_catalog

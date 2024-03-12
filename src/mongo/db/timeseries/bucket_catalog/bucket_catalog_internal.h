@@ -375,6 +375,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     int32_t& sizeToBeAdded,
+    bool& crossedLargeMeasurementThreshold,
     AllowBucketCreation mode);
 
 /**

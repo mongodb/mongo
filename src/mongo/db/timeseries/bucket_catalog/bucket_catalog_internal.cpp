@@ -70,6 +70,7 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_global_options.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -423,27 +424,21 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                                                                     catalog.bucketStateRegistry);
 
     const bool isCompressed = isCompressedBucket(bucketDoc);
+    const bool usingAlwaysCompressed =
+        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     // Initialize the remaining member variables from the bucket document.
-    if (isCompressed) {
-        if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            // Re-opening compressed buckets is only supported when the always use compressed
-            // buckets feature flag is enabled.
-            return {ErrorCodes::BadValue, "Bucket is compressed and cannot be reopened"};
-        }
+    bucket->size = bucketDoc.objsize();
 
-        auto decompressedBucketDoc = decompressBucket(bucketDoc);
-        if (!decompressedBucketDoc.has_value()) {
-            return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
-        }
-        bucket->size = decompressedBucketDoc.value().objsize();
-    } else {
-        bucket->size = bucketDoc.objsize();
-        if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            bucket->uncompressedBucketDoc = makeTrackedBson(catalog.trackingContext, bucketDoc);
-        }
+    if (isCompressed && !usingAlwaysCompressed) {
+        // Re-opening compressed buckets is only supported when the always use compressed buckets
+        // feature flag is enabled.
+        return {ErrorCodes::BadValue, "Bucket is compressed and cannot be reopened"};
+    }
+
+    if (!isCompressed && usingAlwaysCompressed) {
+        bucket->uncompressedBucketDoc = makeTrackedBson(catalog.trackingContext, bucketDoc);
     }
 
     // Populate the top-level data field names.
@@ -485,11 +480,13 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
 
-    if (isCompressed &&
-        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (isCompressed && usingAlwaysCompressed) {
         // Initialize BSONColumnBuilders from the compressed bucket data fields.
-        bucket->intermediateBuilders.initBuilders(dataObj, bucket->numCommittedMeasurements);
+        try {
+            bucket->measurementMap.initBuilders(dataObj, bucket->numCommittedMeasurements);
+        } catch (const AssertionException& ex) {
+            return Status(BucketCompressionFailure(collectionUUID, bucketId.oid), ex.reason());
+        }
     }
 
     updateStatsOnError.dismiss();
@@ -617,6 +614,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     Bucket& existingBucket) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     int32_t sizeToBeAdded = 0;
+    bool crossedLargeMeasurementThreshold = false;
 
     bool isNewlyOpenedBucket = (existingBucket.size == 0);
     std::reference_wrapper<Bucket> bucketToUse{existingBucket};
@@ -629,6 +627,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                                         catalog.numberOfActiveBuckets.load(),
                                                         newFieldNamesToBeInserted,
                                                         sizeToBeAdded,
+                                                        crossedLargeMeasurementThreshold,
                                                         mode);
         if ((action == RolloverAction::kSoftClose || action == RolloverAction::kArchive) &&
             mode == AllowBucketCreation::kNo) {
@@ -649,7 +648,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                            doc,
                                            info.options.getMetaField(),
                                            newFieldNamesToBeInserted,
-                                           sizeToBeAdded);
+                                           sizeToBeAdded,
+                                           crossedLargeMeasurementThreshold);
     }
 
     auto batch = activeBatch(
@@ -663,6 +663,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
 
     bucket.numMeasurements++;
     bucket.size += sizeToBeAdded;
+    bucket.crossedLargeMeasurementThreshold = crossedLargeMeasurementThreshold;
     if (isNewlyOpenedBucket) {
         if (info.openedDuetoMetadata) {
             batch->openedDueToMetadata = true;
@@ -1193,6 +1194,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
     int32_t& sizeToBeAdded,
+    bool& crossedLargeMeasurementThreshold,
     AllowBucketCreation mode) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
@@ -1235,27 +1237,23 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] =
         getCacheDerivedBucketMaxSize(storageCacheSize, numberOfActiveBuckets);
 
-    // Before we hit our bucket minimum count, we will allow for large measurements to be inserted
-    // into buckets. Instead of packing the bucket to the BSON size limit, 16MB, we'll limit the max
-    // bucket size to 12MB. This is to leave some space in the bucket if we need to add new internal
-    // fields to existing, full buckets.
-    static constexpr int32_t largeMeasurementsMaxBucketSize =
-        BSONObjMaxUserSize - (4 * 1024 * 1024);
     // We restrict the ceiling of the bucket max size under cache pressure.
-    int32_t absoluteMaxSize = std::min(largeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
+    int32_t absoluteMaxSize =
+        std::min(Bucket::kLargeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
 
     calculateBucketFieldsAndSizeChange(trackingContext,
                                        bucket,
                                        doc,
                                        info.options.getMetaField(),
                                        newFieldNamesToBeInserted,
-                                       sizeToBeAdded);
+                                       sizeToBeAdded,
+                                       crossedLargeMeasurementThreshold);
     if (bucket.size + sizeToBeAdded > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
             bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
         if (keepBucketOpenForLargeMeasurements) {
             if (bucket.size + sizeToBeAdded > absoluteMaxSize) {
-                if (absoluteMaxSize != largeMeasurementsMaxBucketSize) {
+                if (absoluteMaxSize != Bucket::kLargeMeasurementsMaxBucketSize) {
                     info.stats.incNumBucketsClosedDueToCachePressure();
                     return {RolloverAction::kHardClose, RolloverReason::kCachePressure};
                 }

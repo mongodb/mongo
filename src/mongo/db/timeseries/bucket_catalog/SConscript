@@ -32,6 +32,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/timeseries/bucket_compression',
+        '$BUILD_DIR/mongo/db/timeseries/bucket_compression_failure',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_metadata',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/views/views',

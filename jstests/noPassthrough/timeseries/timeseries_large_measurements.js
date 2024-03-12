@@ -15,6 +15,9 @@
  *   requires_timeseries,
  * ]
  */
+
+const conn = MongoRunner.runMongod({setParameter: {timeseriesLargeMeasurementThreshold: 1}});
+const db = conn.getDB("test");
 const coll = db.getCollection(jsTestName());
 const bucketColl = db.getCollection("system.buckets." + jsTestName());
 
@@ -71,3 +74,5 @@ for (let i = 0; i < numMeasurements; i++) {
 }
 assert.commandWorked(coll.insertMany(batch), {ordered: false});
 checkAverageBucketSize();
+
+MongoRunner.stopMongod(conn);
