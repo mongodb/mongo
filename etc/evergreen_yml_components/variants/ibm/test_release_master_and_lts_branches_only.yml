@@ -45,24 +45,8 @@ buildvariants:
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel81-power8-large
-  - name: .aggregation .common
-  - name: audit
-  - name: .auth !.multiversion !.jscore
-  - name: .misc_js
-  - name: .encrypt
-  - name: .jscore .common !.auth
-  - name: .read_write_concern
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: sasl
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-  - name: .sharding .common !.multiversion
-  - name: .stitch
-  - name: .crypt
-  - name: .publish_crypt
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
-  - name: .timeseries_crud
+  - name: .development_critical !.incompatible_ibm
+  - name: .release_critical !.incompatible_ibm
 
 - <<: *enterprise-rhel-81-ppc64le-template
   name: enterprise-rhel-81-ppc64le-dynamic
@@ -125,24 +109,8 @@ buildvariants:
   - name: small_compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel83-zseries-large
-  - name: .aggregation .common
-  - name: audit
-  - name: .auth !.multiversion !.jscore
-  - name: .misc_js
-  - name: .encrypt
-  - name: .jscore .common !.auth
-  - name: .read_write_concern
-  - name: replica_sets_gen
-  - name: .replica_sets .common
-  - name: sasl
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-  - name: .sharding .common !.multiversion
-  - name: .stitch
-  - name: .crypt
-  - name: .publish_crypt
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
-  - name: .timeseries_crud
+  - name: .development_critical !.incompatible_ibm
+  - name: .release_critical !.incompatible_ibm
 
 - <<: *enterprise-rhel-83-s390x-template
   name: enterprise-rhel-83-s390x-dynamic

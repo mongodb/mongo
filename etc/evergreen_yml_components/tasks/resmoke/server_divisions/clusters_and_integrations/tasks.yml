@@ -445,7 +445,7 @@ tasks:
 
 - <<: *task_template
   name: libunwind_tests
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_mac", "incompatible_windows"]
+  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -478,7 +478,7 @@ tasks:
 
 - <<: *task_template
   name: search_pinned_connections_auth
-  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows"]
+  tags: ["assigned_to_jira_team_server_servicearch", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -896,7 +896,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore_auth
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_windows", "jscore", "auth", "common"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_windows", "incompatible_ibm", "jscore", "auth", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -977,7 +977,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_auth_gen
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_mac", "incompatible_windows"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1392,7 +1392,7 @@ tasks:
 # in the same varient as them
 - <<: *gen_task_template
   name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_windows"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "release_critical", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1517,7 +1517,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1553,7 +1553,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_with_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1568,7 +1568,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
