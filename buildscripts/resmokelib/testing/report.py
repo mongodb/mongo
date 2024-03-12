@@ -5,6 +5,7 @@ This is used to support additional test status and timing information for the re
 """
 
 import copy
+import os
 import threading
 import time
 import unittest
@@ -110,6 +111,7 @@ class TestReport(unittest.TestResult):
         unittest.TestResult.startTest(self, test)
 
         test_info = TestInfo(test.id(), test.test_name, test.dynamic)
+        test_info.group_id = f"job{self.job_num}"
 
         basename = test.basename()
         command = test.as_command()
@@ -132,6 +134,11 @@ class TestReport(unittest.TestResult):
         # Set up logging handlers to capture exceptions.
         test_info.exception_extractors = logging.loggers.configure_exception_capture(test_logger)
 
+        test_info.log_info = {
+            "log_name": logging.loggers.get_evergreen_log_name(self.job_num, test.id()),
+            "logs_to_merge": [logging.loggers.get_evergreen_log_name(self.job_num)],
+            "rendering_type": "resmoke", "version": 0
+        }
         test_info.url_endpoint = url_endpoint
         if self.logging_prefix is not None:
             test_logger.info(self.logging_prefix)
@@ -295,18 +302,17 @@ class TestReport(unittest.TestResult):
             for test_info in self.test_infos:
                 result = {
                     "test_file": test_info.test_file,
+                    "group_id": test_info.group_id,
                     "status": test_info.evergreen_status,
                     "exit_code": test_info.return_code,
                     "start": test_info.start_time,
                     "end": test_info.end_time,
                     "elapsed": test_info.end_time - test_info.start_time,
+                    "log_info": test_info.log_info,
                 }
 
                 if test_info.display_test_name is not None:
                     result["display_test_name"] = test_info.display_test_name
-
-                if test_info.group_id is not None:
-                    result["group_id"] = test_info.group_id
 
                 if test_info.url_endpoint is not None:
                     result["url"] = test_info.url_endpoint
@@ -337,6 +343,7 @@ class TestReport(unittest.TestResult):
             test_info = TestInfo(test_file, test_file, is_dynamic)
             test_info.display_test_name = result.get("display_test_name")
             test_info.group_id = result.get("group_id")
+            test_info.log_info = result.get("log_info")
             test_info.url_endpoint = result.get("url")
             test_info.status = result["status"]
             test_info.evergreen_status = test_info.status
@@ -390,15 +397,16 @@ class TestInfo(object):
 
         self.test_id = test_id
         self.test_file = test_file
+        self.group_id = None
         self.display_test_name = None
         self.dynamic = dynamic
 
-        self.group_id = None
         self.start_time = None
         self.end_time = None
         self.status = None
         self.evergreen_status = None
         self.return_code = None
+        self.log_info = None
         self.url_endpoint = None
         self.exception_extractors = []
         self.error = None
