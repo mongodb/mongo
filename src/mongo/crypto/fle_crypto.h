@@ -604,9 +604,17 @@ public:
 class ESCCollectionAnchorPadding
     : public ESCCollectionCommon<AnchorPaddingKeyToken, AnchorPaddingValueToken> {
 public:
+    static PrfBlock generateNullAnchorId(const AnchorPaddingKeyToken& tagToken);
+    static PrfBlock generateAnchorId(const AnchorPaddingKeyToken& tagToken, uint64_t apos);
+
+    static BSONObj generateNullAnchorDocument(const AnchorPaddingKeyToken& keyToken,
+                                              const AnchorPaddingValueToken& valueToken,
+                                              uint64_t apos,
+                                              uint64_t /* cpos ignored */);
+
     static BSONObj generatePaddingDocument(const AnchorPaddingKeyToken& keyToken,
                                            const AnchorPaddingValueToken& valueToken,
-                                           uint64_t id);
+                                           uint64_t apos);
 };
 
 /**

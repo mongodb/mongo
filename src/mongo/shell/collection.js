@@ -16,8 +16,8 @@ DBCollection.prototype.compact = function(extra = {}) {
     return this._db.getMongo().compact(this._fullName, extra);
 };
 
-DBCollection.prototype.cleanup = function() {
-    return this._db.getMongo().cleanup(this._fullName);
+DBCollection.prototype.cleanup = function(extra = {}) {
+    return this._db.getMongo().cleanup(this._fullName, extra);
 };
 
 DBCollection.prototype._getCompactionTokens = function() {

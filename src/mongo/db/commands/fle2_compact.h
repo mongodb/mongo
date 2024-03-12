@@ -131,11 +131,17 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
  * of this list is capped by maxAnchorListLength.
  * Used by unit tests.
  */
+enum class FLECleanupOneMode {
+    kNormal,
+    kPadding,
+};
+
 std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
                                                const ECOCCompactionDocumentV2& ecocDoc,
                                                const NamespaceString& escNss,
                                                std::size_t maxAnchorListLength,
-                                               ECStats* escStats);
+                                               ECStats* escStats,
+                                               FLECleanupOneMode mode = FLECleanupOneMode::kNormal);
 
 /**
  * Container for the _id values of ESC entries that are slated for deletion

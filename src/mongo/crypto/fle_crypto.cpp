@@ -1858,8 +1858,23 @@ FLEEdgeCountInfo getEdgeCountInfoForCleanup(const FLEStateCollectionReader& read
                                             ConstDataRange tag) {
     auto escToken = EDCServerPayloadInfo::getESCToken(tag);
 
+    // This method is overloaded to provide edge counts for both "real" tokens based on
+    // FLETwiceDerivedToken and range query padding tokens based on AnchorPaddingRootToken. In both
+    // cases, the tag/key token is derived via F(Root, 1) while the value token is derived via
+    // F(Root, 2), therefore we can treat the subderivate tokens equivalently prodived the correct
+    // root token is passed. The dassert() statements below guard this assumption.
+
     auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
+    dassert(tagToken.data ==
+            FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(
+                AnchorPaddingRootToken(escToken.data))
+                .data);
+
     auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+    dassert(valueToken.data ==
+            FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(
+                AnchorPaddingRootToken(escToken.data))
+                .data);
 
     // step (C)
     // positions.cpos is a_1
@@ -2505,9 +2520,14 @@ BSONObj ESCCollection::generateNullDocument(const ESCTwiceDerivedTagToken& tagTo
     return builder.obj();
 }
 
+PrfBlock ESCCollectionAnchorPadding::generateAnchorId(const AnchorPaddingKeyToken& keyToken,
+                                                      uint64_t apos) {
+    return prf(keyToken.data, kESCPaddingId, apos);
+}
+
 BSONObj ESCCollectionAnchorPadding::generatePaddingDocument(
     const AnchorPaddingKeyToken& keyToken, const AnchorPaddingValueToken& valueToken, uint64_t id) {
-    auto block = prf(keyToken.data, kESCPaddingId, id);
+    auto block = generateAnchorId(keyToken, id);
 
     constexpr uint64_t dummy{0};
     auto cipherText = uassertStatusOK(packAndEncrypt(std::tie(dummy, dummy), valueToken));
@@ -2596,6 +2616,26 @@ BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken&
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     toBinData(kValue, swCipherText.getValue(), &builder);
+    return builder.obj();
+}
+
+PrfBlock ESCCollectionAnchorPadding::generateNullAnchorId(const AnchorPaddingKeyToken& keyToken) {
+    return prf(keyToken.data, kESCPaddingId, 0);
+}
+
+BSONObj ESCCollectionAnchorPadding::generateNullAnchorDocument(
+    const AnchorPaddingKeyToken& keyToken,
+    const AnchorPaddingValueToken& valueToken,
+    uint64_t apos,
+    uint64_t /* cpos */) {
+    auto block = generateNullAnchorId(keyToken);
+
+    constexpr uint64_t ignored{0};
+    auto cipherText = uassertStatusOK(packAndEncrypt(std::tie(apos, ignored), valueToken));
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, cipherText, &builder);
     return builder.obj();
 }
 

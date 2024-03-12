@@ -51,5 +51,8 @@ commands:
         reply_type: CleanupStructuredEncryptionDataCommandReply
         fields:
             cleanupTokens:
-                description: "Map of field path to ECOCToken"
+                description: |-
+                    Map of field path to ECOCToken.
+                    Dictionary key/value pairs in the form: { fieldName: "ecocToken" }
+                    or { fieldName: { ecoc: "ecocToken", anchorPaddingToken: "anchorPaddingToken" } }
                 type: object
