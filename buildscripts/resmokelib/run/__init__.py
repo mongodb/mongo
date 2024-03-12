@@ -1239,10 +1239,6 @@ class RunPlugin(PluginInterface):
         internal_options.add_argument("--internalParam", action="append", dest="internal_params",
                                       help=argparse.SUPPRESS)
 
-        internal_options.add_argument("--perfReportFile", dest="perf_report_file",
-                                      metavar="PERF_REPORT",
-                                      help="Writes a JSON file with performance test results.")
-
         internal_options.add_argument("--cedarReportFile", dest="cedar_report_file",
                                       metavar="CEDAR_REPORT",
                                       help="Writes a JSON file with performance test results.")

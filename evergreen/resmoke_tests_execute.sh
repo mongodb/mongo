@@ -159,7 +159,6 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     --taskWorkDir='${workdir}' \
     --projectConfigPath ${evergreen_config_file_path} \
     --reportFile=report.json \
-    --perfReportFile=perf.json \
     --cedarReportFile=cedar_report.json
   resmoke_exit_code=$?
   set -o errexit

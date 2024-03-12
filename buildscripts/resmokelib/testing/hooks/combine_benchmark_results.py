@@ -28,7 +28,6 @@ class CombineBenchmarkResults(interface.Hook):
     def __init__(self, hook_logger, fixture):
         """Initialize CombineBenchmarkResults."""
         interface.Hook.__init__(self, hook_logger, fixture, CombineBenchmarkResults.DESCRIPTION)
-        self.legacy_report_file = _config.PERF_REPORT_FILE
         self.cedar_report_file = _config.CEDAR_REPORT_FILE
 
         # Reports grouped by name without thread.
@@ -43,9 +42,6 @@ class CombineBenchmarkResults(interface.Hook):
 
     def after_test(self, test, test_report):
         """Update test report."""
-        if self.legacy_report_file is None:
-            return
-
         bm_report_path = test.report_name()
 
         with open(bm_report_path, "r") as bm_report_file:
@@ -58,13 +54,8 @@ class CombineBenchmarkResults(interface.Hook):
 
     def after_suite(self, test_report, teardown_flag=None):
         """Update test report."""
-        if self.legacy_report_file is None:
-            return
 
         self.end_time = datetime.datetime.now()
-        legacy_report = self._generate_perf_plugin_report()
-        with open(self.legacy_report_file, "w") as fh:
-            json.dump(legacy_report, fh)
 
         try:
             cedar_report = self._generate_cedar_report()
@@ -72,27 +63,9 @@ class CombineBenchmarkResults(interface.Hook):
             teardown_flag.set()
             raise
         else:
-            with open(self.cedar_report_file, "w") as fh:
-                json.dump(cedar_report, fh)
-
-    def _generate_perf_plugin_report(self):
-        """Format the data to look like a perf plugin report."""
-        perf_report = {
-            "start": self._strftime(self.create_time),
-            "end": self._strftime(self.end_time),
-            "errors": [],  # There are no errors if we have gotten this far.
-            "results": []
-        }
-
-        for name, report in list(self.benchmark_reports.items()):
-            test_report = {
-                "name": name, "context": report.context._asdict(),
-                "results": report.generate_perf_plugin_dict()
-            }
-
-            perf_report["results"].append(test_report)
-
-        return perf_report
+            if self.cedar_report_file is not None:
+                with open(self.cedar_report_file, "w") as fh:
+                    json.dump(cedar_report, fh)
 
     def _generate_cedar_report(self) -> List[dict]:
         """Format the data to look like a cedar report."""
@@ -224,45 +197,6 @@ class _BenchmarkThreadsReport(object):
     def add_report(self, bm_name_obj, report):
         """Add to report."""
         self.thread_benchmark_map[bm_name_obj.thread_count].append(report)
-
-    def generate_perf_plugin_dict(self):
-        """Generate perf plugin data points of the following format.
-
-        "1": {
-          "error_values": [
-            0,
-            0,
-            0
-          ],
-          "ops_per_sec": 9552.108279243452,
-          "ops_per_sec_values": [
-            9574.812658450564,
-            9522.642340821469,
-            9536.252775275878
-          ]
-        },
-        """
-
-        res = {}
-        for thread_count, reports in list(self.thread_benchmark_map.items()):
-            thread_report = {
-                "error_values": [],
-                "ops_per_sec_values": [],  # This is actually storing latency per op, not ops/s
-            }
-
-            for report in reports:
-                # Don't show Benchmark's included statistics to prevent cluttering up the graph.
-                if report.get("run_type") == "aggregate":
-                    continue
-                thread_report["error_values"].append(0)
-                # Take the negative of the latency numbers to preserve the higher is better semantics.
-                thread_report["ops_per_sec_values"].append(-1 * report["cpu_time"])
-            thread_report["ops_per_sec"] = sum(thread_report["ops_per_sec_values"]) / len(
-                thread_report["ops_per_sec_values"])
-
-            res[thread_count] = thread_report
-
-        return res
 
     def generate_cedar_metrics(self) -> Dict[int, List[CedarMetric]]:
         """

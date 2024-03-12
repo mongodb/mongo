@@ -139,18 +139,6 @@ class CombineBenchmarkResultsFixture(unittest.TestCase):
 
 
 class TestCombineBenchmarkResults(CombineBenchmarkResultsFixture):
-    def test_generate_legacy_report(self):
-        report = self.cbr_hook._generate_perf_plugin_report()
-
-        self.assertEqual(len(list(report.keys())), 4)
-        self.assertEqual(len(report["results"]), 2)
-
-        self.assertDictEqual(report["results"][0]["context"], _BM_CONTEXT)
-        self.assertEqual(report["results"][0]["results"]["1"]["ops_per_sec"], -1304.0)
-
-        self.assertEqual(report["start"], "2999-12-31T23:59:59Z")
-        self.assertEqual(report["end"], "3000-01-01T00:00:00Z")
-
     def test_generate_cedar_report(self):
         report = self.cbr_hook._generate_cedar_report()
 
@@ -213,38 +201,6 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
         self.assertEqual(name_obj.thread_count, "1")
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_baseline_match_simple/0")
-
-    def test_generate_multithread_perf_plugin_dict(self):
-        # Also test add_report() in the process.
-        self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_REPORT), _BM_MULTITHREAD_REPORT)
-
-        self.assertEqual(len(list(self.bm_threads_report.thread_benchmark_map.keys())), 1)
-
-        report = self.bm_threads_report.generate_perf_plugin_dict()
-
-        self.assertEqual(len(list(report.keys())), 1)
-        self.assertIn("10", list(report.keys()))
-        self.assertNotIn("10_median", list(report.keys()))
-
-        self.assertEqual(len(report["10"]["error_values"]), 1)
-        self.assertEqual(len(report["10"]["ops_per_sec_values"]), 1)
-        self.assertEqual(report["10"]["ops_per_sec"], -303.0)
-
-    def test_generate_single_thread_perf_plugin_dict(self):
-        self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_1), _BM_REPORT_1)
-
-        self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_2), _BM_REPORT_2)
-
-        self.assertEqual(len(list(self.bm_threads_report.thread_benchmark_map.keys())), 1)
-
-        report = self.bm_threads_report.generate_perf_plugin_dict()
-
-        self.assertEqual(len(list(report.keys())), 1)
-        self.assertIn("1", list(report.keys()))
-        self.assertNotIn("1_mean", list(report.keys()))
 
     def test_generate_multithread_cedar_metrics(self):
         self.bm_threads_report.add_report(

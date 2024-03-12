@@ -232,7 +232,6 @@ class TestLocalCommandLine(unittest.TestCase):
             "run",
             "--suites=my_suite",
             "--reportFile=report.json",
-            "--perfReportFile=perf.json",
             "--storageEngine=my_storage_engine",
         ])
 
