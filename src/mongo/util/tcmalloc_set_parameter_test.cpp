@@ -68,7 +68,6 @@ void runAppendTest(T param, StringData name, size_t value, const F& setTcmallocV
     param.append(nullptr, &bob, "test", boost::none);
     ASSERT_TRUE(bob.hasField("test"));
 
-
     ASSERT_DOES_NOT_THROW(setTcmallocValue(name, value + 1));
 
     BSONObjBuilder subBob = bob.subobjStart("sub_doc");
@@ -152,6 +151,55 @@ void runSetFromStringTest(T param, StringData name, StringData value, const F& g
     ASSERT_EQ(actualVal, intVal);
 }
 
+/**
+ * This function runs an append test on a no-op parameter and verifies that nothing was appended to
+ * the bson object.
+ *
+ * @param param: The server parameter that we are getting the data from.
+ */
+template <typename T>
+void runNoOpAppendTest(T param) {
+    BSONObjBuilder bob;
+    param.append(nullptr, &bob, "test", boost::none);
+    ASSERT_FALSE(bob.hasField("test"));
+}
+
+/**
+ * This function runs a set test on a no-op parameter and verifies that the parameter value cannot
+ * be received. Since the no-op parameters only warn instead of returning an error we have to check
+ * that the parameter set method returns OK.
+ *
+ * @param param: The server parameter that we are setting the data on.
+ * @param name: The name of the server parameter.
+ * @param getTcmallocValue: The get helper function to use when getting the server parameter. It
+ * should take in a StringData parameter name
+ */
+template <typename T, typename F>
+void runNoOpSetTest(T param, StringData name, const F& getTcmallocValue) {
+    ASSERT_THROWS_CODE(
+        getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
+    BSONObjBuilder bob;
+    bob.appendNumber("a", 1);
+    BSONElement val = bob.obj().getField("a");
+    ASSERT_OK(param.set(val, boost::none));
+}
+
+/**
+ * This function runs a setFromString test on a no-op parameter and verifies that the parameter
+ * value cannot be received. Since the no-op parameters only warn instead of returning an error we
+ * have to check that the parameter setFromString method returns OK.
+ *
+ * @param param: The server parameter that we are setting the data on.
+ * @param name: The name of the server parameter.
+ * @param getTcmallocValue: The get helper function to use when getting the server parameter. It
+ * should take in a StringData parameter name
+ */
+template <typename T, typename F>
+void runNoOpSetFromStringTest(T param, StringData name, const F& getTcmallocValue) {
+    ASSERT_THROWS_CODE(
+        getTcmallocValue(name), ExceptionFor<ErrorCodes::InternalError>, ErrorCodes::InternalError);
+    ASSERT_OK(param.setFromString("1", boost::none));
+}
 
 TEST(MaxTotalThreadCacheBytesParam, AppendTest) {
     TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
@@ -172,7 +220,26 @@ TEST(MaxTotalThreadCacheBytesParam, SetFromStringTest) {
         param, kMaxTotalThreadCacheBytesPropertyName, testValIntAsStr, &getTcmallocProperty);
 }
 
-#if MONGO_CONFIG_TCMALLOC_GPERF
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
+TEST(AggressiveMemoryDecommit, NoOpAppendTest) {
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runNoOpAppendTest(param);
+}
+
+TEST(AggressiveMemoryDecommit, NoOpSetTest) {
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runNoOpSetTest(param, kAggressiveMemoryDecommitPropertyName, &getTcmallocProperty);
+}
+
+TEST(AggressiveMemoryDecommit, NoOpSetFromStringTest) {
+    TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runNoOpSetFromStringTest(param, kAggressiveMemoryDecommitPropertyName, &getTcmallocProperty);
+}
+
+#elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 TEST(AggressiveMemoryDecommit, AppendTest) {
     TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
                                                           ServerParameterType::kStartupAndRuntime);
@@ -191,7 +258,7 @@ TEST(AggressiveMemoryDecommit, SetFromStringTest) {
     runSetFromStringTest(
         param, kAggressiveMemoryDecommitPropertyName, testValBoolAsStr, &getTcmallocProperty);
 }
-#endif  // MONGO_CONFIG_TCMALLOC_GPERF
+#endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 
 TEST(ReleaseRate, AppendTest) {
     TCMallocReleaseRateServerParameter param("tcmallocReleaseRate"_sd,

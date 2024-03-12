@@ -232,17 +232,35 @@ void TCMallocAggressiveMemoryDecommitServerParameter::append(OperationContext*,
                                                              BSONObjBuilder* b,
                                                              StringData name,
                                                              const boost::optional<TenantId>&) {
+#ifdef MONGO_CONFIG_TCMALLOC_GPERF
     doAppendProperty<TCMallocAggressiveMemoryDecommitServerParameter>(b, name);
+#endif  //  MONGO_CONFIG_TCMALLOC_GPERF
 }
 
 Status TCMallocAggressiveMemoryDecommitServerParameter::set(const BSONElement& newValueElement,
                                                             const boost::optional<TenantId>&) {
+#ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetProperty<TCMallocAggressiveMemoryDecommitServerParameter>(name(), newValueElement);
+#endif  //  MONGO_CONFIG_TCMALLOC_GPERF
+
+    LOGV2_WARNING(
+        8627600,
+        "The tcmallocAggressiveMemoryDecommit server parameter is unavailable when using TCMalloc "
+        "with per-CPU caching enabled. Setting this parameter will have no effect.");
+    return Status::OK();
 }
 
 Status TCMallocAggressiveMemoryDecommitServerParameter::setFromString(
     StringData str, const boost::optional<TenantId>&) {
+#ifdef MONGO_CONFIG_TCMALLOC_GPERF
     return doSetPropertyFromString<TCMallocAggressiveMemoryDecommitServerParameter>(str);
+#endif  //  MONGO_CONFIG_TCMALLOC_GPERF
+
+    LOGV2_WARNING(
+        8627601,
+        "The tcmallocAggressiveMemoryDecommit server parameter is unavailable when using TCMalloc "
+        "with per-CPU caching enabled. Setting this parameter will have no effect.");
+    return Status::OK();
 }
 
 void TCMallocReleaseRateServerParameter::append(OperationContext*,
