@@ -110,9 +110,7 @@ void generatePlannerInfo(PlanExecutor* exec,
         }
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
-        return querySettings
-            ->getAllowedIndicesFilter(exec->getCanonicalQuery()->encodeKeyForPlanCacheCommand())
-            .has_value();
+        return querySettings->getAllowedIndicesFilter(*exec->getCanonicalQuery()).has_value();
     }();
     if (mainCollection && exec->getCanonicalQuery()) {
         if (exec->getCanonicalQuery()->isSbeCompatible() &&

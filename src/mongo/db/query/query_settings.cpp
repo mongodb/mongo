@@ -88,7 +88,15 @@ AllowedIndexEntry::AllowedIndexEntry(const BSONObj& query,
 //
 
 boost::optional<AllowedIndicesFilter> QuerySettings::getAllowedIndicesFilter(
-    const CanonicalQuery::PlanCacheCommandKey& key) const {
+    const CanonicalQuery& canonicalQuery) const {
+    // Fast-check if there is at least one allowed index in query settings.
+    if (!_someAllowedIndexEntriesPresent.loadRelaxed()) {
+        return {};
+    }
+
+    // Compute the key before entering the critical section.
+    const CanonicalQuery::PlanCacheCommandKey key = canonicalQuery.encodeKeyForPlanCacheCommand();
+
     stdx::lock_guard<Latch> cacheLock(_mutex);
     AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
@@ -126,6 +134,7 @@ void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
         std::piecewise_construct,
         std::forward_as_tuple(key),
         std::forward_as_tuple(query, sort, projection, collation, indexKeyPatterns, indexNames));
+    _updateSomeAllowedIndexEntriesPresent();
 }
 
 void QuerySettings::removeAllowedIndices(const CanonicalQuery::PlanCacheCommandKey& key) {
@@ -138,11 +147,17 @@ void QuerySettings::removeAllowedIndices(const CanonicalQuery::PlanCacheCommandK
     }
 
     _allowedIndexEntryMap.erase(i);
+    _updateSomeAllowedIndexEntriesPresent();
 }
 
 void QuerySettings::clearAllowedIndices() {
     stdx::lock_guard<Latch> cacheLock(_mutex);
     _allowedIndexEntryMap.clear();
+    _updateSomeAllowedIndexEntriesPresent();
+}
+
+void QuerySettings::_updateSomeAllowedIndexEntriesPresent() {
+    _someAllowedIndexEntriesPresent.store(!_allowedIndexEntryMap.empty());
 }
 
 }  // namespace mongo

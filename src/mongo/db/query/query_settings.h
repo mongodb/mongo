@@ -42,6 +42,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -120,11 +121,11 @@ public:
     QuerySettings() = default;
 
     /**
-     * Returns AllowedIndicesFilter for the query if it is set in the query settings, or
+     * Returns AllowedIndicesFilter for the 'query' if it is set in the query settings, or
      * boost::none if it isn't.
      */
     boost::optional<AllowedIndicesFilter> getAllowedIndicesFilter(
-        const CanonicalQuery::PlanCacheCommandKey& key) const;
+        const CanonicalQuery& query) const;
 
     /**
      * Returns copies of all overrides for the collection.
@@ -150,10 +151,22 @@ public:
     void clearAllowedIndices();
 
 private:
+    /**
+     * Updates '_someAllowedIndexEntriesPresent' field state. Should be invoked when the mutex
+     * protecting the index filters is held and just before releasing the mutex to ensure
+     * '_someAllowedIndexEntriesPresent' is consistent with '_allowedIndexEntryMap'.
+     */
+    void _updateSomeAllowedIndexEntriesPresent();
+
     // Allowed index entries owned here.
     using AllowedIndexEntryMap =
         stdx::unordered_map<CanonicalQuery::PlanCacheCommandKey, AllowedIndexEntry>;
     AllowedIndexEntryMap _allowedIndexEntryMap;
+
+    // Is 'true' if '_allowedIndexEntryMap' has at least one entry. It is used to avoid acquiring
+    // the mutex in a typical scenario - when there are no index filters associated with the
+    // collection.
+    Atomic<bool> _someAllowedIndexEntriesPresent{false};
 
     /**
      * Protects data in query settings.

@@ -17,6 +17,7 @@
 import {
     getOptimizer,
     getPlanStages,
+    getQueryPlanners,
     getWinningPlan,
     getWinningPlanFromExplain,
     isCollscan
@@ -58,21 +59,24 @@ function assertIsIxScanOnIndex(explain, keyPattern) {
 }
 
 function checkIndexFilterSet(explain, shouldBeSet) {
-    if (explain.queryPlanner.winningPlan.shards) {
-        for (let shard of explain.queryPlanner.winningPlan.shards) {
-            assert.eq(shard.indexFilterSet, shouldBeSet);
-        }
-    } else {
-        assert.eq(explain.queryPlanner.indexFilterSet, shouldBeSet);
-    }
+    getQueryPlanners(explain).forEach((queryPlanner) => {
+        // When field "indexFilterSet" is not set (indicated as value 'undefined'), convert it to
+        // false.
+        assert.eq(!!queryPlanner.indexFilterSet, shouldBeSet, explain);
+    });
 }
+
+// Verify that no index filter on "find" command is applied when no index filters are set on the
+// collection.
+let explain = assert.commandWorked(coll.find({x: 3}).explain());
+checkIndexFilterSet(explain, false);
 
 assert.commandWorked(coll.createIndexes([{x: 1}, {x: 1, y: 1}]));
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
 assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
-let explain = assert.commandWorked(coll.find({x: 3}).explain());
+explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(explain, {x: 1, y: 1});
 

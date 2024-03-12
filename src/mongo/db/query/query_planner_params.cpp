@@ -418,12 +418,11 @@ void QueryPlannerParams::applyIndexFilters(const CanonicalQuery& canonicalQuery,
     };
 
     const auto& querySettings = *QuerySettingsDecoration::get(collection->getSharedDecorations());
-    const auto key = canonicalQuery.encodeKeyForPlanCacheCommand();
 
     // Filter index catalog if index filters are specified for query.
     // Also, signal to planner that application hint should be ignored.
     if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
-            querySettings.getAllowedIndicesFilter(key)) {
+            querySettings.getAllowedIndicesFilter(canonicalQuery)) {
         filterAllowedIndexEntries(*allowedIndicesFilter, indices);
         indexFiltersApplied = true;
     }
