@@ -10,6 +10,7 @@
  *   command_not_supported_in_serverless,
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,
+ *   operations_longer_than_stepdown_interval,
  *   requires_fcv_80
  * ]
  */
