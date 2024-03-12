@@ -325,6 +325,23 @@ protected:
         return bob;
     }
 
+    /**
+     * Returns all shards, including the config server. Config servers are special because they
+     * are more likely to be removed as a shard and added back again later. This is mainly used
+     * for ensuring that the config server release the critical sections/locks created by the
+     * ddl operation.
+     */
+    std::vector<ShardId> getAllShardsAndConfigServerIds(OperationContext* opCtx) {
+        auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
+        auto iter = std::find(shardIds.begin(), shardIds.end(), ShardId::kConfigServerId);
+        if (iter == shardIds.end()) {
+            shardIds.emplace_back(ShardId::kConfigServerId);
+        }
+
+        return shardIds;
+    }
+
     const std::string _coordinatorName;
     const BSONObj _initialState;
     mutable Mutex _docMutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_docMutex");

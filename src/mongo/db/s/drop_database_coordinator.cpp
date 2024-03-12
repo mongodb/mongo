@@ -284,7 +284,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
             **executor, token, unblockCRUDOperationsRequest, args);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
+            opCtx, opts, getAllShardsAndConfigServerIds(opCtx));
     }
 }
 
