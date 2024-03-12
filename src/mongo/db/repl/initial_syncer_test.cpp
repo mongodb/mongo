@@ -865,7 +865,7 @@ TEST_F(InitialSyncerTest, StartupSetsInitialDataTimestampAndStableTimestampOnSuc
     ASSERT_TRUE(initialSyncer->isActive());
 
     ASSERT_EQUALS(Timestamp::kAllowUnstableCheckpointsSentinel,
-                  _storageInterface->getInitialDataTimestamp());
+                  _storageInterface->getInitialDataTimestamp(getGlobalServiceContext()));
     ASSERT_EQUALS(Timestamp::min(), _storageInterface->getStableTimestamp());
 }
 
@@ -4263,7 +4263,8 @@ void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
     ASSERT_EQUALS(lastOp.getOpTime(), _lastApplied.getValue().opTime);
     ASSERT_EQUALS(lastOp.getWallClockTime(), _lastApplied.getValue().wallTime);
 
-    ASSERT_EQUALS(lastOp.getOpTime().getTimestamp(), _storageInterface->getInitialDataTimestamp());
+    ASSERT_EQUALS(lastOp.getOpTime().getTimestamp(),
+                  _storageInterface->getInitialDataTimestamp(getGlobalServiceContext()));
 }
 
 TEST_F(InitialSyncerTest,

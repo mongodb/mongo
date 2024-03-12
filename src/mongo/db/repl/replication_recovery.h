@@ -81,6 +81,14 @@ public:
      */
     virtual void truncateOplogToTimestamp(OperationContext* opCtx,
                                           Timestamp truncateAfterTimestamp) = 0;
+
+    /**
+     * Performs oplog application for magic restore. This function expects the caller to correctly
+     * truncate oplog the oplog application start point. Callers must be using a storage engine that
+     * supports recover to stable timestamp.
+     */
+    virtual void applyOplogEntriesForRestore(OperationContext* opCtx,
+                                             Timestamp stableTimestamp) = 0;
 };
 
 class ReplicationRecoveryImpl : public ReplicationRecovery {
@@ -101,6 +109,8 @@ public:
 
     void truncateOplogToTimestamp(OperationContext* opCtx,
                                   Timestamp truncateAfterTimestamp) override;
+
+    void applyOplogEntriesForRestore(OperationContext* opCtx, Timestamp stableTimestamp) override;
 
 private:
     enum class RecoveryMode {

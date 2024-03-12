@@ -414,6 +414,11 @@ public:
     virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
 
     /**
+     * Returns the initial timestamp of data at startup.
+     */
+    virtual Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const = 0;
+
+    /**
      * Reverts the state of all database data to the last stable timestamp.
      *
      * The "local" database is exempt and none of its state should be reverted except for

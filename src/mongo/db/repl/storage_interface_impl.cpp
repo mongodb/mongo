@@ -1424,6 +1424,11 @@ void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
     serviceCtx->getStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 
+Timestamp StorageInterfaceImpl::getInitialDataTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->getInitialDataTimestamp();
+}
+
+
 Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx) {
     auto serviceContext = opCtx->getServiceContext();
 

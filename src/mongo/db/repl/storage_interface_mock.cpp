@@ -91,7 +91,7 @@ Timestamp StorageInterfaceMock::getStableTimestamp() const {
     return _stableTimestamp;
 }
 
-Timestamp StorageInterfaceMock::getInitialDataTimestamp() const {
+Timestamp StorageInterfaceMock::getInitialDataTimestamp(ServiceContext* serviceCtx) const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _initialDataTimestamp;
 }

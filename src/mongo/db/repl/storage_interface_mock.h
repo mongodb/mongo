@@ -342,7 +342,7 @@ public:
 
     Timestamp getStableTimestamp() const;
 
-    Timestamp getInitialDataTimestamp() const;
+    Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp recoverToStableTimestamp(OperationContext* opCtx) override {
         return Timestamp();

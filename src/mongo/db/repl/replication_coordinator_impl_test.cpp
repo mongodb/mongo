@@ -500,7 +500,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     ASSERT_OK(status);
     ASSERT(getReplCoord()->getSettings().isReplSet());
 
-    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(), appliedTS);
+    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(getServiceContext()), appliedTS);
 }
 
 TEST_F(ReplCoordTest,
@@ -1266,7 +1266,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigMajorit
     prsiThread.join();
     ASSERT(getReplCoord()->getSettings().isReplSet());
 
-    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(), appliedTS);
+    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(getServiceContext()), appliedTS);
 
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
@@ -1328,7 +1328,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigNoMajor
     prsiThread.join();
     ASSERT(getReplCoord()->getSettings().isReplSet());
 
-    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(), appliedTS);
+    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(getServiceContext()), appliedTS);
 
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
     ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());

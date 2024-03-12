@@ -158,6 +158,17 @@ public:
         return _pointInTimeReadTimestamp;
     }
 
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override {
+        stdx::lock_guard<Latch> lock(_mutex);
+        _initialDataTimestamp = snapshotName;
+    }
+
+    Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const {
+        stdx::lock_guard<Latch> lock(_mutex);
+        return _initialDataTimestamp;
+    };
+
+
 private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("StorageInterfaceRecovery::_mutex");
     Timestamp _initialDataTimestamp = Timestamp::min();
@@ -1753,6 +1764,68 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
     // Without an oplog, the 'truncateOplogToTimestamp' function should hit a fatal assertion.
     recovery.truncateOplogToTimestamp(opCtx, Timestamp(3, 3));
 }
+
+
+TEST_F(ReplicationRecoveryTest, ApplyOplogEntriesForRestore) {
+    storageGlobalParams.magicRestore = true;
+    auto opCtx = getOperationContext();
+    getStorageInterface()->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   Timestamp::kAllowUnstableCheckpointsSentinel);
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(1, 1));
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3});
+
+    recovery.applyOplogEntriesForRestore(opCtx, Timestamp(1, 1));
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime());
+    ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
+              Timestamp::kAllowUnstableCheckpointsSentinel);
+}
+
+DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+                   ApplyOplogEntriesForRestoreStorageMustSupportRts,
+                   "Invariant failure") {
+    storageGlobalParams.magicRestore = true;
+    auto opCtx = getOperationContext();
+    getStorageInterface()->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   Timestamp::kAllowUnstableCheckpointsSentinel);
+    getStorageInterfaceRecovery()->setSupportsRecoveryTimestamp(false);
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
+    recovery.applyOplogEntriesForRestore(opCtx, Timestamp(1, 1));
+}
+
+DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+                   ApplyOplogEntriesForRestoreNoOplog,
+                   "Fatal assertion.*8290700") {
+    storageGlobalParams.magicRestore = true;
+    auto opCtx = getOperationContext();
+    getStorageInterface()->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   Timestamp::kAllowUnstableCheckpointsSentinel);
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    recovery.applyOplogEntriesForRestore(opCtx, Timestamp(1, 1));
+}
+
+TEST_F(ReplicationRecoveryTest, ApplyOplogEntriesForRestoreStartPointIsAfterOplog) {
+    storageGlobalParams.magicRestore = true;
+    auto opCtx = getOperationContext();
+    getStorageInterface()->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   Timestamp::kAllowUnstableCheckpointsSentinel);
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
+    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(7, 7));
+    // The function will adjust the Timestamp(7, 7) start point to the top of the oplog.
+    startCapturingLogMessages();
+    ASSERT_DOES_NOT_THROW(recovery.applyOplogEntriesForRestore(opCtx, Timestamp(7, 7)));
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1,
+        countTextFormatLogLinesContaining("Start point for recovery oplog application not found in "
+                                          "oplog. Adjusting start point to earlier entry"));
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime());
+    ASSERT_EQ(getStorageInterface()->getInitialDataTimestamp(opCtx->getServiceContext()),
+              Timestamp::kAllowUnstableCheckpointsSentinel);
+}
+
 
 }  // namespace
 }  // namespace repl

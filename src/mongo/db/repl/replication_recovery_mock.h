@@ -54,6 +54,8 @@ public:
 
     void truncateOplogToTimestamp(OperationContext* opCtx,
                                   Timestamp truncateAfterTimestamp) override {}
+
+    void applyOplogEntriesForRestore(OperationContext* opCtx, Timestamp stableTimestamp) override {}
 };
 
 }  // namespace repl
