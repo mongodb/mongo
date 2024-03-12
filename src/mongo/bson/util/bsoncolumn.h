@@ -359,8 +359,8 @@ namespace bsoncolumn {
  * BSONColumn decompression.
  */
 template <class T>
-concept Appendable =
-    requires(T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal) {
+concept Appendable = requires(
+    T& t, StringData strVal, BSONBinData binVal, BSONCode codeVal, BSONElement bsonVal, int32_t n) {
     t.append(true);
     t.append((int32_t)1);
     t.append((int64_t)1);
@@ -391,6 +391,8 @@ concept Appendable =
     t.template append<BSONElement>(bsonVal);
 
     t.appendPreallocated(bsonVal);
+
+    t.appendPositionInfo(n);
 
     t.appendMissing();
 
@@ -459,6 +461,15 @@ concept Materializer = requires(T& t,
 };
 
 /**
+ * Interface to indicate to the 'Collector' at compile time if the user requested the decompressor
+ * to collect the position information of values within documents.
+ */
+template <typename T>
+concept PositionInfoAppender = requires(T& t, int32_t n) {
+    { t.appendPositionInfo(n) } -> std::same_as<void>;
+};
+
+/**
  * Implements Appendable and utilizes a user-defined Materializer to receive output of
  * BSONColumn decoding and fill a container of user-defined elements.  Container can
  * be user-defined or any STL container can be used.
@@ -471,6 +482,8 @@ class Collector {
 public:
     Collector(Container& collection, boost::intrusive_ptr<ElementStorage> allocator)
         : _collection(collection), _allocator(std::move(allocator)) {}
+
+    static constexpr bool kCollectsPositionInfo = PositionInfoAppender<Container>;
 
     void append(bool val) {
         _collection.push_back(CMaterializer::materialize(*_allocator, val));
@@ -531,6 +544,13 @@ public:
 
     void appendLast() {
         _collection.push_back(_collection.back());
+    }
+
+    void appendPositionInfo(int32_t n) {
+        // If the 'Container' doesn't request position information, this will be a no-op.
+        if constexpr (kCollectsPositionInfo) {
+            _collection.appendPositionInfo(n);
+        }
     }
 
 private:
