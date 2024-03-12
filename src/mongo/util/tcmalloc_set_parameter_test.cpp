@@ -201,26 +201,44 @@ void runNoOpSetFromStringTest(T param, StringData name, const F& getTcmallocValu
     ASSERT_OK(param.setFromString("1", boost::none));
 }
 
-TEST(MaxTotalThreadCacheBytesParam, AppendTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
-                                                          ServerParameterType::kStartupAndRuntime);
-    runAppendTest(param, kMaxTotalThreadCacheBytesPropertyName, testValInt, &setTcmallocProperty);
-}
-
-TEST(MaxTotalThreadCacheBytesParam, SetTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
-                                                          ServerParameterType::kStartupAndRuntime);
-    runSetTest(param, kMaxTotalThreadCacheBytesPropertyName, testValInt, &getTcmallocProperty);
-}
-
-TEST(MaxTotalThreadCacheBytesParam, SetFromStringTest) {
-    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
-                                                          ServerParameterType::kStartupAndRuntime);
-    runSetFromStringTest(
-        param, kMaxTotalThreadCacheBytesPropertyName, testValIntAsStr, &getTcmallocProperty);
-}
-
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
+TEST(MaxPerCPUCacheSizeParam, AppendTest) {
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+                                                    ServerParameterType::kStartupAndRuntime);
+    runAppendTest(param, kMaxPerCPUCacheSizePropertyName, testValInt, &setTcmallocProperty);
+}
+
+TEST(MaxPerCPUCacheSizeParam, SetTest) {
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+                                                    ServerParameterType::kStartupAndRuntime);
+    runSetTest(param, kMaxPerCPUCacheSizePropertyName, testValInt, &getTcmallocProperty);
+}
+
+TEST(MaxPerCPUCacheSizeParam, SetFromStringTest) {
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+                                                    ServerParameterType::kStartupAndRuntime);
+    runSetFromStringTest(
+        param, kMaxPerCPUCacheSizePropertyName, testValIntAsStr, &getTcmallocProperty);
+}
+
+TEST(MaxTotalThreadCacheBytesParam, NoOpAppendTest) {
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runNoOpAppendTest(param);
+}
+
+TEST(MaxTotalThreadCacheBytesParam, NoOpSetTest) {
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runNoOpSetTest(param, kMaxTotalThreadCacheBytesPropertyName, &getTcmallocProperty);
+}
+
+TEST(MaxTotalThreadCacheBytesParam, NoOpSetFromStringTest) {
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runNoOpSetFromStringTest(param, kMaxTotalThreadCacheBytesPropertyName, &getTcmallocProperty);
+}
+
 TEST(AggressiveMemoryDecommit, NoOpAppendTest) {
     TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
                                                           ServerParameterType::kStartupAndRuntime);
@@ -240,6 +258,43 @@ TEST(AggressiveMemoryDecommit, NoOpSetFromStringTest) {
 }
 
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
+TEST(MaxPerCPUCacheSizeParam, NoOpAppendTest) {
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+                                                    ServerParameterType::kStartupAndRuntime);
+    runNoOpAppendTest(param);
+}
+
+TEST(MaxPerCPUCacheSizeParam, NoOpSetTest) {
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+                                                    ServerParameterType::kStartupAndRuntime);
+    runNoOpSetTest(param, kMaxPerCPUCacheSizePropertyName, &getTcmallocProperty);
+}
+
+TEST(MaxPerCPUCacheSizeParam, NoOpSetFromStringTest) {
+    TCMallocMaxPerCPUCacheSizeServerParameter param("tcmallocMaxPerCPUCacheSize"_sd,
+                                                    ServerParameterType::kStartupAndRuntime);
+    runNoOpSetFromStringTest(param, kMaxPerCPUCacheSizePropertyName, &getTcmallocProperty);
+}
+
+TEST(MaxTotalThreadCacheBytesParam, AppendTest) {
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runAppendTest(param, kMaxTotalThreadCacheBytesPropertyName, testValInt, &setTcmallocProperty);
+}
+
+TEST(MaxTotalThreadCacheBytesParam, SetTest) {
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runSetTest(param, kMaxTotalThreadCacheBytesPropertyName, testValInt, &getTcmallocProperty);
+}
+
+TEST(MaxTotalThreadCacheBytesParam, SetFromStringTest) {
+    TCMallocMaxTotalThreadCacheBytesServerParameter param("tcmallocMaxTotalThreadCacheBytes"_sd,
+                                                          ServerParameterType::kStartupAndRuntime);
+    runSetFromStringTest(
+        param, kMaxTotalThreadCacheBytesPropertyName, testValIntAsStr, &getTcmallocProperty);
+}
+
 TEST(AggressiveMemoryDecommit, AppendTest) {
     TCMallocAggressiveMemoryDecommitServerParameter param("tcmallocAggressiveMemoryDecommit"_sd,
                                                           ServerParameterType::kStartupAndRuntime);

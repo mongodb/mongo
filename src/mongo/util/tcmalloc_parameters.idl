@@ -33,6 +33,13 @@ global:
 
 server_parameters:
 
+  tcmallocMaxPerCPUCacheSize:
+    description: "Configure tcmalloc's max_per_cpu_cache_size"
+    set_at: [startup, runtime]
+    cpp_class:
+      name: TCMallocMaxPerCPUCacheSizeServerParameter
+      override_set: true
+
   tcmallocMaxTotalThreadCacheBytes:
     description: "Configure tcmalloc's max_total_thread_cache_bytes"
     set_at: [startup, runtime]

@@ -39,6 +39,7 @@ using TcmallocReleaseRateT = long long;
 using TcmallocReleaseRateT = double;
 #endif  // MONGO_CONFIG_TCMALLOC_GOOGLE
 
+constexpr inline auto kMaxPerCPUCacheSizePropertyName = "tcmalloc.max_per_cpu_cache_size"_sd;
 constexpr inline auto kMaxTotalThreadCacheBytesPropertyName =
     "tcmalloc.max_total_thread_cache_bytes"_sd;
 constexpr inline auto kAggressiveMemoryDecommitPropertyName =
