@@ -381,8 +381,6 @@ bool isSearchMetaPipeline(const Pipeline* pipeline) {
  *  to make sure a DocumentSource is a $search stage and not $searchMeta check it is either:
  *    - a 'DocumentSourceSearch'.
  *    - a 'DocumentSourceInternalSearchMongotRemote' and not a 'DocumentSourceSearchMeta'.
- * TODO: SERVER-78159 refactor after DocumentSourceInternalSearchMongotRemote and
- * DocumentSourceInternalIdLookup are merged into into DocumentSourceSearch.
  */
 bool isSearchStage(DocumentSource* stage) {
     return stage &&
