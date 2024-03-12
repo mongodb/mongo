@@ -224,6 +224,7 @@ let viewsCommandTests = {
     streams_getMetrics: {skip: isAnInternalCommand},
     streams_updateFeatureFlags: {skip: isAnInternalCommand},
     streams_testOnlyGetFeatureFlags: {skip: isAnInternalCommand},
+    streams_writeCheckpoint: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortMoveCollection: {skip: isUnrelated},
