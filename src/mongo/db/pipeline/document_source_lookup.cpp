@@ -152,9 +152,12 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
               *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
-    auto spec = NamespaceSpec::parse(
-        IDLParserContext{elem.fieldNameStringData(), false /* apiStrict */, vts, tenantId},
-        elem.embeddedObject());
+    auto spec = NamespaceSpec::parse(IDLParserContext{elem.fieldNameStringData(),
+                                                      false /* apiStrict */,
+                                                      vts,
+                                                      tenantId,
+                                                      SerializationContext::stateDefault()},
+                                     elem.embeddedObject());
     auto nss = NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()),
                                                 spec.getColl().value_or(""));
     uassert(

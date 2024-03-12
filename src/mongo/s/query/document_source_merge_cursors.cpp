@@ -140,7 +140,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
         IDLParserContext(kStageName,
                          false /*apiStrict*/,
                          auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         expCtx->ns.tenantId()),
+                         expCtx->ns.tenantId(),
+                         SerializationContext::stateDefault()),
         ownedObj);
     return new DocumentSourceMergeCursors(expCtx, std::move(armParams), std::move(ownedObj));
 }

@@ -1149,7 +1149,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                     auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
               : boost::none;
           auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-              IDLParserContext("importCollectionOplogEntry", false /* apiStrict */, vts, tenantId),
+              IDLParserContext("importCollectionOplogEntry",
+                               false /* apiStrict */,
+                               vts,
+                               tenantId,
+                               SerializationContext::stateDefault()),
               entry.getObject());
           applyImportCollection(opCtx,
                                 importEntry.getImportUUID(),

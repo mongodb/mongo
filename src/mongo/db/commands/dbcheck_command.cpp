@@ -485,7 +485,8 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
             DbCheckSingleInvocation::parse(IDLParserContext("",
                                                             false /*apiStrict*/,
                                                             auth::ValidatedTenancyScope::get(opCtx),
-                                                            dbName.tenantId()),
+                                                            dbName.tenantId(),
+                                                            SerializationContext::stateDefault()),
                                            toParse));
     } else {
         // Otherwise, it's the database-wide form.
@@ -495,7 +496,8 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
             DbCheckAllInvocation::parse(IDLParserContext("",
                                                          false /*apiStrict*/,
                                                          auth::ValidatedTenancyScope::get(opCtx),
-                                                         dbName.tenantId()),
+                                                         dbName.tenantId(),
+                                                         SerializationContext::stateDefault()),
                                         toParse));
     }
 }

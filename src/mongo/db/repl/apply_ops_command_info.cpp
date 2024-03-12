@@ -107,7 +107,9 @@ ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
               *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
         : boost::none;
-    parseProtected(IDLParserContext("applyOps", false, vts, tid), applyOpCmd);
+    parseProtected(
+        IDLParserContext("applyOps", false, vts, tid, SerializationContext::stateDefault()),
+        applyOpCmd);
 
     uassert(6711600,
             "applyOps command no longer supports the 'preCondition' option",
@@ -152,7 +154,10 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
             ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
                   *tid, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
             : boost::none;
-        ReplOperation::parse(IDLParserContext("extractOperations", false, vts, tid), operationDoc);
+        ReplOperation::parse(
+            IDLParserContext(
+                "extractOperations", false, vts, tid, SerializationContext::stateDefault()),
+            operationDoc);
 
         BSONObjBuilder builder(operationDoc);
 

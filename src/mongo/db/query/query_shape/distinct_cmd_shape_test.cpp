@@ -49,7 +49,8 @@ BSONObj distinctJsonToShapeBSON(const char* json,
         IDLParserContext("distinctCommandRequest",
                          false /* apiStrict */,
                          auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         boost::none),
+                         boost::none,
+                         SerializationContext::stateDefault()),
         distinct));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
@@ -66,7 +67,8 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
         IDLParserContext("distinctCommandRequest",
                          false /* apiStrict */,
                          auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         boost::none),
+                         boost::none,
+                         SerializationContext::stateDefault()),
         distinct));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
@@ -206,7 +208,8 @@ TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {
         IDLParserContext("distinctCommandRequest",
                          false /* apiStrict */,
                          auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         boost::none),
+                         boost::none,
+                         SerializationContext::stateDefault()),
         distinct));
     auto pd = parsed_distinct_command::parse(
         expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});

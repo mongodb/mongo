@@ -256,7 +256,8 @@ public:
         IDLParserContext ctxt("ListCollection",
                               apiStrict,
                               auth::ValidatedTenancyScope::get(opCtx),
-                              dbName.tenantId());
+                              dbName.tenantId(),
+                              SerializationContext::stateDefault());
         auto request = ListCollections::parse(ctxt, cmdObj);
         return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }

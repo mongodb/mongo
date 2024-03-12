@@ -86,7 +86,8 @@ std::unique_ptr<ParsedDistinctCommand> bsonToParsedDistinct(
         IDLParserContext("distinctCommandRequest",
                          false /* apiStrict */,
                          auth::ValidatedTenancyScope::get(expCtx->opCtx),
-                         boost::none),
+                         boost::none,
+                         SerializationContext::stateDefault()),
         cmd));
     return parsed_distinct_command::parse(expCtx,
                                           cmd,

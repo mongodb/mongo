@@ -161,7 +161,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
                                                         false /* apiStrict */,
                                                         auth::ValidatedTenancyScope::get(opCtx),
-                                                        dbName.tenantId()),
+                                                        dbName.tenantId(),
+                                                        SerializationContext::stateDefault()),
                                        cmd);
     auto curop = CurOp::get(opCtx);
     curop->beginQueryPlanningTimer();

@@ -293,13 +293,17 @@ public:
     explicit IDLParserContext(StringData fieldName) : IDLParserContext{fieldName, false} {}
 
     IDLParserContext(StringData fieldName, bool apiStrict)
-        : IDLParserContext{fieldName, apiStrict, boost::none, boost::none} {}
+        : IDLParserContext{fieldName,
+                           apiStrict,
+                           boost::optional<auth::ValidatedTenancyScope>{boost::none},
+                           boost::optional<TenantId>{boost::none},
+                           SerializationContext::stateDefault()} {}
 
     IDLParserContext(StringData fieldName,
                      bool apiStrict,
                      const boost::optional<auth::ValidatedTenancyScope>& vts,
                      boost::optional<TenantId> tenantId,
-                     const SerializationContext& serializationContext = SerializationContext())
+                     const SerializationContext& serializationContext)
         : _serializationContext(serializationContext),
           _currentField(fieldName),
           _apiStrict(apiStrict),
@@ -308,8 +312,11 @@ public:
           _validatedTenancyScope(vts) {}
 
     IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
-        : IDLParserContext(
-              fieldName, predecessor, boost::none, boost::none, SerializationContext()) {}
+        : IDLParserContext(fieldName,
+                           predecessor,
+                           boost::optional<auth::ValidatedTenancyScope>{boost::none},
+                           SerializationContext::stateDefault(),
+                           boost::optional<TenantId>{boost::none}) {}
 
     IDLParserContext(StringData fieldName,
                      const IDLParserContext* predecessor,
@@ -319,7 +326,7 @@ public:
         : _serializationContext(serializationContext),
           _currentField(fieldName),
           _apiStrict(predecessor->_apiStrict),
-          _tenantId(tenantId),
+          _tenantId(std::move(tenantId)),
           _predecessor(predecessor),
           _validatedTenancyScope(vts) {
         assertTenantIdMatchesPredecessor(predecessor);

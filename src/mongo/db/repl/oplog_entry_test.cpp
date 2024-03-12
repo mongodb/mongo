@@ -437,8 +437,9 @@ TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
         tid,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
-    auto replOp =
-        ReplOperation::parse(IDLParserContext("ReplOperation", false, vts, tid), oplogBson);
+    auto replOp = ReplOperation::parse(
+        IDLParserContext("ReplOperation", false, vts, tid, SerializationContext::stateDefault()),
+        oplogBson);
     ASSERT(replOp.getTid());
     ASSERT_EQ(replOp.getTid(), tid);
     ASSERT_EQ(replOp.getNss(), nssWithTid);

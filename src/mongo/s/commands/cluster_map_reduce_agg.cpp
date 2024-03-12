@@ -206,7 +206,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
                                                         false /* apiStrict */,
                                                         auth::ValidatedTenancyScope::get(opCtx),
-                                                        dbName.tenantId()),
+                                                        dbName.tenantId(),
+                                                        SerializationContext::stateDefault()),
                                        cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto resolvedOutNss = parsedMr.getOutOptions().getDatabaseName()
