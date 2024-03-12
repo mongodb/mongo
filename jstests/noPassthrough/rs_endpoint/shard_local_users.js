@@ -5,7 +5,7 @@
  * serverless so the cluster cannot become multi-shard.
  *
  * @tags: [
- *   requires_fcv_73,
+ *   requires_fcv_70,
  *   featureFlagEmbeddedRouter,
  *   featureFlagCheckForDirectShardOperations,
  *   requires_persistence
