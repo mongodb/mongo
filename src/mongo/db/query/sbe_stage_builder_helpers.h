@@ -458,6 +458,33 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba
  */
 uint32_t dateTypeMask();
 
+struct BuildSortKeysPlan {
+    enum Type {
+        kTraverseFields,
+        kCallGenSortKey,
+        kCallGenCheapSortKey,
+    };
+
+    Type type = kCallGenSortKey;
+    bool needsResultObj = true;
+    std::vector<std::string> fieldsForSortKeys;
+};
+
+struct SortKeysExprs {
+    SbExpr::Vector keyExprs;
+    SbExpr parallelArraysCheckExpr;
+    SbExpr fullKeyExpr;
+};
+
+BuildSortKeysPlan makeSortKeysPlan(const SortPattern& sortPattern,
+                                   bool allowCallGenCheapSortKey = false);
+
+SortKeysExprs buildSortKeys(StageBuilderState& state,
+                            const BuildSortKeysPlan& plan,
+                            const SortPattern& sortPattern,
+                            const PlanStageSlots& outputs,
+                            SbExpr sortSpecExpr = {});
+
 /**
  * Retrieves the accumulation op name from 'accStmt' and returns it.
  */

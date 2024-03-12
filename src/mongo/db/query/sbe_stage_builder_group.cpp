@@ -70,6 +70,8 @@ void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
  */
 MONGO_COMPILER_NOINLINE
 PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNode& groupNode) {
+    constexpr bool allowCallGenCheapSortKey = true;
+
     auto childReqs = reqs.copyForChild().setResultObj().clearAllFields();
 
     // If the group node references any top level fields, we take all of them and add them to
@@ -83,7 +85,7 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
     if (!groupNode.needWholeDocument) {
         // Tracks whether we need to require our child to produce a materialized result object.
         bool rootDocIsNeeded = false;
-        bool sortKeyIsNeeded = false;
+        bool sortKeysNeedRootDoc = false;
         auto referencesRoot = [&](const ExpressionFieldPath* fieldExpr) {
             rootDocIsNeeded = rootDocIsNeeded || fieldExpr->isROOT();
         };
@@ -92,14 +94,22 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
         walkAndActOnFieldPaths(groupNode.groupByExpression.get(), referencesRoot);
         for (const auto& accStmt : groupNode.accumulators) {
             walkAndActOnFieldPaths(accStmt.expr.argument.get(), referencesRoot);
-            if (isTopBottomN(accStmt)) {
-                sortKeyIsNeeded = true;
+
+            if (auto sortPattern = getSortPattern(accStmt)) {
+                auto plan = makeSortKeysPlan(*sortPattern, allowCallGenCheapSortKey);
+
+                if (!plan.fieldsForSortKeys.empty()) {
+                    childReqs.setFields(std::move(plan.fieldsForSortKeys));
+                }
+                if (plan.needsResultObj) {
+                    sortKeysNeedRootDoc = true;
+                }
             }
         }
 
         // If any accumulator requires generating sort key, we cannot clear the result requirement
         // from 'childReqs'.
-        if (!sortKeyIsNeeded) {
+        if (!sortKeysNeedRootDoc) {
             const auto& childNode = *groupNode.children[0];
 
             // If the group node doesn't have any dependency (e.g. $count) or if the dependency can
@@ -263,23 +273,52 @@ SbExpr getTopBottomNValueExpr(StageBuilderState& state,
 }
 
 SbExpr getTopBottomNSortByExpr(StageBuilderState& state,
+                               const AccumulationStatement& accStmt,
                                const PlanStageSlots& outputs,
                                SbExpr sortSpecExpr) {
+    constexpr bool allowCallGenCheapSortKey = true;
+
     SbExprBuilder b(state);
 
-    auto rootSlot = outputs.getResultObjIfExists();
-    auto collatorSlot = state.getCollatorSlot();
+    auto sortPattern = getSortPattern(accStmt);
+    tassert(8774900, "Expected sort pattern for $top/$bottom accumulator", sortPattern.has_value());
 
-    tassert(5807014, "Expected root slot to be set", rootSlot);
+    auto plan = makeSortKeysPlan(*sortPattern, allowCallGenCheapSortKey);
+    auto sortKeys = buildSortKeys(state, plan, *sortPattern, outputs, std::move(sortSpecExpr));
 
-    auto key = collatorSlot
-        ? b.makeFunction("generateCheapSortKey",
-                         std::move(sortSpecExpr),
-                         SbVar{*rootSlot},
-                         SbVar{*collatorSlot})
-        : b.makeFunction("generateCheapSortKey", std::move(sortSpecExpr), SbVar{*rootSlot});
+    if (plan.type == BuildSortKeysPlan::kTraverseFields) {
+        auto fullKeyExpr = [&] {
+            if (sortPattern->size() == 1) {
+                // When the sort pattern has only one part, we return the sole part's key expr.
+                return std::move(sortKeys.keyExprs[0]);
+            } else if (sortPattern->size() > 1) {
+                // When the sort pattern has more than one part, we return an array containing
+                // each part's key expr (in order).
+                return b.makeFunction("newArray", std::move(sortKeys.keyExprs));
+            } else {
+                MONGO_UNREACHABLE;
+            }
+        }();
 
-    return b.makeFunction("sortKeyComponentVectorToArray", std::move(key));
+        if (sortKeys.parallelArraysCheckExpr) {
+            // If 'parallelArraysCheckExpr' is not null, inject it into 'fullKeyExpr'.
+            auto parallelArraysError =
+                b.makeFail(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
+
+            fullKeyExpr = b.makeIf(std::move(sortKeys.parallelArraysCheckExpr),
+                                   std::move(fullKeyExpr),
+                                   std::move(parallelArraysError));
+        }
+
+        return fullKeyExpr;
+    } else if (plan.type == BuildSortKeysPlan::kCallGenCheapSortKey) {
+        // generateCheapSortKey() returns a SortKeyComponentVector, but we need an array of
+        // keys (or the sole part's key in cases where the sort pattern has only one part),
+        // so we generate a call to sortKeyComponentVectorToArray() to perform the conversion.
+        return b.makeFunction("sortKeyComponentVectorToArray", std::move(sortKeys.fullKeyExpr));
+    } else {
+        MONGO_UNREACHABLE;
+    }
 }
 
 Accum::InputsPtr generateAccumExprs(StageBuilderState& state,
@@ -298,7 +337,7 @@ Accum::InputsPtr generateAccumExprs(StageBuilderState& state,
 
         inputs = std::make_unique<Accum::AccumTopBottomNInputs>(
             getTopBottomNValueExpr(state, accStmt, outputs),
-            getTopBottomNSortByExpr(state, outputs, std::move(spec)),
+            getTopBottomNSortByExpr(state, accStmt, outputs, std::move(spec)),
             SbExpr{state.getSortSpecSlot(&accStmt)});
     } else {
         // For all other accumulators, we call generateExpression() on 'argument' to create an
@@ -345,7 +384,7 @@ boost::optional<Accum::AccumBlockExprs> generateAccumBlockExprs(
 
         inputs = std::make_unique<Accum::AccumTopBottomNInputs>(
             getTopBottomNValueExpr(state, accStmt, outputs),
-            getTopBottomNSortByExpr(state, outputs, std::move(spec)),
+            getTopBottomNSortByExpr(state, accStmt, outputs, std::move(spec)),
             SbExpr{state.getSortSpecSlot(&accStmt)});
     } else {
         // For all other accumulators, we call generateExpression() on 'argument' to create an
