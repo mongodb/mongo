@@ -1,0 +1,69 @@
+# -*- mode: python -*-
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='execution_control_feature_flags',
+    source=[
+        'execution_control_feature_flags.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
+    target='ticketholder_manager',
+    source=[
+        'ticketholder_manager.cpp',
+    ],
+    LIBDEPS=[
+        'execution_control_feature_flags',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+    ],
+)
+
+env.Library(
+    target='execution_control',
+    source=[
+        'admission_server_status_section.cpp',
+        'concurrency_adjustment_validator.cpp',
+        'execution_control_parameters.idl',
+        'execution_control_init.cpp',
+        'throughput_probing.cpp',
+        'throughput_probing.idl',
+    ],
+    LIBDEPS=[
+        'ticketholder_manager',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/processinfo',
+    ],
+)
+
+env.CppUnitTest(
+    target='throughput_probing_test',
+    source=[
+        'throughput_probing_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/mock_periodic_runner',
+        'execution_control',
+    ],
+)

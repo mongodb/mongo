@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   featureFlagDeprioritizeLowPriorityOperations,
+ *   requires_fcv80,
  *   requires_wiredtiger,
  * ]
  */
@@ -25,8 +26,7 @@ const runTest = function(deprioritize) {
     assert.commandWorked(coll.createIndexes([{a: 1}, {a: -1}]));
 
     const numLowPriority = function() {
-        return db.serverStatus()
-            .wiredTiger.concurrentTransactions.read.lowPriority.finishedProcessing;
+        return db.serverStatus().admission.execution.read.lowPriority.finishedProcessing;
     };
 
     const testCoveredScanDeprioritized = function(direction) {

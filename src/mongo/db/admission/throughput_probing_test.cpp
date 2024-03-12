@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/execution_control/throughput_probing.h"
+#include "mongo/db/admission/throughput_probing.h"
 
 #include <cmath>
 #include <functional>
@@ -37,7 +37,7 @@
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
+#include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -49,7 +49,7 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
-namespace mongo::execution_control::throughput_probing {
+namespace mongo::admission::throughput_probing {
 namespace {
 
 TEST(ThroughputProbingParameterTest, InitialConcurrency) {
@@ -516,4 +516,4 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
 }
 
 }  // namespace
-}  // namespace mongo::execution_control::throughput_probing
+}  // namespace mongo::admission::throughput_probing

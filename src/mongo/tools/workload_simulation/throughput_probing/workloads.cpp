@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
+#include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/tools/workload_simulation/simulation.h"
 #include "mongo/tools/workload_simulation/throughput_probing/throughput_probing_simulator.h"
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"

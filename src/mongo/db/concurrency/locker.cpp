@@ -30,10 +30,10 @@
 #include "mongo/db/concurrency/locker.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/dump_lock_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -149,7 +149,7 @@ constexpr Milliseconds kMaxWaitTime = Milliseconds(500);
 Locker::Locker(ServiceContext* serviceContext)
     : _id(idCounter.addAndFetch(1)),
       _lockManager(LockManager::get(serviceContext)),
-      _ticketHolderManager(TicketHolderManager::get(serviceContext)) {
+      _ticketHolderManager(admission::TicketHolderManager::get(serviceContext)) {
     updateThreadIdToCurrentThread();
 }
 

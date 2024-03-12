@@ -12,12 +12,9 @@ env.WorkloadSimulator(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/admission/execution_control',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/concurrency_adjustment_parameters',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_feature_flags',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
-        '$BUILD_DIR/mongo/db/storage/throughput_probing',
         '$BUILD_DIR/mongo/tools/workload_simulation/workload_characteristics',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/mock_periodic_runner',

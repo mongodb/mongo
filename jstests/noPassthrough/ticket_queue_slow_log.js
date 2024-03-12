@@ -68,8 +68,8 @@ assert.soon(() => db.getSiblingDB(TestData.dbName).timing_coordination.count({
 jsTestLog("Wait for no available read tickets");
 assert.soon(() => {
     let stats = db.runCommand({serverStatus: 1});
-    jsTestLog(stats.wiredTiger.concurrentTransactions);
-    return stats.wiredTiger.concurrentTransactions.read.available == 0;
+    jsTestLog(stats.admission.execution);
+    return stats.admission.execution.read.available == 0;
 }, "Expected to have no available read tickets.");
 
 jsTestLog("Stop readers and clean up");

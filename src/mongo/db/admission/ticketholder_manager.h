@@ -42,6 +42,7 @@
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
+namespace admission {
 
 /**
  * A ticket mechanism is required for global lock acquisition to reduce contention on storage engine
@@ -77,12 +78,6 @@ public:
 
     static void use(ServiceContext* svcCtx,
                     std::unique_ptr<TicketHolderManager> newTicketHolderManager);
-
-    /**
-     * Validates whether whether the given name is a valid concurrency adjustment algorithm name.
-     */
-    static Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
-                                                         const boost::optional<TenantId>&);
 
     /**
      * Given the 'mode' a user requests for a GlobalLock, returns the corresponding TicketHolder.
@@ -126,4 +121,5 @@ public:
 protected:
     virtual void _appendImplStats(BSONObjBuilder& builder) const override {}
 };
+}  // namespace admission
 }  // namespace mongo

@@ -92,7 +92,6 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session_manager_mongod.h"
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -126,9 +125,6 @@ constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
 class TestServiceContext {
 public:
     TestServiceContext() {
-        // Disable execution control.
-        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
-
         // Disable server info logging so that the benchmark output is cleaner.
         logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
             mongo::logv2::LogComponent::kDefault, mongo::logv2::LogSeverity::Error());

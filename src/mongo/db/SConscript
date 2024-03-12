@@ -24,6 +24,7 @@ def shouldBuildGRPC(myEnv):
 
 env.SConscript(
     dirs=[
+        'admission',
         'auth',
         'bson',
         'catalog',
@@ -894,6 +895,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'admission/ticketholder_manager',
         'audit',
         'auth/auth',
         'auth/authprivilege',
@@ -912,8 +914,6 @@ env.Library(
         'server_base',
         'stats/resource_consumption_metrics',
         'stats/timer_stats',
-        # TODO (SERVER-66896): Remove this dependency.
-        'storage/storage_engine_feature_flags',
         'timeseries/timeseries_options',
     ],
 )
@@ -2585,6 +2585,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/mongo/util/signal_handlers',
         '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
+        'admission/execution_control',
         'auth/auth_op_observer',
         'catalog/catalog_helpers',
         'catalog/catalog_impl',
@@ -2854,6 +2855,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/net/ssl_options_server',
             '$BUILD_DIR/mongo/util/periodic_runner_factory',
             '$BUILD_DIR/mongo/util/progress_meter',
+            'admission/ticketholder_manager',
             'auth/auth',
             'auth/authmocks',
             'auth/security_token',

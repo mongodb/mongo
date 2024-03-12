@@ -31,7 +31,7 @@
 
 #include <thread>
 
-#include "mongo/db/storage/execution_control/throughput_probing.h"
+#include "mongo/db/admission/throughput_probing.h"
 #include "mongo/tools/workload_simulation/simulation.h"
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -84,7 +84,7 @@ private:
     std::unique_ptr<TicketHolder> _writeTicketHolder;
 
     MockPeriodicRunner* _runner;
-    std::unique_ptr<execution_control::ThroughputProbing> _throughputProbing;
+    std::unique_ptr<admission::ThroughputProbing> _throughputProbing;
     stdx::thread _probingThread;
     AtomicWord<bool> _probing;
 

@@ -1748,7 +1748,7 @@ A ticketing mechanism that limits the number of concurrent storage engine transa
 
 There are 2 separate pools of available tickets: one pool for global lock read requests (MODE_S/MODE_IS), and one pool of tickets for global lock write requests (MODE_IX).
 
-As of v7.0, the size of each ticket pool is managed dynamically by the server to maximize throughput. Details of the algorithm can be found [here](https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/execution_control/README.md). This dynamic management can be disabled by specifying the size of each pool manually via server parameters `storageEngineConcurrentReadTransactions` (read ticket pool) and `storageEngineConcurrentWriteTransactions` (write ticket pool).
+As of v7.0, the size of each ticket pool is managed dynamically by the server to maximize throughput. Details of the algorithm can be found [here](https://github.com/mongodb/mongo/blob/master/src/mongo/db/admission/README.md). This dynamic management can be disabled by specifying the size of each pool manually via server parameters `storageEngineConcurrentReadTransactions` (read ticket pool) and `storageEngineConcurrentWriteTransactions` (write ticket pool).
 
 Each pool of tickets is maintained in a [TicketHolder](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/ticketholder.h#L52). Tickets distributed from a given TicketHolder will always be returned to the same TicketHolder (a write ticket will always be returned to the TicketHolder with the write ticket pool).
 

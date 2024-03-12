@@ -86,7 +86,6 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/db/storage/backup_block',
         '$BUILD_DIR/mongo/db/storage/capped_snapshots',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',

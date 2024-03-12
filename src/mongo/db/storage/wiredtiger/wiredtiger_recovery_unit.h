@@ -204,8 +204,6 @@ public:
         return checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
     }
 
-    static void appendGlobalStats(BSONObjBuilder& b);
-
     bool gatherWriteContextForDebugging() const;
     void storeWriteContextForDebugging(const BSONObj& info);
 

@@ -65,6 +65,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/execution_control_init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/auth_op_observer.h"
@@ -582,6 +583,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                                                   &startupTimeElapsedBuilder);
         repl::InitialSyncerFactory::get(serviceContext)->runCrashRecovery();
     }
+
+    admission::initializeExecutionControl(serviceContext);
 
     // Creating the operation context before initializing the storage engine allows the storage
     // engine initialization to make use of the lock manager. As the storage engine is not yet

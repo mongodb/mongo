@@ -4,6 +4,7 @@
  * @tags: [
  *   featureFlagDeprioritizeLowPriorityOperations,
  *   requires_wiredtiger,
+ *   requires_fcv_80,
  * ]
  */
 import {isLinux} from "jstests/libs/os_helpers.js";
@@ -25,8 +26,7 @@ const runTest = function(options, deprioritize) {
     assert.commandWorked(coll.insert({_id: 1, class: 0}));
 
     const numLowPriority = function() {
-        return db.serverStatus()
-            .wiredTiger.concurrentTransactions.read.lowPriority.finishedProcessing;
+        return db.serverStatus().admission.execution.read.lowPriority.finishedProcessing;
     };
 
     const testScanDeprioritized = function(direction) {

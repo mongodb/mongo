@@ -239,6 +239,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/inline_executor',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/sharding_initialization',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/future_util',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         'analyze_shard_key_util',

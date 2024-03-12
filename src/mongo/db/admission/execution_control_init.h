@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,24 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/execution_control/concurrency_adjustment_validator.h"
-
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/status.h"
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/util/assert_util.h"
-
 namespace mongo {
 
-Status validateConcurrencyAdjustmentAlgorithm(const std::string& name,
-                                              const boost::optional<TenantId>&) try {
-    StorageEngineConcurrencyAdjustmentAlgorithm_parse(
-        IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"}, name);
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
-}
+class ServiceContext;
+
+namespace admission {
+
+/**
+ * Globally initialize execution control.
+ */
+void initializeExecutionControl(ServiceContext* svCctx);
+}  // namespace admission
 
 }  // namespace mongo

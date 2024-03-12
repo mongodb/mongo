@@ -26,9 +26,9 @@
 # it in the license file.
 
 global:
-  cpp_namespace: "mongo::execution_control::throughput_probing"
+  cpp_namespace: "mongo::admission::throughput_probing"
   cpp_includes:
-      - "mongo/db/storage/execution_control/throughput_probing.h"
+      - "mongo/db/admission/throughput_probing.h"
 
 server_parameters:
   throughputProbingStepMultiple:

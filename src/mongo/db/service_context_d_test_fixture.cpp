@@ -51,7 +51,6 @@
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -73,7 +72,6 @@ namespace mongo {
 ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     : _journalListener(std::move(options._journalListener)),
       _tempDir("service_context_d_test_fixture") {
-    gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
 
     if (options._forceDisableTableLogging) {
         storageGlobalParams.forceDisableTableLogging = true;

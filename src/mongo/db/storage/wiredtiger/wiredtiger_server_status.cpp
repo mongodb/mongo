@@ -113,8 +113,6 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
         bob.append("reason", status.reason());
     }
 
-    WiredTigerKVEngine::appendGlobalStats(opCtx, bob);
-
     WiredTigerUtil::appendSnapshotWindowSettings(engine, session, &bob);
 
     {

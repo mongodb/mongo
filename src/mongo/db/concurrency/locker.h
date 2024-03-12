@@ -58,7 +58,9 @@
 namespace mongo {
 
 class OperationContext;
+namespace admission {
 class TicketHolderManager;
+}
 
 /**
  * Interface for acquiring locks. One of those objects will have to be instantiated for each
@@ -706,7 +708,7 @@ protected:
     LockManager* const _lockManager;
 
     // The global ticketholders of the service context.
-    TicketHolderManager* const _ticketHolderManager;
+    admission::TicketHolderManager* const _ticketHolderManager;
 
     // The only reason we have this spin lock here is for the diagnostic tools, which could iterate
     // through the LockRequestsMap on a separate thread and need it to be stable. Apart from that,

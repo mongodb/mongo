@@ -29,11 +29,10 @@
 
 #include "mongo/tools/workload_simulation/throughput_probing/throughput_probing_simulator.h"
 
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
-#include "mongo/db/storage/execution_control/throughput_probing.h"
-#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
-#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
-#include "mongo/db/storage/storage_engine_parameters_gen.h"
+#include "mongo/db/admission/execution_control_feature_flags_gen.h"
+#include "mongo/db/admission/execution_control_parameters_gen.h"
+#include "mongo/db/admission/throughput_probing.h"
+#include "mongo/db/admission/throughput_probing_gen.h"
 #ifdef __linux__
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #endif
@@ -49,7 +48,7 @@ ThroughputProbing::ThroughputProbing(StringData workloadName)
 void ThroughputProbing::setup() {
     Simulation::setup();
 
-    const auto initialTickets = execution_control::throughput_probing::gInitialConcurrency;
+    const auto initialTickets = admission::throughput_probing::gInitialConcurrency;
     Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
@@ -81,7 +80,7 @@ void ThroughputProbing::setup() {
         return runnerPtr;
     }();
 
-    _throughputProbing = std::make_unique<execution_control::ThroughputProbing>(
+    _throughputProbing = std::make_unique<admission::ThroughputProbing>(
         svcCtx(), _readTicketHolder.get(), _writeTicketHolder.get(), probingInterval);
 
     _probingThread = stdx::thread([this, probingInterval]() {
@@ -129,7 +128,7 @@ size_t ThroughputProbing::actorCount() const {
     // held by threads waiting in our queue. The holder implementation only
     // updates the outof() value once it has finished burning all the
     // disappearing tickets.
-    return count * (1 - execution_control::throughput_probing::gStepMultiple.loadRelaxed());
+    return count * (1 - admission::throughput_probing::gStepMultiple.loadRelaxed());
 }
 
 boost::optional<BSONObj> ThroughputProbing::metrics() const {

@@ -45,6 +45,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -55,10 +56,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -110,30 +109,30 @@ public:
             // For simplicity, no low priority operations will ever be expedited in these tests.
             auto lowPriorityAdmissionsBypassThreshold = 0;
 
-            auto ticketHolderManager = std::make_unique<FixedTicketHolderManager>(
+            auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
                 std::make_unique<PriorityTicketHolder>(
                     _svcCtx, numTickets, lowPriorityAdmissionsBypassThreshold, trackPeakUsed),
                 std::make_unique<PriorityTicketHolder>(
                     _svcCtx, numTickets, lowPriorityAdmissionsBypassThreshold, trackPeakUsed));
-            TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
+            admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
         } else {
             LOGV2(7130101, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
-            auto ticketHolderManager = std::make_unique<FixedTicketHolderManager>(
+            auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
                 std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed),
                 std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed));
-            TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
+            admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
         }
 #else
         LOGV2(7207205, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
-        auto ticketHolderManager = std::make_unique<FixedTicketHolderManager>(
+        auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
             std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed),
             std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed));
-        TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
+        admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
 #endif
     }
 
     ~UseReaderWriterGlobalThrottling() noexcept(false) {
-        TicketHolderManager::use(_svcCtx, nullptr);
+        admission::TicketHolderManager::use(_svcCtx, nullptr);
     }
 
 private:

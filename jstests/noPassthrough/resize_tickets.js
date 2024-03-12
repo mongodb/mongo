@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_replication,  # Tickets can only be resized when using the WiredTiger engine.
+ *   requires_fcv80,
  *   requires_wiredtiger,
  * ]
  */
@@ -24,10 +25,10 @@ let algorithm = assert
 if (algorithm === 'throughputProbing') {
     // Users cannot manually adjust read/write tickets once execution control is enabled at startup.
     assert.commandFailedWithCode(
-        mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 10}),
+        mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 10}),
         ErrorCodes.IllegalOperation);
     assert.commandFailedWithCode(
-        mongod.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 10}),
+        mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 10}),
         ErrorCodes.IllegalOperation);
 }
 replTest.stopSet();
@@ -48,9 +49,9 @@ replTest.initiate();
 mongod = replTest.getPrimary();
 
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 20}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 20}));
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 20}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 20}));
 replTest.stopSet();
 
 jsTestLog("Start a replica set with execution control implicitly disabled on startup");
@@ -61,7 +62,7 @@ replTest = new ReplSetTest({
         // If a user manually sets read/write tickets on startup, implicitly set the
         // 'storageEngineConcurrencyAdjustmentAlgorithm' parameter to 'fixedConcurrentTransactions'
         // and disable execution control.
-        setParameter: {wiredTigerConcurrentReadTransactions: 20}
+        setParameter: {storageEngineConcurrentReadTransactions: 20}
     },
 });
 replTest.startSet();
@@ -77,15 +78,15 @@ assert.eq(getParameterResult.storageEngineConcurrencyAdjustmentAlgorithm,
 // The 20, 10, 30 sequence of ticket resizes are just arbitrary numbers in order to test a decrease
 // (20 -> 10) and an increase (10 -> 30) of tickets.
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 20}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 20}));
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 10}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 10}));
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 30}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 30}));
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 20}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 20}));
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 10}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 10}));
 assert.commandWorked(
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 30}));
+    mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 30}));
 replTest.stopSet();

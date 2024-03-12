@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/execution_control/throughput_probing.h"
+#include "mongo/db/admission/throughput_probing.h"
 
 #include <algorithm>
 #include <cmath>
@@ -36,8 +36,8 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/db/dump_lock_manager.h"
-#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -49,7 +49,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-namespace execution_control {
+namespace admission {
 namespace throughput_probing {
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
@@ -59,9 +59,9 @@ Status validateInitialConcurrency(int32_t concurrency, const boost::optional<Ten
     }
 
     if (concurrency > gMaxConcurrency.load()) {
-        return {
-            ErrorCodes::BadValue,
-            "Throughput probing initial concurrency cannot be greater than maximum concurrency"};
+        return {ErrorCodes::BadValue,
+                "Throughput probing initial concurrency cannot be greater than maximum "
+                "concurrency"};
     }
 
     return Status::OK();
@@ -74,9 +74,9 @@ Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantI
     }
 
     if (concurrency > gMaxConcurrency.load()) {
-        return {
-            ErrorCodes::BadValue,
-            "Throughput probing minimum concurrency cannot be greater than maximum concurrency"};
+        return {ErrorCodes::BadValue,
+                "Throughput probing minimum concurrency cannot be greater than maximum "
+                "concurrency"};
     }
 
     return Status::OK();
@@ -140,8 +140,9 @@ void ThroughputProbing::_run(Client* client) {
 
     Microseconds elapsed = _timer.elapsed();
     if (elapsed == Microseconds{0}) {
-        // The clock used to sleep between iterations may not be reliable, and thus the timer may
-        // report that no time has elapsed. If this occurs, just wait for the next iteration.
+        // The clock used to sleep between iterations may not be reliable, and thus the timer
+        // may report that no time has elapsed. If this occurs, just wait for the next
+        // iteration.
         return;
     }
 
@@ -208,8 +209,8 @@ void ThroughputProbing::_probeStable(double throughput) {
         _state = ProbingState::kUp;
         _increaseConcurrency();
     } else if (readPeak > gMinConcurrency || writePeak > gMinConcurrency) {
-        // Neither of the ticket pools are exhausted, so try decreasing concurrency to just below
-        // the current level of usage.
+        // Neither of the ticket pools are exhausted, so try decreasing concurrency to just
+        // below the current level of usage.
         _state = ProbingState::kDown;
         _decreaseConcurrency();
     }
@@ -221,9 +222,10 @@ void ThroughputProbing::_probeUp(double throughput) {
     LOGV2_DEBUG(7346001, 3, "Throughput Probing: up", "throughput"_attr = throughput);
 
     if (throughput > _stableThroughput) {
-        // Increasing concurrency caused throughput to increase, so use this information to adjust
-        // our stable concurrency. We don't want to leave this at the current level. Instead, we use
-        // this to update the moving average to avoid over-correcting on recent measurements.
+        // Increasing concurrency caused throughput to increase, so use this information to
+        // adjust our stable concurrency. We don't want to leave this at the current level.
+        // Instead, we use this to update the moving average to avoid over-correcting on recent
+        // measurements.
         auto concurrency = _readTicketHolder->outof() + _writeTicketHolder->outof();
         auto newConcurrency = expMovingAverage(
             _stableConcurrency, concurrency, gConcurrencyMovingAverageWeight.load());
@@ -238,8 +240,8 @@ void ThroughputProbing::_probeUp(double throughput) {
         _stats.totalAmountIncreased.fetchAndAdd(_readTicketHolder->outof() +
                                                 _writeTicketHolder->outof() - oldStableConcurrency);
     } else {
-        // Increasing concurrency did not cause throughput to increase, so go back to stable and get
-        // a new baseline to compare against.
+        // Increasing concurrency did not cause throughput to increase, so go back to stable and
+        // get a new baseline to compare against.
         _state = ProbingState::kStable;
         _resetConcurrency();
     }
@@ -251,9 +253,10 @@ void ThroughputProbing::_probeDown(double throughput) {
     LOGV2_DEBUG(7346002, 3, "Throughput Probing: down", "throughput"_attr = throughput);
 
     if (throughput > _stableThroughput) {
-        // Decreasing concurrency caused throughput to increase, so use this information to adjust
-        // our stable concurrency. We don't want to leave this at the current level. Instead, we use
-        // this to update the moving average to avoid over-correcting on recent measurements.
+        // Decreasing concurrency caused throughput to increase, so use this information to
+        // adjust our stable concurrency. We don't want to leave this at the current level.
+        // Instead, we use this to update the moving average to avoid over-correcting on recent
+        // measurements.
         auto concurrency = _readTicketHolder->outof() + _writeTicketHolder->outof();
         auto newConcurrency = expMovingAverage(
             _stableConcurrency, concurrency, gConcurrencyMovingAverageWeight.load());
@@ -268,8 +271,8 @@ void ThroughputProbing::_probeDown(double throughput) {
         _stats.totalAmountIncreased.fetchAndAdd(oldStableConcurrency - _readTicketHolder->outof() -
                                                 _writeTicketHolder->outof());
     } else {
-        // Decreasing concurrency did not cause throughput to increase, so go back to stable and get
-        // a new baseline to compare against.
+        // Decreasing concurrency did not cause throughput to increase, so go back to stable and
+        // get a new baseline to compare against.
         _state = ProbingState::kStable;
         _resetConcurrency();
     }
@@ -372,7 +375,6 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("totalAmountIncreased", static_cast<long long>(totalAmountIncreased.load()));
     builder.append("resizeDurationMicros", static_cast<long long>(resizeDurationMicros.load()));
 }
-}  // namespace execution_control
 
 ThroughputProbingTicketHolderManager::ThroughputProbingTicketHolderManager(
     ServiceContext* svcCtx,
@@ -380,7 +382,7 @@ ThroughputProbingTicketHolderManager::ThroughputProbingTicketHolderManager(
     std::unique_ptr<TicketHolder> write,
     Milliseconds interval)
     : TicketHolderManager(std::move(read), std::move(write)) {
-    _monitor = std::make_unique<execution_control::ThroughputProbing>(
+    _monitor = std::make_unique<admission::ThroughputProbing>(
         svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), interval);
     _monitor->start();
 }
@@ -391,4 +393,5 @@ void ThroughputProbingTicketHolderManager::_appendImplStats(BSONObjBuilder& b) c
     bbb.done();
 }
 
+}  // namespace admission
 }  // namespace mongo

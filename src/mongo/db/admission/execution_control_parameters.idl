@@ -29,16 +29,30 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/storage/ticketholder_manager.h"
+    - "mongo/db/admission/ticketholder_manager.h"
+    - "mongo/db/admission/concurrency_adjustment_validator.h"
+
+enums:
+  StorageEngineConcurrencyAdjustmentAlgorithm:
+    description: "Algorithm for adjusting the number of concurrent storage engine transactions"
+    type: string
+    # 'kFixedConcurrentTransactions': Number of concurrent transactions are controlled by
+    # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
+    # not be adjusted automatically based on overall system throughput.
+    #
+    # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
+    # increasing or decreasing concurrency in the storage engine, based on system throughput.
+    values:
+      kFixedConcurrentTransactions: "fixedConcurrentTransactions"
+      kThroughputProbing: "throughputProbing"
 
 server_parameters:
-
   storageEngineConcurrentWriteTransactions:
     description: "Storage Engine Concurrent Write Transactions"
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gConcurrentWriteTransactions
-    on_update: "TicketHolderManager::updateConcurrentWriteTransactions"
+    on_update: "admission::TicketHolderManager::updateConcurrentWriteTransactions"
     deprecated_name:
       - wiredTigerConcurrentWriteTransactions
     # Default value being 0 on startup means we're allowing the underlying storage engines 
@@ -47,14 +61,14 @@ server_parameters:
     # storageEngineConcurrencyAdjustmentAlgorithm.
     default: 0
     validator:
-      callback: "TicketHolderManager::validateConcurrentWriteTransactions"
+      callback: "admission::TicketHolderManager::validateConcurrentWriteTransactions"
 
   storageEngineConcurrentReadTransactions:
     description: "Storage Engine Concurrent Read Transactions"
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gConcurrentReadTransactions
-    on_update: "TicketHolderManager::updateConcurrentReadTransactions"
+    on_update: "admission::TicketHolderManager::updateConcurrentReadTransactions"
     deprecated_name:
       - wiredTigerConcurrentReadTransactions
     # Default value being 0 on startup means we're allowing the underlying storage engines 
@@ -63,7 +77,7 @@ server_parameters:
     # storageEngineConcurrencyAdjustmentAlgorithm.
     default: 0
     validator:
-      callback: "TicketHolderManager::validateConcurrentReadTransactions"
+      callback: "admission::TicketHolderManager::validateConcurrentReadTransactions"
 
   lowPriorityAdmissionBypassThreshold:
     description: >-
@@ -74,9 +88,30 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<int32_t>
     cpp_varname: gLowPriorityAdmissionBypassThreshold
-    on_update: "TicketHolderManager::updateLowPriorityAdmissionBypassThreshold"
+    on_update: "admission::TicketHolderManager::updateLowPriorityAdmissionBypassThreshold"
     # 0 means low priority operations will never be admitted when there are normal priority
     # operations waiting for ticket admission.
     default: 5000
     validator:
       gte: 0
+
+  storageEngineConcurrencyAdjustmentAlgorithm:
+    description: >-
+      The algorithm to be used for adjusting the number of concurrent storage engine transactions.
+    set_at: startup
+    cpp_vartype: std::string
+    cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
+    default: "throughputProbing"
+    validator:
+      callback: validateConcurrencyAdjustmentAlgorithm
+
+  storageEngineConcurrencyAdjustmentIntervalMillis:
+    description: >-
+      The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
+      not set to fixedConcurrentTransactions.
+    set_at: startup
+    cpp_vartype: int32_t
+    cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
+    default: 100
+    validator:
+      gte: 10

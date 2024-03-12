@@ -35,9 +35,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -46,7 +46,7 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-namespace execution_control {
+namespace admission {
 namespace throughput_probing {
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
@@ -57,8 +57,8 @@ Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantI
 
 /**
  * Adjusts the level of concurrency on the read and write ticket holders by probing up/down and
- * attempting to maximize throughput. Assumes both ticket holders have the same starting concurrency
- * level and always keeps the same concurrency level for both.
+ * attempting to maximize throughput. Assumes both ticket holders have the same starting
+ * concurrency level and always keeps the same concurrency level for both.
  */
 class ThroughputProbing {
 public:
@@ -114,8 +114,6 @@ private:
     PeriodicJobAnchor _job;
 };
 
-}  // namespace execution_control
-
 class ThroughputProbingTicketHolderManager : public TicketHolderManager {
 public:
     ThroughputProbingTicketHolderManager(ServiceContext* svcCtx,
@@ -133,6 +131,7 @@ private:
     /**
      * Task which adjusts the number of concurrent read/write transactions.
      */
-    std::unique_ptr<execution_control::ThroughputProbing> _monitor;
+    std::unique_ptr<admission::ThroughputProbing> _monitor;
 };
+}  // namespace admission
 }  // namespace mongo

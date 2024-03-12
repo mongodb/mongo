@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/ticketholder_manager.h"
+#include "mongo/db/admission/ticketholder_manager.h"
 
 #include <utility>
 
@@ -36,8 +36,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
-#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
@@ -49,12 +47,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+namespace mongo {
+namespace admission {
+
 namespace {
 const auto ticketHolderManagerDecoration =
-    mongo::ServiceContext::declareDecoration<std::unique_ptr<mongo::TicketHolderManager>>();
+    mongo::ServiceContext::declareDecoration<std::unique_ptr<TicketHolderManager>>();
 }
-
-namespace mongo {
 
 TicketHolderManager::TicketHolderManager(std::unique_ptr<TicketHolder> readTicketHolder,
                                          std::unique_ptr<TicketHolder> writeTicketHolder)
@@ -231,4 +230,5 @@ void TicketHolderManager::appendStats(BSONObjBuilder& b) {
     _appendImplStats(b);
 }
 
+}  // namespace admission
 }  // namespace mongo

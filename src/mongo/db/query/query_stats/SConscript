@@ -49,7 +49,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',

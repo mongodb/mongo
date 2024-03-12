@@ -27,7 +27,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/db/storage/concurrency_adjustment_parameters',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],

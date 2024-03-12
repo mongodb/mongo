@@ -214,73 +214,6 @@ env.Library(
 )
 
 env.Library(
-    target='concurrency_adjustment_parameters',
-    source=[
-        'execution_control/concurrency_adjustment_validator.cpp',
-        'execution_control/concurrency_adjustment_parameters.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
-env.Library(
-    target='throughput_probing',
-    source=[
-        'execution_control/throughput_probing.cpp',
-        'execution_control/throughput_probing.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        '$BUILD_DIR/mongo/util/processinfo',
-        'storage_engine_parameters',
-    ],
-)
-
-env.Library(
-    target='storage_engine_parameters',
-    source=[
-        'storage_engine_parameters.idl',
-        'ticketholder_manager.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        'storage_engine_feature_flags',
-    ],
-)
-
-env.CppUnitTest(
-    target='throughput_probing_test',
-    source=[
-        'execution_control/throughput_probing_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/transport/transport_layer_common',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/mock_periodic_runner',
-        'throughput_probing',
-    ],
-)
-
-env.Library(
-    target='storage_engine_feature_flags',
-    source=[
-        'storage_engine_feature_flags.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
-env.Library(
     target='encryption_hooks',
     source=[
         'encryption_hooks.cpp',
@@ -445,9 +378,6 @@ env.Library(
         'storage_engine_init.cpp',
         'storage_engine_change_context.cpp',
     ],
-    LIBDEPS=[
-        'concurrency_adjustment_parameters',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/service_context',
@@ -455,12 +385,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         'storage_change_lock',
         'storage_control',
-        'storage_engine_feature_flags',
         'storage_engine_lock_file',
         'storage_engine_metadata',
         'storage_options',
         'storage_repair_observer',
-        'throughput_probing',
     ],
 )
 

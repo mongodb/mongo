@@ -109,7 +109,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_column_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -687,13 +686,6 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
         invariantStatusOK(
             status.withContext("Background compaction failed to start due to an unexpected error"));
     }
-}
-
-void WiredTigerKVEngine::appendGlobalStats(OperationContext* opCtx, BSONObjBuilder& b) {
-    BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
-    auto ticketHolderManager = TicketHolderManager::get(opCtx->getServiceContext());
-    ticketHolderManager->appendStats(bb);
-    bb.done();
 }
 
 void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
