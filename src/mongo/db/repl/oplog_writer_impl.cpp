@@ -33,6 +33,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
@@ -45,6 +46,14 @@ namespace repl {
 namespace {
 
 const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(boost::none);
+
+auto checkFeatureFlagReduceMajorityWriteLatencyFn = [] {
+    return feature_flags::gReduceMajorityWriteLatency.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+};
+
+auto& oplogWriterMetric = *MetricBuilder<OplogWriterStats>{"repl.write"}.setPredicate(
+    checkFeatureFlagReduceMajorityWriteLatencyFn);
 
 Status insertDocsToOplogCollection(OperationContext* opCtx,
                                    std::vector<InsertStatement>::const_iterator begin,
@@ -91,6 +100,22 @@ Status insertDocsToChangeCollection(OperationContext* opCtx,
 }
 
 }  // namespace
+
+
+void OplogWriterStats::incrementBatchSize(uint64_t n) {
+    _batchSize.increment(n);
+}
+
+TimerStats& OplogWriterStats::getBatches() {
+    return _batches;
+}
+
+BSONObj OplogWriterStats::getReport() const {
+    BSONObjBuilder b;
+    b.append("batchSize", _batchSize.get());
+    b.append("batches", _batches.getReport());
+    return b.obj();
+}
 
 OplogWriterImpl::OplogWriterImpl(executor::TaskExecutor* executor,
                                  OplogBuffer* writeBuffer,
@@ -179,6 +204,8 @@ StatusWith<OpTime> OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
     invariant(!ops.empty());
     LOGV2_DEBUG(8352100, 2, "Oplog write batch size", "size"_attr = ops.size());
 
+    oplogWriterMetric.incrementBatchSize(ops.size());
+    TimerHolder timer(&oplogWriterMetric.getBatches());
     std::vector<InsertStatement> docs;
     bool writeChangeCollection = change_stream_serverless_helpers::isChangeCollectionsModeActive();
 

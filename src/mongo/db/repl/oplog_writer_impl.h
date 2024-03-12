@@ -31,10 +31,25 @@
 
 #include "mongo/db/repl/oplog_writer.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/stats/timer_stats.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {
+
+class OplogWriterStats {
+public:
+    void incrementBatchSize(uint64_t n);
+    TimerStats& getBatches();
+    BSONObj getReport() const;
+    operator BSONObj() const {
+        return getReport();
+    }
+
+private:
+    TimerStats _batches;
+    Counter64 _batchSize;
+};
 
 /**
  * Writes oplog entries.

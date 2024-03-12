@@ -7,6 +7,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     checkWriteConcernTimedOut,
     restartServerReplication,
@@ -54,9 +55,19 @@ function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOps
     assert.eq(ss.metrics.repl.apply.batchSize,
               opCount + baseOpsReceived,
               "apply ops batch size mismatch");
-    assert(ss.metrics.repl.apply.batches.num > 0, "no batches");
-    assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time");
+    assert(ss.metrics.repl.apply.batches.num > 0, "no applied batches");
+    assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing applied batch time");
     assert.eq(ss.metrics.repl.apply.ops, opCount + baseOpsApplied, "wrong number of applied ops");
+
+    if (FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")) {
+        assert.eq(ss.metrics.repl.write.batchSize,
+                  opCount + baseOpsReceived,
+                  "write ops batch size mismatch");
+        assert(ss.metrics.repl.write.batches.num > 0, "no write batches");
+        assert(ss.metrics.repl.write.batches.totalMillis >= 0, "missing write batch time");
+    } else {
+        assert(!ss.metrics.repl.write, "repl.write should not exist");
+    }
 }
 
 // Metrics are racy, e.g. repl.buffer.count could over- or under-reported briefly. Retry on error.
