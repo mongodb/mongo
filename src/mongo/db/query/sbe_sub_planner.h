@@ -58,16 +58,16 @@ public:
     SubPlanner(OperationContext* opCtx,
                const MultipleCollectionAccessor& collections,
                CanonicalQuery& cq,
-               const QueryPlannerParams& queryParams,
                PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy} {}
+        : BaseRuntimePlanner{opCtx, collections, cq, yieldPolicy} {}
 
     CandidatePlans plan(
+        const QueryPlannerParams& plannerParams,
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots)
         final;
 
 private:
-    CandidatePlans planWholeQuery() const;
+    CandidatePlans planWholeQuery(const QueryPlannerParams& plannerParams) const;
 };
 }  // namespace mongo::sbe

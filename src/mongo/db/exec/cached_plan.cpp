@@ -75,18 +75,17 @@ CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
                                  VariantCollectionPtrOrAcquisition collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
-                                 const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  std::unique_ptr<PlanStage> root)
     : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),
       _canonicalQuery(cq),
-      _plannerParams(params),
       _decisionWorks(decisionWorks) {
     _children.emplace_back(std::move(root));
 }
 
-Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+Status CachedPlanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
+                                     PlanYieldPolicy* yieldPolicy) {
     // Adds the amount of time taken by pickBestPlan() to executionTime. There's lots of execution
     // work that happens here, so this is needed for the time accounting to make sense.
     auto optTimer = getOptTimer();
@@ -132,7 +131,8 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                         "status"_attr = redact(ex.toStatus()));
 
             const bool shouldCache = false;
-            return replan(yieldPolicy,
+            return replan(plannerParams,
+                          yieldPolicy,
                           shouldCache,
                           str::stream() << "cached plan returned: " << ex.toStatus());
         }
@@ -188,6 +188,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     const bool shouldCache = true;
     return replan(
+        plannerParams,
         yieldPolicy,
         shouldCache,
         str::stream()
@@ -210,7 +211,10 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     return Status::OK();
 }
 
-Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, std::string reason) {
+Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
+                               PlanYieldPolicy* yieldPolicy,
+                               bool shouldCache,
+                               std::string reason) {
     // We're going to start over with a new plan. Clear out info from our old plan.
     {
         std::queue<WorkingSetID> emptyQueue;
@@ -229,7 +233,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     }
 
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(*_canonicalQuery, _plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*_canonicalQuery, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << _canonicalQuery->toStringForErrorMsg()
@@ -265,7 +269,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {
-        solutions[ix]->indexFilterApplied = _plannerParams.indexFiltersApplied;
+        solutions[ix]->indexFilterApplied = plannerParams.indexFiltersApplied;
 
         auto&& nextPlanRoot = stage_builder::buildClassicExecutableTree(
             expCtx()->opCtx, collection(), *_canonicalQuery, *solutions[ix], _ws);

@@ -59,15 +59,15 @@ public:
     CachedSolutionPlanner(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
                           CanonicalQuery& cq,
-                          const QueryPlannerParams& queryParams,
                           boost::optional<size_t> decisionReads,
                           PlanYieldPolicySBE* yieldPolicy,
                           RemoteCursorMap* remoteCursors)
-        : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy},
+        : BaseRuntimePlanner{opCtx, collections, cq, yieldPolicy},
           _decisionReads{decisionReads},
           _remoteCursors(remoteCursors) {}
 
     CandidatePlans plan(
+        const QueryPlannerParams& plannerParams,
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots)
         final;
@@ -107,7 +107,8 @@ private:
      * indicate the reason for replanning, which can be included, for example, into plan stats
      * summary.
      */
-    CandidatePlans replan(bool shouldCache,
+    CandidatePlans replan(const QueryPlannerParams& plannerParams,
+                          bool shouldCache,
                           std::string reason,
                           RemoteCursorMap* remoteCursors = nullptr) const;
 

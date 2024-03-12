@@ -1262,7 +1262,7 @@ protected:
     static const PlanCacheKey ck;
 
     BSONObj queryObj;
-    QueryPlannerParams params;
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     std::vector<std::unique_ptr<QuerySolution>> solns;
 };
 

@@ -56,7 +56,7 @@ SbeRuntimePlanner::SbeRuntimePlanner(
       _remoteCursors(std::move(remoteCursors)),
       _remoteExplains(std::move(remoteExplains)) {
     // Do the runtime planning and pick the best candidate plan.
-    _candidates = runtimePlanner->plan(std::move(solutions), std::move(roots));
+    _candidates = runtimePlanner->plan(_plannerParams, std::move(solutions), std::move(roots));
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SbeRuntimePlanner::makeExecutor(
@@ -100,13 +100,8 @@ SbeSingleSolutionPlanner::SbeSingleSolutionPlanner(
     auto& [stage, data] = _root;
     if (!isRecoveredPinnedCacheEntry) {
         if (!cq->cqPipeline().empty()) {
-            // Need to extend the solution with the agg pipeline and rebuild the execution tree.
-            // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
-            // fillOutSecondaryCollectionsInformation() planner param calls.
-            plannerParams.fillOutPlannerParams(
-                opCtx, *cq, collections, false /* ignoreQuerySettings */);
             _solution = QueryPlanner::extendWithAggPipeline(
-                *cq, std::move(_solution), plannerParams.secondaryCollectionsInfo);
+                *cq, std::move(_solution), _plannerParams.secondaryCollectionsInfo);
             _root = stage_builder::buildSlotBasedExecutableTree(
                 opCtx, collections, *cq, *(_solution), _yieldPolicy.get());
         }

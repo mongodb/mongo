@@ -44,7 +44,6 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
         std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),
                                        collections().getMainCollectionPtrOrAcquisition(),
                                        ws(),
-                                       plannerParams(),
                                        cq(),
                                        PlanCachingMode::NeverCache);
 }
@@ -59,7 +58,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::plan() {
                                yieldPolicy(),
                                collections().getMainCollectionPtrOrAcquisition());
 
-    uassertStatusOK(_subplanStage->pickBestPlan(trialPeriodYieldPolicy.get(),
+    uassertStatusOK(_subplanStage->pickBestPlan(plannerParams(),
+                                                trialPeriodYieldPolicy.get(),
                                                 false /* shouldConstructClassicExecutableTree */));
 
     std::unique_ptr<QuerySolution> solution;

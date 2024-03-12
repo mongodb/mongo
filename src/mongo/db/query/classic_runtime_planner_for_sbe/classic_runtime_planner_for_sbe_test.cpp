@@ -100,11 +100,13 @@ protected:
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
 
+        QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
+        params.indices = _indices;
         return PlannerDataForSBE{expCtx->opCtx,
                                  std::move(cq),
                                  std::make_unique<WorkingSet>(),
                                  *_collections,
-                                 _params,
+                                 std::move(params),
                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                  /* cachedPlanHash */ boost::none,
                                  makeYieldPolicy()};
@@ -164,20 +166,19 @@ protected:
 
         // The QueryPlannerParams should also have information about the index to consider it when
         // actually doing the planning.
-        _params.indices.push_back(
-            IndexEntry(index,
-                       IndexNames::nameToType(IndexNames::findPluginName(index)),
-                       IndexDescriptor::kLatestIndexVersion,
-                       false,
-                       {},
-                       {},
-                       false,
-                       false,
-                       IndexEntry::Identifier{indexName},
-                       nullptr,
-                       BSONObj(),
-                       nullptr,
-                       nullptr));
+        _indices.push_back(IndexEntry(index,
+                                      IndexNames::nameToType(IndexNames::findPluginName(index)),
+                                      IndexDescriptor::kLatestIndexVersion,
+                                      false,
+                                      {},
+                                      {},
+                                      false,
+                                      false,
+                                      IndexEntry::Identifier{indexName},
+                                      nullptr,
+                                      BSONObj(),
+                                      nullptr,
+                                      nullptr));
     }
 
     BSONObj makeIndexSpec(BSONObj index, StringData indexName) {
@@ -280,7 +281,7 @@ private:
     }
 
     boost::optional<MultipleCollectionAccessor> _collections;
-    QueryPlannerParams _params{QueryPlannerParams::DEFAULT};
+    std::vector<IndexEntry> _indices;
 };
 
 TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesCacheEntry) {

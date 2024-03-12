@@ -280,7 +280,7 @@ protected:
 
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
-    QueryPlannerParams params;
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     Status plannerStatus = Status::OK();
     std::vector<std::unique_ptr<QuerySolution>> solns;
 

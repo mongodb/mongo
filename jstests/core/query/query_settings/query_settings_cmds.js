@@ -19,6 +19,15 @@ const ns = {
 };
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 
+// TODO SERVER-85242 Remove once the fallback mechanism is re-implemented.
+for (const indexKeyPattern
+         of [{a: 1, b: 1}, {b: 1, a: 1}, {groupID: 1, matchKey: 1}, {matchKey: 1, groupID: 1}]) {
+    assert.commandWorked(coll.createIndex(indexKeyPattern));
+}
+for (let i = 0; i < 10; i++) {
+    coll.insert({a: i, b: i, groupID: i, matchKey: i});
+}
+
 /**
  * Tests query settings setQuerySettings and removeQuerySettings commands as well as $querySettings
  * agg stage.
@@ -134,17 +143,20 @@ let buildPipeline = (matchValue) => [{$match: {matchKey: matchValue}},
 let testQuerySettingsParameterized = ({find, distinct, aggregate}) => {
     // Testing find query settings.
     testQuerySettingsUsing({
-        queryA: qsutils.makeFindQueryInstance({filter: {a: 15}}),
-        queryB: qsutils.makeFindQueryInstance({filter: {b: "string"}}),
-        queryBPrime: qsutils.makeFindQueryInstance({filter: {b: "another string"}}),
+        queryA: qsutils.makeFindQueryInstance({filter: {a: 15, b: 10}}),
+        queryB: qsutils.makeFindQueryInstance({filter: {b: "string", a: "super-string"}}),
+        queryBPrime:
+            qsutils.makeFindQueryInstance({filter: {b: "another string", a: "still-super-string"}}),
         ...find
     });
 
     // Same for distinct query settings.
     testQuerySettingsUsing({
-        queryA: qsutils.makeDistinctQueryInstance({key: "k", query: {a: 1}}),
-        queryB: qsutils.makeDistinctQueryInstance({key: "k", query: {b: "string"}}),
-        queryBPrime: qsutils.makeDistinctQueryInstance({key: "k", query: {b: "another string"}}),
+        queryA: qsutils.makeDistinctQueryInstance({key: "k", query: {a: 1, b: 2}}),
+        queryB: qsutils.makeDistinctQueryInstance(
+            {key: "k", query: {b: "string", a: "still-super-string"}}),
+        queryBPrime: qsutils.makeDistinctQueryInstance(
+            {key: "k", query: {b: "another string", a: "no-more-super-string"}}),
         ...distinct
     });
 
@@ -166,16 +178,17 @@ let testQuerySettingsParameterized = ({find, distinct, aggregate}) => {
 // Test changing allowed indexes.
 testQuerySettingsParameterized({
     find: {
-        querySettingsA: {indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}},
-        querySettingsB: {indexHints: {ns, allowedIndexes: ["b_1"]}}
+        querySettingsA: {indexHints: {ns, allowedIndexes: [{a: 1, b: 1}, {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: [{b: 1, a: 1}]}}
     },
     distinct: {
-        querySettingsA: {indexHints: {ns, allowedIndexes: ["a_1", {$natural: 1}]}},
-        querySettingsB: {indexHints: {ns, allowedIndexes: ["b_1"]}}
+        querySettingsA: {indexHints: {ns, allowedIndexes: [{a: 1, b: 1}, {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: [{b: 1, a: 1}]}}
     },
     aggregate: {
-        querySettingsA: {indexHints: {ns, allowedIndexes: ["groupID_1", {$natural: 1}]}},
-        querySettingsB: {indexHints: {ns, allowedIndexes: ["matchKey_1"]}}
+        querySettingsA:
+            {indexHints: {ns, allowedIndexes: [{groupID: 1, matchKey: 1}, {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: [{matchKey: 1, groupID: 1}]}}
     }
 });
 

@@ -84,7 +84,6 @@ public:
     SubplanStage(ExpressionContext* expCtx,
                  VariantCollectionPtrOrAcquisition collection,
                  WorkingSet* ws,
-                 const QueryPlannerParams& params,
                  CanonicalQuery* cq,
                  PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
 
@@ -127,7 +126,8 @@ public:
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield, or
      * ErrorCodes::MaxTimeMSExpired if the operation has exceeded its time limit.
      */
-    Status pickBestPlan(PlanYieldPolicy* yieldPolicy,
+    Status pickBestPlan(const QueryPlannerParams& plannerParams,
+                        PlanYieldPolicy* yieldPolicy,
                         bool shouldConstructClassicExecutableTree = true);
 
     //
@@ -184,13 +184,12 @@ private:
     /**
      * Used as a fallback if subplanning fails. Helper for pickBestPlan().
      */
-    Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy,
+    Status choosePlanWholeQuery(const QueryPlannerParams& plannerParams,
+                                PlanYieldPolicy* yieldPolicy,
                                 bool shouldConstructClassicExecutableTree);
 
     // Not owned here.
     WorkingSet* _ws;
-
-    QueryPlannerParams _plannerParams;
 
     // Not owned here.
     CanonicalQuery* _query;

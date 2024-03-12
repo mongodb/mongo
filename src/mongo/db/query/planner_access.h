@@ -130,7 +130,6 @@ public:
      */
     static std::unique_ptr<QuerySolutionNode> scanWholeIndex(const IndexEntry& index,
                                                              const CanonicalQuery& query,
-                                                             const QueryPlannerParams& params,
                                                              int direction = 1);
 
     /**

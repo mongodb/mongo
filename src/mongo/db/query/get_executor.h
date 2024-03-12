@@ -107,10 +107,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    QueryPlannerParams plannerOptions = QueryPlannerParams{},
+    size_t plannerOptions = QueryPlannerParams::DEFAULT,
     Pipeline* pipeline = nullptr,
     bool needsMerge = false,
-    QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{});
+    QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{},
+    boost::optional<TraversalPreference> traversalPreference = boost::none);
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
     OperationContext* opCtx,

@@ -69,7 +69,6 @@ public:
                     VariantCollectionPtrOrAcquisition collection,
                     WorkingSet* ws,
                     CanonicalQuery* cq,
-                    const QueryPlannerParams& params,
                     size_t decisionWorks,
                     std::unique_ptr<PlanStage> root);
 
@@ -95,7 +94,7 @@ public:
      * than expected, the old plan is evicted and a new plan is selected from scratch (again
      * yielding according to 'yieldPolicy'). Otherwise, the cached plan is run.
      */
-    Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+    Status pickBestPlan(const QueryPlannerParams& plannerParams, PlanYieldPolicy* yieldPolicy);
 
     bool bestPlanChosen() const {
         return _bestPlanChosen;
@@ -111,7 +110,10 @@ private:
      *
      * We only modify the plan cache if 'shouldCache' is true.
      */
-    Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, std::string reason);
+    Status replan(const QueryPlannerParams& plannerParams,
+                  PlanYieldPolicy* yieldPolicy,
+                  bool shouldCache,
+                  std::string reason);
 
     /**
      * May yield during the cached plan stage's trial period or replanning phases.
@@ -127,8 +129,6 @@ private:
 
     // Not owned.
     CanonicalQuery* _canonicalQuery;
-
-    QueryPlannerParams _plannerParams;
 
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached.

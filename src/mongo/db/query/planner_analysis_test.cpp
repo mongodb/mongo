@@ -215,7 +215,7 @@ TEST(QueryPlannerAnalysis, GeoSkipValidation) {
         compoundIndex.infoObj = supportedVersion;
     unsupportedIndex.infoObj = unsupportedVersion;
 
-    QueryPlannerParams params;
+    QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
 
     std::unique_ptr<FetchNode> fetchNodePtr = std::make_unique<FetchNode>();
     std::unique_ptr<GeoMatchExpression> exprPtr =

@@ -27,7 +27,7 @@ if (!FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('s
 const testConn = db.getMongo();
 // (Re)create the collection - will be sharded if required.
 const collName = jsTestName();
-assertDropAndRecreateCollection(db, collName);
+const coll = assertDropAndRecreateCollection(db, collName);
 const ns = {
     db: db.getName(),
     coll: collName
@@ -45,6 +45,14 @@ const querySettingsB = {
 const querySettingsC = {
     indexHints: {ns, allowedIndexes: ["c_1"]}
 };
+
+// TODO SERVER-85242 Remove once the fallback mechanism is re-implemented.
+for (const indexKeyPattern of [{a: 1}, {b: 1}, {c: 1}]) {
+    assert.commandWorked(coll.createIndex(indexKeyPattern));
+}
+for (let i = 0; i < 10; i++) {
+    coll.insert({a: i, b: i, c: i});
+}
 
 function runSetQuerySettingsConcurrently(
     {initialConfiguration, settingToFail, settingToPass, finalConfiguration}) {

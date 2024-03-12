@@ -49,15 +49,16 @@
 
 namespace mongo::sbe {
 CandidatePlans SubPlanner::plan(
+    const QueryPlannerParams& plannerParams,
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>>) {
 
     const auto& mainColl = _collections.getMainCollection();
     // Plan each branch of the $or.
     auto subplanningStatus = QueryPlanner::planSubqueries(
-        _opCtx, {} /* getSolutionCachedData */, mainColl, _cq, _queryParams);
+        _opCtx, {} /* getSolutionCachedData */, mainColl, _cq, plannerParams);
     if (!subplanningStatus.isOK()) {
-        return planWholeQuery();
+        return planWholeQuery(plannerParams);
     }
 
     auto multiplanCallback = [&](CanonicalQuery* cq,
@@ -86,14 +87,15 @@ CandidatePlans SubPlanner::plan(
         // not use the 'CachedSolutionPlanner' eviction mechanism. We therefore are more
         // conservative about putting a potentially bad plan into the cache in the subplan path.
         MultiPlanner multiPlanner{
-            _opCtx, _collections, *cq, _queryParams, PlanCachingMode::SometimesCache, _yieldPolicy};
-        auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
+            _opCtx, _collections, *cq, PlanCachingMode::SometimesCache, _yieldPolicy};
+        auto&& [candidates, winnerIdx] =
+            multiPlanner.plan(plannerParams, std::move(solutions), std::move(roots));
         invariant(winnerIdx < candidates.size());
         return std::move(candidates[winnerIdx].solution);
     };
 
     auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
-        _cq, _queryParams, std::move(subplanningStatus.getValue()), multiplanCallback);
+        _cq, plannerParams, std::move(subplanningStatus.getValue()), multiplanCallback);
 
     // One of the indexes in '_queryParams' might have been dropped while planning the final branch
     // of the OR query. In this case, fail with a 'QueryPlanKilled' error.
@@ -106,7 +108,7 @@ CandidatePlans SubPlanner::plan(
         uassert(4822874,
                 subplanSelectStat.getStatus().reason(),
                 subplanSelectStat == ErrorCodes::NoQueryExecutionPlans);
-        return planWholeQuery();
+        return planWholeQuery(plannerParams);
     }
 
     // Build a plan stage tree from a composite solution.
@@ -115,7 +117,7 @@ CandidatePlans SubPlanner::plan(
     // If some agg pipeline stages are being pushed down, extend the solution with them.
     if (!_cq.cqPipeline().empty()) {
         compositeSolution = QueryPlanner::extendWithAggPipeline(
-            _cq, std::move(compositeSolution), _queryParams.secondaryCollectionsInfo);
+            _cq, std::move(compositeSolution), plannerParams.secondaryCollectionsInfo);
     }
 
     auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
@@ -137,9 +139,9 @@ CandidatePlans SubPlanner::plan(
             0};
 }
 
-CandidatePlans SubPlanner::planWholeQuery() const {
+CandidatePlans SubPlanner::planWholeQuery(const QueryPlannerParams& plannerParams) const {
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, _queryParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, plannerParams);
     auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 
     // Only one possible plan. Build the stages from the solution.
@@ -147,7 +149,7 @@ CandidatePlans SubPlanner::planWholeQuery() const {
         // If some agg pipeline stages are being pushed down, extend the solution with them.
         if (!_cq.cqPipeline().empty()) {
             solutions[0] = QueryPlanner::extendWithAggPipeline(
-                _cq, std::move(solutions[0]), _queryParams.secondaryCollectionsInfo);
+                _cq, std::move(solutions[0]), plannerParams.secondaryCollectionsInfo);
         }
 
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
@@ -169,7 +171,7 @@ CandidatePlans SubPlanner::planWholeQuery() const {
     }
 
     MultiPlanner multiPlanner{
-        _opCtx, _collections, _cq, _queryParams, PlanCachingMode::AlwaysCache, _yieldPolicy};
-    return multiPlanner.plan(std::move(solutions), std::move(roots));
+        _opCtx, _collections, _cq, PlanCachingMode::AlwaysCache, _yieldPolicy};
+    return multiPlanner.plan(plannerParams, std::move(solutions), std::move(roots));
 }
 }  // namespace mongo::sbe

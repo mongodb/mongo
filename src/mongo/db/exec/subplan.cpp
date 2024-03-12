@@ -66,12 +66,10 @@ const char* SubplanStage::kStageType = "SUBPLAN";
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
                            VariantCollectionPtrOrAcquisition collection,
                            WorkingSet* ws,
-                           const QueryPlannerParams& params,
                            CanonicalQuery* cq,
                            PlanCachingMode cachingMode)
     : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),
-      _plannerParams(params),
       _query(cq),
       _planCachingMode(cachingMode) {
     invariant(cq);
@@ -110,13 +108,14 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
     return MatchExpression::OR == expr->matchType() && expr->numChildren() > 0;
 }
 
-Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy,
+Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParams,
+                                          PlanYieldPolicy* yieldPolicy,
                                           bool shouldConstructClassicExecutableTree) {
     // Clear out the working set. We'll start with a fresh working set.
     _ws->clear();
 
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(*_query, _plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*_query, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << _query->toStringForErrorMsg()
@@ -150,7 +149,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy,
         MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
-            solutions[ix]->indexFilterApplied = _plannerParams.indexFiltersApplied;
+            solutions[ix]->indexFilterApplied = plannerParams.indexFiltersApplied;
 
             auto&& nextPlanRoot = stage_builder::buildClassicExecutableTree(
                 expCtx()->opCtx, collection(), *_query, *solutions[ix], _ws);
@@ -167,7 +166,8 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy,
     }
 }
 
-Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy,
+Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
+                                  PlanYieldPolicy* yieldPolicy,
                                   bool shouldConstructClassicExecutableTree) {
     // Adds the amount of time taken by pickBestPlan() to executionTime. There's lots of work that
     // happens here, so this is needed for the time accounting to make sense.
@@ -200,9 +200,10 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy,
 
     // Plan each branch of the $or.
     auto subplanningStatus = QueryPlanner::planSubqueries(
-        expCtx()->opCtx, getSolutionCachedData, collectionPtr(), *_query, _plannerParams);
+        expCtx()->opCtx, getSolutionCachedData, collectionPtr(), *_query, plannerParams);
     if (!subplanningStatus.isOK()) {
-        return choosePlanWholeQuery(yieldPolicy, shouldConstructClassicExecutableTree);
+        return choosePlanWholeQuery(
+            plannerParams, yieldPolicy, shouldConstructClassicExecutableTree);
     }
 
     // Remember whether each branch of the $or was planned from a cached solution.
@@ -262,7 +263,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy,
         return multiPlanStage->extractBestSolution();
     };
     auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
-        *_query, _plannerParams, std::move(subplanningResult), multiplanCallback);
+        *_query, plannerParams, std::move(subplanningResult), multiplanCallback);
     if (!subplanSelectStat.isOK()) {
         if (subplanSelectStat != ErrorCodes::NoQueryExecutionPlans) {
             // Query planning can continue if we failed to find a solution for one of the
@@ -270,7 +271,8 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy,
             // (and index may have been dropped, we may have exceeded the time limit, etc).
             return subplanSelectStat.getStatus();
         }
-        return choosePlanWholeQuery(yieldPolicy, shouldConstructClassicExecutableTree);
+        return choosePlanWholeQuery(
+            plannerParams, yieldPolicy, shouldConstructClassicExecutableTree);
     }
 
     // Build a plan stage tree from the the composite solution and add it as our child stage.

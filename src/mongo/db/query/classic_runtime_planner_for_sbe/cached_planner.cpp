@@ -188,20 +188,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::_replan(
             *cq(), collections(), canonical_query_encoder::Optimizer::kSbeStageBuilders));
     }
 
-    QueryPlannerParams queryPlannerParams = plannerParams();
-    // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
-    // fillOutSecondaryCollectionsInformation() planner param calls.
-    queryPlannerParams.fillOutPlannerParams(
-        opCtx(), *cq(), collections(), false /* ignoreQuerySettings */);
-
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq(), queryPlannerParams);
-    auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
-
+    auto solutions = uassertStatusOK(QueryPlanner::plan(*cq(), plannerParams()));
     if (solutions.size() == 1) {
         if (!cq()->cqPipeline().empty()) {
             solutions[0] = QueryPlanner::extendWithAggPipeline(
-                *cq(), std::move(solutions[0]), queryPlannerParams.secondaryCollectionsInfo);
+                *cq(), std::move(solutions[0]), plannerParams().secondaryCollectionsInfo);
         }
 
         auto [root, data] = stage_builder::buildSlotBasedExecutableTree(

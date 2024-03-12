@@ -53,7 +53,7 @@ struct PlannerDataForSBE final : public PlannerData {
                       std::unique_ptr<CanonicalQuery> ownedCq,
                       std::unique_ptr<WorkingSet> workingSet,
                       const MultipleCollectionAccessor& collections,
-                      const QueryPlannerParams& plannerParams,
+                      QueryPlannerParams plannerParams,
                       PlanYieldPolicy::YieldPolicy yieldPolicy,
                       boost::optional<size_t> cachedPlanHash,
                       std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
@@ -61,7 +61,7 @@ struct PlannerDataForSBE final : public PlannerData {
                       ownedCq.get(),
                       std::move(workingSet),
                       collections,
-                      plannerParams,
+                      std::move(plannerParams),
                       yieldPolicy,
                       cachedPlanHash),
           ownedCq(std::move(ownedCq)),

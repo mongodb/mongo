@@ -691,9 +691,7 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     return ownedProjectionInput;
 }
 
-bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
-                      const CanonicalQuery& cq,
-                      const QueryPlannerParams& plannerParams) {
+bool canUseSimpleSort(const QuerySolutionNode& solnRoot, const CanonicalQuery& cq) {
     // The simple sort stage discards any metadata other than sort key metadata. It can only be used
     // if there are no metadata dependencies, or the only metadata dependency is a 'kSortKey'
     // dependency.
@@ -1014,7 +1012,6 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
 
 // static
 bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
-                                          const QueryPlannerParams& params,
                                           std::unique_ptr<QuerySolutionNode>* solnRoot) {
     vector<QuerySolutionNode*> explodableNodes;
 
@@ -1270,7 +1267,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     // Sort not provided, can't reverse scans to get the sort.  One last trick: We can "explode"
     // index scans over point intervals to an OR of sub-scans in order to pull out a sort.
     // Let's try this.
-    if (explodeForSort(query, params, &solnRoot)) {
+    if (explodeForSort(query, &solnRoot)) {
         return solnRoot;
     }
 
@@ -1300,7 +1297,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     size_t sortLimit = findCommand.getLimit() ? static_cast<size_t>(*findCommand.getLimit()) +
             static_cast<size_t>(findCommand.getSkip().value_or(0))
                                               : 0;
-    if (canUseSimpleSort(*solnRoot, query, params)) {
+    if (canUseSimpleSort(*solnRoot, query)) {
         sortNode = std::make_unique<SortNodeSimple>(
             std::move(solnRoot),
             sortObj,

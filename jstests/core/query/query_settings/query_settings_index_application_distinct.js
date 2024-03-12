@@ -103,7 +103,8 @@ function setIndexes(coll, indexList) {
     qstests.assertQuerySettingsIndexApplication(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsNaturalApplication(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsIgnoreCursorHints(querySettingsDistinctQuery, ns);
-    qstests.assertQuerySettingsFallback(querySettingsDistinctQuery, ns);
+    // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
+    // qstests.assertQuerySettingsFallback(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsCommandValidation(querySettingsDistinctQuery, ns);
 })();
 

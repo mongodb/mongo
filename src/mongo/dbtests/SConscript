@@ -168,6 +168,7 @@ env.Program(
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/db/working_set_common',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/shell/shell_utils',
         '$BUILD_DIR/mongo/transport/message_compressor_options_server',
         '$BUILD_DIR/mongo/transport/session_manager',

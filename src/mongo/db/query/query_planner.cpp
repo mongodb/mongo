@@ -853,7 +853,7 @@ std::unique_ptr<QuerySolution> buildWholeIXSoln(
             "Cannot pass both an explicit direction and a traversal preference",
             !(direction.has_value() && params.traversalPreference));
     std::unique_ptr<QuerySolutionNode> solnRoot(
-        QueryPlannerAccess::scanWholeIndex(index, query, params, direction.value_or(1)));
+        QueryPlannerAccess::scanWholeIndex(index, query, direction.value_or(1)));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
@@ -1705,8 +1705,13 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 continue;
             }
 
-            QueryPlannerParams paramsForCoveredIxScan;
-            auto soln = buildWholeIXSoln(index, query, paramsForCoveredIxScan);
+            auto soln = buildWholeIXSoln(
+                index,
+                query,
+                // TODO SERVER-87683 Investigate why empty parameters are used instead of 'params'.
+                QueryPlannerParams{
+                    QueryPlannerParams::ArgsForTest{},
+                });
             if (soln && !soln->root()->fetched()) {
                 LOGV2_DEBUG(
                     20983, 5, "Planner: outputting soln that uses index to provide projection");

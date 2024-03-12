@@ -189,13 +189,37 @@ struct QueryPlannerParams {
         size_t plannerOptions;
     };
 
-    QueryPlannerParams(size_t options = DEFAULT) : options(options) {}
+    /**
+     * Struct containing all the arguments required for initializing QueryPlannerParams for commands
+     * using the single collection queries. QueryPlannerParams can then be upgraded to support
+     * multiple collection ones as well by calling 'fillOutSecondaryCollectionsPlannerParams()'.
+     * This can only be done after SBE stages have been pushed down to canonical query.
+     */
+    struct ArgsForSingleCollectionQuery {
+        OperationContext* opCtx;
+        const CanonicalQuery& canonicalQuery;
+        const MultipleCollectionAccessor& collections;
+        size_t plannerOptions = DEFAULT;
+        bool ignoreQuerySettings;
+        boost::optional<TraversalPreference> traversalPreference = boost::none;
+    };
 
     /**
-     * Initializes query planner parameters by fetching relevant indexes and appling query settings,
-     * index filters.
+     * Struct containing the necessary arguments for initializing QueryPlannerParams for internal
+     * shard key queries.
      */
-    explicit QueryPlannerParams(const ArgsForDistinct& args);
+    struct ArgsForInternalShardKeyQuery {
+        size_t plannerOptions;
+        IndexEntry indexEntry;
+    };
+
+    struct ArgsForTest {};
+
+    /**
+     * Initializes query planner parameters by fetching relevant indexes and applying query
+     * settings, index filters.
+     */
+    explicit QueryPlannerParams(ArgsForDistinct&& args);
 
     /**
      * Initializes query planner parameters by filling collection info and shard filter.
@@ -206,13 +230,44 @@ struct QueryPlannerParams {
     }
 
     /**
-     * Fills planner parameters for main and secondary collections as well as applies query
-     * settings, index filters.
+     * Initializes query planner parameters by filling in main collection info and fetching main
+     * collection indexes.
      */
-    void fillOutPlannerParams(OperationContext* opCtx,
-                              const CanonicalQuery& canonicalQuery,
-                              const MultipleCollectionAccessor& collections,
-                              bool ignoreQuerySettings);
+    explicit QueryPlannerParams(ArgsForSingleCollectionQuery&& args)
+        : options(args.plannerOptions), traversalPreference(std::move(args.traversalPreference)) {
+        if (!args.collections.hasMainCollection()) {
+            return;
+        }
+        fillOutPlannerParamsForExpressQuery(
+            args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
+        fillOutMainCollectionPlannerParams(
+            args.opCtx, args.canonicalQuery, args.collections, args.ignoreQuerySettings);
+    }
+
+    /**
+     * Initializes query planner parameters by simply inserting the provided index entry.
+     */
+    explicit QueryPlannerParams(ArgsForInternalShardKeyQuery&& args)
+        : options(args.plannerOptions) {
+        indices.push_back(std::move(args.indexEntry));
+    }
+
+    explicit QueryPlannerParams(ArgsForTest&& args) : options(DEFAULT){};
+
+    QueryPlannerParams(const QueryPlannerParams&) = delete;
+    QueryPlannerParams& operator=(const QueryPlannerParams& other) = delete;
+
+    QueryPlannerParams(QueryPlannerParams&&) = default;
+    QueryPlannerParams& operator=(QueryPlannerParams&& other) = default;
+
+    /**
+     * Fills planner parameters for the secondary collections.
+     */
+    void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
+                                                  const CanonicalQuery& canonicalQuery,
+                                                  const MultipleCollectionAccessor& collections,
+                                                  bool shouldIgnoreQuerySettings);
+
 
     // See Options enum above.
     size_t options;
@@ -271,7 +326,7 @@ private:
                                              const CanonicalQuery& canonicalQuery,
                                              const CollectionPtr& collection) {
         // If the caller wants a shard filter, make sure we're actually sharded.
-        if (options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+        if (options & INCLUDE_SHARD_FILTER) {
             if (collection.isSharded_DEPRECATED()) {
                 const auto& shardKeyPattern = collection.getShardKeyPattern();
 
@@ -302,25 +357,21 @@ private:
     }
 
     /**
-     * Fills planner parameters for the secondary collections.
-     */
-    void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
-                                                  const CanonicalQuery& canonicalQuery,
-                                                  const MultipleCollectionAccessor& collections);
-
-    /**
      * Fills planner parameters for the main collection.
      */
     void fillOutMainCollectionPlannerParams(OperationContext* opCtx,
                                             const CanonicalQuery& canonicalQuery,
-                                            const CollectionPtr& collection);
+                                            const MultipleCollectionAccessor& collections,
+                                            bool shouldIgnoreQuerySettings = true);
 
     /**
-     * Applies query settings to the query if applicable. If not, tries to apply index filters.
+     * Applies query settings to the main collection if applicable. If not, tries to apply index
+     * filters.
      */
-    void applyQuerySettingsOrIndexFilters(const CanonicalQuery& canonicalQuery,
-                                          const MultipleCollectionAccessor& collections,
-                                          bool shouldIgnoreQuerySettings);
+    void applyQuerySettingsOrIndexFiltersForMainCollection(
+        const CanonicalQuery& canonicalQuery,
+        const MultipleCollectionAccessor& collections,
+        bool shouldIgnoreQuerySettings);
 
     /**
      * If query supports index filters, filters params.indices according to the configuration. In
@@ -329,14 +380,8 @@ private:
     void applyIndexFilters(const CanonicalQuery& canonicalQuery, const CollectionPtr& collection);
 
     /**
-     * If query has query settings index hints set, filters params.indices according to the
-     * configuration. In addition, sets that there were index filters or query settings applied.
-     */
-    void applyQuerySettings(const CanonicalQuery& canonicalQuery,
-                            const MultipleCollectionAccessor& collections);
-
-    /**
-     * Applies 'indexHints' query settings for the given 'collection'.
+     * Applies 'indexHints' query settings for the given 'collection'.In addition, sets that there
+     * were query settings applied.
      */
     void applyQuerySettingsForCollection(
         const CanonicalQuery& canonicalQuery,

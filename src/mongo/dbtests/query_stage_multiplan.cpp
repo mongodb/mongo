@@ -170,6 +170,20 @@ public:
         return _opCtx->getServiceContext();
     }
 
+    QueryPlannerParams makePlannerParams(const CollectionPtr& collection,
+                                         const CanonicalQuery& canonicalQuery) {
+        MultipleCollectionAccessor collections(collection);
+        return QueryPlannerParams{
+            QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = opCtx(),
+                .canonicalQuery = canonicalQuery,
+                .collections = collections,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+                .ignoreQuerySettings = true,
+            },
+        };
+    }
+
 protected:
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
     ClockSource* const _clock = _opCtx->getServiceContext()->getFastClockSource();
@@ -458,13 +472,8 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();
     internalQueryForceIntersectionPlans.store(true);
 
-    // Get planner params.
-    QueryPlannerParams plannerParams;
-    MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
-    plannerParams.fillOutPlannerParams(
-        _opCtx.get(), *cq.get(), collectionsAccessor, true /* shouldIgnoreQuerySettings */);
-
     // Plan.
+    auto plannerParams = makePlannerParams(collection.getCollection(), *cq);
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());

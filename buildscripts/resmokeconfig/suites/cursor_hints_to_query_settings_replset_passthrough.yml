@@ -6,7 +6,8 @@ selector:
   roots:
     - jstests/core/**/*.js
   exclude_files:
-    # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
+    # TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented to cover runtime planning errors.
+    - jstests/core/clustered/clustered_collection_hint.js
     - jstests/core/query/or/orj.js
 
     # TODO SERVER-86996 Apply QuerySettings for queries involving timeseries collections.

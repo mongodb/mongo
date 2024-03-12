@@ -136,11 +136,16 @@ public:
      */
     const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
         AutoGetCollectionForReadCommand collection(&_opCtx, nss);
-
-        QueryPlannerParams plannerParams;
         MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
-        plannerParams.fillOutPlannerParams(
-            &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
+        QueryPlannerParams plannerParams{
+            QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = &_opCtx,
+                .canonicalQuery = *cq,
+                .collections = collectionsAccessor,
+                .plannerOptions = QueryPlannerParams::DEFAULT,
+                .ignoreQuerySettings = true,
+            },
+        };
 
         // Plan.
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);

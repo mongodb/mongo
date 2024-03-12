@@ -61,15 +61,15 @@ public:
     MultiPlanner(OperationContext* opCtx,
                  const MultipleCollectionAccessor& collections,
                  CanonicalQuery& cq,
-                 const QueryPlannerParams& qpp,
                  PlanCachingMode cachingMode,
                  PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collections, cq, qpp, yieldPolicy},
+        : BaseRuntimePlanner{opCtx, collections, cq, yieldPolicy},
           _cachingMode{cachingMode},
           _maxNumResults{0},
           _maxNumReads{0} {}
 
     CandidatePlans plan(
+        const QueryPlannerParams& plannerParams,
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots)
         final;
@@ -137,6 +137,7 @@ private:
      * if possible.
      */
     CandidatePlans finalizeExecutionPlans(
+        const QueryPlannerParams& plannerParams,
         std::unique_ptr<mongo::plan_ranker::PlanRankingDecision> decision,
         std::vector<plan_ranker::CandidatePlan> candidates) const;
 

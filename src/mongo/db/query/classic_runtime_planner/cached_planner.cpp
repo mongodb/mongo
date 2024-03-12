@@ -39,7 +39,6 @@ CachedPlanner::CachedPlanner(PlannerData plannerData,
                                                   collections().getMainCollectionPtrOrAcquisition(),
                                                   ws(),
                                                   cq(),
-                                                  plannerParams(),
                                                   cachedSolution->decisionWorks.value(),
                                                   buildExecutableTree(*_querySolution));
     _cachedPlanStage = root.get();
@@ -47,7 +46,7 @@ CachedPlanner::CachedPlanner(PlannerData plannerData,
 }
 
 Status CachedPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    return _cachedPlanStage->pickBestPlan(planYieldPolicy);
+    return _cachedPlanStage->pickBestPlan(plannerParams(), planYieldPolicy);
 }
 
 std::unique_ptr<QuerySolution> CachedPlanner::extractQuerySolution() {

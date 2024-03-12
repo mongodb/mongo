@@ -2065,11 +2065,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
     return nullptr;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
-    const IndexEntry& index,
-    const CanonicalQuery& query,
-    const QueryPlannerParams& params,
-    int direction) {
+std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
+                                                                      const CanonicalQuery& query,
+                                                                      int direction) {
     std::unique_ptr<QuerySolutionNode> solnRoot;
 
     // Build an ixscan over the id index, use it, and return it.

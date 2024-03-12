@@ -75,6 +75,7 @@ public:
     virtual ~RuntimePlanner() = default;
 
     virtual CandidatePlans plan(
+        const QueryPlannerParams& plannerParams,
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) = 0;
 };
@@ -87,12 +88,10 @@ public:
     BaseRuntimePlanner(OperationContext* opCtx,
                        const MultipleCollectionAccessor& collections,
                        CanonicalQuery& cq,
-                       const QueryPlannerParams& queryParams,
                        PlanYieldPolicySBE* yieldPolicy)
         : _opCtx(opCtx),
           _collections(collections),
           _cq(cq),
-          _queryParams(queryParams),
           _yieldPolicy(yieldPolicy),
           _indexExistenceChecker(collections),
           _trialRuntimeExecutor{_opCtx, _collections, _cq, _yieldPolicy, _indexExistenceChecker} {
@@ -103,7 +102,6 @@ protected:
     OperationContext* const _opCtx;
     const MultipleCollectionAccessor& _collections;
     CanonicalQuery& _cq;
-    QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;
     const AllIndicesRequiredChecker _indexExistenceChecker;
     TrialRuntimeExecutor _trialRuntimeExecutor;

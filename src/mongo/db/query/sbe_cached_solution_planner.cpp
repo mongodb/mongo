@@ -144,19 +144,14 @@ void recoverWhereExprPredicate(MatchExpression* filter, stage_builder::PlanStage
 }  // namespace
 
 CandidatePlans CachedSolutionPlanner::plan(
+    const QueryPlannerParams& plannerParams,
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     if (!_cq.cqPipeline().empty()) {
         // We'd like to check if there is any foreign collection in the hash_lookup stage that is no
         // longer eligible for using a hash_lookup plan. In this case we invalidate the cache and
         // immediately replan without ever running a trial period.
-        // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
-        // fillOutSecondaryCollectionsInformation() planner param calls.
-        _queryParams.fillOutPlannerParams(
-            _opCtx, _cq, _collections, false /* ignoreQuerySettings */);
-
-        const auto& secondaryCollectionsInfo = _queryParams.secondaryCollectionsInfo;
-
+        const auto& secondaryCollectionsInfo = plannerParams.secondaryCollectionsInfo;
         for (const auto& foreignCollection :
              roots[0].second.staticData->foreignHashJoinCollections) {
             const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
@@ -166,7 +161,8 @@ CandidatePlans CachedSolutionPlanner::plan(
             tassert(6693501, "Foreign collection must exist", collectionInfo->second.exists);
 
             if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
-                return replan(/* shouldCache */ true,
+                return replan(plannerParams,
+                              /* shouldCache */ true,
                               str::stream() << "Foreign collection "
                                             << foreignCollection.toStringForErrorMsg()
                                             << " is not eligible for hash join anymore",
@@ -228,7 +224,9 @@ CandidatePlans CachedSolutionPlanner::plan(
                     "Execution of cached plan failed, falling back to replan",
                     "query"_attr = redact(_cq.toStringShort()),
                     "planSummary"_attr = explainer->getPlanSummary());
-        return replan(false, str::stream() << "cached plan returned: " << candidate.status);
+        return replan(plannerParams,
+                      /* shouldCache */ false,
+                      str::stream() << "cached plan returned: " << candidate.status);
     }
 
     // If the trial run did not exit early, it means no replanning is necessary and can return this
@@ -262,7 +260,8 @@ CandidatePlans CachedSolutionPlanner::plan(
         "query"_attr = redact(_cq.toStringShort()),
         "planSummary"_attr = explainer->getPlanSummary());
     return replan(
-        true,
+        plannerParams,
+        /* shouldCache */ true,
         str::stream()
             << "cached plan was less efficient than expected: expected trial execution to take "
             << *_decisionReads << " reads but it took at least " << numReads << " reads");
@@ -311,7 +310,8 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
     return candidate;
 }
 
-CandidatePlans CachedSolutionPlanner::replan(bool shouldCache,
+CandidatePlans CachedSolutionPlanner::replan(const QueryPlannerParams& plannerParams,
+                                             bool shouldCache,
                                              std::string reason,
                                              RemoteCursorMap* remoteCursors) const {
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
@@ -331,12 +331,6 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache,
         data.replanReason.emplace(reason);
         return std::make_pair(std::move(root), std::move(data));
     };
-
-    QueryPlannerParams plannerParams(_queryParams.options);
-    // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
-    // fillOutSecondaryCollectionsInformation() planner param calls.
-    // QueryPlannerParams could be reused from the plan() method.
-    plannerParams.fillOutPlannerParams(_opCtx, _cq, _collections, false /* ignoreQuerySettings */);
 
     // Use the query planning module to plan the whole query.
     auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, plannerParams);
@@ -377,8 +371,9 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache,
 
     const auto cachingMode =
         shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
-    MultiPlanner multiPlanner{_opCtx, _collections, _cq, plannerParams, cachingMode, _yieldPolicy};
-    auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
+    MultiPlanner multiPlanner{_opCtx, _collections, _cq, cachingMode, _yieldPolicy};
+    auto&& [candidates, winnerIdx] =
+        multiPlanner.plan(plannerParams, std::move(solutions), std::move(roots));
     auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
                                                   &candidates[winnerIdx].data.stageData,
                                                   candidates[winnerIdx].solution.get());

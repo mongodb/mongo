@@ -125,7 +125,6 @@ public:
      * the sort order that each scan provides.
      */
     static bool explodeForSort(const CanonicalQuery& query,
-                               const QueryPlannerParams& params,
                                std::unique_ptr<QuerySolutionNode>* solnRoot);
 
     /**

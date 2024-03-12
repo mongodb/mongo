@@ -44,14 +44,14 @@ struct PlannerData {
                 CanonicalQuery* cq,
                 std::unique_ptr<WorkingSet> workingSet,
                 const MultipleCollectionAccessor& collections,
-                const QueryPlannerParams& plannerParams,
+                QueryPlannerParams plannerParams,
                 PlanYieldPolicy::YieldPolicy yieldPolicy,
                 boost::optional<size_t> cachedPlanHash)
         : opCtx(opCtx),
           cq(cq),
           workingSet(std::move(workingSet)),
           collections(collections),
-          plannerParams(plannerParams),
+          plannerParams(std::move(plannerParams)),
           yieldPolicy(yieldPolicy),
           cachedPlanHash(cachedPlanHash) {}
 
@@ -66,7 +66,7 @@ struct PlannerData {
     CanonicalQuery* cq;
     std::unique_ptr<WorkingSet> workingSet;
     const MultipleCollectionAccessor& collections;
-    const QueryPlannerParams& plannerParams;
+    QueryPlannerParams plannerParams;
     PlanYieldPolicy::YieldPolicy yieldPolicy;
     boost::optional<size_t> cachedPlanHash;
 };

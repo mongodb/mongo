@@ -110,6 +110,7 @@ auto& sbeNumReadsHistogram =
 }  // namespace
 
 CandidatePlans MultiPlanner::plan(
+    const QueryPlannerParams& plannerParams,
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     auto candidates = collectExecutionStats(
@@ -120,7 +121,7 @@ CandidatePlans MultiPlanner::plan(
                                              internalQueryPlanEvaluationWorksSbe.load(),
                                              internalQueryPlanEvaluationCollFractionSbe.load()));
     auto decision = uassertStatusOK(mongo::plan_ranker::pickBestPlan<PlanStageStats>(candidates));
-    return finalizeExecutionPlans(std::move(decision), std::move(candidates));
+    return finalizeExecutionPlans(plannerParams, std::move(decision), std::move(candidates));
 }
 
 bool MultiPlanner::CandidateCmp::operator()(const plan_ranker::CandidatePlan* lhs,
@@ -262,6 +263,7 @@ std::vector<plan_ranker::CandidatePlan> MultiPlanner::collectExecutionStats(
 }
 
 CandidatePlans MultiPlanner::finalizeExecutionPlans(
+    const QueryPlannerParams& plannerParams,
     std::unique_ptr<mongo::plan_ranker::PlanRankingDecision> decision,
     std::vector<plan_ranker::CandidatePlan> candidates) const {
     invariant(decision);
@@ -349,7 +351,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         winner.root->close();
         _yieldPolicy->clearRegisteredPlans();
         auto solution = QueryPlanner::extendWithAggPipeline(
-            _cq, std::move(winner.solution), _queryParams.secondaryCollectionsInfo);
+            _cq, std::move(winner.solution), plannerParams.secondaryCollectionsInfo);
         auto [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solution, _yieldPolicy);
         // The winner might have been replanned. So, pass through the replanning reason to the new
@@ -380,7 +382,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
                     continue;  // have already done the winner
 
                 auto solution = QueryPlanner::extendWithAggPipeline(
-                    _cq, std::move(candidates[i].solution), _queryParams.secondaryCollectionsInfo);
+                    _cq, std::move(candidates[i].solution), plannerParams.secondaryCollectionsInfo);
                 auto&& [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
                     _opCtx, _collections, _cq, *solution, _yieldPolicy);
                 candidates[i] = sbe::plan_ranker::CandidatePlan{

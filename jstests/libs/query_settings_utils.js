@@ -167,8 +167,9 @@ export class QuerySettingsUtils {
             db.adminCommand({setQuerySettings: representativeQuery, settings: settings}));
         this.assertQueryShapeConfiguration(
             [this.makeQueryShapeConfiguration(settings, representativeQuery)]);
-        runTest();
+        const result = runTest();
         this.removeAllQuerySettings();
+        return result;
     }
 
     withoutDollarDB(cmd) {

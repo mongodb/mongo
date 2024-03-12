@@ -407,10 +407,6 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
     const auto indexType = IndexNames::nameToType(accessMethod);
 
     // Use query framework to generate index bounds.
-    QueryPlannerParams plannerParams;
-    // Must use "shard key" index.
-    plannerParams.options =
-        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::STRICT_NO_TABLE_SCAN;
     IndexEntry indexEntry(key,
                           indexType,
                           IndexDescriptor::kLatestIndexVersion,
@@ -427,9 +423,17 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
                           BSONObj(),
                           nullptr, /* collator */
                           nullptr /* projExec */);
-    plannerParams.indices.push_back(std::move(indexEntry));
+    ;
 
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::plan(canonicalQuery,
+                           QueryPlannerParams{
+                               QueryPlannerParams::ArgsForInternalShardKeyQuery{
+                                   .plannerOptions = QueryPlannerParams::NO_TABLE_SCAN |
+                                       QueryPlannerParams::STRICT_NO_TABLE_SCAN,
+                                   .indexEntry = std::move(indexEntry),
+                               },
+                           });
     if (statusWithMultiPlanSolns.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
         auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 

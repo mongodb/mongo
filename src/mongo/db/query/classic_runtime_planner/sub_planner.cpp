@@ -34,17 +34,14 @@
 namespace mongo::classic_runtime_planner {
 
 SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::move(plannerData)) {
-    auto root = std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),
-                                               collections().getMainCollectionPtrOrAcquisition(),
-                                               ws(),
-                                               plannerParams(),
-                                               cq());
+    auto root = std::make_unique<SubplanStage>(
+        cq()->getExpCtxRaw(), collections().getMainCollectionPtrOrAcquisition(), ws(), cq());
     _subplanStage = root.get();
     setRoot(std::move(root));
 }
 
 Status SubPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    return _subplanStage->pickBestPlan(planYieldPolicy);
+    return _subplanStage->pickBestPlan(plannerParams(), planYieldPolicy);
 }
 
 std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {

@@ -1015,7 +1015,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool* shouldProduceEmptyDocs,
     bool timeseriesBoundedSortOptimization,
-    QueryPlannerParams plannerOpts = QueryPlannerParams{}) {
+    std::size_t plannerOpts = QueryPlannerParams::DEFAULT,
+    boost::optional<TraversalPreference> traversalPreference = boost::none) {
 
     // See if could use DISTINCT_SCAN with the pipeline (SERVER-9507). We must do this check before
     // creating the CQ which might modify the pipeline.
@@ -1043,7 +1044,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     std::unique_ptr<CanonicalQuery> cq = std::move(cqWithStatus.getValue());
 
     if (!*shouldProduceEmptyDocs) {
-        plannerOpts.options |= QueryPlannerParams::RETURN_OWNED_DATA;
+        plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
     // If this pipeline is a change stream, then the cursor must use the simple collation, so we
@@ -1072,7 +1073,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
         //    arrays shouldn't be traversed.
         StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> swExecutorGrouped =
             tryGetExecutorDistinct(collections,
-                                   plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                   plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
                                    canonicalDistinct,
                                    flipDistinctScanDirection);
 
@@ -1109,7 +1110,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                                     plannerOpts,
                                     pipeline,
                                     expCtx->needsMerge,
-                                    unavailableMetadata);
+                                    unavailableMetadata,
+                                    std::move(traversalPreference));
 
     // While constructing the executor, some stages might have been lowered from the 'pipeline' into
     // the executor, so we need to recheck whether the executor's layer can still produce an empty
@@ -1461,9 +1463,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     // But in classic it may be eligible for a post-planning sort optimization. We check eligibility
     // and perform the rewrite here.
     const bool timeseriesBoundedSortOptimization = unpack && sort && (su.unpackIdx < su.sortIdx);
-    QueryPlannerParams plannerOpts;
+    std::size_t plannerOpts = QueryPlannerParams::DEFAULT;
+    boost::optional<TraversalPreference> traversalPreference = boost::none;
     if (timeseriesBoundedSortOptimization) {
-        plannerOpts.traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);
+        traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);
 
         // Whether to use bounded sort or not is determined _after_ the executor is created, based
         // on whether the chosen collection access stage would support it. Because bounded sort and
@@ -1486,14 +1489,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
     if (isChangeStream) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
-        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
-                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
+        plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                        QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
     // The $_requestReshardingResumeToken parameter is only valid for an oplog scan.
     if (aggRequest && aggRequest->getRequestReshardingResumeToken()) {
-        plannerOpts.options |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
-                                QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
+        plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                        QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
     // Create the PlanExecutor.
@@ -1508,7 +1511,8 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
                                                 Pipeline::kAllowedMatcherFeatures,
                                                 &shouldProduceEmptyDocs,
                                                 timeseriesBoundedSortOptimization,
-                                                std::move(plannerOpts)));
+                                                plannerOpts,
+                                                std::move(traversalPreference)));
 
     // If this is a query on a time-series collection then it may be eligible for a post-planning
     // sort optimization. We check eligibility and perform the rewrite here.
