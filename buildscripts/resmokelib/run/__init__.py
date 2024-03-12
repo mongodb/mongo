@@ -1341,6 +1341,9 @@ class RunPlugin(PluginInterface):
         evergreen_options.add_argument("--versionId", dest="version_id", metavar="VERSION_ID",
                                        help="Sets the version ID of the task.")
 
+        evergreen_options.add_argument("--taskWorkDir", dest="work_dir", metavar="TASK_WORK_DIR",
+                                       help="Sets the working directory of the task.")
+
         evergreen_options.add_argument(
             "--projectConfigPath", dest="evg_project_config_path",
             help="Sets the path to evergreen project configuration yaml.")
