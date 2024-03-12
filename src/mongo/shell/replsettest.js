@@ -2624,8 +2624,11 @@ var ReplSetTest = function ReplSetTest(opts) {
                 });
             });
 
+            const expectPrefix =
+                (typeof TestData !== "undefined" && TestData.multitenancyExpectPrefix) ? true
+                                                                                       : false;
+
             for (const [key, db] of combinedDBs) {
-                const expectPrefix = TestData.multitenancyExpectPrefix ? true : false;
                 const tenant = db.tenant;
                 const dbName = expectPrefix && tenant ? tenant + '_' + db.name : db.name;
 
