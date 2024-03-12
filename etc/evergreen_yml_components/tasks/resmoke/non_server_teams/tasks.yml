@@ -228,14 +228,14 @@ tasks:
 
 - <<: *task_template
   name: streams
-  tags: ["assigned_to_jira_team_streams", "default"]
+  tags: ["assigned_to_jira_team_streams", "default", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: streams_kafka
-  tags: ["assigned_to_jira_team_streams", "default"]
+  tags: ["assigned_to_jira_team_streams", "default", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"

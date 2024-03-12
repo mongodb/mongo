@@ -358,13 +358,12 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2-streams
+    large_distro_name: amazon2-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-build
-  - name: .publish
-  - name: generate_buildid_to_debug_symbols_mapping
+  - name: .development_critical
+  - name: .release_critical !crypt_push
   - name: streams
   - name: streams_kafka
-  - name: aggregation !.feature_flag_guarded
-  - name: .jscore .common
