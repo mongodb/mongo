@@ -1,7 +1,7 @@
 /**
  * Tests that direct shard connections are correctly allowed and disallowed using authentication.
  *
- * @tags: [featureFlagCheckForDirectShardOperations, requires_fcv_73]
+ * @tags: [featureFlagCheckForDirectShardOperations, requires_fcv_70]
  */
 // Create a new sharded cluster for testing and enable auth.
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
