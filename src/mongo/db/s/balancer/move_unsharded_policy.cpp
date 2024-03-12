@@ -40,11 +40,11 @@ namespace mongo {
 namespace {
 
 template <class T>
-const T& getRandomElement(const std::vector<T>& items) {
+int64_t getRandomIndex(const std::vector<T>& items) {
     static std::default_random_engine gen(time(nullptr));
     size_t max = items.size();
     std::uniform_int_distribution<int64_t> dist(0, max - 1);
-    return items[dist(gen)];
+    return dist(gen);
 }
 
 
@@ -61,32 +61,39 @@ boost::optional<std::pair<CollectionType, ChunkType>> getRandomUnsplittableColle
         }
     }
 
-    if (unsplittableCollections.empty())
-        return {};
-
-    auto selectedCollection = getRandomElement(unsplittableCollections);
-    auto swChunks = catalogClient->getChunks(
-        opCtx,
-        BSON(ChunkType::collectionUUID() << selectedCollection->getUuid()) /*query*/,
-        noSort,
-        boost::none /*limit*/,
-        nullptr /*opTime*/,
-        selectedCollection->getEpoch(),
-        selectedCollection->getTimestamp(),
-        repl::ReadConcernLevel::kMajorityReadConcern,
-        boost::none);
-    if (!swChunks.isOK()) {
-        LOGV2_WARNING(
-            8544101,
-            "Could not find the corresponding chunks in the catalog for the selected unsplitable "
-            "collection",
-            logAttrs(selectedCollection->getNss()));
-        return {};
+    while (!unsplittableCollections.empty()) {
+        auto selectedIndex = getRandomIndex(unsplittableCollections);
+        auto selectedCollection = unsplittableCollections[selectedIndex];
+        auto swChunks = catalogClient->getChunks(
+            opCtx,
+            BSON(ChunkType::collectionUUID() << selectedCollection->getUuid()) /*query*/,
+            noSort,
+            boost::none /*limit*/,
+            nullptr /*opTime*/,
+            selectedCollection->getEpoch(),
+            selectedCollection->getTimestamp(),
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            boost::none);
+        if (!swChunks.isOK()) {
+            LOGV2_WARNING(8544101,
+                          "Could not find the corresponding chunks in the catalog for the selected "
+                          "unsplitable collection",
+                          logAttrs(selectedCollection->getNss()));
+            return {};
+        }
+        auto& chunks = swChunks.getValue();
+        if (chunks.size() == 1) {
+            // Successfully selected a collection
+            return std::make_pair(*selectedCollection, chunks[0]);
+        } else {
+            // The collection was deleted or changed to sharded while we were fetching additional
+            // chunk information. We simply look for another one
+            std::swap(unsplittableCollections[selectedIndex], unsplittableCollections.back());
+            unsplittableCollections.pop_back();
+        }
     }
-    auto& chunks = swChunks.getValue();
-    tassert(8245243, "Unsplittable collection has more than one chunk", chunks.size() == 1);
-
-    return std::make_pair(*selectedCollection, chunks[0]);
+    // There are no unsplittable collections
+    return {};
 }
 }  // namespace
 
