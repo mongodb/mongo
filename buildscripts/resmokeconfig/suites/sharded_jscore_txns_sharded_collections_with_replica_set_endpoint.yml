@@ -42,9 +42,6 @@ selector:
   # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID
   # (instead of a collection name).
   - jstests/core/txns/banned_collection_reads_in_txn.js
-  # TODO (SERVER-85410): Investigate why timeseries_reads_in_txns.js sometimes fail with
-  # ShardCannotRefreshDueToLocksHeld.
-  - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
