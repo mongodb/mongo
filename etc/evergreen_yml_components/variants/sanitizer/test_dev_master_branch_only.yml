@@ -235,12 +235,12 @@ buildvariants:
     - rhel80-xlarge
   - name: .updatefuzzer !.no_debug_mode
   - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_discovery_and_monitoring_json_test
   # TODO(SERVER-70015) reenable after ticket is complete
   # - name: .serverless
   #   distros:
   #   - rhel80-xlarge
-  - name: server_selection_json_test_TG
+  - name: server_selection_json_test
     distros:
     - rhel80-xlarge
   - name: streams
@@ -335,8 +335,8 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .stitch
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
+  - name: server_discovery_and_monitoring_json_test
+  - name: server_selection_json_test
 
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
   display_name: "Enterprise Windows DEBUG (Unoptimized)"
@@ -728,11 +728,11 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .stitch
   - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_discovery_and_monitoring_json_test
   - name: .serverless
     distros:
     - rhel80-xlarge
-  - name: server_selection_json_test_TG
+  - name: server_selection_json_test
     distros:
     - rhel80-xlarge
   - name: streams

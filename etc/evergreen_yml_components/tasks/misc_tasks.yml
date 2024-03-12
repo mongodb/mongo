@@ -18,89 +18,6 @@ variables:
         --arg=val
         --flag
 
-# THIS HAS COPIES IN
-# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/compile_tasks.yml
-# - etc/evergreen_yml_components/tasks/misc_tasks.yml
-# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &compile_task_group_template
-  name: compile_task_group_template
-  max_hosts: 1
-  tasks: []
-  setup_task:
-  - func: "f_expansions_write"
-  - func: "apply compile expansions"
-  - func: "f_expansions_write"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "get engflow creds"
-  teardown_task:
-  - func: "f_expansions_write"
-  - func: "attach scons logs"
-  - func: "attach report"
-  - func: "attach artifacts"
-  - func: "attach local resmoke invocation"
-  - func: "attach multiversion download links"
-  - func: "kill processes"
-  - func: "save mongo coredumps"
-  - func: "generate hang analyzer tasks"
-  - func: "save failed unittests"
-  - func: "save UndoDB recordings"
-  - func: "save unstripped dbtest"
-  - func: "save hang analyzer debugger files"
-  - func: "save disk statistics"
-  - func: "save system resource information"
-  - func: "save libfuzzertest corpora"
-  - func: "remove files"
-    vars:
-      files: >-
-        src/resmoke_error_code
-        src/build/scons/config.log
-        src/*.gcda.gcov
-        src/gcov-intermediate-files.tgz
-        src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
-        mongo-coredumps.json
-        src/dist-unittests/bin/*
-        src/dist-unittests/lib/*
-        mongo-unittests.tgz
-        src/debugger*.*
-        src/mongo-hanganalyzer.tgz
-        diskstats.tgz
-        system-resource-info.tgz
-        ${report_file|src/report.json}
-        ${archive_file|src/archive.json}
-  setup_group_can_fail_task: true
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in
-  # "set up venv".
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "f_expansions_write"
-  - func: "configure evergreen api credentials"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up credentials"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-  - func: "f_expansions_write"
-  - func: "set up win mount script"
-  - func: "f_expansions_write"
-  - func: "generate compile expansions"
-  - func: "f_expansions_write"
-  teardown_group:
-  - func: "f_expansions_write"
-  - func: "umount shared scons directory"
-  - func: "cleanup environment"
-  timeout:
-  - func: "f_expansions_write"
-  - func: "run hang analyzer"
-  - func: "wait for resmoke to shutdown"
-
 - &jepsen_config_vars
   jepsen_key_time_limit: --key-time-limit 15
   jepsen_protocol_version: --protocol-version 1
@@ -239,11 +156,12 @@ tasks:
         --runAllFeatureFlagTests
 
 - name: build_metrics_tasks_gen
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "experimental"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - command: subprocess.exec
     params:
       binary: bash
@@ -369,8 +287,9 @@ tasks:
   - func: "run idl tests"
 
 - name: iwyu_self_test
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant"]
   commands:
+  - func: "do scons setup"
   - command: subprocess.exec
     params:
       binary: bash
@@ -1260,26 +1179,3 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate version validation"
-
-
-################################################
-#                 Task Groups                  #
-################################################
-task_groups:
-- <<: *compile_task_group_template
-  name: build_metrics_gen_TG
-  tags: []
-  tasks:
-  - build_metrics_tasks_gen
-
-- <<: *compile_task_group_template
-  name: libdeps_graph_linting_TG
-  tags: ["default"]
-  tasks:
-  - libdeps_graph_linting
-
-- <<: *compile_task_group_template
-  name: iwyu_self_test_TG
-  tags: ["default"]
-  tasks:
-  - iwyu_self_test

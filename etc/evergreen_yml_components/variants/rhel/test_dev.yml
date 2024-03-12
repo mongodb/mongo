@@ -140,10 +140,10 @@ buildvariants:
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: run_pretty_printer_tests
-    - name: server_discovery_and_monitoring_json_test_TG
+    - name: server_discovery_and_monitoring_json_test
       distros:
       - rhel80-large
-    - name: server_selection_json_test_TG
+    - name: server_selection_json_test
       distros:
       - rhel80-large
 

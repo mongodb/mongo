@@ -108,7 +108,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_variant: *windows-dynamic-visibility-test
   tasks:
-  - name: visibility_test_TG
+  - name: compile_visibility_test
     distros:
     - windows-vsCurrent-large
 

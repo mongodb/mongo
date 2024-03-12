@@ -26,7 +26,6 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/compile_tasks.yml
-# - etc/evergreen_yml_components/tasks/misc_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &compile_task_group_template
   name: compile_task_group_template
@@ -91,6 +90,7 @@ variables:
   - func: "get buildnumber"
   - func: "f_expansions_write"
   - func: "set up credentials"
+  - func: "f_expansions_write"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "f_expansions_write"
   - func: "set up win mount script"
@@ -785,11 +785,12 @@ tasks:
         install-core
 
 - name: libdeps_graph_linting
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - func: "f_expansions_write"
   - command: subprocess.exec
     params:
@@ -863,12 +864,13 @@ tasks:
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant"]
   exec_timeout_secs: 7200 # 1 hour timeout for the task overall
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - func: "scons compile"
     vars:
       task_compile_flags: >-
@@ -1138,11 +1140,12 @@ tasks:
       separate_debug: off
 
 - name: compile_visibility_test
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "experimental"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - func: "scons compile"
     vars:
       targets: archive-visibility-test-meta
@@ -1199,7 +1202,6 @@ tasks:
       permissions: public-read
       content_type: application/tar
       display_name: "Stitch Support Library"
-  - func: "do scons teardown"
 
 - name: stitch_support_install_and_run_tests
   tags: ["assigned_to_jira_team_devprod_build", "release_critical", "incompatible_mac", "stitch"]
@@ -1225,7 +1227,6 @@ tasks:
       binary: bash
       args:
       - "src/evergreen/stitch_support_run_tests.sh"
-  - func: "do scons teardown"
 
 - name: crypt_create_lib
   tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "crypt"]
@@ -1262,7 +1263,6 @@ tasks:
       permissions: public-read
       content_type: ${content_type|application/tar}
       display_name: "Mongo crypt Library"
-  - func: "do scons teardown"
 
 - name: crypt_create_debug_lib
   tags: ["assigned_to_jira_team_server_security"]
@@ -2300,13 +2300,11 @@ tasks:
 task_groups:
 - <<: *compile_task_group_template
   name: compile_dist_test_TG
-  tags: []
   tasks:
   - compile_dist_test
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_TG
-  tags: []
   tasks:
   - compile_bazel_dist_test
   - compile_bazel_c_and_asm_targets_gcc
@@ -2317,7 +2315,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: bazel_workstation_TG
-  tags: []
   tasks:
   - bazel_workstation_unittests
 
@@ -2328,32 +2325,27 @@ task_groups:
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_ninja_TG
-  tags: []
   tasks:
   - compile_ninja_bazel
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_windows_TG
-  tags: []
   tasks:
   - compile_bazel_dist_test_windows
   - run_bazel_program_windows
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_macos_TG
-  tags: []
   tasks:
   - compile_bazel_dist_test
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG
-  tags: []
   tasks:
   - compile_upload_benchmarks
 
 - <<: *compile_task_group_template
   name: compile_and_archive_dist_test_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2361,7 +2353,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_and_archive_dist_test_then_package_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2370,19 +2361,16 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_ninja_next_TG
-  tags: []
   tasks:
   - compile_ninja_next
 
 - <<: *compile_task_group_template
   name: compile_build_tools_next_TG
-  tags: []
   tasks:
   - compile_build_tools_next
 
 - <<: *compile_task_group_template
   name: compile_ninja_TG
-  tags: []
   tasks:
   - compile_ninja
   teardown_task:
@@ -2400,49 +2388,41 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_ninja_quick_TG
-  tags: []
   tasks:
   - compile_ninja_quick
 
 - <<: *compile_task_group_template
   name: compile_ninja_default_profile_TG
-  tags: []
   tasks:
   - compile_ninja_default_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_default_profile_linux_TG
-  tags: []
   tasks:
   - compile_ninja_default_profile_linux
 
 - <<: *compile_task_group_template
   name: compile_ninja_opt_profile_TG
-  tags: []
   tasks:
   - compile_ninja_opt_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_san_profile_TG
-  tags: []
   tasks:
   - compile_ninja_san_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_fast_profile_TG
-  tags: []
   tasks:
   - compile_ninja_fast_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_compiledb_profile_TG
-  tags: []
   tasks:
   - compile_ninja_compiledb_profile
 
 - <<: *compile_task_group_template
   name: compile_run_and_archive_dbtest_TG
-  tags: []
   tasks:
   - compile_dbtest
   - run_dbtest
@@ -2450,7 +2430,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_serial_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2461,7 +2440,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_serial_future_git_tag_multiversion_TG
-  tags: []
   tasks:
   - compile_dist_test_future_git_tag_multiversion
   - archive_dist_test_future_git_tag_multiversion
@@ -2475,7 +2453,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2492,7 +2469,6 @@ task_groups:
 # a terabyte of data.
 - <<: *compile_task_group_template
   name: compile_test_serial_no_unittests_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2504,7 +2480,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_no_unittests_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2519,7 +2494,6 @@ task_groups:
 # TODO: SERVER-79886 Fix commented out tasks
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_lto_no_unittests_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2534,7 +2508,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_and_package_serial_no_unittests_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2542,7 +2515,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_benchmark_serial_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2557,7 +2529,6 @@ task_groups:
 # a terabyte of data.
 - <<: *compile_task_group_template
   name: compile_test_benchmark_and_package_serial_no_unittests_TG
-  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2572,7 +2543,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_parallel_unittest_stream_TG
-  tags: []
   max_hosts: -1
   tasks:
   - compile_and_run_unittests_first_quarter
@@ -2591,7 +2561,6 @@ task_groups:
 # cost of re-running the setup tasks.
 - <<: *compile_task_group_template
   name: compile_test_parallel_core_stream_TG
-  tags: []
   tasks:
   - compile_dist_test
   - determine_patch_tests
@@ -2601,7 +2570,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_parallel_dbtest_stream_TG
-  tags: []
   tasks:
   - compile_dbtest
   - run_dbtest
@@ -2609,85 +2577,15 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: scons_compile_smoke_test_TG
-  tags: []
   tasks:
   - scons_dev_compile_smoke_test
 
 - <<: *compile_task_group_template
   name: ninja_compile_smoke_test_TG
-  tags: []
   tasks:
   - ninja_dev_compile_smoke_test
 
-- name: clang_tidy_TG
-  tags: ["development_critical_single_variant"]
-  setup_group_can_fail_task: true
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "configure evergreen api credentials"
-  - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up credentials"
-  - func: "f_expansions_write"
-  - func: "set up win mount script"
-  - func: "f_expansions_write"
-  - func: "generate compile expansions"
-  - func: "get engflow creds"
-  teardown_group:
-  - func: "f_expansions_write"
-  - func: "attach report"
-  - func: "upload clang tidy results"
-  - func: "f_expansions_write"
-  - func: "umount shared scons directory"
-  - func: "cleanup environment"
-  setup_task:
-  - func: "apply compile expansions"
-  - func: "f_expansions_write"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  teardown_task:
-  tasks:
-  - clang_tidy
-
-- name: visibility_test_TG
-  tags: ["default"]
-  setup_group_can_fail_task: true
-  max_hosts: 1
-  setup_group:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "get buildnumber"
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "set up credentials"
-  - func: "f_expansions_write"
-  - func: "set up win mount script"
-  - func: "f_expansions_write"
-  - func: "generate compile expansions"
-  teardown_group:
-  - func: "f_expansions_write"
-  - func: "umount shared scons directory"
-  setup_task:
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  - func: "apply compile expansions"
-  - func: "f_expansions_write"
-  teardown_task:
-  - func: "attach scons logs"
-  tasks:
-  - compile_visibility_test
-
 - name: crypt_build_debug_and_test
-  tags: ["default"]
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"

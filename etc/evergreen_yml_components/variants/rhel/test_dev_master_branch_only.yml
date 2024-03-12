@@ -247,10 +247,10 @@ buildvariants:
     # and processes to be used with TLS on a single host.
     - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.sharding !.txns
     - name: .lint
-    - name: libdeps_graph_linting_TG
+    - name: libdeps_graph_linting
       distros:
       - rhel80-large
-    - name: clang_tidy_TG
+    - name: clang_tidy
       distros:
       - rhel80-xxlarge
 

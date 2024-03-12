@@ -445,9 +445,8 @@ functions:
       permissions: public-read
       content_type: ${content_type|application/gzip}
 
-  "use WiredTiger develop":
-  - *f_expansions_write
-  - command: subprocess.exec
+  "use WiredTiger develop": &use_wiredtiger_develop
+    command: subprocess.exec
     display_name: "wiredtiger develop use"
     params:
       binary: bash
@@ -2452,11 +2451,18 @@ functions:
   - *cleanup_environment
   - *set_up_venv
   - *upload_pip_requirements
+  - *f_expansions_write
+  - *configure_evergreen_api_credentials
   - *get_buildnumber
+  - *f_expansions_write
+  - *set_up_credentials
+  - *f_expansions_write
+  - *use_wiredtiger_develop
   - *f_expansions_write
   - *set_up_win_mount_script
   - *f_expansions_write
   - *generate_compile_expansions
+  - *f_expansions_write
   - *apply_compile_expansions
   - *f_expansions_write
   - *set_task_expansion_macros
@@ -2464,10 +2470,3 @@ functions:
   - *get_engflow_key
   - *get_engflow_cert
   - *generate_evergreen_engflow_bazelrc
-
-  "do scons teardown":
-  - *attach_scons_config_logs
-  - *attach_scons_cache_logs
-  - *attach_scons_stdout_logs
-  - *f_expansions_write
-  - *umount_shared_scons_directory

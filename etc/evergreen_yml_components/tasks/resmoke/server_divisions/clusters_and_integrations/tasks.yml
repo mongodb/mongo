@@ -108,7 +108,6 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/compile_tasks.yml
-# - etc/evergreen_yml_components/tasks/misc_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &compile_task_group_template
   name: compile_task_group_template
@@ -173,6 +172,7 @@ variables:
   - func: "get buildnumber"
   - func: "f_expansions_write"
   - func: "set up credentials"
+  - func: "f_expansions_write"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "f_expansions_write"
   - func: "set up win mount script"
@@ -486,11 +486,12 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: server_discovery_and_monitoring_json_test
-  tags: ["assigned_to_jira_team_server_servicearch"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - func: "scons compile"
     vars:
       targets: install-sdam-json-test
@@ -501,11 +502,12 @@ tasks:
       suite: sdam_json_test
 
 - name: server_selection_json_test
-  tags: ["assigned_to_jira_team_server_servicearch"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
+  - func: "do scons setup"
   - func: "scons compile"
     vars:
       targets: install-server-selection-json-test
@@ -1844,14 +1846,12 @@ tasks:
 task_groups:
 - <<: *compile_task_group_template
   name: compile_archive_and_run_libfuzzertests_TG
-  tags: []
   tasks:
   - compile_and_archive_libfuzzertests
   - fetch_and_run_libfuzzertests
 
 - <<: *compile_task_group_template
   name: compile_integration_and_test_no_audit_parallel_stream_TG
-  tags: []
   tasks:
   - compile_integration_test
   - integration_tests_standalone
@@ -1861,7 +1861,6 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_integration_and_test_parallel_stream_TG
-  tags: []
   tasks:
   - compile_integration_test
   - integration_tests_standalone
@@ -1876,7 +1875,6 @@ task_groups:
 # across different tasks.
 - <<: *compile_task_group_template
   name: small_compile_test_and_package_serial_no_unittests_TG
-  tags: []
   tasks:
   - compile_dist_test_half
   - compile_dist_test
@@ -1893,16 +1891,3 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_all_but_not_unittests
-
-
-- <<: *compile_task_group_template
-  name: server_discovery_and_monitoring_json_test_TG
-  tags: ["default"]
-  tasks:
-  - server_discovery_and_monitoring_json_test
-
-- <<: *compile_task_group_template
-  name: server_selection_json_test_TG
-  tags: ["default"]
-  tasks:
-  - server_selection_json_test

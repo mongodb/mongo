@@ -332,8 +332,8 @@ buildvariants:
   - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
+  - name: server_discovery_and_monitoring_json_test
+  - name: server_selection_json_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel80-debug-ubsan
@@ -417,8 +417,8 @@ buildvariants:
   - name: .updatefuzzer
   - name: .serverless
   - name: watchdog_wiredtiger
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
+  - name: server_discovery_and_monitoring_json_test
+  - name: server_selection_json_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &rhel80-debug-aubsan-lite_fuzzer-template

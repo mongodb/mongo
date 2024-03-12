@@ -65,7 +65,7 @@ buildvariants:
     clang_tidy_toolchain: v4
     compile_variant: *amazon-linux2-arm64-dynamic-compile
   tasks:
-    - name: clang_tidy_TG
+    - name: clang_tidy
       distros:
         - amazon2-arm64-xlarge
     - name: compile_ninja_quick_TG
@@ -74,11 +74,11 @@ buildvariants:
     - name: compile_test_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
-    - name: iwyu_self_test_TG
+    - name: iwyu_self_test
     - name: .lint
     - name: resmoke_validation_tests
-    - name: server_discovery_and_monitoring_json_test_TG
-    - name: server_selection_json_test_TG
+    - name: server_discovery_and_monitoring_json_test
+    - name: server_selection_json_test
     - name: run_pretty_printer_tests
 
 - name: &commit-queue commit-queue

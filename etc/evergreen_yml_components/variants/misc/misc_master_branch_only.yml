@@ -17,7 +17,7 @@ buildvariants:
       --win-version-min=win10
     python: '/cygdrive/c/python/python310/python.exe'
   tasks:
-  - name: build_metrics_gen_TG
+  - name: build_metrics_tasks_gen
 
 - name: &macos-enterprise-build-metrics macos-enterprise-build-metrics
   display_name: "~ Build Metrics Enterprise MacOS"
@@ -34,7 +34,7 @@ buildvariants:
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
   tasks:
-  - name: build_metrics_gen_TG
+  - name: build_metrics_tasks_gen
 
 - name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
   display_name: "~ Build Metrics Enterprise RHEL 8.0 "
@@ -52,7 +52,7 @@ buildvariants:
     core_analyzer_distro_name: rhel80-xlarge
     num_scons_link_jobs_available: 0.1
   tasks:
-  - name: build_metrics_gen_TG
+  - name: build_metrics_tasks_gen
 
 - name: &enterprise-rhel-80-aarch64-build-metrics enterprise-rhel-80-aarch64-build-metrics
   display_name: "~ Build Metrics Enterprise AL22 ARM"
@@ -69,7 +69,7 @@ buildvariants:
     large_distro_name: amazon2023.0-arm64-large
     num_scons_link_jobs_available: 0.1
   tasks:
-  - name: build_metrics_gen_TG
+  - name: build_metrics_tasks_gen
 
 - name: &shared-scons-cache-pruning shared-scons-cache-pruning
   display_name: "Shared SCons Cache Pruning"

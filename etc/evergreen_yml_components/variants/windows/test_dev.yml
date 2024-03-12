@@ -75,8 +75,8 @@ buildvariants:
   - name: compile_test_parallel_unittest_stream_TG
   - name: compile_test_parallel_dbtest_stream_TG
   - name: compile_build_tools_next_TG
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
+  - name: server_discovery_and_monitoring_json_test
+  - name: server_selection_json_test
   - name: .crypt
   - name: generate_buildid_to_debug_symbols_mapping
 
