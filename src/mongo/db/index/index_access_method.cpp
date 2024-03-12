@@ -211,7 +211,8 @@ public:
     SorterFileStats sorterFileStats = {&sorterTracker};
 };
 
-auto& indexBulkBuilderSSS = *ServerStatusSectionBuilder<IndexBulkBuilderSSS>("indexBulkBuilder");
+auto& indexBulkBuilderSSS =
+    *ServerStatusSectionBuilder<IndexBulkBuilderSSS>("indexBulkBuilder").forShard();
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be

@@ -240,5 +240,5 @@ public:
         return builder.obj();
     }
 };
-auto indexStatsSSS = *ServerStatusSectionBuilder<IndexStatsSSS>("indexStats");
+auto indexStatsSSS = *ServerStatusSectionBuilder<IndexStatsSSS>("indexStats").forShard();
 }  // namespace mongo

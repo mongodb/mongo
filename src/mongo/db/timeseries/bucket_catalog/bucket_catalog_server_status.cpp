@@ -106,7 +106,7 @@ public:
     }
 };
 auto& bucketCatalogServerStatus =
-    *ServerStatusSectionBuilder<BucketCatalogServerStatus>("bucketCatalog");
+    *ServerStatusSectionBuilder<BucketCatalogServerStatus>("bucketCatalog").forShard();
 
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

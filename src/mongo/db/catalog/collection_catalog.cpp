@@ -239,7 +239,7 @@ public:
 };
 
 auto& gCollectionCatalogSection =
-    *ServerStatusSectionBuilder<CollectionCatalogSection>("collectionCatalog");
+    *ServerStatusSectionBuilder<CollectionCatalogSection>("collectionCatalog").forShard();
 
 class IgnoreExternalViewChangesForDatabase {
 public:

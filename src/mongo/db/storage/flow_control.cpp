@@ -87,7 +87,7 @@ public:
 };
 
 auto& flowControlSection =
-    *ServerStatusSectionBuilder<FlowControlServerStatusSection>("flowControl");
+    *ServerStatusSectionBuilder<FlowControlServerStatusSection>("flowControl").forShard();
 
 const auto getFlowControl = ServiceContext::declareDecoration<std::unique_ptr<FlowControl>>();
 
