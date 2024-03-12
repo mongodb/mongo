@@ -1,6 +1,10 @@
 /**
  * Tests that any running MultiUpdateCoordinators are aborted and properly
  * cleaned up before downgrading to 7.0.
+ *
+ *  @tags: [
+ *      featureFlagPauseMigrationsDuringMultiUpdatesAvailable
+ *  ]
  */
 
 import {migrationsAreAllowed} from "jstests/libs/chunk_manipulation_util.js";
