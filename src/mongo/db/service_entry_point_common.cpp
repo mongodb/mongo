@@ -57,6 +57,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -166,6 +167,8 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -520,6 +523,9 @@ public:
         // Ensure the lifetime of `_scopedMetrics` ends here.
         _scopedMetrics = boost::none;
 
+        // Release the ingress admission ticket
+        _admissionTicket = boost::none;
+
         if (!_execContext.client().isInDirectClient()) {
             auto authzSession = AuthorizationSession::get(_execContext.client());
             authzSession->verifyContract(_execContext.getCommand()->getAuthorizationContract());
@@ -663,6 +669,8 @@ private:
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
+
+    boost::optional<Ticket> _admissionTicket;
 
     // Keep a static variable to track the last time a warning about direct shard connections was
     // logged.
@@ -1760,6 +1768,16 @@ void ExecCommandDatabase::_initiateCommand() {
                                          ErrorCodes::MaxTimeMSExpired);
             }
         }
+    }
+
+    // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
+    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
+        boost::optional<ScopedAdmissionPriority> admissionPriority;
+        if (!_invocation->isSubjectToIngressAdmissionControl()) {
+            admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+        }
+        auto& admissionController = IngressAdmissionController::get(opCtx);
+        _admissionTicket = admissionController.admitOperation(opCtx);
     }
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);

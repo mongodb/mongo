@@ -1,7 +1,25 @@
 # -*- mode: python -*-
+
 Import("env")
 
 env = env.Clone()
+
+env.Library(
+    target='ingress_admission_control',
+    source=[
+        'ingress_admission_controller.cpp',
+        'ingress_admission_control.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/admission_context',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_feature_flags',
+    ],
+)
 
 env.Library(
     target='execution_control_feature_flags',
