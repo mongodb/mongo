@@ -150,13 +150,8 @@ export class QuerySettingsUtils {
         let settingsArray = this.getQuerySettings();
         while (settingsArray.length > 0) {
             const setting = settingsArray.pop();
-            // Some suites may transparently retry this request if it fails due to e.g., step down.
-            // However, the settings may already be modified. The retry will then fail with:
-            //  "A matching query settings entry does not exist"
-            // despite the call actually succeeding.
-            // Since we immediately check the correct set of settings exists, this test still
-            // verifies the correct behaviour, even without an assert.commandWorked here.
-            this.adminDB.runCommand({removeQuerySettings: setting.representativeQuery});
+            assert.commandWorked(
+                this.adminDB.runCommand({removeQuerySettings: setting.representativeQuery}));
             // Check that the given setting has indeed been removed.
             this.assertQueryShapeConfiguration(settingsArray);
         }

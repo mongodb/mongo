@@ -152,26 +152,6 @@ void readModifyWrite(OperationContext* opCtx,
     }
 }
 
-/**
- * Finds a query shape configuration by the given query shape hash in the given vector. Returns an
- * iterator (non-const) in cases of success or throws otherwise.
- */
-std::vector<QueryShapeConfiguration>::iterator findByHash(
-    std::vector<QueryShapeConfiguration>& settingsArray,
-    const query_shape::QueryShapeHash& queryShapeHash) {
-    auto matchingQueryShapeConfigurationIt =
-        std::find_if(settingsArray.begin(),
-                     settingsArray.end(),
-                     [&](const QueryShapeConfiguration& configuration) {
-                         return configuration.getQueryShapeHash() == queryShapeHash;
-                     });
-    // Ensure the 'queryShapeHash' is present in the 'settingsArray'.
-    uassert(7746701,
-            "A matching query settings entry does not exist",
-            matchingQueryShapeConfigurationIt != settingsArray.end());
-    return matchingQueryShapeConfigurationIt;
-}
-
 void assertNoStandalone(OperationContext* opCtx, const std::string& cmdName) {
     auto* repl = repl::ReplicationCoordinator::get(opCtx);
     bool isStandalone = repl && !repl->getSettings().isReplSet() &&
@@ -234,8 +214,20 @@ public:
             // Build the new 'settingsArray' by updating the existing QueryShapeConfiguration with
             // the new query settings.
             readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
-                findByHash(settingsArray, newQueryShapeConfiguration.getQueryShapeHash())
-                    ->setSettings(newQueryShapeConfiguration.getSettings());
+                auto matchingQueryShapeConfigurationIt =
+                    std::find_if(settingsArray.begin(),
+                                 settingsArray.end(),
+                                 [&](const QueryShapeConfiguration& configuration) {
+                                     return configuration.getQueryShapeHash() ==
+                                         newQueryShapeConfiguration.getQueryShapeHash();
+                                 });
+
+                // Ensure the 'queryShapeHash' is present in the 'settingsArray'.
+                tassert(8758500,
+                        "no matching query settings entries",
+                        matchingQueryShapeConfigurationIt != settingsArray.end());
+                matchingQueryShapeConfigurationIt->setSettings(
+                    newQueryShapeConfiguration.getSettings());
             });
 
             SetQuerySettingsCommandReply reply;
@@ -400,10 +392,19 @@ public:
                       },
                       request().getCommandParameter());
 
-            // Build the new 'settingsArray' by removing the QueryShapeConfiguration with a matching
-            // QueryShapeHash.
+            // Build the new 'settingsArray' by removing the first QueryShapeConfiguration matching
+            // the 'queryShapeHash'. There can be only one match, since 'settingsArray' is
+            // constructed from a map where QueryShapeHash is the key.
             readModifyWrite(opCtx, request().getDbName(), [&](auto& settingsArray) {
-                settingsArray.erase(findByHash(settingsArray, queryShapeHash));
+                auto matchingQueryShapeConfigurationIt =
+                    std::find_if(settingsArray.begin(),
+                                 settingsArray.end(),
+                                 [&](const QueryShapeConfiguration& configuration) {
+                                     return configuration.getQueryShapeHash() == queryShapeHash;
+                                 });
+                if (matchingQueryShapeConfigurationIt != settingsArray.end()) {
+                    settingsArray.erase(matchingQueryShapeConfigurationIt);
+                }
             });
         }
 

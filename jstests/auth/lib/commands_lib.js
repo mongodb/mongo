@@ -7488,7 +7488,6 @@ export const authCommandsLib = {
             roles: roles_clusterManager,
             privileges: [{resource: {cluster: true}, actions: ["querySettings"]}],
             expectAuthzFailure: false, // We expect the request to be authorized.
-            expectFail: true // We expect to receive 7746701 because there are no matching query settings .
           },
       ]
       },

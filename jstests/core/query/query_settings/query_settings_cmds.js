@@ -84,13 +84,7 @@ let testQuerySettingsUsing =
         // Ensure that removeQuerySettings command removes one query settings from the
         // 'settingsArray' of the 'querySettings' cluster parameter by providing a query instance.
         {
-            // Some suites may transparently retry this request if it fails due to e.g., step down.
-            // However, the settings may already be modified. The retry will then fail with:
-            //  "A matching query settings entry does not exist"
-            // despite the call actually succeeding.
-            // Since we immediately check the correct set of settings exists, this test still
-            // verifies the correct behaviour, even without an assert.commandWorked here.
-            db.adminCommand({removeQuerySettings: params.queryBPrime});
+            assert.commandWorked(db.adminCommand({removeQuerySettings: params.queryBPrime}));
             qsutils.assertQueryShapeConfiguration(
                 [qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA)]);
             qsutils.assertExplainQuerySettings(params.queryB, undefined);
@@ -99,12 +93,7 @@ let testQuerySettingsUsing =
         // Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings
         // command providing a query shape hash.
         {
-            // Some suites may transparently retry this request if it fails due to e.g., step down.
-            // However, the settings may already be modified. The retry will then fail with: "A
-            // matching query settings entry does not exist" despite the call actually succeeding.
-            // Since we immediately check the correct set of settings exists, this test still
-            // verifies the correct behavior, even without an assert.commandWorked here.
-            db.adminCommand({removeQuerySettings: queryShapeHashA});
+            assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
             qsutils.assertQueryShapeConfiguration([]);
             qsutils.assertExplainQuerySettings(params.queryA, undefined);
         }
@@ -128,13 +117,7 @@ let testQuerySettingsUsing =
                             showDebugQueryShape: true,
                         })[0]
                         .hasOwnProperty("debugQueryShape"));
-
-            // Some suites may transparently retry this request if it fails due to e.g., step down.
-            // However, the settings may already be modified. The retry will then fail with: "A
-            // matching query settings entry does not exist" despite the call actually succeeding.
-            // Since we immediately check the correct set of settings exists, this test still
-            // verifies the correct behavior, even without an assert.commandWorked here.
-            db.adminCommand({removeQuerySettings: queryShapeHashA});
+            assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
             qsutils.assertQueryShapeConfiguration([]);
         }
     }
@@ -263,7 +246,7 @@ testQuerySettingsParameterized({
         db.adminCommand({setQuerySettings: query, settings: {reject: false}}), 8587402);
 
     // Confirm that the settings can indeed be removed (also cleans up after above test).
-    db.adminCommand({removeQuerySettings: query});
+    assert.commandWorked(db.adminCommand({removeQuerySettings: query}));
     // Check that the given setting has indeed been removed.
     qsutils.assertQueryShapeConfiguration([]);
 }

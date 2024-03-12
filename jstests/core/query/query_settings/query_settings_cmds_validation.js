@@ -30,9 +30,8 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 }
 
 {
-    // Ensure that removeQuerySettings command fails for invalid input.
-    assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: nonExistentQueryShapeHash}),
-                                 7746701);
+    // Ensure that removeQuerySettings command ignores for invalid input.
+    assert.commandWorked(db.adminCommand({removeQuerySettings: nonExistentQueryShapeHash}));
     assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: {notAValid: "query"}}),
                                  7746402);
 }
