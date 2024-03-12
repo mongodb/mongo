@@ -228,15 +228,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings") && !FixtureHelpers.
     // solution plan, that won't be cached in classic.
     const settings = {
         indexHints:
-            {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1", "a_1_b_1"]}
+            {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1_b_1", "b_1_a_1"]}
     };
-    const filter = {a: 1};
+    assert.commandWorked(coll.createIndex({b: 1, a: 1}));
+    const filter = {a: 1, b: 1};
     const query = qsutils.makeFindQueryInstance({filter});
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: settings}));
     qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(settings, query)]);
 
     // Run the query, such that a plan cache entry is created.
-    assert.eq(3, coll.find(filter).itcount());
+    assert.eq(1, coll.find(filter).itcount());
 
     // Ensure plan cache entry contains 'settings'.
     const planCacheEntry = getPlansForCacheEntry(filter);
