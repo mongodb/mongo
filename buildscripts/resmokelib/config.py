@@ -127,10 +127,10 @@ DEFAULTS = {
     "task_doc": None,
     "variant_name": None,
     "version_id": None,
-
     # Cedar options.
     "cedar_url": "cedar.mongodb.com",
     "cedar_rpc_port": "7070",
+    "work_dir": None,
 
     # WiredTiger options.
     "wt_coll_config": None,
@@ -320,6 +320,9 @@ EVERGREEN_VERSION_ID = None
 
 # The url that retrieve the debug symbol from a patch build.
 DEBUG_SYMBOLS_URL = None
+
+# The Evergreen task's working directory.
+EVERGREEN_WORK_DIR = None
 
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None

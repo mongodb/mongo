@@ -1004,6 +1004,9 @@ class RunPlugin(PluginInterface):
         evergreen_options.add_argument("--versionId", dest="version_id", metavar="VERSION_ID",
                                        help="Sets the version ID of the task.")
 
+        evergreen_options.add_argument("--taskWorkDir", dest="work_dir", metavar="TASK_WORK_DIR",
+                                       help="Sets the working directory of the task.")
+
         cedar_options = parser.add_argument_group(
             title=_CEDAR_ARGUMENT_TITLE,
             description=("Options used to propagate Cedar service connection information."))
