@@ -73,6 +73,9 @@ build:public-release --legacy_important_outputs
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async
 
+# Enable Build without the Bytes
+common --remote_download_outputs=toplevel
+
 # try to import the bazelrc files if available
 try-import %workspace%/.bazelrc.local
 

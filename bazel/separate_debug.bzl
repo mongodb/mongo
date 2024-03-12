@@ -70,6 +70,21 @@ def propgate_static_lib(ctx, static_lib, static_ext, inputs):
 
     return unstripped_static_lib
 
+def get_transitive_dyn_libs(deps):
+    """
+    Get a transitive list of all dynamic library files under a set of dependencies.
+    """
+
+    # TODO(SERVER-85819): Investigate to see if it's possible to merge the depset without looping over all transitive
+    # dependencies.
+    transitive_dyn_libs = []
+    for dep in deps:
+        for input in dep[CcInfo].linking_context.linker_inputs.to_list():
+            for library in input.libraries:
+                if library.dynamic_library:
+                    transitive_dyn_libs.append(library.dynamic_library)
+    return transitive_dyn_libs
+
 def symlink_shared_archive(ctx, shared_ext, static_ext):
     """
     Shared archives (.so.a/.dll.lib) have different extensions depending on the operating system.
@@ -232,6 +247,12 @@ def linux_extraction(ctx, cc_toolchain, inputs):
         unstripped_shared_archive = symlink_shared_archive(ctx, ".so", ".a")
         outputs.append(unstripped_shared_archive)
 
+    # The final program binary depends on the existence of the dependent dynamic library files. With
+    # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
+    # output set.
+    if ctx.attr.type == "program":
+        outputs.extend(get_transitive_dyn_libs(ctx.attr.deps))
+
     provided_info = [
         DefaultInfo(
             files = depset(outputs),
@@ -295,6 +316,12 @@ def macos_extraction(ctx, cc_toolchain, inputs):
     if ctx.attr.shared_archive:
         unstripped_shared_archive = symlink_shared_archive(ctx, ".dylib", ".a")
         outputs.append(unstripped_shared_archive)
+
+    # The final program binary depends on the existence of the dependent dynamic library files. With
+    # build-without-the-bytes enabled, these aren't downloaded. Manually collect them and add them to the
+    # output set.
+    if ctx.attr.type == "program":
+        outputs.extend(get_transitive_dyn_libs(ctx.attr.deps))
 
     provided_info = [
         DefaultInfo(
