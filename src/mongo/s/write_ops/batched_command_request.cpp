@@ -55,7 +55,12 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
 
     auto writeConcernField = request.body[kWriteConcern];
     if (!writeConcernField.eoo()) {
-        batchRequest.setWriteConcern(writeConcernField.Obj());
+        auto wcObj = writeConcernField.Obj();
+        // Client write concerns without 'w' fields should be filled with the default write concern,
+        // which should be populated later to the operation context during the command setup phase.
+        if (wcObj.hasElement("w")) {
+            batchRequest.setWriteConcern(wcObj);
+        }
     }
 
     // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
@@ -173,7 +178,7 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     return _visit(Visitor{});
 };
 
-bool BatchedCommandRequest::isVerboseWC() const {
+bool BatchedCommandRequest::requiresWriteAcknowledgement() const {
     if (!hasWriteConcern()) {
         return true;
     }

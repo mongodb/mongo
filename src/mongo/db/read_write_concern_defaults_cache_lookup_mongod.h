@@ -40,6 +40,6 @@ namespace mongo {
 boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
     OperationContext* opCtx);
 
-void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx);
+void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx, bool isReplicaSet);
 
 }  // namespace mongo

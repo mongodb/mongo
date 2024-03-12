@@ -132,7 +132,7 @@ public:
         return *_writeConcern;
     }
 
-    bool isVerboseWC() const;
+    bool requiresWriteAcknowledgement() const;
 
     void setShardVersion(ChunkVersion shardVersion) {
         _shardVersion = std::move(shardVersion);

@@ -581,7 +581,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
         request.setDbVersion(*dbVersion);
 
     if (_clientRequest.hasWriteConcern()) {
-        if (_clientRequest.isVerboseWC()) {
+        if (_clientRequest.requiresWriteAcknowledgement()) {
             request.setWriteConcern(_clientRequest.getWriteConcern());
         } else {
             // Mongos needs to send to the shard with w > 0 so it will be able to see the
@@ -775,7 +775,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     batchResp->setStatus(Status::OK());
 
     // For non-verbose, it's all we need.
-    if (!_clientRequest.isVerboseWC()) {
+    if (!_opCtx->getWriteConcern().requiresWriteAcknowledgement()) {
         return;
     }
 

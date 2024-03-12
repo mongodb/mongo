@@ -109,6 +109,10 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
                           << "\" fields must be present",
             rc || wc);
 
+    uassert(ErrorCodes::BadValue,
+            "Default write concern must have 'w' field.",
+            !wc || !wc->isExplicitWithoutWField());
+
     RWConcernDefault rwc;
 
     if (rc && !rc->isEmpty()) {

@@ -3842,6 +3842,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                 const auto rwcDefaults =
                     ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
                 const auto wcDefault = rwcDefaults.getDefaultWriteConcern();
+                // Default WC can be 'boost::none' if the implicit default is used and set to 'w:1'.
                 if (wcDefault) {
                     auto validateWCStatus = newConfig.validateWriteConcern(wcDefault.get());
                     if (!validateWCStatus.isOK()) {
