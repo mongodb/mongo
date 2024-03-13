@@ -117,3 +117,4 @@ buildvariants:
       - name: external_auth_windows
         distros:
           - windows-2016-dc
+      - name: sasl_windows_cyrussasl

@@ -1447,6 +1447,20 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  - <<: *task_template
+    name: sasl_windows_cyrussasl
+    tags: ["assigned_to_jira_team_server_security", "sasl", "experimental"]
+    commands:
+      - func: "f_expansions_write"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/sasl_windows_cyrussasl_setup.sh"
+      - func: "run tests"
+
   - <<: *gen_task_template
     name: sharding_auth_audit_gen
     tags:

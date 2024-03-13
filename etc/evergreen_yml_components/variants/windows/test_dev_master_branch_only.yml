@@ -181,4 +181,4 @@ buildvariants:
       - name: .encrypt .patch_build
       - name: .sasl .patch_build
       - name: external_auth_aws
-      - name: external_auth_oidc
+      - name: sasl_windows_cyrussasl
