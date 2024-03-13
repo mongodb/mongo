@@ -94,6 +94,9 @@ selector:
     # TODO(SERVER-87308): This tests times out when replicateVectoredInsertsTransactionally is
     # enabled because we have to do a write for every causal secondary read.
     - jstests/core/timeseries/timeseries_predicates.js
+    # Test expects changes in metrics (rejected command count), but these are
+    # per-ClusterRole. This suite changes which role's metrics are updated.
+    - jstests/core/query/query_settings/query_settings_reject_application.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
