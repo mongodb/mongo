@@ -133,7 +133,7 @@ protected:
     ProjectionExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        ProjectionPolicies policies,
                        boost::optional<projection_ast::ProjectionPathASTNode> proj = boost::none)
-        : projection(proj),
+        : projection(std::move(proj)),
           _expCtx(expCtx),
           _policies(policies),
           _projectionPostImageVarId{

@@ -82,7 +82,7 @@ ExclusionProjectionExecutor::ExclusionProjectionExecutor(
     ProjectionPolicies policies,
     bool allowFastPath,
     boost::optional<projection_ast::ProjectionPathASTNode> proj)
-    : ProjectionExecutor(expCtx, policies, proj),
+    : ProjectionExecutor(expCtx, policies, std::move(proj)),
       _root((allowFastPath && !internalQueryDisableExclusionProjectionFastPath)
                 ? std::make_unique<FastPathEligibleExclusionNode>(policies)
                 : std::make_unique<ExclusionNode>(policies)) {}

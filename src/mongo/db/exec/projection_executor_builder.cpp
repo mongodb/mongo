@@ -55,6 +55,7 @@ namespace {
 constexpr auto kInclusion = projection_ast::ProjectType::kInclusion;
 constexpr auto kExclusion = projection_ast::ProjectType::kExclusion;
 constexpr auto kProjectionPostImageVarName = ProjectionExecutor::kProjectionPostImageVarName;
+const auto kIdFieldPath = FieldPath("_id");
 
 /**
  * Holds data used to built a projection executor while walking an AST tree. This struct is attached
@@ -200,7 +201,7 @@ public:
         const auto& path = _context->fullPath();
         auto& userData = _context->data();
 
-        userData.rootNode()->addProjectionForPath(path.fullPath());
+        userData.rootNode()->addProjectionForPath(path);
         userData.setRootReplacementExpression(createFindPositionalExpression(node, userData, path));
     }
 
@@ -212,7 +213,7 @@ public:
         // to project out the path to which $slice is applied, since it will already be included
         // into the output document.
         if constexpr (std::is_same_v<Executor, InclusionProjectionExecutor>) {
-            userData.rootNode()->addProjectionForPath(path.fullPath());
+            userData.rootNode()->addProjectionForPath(path);
         }
 
         userData.setRootReplacementExpression(createFindSliceExpression(node, userData, path));
@@ -223,14 +224,14 @@ public:
         const auto& userData = _context->data();
 
         userData.rootNode()->addExpressionForPath(
-            path.fullPath(), createFindElemMatchExpression(node, userData, path));
+            path, createFindElemMatchExpression(node, userData, path));
     }
 
     void visit(const projection_ast::ExpressionASTNode* node) final {
         const auto& path = _context->fullPath();
         const auto& userData = _context->data();
 
-        userData.rootNode()->addExpressionForPath(path.fullPath(), node->expression());
+        userData.rootNode()->addExpressionForPath(path, node->expression());
     }
 
     void visit(const projection_ast::BooleanConstantASTNode* node) final {
@@ -240,7 +241,7 @@ public:
         // In an inclusion projection only the _id field can be excluded from the result document.
         // If this is the case, then we don't need to include the field into the projection.
         if constexpr (std::is_same_v<Executor, InclusionProjectionExecutor>) {
-            const auto isIdField = path == "_id";
+            const auto isIdField = path == kIdFieldPath;
             if (isIdField && !node->value()) {
                 return;
             }
@@ -251,7 +252,7 @@ public:
                 !isIdField || node->value());
         }
 
-        userData.rootNode()->addProjectionForPath(path.fullPath());
+        userData.rootNode()->addProjectionForPath(path);
     }
 
     void visit(const projection_ast::ProjectionPathASTNode* node) final {}

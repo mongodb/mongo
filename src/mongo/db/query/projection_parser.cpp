@@ -530,7 +530,7 @@ void parseSubObject(ParseContext* ctx,
 
     FieldPath path(objFieldName);
 
-    if (obj.nFields() == 1 && obj.firstElementFieldNameStringData().startsWith("$")) {
+    if (obj.nFields() == 1 && obj.firstElementFieldNameStringData().starts_with('$')) {
         // Maybe it's an expression.
         const bool isExpression = parseSubObjectAsExpression(ctx, path, obj, parent);
 
@@ -652,8 +652,11 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
 
     for (auto&& elem : obj) {
-        ctx.idSpecified |=
-            elem.fieldNameStringData() == "_id" || elem.fieldNameStringData().startsWith("_id.");
+        if (elem.fieldNameStringData().starts_with("_")) {
+            ctx.idSpecified |= elem.fieldNameStringData() == "_id" ||
+                elem.fieldNameStringData().startsWith("_id.");
+        }
+
         parseElement(&ctx, elem, boost::none, &root);
     }
 

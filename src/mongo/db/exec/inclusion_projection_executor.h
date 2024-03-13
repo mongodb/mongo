@@ -223,7 +223,7 @@ public:
         ProjectionPolicies policies,
         std::unique_ptr<InclusionNode> root,
         boost::optional<projection_ast::ProjectionPathASTNode> proj = boost::none)
-        : ProjectionExecutor(expCtx, policies, proj), _root(std::move(root)) {}
+        : ProjectionExecutor(expCtx, policies, std::move(proj)), _root(std::move(root)) {}
 
     InclusionProjectionExecutor(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -235,7 +235,7 @@ public:
               policies,
               allowFastPath ? std::make_unique<FastPathEligibleInclusionNode>(policies)
                             : std::make_unique<InclusionNode>(policies),
-              proj) {}
+              std::move(proj)) {}
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;
