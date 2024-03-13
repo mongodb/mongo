@@ -53,8 +53,7 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
                           std::vector<BSONObj> shapifiedPipeline);
 
-    AggCmdShapeComponents(OptionalBool explain,
-                          OptionalBool allowDiskUse,
+    AggCmdShapeComponents(OptionalBool allowDiskUse,
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
                           std::vector<BSONObj> shapifiedPipeline);
 
@@ -64,7 +63,6 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
 
     void HashValue(absl::HashState state) const final;
 
-    OptionalBool explain;
     OptionalBool allowDiskUse;
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
