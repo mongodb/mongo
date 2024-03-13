@@ -62,7 +62,6 @@ enums:
         description: "Description of each metadata inconsistency."
         type: string
         values:
-            kMissingLocalCollection: "Collection registered on the sharding catalog not found on the given shards"
             kCollectionOptionsMismatch: "Found collection with mismatching options across shards and/or config server"
             kCollectionUUIDMismatch: "Found collection on non primary shard with mismatching UUID"
             kCorruptedChunkShardKey: "Found chunk with a shard key pattern violation"
@@ -70,6 +69,7 @@ enums:
             kHiddenShardedCollection: "Found sharded collection but relative database does not exist"
             kInconsistentIndex: "Found an index of a sharded collection that is inconsistent between different shards"
             kMisplacedCollection: "Unsharded collection found on shard different from database primary shard"
+            kMissingLocalCollection: "Collection registered on the sharding catalog not found on the given shards"
             kMissingRoutingTable: "Found sharded collection without any chunk"
             kMissingShardKeyIndex: "Found sharded collection without a shard key index"
             kRoutingTableMissingMaxKey: "Routing table has a gap because last chunk boundary does not reach MaxKey"
