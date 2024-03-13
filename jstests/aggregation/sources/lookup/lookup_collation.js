@@ -14,6 +14,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -62,7 +63,7 @@ const lookupNoPipeline = (foreignColl) => {
     };
 };
 
-const resultCaseSensistive = [
+const resultCaseSensitive = [
     {_id: 0, key: "a", matched: [{_id: 0, key: "a"}]},
     {_id: 1, key: "A", matched: [{_id: 1, key: "A"}]},
 ];
@@ -79,7 +80,7 @@ let explain;
         results = collAa.aggregate([lookupInto(collAA)]).toArray();
         assertArrayEq({
             actual: results,
-            expected: resultCaseSensistive,
+            expected: resultCaseSensitive,
             extraErrorMsg: " Default collation on local, running: " + tojson(lookupInto)
         });
 
@@ -116,7 +117,7 @@ let explain;
         results = collAA.aggregate([lookupInto(collAa)], {collation: caseSensitive}).toArray();
         assertArrayEq({
             actual: results,
-            expected: resultCaseSensistive,
+            expected: resultCaseSensitive,
             extraErrorMsg: " Case-sensitive collation on command, running: " + tojson(lookupInto)
         });
     }
@@ -139,7 +140,7 @@ let explain;
         results = collAA.aggregate([lookupStage], {collation: caseInsensitive}).toArray();
         assertArrayEq({
             actual: results,
-            expected: resultCaseSensistive,
+            expected: resultCaseSensitive,
             extraErrorMsg: " Case-sensitive collation on stage, running: " + tojson(lookupInto)
         });
     }
@@ -177,8 +178,13 @@ let explain;
             extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
-        explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
-        assertIndexJoinStrategy(explain);
+
+        let areCollectionsCollocated =
+            FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
+        if (areCollectionsCollocated) {
+            explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
+            assertIndexJoinStrategy(explain);
+        }
 
         // Command-level collation overrides collection-level collation.
         results =
@@ -189,15 +195,19 @@ let explain;
             extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
-        explain =
-            collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive});
-        assertIndexJoinStrategy(explain);
 
-        // If no index is compatible with the requested collation and disk use is not allowed,
-        // nested loop join will be chosen instead.
-        explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
-                                             {collation: {locale: "fr"}, allowDiskUse: false});
-        assertNestedLoopJoinStrategy(explain);
+        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsCollocated) {
+            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
+                                                 {collation: caseInsensitive});
+            assertIndexJoinStrategy(explain);
+
+            // If no index is compatible with the requested collation and disk use is not allowed,
+            // nested loop join will be chosen instead.
+            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
+                                                 {collation: {locale: "fr"}, allowDiskUse: false});
+            assertNestedLoopJoinStrategy(explain);
+        }
 
         // Stage-level collation overrides collection-level and command-level collations.
         let lookupStage = lookupInto(collAa_indexed);
@@ -209,7 +219,9 @@ let explain;
             extraErrorMsg: " Case-insensitive collation on stage, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
-        explain = collAa.explain().aggregate([lookupStage], {collation: caseSensitive});
-        assertIndexJoinStrategy(explain);
+        if (areCollectionsCollocated) {
+            explain = collAa.explain().aggregate([lookupStage], {collation: caseSensitive});
+            assertIndexJoinStrategy(explain);
+        }
     }
 })();

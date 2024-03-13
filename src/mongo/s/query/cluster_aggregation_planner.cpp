@@ -179,6 +179,47 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
     return response;
 }
 
+/**
+ * Contacts the primary shard for the collection default collation.
+ *
+ * TODO SERVER-79159: This function can be deleted once all unsharded collections are tracked in the
+ * sharding catalog (at this point, it wont't be necessary to contact the primary shard for
+ * collation information).
+ */
+BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
+                                        const ChunkManager& cm,
+                                        const NamespaceString& nss) {
+    auto shard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
+    ScopedDbConnection conn(shard->getConnString());
+    std::list<BSONObj> all = conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
+
+    // Collection or collection info does not exist; return an empty collation object.
+    if (all.empty() || all.front().isEmpty()) {
+        return BSONObj();
+    }
+
+    auto collectionInfo = all.front();
+
+    // We inspect 'info' to infer the collection default collation.
+    BSONObj collationToReturn = CollationSpec::kSimpleSpec;
+    if (collectionInfo["options"].type() == BSONType::Object) {
+        BSONObj collectionOptions = collectionInfo["options"].Obj();
+        BSONElement collationElement;
+        auto status = bsonExtractTypedField(
+            collectionOptions, "collation", BSONType::Object, &collationElement);
+        if (status.isOK()) {
+            collationToReturn = collationElement.Obj().getOwned();
+            uassert(ErrorCodes::BadValue,
+                    "Default collation in collection metadata cannot be empty.",
+                    !collationToReturn.isEmpty());
+        } else if (status != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(status);
+        }
+    }
+    return collationToReturn;
+}
+
 ShardId pickMergingShard(OperationContext* opCtx,
                          const boost::optional<ShardId>& pipelineMergeShardId,
                          const std::vector<ShardId>& targetedShards) {
@@ -192,8 +233,12 @@ ShardId pickMergingShard(OperationContext* opCtx,
 
 BSONObj createCommandForMergingShard(Document serializedCommand,
                                      const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
+                                     const NamespaceString& nss,
                                      const ShardId& shardId,
-                                     const boost::optional<ShardingIndexesCatalogCache> sii,
+                                     const std::vector<ShardId>& targetedShards,
+                                     bool hasSpecificMergeShard,
+                                     const ChunkManager& cm,
+                                     const boost::optional<ShardingIndexesCatalogCache>& sii,
                                      bool mergingShardContributesData,
                                      const Pipeline* pipelineForMerging) {
     MutableDocument mergeCmd(serializedCommand);
@@ -207,9 +252,40 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     // If the user didn't specify a collation already, make sure there's a collation attached to
     // the merge command, since the merging shard may not have the collection metadata.
     if (mergeCmd.peek()["collation"].missing()) {
-        mergeCmd["collation"] = mergeCtx->getCollator()
-            ? Value(mergeCtx->getCollator()->getSpec().toBSON())
-            : Value(Document{CollationSpec::kSimpleSpec});
+        mergeCmd["collation"] = [&]() {
+            if (mergeCtx->getCollator()) {
+                return Value(mergeCtx->getCollator()->getSpec().toBSON());
+            } else if (!cm.hasRoutingTable() && !nss.isCollectionlessAggregateNS()) {
+                // If we are dispatching a merging pipeline to a specific shard, and the main
+                // namespace is untracked, we must contact the primary shard to determine whether or
+                // not there exists a collection default collation. This is unfortunate, but
+                // necessary, because while the shards part of the pipeline will discover the
+                // collection default collation upon dispatch to the shard which owns the untracked
+                // collection. The same is not true for the merging pipeline, however, because the
+                // merging shard has no knowledge of the collection default collator.
+                //
+                // Note also that, unlike tracked collections, which do have information about any
+                // collection default collations in the routing information, the same is not true
+                // for untracked collections.
+                //
+                // TODO SERVER-79159: Once all unsharded collections are tracked in the sharding
+                // catalog, this 'else' block can be deleted.
+
+                // We should only be contacting the primary shard if the only shard that we are
+                // targeting is the primary shard and a stage has designated a specific merging
+                // shard.
+                tassert(8596500,
+                        "Contacting primary shard for collation in unexpected case",
+                        targetedShards.size() == 1 && targetedShards[0] == cm.dbPrimary() &&
+                            hasSpecificMergeShard);
+                if (auto untrackedDefaultCollation =
+                        getUntrackedCollectionCollation(mergeCtx->opCtx, cm, nss);
+                    !untrackedDefaultCollation.isEmpty()) {
+                    return Value(untrackedDefaultCollation);
+                }
+            }
+            return Value(Document{CollationSpec::kSimpleSpec});
+        }();
     }
 
     const auto txnRouter = TransactionRouter::get(mergeCtx->opCtx);
@@ -317,7 +393,11 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 
     auto mergeCmdObj = createCommandForMergingShard(serializedCommand,
                                                     expCtx,
+                                                    namespaces.requestedNss,
                                                     mergingShardId,
+                                                    targetedShards,
+                                                    shardDispatchResults.mergeShardId.has_value(),
+                                                    cri->cm,
                                                     cri->sii,
                                                     mergingShardContributesData,
                                                     mergePipeline);
@@ -623,42 +703,6 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
         std::move(cursorParams));
 }
 
-/**
- * Contacts the primary shard for the collection default collation.
- */
-BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
-                                        const ShardId& shardId,
-                                        const NamespaceString& nss) {
-    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-    ScopedDbConnection conn(shard->getConnString());
-    std::list<BSONObj> all = conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
-
-    // Collection or collection info does not exist; return an empty collation object.
-    if (all.empty() || all.front().isEmpty()) {
-        return BSONObj();
-    }
-
-    auto collectionInfo = all.front();
-
-    // We inspect 'info' to infer the collection default collation.
-    BSONObj collationToReturn = CollationSpec::kSimpleSpec;
-    if (collectionInfo["options"].type() == BSONType::Object) {
-        BSONObj collectionOptions = collectionInfo["options"].Obj();
-        BSONElement collationElement;
-        auto status = bsonExtractTypedField(
-            collectionOptions, "collation", BSONType::Object, &collationElement);
-        if (status.isOK()) {
-            collationToReturn = collationElement.Obj().getOwned();
-            uassert(ErrorCodes::BadValue,
-                    "Default collation in collection metadata cannot be empty.",
-                    !collationToReturn.isEmpty());
-        } else if (status != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(status);
-        }
-    }
-    return collationToReturn;
-}
-
 bool isMergeSkipOrLimit(const boost::intrusive_ptr<DocumentSource>& stage) {
     return (dynamic_cast<DocumentSourceLimit*>(stage.get()) ||
             dynamic_cast<DocumentSourceMergeCursors*>(stage.get()) ||
@@ -843,7 +887,7 @@ BSONObj getCollation(OperationContext* opCtx,
     // the command is executed on the primary shard.
     if (!cm->hasRoutingTable()) {
         return requiresCollationForParsingUnshardedAggregate
-            ? getUntrackedCollectionCollation(opCtx, cm->dbPrimary(), nss)
+            ? getUntrackedCollectionCollation(opCtx, *cm, nss)
             : BSONObj();
     }
 

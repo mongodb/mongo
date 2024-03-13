@@ -22,12 +22,6 @@ selector:
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
 
-  # TODO SERVER-85965: These tests currently fail because we do not track the collation of
-  # unsplittable collections in the sharding catalog, and we do not lookup the collation from the
-  # primary shard. Re-enable these tests once we either track this information, or look it up.
-  - jstests/aggregation/sources/lookup/lookup_collation.js
-  - jstests/aggregation/sources/lookup/lookup_foreign_collation.js
-
   # Includes expectations on failpoints being hit on specific shards.
   - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
 

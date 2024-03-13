@@ -7,6 +7,7 @@
  */
 import {anyEq} from "jstests/aggregation/extras/utils.js";
 import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const localColl = testDB.local_no_collation;
@@ -165,13 +166,19 @@ function setup() {
     assert.eq(0, results.length);
 
     let explain = getSingleNodeExplain(localColl.explain().aggregate(pipeline));
-    assert(explain.hasOwnProperty("stages"), explain);
-    let lastStage = explain.stages[explain.stages.length - 1];
-    assert(lastStage.hasOwnProperty("$match"), tojson(explain));
-    assert.eq({$match: {"foreignMatch._id": {$eq: "b"}}},
-              lastStage,
-              "The $match stage should not be optimized into the $lookup stage" + tojson(explain));
+    let lastStage;
+    const areCollectionsCollocated =
+        FixtureHelpers.areCollectionsColocated([localColl, foreignColl]);
 
+    if (areCollectionsCollocated) {
+        assert(explain.hasOwnProperty("stages"), explain);
+        lastStage = explain.stages[explain.stages.length - 1];
+        assert(lastStage.hasOwnProperty("$match"), tojson(explain));
+        assert.eq(
+            {$match: {"foreignMatch._id": {$eq: "b"}}},
+            lastStage,
+            "The $match stage should not be optimized into the $lookup stage" + tojson(explain));
+    }
     // A $lookup stage with a collation that matches the command collation will absorb a $match
     // stage.
     pipeline = [{$lookup: {from: foreignColl.getName(),
@@ -187,10 +194,12 @@ function setup() {
     results = localColl.aggregate(pipeline, {collation: caseInsensitiveCollation}).toArray();
     assert(anyEq(results, expectedResults), tojson(results));
 
-    explain = getSingleNodeExplain(
-        localColl.explain().aggregate(pipeline, {collation: caseInsensitiveCollation}));
-    lastStage = explain.stages[explain.stages.length - 1];
-    assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
+    if (areCollectionsCollocated) {
+        explain = getSingleNodeExplain(
+            localColl.explain().aggregate(pipeline, {collation: caseInsensitiveCollation}));
+        lastStage = explain.stages[explain.stages.length - 1];
+        assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
+    }
 
     // A $lookup stage with a collation that matches the local collection collation will absorb
     // a $match stage.
@@ -207,7 +216,9 @@ function setup() {
     results = localCaseInsensitiveColl.aggregate(pipeline).toArray();
     assert(anyEq(results, expectedResults), tojson(results));
 
-    explain = getSingleNodeExplain(localCaseInsensitiveColl.explain().aggregate(pipeline));
-    lastStage = explain.stages[explain.stages.length - 1];
-    assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
+    if (areCollectionsCollocated) {
+        explain = getSingleNodeExplain(localCaseInsensitiveColl.explain().aggregate(pipeline));
+        lastStage = explain.stages[explain.stages.length - 1];
+        assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
+    }
 })();

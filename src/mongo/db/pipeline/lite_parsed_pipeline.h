@@ -154,7 +154,6 @@ public:
         });
     }
 
-
     /**
      * Returns an error Status if at least one of the stages does not allow the involved
      * namespace 'nss' to be sharded, otherwise returns Status::OK().
