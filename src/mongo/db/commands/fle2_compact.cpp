@@ -637,7 +637,7 @@ void processFLECompactV2(OperationContext* opCtx,
                 "Missing range field '{}' in '{}'"_format(
                     rfIt.first, CompactStructuredEncryptionData::kEncryptionInformationFieldName),
                 fieldConfig != efcFields.end());
-            rfIt.second.queryTypeConfig = getQueryType(*fieldConfig, QueryTypeEnum::RangePreview);
+            rfIt.second.queryTypeConfig = getQueryType(*fieldConfig, QueryTypeEnum::Range);
         }
     }
 

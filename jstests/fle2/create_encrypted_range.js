@@ -2,7 +2,7 @@
 
 /**
  * @tags: [
- * requires_fcv_70,
+ * requires_fcv_80,
  * assumes_unsharded_collection
  * ]
  */
@@ -16,8 +16,7 @@ const sampleEncryptedFields = {
             "path": "firstName",
             "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
             "bsonType": "int",
-            "queries":
-                {"queryType": "rangePreview", "sparsity": 1, min: NumberInt(1), max: NumberInt(2)}
+            "queries": {"queryType": "range", "sparsity": 1, min: NumberInt(1), max: NumberInt(2)}
         },
     ]
 };

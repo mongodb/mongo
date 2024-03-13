@@ -54,7 +54,9 @@ enums:
         type: string
         values:
             Equality: "equality"
-            RangePreview: "rangePreview"
+            # TODO SERVER-87670 Remove once 8.0 is lastLTS.
+            RangePreviewDeprecated: "rangePreview"
+            Range: "range"
 
 feature_flags:
     featureFlagFLE2CleanupCommand:

@@ -2471,104 +2471,6 @@ TEST(EDC, UnindexedEncryptDecrypt) {
     }
 }
 
-TEST(EDC, ValidateDocument) {
-    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-
-    TestKeyVault keyVault;
-
-    BSONObjBuilder builder;
-    builder.append("plainText", "sample");
-    {
-        auto doc = BSON("a"
-                        << "secret");
-        auto element = doc.firstElement();
-        auto buf = generatePlaceholder(element, Operation::kInsert);
-        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-    }
-
-    BSONObjBuilder sub(builder.subobjStart("nested"));
-    {
-        auto doc = BSON("a"
-                        << "top secret");
-        auto element = doc.firstElement();
-
-        auto buf = generatePlaceholder(
-            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
-        builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-    }
-    {
-        auto doc = BSON("a"
-                        << "bottom secret");
-        auto element = doc.firstElement();
-
-        auto buf = generatePlaceholder(element, Operation::kInsert, Fle2AlgorithmInt::kUnindexed);
-        builder.appendBinData("notindexed", buf.size(), BinDataType::Encrypt, buf.data());
-    }
-    sub.done();
-
-    auto doc1 = builder.obj();
-    auto finalDoc = encryptDocument(doc1, &keyVault, &efc);
-
-    // Positive - Encrypted Doc
-    FLEClientCrypto::validateDocument(finalDoc, efc, &keyVault);
-
-    // Positive - Unencrypted Doc
-    auto unencryptedDocument = BSON("a" << 123);
-    FLEClientCrypto::validateDocument(unencryptedDocument, efc, &keyVault);
-
-    // Remove all tags
-    {
-        auto testDoc = finalDoc.removeField(kSafeContent);
-
-        ASSERT_THROWS_CODE(
-            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371506);
-    }
-
-    // Remove an encrypted field
-    {
-        auto testDoc = finalDoc.removeField("encrypted");
-        ASSERT_THROWS_CODE(
-            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371510);
-    }
-
-    // Remove a tag
-    {
-        BSONObj sc2 = BSON(kSafeContent << BSON_ARRAY(finalDoc[kSafeContent].Array()[0]));
-        auto testDoc = finalDoc.addFields(sc2);
-        ASSERT_THROWS_CODE(
-            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371516);
-    }
-
-    // Make safecontent an int
-    {
-        BSONObj sc2 = BSON(kSafeContent << 1234);
-        auto testDoc = finalDoc.addFields(sc2);
-        ASSERT_THROWS_CODE(
-            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371507);
-    }
-
-    // Replace a tag
-    {
-        PrfBlock block;
-        BSONObj sc2 = BSON(kSafeContent
-                           << BSON_ARRAY(finalDoc[kSafeContent].Array()[0] << BSONBinData(
-                                             &block, sizeof(block), BinDataType::BinDataGeneral)));
-        auto testDoc = finalDoc.addFields(sc2);
-
-        ASSERT_THROWS_CODE(
-            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371510);
-    }
-
-    // Wrong tag type
-    {
-        BSONObj sc2 = BSON(kSafeContent << BSON_ARRAY(123));
-        auto testDoc = finalDoc.addFields(sc2);
-
-        ASSERT_THROWS_CODE(
-            FLEClientCrypto::validateDocument(testDoc, efc, &keyVault), DBException, 6371515);
-    }
-}
-
 TEST(EDC, NonMatchingSchema) {
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
 
@@ -5155,7 +5057,7 @@ public:
                                                     const boost::optional<uint32_t>& precision,
                                                     int sparsity) {
         QueryTypeConfig config;
-        config.setQueryType(QueryTypeEnum::RangePreview);
+        config.setQueryType(QueryTypeEnum::Range);
         if constexpr (std::is_same_v<T, long>) {
             // Type aliasing gets a little weird. int64_t -> long, but Value(long) = delete, and
             // int64_t ~= long long anyway. Ignore the distinction for the purposes of this test.

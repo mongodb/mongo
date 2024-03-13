@@ -874,18 +874,6 @@ public:
      * Validate the tags array exists and is of the right type.
      */
     static void validateTagsArray(const BSONObj& doc);
-
-    /**
-     * Validate document
-     *
-     * Checks performed
-     * 1. Fields, if present, are indexed the way specified
-     * 2. All fields can be decrypted successfully
-     * 3. There is a tag for each field and no extra tags
-     */
-    static void validateDocument(const BSONObj& doc,
-                                 const EncryptedFieldConfig& efc,
-                                 FLEKeyVault* keyVault);
 };
 
 /*

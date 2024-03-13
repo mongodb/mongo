@@ -52,6 +52,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -733,8 +734,33 @@ private:
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
     // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-    void _userCollectionsWorkForUpgrade() {
-        return;
+    void _userCollectionsWorkForUpgrade(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
+        if (gFeatureFlagQERangeV2.isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                               originalVersion)) {
+            auto checkForDeprecatedQueryType = [](const Collection* collection) {
+                const auto& encryptedFields =
+                    collection->getCollectionOptions().encryptedFieldConfig;
+                if (encryptedFields) {
+                    uassert(ErrorCodes::CannotUpgrade,
+                            str::stream()
+                                << "Collection " << collection->ns().toStringForErrorMsg()
+                                << " has an encrypted field with query type rangePreview, "
+                                   "which is deprecated. Please drop this collection "
+                                   "before trying to upgrade FCV.",
+                            !hasQueryType(encryptedFields.get(),
+                                          QueryTypeEnum::RangePreviewDeprecated));
+                }
+                return true;
+            };
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(
+                    opCtx, dbName, MODE_IS, checkForDeprecatedQueryType);
+            }
+        }
     }
 
     void _maybeRemoveOldAuditConfig(
@@ -1032,7 +1058,7 @@ private:
         // is idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
-            _userCollectionsWorkForUpgrade();
+            _userCollectionsWorkForUpgrade(opCtx, requestedVersion);
         }
 
         uassert(ErrorCodes::Error(549180),
@@ -1206,6 +1232,26 @@ private:
                     [&](const Collection* collection) {
                         return collection->areRecordIdsReplicated();
                     });
+            }
+        }
+
+        if (!gFeatureFlagQERangeV2.isEnabledOnVersion(requestedVersion)) {
+            auto checkForNewRangeQueryType = [](const Collection* collection) {
+                const auto& encryptedFields =
+                    collection->getCollectionOptions().encryptedFieldConfig;
+                if (encryptedFields) {
+                    uassert(ErrorCodes::CannotDowngrade,
+                            str::stream() << "Collection " << collection->ns().toStringForErrorMsg()
+                                          << " has an encrypted field with query type range, "
+                                             "which is new in 8.0. Please drop this collection "
+                                             "before trying to downgrade FCV.",
+                            !hasQueryType(encryptedFields.get(), QueryTypeEnum::Range));
+                }
+                return true;
+            };
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, checkForNewRangeQueryType);
             }
         }
     }

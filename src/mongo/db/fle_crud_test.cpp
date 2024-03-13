@@ -455,7 +455,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
                         ,
             "path": "encrypted",
             "bsonType": "int",
-            "queries": {"queryType": "rangePreview", "min": 0, "max": 15, "sparsity": 1}
+            "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1}
 
         }
     ]
@@ -482,7 +482,7 @@ void parseEncryptedInvalidFieldConfig(StringData esc, StringData ecoc) {
                             ,
                 "path": "encrypted",
                 "bsonType": "int",
-                "queries": {"queryType": "rangePreview", "min": 0, "max": 15, "sparsity": 1}
+                "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1}
 
             }
         ]
@@ -532,7 +532,6 @@ void FleCrudTest::validateDocument(int id, boost::optional<BSONObj> doc, Fle2Alg
     std::cout << "Updated Doc: " << updatedDoc << std::endl;
 
     auto efc = getTestEncryptedFieldConfig(alg);
-    FLEClientCrypto::validateDocument(updatedDoc, efc, &_keyVault);
 
     // Decrypt document
     auto decryptedDoc = FLEClientCrypto::decryptDocument(updatedDoc, &_keyVault);

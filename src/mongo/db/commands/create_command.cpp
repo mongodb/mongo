@@ -350,6 +350,13 @@ public:
                         "Encrypted collections are not supported on standalone",
                         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
+                uassert(8575605,
+                        "Cannot create a collection with an encrypted field with query "
+                        "type rangePreview, as it is deprecated",
+                        !hasQueryType(cmd.getEncryptedFields().get(),
+                                      QueryTypeEnum::RangePreviewDeprecated));
+
+
                 FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
             }
 

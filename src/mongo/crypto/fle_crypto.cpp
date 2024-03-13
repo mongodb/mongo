@@ -2405,7 +2405,8 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
         auto collToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
         auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collToken);
         auto tokenCdr = ecocToken.toCDR();
-        if (hasQueryType(field, QueryTypeEnum::RangePreview)) {
+        if (hasQueryType(field, QueryTypeEnum::RangePreviewDeprecated) ||
+            hasQueryType(field, QueryTypeEnum::Range)) {
             BSONObjBuilder token(tokensBuilder.subobjStart(field.getPath()));
             token.appendBinData(CompactionTokenDoc::kECOCTokenFieldName,
                                 tokenCdr.length(),
@@ -2456,93 +2457,6 @@ void FLEClientCrypto::validateTagsArray(const BSONObj& doc) {
 
     uassert(
         6371507, str::stream() << kSafeContent << " must be an array", safeContent.type() == Array);
-}
-
-void FLEClientCrypto::validateDocument(const BSONObj& doc,
-                                       const EncryptedFieldConfig& efc,
-                                       FLEKeyVault* keyVault) {
-    stdx::unordered_map<std::string, ConstDataRange> validateFields;
-
-    visitEncryptedBSON(doc, [&validateFields](ConstDataRange cdr, StringData fieldPath) {
-        collectFieldValidationInfo(&validateFields, cdr, fieldPath);
-    });
-
-    auto configMap = toFieldMap(efc);
-
-    stdx::unordered_map<PrfBlock, std::string> tags;
-
-    // Ensure all encrypted fields are in EncryptedFieldConfig
-    // It is ok for fields to be in EncryptedFieldConfig but not present
-    for (const auto& field : validateFields) {
-        auto configField = configMap.find(field.first);
-        uassert(6371508,
-                str::stream() << "Field '" << field.first
-                              << "' is encrypted by not marked as an encryptedField",
-                configField != configMap.end());
-
-        auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(field.second);
-
-        if (configField->second.getQueries().has_value()) {
-            if (hasQueryType(configField->second, QueryTypeEnum::Equality)) {
-                uassert(7293205,
-                        str::stream() << "Field '" << field.first
-                                      << "' is marked as equality but not indexed",
-                        encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
-
-                auto swTag = FLE2IndexedEqualityEncryptedValueV2::parseMetadataBlockTag(subCdr);
-                uassertStatusOK(swTag.getStatus());
-                tags.insert({swTag.getValue(), field.first});
-            } else if (hasQueryType(configField->second, QueryTypeEnum::RangePreview)) {
-                uassert(7293206,
-                        str::stream()
-                            << "Field '" << field.first << "' is marked as range but not indexed",
-                        encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValueV2);
-
-                auto swTags = FLE2IndexedRangeEncryptedValueV2::parseMetadataBlockTags(subCdr);
-                uassertStatusOK(swTags.getStatus());
-                for (const auto& tag : swTags.getValue()) {
-                    tags.insert({tag, field.first});
-                }
-            }
-        } else {
-            uassert(7293207,
-                    str::stream() << "Field '" << field.first << "' must be marked unindexed",
-                    encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2);
-        }
-    }
-
-    BSONElement safeContent = doc[kSafeContent];
-
-    // If there are no tags and no safeContent, then this document is not Queryable Encryption and
-    // is therefore fine
-    if (tags.size() == 0 && safeContent.eoo()) {
-        return;
-    }
-
-    validateTagsArray(doc);
-
-    size_t count = 0;
-    for (const auto& element : safeContent.Obj()) {
-        uassert(6371515,
-                str::stream() << "Field'" << element.fieldNameStringData()
-                              << "' must be a bindata and general subtype",
-                element.isBinData(BinDataType::BinDataGeneral));
-
-        auto vec = element._binDataVector();
-        auto block = PrfBlockfromCDR(vec);
-
-        uassert(6371510,
-                str::stream() << "Missing tag for encrypted indexed field '"
-                              << element.fieldNameStringData() << "'",
-                tags.count(block) == 1);
-
-        ++count;
-    }
-
-    uassert(6371516,
-            str::stream() << "Mismatch in expected count of tags, Expected: '" << tags.size()
-                          << "', Actual: '" << count << "'",
-            count == tags.size());
 }
 
 PrfBlock ESCCollection::generateId(const ESCTwiceDerivedTagToken& tagToken,
@@ -4125,7 +4039,10 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
 
     uassert(6371207, "Expected a value for escCollection", efc.getEscCollection().has_value());
     uassert(6371208, "Expected a value for ecocCollection", efc.getEcocCollection().has_value());
-
+    uassert(8575606,
+            "Collection contains the 'rangePreview' query type which is deprecated. Please "
+            "recreate the collection with the 'range' query type.",
+            !hasQueryType(efc, QueryTypeEnum::RangePreviewDeprecated));
     return efc;
 }
 

@@ -370,7 +370,10 @@ void validateEncryptedField(const EncryptedField* field) {
                         "The field 'trimFactor' is not allowed for equality index but is present",
                         !encryptedIndex.getTrimFactor().has_value());
                 break;
-            case QueryTypeEnum::RangePreview: {
+            case QueryTypeEnum::RangePreviewDeprecated:
+                // rangePreview is renamed to range in Range V2, but we still need to accept it as
+                // valid so that we can start up with existing rangePreview collections.
+            case QueryTypeEnum::Range: {
                 validateRangeIndex(fieldType, encryptedIndex);
                 break;
             }

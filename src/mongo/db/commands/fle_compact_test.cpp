@@ -911,7 +911,7 @@ QueryTypeConfig generateQueryTypeConfigForTest(const T& min,
                                                boost::optional<uint32_t> precision = boost::none,
                                                int sparsity = 1) {
     QueryTypeConfig config;
-    config.setQueryType(QueryTypeEnum::RangePreview);
+    config.setQueryType(QueryTypeEnum::Range);
     config.setMin(Value(min));
     config.setMax(Value(max));
     if (precision) {
