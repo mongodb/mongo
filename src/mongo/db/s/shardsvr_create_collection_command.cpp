@@ -137,6 +137,8 @@ public:
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             bool isUnsplittable = request().getUnsplittable();
+            bool isFromCreateUnsplittableCommand =
+                request().getIsFromCreateUnsplittableCollectionTestCommand();
             bool hasShardKey = request().getShardKey().has_value();
             if (opCtx->inMultiDocumentTransaction()) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -169,11 +171,13 @@ public:
                 // In case of "unsplittable" collections, create the collection locally if either
                 // the feature flag is disabled or the nss identifies a collection which should
                 // always be local
-                if (isUnsplittable) {
-                    bool isTrackUnshardedDisabled =
+                // TODO (SERVER-86295) change this check according to the "trackCollectionIfExists"
+                // coordinator parameter
+                if (isUnsplittable && !isFromCreateUnsplittableCommand) {
+                    bool isTrackUnshardedUponCreationDisabled =
                         !feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
                             (*optFixedFcvRegion)->acquireFCVSnapshot());
-                    if (isTrackUnshardedDisabled) {
+                    if (isTrackUnshardedUponCreationDisabled) {
                         auto cmd = create_collection_util::makeCreateCommand(
                             opCtx, ns(), request().getShardsvrCreateCollectionRequest());
                         runCreateCommandDirectClient(opCtx, ns(), cmd);

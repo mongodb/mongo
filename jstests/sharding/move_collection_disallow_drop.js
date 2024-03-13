@@ -5,7 +5,7 @@
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
- *  featureFlagTrackUnshardedCollectionsUponCreation,
+ *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *  multiversion_incompatible,
  * ]
  */
@@ -25,6 +25,8 @@ const collName = "foo";
 const ns = dbName + "." + collName;
 const db = st.s.getDB(dbName);
 
+// TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
+// registers the collection on the sharding catalog
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.getDB(dbName).runCommand({createUnsplittableCollection: collName}));

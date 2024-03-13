@@ -3,8 +3,9 @@
  * views.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagBalanceUnshardedCollections,
+ *   # Needed to run createUnsplittableCollection
+ *   featureFlagAuthoritativeShardCollection,
  * ]
  */
 
@@ -39,9 +40,9 @@ assert.commandWorked(mongos.getDB(dbName).getCollection(shardedCollName).insert(
 // Create unsharded (tracked) collection and insert 1 document.
 assert.commandWorked(
     mongos.getDB(dbName).runCommand({createUnsplittableCollection: unshardedCollName}));
+assert.commandWorked(mongos.getDB(dbName).getCollection(unshardedCollName).insert({_id: 0}));
 // Create unsharded (untracked) collection and insert 1 document.
 assert.commandWorked(shard0.getDB(dbName).getCollection(untrackedCollName).insert({_id: 0}));
-assert.commandWorked(mongos.getDB(dbName).getCollection(unshardedCollName).insert({_id: 0}));
 // Create view on sharded collection.
 assert.commandWorked(mongos.getDB(dbName).createView(shardedViewName, shardedCollName, []));
 // Create view on unsharded collection.

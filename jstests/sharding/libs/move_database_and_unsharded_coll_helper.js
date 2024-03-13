@@ -2,6 +2,7 @@
  * Helper function to move unsharded, tracked collections as well as unsharded, untracked
  * collections and the database primary for a given database.
  */
+// TODO (SERVER-87807): Issue moveCollection for untracked collections
 export function moveDatabaseAndUnshardedColls(db, destinationShard) {
     let configDB = db.getSiblingDB('config');
     const originShard = configDB.getCollection('databases').findOne({_id: db.getName()}).primary;

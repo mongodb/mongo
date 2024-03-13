@@ -14,9 +14,9 @@ const collName = "foo";
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 // Database versioning tests only make sense when all collections are not tracked.
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-if (isTrackUnshardedEnabled) {
+if (isTrackUnshardedUponCreationEnabled) {
     st.stop();
     quit();
 }

@@ -76,7 +76,7 @@ function bulkWriteBasicTest(ordered) {
 
     const db_s1 = st.s1.getDB("test");
 
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
     // Case 3: Move the 'test2' DB back and forth across shards. This will result in bulkWrite
@@ -89,7 +89,9 @@ function bulkWriteBasicTest(ordered) {
         {bulkWrite: 1, ops: [{insert: 0, document: {a: 3}}], nsInfo: [{ns: orange}]}));
     insertedDocs = getCollection(orange).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
-    if (!isTrackUnshardedEnabled) {
+
+    // TODO (SERVER-87807): Skip this check also for uponMoveCollection feature flag
+    if (!isTrackUnshardedUponCreationEnabled) {
         assert(checkLog.checkContainsOnce(st.s0, staleDbTest2Log));
     }
 

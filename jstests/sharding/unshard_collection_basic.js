@@ -5,7 +5,7 @@
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
  *  featureFlagUnshardCollection,
- *  featureFlagTrackUnshardedCollectionsUponCreation,
+ *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *  multiversion_incompatible,
  *  assumes_balancer_off,
  * ]
@@ -41,6 +41,13 @@ assert.commandWorked(
     st.s.getDB(dbName).runCommand({createUnsplittableCollection: unsplittableCollName}));
 assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: unsplittableCollNs}),
                              ErrorCodes.NamespaceNotSharded);
+
+// Fail if unsharded collection.
+const unshardedCollName = "foo_unsharded"
+const unshardedCollNS = dbName + '.' + unshardedCollName;
+assert.commandWorked(st.s.getDB(dbName).runCommand({create: unshardedCollName}));
+assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: unshardedCollNS}),
+                             [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
 
 assert.commandWorked(coll.createIndex({oldKey: 1}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));

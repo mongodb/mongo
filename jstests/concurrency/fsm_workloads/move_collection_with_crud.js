@@ -8,7 +8,7 @@
  *  featureFlagUnshardCollection,
  *  featureFlagMoveCollection,
  *  featureFlagReshardingImprovements,
- *  featureFlagTrackUnshardedCollectionsUponCreation,
+ *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *  multiversion_incompatible,
  *  requires_fcv_72
  * ]

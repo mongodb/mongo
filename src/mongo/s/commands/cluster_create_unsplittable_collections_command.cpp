@@ -33,7 +33,6 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/commands/shard_collection_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -81,15 +80,6 @@ public:
                 "The tracking of unsharded collections doesn't support Queryable Encryption state "
                 "collection yet",
                 !nss.isFLE2StateCollection());
-
-            bool isTrackUnshardedEnabled =
-                feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-            uassert(ErrorCodes::IllegalOperation,
-                    "cannot create an unsplittable collection if "
-                    "featureFlagTrackUnshardedCollectionsUponCreation is unset",
-                    isTrackUnshardedEnabled);
 
             ShardsvrCreateCollection shardsvrCollRequest(nss);
             auto svrRequest = ShardsvrCreateCollectionRequest::parse(

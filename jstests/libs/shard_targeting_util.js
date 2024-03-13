@@ -181,6 +181,8 @@ export class ShardTargetingTest {
         } else if (collType == "unsplittable") {
             assert(owningShard,
                    "Must specify an owning shard when setting up an unsplittable collection");
+            // TODO (SERVER-85395) Replace createUnsplittableCollection with create command once
+            // featureFlagTrackUnshardedCollectionsUponCreation is enabled.
             assert.commandWorked(this.db.runCommand(
                 {createUnsplittableCollection: collName, dataShard: owningShard}));
         } else {

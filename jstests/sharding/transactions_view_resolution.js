@@ -270,9 +270,9 @@ function assertAggResultEqInTransaction(coll, pipeline, expected) {
 
 // TODO SERVER-84470 Remove this check once lookup on unsplittable collection still on the primary
 // is supported
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-if (!isTrackUnshardedEnabled) {
+if (!isTrackUnshardedUponCreationEnabled) {
     // Set up an unsharded collection to use for $lookup, as lookup into a sharded collection in a
     // transaction is not yet supported.
     // TODO SERVER-39162: Add testing for lookup into sharded collections in a transaction.

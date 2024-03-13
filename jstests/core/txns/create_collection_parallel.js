@@ -78,12 +78,12 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    // TODO SERVER-77915 Remove isTrackUnshardedEnabled. Once track unsharded is enabled, creation
-    // within a transaction will always serialize with any other collection creation by taking the
-    // DDLLock
-    const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+    // TODO SERVER-77915 Remove isTrackUnshardedUponCreationDisabled. Once track unsharded is
+    // enabled, creation within a transaction will always serialize with any other collection
+    // creation by taking the DDLLock
+    const isTrackUnshardedUponCreationDisabled = !FeatureFlagUtil.isPresentAndEnabled(
         db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedDisabled) {
+    if (isTrackUnshardedUponCreationDisabled) {
         jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
         session.startTransaction({writeConcern: {w: "majority"}});
         retryOnceOnTransientAndRestartTxnOnMongos(session, () => {

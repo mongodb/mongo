@@ -48,9 +48,9 @@ const kBatchSize = 2;
 const testLookupDoesNotSeeDocumentsOutsideSnapshot = function() {
     // TODO SERVER-84470 Remove this check once lookup on unsplittable collection still on the
     // primary is supported
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedEnabled) {
+    if (isTrackUnshardedUponCreationEnabled) {
         return;
     }
 

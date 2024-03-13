@@ -149,12 +149,12 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    // TODO SERVER-77915 Remove isTrackUnshardedEnabled. Once track unsharded is enabled, creation
-    // within a transaction will always serialize with any other collection creation by taking the
-    // DDLLock
-    const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+    // TODO SERVER-77915 Remove isTrackUnshardedUponCreationDisabled. Once track unsharded is
+    // enabled, creation within a transaction will always serialize with any other collection
+    // creation by taking the DDLLock
+    const isTrackUnshardedUponCreationDisabled = !FeatureFlagUtil.isPresentAndEnabled(
         db.getSiblingDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedDisabled) {
+    if (isTrackUnshardedUponCreationDisabled) {
         jsTest.log(
             "Testing createIndexes inside txn and createCollection on conflicting collection " +
             "in parallel.");

@@ -9,9 +9,9 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
 
 // Database versioning tests only make sense when all collections are not tracked.
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-if (isTrackUnshardedEnabled) {
+if (isTrackUnshardedUponCreationEnabled) {
     st.stop();
     quit();
 }

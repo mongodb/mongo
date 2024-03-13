@@ -1,9 +1,8 @@
 /*
  * Test that unsplittable collections can be sharded.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsUponCreation,
+ *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
- *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]
  */

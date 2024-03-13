@@ -78,16 +78,16 @@ assert.commandWorked(testDB_s1.user.insert({x: 10}));
 
 // TODO SERVER-77915 Remove the feature flag. Now that user unsharded collection are tracked we no
 // longer store them with UNSHARDED version
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedEnabled ? 1 : 0);
+checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedUponCreationEnabled ? 1 : 0);
 
 // mongos0 still thinks { x: 10 } belong to st.shard0.shardName, but since coll is dropped,
 // query should be routed to primary shard.
 assert.neq(null, testDB_s0.user.findOne({x: 10}));
 
 checkShardMajorVersion(st.rs0.getPrimary(), 0);
-checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedEnabled ? 1 : 0);
+checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedUponCreationEnabled ? 1 : 0);
 
 // Routing information:
 //   - mongos0: 0|0|b

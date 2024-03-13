@@ -5,7 +5,9 @@
  * @tags: [
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
- *   featureFlagTrackUnshardedCollectionsUponCreation,
+ *   # Needed to run createUnsplittableCollection
+ *   # TODO (SERVER-87625) Remove feature flag dependency.
+ *   featureFlagAuthoritativeShardCollection,
  * ]
  */
 

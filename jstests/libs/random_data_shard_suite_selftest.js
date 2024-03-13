@@ -1,3 +1,11 @@
+/*
+ * Tests that the failpoint createUnshardedCollectionRandomizeDataShard works as expected.
+ *
+ * @tags: [
+ *   featureFlagTrackUnshardedCollectionsUponCreation,
+ * ]
+ */
+
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDb = db.getSiblingDB('random_data_shard_suite_selftest_' + Random.srand());

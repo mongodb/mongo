@@ -2,7 +2,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
 
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     s.s0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
@@ -87,9 +87,9 @@ assert.writeError(db.foo4.insert({num: 7}));
 assert.eq(3, db.foo4.count(), "uc4");
 
 // --- don't let you convertToCapped ----
-// TODO SERVER-84482 remove isTrackUnshardedEnabled check once convertToCapped is compatible with
-// unsplittable collection
-if (!isTrackUnshardedEnabled) {
+// TODO SERVER-84482 remove isTrackUnshardedUponCreationEnabled check once convertToCapped is
+// compatible with unsplittable collection
+if (!isTrackUnshardedUponCreationEnabled) {
     assert(!db.foo4.isCapped(), "ca1");
     assert(!a.foo4.isCapped(), "ca2");
     assert(!b.foo4.isCapped(), "ca3");

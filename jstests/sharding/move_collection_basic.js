@@ -5,7 +5,7 @@
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
- *  featureFlagTrackUnshardedCollectionsUponCreation,
+ *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *  multiversion_incompatible,
  *  assumes_balancer_off,
  * ]
@@ -34,6 +34,8 @@ assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}
 // Fail if collection is sharded.
 assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
+// TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
+// registers the collection on the sharding catalog
 const unsplittableCollName = "foo_unsplittable"
 const unsplittableCollNs = dbName + '.' + unsplittableCollName;
 assert.commandWorked(

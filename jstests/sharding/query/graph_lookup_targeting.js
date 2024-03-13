@@ -1,11 +1,12 @@
 /*
  * Test that the targeting of $graphLookup queries and any sub-queries works correctly.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   assumes_balancer_off,
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
+ *   # Needed to run createUnsplittableCollection
+ *   featureFlagAuthoritativeShardCollection,
  * ]
  */
 

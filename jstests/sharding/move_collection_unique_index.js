@@ -2,7 +2,6 @@
  * Tests that moveCollection works on unsplittable collections with unique indexes that are not
  * prefix of _id.
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   featureFlagReshardingImprovements,
@@ -19,7 +18,9 @@ const nss = kDbName + '.' + kCollName;
 assert.commandWorked(
     st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
-assert.commandWorked(st.s.getDB(kDbName).createCollection(kCollName));
+// TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
+// registers the collection on the sharding catalog
+assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kCollName}));
 
 assert.commandWorked(st.s.getCollection(nss).createIndex({oldKey: 1, a: 1, b: 1}, {unique: true}));
 

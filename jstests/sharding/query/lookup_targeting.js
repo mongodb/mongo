@@ -2,13 +2,14 @@
  * Test that the targeting of $lookup queries and any sub-queries works correctly.
  *
  * @tags: [
- *   featureFlagTrackUnshardedCollectionsUponCreation,
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   assumes_balancer_off,
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
+ *   # Needed to run createUnsplittableCollection
+ *   featureFlagAuthoritativeShardCollection,
  * ]
  */
 

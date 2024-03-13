@@ -223,9 +223,9 @@ const newShardName =
     assert.eq("ongoing", removeRes.state);
     // TODO SERVER-77915 remove feature flag and set remaining chunks to 2 (before track unsharded,
     // only sharded collection had associated chunks)
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    assert.eq(isTrackUnshardedEnabled ? 2 : 1, removeRes.remaining.chunks);
+    assert.eq(isTrackUnshardedUponCreationEnabled ? 2 : 1, removeRes.remaining.chunks);
     assert.eq(3, removeRes.remaining.dbs);
 
     moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);

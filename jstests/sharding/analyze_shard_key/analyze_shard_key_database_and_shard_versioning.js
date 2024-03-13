@@ -63,9 +63,9 @@ function runTest(readPreference) {
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0.keyCharacteristics, expectedMetrics);
 
     // Database versioning tests only make sense when all collections are not tracked.
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (!isTrackUnshardedEnabled) {
+    if (!isTrackUnshardedUponCreationEnabled) {
         // Make shard1 the primary shard instead using mongos0 to make mongos1 stale.
         assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: st.shard1.name}));
 

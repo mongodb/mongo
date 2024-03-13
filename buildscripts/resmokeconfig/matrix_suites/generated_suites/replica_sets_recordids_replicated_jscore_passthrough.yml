@@ -76,6 +76,7 @@ selector:
   - jstests/core/query/internal_rename_if_options_and_indexes_match.js
   - jstests/core/shell/shell_connection_strings.js
   - jstests/core/query/query_settings/query_settings_lost_update.js
+  - jstests/core/**/create_indexes.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - requires_profiling

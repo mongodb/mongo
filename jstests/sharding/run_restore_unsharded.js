@@ -15,9 +15,9 @@ const s = new ShardingTest(
 let mongos = s.s0;
 let db = s.getDB("test");
 
-// TODO SERVER-77915 Remove isTrackUnshardedEnabled. Update the test as
-// this variable is now always "true".
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+// TODO SERVER-77915 Remove isTrackUnshardedUponCreationEnabled. Update the test as this variable is
+// now always "true".
+const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     s.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 
 // Create an unsharded collection.
@@ -25,7 +25,7 @@ assert.commandWorked(db.createCollection("a"));
 const collUUID =
     mongos.getDB("test").runCommand({listCollections: 1}).cursor.firstBatch[0].info.uuid;
 
-if (isTrackUnshardedEnabled) {
+if (isTrackUnshardedUponCreationEnabled) {
     // The collection should appear in config.collections
     assert.eq(1, mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
 } else {
@@ -54,7 +54,7 @@ assert.commandWorked(conn.getDB("local").getCollection("system.collections_to_re
 
 assert.commandWorked(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}));
 
-if (isTrackUnshardedEnabled) {
+if (isTrackUnshardedUponCreationEnabled) {
     // The collection should appear in config.collections
     assert.eq(1, conn.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
 } else {

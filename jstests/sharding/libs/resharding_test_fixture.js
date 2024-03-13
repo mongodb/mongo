@@ -293,6 +293,8 @@ export var ReshardingTest = class {
 
         assert.commandWorked(
             this._st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
+        // TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
+        // registers the collection on the sharding catalog
         assert.commandWorked(
             this._st.s.getDB(dbName).runCommand({createUnsplittableCollection: collName}));
 

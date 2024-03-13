@@ -10,7 +10,9 @@
  *   requires_timeseries,
  *   requires_fcv_80,
  *   featureFlagTimeseriesUpdatesSupport,
- *   featureFlagTrackUnshardedCollectionsUponCreation,
+ *   # Needed to run createUnsplittableCollection
+ *   # TODO (SERVER-87625) Remove feature flag dependency.
+ *   featureFlagAuthoritativeShardCollection,
  * ]
  */
 await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');

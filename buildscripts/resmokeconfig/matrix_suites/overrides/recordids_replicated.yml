@@ -49,3 +49,5 @@
       - jstests/core/shell/shell_connection_strings.js
       # due to error: "operation exceeded time limit"
       - jstests/core/query/query_settings/query_settings_lost_update.js
+      # TODO (SERVER-87803) Enable after fixing the bug
+      - jstests/core/**/create_indexes.js
