@@ -134,12 +134,15 @@ auto& classicNumPlansHistogram =
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
                                VariantCollectionPtrOrAcquisition collection,
                                CanonicalQuery* cq,
-                               PlanCachingMode cachingMode)
+                               PlanCachingMode cachingMode,
+                               boost::optional<std::string> replanReason)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _cachingMode(cachingMode),
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
-      _backupPlanIdx(kNoSuchPlan) {}
+      _backupPlanIdx(kNoSuchPlan) {
+    _specificStats.replanReason = replanReason;
+}
 
 void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
                              std::unique_ptr<PlanStage> root,

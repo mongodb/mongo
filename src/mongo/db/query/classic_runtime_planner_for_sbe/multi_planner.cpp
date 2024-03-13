@@ -51,7 +51,8 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
         std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
                                          collections().getMainCollectionPtrOrAcquisition(),
                                          cq(),
-                                         PlanCachingMode::NeverCache);
+                                         PlanCachingMode::NeverCache,
+                                         replanReason);
     for (auto&& solution : candidatePlans) {
         auto nextPlanRoot = stage_builder::buildClassicExecutableTree(
             opCtx(), collections().getMainCollectionPtrOrAcquisition(), *cq(), *solution, ws());

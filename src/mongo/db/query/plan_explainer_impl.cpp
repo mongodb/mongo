@@ -805,6 +805,14 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                 break;
             }
             case STAGE_MULTI_PLAN: {
+                const MultiPlanStage* multiPlan = static_cast<const MultiPlanStage*>(stages[i]);
+                const MultiPlanStats* multiPlanStats =
+                    static_cast<const MultiPlanStats*>(multiPlan->getSpecificStats());
+                tassert(8737700,
+                        "Replan reason has to be consistent if it already exists",
+                        !statsOut->replanReason ||
+                            statsOut->replanReason == multiPlanStats->replanReason);
+                statsOut->replanReason = multiPlanStats->replanReason;
                 statsOut->fromMultiPlanner = true;
                 break;
             }

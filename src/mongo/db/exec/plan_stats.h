@@ -702,6 +702,8 @@ struct MultiPlanStats : public SpecificStats {
     void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
         visitor->visit(this);
     }
+
+    boost::optional<std::string> replanReason;
 };
 
 struct OrStats : public SpecificStats {

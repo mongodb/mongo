@@ -76,7 +76,8 @@ public:
     MultiPlanStage(ExpressionContext* expCtx,
                    VariantCollectionPtrOrAcquisition collection,
                    CanonicalQuery* cq,
-                   PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
+                   PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache,
+                   boost::optional<std::string> replanReason = boost::none);
 
     bool isEOF() final;
 

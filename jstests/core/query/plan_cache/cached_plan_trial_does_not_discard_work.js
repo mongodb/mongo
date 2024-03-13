@@ -22,17 +22,10 @@
 //   cqf_experimental_incompatible,
 //   featureFlagSbeFull,
 // ]
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());
-
-// TODO SERVER-85239: Remove this check when classic replanning for agg pipeline is implemented.
-if (FeatureFlagUtil.isPresentAndEnabled(testDb, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    quit();
-}
 
 const coll = testDb.getCollection('test');
 

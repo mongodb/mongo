@@ -264,8 +264,8 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
     // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
     // and so on. The working set will be shared by all candidate plans.
     auto cachingMode = shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
-    _children.emplace_back(
-        new MultiPlanStage(expCtx(), collection(), _canonicalQuery, cachingMode));
+    _children.emplace_back(new MultiPlanStage(
+        expCtx(), collection(), _canonicalQuery, cachingMode, _specificStats.replanReason));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {

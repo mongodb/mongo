@@ -11,7 +11,7 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("test");
 
-// TODO SERVER-85239: Remove this check when classic replanning for agg pipeline is implemented.
+// TODO SERVER-87769: Remove this check when the error on JsFunction is fixed.
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
     jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
     MongoRunner.stopMongod(conn);
