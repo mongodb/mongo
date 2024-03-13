@@ -167,7 +167,6 @@ double Simple8bTypeUtil::decodeDouble(int64_t val, uint8_t scaleIndex) {
         memcpy(&ret, &val, sizeof(ret));
         return ret;
     }
-
     return val / kScaleMultiplier[scaleIndex];
 }
 

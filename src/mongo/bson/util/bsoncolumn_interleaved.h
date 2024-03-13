@@ -804,6 +804,12 @@ void BlockBasedInterleavedDecompressor::appendToBuffers(BufferVector<Buffer*>& b
                           appendEncodedToBuffers<Buffer, Date_t>(
                               buffers, Date_t::fromMillisSinceEpoch(encoded.second));
                           break;
+                      case NumberDouble:
+                          appendEncodedToBuffers<Buffer, double>(
+                              buffers,
+                              Simple8bTypeUtil::decodeDouble(encoded.second,
+                                                             Simple8bTypeUtil::kMemoryAsInteger));
+                          break;
                       case NumberLong:
                           appendEncodedToBuffers<Buffer, int64_t>(buffers, encoded.second);
                           break;

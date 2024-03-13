@@ -642,6 +642,30 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithBinData) {
     }
 }
 
+TEST_F(BSONColumnBlockBasedTest, DecompressWithDoublesSameScale) {
+    const std::vector<double> doubles = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(doubles, allocator);
+
+    ASSERT_EQ(result[0].type(), NumberDouble);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].Double(), doubles[i]);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithDoublesDifferentScale) {
+    const std::vector<double> doubles = {1.0, 2.0, 1.1, 3.0, 1.2, 2.0};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(doubles, allocator);
+
+    ASSERT_EQ(result[0].type(), NumberDouble);
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].Double(), doubles[i]);
+    }
+}
+
 TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     auto col = bsonColumnFromObjs({
         fromjson("{a: [{b:  0}]}"),

@@ -857,5 +857,17 @@ TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithDateAndTimestamp) {
     verifyDecompressWithDifferentTypes(timestamps);
 }
 
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithDoublesSameScale) {
+    std::vector<double> doubles = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6};
+
+    verifyDecompressWithDifferentTypes(doubles);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithDoublesDifferentScale) {
+    std::vector<double> doubles = {1.0, 2.0, 1.1, 3.0, 1.2, 2.0};
+
+    verifyDecompressWithDifferentTypes(doubles);
+}
+
 }  // namespace
 }  // namespace mongo::sbe::bsoncolumn
