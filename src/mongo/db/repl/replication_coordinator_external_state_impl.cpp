@@ -274,7 +274,15 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         // TODO (SERVER-85720): Add write buffer metrics to serverStatus.
         _oplogWriteBuffer = std::make_unique<OplogBufferBatchedQueue>(kOplogWriteBufferSize);
     }
-    _oplogApplyBuffer = std::make_unique<OplogBufferBlockingQueue>(applyBufferSize, &bufferGauge);
+
+    // When featureFlagReduceMajorityWriteLatency is enabled, we must drain the apply buffer on
+    // clean shutdown in order to make sure that every oplog that has been written is applied
+    // and thus recovery after clean shutdown does not need to apply any oplog, which is needed
+    // for downgrades to work.
+    OplogBufferBlockingQueue::Options bufferOptions;
+    bufferOptions.clearOnShutdown = !useOplogWriter;
+    _oplogApplyBuffer =
+        std::make_unique<OplogBufferBlockingQueue>(applyBufferSize, &bufferGauge, bufferOptions);
 
     // No need to log OplogBuffer::startup because the blocking queue and batched queue
     // implementations does not start any threads or access the storage layer.
@@ -363,8 +371,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     auto oldApplierExecutor = std::move(_oplogApplierTaskExecutor);
     lock.unlock();
 
-    // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
-    // a pointer of _bgSync.
+    // The _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it
+    // has a pointer of _bgSync.
     if (oldSSF) {
         LOGV2(21302, "Stopping replication reporter thread");
         _syncSourceFeedback.shutdown();
@@ -379,22 +387,17 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     if (oldWriter) {
         LOGV2(8569801, "Stopping replication writer thread");
         oldWriter->shutdown();
-    }
-
-    if (oldApplier) {
-        LOGV2(21304, "Stopping replication applier thread");
+    } else if (oldApplier) {
+        LOGV2(8569806, "Stopping replication applier thread");
         oldApplier->shutdown();
     }
 
-    // Shutdown the buffers. This unblocks the OplogFetcher if it is blocked with a full queue,
-    // but ensures that it won't add anything. It will also unblock the OplogApplier pipeline
-    // if it is waiting for an operation to be past the secondaryDelaySecs point.
-    // TODO (SERVER-87720): Drain apply buffer on clean shutdown.
+    // Shutdown the buffer. This unblocks the OplogFetcher if it is blocked with a full
+    // queue, but ensures that it won't add anything. This also unblocks the downstream
+    // pipeline if it is waiting for an operation to be past secondaryDelaySecs.
     if (oldWriteBuffer) {
         oldWriteBuffer->shutdown(opCtx);
-    }
-
-    if (oldApplyBuffer) {
+    } else if (oldApplyBuffer) {
         oldApplyBuffer->shutdown(opCtx);
     }
 
@@ -402,11 +405,25 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
         oldBgSync->join(opCtx);
     }
 
+    // Since OplogApplier needs to drain the buffer on clean shutdown, we need to wait
+    // for OplogWriter to finish before shutting down the OplogApplier and its buffer,
+    // to make sure that no more oplog entries will be written.
     if (oldWriter) {
         _oplogWriterShutdownFuture.get();
+    } else if (oldApplier) {
+        _oplogApplierShutdownFuture.get();
     }
 
-    if (oldApplier) {
+    if (oldWriter && oldApplier) {
+        LOGV2(8569807, "Stopping replication applier thread");
+        oldApplier->shutdown();
+    }
+
+    if (oldWriteBuffer && oldApplyBuffer) {
+        oldApplyBuffer->shutdown(opCtx);
+    }
+
+    if (oldWriter && oldApplier) {
         _oplogApplierShutdownFuture.get();
     }
 

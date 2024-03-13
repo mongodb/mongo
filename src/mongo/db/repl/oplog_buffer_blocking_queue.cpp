@@ -56,9 +56,11 @@ std::size_t getTotalDocumentSize(OplogBuffer::Batch::const_iterator begin,
 }  // namespace
 
 OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize)
-    : OplogBufferBlockingQueue(maxSize, nullptr) {}
-OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize, Counters* counters)
-    : _maxSize(maxSize), _counters(counters) {}
+    : OplogBufferBlockingQueue(maxSize, nullptr, Options()) {}
+OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize,
+                                                   Counters* counters,
+                                                   Options options)
+    : _maxSize(maxSize), _counters(counters), _options(std::move(options)) {}
 
 void OplogBufferBlockingQueue::startup(OperationContext*) {
     invariant(!_isShutdown);
@@ -72,10 +74,15 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _isShutdown = true;
-        _clear_inlock(lk);
+        if (_options.clearOnShutdown) {
+            _clear_inlock(lk);
+        } else {
+            _notFullCV.notify_one();
+            _notEmptyCV.notify_one();
+        }
     }
 
-    if (_counters) {
+    if (_options.clearOnShutdown && _counters) {
         _counters->clear();
     }
 }

@@ -90,6 +90,11 @@ public:
     bool inShutdown() const;
 
     /**
+     * Blocks until enough space is available.
+     */
+    void waitForSpace(OperationContext* opCtx, std::size_t size);
+
+    /**
      * Pushes operations read into oplog buffer.
      */
     void enqueue(OperationContext* opCtx,

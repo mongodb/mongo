@@ -53,8 +53,13 @@ namespace repl {
  */
 class OplogBufferBlockingQueue final : public OplogBuffer {
 public:
+    struct Options {
+        bool clearOnShutdown = true;
+        Options() {}
+    };
+
     explicit OplogBufferBlockingQueue(std::size_t maxSize);
-    OplogBufferBlockingQueue(std::size_t maxSize, Counters* counters);
+    OplogBufferBlockingQueue(std::size_t maxSize, Counters* counters, Options options);
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
@@ -94,6 +99,7 @@ private:
     bool _isShutdown = false;
     Counters* const _counters;
     std::deque<BSONObj> _queue;
+    const Options _options;
 };
 
 }  // namespace repl

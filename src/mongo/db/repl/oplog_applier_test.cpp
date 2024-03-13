@@ -116,7 +116,7 @@ protected:
 };
 
 void OplogApplierTest::setUp() {
-    _buffer = std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize, nullptr);
+    _buffer = std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize);
     _applier = std::make_unique<OplogApplierMock>(_buffer.get());
     _opCtxHolder = makeOperationContext();
 

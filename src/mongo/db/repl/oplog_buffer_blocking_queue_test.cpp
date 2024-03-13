@@ -210,6 +210,44 @@ TEST_F(OplogBufferBlockingQueueTest, ClearAndShutdownBuffer) {
     ASSERT_EQ(0, buffer.getCount());
 }
 
+TEST_F(OplogBufferBlockingQueueTest, ShutdownNoClear) {
+    OplogBufferBlockingQueue::Options options;
+    options.clearOnShutdown = false;
+    OplogBufferBlockingQueue buffer(1024, nullptr, options);
+    buffer.startup(opCtx());
+
+    std::vector<BSONObj> ops1;
+    ops1.push_back(makeNoopOplogEntry(1));
+    ops1.push_back(makeNoopOplogEntry(2));
+
+    size_t size1 = kOpSize * 2;
+    buffer.push(opCtx(), ops1.begin(), ops1.end(), size1);
+
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(size1, buffer.getSize());
+    ASSERT_EQ(ops1.size(), buffer.getCount());
+
+    // Shutdown the buffer.
+    buffer.shutdown(opCtx());
+
+    // Shutdown should not clear the buffer due to having
+    // set the clearOnShutdown option.
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(size1, buffer.getSize());
+    ASSERT_EQ(ops1.size(), buffer.getCount());
+
+    std::vector<BSONObj> ops2;
+    ops2.push_back(makeNoopOplogEntry(3));
+
+    // Shutdown should prevent new data from being pushed.
+    size_t size2 = kOpSize * 1;
+    buffer.push(opCtx(), ops2.begin(), ops2.end(), size2);
+
+    ASSERT(!buffer.isEmpty());
+    ASSERT_EQ(size1, buffer.getSize());
+    ASSERT_EQ(ops1.size(), buffer.getCount());
+}
+
 TEST_F(OplogBufferBlockingQueueTest, PushWaitForSpace) {
     OplogBufferBlockingQueue buffer(kOpSize * 4);
     buffer.startup(opCtx());
