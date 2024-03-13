@@ -206,6 +206,33 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
     return BSON("applyOps" << updates.arr() << "alwaysUpsert" << false);
 }
 
+BSONObj buildCountContiguousChunksByBounds(const UUID& collectionUUID,
+                                           const std::string& shard,
+                                           const std::vector<BSONObj>& boundsForChunks) {
+    AggregateCommandRequest countRequest(ChunkType::ConfigNS);
+
+    invariant(boundsForChunks.size() > 1);
+    auto minBoundIt = boundsForChunks.begin();
+    auto maxBoundIt = minBoundIt + 1;
+
+    BSONArrayBuilder chunkDocArray;
+    while (maxBoundIt != boundsForChunks.end()) {
+        const auto query = BSON(ChunkType::min(*minBoundIt)
+                                << ChunkType::max(*maxBoundIt) << ChunkType::collectionUUID()
+                                << collectionUUID << ChunkType::shard() << shard);
+
+        chunkDocArray.append(query);
+        ++minBoundIt;
+        ++maxBoundIt;
+    }
+
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$match" << BSON("$or" << chunkDocArray.arr())));
+    pipeline.push_back(BSON("$count" << ChunkType::collectionUUID.name()));
+    countRequest.setPipeline(pipeline);
+    return countRequest.toBSON({});
+}
+
 /**
  * Returns a chunk different from the one being migrated or 'none' if one doesn't exist.
  */
@@ -433,6 +460,48 @@ std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
     return shardIds;
 }
 
+// Checks if the requested split already exists. It is possible that the split operation completed,
+// but the router did not receive the response. This would result in the router retrying the split
+// operation, in which case it is fine for the request to become a no-op.
+auto isSplitAlreadyDone(OperationContext* opCtx,
+                        const ChunkRange& range,
+                        const std::string& shardName,
+                        const ChunkType& origChunk,
+                        const std::vector<BSONObj>& newChunkBounds) {
+    std::vector<BSONObj> expectedChunksBounds;
+    expectedChunksBounds.reserve(newChunkBounds.size() + 1);
+    expectedChunksBounds.push_back(range.getMin());
+    expectedChunksBounds.insert(
+        std::end(expectedChunksBounds), std::begin(newChunkBounds), std::end(newChunkBounds));
+
+    auto countRequest = buildCountContiguousChunksByBounds(
+        origChunk.getCollectionUUID(), shardName, expectedChunksBounds);
+
+    const auto expectedChunkCount = expectedChunksBounds.size() - 1;
+
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    auto countResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        NamespaceString::kConfigDb.toString(),
+        countRequest,
+        Shard::RetryPolicy::kIdempotent));
+
+    const auto docCount = [&]() {
+        auto cursorResponse =
+            uassertStatusOK(CursorResponse::parseFromBSON(countResponse.response));
+        auto firstBatch = cursorResponse.getBatch();
+        if (firstBatch.empty()) {
+            return 0;
+        }
+
+        auto countObj = firstBatch.front();
+        return countObj.getIntField(ChunkType::collectionUUID.name());
+    }();
+    return size_t(docCount) == expectedChunkCount;
+}
+
 }  // namespace
 
 void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
@@ -564,10 +633,20 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     std::vector<ChunkType> newChunks;
 
     ChunkVersion currentMaxVersion = collVersion;
+    const auto buildChunkVersionBSON = [](const ChunkVersion& version) {
+        BSONObjBuilder response;
+        version.serializeToBSON(kCollectionVersionField, &response);
+        version.serializeToBSON(ChunkVersion::kShardVersionField, &response);
+        return response.obj();
+    };
 
     auto startKey = range.getMin();
     auto newChunkBounds(splitPoints);
     newChunkBounds.push_back(range.getMax());
+
+    if (isSplitAlreadyDone(opCtx, range, shardName, origChunk.getValue(), newChunkBounds)) {
+        return buildChunkVersionBSON(collVersion);
+    }
 
     auto shouldTakeOriginalChunkID = true;
     OID chunkID;
@@ -717,10 +796,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         }
     }
 
-    BSONObjBuilder response;
-    currentMaxVersion.serializeToBSON(kCollectionVersionField, &response);
-    currentMaxVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
-    return response.obj();
+    return buildChunkVersionBSON(currentMaxVersion);
 }
 
 void ShardingCatalogManager::_mergeChunksInTransaction(
