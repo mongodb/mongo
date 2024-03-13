@@ -73,7 +73,7 @@ public:
     //
 
     /** Add a new component, by default ascending, field to index. */
-    IndexSpec& addKey(const StringData& field, IndexType type = kIndexTypeAscending);
+    IndexSpec& addKey(StringData field, IndexType type = kIndexTypeAscending);
 
     /** Add a component to this index. The field name of the element is used as the field
      *  name to index. The value of the element is the index type. This method exists to
@@ -111,7 +111,7 @@ public:
 
 
     /** Set the name for this index. If not set, a name will be automatically generated. */
-    IndexSpec& name(const StringData& name);
+    IndexSpec& name(StringData name);
 
     /** Sets whether duplicates detected while indexing should be dropped. By default,
      *  duplicates are not dropped.
@@ -144,10 +144,10 @@ public:
     IndexSpec& textWeights(const BSONObj& value);
 
     /** Sets the default language for a text index. */
-    IndexSpec& textDefaultLanguage(const StringData& value);
+    IndexSpec& textDefaultLanguage(StringData value);
 
     /** Sets the name of the field containing the language override in a text index. */
-    IndexSpec& textLanguageOverride(const StringData& value);
+    IndexSpec& textLanguageOverride(StringData value);
 
     /** Sets the version of the text index to use. MongoDB 2.4 only supports version
      *  '1'. If not otherwise specified, MongoDB 2.6 defaults to version 2.

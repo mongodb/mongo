@@ -94,7 +94,7 @@ public:
      * Captures the diagnostic information based on the caller's context.
      */
     static const DiagnosticInfo& capture(Client* client,
-                                         const StringData& captureName,
+                                         StringData captureName,
                                          Options options = Options{}) noexcept;
 
     /**
@@ -118,7 +118,7 @@ private:
     StringData _captureName;
     Backtrace _backtrace;
 
-    DiagnosticInfo(const Date_t& timestamp, const StringData& captureName, Backtrace backtrace)
+    DiagnosticInfo(const Date_t& timestamp, StringData captureName, Backtrace backtrace)
         : _timestamp(timestamp), _captureName(captureName), _backtrace(std::move(backtrace)) {}
 };
 

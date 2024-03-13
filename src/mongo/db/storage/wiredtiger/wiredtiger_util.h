@@ -253,7 +253,7 @@ public:
      *
      * Returns the FailedToParse status if the storage engine metadata object is malformed.
      */
-    static StatusWith<std::string> generateImportString(const StringData& ident,
+    static StatusWith<std::string> generateImportString(StringData ident,
                                                         const BSONObj& storageMetadata,
                                                         const ImportOptions& importOptions);
 

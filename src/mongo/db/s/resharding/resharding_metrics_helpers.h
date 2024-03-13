@@ -91,17 +91,17 @@ std::string getMetricsPrefix() {
 }
 
 template <typename T>
-std::string getIntervalPrefix(const StringData& intervalFieldName) {
+std::string getIntervalPrefix(StringData intervalFieldName) {
     return getMetricsPrefix<T>() + intervalFieldName + ".";
 }
 
 template <typename T>
-std::string getIntervalStartFieldName(const StringData& intervalFieldName) {
+std::string getIntervalStartFieldName(StringData intervalFieldName) {
     return getIntervalPrefix<T>(intervalFieldName) + ReshardingMetricsTimeInterval::kStartFieldName;
 }
 
 template <typename T>
-std::string getIntervalEndFieldName(const StringData& intervalFieldName) {
+std::string getIntervalEndFieldName(StringData intervalFieldName) {
     return getIntervalPrefix<T>(intervalFieldName) + ReshardingMetricsTimeInterval::kStopFieldName;
 }
 

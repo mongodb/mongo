@@ -140,7 +140,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    static YieldPolicy parseFromBSON(const StringData& element) {
+    static YieldPolicy parseFromBSON(StringData element) {
         const std::string& yieldPolicy = element.toString();
         if (yieldPolicy == "YIELD_AUTO") {
             return YieldPolicy::YIELD_AUTO;

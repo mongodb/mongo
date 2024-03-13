@@ -145,7 +145,7 @@ public:
     // name. This lives here because Timestamp manages its own serialization format.
 
     template <class Builder>
-    void append(Builder& builder, const StringData& fieldName) const {
+    void append(Builder& builder, StringData fieldName) const {
         // No endian conversions needed, since we store in-memory representation
         // in little endian format, regardless of target endian.
         builder.appendNum(static_cast<char>(bsonTimestamp));

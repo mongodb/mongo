@@ -162,7 +162,7 @@ boost::intrusive_ptr<DocumentSourceSort> createNewSortWithMemoryUsage(
  */
 bool checkMetadataSortReorder(
     const SortPattern& sortPattern,
-    const StringData& metaFieldStr,
+    StringData metaFieldStr,
     const boost::optional<std::string&> lastpointTimeField = boost::none) {
     auto timeFound = false;
     for (const auto& sortKey : sortPattern) {

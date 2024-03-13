@@ -2268,7 +2268,7 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
 }
 
 void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
-                                              const StringData& horizonString) const {
+                                              StringData horizonString) const {
     invariant(_rsConfig.isInitialized());
     response->setTopologyVersion(getTopologyVersion());
     const MemberState myState = getMemberState();

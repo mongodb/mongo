@@ -67,7 +67,7 @@ using namespace fmt;
 namespace {
 
 void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
-                                              const StringData& tenantId,
+                                              StringData tenantId,
                                               const UUID& migrationId) {
     auto& registry = TenantMigrationAccessBlockerRegistry::get(serviceContext);
     TenantId tid = TenantId::parseFromString(tenantId);

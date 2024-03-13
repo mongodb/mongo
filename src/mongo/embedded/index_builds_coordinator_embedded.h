@@ -95,7 +95,7 @@ public:
     Status voteAbortIndexBuild(OperationContext* opCtx,
                                const UUID& buildUUID,
                                const HostAndPort& hostAndPort,
-                               const StringData& reason) override;
+                               StringData reason) override;
     Status voteCommitIndexBuild(OperationContext* opCtx,
                                 const UUID& buildUUID,
                                 const HostAndPort& hostAndPort) override;

@@ -1047,7 +1047,7 @@ const std::set<std::string>& Command::deprecatedApiVersions() const {
     return kNoApiVersions;
 }
 
-bool Command::hasAlias(const StringData& alias) const {
+bool Command::hasAlias(StringData alias) const {
     return getName() == alias ||
         std::find(_aliases.begin(), _aliases.end(), alias) != _aliases.end();
 }

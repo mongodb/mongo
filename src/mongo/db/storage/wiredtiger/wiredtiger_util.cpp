@@ -1161,7 +1161,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
     return Status::OK();
 }
 
-StatusWith<std::string> WiredTigerUtil::generateImportString(const StringData& ident,
+StatusWith<std::string> WiredTigerUtil::generateImportString(StringData ident,
                                                              const BSONObj& storageMetadata,
                                                              const ImportOptions& importOptions) {
     if (!storageMetadata.hasField(ident)) {

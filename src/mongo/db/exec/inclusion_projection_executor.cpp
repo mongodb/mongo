@@ -115,9 +115,7 @@ bool computedExprDependsOnField(const std::vector<OrderedPathSet>& topLevelDeps,
 }  // namespace
 
 std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
-    const StringData& oldName,
-    const StringData& newName,
-    const std::set<StringData>& reservedNames) {
+    StringData oldName, StringData newName, const std::set<StringData>& reservedNames) {
     if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
         return {BSONObj{}, false};
     }
@@ -210,9 +208,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
 }
 
 std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
-    const StringData& oldName,
-    const StringData& newName,
-    const std::set<StringData>& reservedNames) {
+    StringData oldName, StringData newName, const std::set<StringData>& reservedNames) {
     if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
         return {BSONObj{}, false};
     }

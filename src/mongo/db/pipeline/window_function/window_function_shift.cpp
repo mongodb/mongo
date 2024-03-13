@@ -48,7 +48,7 @@ namespace mongo::window_function {
 REGISTER_STABLE_WINDOW_FUNCTION(shift, ExpressionShift::parse);
 
 boost::intrusive_ptr<Expression> ExpressionShift::parseShiftArgs(BSONObj obj,
-                                                                 const mongo::StringData& accName,
+                                                                 mongo::StringData accName,
                                                                  ExpressionContext* expCtx) {
     // 'obj' is something like '{output: EXPR, by: INT, default: CONSTEXPR}'.
     // only default is optional.

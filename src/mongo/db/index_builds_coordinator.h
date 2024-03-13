@@ -413,7 +413,7 @@ public:
     virtual Status voteAbortIndexBuild(OperationContext* opCtx,
                                        const UUID& buildUUID,
                                        const HostAndPort& hostAndPort,
-                                       const StringData& reason) = 0;
+                                       StringData reason) = 0;
 
     /**
      * Handles the 'VoteCommitIndexBuild' command request.

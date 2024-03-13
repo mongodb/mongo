@@ -102,7 +102,7 @@ void IndexBuildsCoordinatorEmbedded::_waitForNextIndexBuildActionAndCommit(
 Status IndexBuildsCoordinatorEmbedded::voteAbortIndexBuild(OperationContext* opCtx,
                                                            const UUID& buildUUID,
                                                            const HostAndPort& hostAndPort,
-                                                           const StringData& reason) {
+                                                           StringData reason) {
     MONGO_UNREACHABLE;
 }
 

@@ -60,7 +60,7 @@ IndexBuildsCoordinatorMock::resumeIndexBuild(OperationContext* opCtx,
 Status IndexBuildsCoordinatorMock::voteAbortIndexBuild(OperationContext* opCtx,
                                                        const UUID& buildUUID,
                                                        const HostAndPort& hostAndPort,
-                                                       const StringData& reason) {
+                                                       StringData reason) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

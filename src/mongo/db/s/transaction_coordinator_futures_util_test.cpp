@@ -301,7 +301,7 @@ protected:
         }
     }
 
-    void assertCommandSentAndRespondWith(const StringData& commandName,
+    void assertCommandSentAndRespondWith(StringData commandName,
                                          const StatusWith<BSONObj>& response,
                                          boost::optional<BSONObj> expectedWriteConcern) {
         onCommand([&](const executor::RemoteCommandRequest& request) {

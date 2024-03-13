@@ -385,7 +385,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     const MatchExpression* conjunct,
     const CollatorInterface* queryCollator,
     const CollatorInterface* ccCollator,
-    const StringData& clusterKeyFieldName,
+    StringData clusterKeyFieldName,
     RecordIdRange& recordRange,
     const std::function<void(const MatchExpression*)>& redundant) {
     if (conjunct == nullptr) {

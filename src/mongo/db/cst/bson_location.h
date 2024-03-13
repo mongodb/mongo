@@ -68,7 +68,7 @@ public:
         std::ostringstream stream;
         visit(OverloadedVisitor{
                   [&](const BSONElement& elem) { stream << "'" << elem.toString(false) << "'"; },
-                  [&](const StringData& elem) {
+                  [&](StringData elem) {
                       stream << "'" << elem << "'";
                   }},
               _location);
@@ -79,7 +79,7 @@ public:
             visit(OverloadedVisitor{[&](const unsigned int& index) {
                                         stream << " within array at index " << index;
                                     },
-                                    [&](const StringData& pref) {
+                                    [&](StringData pref) {
                                         stream << " within '" << pref << "'";
                                     }},
                   *it);
@@ -87,7 +87,7 @@ public:
 
         // The final prefix (or first element in the vector) is the input description.
         visit(OverloadedVisitor{[&](const unsigned int& index) { MONGO_UNREACHABLE; },
-                                [&](const StringData& pref) {
+                                [&](StringData pref) {
                                     stream << " of input " << pref;
                                 }},
               _prefix[0]);

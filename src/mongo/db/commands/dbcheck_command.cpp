@@ -991,7 +991,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
  */
 Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
     OperationContext* opCtx,
-    const StringData& indexName,
+    StringData indexName,
     key_string::Value batchFirst,
     DbCheckExtraIndexKeysBatchStats& batchStats) {
     bool reachedBatchEnd = false;
@@ -1034,7 +1034,7 @@ Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
  */
 Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     OperationContext* opCtx,
-    const StringData& indexName,
+    StringData indexName,
     const key_string::Value& snapshotFirstKey,
     DbCheckExtraIndexKeysBatchStats& batchStats) {
     if (MONGO_unlikely(hangBeforeReverseLookupCatalogSnapshot.shouldFail())) {
@@ -1238,7 +1238,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
 
 void DbChecker::_reverseLookup(OperationContext* opCtx,
-                               const StringData& indexName,
+                               StringData indexName,
                                DbCheckExtraIndexKeysBatchStats& batchStats,
                                const CollectionPtr& collection,
                                const key_string::Value& keyString,

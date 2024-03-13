@@ -92,7 +92,7 @@ public:
 
 private:
     static boost::intrusive_ptr<Expression> parseShiftArgs(BSONObj obj,
-                                                           const mongo::StringData& accName,
+                                                           mongo::StringData accName,
                                                            ExpressionContext* expCtx);
 
     boost::optional<mongo::Value> _defaultVal;

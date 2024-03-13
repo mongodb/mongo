@@ -127,7 +127,7 @@ void sortValueVector(std::vector<SBEValue>& sortVector);
 /**
  * Convert a prefix of the input string (up to 8 characters) to a double.
  */
-double stringToDouble(const StringData& sd);
+double stringToDouble(StringData sd);
 
 /**
  * Treats the entire ObjectId as a string of 12 unsigned characters and applies the string-to-double

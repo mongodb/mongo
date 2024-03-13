@@ -75,7 +75,7 @@ namespace mongo::timeseries {
 
 namespace {
 
-bool isIndexOnControl(const StringData& field) {
+bool isIndexOnControl(StringData field) {
     return field.startsWith(timeseries::kControlMinFieldNamePrefix) ||
         field.startsWith(timeseries::kControlMaxFieldNamePrefix);
 }
@@ -84,7 +84,7 @@ bool isIndexOnControl(const StringData& field) {
  * Takes the index specification field name, such as 'control.max.x.y', or 'control.min.z' and
  * returns a pair of the prefix ('control.min.' or 'control.max.') and key ('x.y' or 'z').
  */
-std::pair<std::string, std::string> extractControlPrefixAndKey(const StringData& field) {
+std::pair<std::string, std::string> extractControlPrefixAndKey(StringData field) {
     // Can't use rfind() due to dotted fields such as 'control.max.x.y'.
     size_t numDotsFound = 0;
     auto fieldIt = std::find_if(field.begin(), field.end(), [&numDotsFound](const char c) {

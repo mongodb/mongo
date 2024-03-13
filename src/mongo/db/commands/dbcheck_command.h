@@ -178,7 +178,7 @@ private:
      * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
      */
     Status _getExtraIndexKeysBatchAndRunReverseLookup(OperationContext* opCtx,
-                                                      const StringData& indexName,
+                                                      StringData indexName,
                                                       key_string::Value batchFirst,
                                                       DbCheckExtraIndexKeysBatchStats& batchStats);
 
@@ -193,7 +193,7 @@ private:
      * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
      */
     Status _getCatalogSnapshotAndRunReverseLookup(OperationContext* opCtx,
-                                                  const StringData& indexName,
+                                                  StringData indexName,
                                                   const key_string::Value& snapshotFirstKey,
                                                   DbCheckExtraIndexKeysBatchStats& batchStats);
 
@@ -201,7 +201,7 @@ private:
      * Iterates through an index table and fetches the corresponding document for each index entry.
      */
     void _reverseLookup(OperationContext* opCtx,
-                        const StringData& indexName,
+                        StringData indexName,
                         DbCheckExtraIndexKeysBatchStats& batchStats,
                         const CollectionPtr& collection,
                         const key_string::Value& keyString,

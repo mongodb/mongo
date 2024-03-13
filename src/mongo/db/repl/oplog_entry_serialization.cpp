@@ -32,7 +32,7 @@
 namespace mongo {
 namespace repl {
 void zeroOneManyStmtIdAppend(const std::vector<StmtId>& stmtIds,
-                             const StringData& fieldName,
+                             StringData fieldName,
                              BSONObjBuilder* bob) {
     if (stmtIds.size() == 1) {
         bob->append(fieldName, stmtIds.front());

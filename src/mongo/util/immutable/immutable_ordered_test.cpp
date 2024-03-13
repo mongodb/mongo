@@ -112,10 +112,10 @@ struct StringCompare {
     bool operator()(const std::string& a, const std::string& b) const {
         return a < b;
     }
-    bool operator()(const std::string& a, const StringData& b) const {
+    bool operator()(const std::string& a, StringData b) const {
         return a < b;
     }
-    bool operator()(const StringData& a, const std::string& b) const {
+    bool operator()(StringData a, const std::string& b) const {
         return a < b;
     }
     bool operator()(const std::string& a, const char* b) const {

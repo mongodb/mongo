@@ -76,9 +76,7 @@ size_t numberOfBytesForCodePoint(char charByte);
  */
 std::vector<StringData> extractCodePointsFromChars(StringData utf8String);
 
-bool codePointMatchesAtIndex(const StringData& input,
-                             std::size_t indexOfInput,
-                             const StringData& testCP);
+bool codePointMatchesAtIndex(StringData input, std::size_t indexOfInput, StringData testCP);
 
 StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs);
 

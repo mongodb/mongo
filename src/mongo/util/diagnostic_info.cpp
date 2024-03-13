@@ -241,7 +241,7 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
         using WakeReason = Interruptible::WakeReason;
         using WakeSpeed = Interruptible::WakeSpeed;
 
-        void addInfo(const StringData& name) {
+        void addInfo(StringData name) {
             if (auto client = Client::getCurrent()) {
                 DiagnosticInfo::capture(client, name);
 
@@ -252,7 +252,7 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
             }
         }
 
-        void removeInfo(const StringData& name) {
+        void removeInfo(StringData name) {
             if (auto client = Client::getCurrent()) {
                 auto& handle = getDiagnosticInfoHandle(client);
                 stdx::lock_guard<stdx::mutex> lk(handle.mutex);
@@ -262,11 +262,11 @@ MONGO_INITIALIZER(InterruptibleWaitListener)(InitializerContext* context) {
             }
         }
 
-        void onLongSleep(const StringData& name) override {
+        void onLongSleep(StringData name) override {
             addInfo(name);
         }
 
-        void onWake(const StringData& name, WakeReason, WakeSpeed speed) override {
+        void onWake(StringData name, WakeReason, WakeSpeed speed) override {
             if (speed == WakeSpeed::kSlow) {
                 removeInfo(name);
             }
@@ -289,7 +289,7 @@ std::string DiagnosticInfo::toString() const {
 }
 
 const DiagnosticInfo& DiagnosticInfo::capture(Client* client,
-                                              const StringData& captureName,
+                                              StringData captureName,
                                               Options options) noexcept {
     auto currentTime = client->getServiceContext()->getFastClockSource()->now();
 

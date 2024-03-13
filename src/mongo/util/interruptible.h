@@ -430,8 +430,8 @@ public:
 protected:
     class NotInterruptible;
 
-    void _onLongSleep(const StringData& name);
-    void _onWake(const StringData& name, WakeReason reason, WakeSpeed speed);
+    void _onLongSleep(StringData name);
+    void _onWake(StringData name, WakeReason reason, WakeSpeed speed);
 
     static auto& _getListenerState() {
         struct State {
@@ -459,7 +459,7 @@ public:
      * Any implementation of this function must be safe to invoke when an Interruptible-associated
      * latch is held. As this is hard to reason about, avoid external latches whenever possible.
      */
-    virtual void onLongSleep(const StringData& name) = 0;
+    virtual void onLongSleep(StringData name) = 0;
 
     /**
      * Action to do when a wait resolves after a sleep
@@ -467,7 +467,7 @@ public:
      * Any implementation of this function must be safe to invoke when an Interruptible-associated
      * latch is held. As this is hard to reason about, avoid external latches whenever possible.
      */
-    virtual void onWake(const StringData& name, WakeReason reason, WakeSpeed speed) = 0;
+    virtual void onWake(StringData name, WakeReason reason, WakeSpeed speed) = 0;
 };
 
 template <typename WaitListenerT>
@@ -478,7 +478,7 @@ inline void Interruptible::installWaitListener() {
     state.list.push_back(listener);
 }
 
-inline void Interruptible::_onLongSleep(const StringData& name) {
+inline void Interruptible::_onLongSleep(StringData name) {
     auto& state = _getListenerState();
 
     for (auto listener : state.list) {
@@ -486,7 +486,7 @@ inline void Interruptible::_onLongSleep(const StringData& name) {
     }
 }
 
-inline void Interruptible::_onWake(const StringData& name, WakeReason reason, WakeSpeed speed) {
+inline void Interruptible::_onWake(StringData name, WakeReason reason, WakeSpeed speed) {
     auto& state = _getListenerState();
 
     for (auto listener : state.list) {

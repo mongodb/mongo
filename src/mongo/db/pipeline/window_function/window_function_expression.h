@@ -188,7 +188,7 @@ public:
     /**
      * Is this a function that the parser knows about?
      */
-    inline static bool isFunction(const mongo::StringData& name) {
+    inline static bool isFunction(mongo::StringData name) {
         return parserMap.find(name) != parserMap.end();
     }
 

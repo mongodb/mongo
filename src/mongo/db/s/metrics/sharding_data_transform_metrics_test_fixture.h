@@ -201,7 +201,7 @@ protected:
         ShardingDataTransformInstanceMetrics* metrics,
         const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
         Section section,
-        const StringData& fieldName,
+        StringData fieldName,
         const std::function<bool(int, int)>& verifyFn) {
         assertAltersCumulativeMetrics(metrics, mutateFn, [&](auto reportBefore, auto reportAfter) {
             auto before = getReportSection(reportBefore, section).getIntField(fieldName);
@@ -214,7 +214,7 @@ protected:
         ShardingDataTransformInstanceMetrics* metrics,
         const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
         Section section,
-        const StringData& fieldName) {
+        StringData fieldName) {
         assertAltersCumulativeMetricsField(
             metrics, mutateFn, section, fieldName, [](auto before, auto after) {
                 return after > before;
@@ -225,7 +225,7 @@ protected:
         ShardingDataTransformInstanceMetrics* metrics,
         const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutateFn,
         Section section,
-        const StringData& fieldName) {
+        StringData fieldName) {
         assertAltersCumulativeMetricsField(
             metrics, mutateFn, section, fieldName, [](auto before, auto after) {
                 return after < before;

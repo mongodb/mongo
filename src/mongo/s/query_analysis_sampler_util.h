@@ -91,7 +91,7 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           SampledCommandNameEnum cmdName);
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const StringData& cmdName);
+                                          StringData cmdName);
 
 /**
  * Similar to 'tryGenerateSampleId()' but assigns the sample id to a random shard out of the given
@@ -104,7 +104,7 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* 
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
                                                               const NamespaceString& nss,
-                                                              const StringData& cmdName,
+                                                              StringData cmdName,
                                                               const std::set<ShardId>& shardIds);
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(

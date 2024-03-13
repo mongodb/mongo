@@ -70,6 +70,8 @@ namespace mongo {
  *
  * StringData is not null-terminated.
  *
+ * StringData should almost always be passed by value.
+ *
  * See https://en.cppreference.com/w/cpp/string/basic_string_view.
  */
 class MONGO_GSL_POINTER StringData {
@@ -424,7 +426,7 @@ class formatter<mongo::StringData> : formatter<std::string_view> {
 public:
     using Base::parse;
     template <typename FormatContext>
-    auto format(const mongo::StringData& s, FormatContext& fc) {
+    auto format(mongo::StringData s, FormatContext& fc) {
         return Base::format(std::string_view{s}, fc);
     }
 };

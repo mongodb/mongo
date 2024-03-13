@@ -206,7 +206,7 @@ void QueryAnalysisSampler::onShutdown() {
     }
 }
 
-void QueryAnalysisSampler::QueryStats::gotCommand(const StringData& cmdName) {
+void QueryAnalysisSampler::QueryStats::gotCommand(StringData cmdName) {
     if (cmdName == "findAndModify" || cmdName == "findandmodify") {
         _lastFindAndModifyQueriesCount++;
     } else if (cmdName == "aggregate") {

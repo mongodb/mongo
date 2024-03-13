@@ -76,14 +76,12 @@ public:
      * become empty after the extraction and can be deleted by the caller.
      */
     virtual std::pair<BSONObj, bool> extractComputedProjections(
-        const StringData& oldName,
-        const StringData& newName,
-        const std::set<StringData>& reservedNames) {
+        StringData oldName, StringData newName, const std::set<StringData>& reservedNames) {
         return {BSONObj{}, false};
     }
 
-    virtual std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
-                                                                    const StringData& newName) {
+    virtual std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
+                                                                    StringData newName) {
         return {BSONObj{}, false};
     }
 };

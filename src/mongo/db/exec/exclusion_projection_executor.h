@@ -96,8 +96,7 @@ public:
      * 'oldName'. Also returns a bool indicating whether this entire project is extracted. In the
      * extracted $project, 'oldName' is renamed to 'newName'. 'oldName' should not be dotted.
      */
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
-                                                            const StringData& newName);
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName, StringData newName);
 
 protected:
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const {
@@ -266,8 +265,8 @@ public:
         return boost::none;
     }
 
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
-                                                            const StringData& newName) final {
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
+                                                            StringData newName) final {
         return _root->extractProjectOnFieldAndRename(oldName, newName);
     }
 

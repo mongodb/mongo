@@ -144,8 +144,8 @@ public:
      * The function has no effect for exclusion projections, or if there are no computed
      * projections, or the computed expression depends on other fields than the oldName.
      */
-    std::pair<BSONObj, bool> extractComputedProjections(const StringData& oldName,
-                                                        const StringData& newName,
+    std::pair<BSONObj, bool> extractComputedProjections(StringData oldName,
+                                                        StringData newName,
                                                         const std::set<StringData>& reservedNames) {
         return _transformationProcessor->getTransformer().extractComputedProjections(
             oldName, newName, reservedNames);
@@ -157,8 +157,8 @@ public:
      * entire project is extracted. In the extracted $project, 'oldName' is renamed to 'newName'.
      * 'oldName' should not be dotted.
      */
-    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
-                                                            const StringData& newName) {
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName,
+                                                            StringData newName) {
         return _transformationProcessor->getTransformer().extractProjectOnFieldAndRename(oldName,
                                                                                          newName);
     }

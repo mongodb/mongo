@@ -580,7 +580,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx,
                                                          const UUID& buildUUID,
                                                          const HostAndPort& votingNode,
-                                                         const StringData& reason) {
+                                                         StringData reason) {
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto memberConfig = replCoord->findConfigMemberByHostAndPort_deprecated(votingNode);

@@ -42,7 +42,7 @@ using boost::intrusive_ptr;
 DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<ExpressionContext>& expCtx,
                                                      size_t facetId,
                                                      const intrusive_ptr<TeeBuffer>& bufferSource,
-                                                     const StringData& stageName)
+                                                     StringData stageName)
     : DocumentSource(stageName, expCtx),
       _facetId(facetId),
       _bufferSource(bufferSource),
@@ -52,7 +52,7 @@ boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::creat
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     size_t facetId,
     const boost::intrusive_ptr<TeeBuffer>& bufferSource,
-    const StringData& stageName) {
+    StringData stageName) {
     return new DocumentSourceTeeConsumer(expCtx, facetId, bufferSource, stageName);
 }
 

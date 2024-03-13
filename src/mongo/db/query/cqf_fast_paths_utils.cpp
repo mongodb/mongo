@@ -32,11 +32,11 @@
 namespace mongo::optimizer::fast_path {
 namespace {
 
-bool isSpecialField(const StringData& field) {
+bool isSpecialField(StringData field) {
     return field == "_id" || field.find(".") != std::string::npos;
 }
 
-bool isExpression(const StringData& field) {
+bool isExpression(StringData field) {
     return !field.empty() && field[0] == '$';
 }
 

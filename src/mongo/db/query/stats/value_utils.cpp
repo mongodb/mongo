@@ -178,7 +178,7 @@ double convertToDouble(const T& arr, const size_t maxPrecision) {
     return result;
 }
 
-double stringToDouble(const StringData& sd) {
+double stringToDouble(StringData sd) {
     constexpr size_t exponent = sizeof(double);
     const size_t maxPrecision = std::min(sd.size(), exponent);
     return convertToDouble<StringData, char, exponent>(sd, maxPrecision);

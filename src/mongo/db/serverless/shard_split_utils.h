@@ -59,7 +59,7 @@ namespace serverless {
  * @returns A list of `MemberConfig` for member nodes which match a provided replica set tag name
  */
 std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& config,
-                                                    const StringData& recipientTagName);
+                                                    StringData recipientTagName);
 
 
 /**
@@ -68,8 +68,8 @@ std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& c
  * connection string.
  */
 ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config,
-                                               const StringData& recipientTagName,
-                                               const StringData& recipientSetName);
+                                               StringData recipientTagName,
+                                               StringData recipientSetName);
 
 /**
  * Builds a split config, which is a ReplSetConfig with a subdocument identifying a recipient config

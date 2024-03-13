@@ -100,7 +100,7 @@ public:
     void _sleepInLock(mongo::OperationContext* opCtx,
                       long long millis,
                       LockMode mode,
-                      const StringData& ns) {
+                      StringData ns) {
         if (ns.empty()) {
             Lock::GlobalLock lk(opCtx, mode, Date_t::max(), Lock::InterruptBehavior::kThrow);
             LOGV2(6001601,

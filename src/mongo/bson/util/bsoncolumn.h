@@ -517,7 +517,7 @@ public:
         _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
-    void append(const StringData& val) {
+    void append(StringData val) {
         _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 

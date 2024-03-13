@@ -47,7 +47,7 @@ enum class NumericPathComponentResult {
 
 NumericPathComponentResult checkNumericOrDollarPathComponent(const FieldRef& path,
                                                              size_t pathIdx,
-                                                             const StringData& pathComponent) {
+                                                             StringData pathComponent) {
     if (pathComponent == "$"_sd) {
         return NumericPathComponentResult::kNumericOrDollar;
     }

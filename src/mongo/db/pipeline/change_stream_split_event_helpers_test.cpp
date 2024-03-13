@@ -71,7 +71,7 @@ public:
         minFragmentSize = static_cast<size_t>(fragment.peek().toBsonWithMetaData().objsize());
     }
 
-    size_t getFieldBsonSize(const Document& doc, const StringData& key) {
+    size_t getFieldBsonSize(const Document& doc, StringData key) {
         return static_cast<size_t>(doc.toBson<BSONObj::LargeSizeTrait>().getField(key).size());
     }
 

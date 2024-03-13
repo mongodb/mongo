@@ -178,7 +178,7 @@ public:
     void createMetricsAndAssertIncrementsCumulativeMetricsField(
         const std::function<void(ShardingDataTransformInstanceMetrics*)>& mutate,
         Section section,
-        const StringData& fieldName) {
+        StringData fieldName) {
         auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
         assertIncrementsCumulativeMetricsField(metrics.get(), mutate, section, fieldName);
     }

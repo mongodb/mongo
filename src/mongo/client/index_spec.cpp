@@ -57,7 +57,7 @@ const char kDuplicateOption[] = "duplicate option added to index descriptor";
 
 IndexSpec::IndexSpec() : _dynamicName(true) {}
 
-IndexSpec& IndexSpec::addKey(const StringData& field, IndexType type) {
+IndexSpec& IndexSpec::addKey(StringData field, IndexType type) {
     uassert(ErrorCodes::InvalidOptions, kDuplicateKey, !_keys.asTempObj().hasField(field));
     if (type <= kIndexTypeDescending)
         _keys.append(field, kIndexTypeNumbers[type]);
@@ -104,7 +104,7 @@ IndexSpec& IndexSpec::unique(bool value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::name(const StringData& value) {
+IndexSpec& IndexSpec::name(StringData value) {
     _name = value.toString();
     _dynamicName = false;
     return *this;
@@ -144,7 +144,7 @@ IndexSpec& IndexSpec::textWeights(const BSONObj& value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::textDefaultLanguage(const StringData& value) {
+IndexSpec& IndexSpec::textDefaultLanguage(StringData value) {
     uassert(ErrorCodes::InvalidOptions,
             kDuplicateOption,
             !_options.asTempObj().hasField("default_language"));
@@ -152,7 +152,7 @@ IndexSpec& IndexSpec::textDefaultLanguage(const StringData& value) {
     return *this;
 }
 
-IndexSpec& IndexSpec::textLanguageOverride(const StringData& value) {
+IndexSpec& IndexSpec::textLanguageOverride(StringData value) {
     uassert(ErrorCodes::InvalidOptions,
             kDuplicateOption,
             !_options.asTempObj().hasField("language_override"));

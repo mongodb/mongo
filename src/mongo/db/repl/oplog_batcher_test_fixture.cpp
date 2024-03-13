@@ -284,7 +284,7 @@ OplogEntry makeUpdateOplogEntry(int t,
                               boost::none)};  // needsRetryImage
 }
 
-OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
+OplogEntry makeNoopOplogEntry(int t, StringData msg) {
     BSONObj oField = BSON("msg" << msg << "count" << t);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               OpTypeEnum::kNoop,           // op type

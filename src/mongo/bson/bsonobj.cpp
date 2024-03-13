@@ -179,7 +179,7 @@ BSONObj BSONObj::redact(RedactLevel level,
     // Helper to get an "internal function" to be able to do recursion
     struct redactor {
         void appendRedactedElem(BSONObjBuilder& builder,
-                                const StringData& fieldNameString,
+                                StringData fieldNameString,
                                 bool appendMask) {
             if (appendMask) {
                 builder.append(fieldNameString, "###"_sd);

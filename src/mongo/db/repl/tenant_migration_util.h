@@ -197,7 +197,7 @@ inline Status validateTimestampNotNull(const Timestamp& ts) {
         : Status(ErrorCodes::BadValue, str::stream() << "Timestamp can't be null");
 }
 
-inline Status validateConnectionString(const StringData& donorOrRecipientConnectionString) {
+inline Status validateConnectionString(StringData donorOrRecipientConnectionString) {
     const auto donorOrRecipientUri =
         uassertStatusOK(MongoURI::parse(donorOrRecipientConnectionString.toString()));
     const auto donorOrRecipientServers = donorOrRecipientUri.getServers();

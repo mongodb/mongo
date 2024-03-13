@@ -59,7 +59,7 @@ Status isUpdatable(const FieldRef& field) {
     return Status::OK();
 }
 
-bool isPositionalElement(const StringData& field) {
+bool isPositionalElement(StringData field) {
     return field.size() == 1 && field[0] == '$';
 }
 
@@ -83,7 +83,7 @@ bool isPositional(const FieldRef& fieldRef, size_t* pos, size_t* count) {
     return *count > 0;
 }
 
-bool isArrayFilterIdentifier(const StringData& field) {
+bool isArrayFilterIdentifier(StringData field) {
     return field.size() >= 3 && field[0] == '$' && field[1] == '[' &&
         field[field.size() - 1] == ']';
 }

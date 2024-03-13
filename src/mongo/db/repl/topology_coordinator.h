@@ -429,7 +429,7 @@ public:
     // replset.  Drivers interpret the hello fields according to the Server Discovery and
     // Monitoring Spec, see the "Parsing an isMaster response" section.
     void fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
-                             const StringData& horizonString) const;
+                             StringData horizonString) const;
 
     // Produce member data for the serverStatus command and diagnostic logging.
     void fillMemberData(BSONObjBuilder* result);

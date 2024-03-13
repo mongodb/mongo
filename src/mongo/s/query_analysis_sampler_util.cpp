@@ -56,7 +56,7 @@ auto sampleIter(C&& c) {
     return std::next(c.begin(), (*random)->nextInt64(c.size()));
 }
 
-StringData adjustCmdNameCase(const StringData& cmdName) {
+StringData adjustCmdNameCase(StringData cmdName) {
     if (cmdName == "findandmodify") {
         return StringData("findAndModify");
     } else {
@@ -76,7 +76,7 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
 
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const StringData& cmdName) {
+                                          StringData cmdName) {
     return tryGenerateSampleId(opCtx,
                                nss,
                                SampledCommandName_parse(IDLParserContext("tryGenerateSampleId"),
@@ -95,7 +95,7 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* 
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
                                                               const NamespaceString& nss,
-                                                              const StringData& cmdName,
+                                                              StringData cmdName,
                                                               const std::set<ShardId>& shardIds) {
     return tryGenerateTargetedSampleId(
         opCtx,

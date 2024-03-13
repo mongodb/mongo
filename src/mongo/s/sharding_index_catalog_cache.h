@@ -63,11 +63,11 @@ public:
 
     size_t numIndexes() const;
 
-    bool contains(const StringData& name) const;
+    bool contains(StringData name) const;
 
     void add(const IndexCatalogType& index, const CollectionIndexes& collectionIndexes);
 
-    void remove(const StringData& name, const CollectionIndexes& collectionIndexes);
+    void remove(StringData name, const CollectionIndexes& collectionIndexes);
 
     template <typename Callable>
     void forEachIndex(Callable&& handler) const {

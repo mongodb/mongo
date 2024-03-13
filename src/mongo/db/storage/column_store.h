@@ -505,7 +505,7 @@ struct SplitCellView {
     struct CursorWithArrayDepth {
         CursorWithArrayDepth(int pathLength,
                              const char* elemPtr,
-                             const StringData& arrayInfo,
+                             StringData arrayInfo,
                              ValueEncoder* encoder)
             : elemPtr(elemPtr),
               end(arrayInfo.rawData()),

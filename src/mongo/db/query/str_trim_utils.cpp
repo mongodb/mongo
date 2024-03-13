@@ -72,9 +72,7 @@ std::vector<StringData> extractCodePointsFromChars(StringData utf8String) {
     return codePoints;
 }
 
-bool codePointMatchesAtIndex(const StringData& input,
-                             std::size_t indexOfInput,
-                             const StringData& testCP) {
+bool codePointMatchesAtIndex(StringData input, std::size_t indexOfInput, StringData testCP) {
     for (size_t i = 0; i < testCP.size(); ++i) {
         if (indexOfInput + i >= input.size() || input[indexOfInput + i] != testCP[i]) {
             return false;

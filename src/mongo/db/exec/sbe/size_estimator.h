@@ -100,7 +100,7 @@ inline size_t estimate(S) {
     return 0;
 }
 
-inline size_t estimate(const StringData& str) {
+inline size_t estimate(StringData str) {
     return 0;
 }
 

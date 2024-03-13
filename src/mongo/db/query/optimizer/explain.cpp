@@ -341,7 +341,7 @@ public:
         return *this;
     }
 
-    ExplainPrinterImpl& print(const StringData& s) {
+    ExplainPrinterImpl& print(StringData s) {
         print(s.empty() ? "<empty>" : s.rawData());
         return *this;
     }
@@ -670,7 +670,7 @@ public:
         return *this;
     }
 
-    ExplainPrinterImpl& print(const StringData& s) {
+    ExplainPrinterImpl& print(StringData s) {
         printStringInternal(s);
         return *this;
     }
@@ -754,7 +754,7 @@ public:
     }
 
 private:
-    ExplainPrinterImpl& printStringInternal(const StringData& s) {
+    ExplainPrinterImpl& printStringInternal(StringData s) {
         auto [tag, val] = sbe::value::makeNewString(s);
         addValue(tag, val);
         return *this;

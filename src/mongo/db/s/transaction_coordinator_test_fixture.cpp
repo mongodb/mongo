@@ -124,7 +124,7 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
 }
 
 void TransactionCoordinatorTestFixture::assertCommandSentAndRespondWith(
-    const StringData& commandName,
+    StringData commandName,
     const StatusWith<BSONObj>& response,
     boost::optional<BSONObj> expectedWriteConcern) {
     onCommand([&](const executor::RemoteCommandRequest& request) {

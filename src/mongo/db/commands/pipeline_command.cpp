@@ -201,7 +201,7 @@ public:
                         option.getDataSources().size() > 0);
             }
 
-            auto findCollNameInExternalDataSourceOption = [&](const StringData& collName) {
+            auto findCollNameInExternalDataSourceOption = [&](StringData collName) {
                 return std::find_if(externalDataSources->begin(),
                                     externalDataSources->end(),
                                     [&](const ExternalDataSourceOption& externalDataSourceOption) {

@@ -81,7 +81,7 @@ public:
         /**
          * If the command is an aggregate, count or distinct command, increment its count.
          */
-        void gotCommand(const StringData& cmdName);
+        void gotCommand(StringData cmdName);
 
         long long getLastTotalCount() const {
             return _lastTotalCount;
@@ -206,7 +206,7 @@ public:
 
     void onShutdown();
 
-    void gotCommand(const StringData& cmdName) {
+    void gotCommand(StringData cmdName) {
         stdx::lock_guard<Latch> lk(_queryStatsMutex);
         _queryStats.gotCommand(cmdName);
     }

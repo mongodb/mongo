@@ -113,7 +113,7 @@ OplogEntry makeUpdateOplogEntry(int t,
                                 boost::optional<OpTime> preImageOpTime = boost::none,
                                 boost::optional<OpTime> postImageOpTime = boost::none);
 
-OplogEntry makeNoopOplogEntry(int t, const StringData& msg);
+OplogEntry makeNoopOplogEntry(int t, StringData msg);
 
 OplogEntry makeApplyOpsOplogEntry(int t,
                                   bool prepare,

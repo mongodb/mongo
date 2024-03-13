@@ -224,7 +224,7 @@ std::unique_ptr<MatchExpression> makeOr(std::vector<std::unique_ptr<MatchExpress
  */
 std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
-    const StringData& matchExprPath,
+    StringData matchExprPath,
     bool assumeNoMixedSchemaData) {
 
     std::vector<std::unique_ptr<MatchExpression>> typeEqualityPredicates;

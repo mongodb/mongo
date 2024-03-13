@@ -48,7 +48,7 @@ void setSocketKeepAliveParams(int sock,
 
 std::string makeUnixSockPath(int port, StringData label = "");
 
-inline bool isUnixDomainSocket(const StringData& hostname) {
+inline bool isUnixDomainSocket(StringData hostname) {
     return hostname.find('/') != std::string::npos;
 }
 

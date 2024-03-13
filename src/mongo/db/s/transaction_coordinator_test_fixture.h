@@ -69,7 +69,7 @@ protected:
      */
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
-    void assertCommandSentAndRespondWith(const StringData& commandName,
+    void assertCommandSentAndRespondWith(StringData commandName,
                                          const StatusWith<BSONObj>& response,
                                          boost::optional<BSONObj> expectedWriteConcern);
     /**

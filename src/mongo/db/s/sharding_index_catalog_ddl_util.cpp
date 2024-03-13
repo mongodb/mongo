@@ -278,7 +278,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
 void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const UUID& uuid,
-                                                   const StringData& indexName,
+                                                   StringData indexName,
                                                    const Timestamp& lastmod) {
     writeConflictRetry(
         opCtx,

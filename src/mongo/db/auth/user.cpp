@@ -223,7 +223,7 @@ void User::reportForUsersInfo(BSONObjBuilder* builder,
     builder->append(kDbFieldName, getName().getDB());
 
     BSONArrayBuilder mechanismNamesBuilder(builder->subarrayStart(kMechanismsFieldName));
-    for (const StringData& mechanism : _credentials.toMechanismsVector()) {
+    for (StringData mechanism : _credentials.toMechanismsVector()) {
         mechanismNamesBuilder.append(mechanism);
     }
     mechanismNamesBuilder.doneFast();

@@ -119,7 +119,7 @@ namespace {
 template <typename T>
 void serializeSpecField(BSONObjBuilder* builder,
                         const SerializationOptions& opts,
-                        const StringData& fieldName,
+                        StringData fieldName,
                         const boost::optional<T>& value) {
     if (value) {
         opts.serializeLiteral((*value).toBSON()).addToBsonObj(builder, fieldName);
@@ -129,7 +129,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 template <>
 void serializeSpecField(BSONObjBuilder* builder,
                         const SerializationOptions& opts,
-                        const StringData& fieldName,
+                        StringData fieldName,
                         const boost::optional<Timestamp>& value) {
     if (value) {
         opts.serializeLiteral(*value).addToBsonObj(builder, fieldName);
@@ -139,7 +139,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 template <typename T>
 void serializeSpecField(BSONObjBuilder* builder,
                         const SerializationOptions& opts,
-                        const StringData& fieldName,
+                        StringData fieldName,
                         const T& value) {
     opts.appendLiteral(builder, fieldName, value);
 }
@@ -147,7 +147,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 template <>
 void serializeSpecField(BSONObjBuilder* builder,
                         const SerializationOptions& opts,
-                        const StringData& fieldName,
+                        StringData fieldName,
                         const mongo::OptionalBool& value) {
     if (value.has_value()) {
         opts.appendLiteral(builder, fieldName, value.value_or(true));

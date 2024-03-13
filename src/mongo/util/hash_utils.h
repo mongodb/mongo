@@ -41,7 +41,7 @@ namespace mongo {
  * StringData's hash function compatible with absl::Hash.
  */
 template <typename H>
-H AbslHashValue(H h, const StringData& sd) {
+H AbslHashValue(H h, StringData sd) {
     if (sd.empty()) {
         return H::combine(std::move(h), 9081739);
     }

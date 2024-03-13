@@ -50,8 +50,8 @@ Document FastPathEligibleExclusionNode::applyToDocument(const Document& inputDoc
     return ExclusionNode::applyToDocument(inputDoc);
 }
 
-std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(const StringData& oldName,
-                                                                       const StringData& newName) {
+std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(StringData oldName,
+                                                                       StringData newName) {
     BSONObjBuilder extractedExclusion;
 
     // Check for a projection directly on 'oldName'. For example, {oldName: 0}.

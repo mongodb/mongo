@@ -108,7 +108,7 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
 
 BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
     std::shared_ptr<const Key> key, const SerializationContext& serializationContext) const {
-    static const auto sha256HmacStringDataHasher = [](std::string key, const StringData& sd) {
+    static const auto sha256HmacStringDataHasher = [](std::string key, StringData sd) {
         auto hashed = SHA256Block::computeHmac(
             (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
         return hashed.toString();

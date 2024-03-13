@@ -669,7 +669,7 @@ public:
     /**
      * Checks if the command is also known by the provided alias.
      */
-    bool hasAlias(const StringData& alias) const;
+    bool hasAlias(StringData alias) const;
 
     /**
      * Audit when this command fails authz check.

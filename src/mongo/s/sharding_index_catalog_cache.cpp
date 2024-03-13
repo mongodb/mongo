@@ -59,7 +59,7 @@ size_t ShardingIndexesCatalogCache::numIndexes() const {
     return _indexes.size();
 }
 
-bool ShardingIndexesCatalogCache::contains(const StringData& name) const {
+bool ShardingIndexesCatalogCache::contains(StringData name) const {
     return _indexes.contains(name);
 }
 
@@ -73,7 +73,7 @@ void ShardingIndexesCatalogCache::add(const IndexCatalogType& index,
     _indexes.emplace(index.getName(), index);
 }
 
-void ShardingIndexesCatalogCache::remove(const StringData& name,
+void ShardingIndexesCatalogCache::remove(StringData name,
                                          const CollectionIndexes& collectionIndexes) {
     tassert(7019901,
             str::stream() << "Cannot remove global index with different uuid than is in the "

@@ -74,7 +74,7 @@ namespace serverless {
 const size_t kMinimumRequiredRecipientNodes = 3;
 
 std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& config,
-                                                    const StringData& recipientTagName) {
+                                                    StringData recipientTagName) {
     std::vector<repl::MemberConfig> result;
     const auto& tagConfig = config.getTagConfig();
     for (const auto& member : config.members()) {
@@ -93,8 +93,8 @@ std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& c
 
 
 ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config,
-                                               const StringData& recipientTagName,
-                                               const StringData& recipientSetName) {
+                                               StringData recipientTagName,
+                                               StringData recipientSetName) {
     auto recipientMembers = getRecipientMembers(config, recipientTagName);
     std::vector<HostAndPort> recipientNodes;
     std::transform(recipientMembers.cbegin(),

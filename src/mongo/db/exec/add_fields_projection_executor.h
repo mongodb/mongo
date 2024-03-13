@@ -167,9 +167,7 @@ public:
     }
 
     std::pair<BSONObj, bool> extractComputedProjections(
-        const StringData& oldName,
-        const StringData& newName,
-        const std::set<StringData>& reservedNames) final {
+        StringData oldName, StringData newName, const std::set<StringData>& reservedNames) final {
         return _root->extractComputedProjectionsInAddFields(oldName, newName, reservedNames);
     }
 

@@ -123,9 +123,7 @@ public:
      * and cannot be deleted.
      */
     std::pair<BSONObj, bool> extractComputedProjectionsInProject(
-        const StringData& oldName,
-        const StringData& newName,
-        const std::set<StringData>& reservedNames);
+        StringData oldName, StringData newName, const std::set<StringData>& reservedNames);
 
     /**
      * Returns a pair of <BSONObj, bool>. The BSONObj contains extracted computed projections that
@@ -138,9 +136,7 @@ public:
      * extraction and can be deleted by the caller.
      */
     std::pair<BSONObj, bool> extractComputedProjectionsInAddFields(
-        const StringData& oldName,
-        const StringData& newName,
-        const std::set<StringData>& reservedNames);
+        StringData oldName, StringData newName, const std::set<StringData>& reservedNames);
 
 protected:
     // For inclusions, we can apply an optimization here by simply appending to the output document
@@ -345,9 +341,7 @@ public:
     }
 
     std::pair<BSONObj, bool> extractComputedProjections(
-        const StringData& oldName,
-        const StringData& newName,
-        const std::set<StringData>& reservedNames) final {
+        StringData oldName, StringData newName, const std::set<StringData>& reservedNames) final {
         return _root->extractComputedProjectionsInProject(oldName, newName, reservedNames);
     }
 

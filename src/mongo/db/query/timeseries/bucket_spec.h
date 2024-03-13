@@ -96,7 +96,7 @@ public:
         _fieldSet = std::move(fieldSet);
     }
 
-    void addIncludeExcludeField(const StringData& field) {
+    void addIncludeExcludeField(StringData field) {
         _fieldSet.emplace(field);
     }
 
@@ -116,7 +116,7 @@ public:
         return _behavior;
     }
 
-    void addComputedMetaProjFields(const StringData& field) {
+    void addComputedMetaProjFields(StringData field) {
         _computedMetaProjFields.emplace(field);
     }
 

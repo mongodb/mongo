@@ -40,7 +40,7 @@ namespace mongo {
 
 namespace {
 
-Status makeStoreStatus(const StringData& sdata, size_t length, std::ptrdiff_t debug_offset) {
+Status makeStoreStatus(StringData sdata, size_t length, std::ptrdiff_t debug_offset) {
     str::stream ss;
     ss << "buffer size too small to write StringData(" << sdata.size() << ") bytes into buffer["
        << length << "] at offset: " << debug_offset;
@@ -64,11 +64,8 @@ Status DataType::Handler<StringData>::load(StringData* sdata,
     return Status::OK();
 }
 
-Status DataType::Handler<StringData>::store(const StringData& sdata,
-                                            char* ptr,
-                                            size_t length,
-                                            size_t* advanced,
-                                            std::ptrdiff_t debug_offset) {
+Status DataType::Handler<StringData>::store(
+    StringData sdata, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
     if (sdata.size() > length) {
         return makeStoreStatus(sdata, length, debug_offset);
     }

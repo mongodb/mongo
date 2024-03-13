@@ -39,7 +39,7 @@
 namespace mongo {
 namespace repl {
 void zeroOneManyStmtIdAppend(const std::vector<StmtId>& stmtIds,
-                             const StringData& fieldName,
+                             StringData fieldName,
                              BSONObjBuilder* bob);
 
 std::vector<StmtId> parseZeroOneManyStmtId(const BSONElement& element);

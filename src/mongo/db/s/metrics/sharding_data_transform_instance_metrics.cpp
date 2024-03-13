@@ -58,7 +58,7 @@ boost::optional<Milliseconds> readCoordinatorEstimate(const AtomicWord<Milliseco
 
 template <typename T>
 void appendOptionalMillisecondsFieldAs(BSONObjBuilder& builder,
-                                       const StringData& fieldName,
+                                       StringData fieldName,
                                        const boost::optional<Milliseconds> value) {
     if (!value) {
         return;

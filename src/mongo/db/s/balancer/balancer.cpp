@@ -1457,13 +1457,12 @@ BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationConte
     maxChunkSizeMB = std::ceil(maxChunkSizeMB * 100.0) / 100.0;
 
     BalancerCollectionStatusResponse response(maxChunkSizeMB, true /*balancerCompliant*/);
-    auto setViolationOnResponse = [&response](const StringData& reason,
-                                              const boost::optional<BSONObj>& details =
-                                                  boost::none) {
-        response.setBalancerCompliant(false);
-        response.setFirstComplianceViolation(reason);
-        response.setDetails(details);
-    };
+    auto setViolationOnResponse =
+        [&response](StringData reason, const boost::optional<BSONObj>& details = boost::none) {
+            response.setBalancerCompliant(false);
+            response.setFirstComplianceViolation(reason);
+            response.setDetails(details);
+        };
 
     bool isDefragmenting = coll.getDefragmentCollection();
     if (isDefragmenting) {
