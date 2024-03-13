@@ -598,6 +598,11 @@ public:
     void cancelElection_forTest();
 
     /**
+     * Runs the repl set initiate internal function.
+     */
+    Status runReplSetInitiate_forTest(const BSONObj& configObj, BSONObjBuilder* resultObj);
+
+    /**
      * Implementation of an interface used to synchronize changes to custom write concern tags in
      * the config and custom default write concern settings.
      * See base class fore more information.
@@ -1355,7 +1360,13 @@ private:
     void _initialSyncerCompletionFunction(const StatusWith<OpTimeAndWallTime>& opTimeStatus);
 
     /**
-     * Finishes the work of processReplSetInitiate() in the event of a successful quorum check.
+     * Function that executes a replSetInitiate command. This function should be run in an internal
+     * thread so that it cannot be interrupted upon state transition.
+     */
+    Status _runReplSetInitiate(const BSONObj& configObj, BSONObjBuilder* resultObj);
+
+    /**
+     * Finishes the work of _runReplSetInitiate() in the event of a successful quorum check.
      */
     void _finishReplSetInitiate(OperationContext* opCtx,
                                 const ReplSetConfig& newConfig,

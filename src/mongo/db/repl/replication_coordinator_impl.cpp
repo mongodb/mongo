@@ -4540,6 +4540,31 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
                                                           const BSONObj& configObj,
                                                           BSONObjBuilder* resultObj) {
     LOGV2(21356, "replSetInitiate admin command received from client");
+    auto status = std::make_shared<Status>(Status::OK());
+    // Run the initiate logic in an internal thread, so that it will not be interrupted upon state
+    // transition. This user thread will also not be interrupted, since it does not obtain the
+    // global lock.
+    auto handle = _replExecutor->scheduleWork(
+        [status, configObj, resultObj, this](const executor::TaskExecutor::CallbackArgs& cb) {
+            *status = _runReplSetInitiate(configObj, resultObj);
+        });
+    if (!handle.isOK()) {
+        return handle.getStatus();
+    }
+
+    _replExecutor->wait(handle.getValue());
+    return *status;
+}
+
+Status ReplicationCoordinatorImpl::runReplSetInitiate_forTest(const BSONObj& configObj,
+                                                              BSONObjBuilder* resultObj) {
+    return _runReplSetInitiate(configObj, resultObj);
+}
+
+Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
+                                                       BSONObjBuilder* resultObj) {
+    auto uniqueOpCtx = cc().makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
 
     stdx::unique_lock<Latch> lk(_mutex);
     if (!_settings.isReplSet()) {
@@ -4658,10 +4683,17 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     // A configuration passed to replSetInitiate() with the current node as an arbiter
     // will fail validation with a "replSet initiate got ... while validating" reason.
     invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
+
+    // After _finishReplSetInitiate, the new config should be installed. As a result, we can dismiss
+    // the scope guard for the config state that would reset the state to kConfigUninitialized. It
+    // is important to note that _startDataReplication may transition us to secondary mode while we
+    // are a single node replica set, which will cause us to run for election and kill
+    // resource-holding threads.
+    configStateGuard.dismiss();
+
     _externalState->startThreads();
     _startDataReplication(opCtx);
 
-    configStateGuard.dismiss();
     return Status::OK();
 }
 

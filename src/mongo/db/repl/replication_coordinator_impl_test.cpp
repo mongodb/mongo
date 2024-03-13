@@ -259,22 +259,35 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
+const auto defaultConfigOneNode = BSON("_id"
+                                       << "mySet"
+                                       << "version" << 1 << "members"
+                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                << "node1:12345")));
+const auto defaultConfigTwoNodes = BSON("_id"
+                                        << "mySet"
+                                        << "version" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "node1:12345")
+                                                      << BSON("_id" << 1 << "host"
+                                                                    << "node2:54321")));
+
+void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord, BSONObj config, Status* status) {
+    BSONObjBuilder garbage;
+    *status = replCoord->runReplSetInitiate_forTest(config, &garbage);
+}
+
 TEST_F(ReplCoordTest, NodeInitiateInServerlessMode) {
     ReplSettings settings;
     settings.setServerlessMode();
 
     ReplCoordTest::init(settings);
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ASSERT_OK(
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_OK(status);
+
     ASSERT(getReplCoord()->getSettings().isReplSet());
     auto config = getReplCoord()->getConfig();
     ASSERT_EQUALS("mySet", config.getReplSetName());
@@ -283,26 +296,19 @@ TEST_F(ReplCoordTest, NodeInitiateInServerlessMode) {
 TEST_F(ReplCoordTest, NodeInitiateDifferentSetNames) {
     ReplCoordTest::init("cliSetName");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatedWithAnEmptyConfig) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  getReplCoord()->processReplSetInitiate(opCtx.get(), BSONObj(), &result));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), BSONObj(), &status);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
@@ -312,32 +318,16 @@ TEST_F(ReplCoordTest,
     start(HostAndPort("node1", 12345));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    auto opCtx = makeOperationContext();
-
     // Starting uninitialized, show that we can perform the initiate behavior.
-    BSONObjBuilder result1;
-    ASSERT_OK(
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result1));
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_OK(status);
     ASSERT(getReplCoord()->getSettings().isReplSet());
     ASSERT_TRUE(getExternalState()->threadsStarted());
 
     // Show that initiate fails after it has already succeeded.
-    BSONObjBuilder result2;
-    ASSERT_EQUALS(
-        ErrorCodes::AlreadyInitialized,
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result2));
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_EQUALS(ErrorCodes::AlreadyInitialized, status);
 
     // Still in repl set mode, even after failed reinitiate.
     ASSERT(getReplCoord()->getSettings().isReplSet());
@@ -347,24 +337,20 @@ TEST_F(ReplCoordTest,
        NodeReturnsInvalidReplicaSetConfigWhenInitiatingViaANodeThatCannotBecomePrimary) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
 
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
+    auto config = BSON("_id"
+                       << "mySet"
+                       << "version" << 1 << "members"
+                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                << "node1:12345"
+                                                << "arbiterOnly" << true)
+                                     << BSON("_id" << 1 << "host"
+                                                   << "node2:12345")));
 
     // Starting uninitialized, show that we can perform the initiate behavior.
-    BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"
-                                                                             << "arbiterOnly"
-                                                                             << true)
-                                                                  << BSON("_id" << 1 << "host"
-                                                                                << "node2:12345"))),
-                                               &result1);
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), config, &status);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_STRING_CONTAINS(status.reason(), "is not electable under the new configuration with");
     ASSERT_FALSE(getExternalState()->threadsStarted());
@@ -374,56 +360,32 @@ TEST_F(ReplCoordTest,
        InitiateShouldSucceedWithAValidConfigEvenIfItHasFailedWithAnInvalidConfigPreviously) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
-    BSONObjBuilder result;
-    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  getReplCoord()->processReplSetInitiate(opCtx.get(), BSONObj(), &result));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), BSONObj(), &status);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
     // Having failed to initiate once, show that we can now initiate.
-    BSONObjBuilder result1;
-    ASSERT_OK(
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result1));
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_OK(status);
     ASSERT(getReplCoord()->getSettings().isReplSet());
 }
 
 TEST_F(ReplCoordTest,
        NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAConfigTheNodeIsAbsentFrom) {
-    BSONObjBuilder result;
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node4"))),
-                                               &result));
-}
 
-void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord, Status* status) {
-    BSONObjBuilder garbage;
-    auto client = getGlobalServiceContext()->getService()->makeClient("rsi");
-    auto opCtx = client->makeOperationContext();
-    *status =
-        replCoord->processReplSetInitiate(opCtx.get(),
-                                          BSON("_id"
-                                               << "mySet"
-                                               << "version" << 1 << "members"
-                                               << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                        << "node1:12345")
-                                                             << BSON("_id" << 1 << "host"
-                                                                           << "node2:54321"))),
-                                          &garbage);
+    auto config = BSON("_id"
+                       << "mySet"
+                       << "version" << 1 << "members"
+                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                << "node4")));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), config, &status);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating) {
@@ -442,7 +404,10 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     hbArgs.setHeartbeatVersion(1);
 
     Status status(ErrorCodes::InternalError, "Not set");
-    stdx::thread prsiThread([&] { doReplSetInitiate(getReplCoord(), &status); });
+    stdx::thread prsiThread([&] {
+        Client::setCurrent(getGlobalServiceContext()->getService()->makeClient("replSetInitiate"));
+        doReplSetInitiate(getReplCoord(), defaultConfigTwoNodes, &status);
+    });
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -480,7 +445,10 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     replCoordSetMyLastAppliedOpTime(OpTime(appliedTS, 1), Date_t() + Seconds(100));
 
     Status status(ErrorCodes::InternalError, "Not set");
-    stdx::thread prsiThread([&] { doReplSetInitiate(getReplCoord(), &status); });
+    stdx::thread prsiThread([&] {
+        Client::setCurrent(getGlobalServiceContext()->getService()->makeClient("replSetInitiate"));
+        doReplSetInitiate(getReplCoord(), defaultConfigTwoNodes, &status);
+    });
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -509,30 +477,27 @@ TEST_F(ReplCoordTest,
        NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAConfigWithAMismatchedSetName) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    BSONObjBuilder result1;
-    ASSERT_EQUALS(
-        ErrorCodes::InvalidReplicaSetConfig,
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "wrongSet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result1));
+    auto config = BSON("_id"
+                       << "wrongSet"
+                       << "version" << 1 << "members"
+                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                << "node1:12345")));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), config, &status);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAnEmptyConfig) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    BSONObjBuilder result1;
-    auto status = getReplCoord()->processReplSetInitiate(opCtx.get(), BSONObj(), &result1);
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), BSONObj(), &status);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "'ReplSetConfig.version' is missing but a required field");
@@ -542,16 +507,14 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAnEmpt
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithoutAn_idField) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    BSONObjBuilder result1;
-    auto status = getReplCoord()->processReplSetInitiate(
-        opCtx.get(),
-        BSON("version" << 1 << "members"
-                       << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                << "node1:12345"))),
-        &result1);
+    auto config = BSON("version" << 1 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                          << "node1:12345")));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), config, &status);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_STRING_CONTAINS(status.reason(), "'ReplSetConfig._id' is missing but a required field");
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
@@ -561,18 +524,16 @@ TEST_F(ReplCoordTest,
        NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAConfigVersionNotEqualToOne) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    BSONObjBuilder result1;
-    auto status =
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 2 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result1);
+    auto config = BSON("_id"
+                       << "mySet"
+                       << "version" << 2 << "members"
+                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                << "node1:12345")));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), config, &status);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_STRING_CONTAINS(status.reason(), "have version 1, but found 2");
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
@@ -581,40 +542,25 @@ TEST_F(ReplCoordTest,
 TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlag) {
     init("");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    BSONObjBuilder result1;
-    ASSERT_EQUALS(
-        ErrorCodes::NoReplicationEnabled,
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result1));
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_EQUALS(ErrorCodes::NoReplicationEnabled, status);
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenInitiateCannotWriteConfigToDisk) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
-    BSONObjBuilder result1;
     getExternalState()->setStoreLocalConfigDocumentStatus(
         Status(ErrorCodes::OutOfDiskSpace, "The test set this"));
-    ASSERT_EQUALS(
-        ErrorCodes::OutOfDiskSpace,
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result1));
+
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
+    ASSERT_EQUALS(ErrorCodes::OutOfDiskSpace, status);
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
@@ -1234,25 +1180,17 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigMajorit
     replCoordSetMyLastWrittenOpTime(OpTime(appliedTS, 1), Date_t() + Seconds(100));
     replCoordSetMyLastAppliedOpTime(OpTime(appliedTS, 1), Date_t() + Seconds(100));
 
+
     stdx::thread prsiThread([&] {
-        BSONObjBuilder result1;
-        ASSERT_OK(
-            getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                                   BSON("_id"
-                                                        << "mySet"
-                                                        << "version" << 1 << "members"
-                                                        << BSON_ARRAY(BSON("host"
-                                                                           << "node1:12345"
-                                                                           << "_id" << 0)
-                                                                      << BSON("host"
-                                                                              << "node2:12345"
-                                                                              << "_id" << 1))),
-                                                   &result1));
+        Client::setCurrent(getGlobalServiceContext()->getService()->makeClient("replSetInitiate"));
+        Status status(ErrorCodes::InternalError, "Not set");
+        doReplSetInitiate(getReplCoord(), defaultConfigTwoNodes, &status);
+        ASSERT_OK(status);
     });
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
-    ASSERT_EQUALS(HostAndPort("node2", 12345), noi->getRequest().target);
+    ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
     ASSERT_EQUALS(DatabaseName::kAdmin, noi->getRequest().dbname);
     ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
     ReplSetHeartbeatResponse hbResp;
@@ -1297,19 +1235,20 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigNoMajor
     replCoordSetMyLastAppliedOpTime(OpTime(appliedTS, 1), Date_t() + Seconds(100));
 
     stdx::thread prsiThread([&] {
-        BSONObjBuilder result1;
-        ASSERT_OK(getReplCoord()->processReplSetInitiate(
-            opCtx.get(),
-            BSON("_id"
-                 << "mySet"
-                 << "version" << 1 << "members"
-                 << BSON_ARRAY(BSON("host"
-                                    << "node1:12345"
-                                    << "_id" << 0)
-                               << BSON("host"
-                                       << "node2:12345"
-                                       << "_id" << 1 << "arbiterOnly" << true))),
-            &result1));
+        Client::setCurrent(getGlobalServiceContext()->getService()->makeClient("replSetInitiate"));
+
+        auto config = BSON("_id"
+                           << "mySet"
+                           << "version" << 1 << "members"
+                           << BSON_ARRAY(BSON("host"
+                                              << "node1:12345"
+                                              << "_id" << 0)
+                                         << BSON("host"
+                                                 << "node2:12345"
+                                                 << "_id" << 1 << "arbiterOnly" << true)));
+        Status status(ErrorCodes::InternalError, "Not set");
+        doReplSetInitiate(getReplCoord(), config, &status);
+        ASSERT_OK(status);
     });
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
@@ -2113,8 +2052,8 @@ protected:
                                                             << "test3:1234"))),
                            HostAndPort("test1", 1234));
         ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    }
-};
+    }  // namespace
+};     // namespace repl
 
 TEST_F(StepDownTestWithUnelectableNode,
        UpdatePositionDuringStepDownWakesUpStepDownWaiterMoreThanOnce) {
@@ -4221,7 +4160,6 @@ TEST_F(ReplCoordTest, NonAwaitableHelloReturnsNoConfigsOnNodeWithUninitializedCo
 TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfig) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
 
     auto maxAwaitTime = Milliseconds(5000);
     auto halfwayToDeadline = getNet()->now() + maxAwaitTime / 2;
@@ -4272,15 +4210,8 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfig) {
     // Ensure that awaitHelloResponse() is called before initiating.
     waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
 
-    BSONObjBuilder result;
-    auto status =
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result);
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
     ASSERT_OK(status);
     awaitHelloInitiate.join();
 }
@@ -4348,7 +4279,6 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigDifferentTopolo
 TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigInvalidHorizon) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
 
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = getNet()->now() + maxAwaitTime;
@@ -4357,7 +4287,7 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigInvalidHorizon)
     const auto horizonParam = SplitHorizon::Parameters(horizonSniName);
 
     // Send a non-awaitable hello.
-    const auto initialResponse = getReplCoord()->awaitHelloResponse(opCtx.get(), {}, {}, {});
+    const auto initialResponse = awaitHelloWithNewOpCtx(getReplCoord(), {}, {}, {});
     ASSERT_FALSE(initialResponse->isWritablePrimary());
     ASSERT_FALSE(initialResponse->isSecondary());
     ASSERT_FALSE(initialResponse->isConfigSet());
@@ -4379,15 +4309,8 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigInvalidHorizon)
 
     // Call replSetInitiate with no horizon configured. This should return an error to the hello
     // request that is currently waiting on a horizonParam that doesn't exit in the config.
-    BSONObjBuilder result;
-    auto status =
-        getReplCoord()->processReplSetInitiate(opCtx.get(),
-                                               BSON("_id"
-                                                    << "mySet"
-                                                    << "version" << 1 << "members"
-                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                             << "node1:12345"))),
-                                               &result);
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), defaultConfigOneNode, &status);
     ASSERT_OK(status);
     awaitHelloInitiate.join();
 }
@@ -4395,7 +4318,6 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigInvalidHorizon)
 TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigSpecifiedHorizon) {
     init("mySet");
     start(HostAndPort("node1", 12345));
-    auto opCtx = makeOperationContext();
 
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = getNet()->now() + maxAwaitTime;
@@ -4427,18 +4349,16 @@ TEST_F(ReplCoordTest, AwaitableHelloOnNodeWithUninitializedConfigSpecifiedHorizo
     waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
 
     // Call replSetInitiate with a horizon configured.
-    BSONObjBuilder result;
-    auto status = getReplCoord()->processReplSetInitiate(
-        opCtx.get(),
-        BSON("_id"
-             << "mySet"
-             << "version" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                      << "node1:12345"
-                                      << "horizons"
-                                      << BSON("horizon1"
-                                              << "horizon1.com:12345")))),
-        &result);
+    auto config = BSON("_id"
+                       << "mySet"
+                       << "version" << 1 << "members"
+                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                << "node1:12345"
+                                                << "horizons"
+                                                << BSON("horizon1"
+                                                        << "horizon1.com:12345"))));
+    Status status(ErrorCodes::InternalError, "Not set");
+    doReplSetInitiate(getReplCoord(), config, &status);
     ASSERT_OK(status);
     awaitHelloInitiate.join();
 }

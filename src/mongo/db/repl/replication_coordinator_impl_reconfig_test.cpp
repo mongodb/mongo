@@ -367,20 +367,18 @@ TEST_F(ReplCoordTest,
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord,
-                       Status* status,
-                       OperationContext* opCtx) {
+void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord, Status* status) {
+    // Client::setCurrent(getGlobalServiceContext()->getService()->makeClient("replSetInitiate"));
     BSONObjBuilder garbage;
     *status =
-        replCoord->processReplSetInitiate(opCtx,
-                                          BSON("_id"
-                                               << "mySet"
-                                               << "version" << 1 << "members"
-                                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                        << "node1:12345")
-                                                             << BSON("_id" << 2 << "host"
-                                                                           << "node2:12345"))),
-                                          &garbage);
+        replCoord->runReplSetInitiate_forTest(BSON("_id"
+                                                   << "mySet"
+                                                   << "version" << 1 << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "node1:12345")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "node2:12345"))),
+                                              &garbage);
 }
 
 void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
@@ -576,8 +574,11 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
 
     // initiate
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto opCtx = makeOperationContext();
-    stdx::thread initateThread([&] { doReplSetInitiate(getReplCoord(), &status, opCtx.get()); });
+    stdx::thread initateThread([&] {
+        Client::setCurrent(getServiceContext()->getService()->makeClient("replSetInitiate"));
+        doReplSetInitiate(getReplCoord(), &status);
+    });
+
     getNet()->enterNetwork();
     getNet()->blackHole(getNet()->getNextReadyRequest());
     getNet()->exitNetwork();
@@ -593,10 +594,11 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
+
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
-
     shutdown(opCtx.get());
     initateThread.join();
 }
