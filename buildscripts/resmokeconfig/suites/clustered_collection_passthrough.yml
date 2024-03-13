@@ -67,6 +67,7 @@ selector:
   - jstests/core/fts_projection.js
   # Assumes there is one collection that is not clustered.
   - jstests/core/find_with_resume_after_param.js
+  - jstests/core/group_lookup_with_canonical_query_prefix.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

@@ -554,3 +554,80 @@ function flattenQueryPlanTree(winningPlan) {
     stages.reverse();
     return stages;
 }
+
+/**
+ * Recursively checks if a javascript object contains a nested property key and returns the
+ value.
+ * Note, this only recurses into other objects, array elements are ignored.
+ *
+ * This helper function can be used for any optimizer.
+ */
+function getNestedProperty(object, key) {
+    if (typeof object !== "object") {
+        return null;
+    }
+
+    for (const k in object) {
+        if (k == key) {
+            return object[k];
+        }
+
+        const result = getNestedProperty(object[k], key);
+        if (result) {
+            return result;
+        }
+    }
+    return null;
+}
+
+/**
+ * Returns the output from a single shard if 'explain' was obtained from an unsharded collection;
+ * returns 'explain' as is otherwise.
+ *
+ * This helper function can be used for any optimizer.
+ */
+function getSingleNodeExplain(explain) {
+    if ("shards" in explain) {
+        const shards = explain.shards;
+        const shardNames = Object.keys(shards);
+        // There should only be one shard given that this function assumes that 'explain' was
+        // obtained from an unsharded collection.
+        assert.eq(shardNames.length, 1, explain);
+        return shards[shardNames[0]];
+    }
+    return explain;
+}
+
+/**
+ * Utility to return the 'queryPlanner' section of 'explain'. The input is the root of the
+ * explain output.
+ *
+ * This helper function can be used for any optimizer.
+ */
+function getQueryPlanner(explain) {
+    explain = getSingleNodeExplain(explain);
+    if ("queryPlanner" in explain) {
+        const qp = explain.queryPlanner;
+        // Sharded case.
+        if ("winningPlan" in qp && "shards" in qp.winningPlan) {
+            return qp.winningPlan.shards[0];
+        }
+        return qp;
+    }
+    assert(explain.hasOwnProperty("stages"), explain);
+    const stage = explain.stages[0];
+    assert(stage.hasOwnProperty("$cursor"), explain);
+    const cursorStage = stage.$cursor;
+    assert(cursorStage.hasOwnProperty("queryPlanner"), explain);
+    return cursorStage.queryPlanner;
+}
+
+/**
+ * Recognizes the query engine used by the query (sbe/classic).
+ *
+ * This helper function can be used for any optimizer.
+ */
+function getEngine(explain) {
+    const queryPlanner = getQueryPlanner(explain);
+    return getNestedProperty(queryPlanner, "slotBasedPlan") ? "sbe" : "classic";
+}
