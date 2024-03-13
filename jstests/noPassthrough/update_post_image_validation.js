@@ -3,14 +3,14 @@
 (function() {
 "use strict";
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
 const testDB = conn.getDB("test");
 
-const isDotsAndDollarsEnabled = testDB.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
+if (!isDotsAndDollarsEnabled(testDB)) {
     // Test validation of elements added to an array that is represented in a "deserialized" format
     // in mutablebson. The added element is invalid because it is a DBRef with a missing $id.
     assert.commandWorked(testDB.coll.insert({_id: 0, a: []}));

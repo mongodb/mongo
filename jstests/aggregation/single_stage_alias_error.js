@@ -8,6 +8,7 @@
 
 // For assertErrMessageContains and assertErrMessageDoesNotContain.
 load("jstests/aggregation/extras/utils.js");
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
 const coll = db.single_stage_alias_error;
 
 coll.drop();
@@ -20,9 +21,7 @@ assertErrMsgDoesNotContain(coll, pipeline, "$addFields");
 
 pipeline = [{'$addFields': {"$a.$c": 1}}];
 assertErrMsgContains(coll, pipeline, "$addFields");
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
+if (isDotsAndDollarsEnabled()) {
     // The error message when this flag is enabled suggests using $setField (which trivially
     // includes $set) so this assert should check for something that isn't a substring of $setField.
     assertErrMsgDoesNotContain(coll, pipeline, "$set ");

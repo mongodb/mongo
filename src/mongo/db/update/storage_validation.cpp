@@ -113,7 +113,9 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
     } else {
         // Not an okay, $ prefixed field name.
         const auto replaceWithHint =
-            feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+                    serverGlobalParams.featureCompatibility)
             ? "' is not allowed in the context of an update's replacement document. Consider using "
               "an aggregation pipeline with $replaceWith."
             : "' is not valid for storage.";
@@ -136,7 +138,9 @@ Status storageValidIdField(const mongo::BSONElement& element) {
         case BSONType::Object: {
             auto status = element.Obj().storageValidEmbedded();
             if (!status.isOK() && status.code() == ErrorCodes::DollarPrefixedFieldName &&
-                feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()) {
+                serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
                 return Status(status.code(),
                               str::stream() << "_id fields may not contain '$'-prefixed fields: "
                                             << status.reason());
@@ -209,7 +213,9 @@ void scanDocument(mutablebson::ConstElement elem,
     // fields for '$'-prefixes if 'allowTopLevelDollarPrefixes' is true.
     const bool checkTopLevelFields = !allowTopLevelDollarPrefixes && (recursionLevel == 1);
     const bool dotsAndDollarsFeatureEnabled =
-        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV();
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+            serverGlobalParams.featureCompatibility);
     const bool checkFields = !dotsAndDollarsFeatureEnabled || checkTopLevelFields;
 
     auto fieldName = elem.getFieldName();

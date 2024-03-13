@@ -4,16 +4,15 @@
 (function() {
 "use strict";
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 const mongod = MongoRunner.runMongod();
 const dbName = "dots_and_dollars_fields";
 const db = mongod.getDB(dbName);
 const collName = "server_status_metrics_dots_and_dollars_fields";
 const coll = db[collName];
-let serverStatusMetrics = db.serverStatus().metrics.dotsAndDollarsFields;
 
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
+if (!isDotsAndDollarsEnabled(db)) {
     jsTestLog("Skipping test because the dots and dollars feature flag is disabled");
     MongoRunner.stopMongod(mongod);
     return;

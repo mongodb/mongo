@@ -486,7 +486,9 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     write_ops_exec::recordUpdateResultInOpDebug(updateResult, opDebug);
     opDebug->setPlanSummaryMetrics(summaryStats);
 
-    if (feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
         updateResult.containsDotsAndDollarsField) {
         // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
         dotsAndDollarsFieldsCounters.incrementForUpsert(!updateResult.upsertedId.isEmpty());

@@ -5,6 +5,8 @@
 
 // Test that we can update DBRefs, but not dbref fields outside a DBRef
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 var res;
 t = db.jstests_update_dbref;
 t.drop();
@@ -38,9 +40,7 @@ assert.writeError(res);
 assert(/\$db/.test(res.getWriteError()), "expected bad update because of $db");
 assert.docEq({_id: 1, a: new DBRef("b", 2)}, t.findOne());
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
+if (!isDotsAndDollarsEnabled()) {
     res = t.update({}, {$set: {"b.$id": 2}});
     assert(res.hasWriteError(),
            "b.$id update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());

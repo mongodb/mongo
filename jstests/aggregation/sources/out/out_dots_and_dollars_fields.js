@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 const coll = db.out_dots_and_dollars_fields_coll;
 coll.drop();
 coll.insertOne({_id: 0});
@@ -15,9 +17,7 @@ from.drop();
 from.insertOne({_id: 0});
 
 // Test that the 'on' field can contain dots and dollars when the appropriate feature flag is on.
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
+if (isDotsAndDollarsEnabled()) {
     const test = {
         _id: 0,
         "$aField": 1,

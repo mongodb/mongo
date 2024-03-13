@@ -97,5 +97,25 @@ TEST_F(InsertTest, FixDocumentForInsertFailsOnDeeplyNestedDocuments) {
                                    makeNestedArray(BSONDepth::getMaxDepthForUserStorage() + 1)),
               ErrorCodes::Overflow);
 }
+
+TEST_F(InsertTest, FixDocumentForInsertRejectsDocumentsWithAFieldStartingByDollar) {
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+    ASSERT_EQ(fixDocumentForInsert(getOperationContext(), BSON("$a" << 1)), ErrorCodes::BadValue);
+}
+
+TEST_F(InsertTest, FixDocumentForInsertAcceptsDocumentsWithAFieldStartingByDollar) {
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
+    ASSERT_OK(fixDocumentForInsert(getOperationContext(), BSON("$a" << 1)));
+}
+
+TEST_F(InsertTest,
+       FixDocumentForInsertRejectsDocumentsWithAFieldStartingByDollarIfFCVNotYetInitialized) {
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior);
+    ASSERT_FALSE(serverGlobalParams.mutableFeatureCompatibility.isVersionInitialized());
+    ASSERT_EQ(fixDocumentForInsert(getOperationContext(), BSON("$a" << 1)), ErrorCodes::BadValue);
+}
 }  // namespace
 }  // namespace mongo

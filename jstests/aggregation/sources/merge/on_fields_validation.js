@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
 
 const source = db.unique_key_validation_source;
 const target = db.unique_key_validation_target;
@@ -138,9 +139,7 @@ assert.doesNotThrow(() => source.aggregate(pipelineAddressDotStreet));
 assert.eq(target.find().toArray(), [{_id: 0, address: {street: "1633 Broadway"}}]);
 
 // Test that the 'on' field can contain dots and dollars when the appropriate feature flag is on.
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
+if (isDotsAndDollarsEnabled()) {
     // '$'-prefixed fields are not allowed here because $merge's 'on' field must be indexed, but we
     // cannot build indexes on $-prefixed fields. Field names containing dots also cannot be used
     // here, because the "on" field of $merge does implicit path traversal, so "a.b" always refers

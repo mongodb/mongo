@@ -16,6 +16,7 @@
 //
 
 load("jstests/libs/get_index_helpers.js");
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
 
 var coll = db.getCollection("batch_write_insert");
 coll.drop();
@@ -98,9 +99,7 @@ assert(resultOK(result), tojson(result));
 assert.eq(1, result.n);
 assert.eq(coll.count(), 1);
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
+if (!isDotsAndDollarsEnabled()) {
     //
     // Document with illegal key should fail
     coll.drop();

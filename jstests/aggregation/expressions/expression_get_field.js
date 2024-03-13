@@ -5,6 +5,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
 
 const coll = db.expression_get_field;
 coll.drop();
@@ -27,10 +28,7 @@ function assertPipelineResultsEq(pipeline, expected) {
     assertArrayEq({actual, expected});
 }
 
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-
-if (!isDotsAndDollarsEnabled) {
+if (!isDotsAndDollarsEnabled()) {
     // Verify that $getField is not available if the feature flag is set to false and don't
     // run the rest of the test.
     assertGetFieldFailedWithCode({field: "a", from: {a: "b"}}, 31325);

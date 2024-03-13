@@ -98,7 +98,9 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
     uassert(15998, "FieldPath field names may not be empty strings.", !fieldName.empty());
 
     const auto dotsAndDollarsHint =
-        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+                serverGlobalParams.featureCompatibility)
         ? " Consider using $getField or $setField."
         : "";
 

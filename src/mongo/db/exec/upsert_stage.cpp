@@ -284,7 +284,9 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mb::Document& documen
         bool containsDotsAndDollarsField = false;
         storage_validation::scanDocument(
             document,
-            feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV(),
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+                    serverGlobalParams.featureCompatibility),
             true, /* Should validate for storage */
             &containsDotsAndDollarsField);
         if (containsDotsAndDollarsField)

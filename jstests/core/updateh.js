@@ -3,6 +3,8 @@
 // key.
 // @tags: [assumes_unsharded_collection, requires_fcv_50]
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 var res;
 
 t = db.jstest_updateh;
@@ -20,9 +22,7 @@ assert.writeError(res);
 res = t.update({x: 1}, {$inc: {$z: 1}});  // not ok
 assert.writeError(res);
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
+if (isDotsAndDollarsEnabled()) {
     // Allow $ in nested field names.
     res = t.update({x: 1}, {$set: {'a.$b': 1}});
     assert.commandWorked(res);

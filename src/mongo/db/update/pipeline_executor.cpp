@@ -107,7 +107,9 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
         applyParams,
         transformedDoc,
         transformedDocHasIdField,
-        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV());
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+                serverGlobalParams.featureCompatibility));
 
     // The oplog entry should not have been populated yet.
     invariant(ret.oplogEntry.isEmpty());

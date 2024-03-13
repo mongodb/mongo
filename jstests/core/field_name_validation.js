@@ -15,6 +15,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 const coll = db.field_name_validation;
 coll.drop();
 
@@ -43,9 +45,7 @@ assert.commandWorked(coll.insert({a: {_id: [9]}}));
 assert.commandWorked(coll.insert({a: {_id: /a/}}));
 assert.commandWorked(coll.insert({a: {_id: {$b: 1}}}));
 
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
+if (isDotsAndDollarsEnabled()) {
     // Test that $-prefixed field names are allowed generally.
     assert.commandWorked(coll.insert({$a: 1}));
     assert.commandWorked(coll.insert({valid: 1, $a: 1}));

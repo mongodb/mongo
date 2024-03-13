@@ -296,7 +296,9 @@ StatusWithMatchExpression parse(const BSONObj& obj,
 
             if (!parseExpressionMatchFunction) {
                 const auto dotsAndDollarsHint =
-                    feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                        feature_flags::gFeatureFlagDotsAndDollars.isEnabled(
+                            serverGlobalParams.featureCompatibility)
                     ? ". If you have a field name that starts with a '$' symbol, consider using "
                       "$getField or $setField."
                     : "";

@@ -7,9 +7,8 @@
 //   requires_fcv_50,
 // ]
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+if (!isDotsAndDollarsEnabled()) {
     // Create a new connection object so it won't affect the global connection when we modify
     // it's settings.
     var conn = new Mongo(db.getMongo().host);

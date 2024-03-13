@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
 
 const collName = "update_with_pipeline";
 const coll = db[collName];
@@ -266,9 +267,7 @@ testUpdate({
     nModified: 1
 });
 
-const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                    .featureFlagDotsAndDollars.value;
-if (isDotsAndDollarsEnabled) {
+if (isDotsAndDollarsEnabled()) {
     // Test that expressions within constants are treated as field names instead of expressions.
     db.runCommand({
         update: collName,

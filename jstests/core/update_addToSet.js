@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/dots_and_dollars_enabled_helper.js");
+
 const coll = db.update_addToSet;
 coll.drop();
 
@@ -71,9 +73,7 @@ assert.commandWorked(coll.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 
 doc.a.push(3);
 assert.eq(doc, coll.findOne());
 
-var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
-                                  .featureFlagDotsAndDollars.value;
-if (!isDotsAndDollarsEnabled) {
+if (!isDotsAndDollarsEnabled()) {
     // Test that dotted and '$' prefixed field names fail.
     assert(coll.drop());
     doc = {_id: 1, a: [1, 2]};
