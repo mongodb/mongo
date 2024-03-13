@@ -7,6 +7,7 @@ load(
     "compiler_type",
     "dbg",
     "detect_odr_violations",
+    "dwarf_version",
     "fsan",
     "http_client",
     "libunwind",
@@ -66,6 +67,22 @@ config_setting(
     flag_values = {
         "//bazel/config:compiler_type": "msvc",
     },
+)
+
+selects.config_setting_group(
+    name = "gcc_or_clang",
+    match_any = [
+        ":compiler_type_gcc",
+        ":compiler_type_clang",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gcc_opt",
+    match_all = [
+        ":compiler_type_gcc",
+        ":opt_any",
+    ],
 )
 
 # --------------------------------------
@@ -137,11 +154,27 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "not_linux",
+    match_any = [
+        "@platforms//os:macos",
+        "@platforms//os:windows",
+    ],
+)
+
+selects.config_setting_group(
     name = "not_s390x",
     match_any = [
         "@platforms//cpu:aarch64",
         "@platforms//cpu:x86_64",
         "@platforms//cpu:ppc64le",
+    ],
+)
+
+selects.config_setting_group(
+    name = "posix",
+    match_any = [
+        "@platforms//os:macos",
+        "@platforms//os:linux",
     ],
 )
 
@@ -516,6 +549,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "_libunwind_disabled_by_auto",
+    match_all = [
+        ":_libunwind_auto",
+        ":not_linux",
+    ],
+)
+
+selects.config_setting_group(
     name = "_libunwind_enabled_by_on",
     match_all = [
         ":_libunwind_on",
@@ -530,6 +571,22 @@ selects.config_setting_group(
     match_any = [
         ":_libunwind_enabled_by_on",
         ":_libunwind_enabled_by_auto",
+    ],
+)
+
+selects.config_setting_group(
+    name = "libunwind_disabled",
+    match_any = [
+        ":_libunwind_off",
+        ":_libunwind_disabled_by_auto",
+    ],
+)
+
+selects.config_setting_group(
+    name = "libunwind_disabled_linux",
+    match_all = [
+        ":libunwind_disabled",
+        "@platforms//os:linux",
     ],
 )
 
@@ -692,6 +749,22 @@ selects.config_setting_group(
     match_all = [
         ":_tcmalloc_gperf_selected",
         ":_tcmalloc_gperf_supported_os",
+    ],
+)
+
+selects.config_setting_group(
+    name = "non_system_allocator_enabled",
+    match_any = [
+        ":tcmalloc_google_enabled",
+        ":tcmalloc_gperf_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "non_system_allocator_enabled_and_debug",
+    match_all = [
+        ":non_system_allocator_enabled",
+        ":dbg_enabled",
     ],
 )
 
@@ -900,6 +973,30 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "linkdynamic_not_shared_archive",
+    match_all = [
+        ":linkstatic_disabled",
+        ":shared_archive_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linkstatic_enabled_macos",
+    match_all = [
+        ":linkstatic_enabled",
+        "@platforms//os:macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linkstatic_enabled_linux",
+    match_all = [
+        ":linkstatic_enabled",
+        "@platforms//os:linux",
+    ],
+)
+
 # --------------------------------------
 # sanitizer options
 # --------------------------------------
@@ -1082,6 +1179,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "any_sanitizer_gcc",
+    match_all = [
+        ":any_enabled_sanitizer",
+        ":compiler_type_gcc",
+    ],
+)
+
+selects.config_setting_group(
     name = "sanitize_address_required_settings",
     match_all = [
         ":asan_enabled",
@@ -1202,6 +1307,13 @@ config_setting(
     name = "shared_archive_enabled",
     flag_values = {
         "//bazel/config:shared_archive": "True",
+    },
+)
+
+config_setting(
+    name = "shared_archive_disabled",
+    flag_values = {
+        "//bazel/config:shared_archive": "False",
     },
 )
 
@@ -1374,4 +1486,43 @@ config_setting(
     flag_values = {
         "//bazel/config:local_build": "True",
     },
+)
+
+# --------------------------------------
+# dwarf_version
+# --------------------------------------
+
+dwarf_version(
+    name = "dwarf_version",
+    build_setting_default = "",
+)
+
+config_setting(
+    name = "dwarf_version_4",
+    flag_values = {
+        "//bazel/config:dwarf_version": "4",
+    },
+)
+
+config_setting(
+    name = "dwarf_version_5",
+    flag_values = {
+        "//bazel/config:dwarf_version": "5",
+    },
+)
+
+selects.config_setting_group(
+    name = "dwarf_version_4_linux",
+    match_all = [
+        "@platforms//os:linux",
+        ":dwarf_version_4",
+    ],
+)
+
+selects.config_setting_group(
+    name = "dwarf_version_5_linux",
+    match_all = [
+        "@platforms//os:linux",
+        ":dwarf_version_5",
+    ],
 )

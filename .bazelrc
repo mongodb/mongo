@@ -22,6 +22,9 @@ build:linux --crosstool_top=@mongo_toolchain//:toolchain_suite
 # Dynamic linking on Windows (DLL generation) is currently not supported.
 build:windows --//bazel/config:linkstatic=True
 
+# The only Windows compiler we support is MSVC.
+build:windows --//bazel/config:compiler_type=msvc
+
 # Windows and MacOS do not use the custom toolchain config, so the compiler flags need to be set here.
 build:macos --cxxopt=-std=c++20
 build:windows --cxxopt=/std:c++20

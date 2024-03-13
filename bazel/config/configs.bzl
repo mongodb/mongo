@@ -453,3 +453,24 @@ local_build = rule(
     implementation = lambda ctx: local_build_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# dwarf_version
+# =========
+dwarf_version_values = ["4", "5"]
+
+dwarf_version_provider = provider(
+    doc = """Sets the DWARF version (non-Windows). Incompatible with SPLIT_DWARF=1""",
+    fields = {"dwarf_version": "choose one of " + ".".join(dwarf_version_values)},
+)
+
+def dwarf_version_impl(ctx):
+    dwarf_version = ctx.build_setting_value
+    if dwarf_version != "" and dwarf_version not in dwarf_version_values:
+        fail(str(ctx.label) + " version allowed to take values {" + ", ".join(dwarf_version_values) + "} but was set to unallowed value " + dwarf_version)
+    return dwarf_version_provider(dwarf_version = dwarf_version)
+
+dwarf_version = rule(
+    implementation = dwarf_version_impl,
+    build_setting = config.string(flag = True),
+)

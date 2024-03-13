@@ -658,6 +658,9 @@ def generate(env: SCons.Environment.Environment) -> None:
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
         ]
 
+        if env["DWARF_VERSION"]:
+            bazel_internal_flags.append(f"--//bazel/config:dwarf_version={env['DWARF_VERSION']}")
+
         if normalized_os == "macos":
             minimum_macos_version = "11.0" if normalized_arch == "arm64" else "10.14"
             bazel_internal_flags.append(f'--macos_minimum_os={minimum_macos_version}')
