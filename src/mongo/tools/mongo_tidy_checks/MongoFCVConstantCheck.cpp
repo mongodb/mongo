@@ -48,12 +48,12 @@ void MongoFCVConstantCheck::registerMatchers(ast_matchers::MatchFinder* Finder) 
             hasDeclaration(enumConstantDecl(
                 hasType(enumDecl(hasName("mongo::multiversion::FeatureCompatibilityVersion"))))),
             // Find a call to FCV comparison functions.
-            hasParent(callExpr(anyOf(
-                callee(functionDecl(hasName("FeatureCompatibility::isLessThan"))),
-                callee(functionDecl(hasName("FeatureCompatibility::isGreaterThan"))),
-                callee(functionDecl(hasName("FeatureCompatibility::isLessThanOrEqualTo"))),
-                callee(functionDecl(hasName("FeatureCompatibility::isGreaterThanOrEqualTo"))),
-                callee(functionDecl(hasName("FeatureCompatibility::isUpgradingOrDowngrading")))))))
+            hasParent(callExpr(
+                anyOf(callee(functionDecl(hasName("FCVSnapshot::isLessThan"))),
+                      callee(functionDecl(hasName("FCVSnapshot::isGreaterThan"))),
+                      callee(functionDecl(hasName("FCVSnapshot::isLessThanOrEqualTo"))),
+                      callee(functionDecl(hasName("FCVSnapshot::isGreaterThanOrEqualTo"))),
+                      callee(functionDecl(hasName("FCVSnapshot::isUpgradingOrDowngrading")))))))
             .bind("fcv_constant"),
         this);
 }

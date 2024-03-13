@@ -39,12 +39,12 @@ enum class FeatureCompatibilityVersion {
 using FCV = multiversion::FeatureCompatibilityVersion;
 
 struct ServerGlobalParams {
-    struct FeatureCompatibility {
+    struct FCVSnapshot {
         bool isLessThan(FCV version) const {
             return true;
         }
     } mutableFeatureCompatibility;
-    const FeatureCompatibility& featureCompatibility = mutableFeatureCompatibility;
+    const FCVSnapshot& featureCompatibility = mutableFeatureCompatibility;
 };
 
 void testFCVConstant() {

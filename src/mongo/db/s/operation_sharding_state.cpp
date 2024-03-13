@@ -90,8 +90,11 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     if (shardVersion && shardVersion != ShardVersion::UNSHARDED()) {
         // TODO (SERVER-87196): remove the fcvSnapshot branch after 8.0 is released
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        // TODO (SERVER-87869): Change the FCV constant comparison to feature flag gating.
         if (fcvSnapshot.isVersionInitialized() &&
-            fcvSnapshot.isGreaterThan(multiversion::FeatureCompatibilityVersion::kVersion_7_3)) {
+            fcvSnapshot.isGreaterThan(                       // NOLINT(mongo-fcv-constant-check)
+                multiversion::FeatureCompatibilityVersion::  // NOLINT(mongo-fcv-constant-check)
+                kVersion_7_3)) {                             // NOLINT(mongo-fcv-constant-check)
             tassert(6300900,
                     "Attaching a shard version requires a non db-only namespace",
                     !nss.isDbOnly());
