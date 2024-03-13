@@ -8,12 +8,14 @@ import argparse
 parser = argparse.ArgumentParser(description='Ninja Bazel builder.')
 
 parser.add_argument('--ninja-file', type=str, help="The ninja file in use", default="build.ninja")
-parser.add_argument('--debug', action='store_true', help="Turn on extra debug output")
+parser.add_argument('--verbose', action='store_true', help="Turn on verbose mode")
+parser.add_argument('--integration-debug', action='store_true',
+                    help="Turn on extra debug output about the ninja-bazel integration")
 
 args = parser.parse_args()
 
 # This corresponds to BAZEL_INTEGRATION_DEBUG=1 from SCons command line
-if args.debug:
+if args.integration_debug:
 
     def print_debug(msg):
         print("[BAZEL_INTEGRATION_DEBUG] " + msg)
@@ -106,5 +108,10 @@ else:
 
 # now we are ready to build all bazel buildable files
 print_debug(f"BAZEL TARGETS TO BUILD:{os.linesep}{os.linesep.join(targets_to_build)}")
-print(f"{' '.join(ninja_build_info['bazel_cmd'] + targets_to_build)}")
-bazel_proc = subprocess.run(ninja_build_info['bazel_cmd'] + targets_to_build, check=True)
+if args.verbose:
+    print(f"{' '.join(ninja_build_info['bazel_cmd'] + targets_to_build)}")
+    extra_args = []
+else:
+    extra_args = ["--ui_event_filters=-info,-debug,-warning,-stderr,-stdout"]
+bazel_proc = subprocess.run(ninja_build_info['bazel_cmd'] + extra_args + targets_to_build,
+                            check=True)
