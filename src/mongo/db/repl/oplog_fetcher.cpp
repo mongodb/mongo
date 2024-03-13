@@ -943,18 +943,22 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     // Determine if we should stop syncing from our current sync source.
     auto changeSyncSourceAction = _dataReplicatorExternalState->shouldStopFetching(
         _config.source, replSetMetadata, oqMetadata, previousOpTimeFetched, lastDocOpTime);
-    str::stream errMsg;
-    errMsg << "sync source " << _config.source.toString();
-    errMsg << " (config version: " << replSetMetadata.getConfigVersion();
-    errMsg << "; last written optime: " << oqMetadata.getLastOpWritten().toString();
-    errMsg << "; sync source index: " << oqMetadata.getSyncSourceIndex();
-    errMsg << "; has primary index: " << oqMetadata.hasPrimaryIndex();
-    errMsg << ") is no longer valid";
-    errMsg << " previous batch last fetched optime: " << previousOpTimeFetched.toString();
-    errMsg << " current batch last fetched optime: " << lastDocOpTime.toString();
+
+    auto getErrMsg = [&] {
+        str::stream errMsg;
+        errMsg << "sync source " << _config.source.toString();
+        errMsg << " (config version: " << replSetMetadata.getConfigVersion();
+        errMsg << "; last written optime: " << oqMetadata.getLastOpWritten().toString();
+        errMsg << "; sync source index: " << oqMetadata.getSyncSourceIndex();
+        errMsg << "; has primary index: " << oqMetadata.hasPrimaryIndex();
+        errMsg << ") is no longer valid";
+        errMsg << " previous batch last fetched optime: " << previousOpTimeFetched.toString();
+        errMsg << " current batch last fetched optime: " << lastDocOpTime.toString();
+        return errMsg;
+    };
 
     if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndDropLastBatchIfPresent) {
-        return Status(ErrorCodes::InvalidSyncSource, errMsg);
+        return Status(ErrorCodes::InvalidSyncSource, getErrMsg());
     }
 
     _dataReplicatorExternalState->processMetadata(replSetMetadata, oqMetadata);
@@ -982,7 +986,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     }
 
     if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch) {
-        return Status(ErrorCodes::InvalidSyncSource, errMsg);
+        return Status(ErrorCodes::InvalidSyncSource, getErrMsg());
     }
 
     if (MONGO_unlikely(hangOplogFetcherBeforeAdvancingLastFetched.shouldFail())) {
