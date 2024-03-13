@@ -4489,7 +4489,7 @@ def doConfigure(myenv):
             # reporting thread leaks, which we have because we don't
             # do a clean shutdown of the ServiceContext.
             #
-            tsan_options = f"abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions={myenv.File('#etc/tsan.suppressions').abspath}"
+            tsan_options = f"abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=5:suppressions={myenv.File('#etc/tsan.suppressions').abspath}"
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options + symbolizer_option
             myenv.AppendUnique(CPPDEFINES=['THREAD_SANITIZER'])
 

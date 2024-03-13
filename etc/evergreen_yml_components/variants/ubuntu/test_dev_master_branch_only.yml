@@ -121,6 +121,6 @@ buildvariants:
       CCFLAGS="-fsanitize-coverage=trace-pc-guard"
       LIBS="voidstar"
       --use-diagnostic-latches=on
-    san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4"
+    san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=5"
     test_flags: >-
       --excludeWithAnyTags=tsan_incompatible
