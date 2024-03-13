@@ -254,9 +254,10 @@ TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
     });
 
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
-        {TestPath{{"a"}}, {}},
-        {TestPath{{"b", "c"}}, {}},
+    std::vector<BSONElement> vec0, vec1;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
+        {TestPath{{"a"}}, vec0},
+        {TestPath{{"b", "c"}}, vec1},
     };
 
     // Decompress both scalar fields to vectors. Both paths can use the fast implementation to
@@ -289,9 +290,10 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
 
     // Select a and c, but omit b to show that we can skip over parts of the data as needed.
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
-        {TestPath{{"a"}}, {}},
-        {TestPath{{"c"}}, {}},
+    std::vector<BSONElement> vec0, vec1;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
+        {TestPath{{"a"}}, vec0},
+        {TestPath{{"c"}}, vec1},
     };
 
     // Decompress both scalar fields to vectors. The fast path will be used.
@@ -317,7 +319,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     });
 
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{}, {}}};
+    std::vector<BSONElement> vec0;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{}, vec0}};
 
     // Decompress complete objects to the vector. The fast path won't be used here, since we are
     // decompressing objects.
@@ -341,7 +344,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
 
     {
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{}, vec0}};
 
         // Decompress complete objects to the vector.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
@@ -355,7 +359,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
     }
     {
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"b"}}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"b"}}, vec0}};
 
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
@@ -368,8 +373,9 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
     }
     {
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"a"}}, {}},
-                                                                         {TestPath{{"b"}}, {}}};
+        std::vector<BSONElement> vec0, vec1;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"a"}}, vec0},
+                                                                          {TestPath{{"b"}}, vec1}};
 
         // We will use the fast implementation to decompress "a" since it is scalar. We will fall
         // back to the general implementation for "b".
@@ -400,8 +406,9 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
     });
 
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"a"}}, {}},
-                                                                     {TestPath{{"b"}}, {}}};
+    std::vector<BSONElement> vec0, vec1;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"a"}}, vec0},
+                                                                      {TestPath{{"b"}}, vec1}};
 
     col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
@@ -469,9 +476,10 @@ auto decompressArraysAndFullColumns(const std::vector<T> values,
     auto mockRefObj = BSON("a" << BSON_ARRAY(BSON("b" << values[0]) << BSON("b" << values[1])));
 
     // Test that we can decompress the whole column.
+    std::vector<BSONElement> vec0;
     TestPath testPath{};
     ASSERT_EQ(testPath.elementsToMaterialize(mockRefObj).size(), 1);
-    std::vector<std::pair<TestPath, std::vector<BSONElement>>> testPaths{{testPath, {}}};
+    std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
 
     // This is decompressing the whole column, in which there are scalars within objects.
     col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
@@ -488,7 +496,8 @@ auto decompressArraysAndFullColumns(const std::vector<T> values,
     TestArrayPath arrayPath;
     ASSERT_EQ(arrayPath.elementsToMaterialize(mockRefObj).size(), 2);
 
-    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>>> arrayPaths{{arrayPath, {}}};
+    std::vector<BSONElement> vec1;
+    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> arrayPaths{{arrayPath, vec1}};
 
     // This is decompressing scalars, but since a single path is accessing two fields that need to
     // be interleaved in the output, we still need to use the slow path.
@@ -496,7 +505,7 @@ auto decompressArraysAndFullColumns(const std::vector<T> values,
 
     ASSERT_EQ(arrayPaths[0].second.size(), values.size());
 
-    return arrayPaths[0].second;
+    return vec1;
 }
 
 TEST_F(BSONColumnBlockBasedTest, DecompressArraysWithIntegers) {
@@ -680,7 +689,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
 
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>>> paths{{path, {}}};
+    std::vector<BSONElement> vec0;
+    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> paths{{path, vec0}};
 
     // This is decompressing scalars, but since a single path is accessing two fields that need to
     // be interleaved in the output, we still need to use the slow path.
@@ -714,7 +724,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
 
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{}}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{}}, vec0}};
         // This takes the general path since we are getting whole documents.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
         ASSERT_EQ(paths[0].second.size(), nObjs);
@@ -724,8 +735,9 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
         }
     }
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"a"}}, {}},
-                                                                         {TestPath{{"b"}}, {}}};
+        std::vector<BSONElement> vec0, vec1;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"a"}}, vec0},
+                                                                          {TestPath{{"b"}}, vec1}};
         // This takes the fast path because each path maps to a single scalar stream.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
         ASSERT_EQ(paths[0].second.size(), nObjs);
@@ -743,7 +755,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
         }
     }
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"c"}}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"c"}}, vec0}};
         // This takes the fast path because each path maps to a single scalar stream.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
         ASSERT_EQ(paths[0].second.size(), nObjs);
@@ -772,7 +785,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
 
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{}}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{}}, vec0}};
         // this takes the general path because we are materializing objects.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
         ASSERT_EQ(paths[0].second.size(), nObjs);
@@ -786,7 +800,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
         }
     }
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"b"}}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"b"}}, vec0}};
         // this takes the general path because we are materializing objects.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
         ASSERT_EQ(paths[0].second.size(), nObjs);
@@ -799,8 +814,9 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
         }
     }
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
-            {TestPath{{"b", "bb"}}, {}}};
+        std::vector<BSONElement> vec0;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
+            {TestPath{{"b", "bb"}}, vec0}};
         // this takes the fast path because we are materializing a scalar field.
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
         ASSERT_EQ(paths[0].second.size(), nObjs);
@@ -829,9 +845,10 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
 
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
-            {TestPath{{"b", "bb"}}, {}},        // general
-            {TestPath{{"b", "bb", "bbb"}}, {}}  // fast
+        std::vector<BSONElement> vec0, vec1;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
+            {TestPath{{"b", "bb"}}, vec0},        // general
+            {TestPath{{"b", "bb", "bbb"}}, vec1}  // fast
         };
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
@@ -868,9 +885,10 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
 
     {
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
-            {TestPath{{"b"}}, {}},       // general
-            {TestPath{{"b", "bb"}}, {}}  // fast (missing)
+        std::vector<BSONElement> vec0, vec1;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
+            {TestPath{{"b"}}, vec0},       // general
+            {TestPath{{"b", "bb"}}, vec1}  // fast (missing)
         };
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
@@ -899,11 +917,12 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
     {
         // The bogus paths don't match anything in the reference object and so should all be
         // materialized as missing, aka a EOO BSONElement.
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
-            {TestPath{{"bogus"}}, {}},       // empty, fast path
-            {TestPath{{"a"}}, {}},           // general path
-            {TestPath{{"a", "b"}}, {}},      // fast path
-            {TestPath{{"also-bogus"}}, {}},  // empty, fast path
+        std::vector<BSONElement> vec0, vec1, vec2, vec3;
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
+            {TestPath{{"bogus"}}, vec0},       // empty, fast path
+            {TestPath{{"a"}}, vec1},           // general path
+            {TestPath{{"a", "b"}}, vec2},      // fast path
+            {TestPath{{"also-bogus"}}, vec3},  // empty, fast path
 
         };
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
@@ -930,7 +949,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
     }
     {
         // Make sure that decompressing zero paths doesn't segfault or anything like that.
-        std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{}};
+        std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{}};
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
     }
 }

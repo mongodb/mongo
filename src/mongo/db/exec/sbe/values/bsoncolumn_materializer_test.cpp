@@ -137,11 +137,12 @@ public:
         mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
 
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-        std::vector<std::pair<SBEPath, PositionInfoTestContainer>> paths{
+        PositionInfoTestContainer positionInfoTestContainer;
+        std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
             {SBEPath{value::CellBlock::PathRequest(
                  value::CellBlock::PathRequestType::kFilter,
                  {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})},
-             {}}};
+             positionInfoTestContainer}};
 
         // Decompress only the values of "a" to the vector.
         col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
@@ -170,7 +171,9 @@ public:
             cb.append(o);
         }
         mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
-        std::vector<std::pair<SBEPath, PositionInfoTestContainer>> paths{{path, {}}};
+        PositionInfoTestContainer positionInfoTestContainer;
+        std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
+            {path, positionInfoTestContainer}};
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
 
         col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
@@ -712,15 +715,16 @@ TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
     // Decompress the path Get(a) / Traverse / Id and Get(b) / Id.
     mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<SBEPath, PositionInfoTestContainer>> paths{
+    PositionInfoTestContainer positionInfoTestContainer0, positionInfoTestContainer1;
+    std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
         {SBEPath{value::CellBlock::PathRequest(
              value::CellBlock::PathRequestType::kFilter,
              {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})},
-         {}},
+         positionInfoTestContainer0},
         {SBEPath{
              value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
                                            {value::CellBlock::Get{"b"}, value::CellBlock::Id{}})},
-         {}}};
+         positionInfoTestContainer1}};
     col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
 
     // Validate the first buffer.

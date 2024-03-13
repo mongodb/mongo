@@ -554,6 +554,10 @@ public:
         }
     }
 
+    ElementStorage& getAllocator() {
+        return *_allocator;
+    }
+
 private:
     Container& _collection;
     boost::intrusive_ptr<ElementStorage> _allocator;
@@ -590,7 +594,7 @@ public:
     template <class CMaterializer, class Container, typename Path>
     requires Materializer<CMaterializer>
     void decompress(boost::intrusive_ptr<ElementStorage> allocator,
-                    std::span<std::pair<Path, Container>> paths) const;
+                    std::span<std::pair<Path, Container&>> paths) const;
 
     /*
      * Decompress entire BSONColumn using the iteration-based implementation. This is used for
@@ -734,11 +738,19 @@ private:
 template <class CMaterializer, class Container, typename Path>
 requires Materializer<CMaterializer>
 void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> allocator,
-                                      std::span<std::pair<Path, Container>> paths) const {
-    std::vector<std::pair<Path, Collector<CMaterializer, Container>>> pathCollectors;
+                                      std::span<std::pair<Path, Container&>> paths) const {
+    // The Collector class wraps a reference to a buffer passed in by the caller.
+    // BlockBasedInterleavedDecompressor expects references to collectors, so create a vector where
+    // we allocate them.
+    std::vector<Collector<CMaterializer, Container>> ownedCollectors;
+    // Create a vector of pairs of paths and references to collectors, to be passed to the
+    // decompressor.
+    std::vector<std::pair<Path, Collector<CMaterializer, Container>&>> pathCollectors;
+    ownedCollectors.reserve(paths.size());
+    pathCollectors.reserve(paths.size());
     for (auto&& p : paths) {
-        pathCollectors.push_back(
-            {p.first, Collector<CMaterializer, Container>{p.second, allocator}});
+        ownedCollectors.emplace_back(p.second, allocator);
+        pathCollectors.push_back({p.first, ownedCollectors.back()});
     }
 
     const char* control = _binary;
@@ -747,7 +759,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
         BlockBasedInterleavedDecompressor decompressor{*allocator, control, end};
         invariant(bsoncolumn::isInterleavedStartControlByte(*control),
                   "non-interleaved data is not yet handled via this API");
-        control = decompressor.decompress(pathCollectors);
+        control = decompressor.decompress(std::span{pathCollectors});
         invariant(control < end);
     }
 }

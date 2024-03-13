@@ -475,5 +475,11 @@ inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<OID
     return materialize(allocator, val.OID());
 }
 
+struct RootPath {
+    boost::container::small_vector<const char*, 1> elementsToMaterialize(BSONObj refObj) {
+        return {refObj.objdata()};
+    }
+};
+
 }  // namespace bsoncolumn
 }  // namespace mongo

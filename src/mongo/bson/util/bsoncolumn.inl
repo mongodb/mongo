@@ -425,7 +425,10 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     break;
             }
         } else if (isInterleavedStartControlByte(control)) {
-            uasserted(8295705, "Interleaved decoding not implemented");
+            BlockBasedInterleavedDecompressor decompressor{buffer.getAllocator(), ptr, end};
+            using PathBufferPair = std::pair<RootPath, Buffer&>;
+            std::array<PathBufferPair, 1> path{{{RootPath{}, buffer}}};
+            ptr = decompressor.decompress(std::span<PathBufferPair, 1>{path});
         } else {
             uasserted(8295706, "Unexpected control");
         }

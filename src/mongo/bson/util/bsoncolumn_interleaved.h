@@ -30,6 +30,7 @@
 #pragma once
 
 #include <algorithm>
+#include <span>
 
 #include "mongo/bson/util/bsoncolumn_helpers.h"
 
@@ -71,8 +72,8 @@ public:
      * Decompresses interleaved data where data at a given path is sent to the corresonding buffer.
      * Returns a pointer to the next byte after the EOO that ends the interleaved data.
      */
-    template <typename Path, typename Buffer>
-    const char* decompress(std::vector<std::pair<Path, Buffer>>& paths);
+    template <typename Path, typename Buffer, std::size_t N = std::dynamic_extent>
+    const char* decompress(std::span<std::pair<Path, Buffer&>, N> paths);
 
 private:
     /**
@@ -234,9 +235,9 @@ void BlockBasedSubObjectFinisher<Buffer>::finishMissing() {
  * Decompresses interleaved data where data at a given path is sent to the corresonding buffer.
  * Returns a pointer to the next byte after the EOO that ends the interleaved data.
  */
-template <typename Path, typename Buffer>
+template <typename Path, typename Buffer, std::size_t N>
 const char* BlockBasedInterleavedDecompressor::decompress(
-    std::vector<std::pair<Path, Buffer>>& paths) {
+    std::span<std::pair<Path, Buffer&>, N> paths) {
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
