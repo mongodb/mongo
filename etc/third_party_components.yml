@@ -95,6 +95,13 @@ components:
     team_owner: "Service Architecture"
     upgrade_suppression: TODO SERVER-74870
 
+  croaring:
+    homepage_url: https://roaringbitmap.org/
+    open_hub_url: N/A
+    release_monitoring_id: 370651
+    local_directory_path: src/third_party/croaring
+    team_owner: "Query Execution"
+
   "dcleblanc/SafeInt":
     homepage_url: https://github.com/dcleblanc/SafeInt
     open_hub_url: https://www.openhub.net/p/SafeInt

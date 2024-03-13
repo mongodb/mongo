@@ -26,6 +26,7 @@ thirdPartyEnvironmentModifications = {
             '#src/third_party/cares/platform/${TARGET_OS}_${TARGET_ARCH}/install/include'
         ],
     },
+    'croaring': {'CPPPATH': ['#src/third_party/croaring/dist'], },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
     'immer': {'CPPPATH': ['#src/third_party/immer/dist'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
@@ -663,6 +664,9 @@ else:
     ])
 
 asioEnv.ShimLibrary(name="asio")
+
+croaringEnv = env.Clone()
+croaringEnv.SConscript('croaring/SConscript', exports={'env': croaringEnv})
 
 intelDecimal128Env = env.Clone()
 if use_system_version_of_library("intel_decimal128"):

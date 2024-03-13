@@ -1,0 +1,6 @@
+Import('env')
+
+env.Library(
+    target='croaring',
+    source=['dist/roaring.c'],
+)
