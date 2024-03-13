@@ -5,8 +5,6 @@
  *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
-
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {checkHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const nDocs = 10;
@@ -35,52 +33,71 @@ const db = primary.getDB(dbName);
 const debugBuild = db.adminCommand("buildInfo").debug;
 if (debugBuild) {
     jsTestLog("Skipping the test because debug is on.");
-} else {
-    // That will force the batch to only have 1 document as the hasher deadline will expire after
-    // reading one document.
-    configureFailPoint(primary, 'SleepDbCheckInBatch', {sleepMs: maxBatchTimeMillis * 2});
+    replSet.stopSet();
+    quit();
+}
 
-    function healthLogConsistent() {
-        jsTestLog("Clear healthLog and run dbcheck and waits for it to finish.");
-        resetAndInsert(replSet, db, collName, nDocs);
-        runDbCheck(replSet,
-                   db,
-                   collName,
-                   {maxBatchTimeMillis: maxBatchTimeMillis},
-                   true /* awaitCompletion */);
+function healthLogConsistent(params) {
+    jsTestLog("Clear healthLog and run dbcheck and waits for it to finish.");
+    resetAndInsert(replSet, db, collName, nDocs);
+    assert.commandWorked(db.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {a: 1}, name: 'a_1'}],
+    }));
+    replSet.awaitReplication();
 
-        const collUUID = db.getCollectionInfos({name: collName})[0].info.uuid;
-        let query = {operation: "dbCheckBatch", collectionUUID: collUUID};
-        checkHealthLog(primaryHealthlog, query, numBatchLogExpected);
-        checkHealthLog(secondaryHealthlog, query, numBatchLogExpected);
+    runDbCheck(replSet,
+               db,
+               collName,
+               {...params, maxDocsPerBatch: 1, maxBatchTimeMillis: maxBatchTimeMillis},
+               true /* awaitCompletion */);
 
-        jsTestLog("Testing that 'data.batchId' field exist in batch health logs.");
-        // There are no dbCheckBatch health log entries without a batchId.
-        query = {operation: "dbCheckBatch", "data.batchId": {$exists: false}};
-        checkHealthLog(primaryHealthlog, query, 0);
-        checkHealthLog(secondaryHealthlog, query, 0);
+    const collUUID = db.getCollectionInfos({name: collName})[0].info.uuid;
+    let query = {operation: "dbCheckBatch", collectionUUID: collUUID};
+    checkHealthLog(primaryHealthlog, query, numBatchLogExpected);
+    checkHealthLog(secondaryHealthlog, query, numBatchLogExpected);
 
-        let primaryHealthLogs =
-            primaryHealthlog.find({operation: "dbCheckBatch"}).toArray().reduce((map, log) => {
-                map[log.data.batchId] = log.data;
-                return map;
-            }, {});
-        let secondaryHealthLogs =
-            secondaryHealthlog.find({operation: "dbCheckBatch"}).toArray().reduce((map, log) => {
-                map[log.data.batchId] = log.data;
-                return map;
-            }, {});
+    jsTestLog("Testing that 'data.batchId' field exist in batch health logs.");
+    // There are no dbCheckBatch health log entries without a batchId.
+    query = {operation: "dbCheckBatch", "data.batchId": {$exists: false}};
+    checkHealthLog(primaryHealthlog, query, 0);
+    checkHealthLog(secondaryHealthlog, query, 0);
 
-        jsTestLog("Batch healthlog entries should be the same across nodes.");
-        assert.eq(tojson(primaryHealthLogs), tojson(secondaryHealthLogs));
-    }
+    let primaryHealthLogs =
+        primaryHealthlog.find({operation: "dbCheckBatch"}).toArray().reduce((map, log) => {
+            map[log.data.batchId] = log.data;
+            return map;
+        }, {});
+    let secondaryHealthLogs =
+        secondaryHealthlog.find({operation: "dbCheckBatch"}).toArray().reduce((map, log) => {
+            map[log.data.batchId] = log.data;
+            return map;
+        }, {});
 
-    // Running the dbcheck multiple times should invalidate all the in-memory states between primary
-    // and secondaries. That should be false if the secondaries is keeping a global number of
-    // batches while the primary keeps a local number for each dbcheck run because (NumberOfBatches
-    // % dbCheckHealthLogEveryNBatches (10 % 4)) != 0.
-    for (var i = 0; i < 3; i++) {
-        healthLogConsistent();
+    jsTestLog(`Verifying that batch healthlog entries should be the same across nodes. Params: ${
+        tojson(params)}`);
+    jsTestLog(`Primary health log: ${tojson(primaryHealthLogs)}`);
+    assert.eq(tojson(primaryHealthLogs),
+              tojson(secondaryHealthLogs),
+              `primary health logs: ${tojson(primaryHealthLogs)}, secondary health logs: ${
+                  tojson(secondaryHealthLogs)}`);
+}
+
+// Running the dbcheck multiple times should invalidate all the in-memory states between primary
+// and secondaries. That should be false if the secondaries is keeping a global number of
+// batches while the primary keeps a local number for each dbcheck run because (NumberOfBatches
+// % dbCheckHealthLogEveryNBatches (10 % 4)) != 0.
+const validateModes = [
+    {},
+    {validateMode: "dataConsistency"},
+    {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+    {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"}
+];
+for (let i = 0; i < 3; i++) {
+    for (let params of validateModes) {
+        jsTestLog(`Running test with parameters ${tojson(params)} and iteration ${i}`);
+        healthLogConsistent(params);
     }
 }
+
 replSet.stopSet();

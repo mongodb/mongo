@@ -332,7 +332,12 @@ function testDbCheckParameters() {
                 let query = {"operation": "dbCheckBatch"};
                 checkHealthLog(healthlog, query, nDocs + 1);
 
-                query = {"operation": "dbCheckBatch", "data.count": 1};
+                let expectedCount = 1;
+                if (parameters.validateMode == "dataConsistencyAndMissingIndexKeysCheck") {
+                    // There should be two items checked as the index is included.
+                    expectedCount = 2;
+                }
+                query = {"operation": "dbCheckBatch", "data.count": expectedCount};
                 checkHealthLog(healthlog, query, nDocs);
 
                 query = {"operation": "dbCheckBatch", "data.count": 0};

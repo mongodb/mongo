@@ -274,10 +274,10 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     if (readTimestamp) {
         builder.append("readTimestamp", *readTimestamp);
     }
-    builder.append("optime", optime.toBSON());
     if (indexSpec) {
         builder.append("indexSpec", indexSpec.get());
     }
+    builder.append("optime", optime.toBSON());
 
     const auto hashesMatch = hashes.first;
     const auto severity = [&] {
