@@ -294,6 +294,13 @@ protected:
      */
     std::vector<OplogInterfaceMock::Operation> _setUpUnpreparedTransactionForCountTest(UUID collId);
 
+    /**
+     * Sets up a test for a retryable write that is comprised of multiple applyOps oplog entries.
+     *
+     * Returns entries appended to the oplog.
+     */
+    std::vector<OplogInterfaceMock::Operation> _setUpBatchedRetryableWriteForCountTest(UUID collId);
+
     std::unique_ptr<OplogInterfaceLocal> _localOplog;
     std::unique_ptr<OplogInterfaceMock> _remoteOplog;
     std::unique_ptr<RollbackImplForTest> _rollback;
@@ -1624,6 +1631,100 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
     return ops;
 }
 
+std::vector<OplogInterfaceMock::Operation>
+RollbackImplTest::_setUpBatchedRetryableWriteForCountTest(UUID collId) {
+    std::vector<OplogInterfaceMock::Operation> ops;
+
+    // Initialize the collection with one document inserted outside a transaction.
+    // The final collection count after partially rolling back the retryable write,
+    // which has one entry before the stable timestamp, should be 2.
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll1");
+    _initializeCollection(_opCtx.get(), collId, nss);
+    auto insertOp1 = _insertDocAndReturnOplogEntry(BSON("_id" << 1), collId, nss, 1);
+    ops.push_back(insertOp1);
+    ASSERT_OK(_insertOplogEntry(insertOp1.first));
+
+    // Common field values for applyOps oplog entries.
+    auto adminCmdNss =
+        NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionId(_opCtx.get()));
+    sessionInfo.setTxnNumber(1);
+
+    // Start a retryable write with an applyOps oplog entry containing an insert op.
+    auto insertOp2 = _insertDocAndReturnOplogEntry(BSON("_id" << 2), collId, nss, 2);
+    auto applyOps0OpTime = unittest::assertGet(OpTime::parseFromOplogEntry(insertOp2.first));
+
+    // applyOps oplog entries cannot have an inner "ts", "t" or "wall" field.
+    auto insertOp2Obj = insertOp2.first.removeField("ts");
+    insertOp2Obj = insertOp2Obj.removeField("t");
+    insertOp2Obj = insertOp2Obj.removeField("wall");
+
+    auto applyOps0Obj = BSON("applyOps" << BSON_ARRAY(insertOp2Obj));
+    DurableOplogEntry applyOps0OplogEntry(applyOps0OpTime,            // opTime
+                                          OpTypeEnum::kCommand,       // opType
+                                          adminCmdNss,                // nss
+                                          boost::none,                // uuid
+                                          boost::none,                // fromMigrate
+                                          boost::none,                // checkExistenceForDiffInsert
+                                          OplogEntry::kOplogVersion,  // version
+                                          applyOps0Obj,               // oField
+                                          boost::none,                // o2Field
+                                          sessionInfo,                // sessionInfo
+                                          boost::none,                // isUpsert
+                                          Date_t(),                   // wallClockTime
+                                          {},                         // statementIds
+                                          OpTime(),      // prevWriteOpTimeInTransaction
+                                          boost::none,   // preImageOpTime
+                                          boost::none,   // postImageOpTime
+                                          boost::none,   // ShardId of resharding recipient
+                                          boost::none,   // _id
+                                          boost::none);  // needsRetryImage
+    auto applyOps0BSON = applyOps0OplogEntry.toBSON();
+    applyOps0BSON = applyOps0BSON.addField(BSON("multiOpType" << 1).firstElement());
+    ASSERT_OK(_insertOplogEntry(applyOps0BSON));
+    ops.push_back(std::make_pair(applyOps0BSON, insertOp2.second));
+
+    // Second entry in retryable write; this one should be rolled back.
+    auto insertOp3 = _insertDocAndReturnOplogEntry(BSON("_id" << 3), collId, nss, 3);
+    auto applyOps1OpTime = unittest::assertGet(OpTime::parseFromOplogEntry(insertOp3.first));
+
+    // applyOps oplog entries cannot have an inner "ts", "t" or "wall" field.
+    auto insertOp3Obj = insertOp3.first.removeField("ts");
+    insertOp3Obj = insertOp3Obj.removeField("t");
+    insertOp3Obj = insertOp3Obj.removeField("wall");
+
+    auto applyOps1Obj = BSON("applyOps" << BSON_ARRAY(insertOp3Obj));
+    DurableOplogEntry applyOps1OplogEntry(applyOps1OpTime,            // opTime
+                                          OpTypeEnum::kCommand,       // opType
+                                          adminCmdNss,                // nss
+                                          boost::none,                // uuid
+                                          boost::none,                // fromMigrate
+                                          boost::none,                // checkExistenceForDiffInsert
+                                          OplogEntry::kOplogVersion,  // version
+                                          applyOps1Obj,               // oField
+                                          boost::none,                // o2Field
+                                          sessionInfo,                // sessionInfo
+                                          boost::none,                // isUpsert
+                                          Date_t(),                   // wallClockTime
+                                          {},                         // statementIds
+                                          applyOps0OpTime,  // prevWriteOpTimeInTransaction
+                                          boost::none,      // preImageOpTime
+                                          boost::none,      // postImageOpTime
+                                          boost::none,      // ShardId of resharding recipient
+                                          boost::none,      // _id
+                                          boost::none);     // needsRetryImage
+    auto applyOps1BSON = applyOps1OplogEntry.toBSON();
+    applyOps1BSON = applyOps1BSON.addField(BSON("multiOpType" << 1).firstElement());
+    ASSERT_OK(_insertOplogEntry(applyOps1BSON));
+    ops.push_back(std::make_pair(applyOps1BSON, insertOp3.second));
+
+    ASSERT_OK(_storageInterface->setCollectionCount(nullptr, {nss.dbName(), collId}, 3));
+    _assertDocsInOplog(_opCtx.get(), {1, 2, 3});
+
+    return ops;
+}
+
 TEST_F(RollbackImplTest, RollbackFixesCountForUnpreparedTransactionApplyOpsChain1) {
     auto collId = UUID::gen();
     auto ops = _setUpUnpreparedTransactionForCountTest(collId);
@@ -1651,6 +1752,35 @@ TEST_F(RollbackImplTest, RollbackFixesCountForUnpreparedTransactionApplyOpsChain
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 1);
+}
+
+TEST_F(RollbackImplTest, RollbackFixesCountForBatchedRetryableWriteApplyOpsChain1) {
+    auto collId = UUID::gen();
+    auto ops = _setUpBatchedRetryableWriteForCountTest(collId);
+
+    // Make the non-transaction CRUD oplog entry the common point and use its timestamp for the
+    // stable timestamp.
+    const auto& commonOp = ops[0];
+    _storageInterface->setStableTimestamp(nullptr, commonOp.first["ts"].timestamp());
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // The entire applyOps chain occurs after the common point.
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 1);
+}
+
+TEST_F(RollbackImplTest, RollbackFixesCountForBatchedRetryableWriteApplyOpsChain2) {
+    auto collId = UUID::gen();
+    auto ops = _setUpBatchedRetryableWriteForCountTest(collId);
+
+    // Make the starting applyOps oplog entry the common point and use its timestamp for the stable
+    // timestamp.
+    const auto& commonOp = ops[1];
+    _storageInterface->setStableTimestamp(nullptr, commonOp.first["ts"].timestamp());
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 2);
 }
 
 TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTimestamp) {
