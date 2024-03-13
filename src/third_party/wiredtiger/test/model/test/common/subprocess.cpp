@@ -26,7 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sys/types.h>
 #include <cstdlib>
+#include <signal.h>
 #include <vector>
 #include <unistd.h>
 
@@ -98,7 +100,7 @@ subprocess_helper::~subprocess_helper()
 }
 
 /*
- * subprocess_helper::child --
+ * subprocess_helper::abort_if_child --
  *     Abort the subprocess, but only if it is the child.
  */
 void
@@ -108,6 +110,10 @@ subprocess_helper::abort_if_child()
         /* Subprocess failure is now expected. */
         testutil_remove(_monitor_child_sentinel.c_str());
 
+        /* Terminate self with a signal that doesn't produce a core file. */
+        (void)kill(getpid(), SIGKILL);
+
+        /* Abort in the very unlikely case the previous call failed. */
         abort();
     }
 }
