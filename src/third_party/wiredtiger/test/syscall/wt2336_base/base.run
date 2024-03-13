@@ -51,7 +51,7 @@ SYSTEM("Darwin");
 #define OPEN(...)				open(__VA_ARGS__)
 #endif
 
-TRACE("close,fdatasync,fsync,ftruncate,open,openat,pwrite64,rename");
+TRACE("close,fdatasync,fsync,ftruncate,open,openat,pwrite64");
 RUN("");
 ...
 OUTPUT("--------------wiredtiger_open");
@@ -73,7 +73,6 @@ pwrite64(fd, "# Do not modify this file."..., ...);
 fdatasync(fd);
 #endif /* __linux__ */
 close(fd);
-rename("./WiredTiger.basecfg.set", "./WiredTiger.basecfg");
 
 #ifdef __linux__
 dir = OPEN("./", O_RDONLY|O_CLOEXEC);
@@ -104,7 +103,6 @@ pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 fdatasync(fd);
 #endif /* __linux__ */
 close(fd);
-rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 
 ...  // There is a second open of turtle here, is it important? We also set two thread names.
 
@@ -140,7 +138,6 @@ pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 fdatasync(fd);
 #endif /* __linux__ */
 close(fd);
-rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 #ifdef __linux__
 dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
@@ -168,15 +165,6 @@ FTRUNCATE(hello, 0x1000);
 turtle = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
 close(turtle);
 ...  // more changes to turtle
-OUTPUT("--------------rename");
-#ifdef __linux__
-FTRUNCATE(hello, 0x1000);
-#endif /* __linux__ */
-close(hello);
-rename("./hello.wt", "./world.wt");
-// Changes to turtle, more writes to wt.
-turtle = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
-close(turtle);
 ...
 OUTPUT("--------------drop");
 ...

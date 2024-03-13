@@ -59,10 +59,10 @@ usage(void)
       "create an object", "downgrade", "downgrade a database", "drop", "drop an object", "dump",
       "dump an object", "list", "list database objects", "load", "load an object", "loadtext",
       "load an object from a text file", "printlog", "display the database log", "read",
-      "read values from an object", "rename", "rename an object", "salvage", "salvage a file",
-      "stat", "display statistics for an object", "truncate",
-      "truncate an object, removing all content", "upgrade", "upgrade an object", "verify",
-      "verify an object", "write", "write values to an object", NULL, NULL};
+      "read values from an object", "salvage", "salvage a file", "stat",
+      "display statistics for an object", "truncate", "truncate an object, removing all content",
+      "upgrade", "upgrade an object", "verify", "verify an object", "write",
+      "write values to an object", NULL, NULL};
 
     fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
       WIREDTIGER_VERSION_MINOR);
@@ -245,8 +245,6 @@ main(int argc, char *argv[])
     case 'r':
         if (strcmp(command, "read") == 0)
             func = util_read;
-        else if (strcmp(command, "rename") == 0)
-            func = util_rename;
         break;
     case 's':
         if (strcmp(command, "salvage") == 0)

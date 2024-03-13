@@ -708,12 +708,6 @@ session_ops(WT_SESSION *session)
         error_check(session->compact(session, "table:mytable", NULL));
         /*! [Compact a table] */
 
-        error_check(
-          session->create(session, "table:old", "key_format=r,value_format=S,cache_resident=true"));
-        /*! [Rename a table] */
-        error_check(session->rename(session, "table:old", "table:new", NULL));
-        /*! [Rename a table] */
-
         /*! [Salvage a table] */
         error_check(session->salvage(session, "table:mytable", NULL));
         /*! [Salvage a table] */

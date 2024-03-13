@@ -147,7 +147,7 @@ class VariableContext(object):
 # Generally, system calls must be wrapped in an ASSERT_XX() "macro".
 # Exceptions are calls in this list that return 0 on success, or
 # those that are hardcoded in Runner.call_compare()
-calls_returning_zero = [ 'close', 'ftruncate', 'fdatasync', 'rename' ]
+calls_returning_zero = [ 'close', 'ftruncate', 'fdatasync' ]
 
 # Encapsulate all the defines we can use in our scripts.
 # When this program is run, we'll find out their actual values on
