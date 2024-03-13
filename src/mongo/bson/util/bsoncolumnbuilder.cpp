@@ -447,7 +447,7 @@ bool BSONColumnBuilder::BinaryReopen::scan(const char* binary, int size) {
     const char* end = binary + size;
 
     // Last encountered non-RLE block during binary scan
-    uint64_t lastNonRLE;
+    uint64_t lastNonRLE = 0xE;
 
     while (pos != end) {
         uint8_t control = *pos;
@@ -897,15 +897,6 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
         // then disregard this control block and proceed as-if we didn't overflow in the
         // first as there's nothing to re-write in the second control block.
         if (overflowIndex == blocks - 1) {
-            // If the previous control block was not full, record its offset. This is needed
-            // for the double type where we might not fill the control block with simple8b
-            // due to scaling. When we record the offset to the previous block we can re-use
-            // it if future values change the scaling to be equal to the scaling in this
-            // block.
-            if (blocks != 16) {
-                regular._controlByteOffset = last.control - scannedBinary;
-            }
-
             overflow = false;
         } else {
             // If overflow happens later, we switch to this control byte as our new
