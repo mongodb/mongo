@@ -34,7 +34,7 @@
 #
 # Note that the wiredtiger/tools directory must be on your PYTHONPATH.
 # ------------------------------------------------------------------------------
-import os, pathlib, re, sys
+import os, re, sys
 from contextlib import redirect_stdout
 from wt_tools_common import wiredtiger_open
 from wt_cmp_uri import wiredtiger_compare_uri
