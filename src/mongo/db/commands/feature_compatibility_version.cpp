@@ -105,7 +105,6 @@ namespace {
  * Utility class for recording permitted transitions between feature compatibility versions and
  * their on-disk representation as FeatureCompatibilityVersionDocument objects.
  */
-// TODO (SERVER-74847): Add back 'const' qualifier to FCVTransitions class declaration
 class FCVTransitions {
 public:
     FCVTransitions() {
@@ -175,8 +174,6 @@ public:
             );
     }
 
-    // TODO (SERVER-74847): Remove this transition once we remove testing around
-    // downgrading from latest to last continuous.
     void addTransitionFromLatestToLastContinuous() {
         for (auto&& isFromConfigServer : {false, true}) {
             _transitions[{GenericFCV::kLatest, GenericFCV::kLastContinuous, isFromConfigServer}] =

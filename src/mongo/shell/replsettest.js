@@ -3414,9 +3414,6 @@ var ReplSetTest = function ReplSetTest(opts) {
         // spinning up. We will re-enable this check after the replica set has finished initiating.
         if (jsTestOptions().enableTestCommands) {
             options.setParameter.enableReconfigRollbackCommittedWritesCheck = false;
-
-            // TODO (SERVER-74847): Remove this transition once we remove testing around
-            // downgrading from latest to last continuous.
             options.setParameter.disableTransitionFromLatestToLastContinuous =
                 options.setParameter.disableTransitionFromLatestToLastContinuous || false;
         }

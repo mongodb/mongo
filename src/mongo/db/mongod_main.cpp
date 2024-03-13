@@ -709,8 +709,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // error.
     FeatureCompatibilityVersion::fassertInitializedAfterStartup(startupOpCtx.get());
 
-    // TODO (SERVER-74847): Remove this function call once we remove testing around downgrading from
-    // latest to last continuous.
     if (!mongo::repl::disableTransitionFromLatestToLastContinuous) {
         FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous();
     }

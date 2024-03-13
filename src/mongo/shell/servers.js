@@ -750,8 +750,6 @@ MongoRunner.mongodOptions = function(opts = {}) {
 
     opts.setParameter = opts.setParameter || {};
     if (jsTestOptions().enableTestCommands && typeof opts.setParameter !== "string") {
-        // TODO (SERVER-74847): Remove this transition once we remove testing around
-        // downgrading from latest to last continuous.
         if (jsTestOptions().setParameters &&
             jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous) {
             opts.setParameter["disableTransitionFromLatestToLastContinuous"] =

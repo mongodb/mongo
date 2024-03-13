@@ -742,7 +742,6 @@ server_parameters:
         validator:
             gte: 0
 
-    # TODO (SERVER-74847): Remove this server parameter.
     disableTransitionFromLatestToLastContinuous:
         description: >-
             Prohibits downgrading from latest FCV to last continuous FCV. Disabled by default.
