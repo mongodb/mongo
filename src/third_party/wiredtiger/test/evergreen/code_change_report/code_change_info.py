@@ -241,7 +241,7 @@ def get_function_info(file_path: str,
 
                 function_info.update(function_coverage)
 
-                if preprocessed_prev_complexity_data is not None:
+                if preprocessed_prev_complexity_data is not None and detail_file in preprocessed_prev_complexity_data:
                     file_prev_info = preprocessed_prev_complexity_data[detail_file]
                     if function_name in file_prev_info:
                         function_prev_info = file_prev_info[function_name]
