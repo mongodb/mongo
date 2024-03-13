@@ -203,7 +203,7 @@ To create a new topology for Antithesis testing is easy & requires a few simple 
    uploaded to the Antithesis Docker registry.
 4. Reach out to #server-testing on Slack & provide the new topology image name as well as the
    desired test suite to run.
-5. Include the SDP team on the code review.
+5. Include the Correctness team on the code review.
 
 These are the required updates to `evergreen/antithesis_image_build.sh`:
 

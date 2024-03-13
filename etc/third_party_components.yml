@@ -348,7 +348,7 @@ components:
     open_hub_url: https://www.openhub.net/p/scons
     release_monitoring_id: 4770
     local_directory_path: src/third_party/scons-3.1.2
-    team_owner: "Service Development Platform"
+    team_owner: "Build"
     upgrade_suppression: TODO SERVER-49324
 
   smhasher:

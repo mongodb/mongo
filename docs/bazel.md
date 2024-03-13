@@ -1,4 +1,4 @@
-(Note: This is a work-in-progress for the SDP team; contact #server-dev-platform for questions)
+(Note: This is a work-in-progress for the Build team; contact #ask-devprod-build for questions)
 
 To perform a Bazel build via SCons:
 
