@@ -119,7 +119,6 @@ backup_read(WTPERF *wtperf, WT_SESSION *session)
     WT_DECL_RET;
     uint32_t buf_size, size, total;
     int rfd;
-    size_t len;
     ssize_t rdsize;
     char *buf;
     const char *filename;
@@ -134,22 +133,19 @@ backup_read(WTPERF *wtperf, WT_SESSION *session)
     if (ret != 0)
         goto err;
 
+    buf = dmalloc(WT_BACKUP_COPY_SIZE);
     while ((ret = backup_cursor->next(backup_cursor)) == 0) {
         testutil_check(backup_cursor->get_key(backup_cursor, &filename));
 
         rfd = -1;
         /* Open the file handle. */
-        len = strlen(wtperf->home) + strlen(filename) + 10;
-        buf = dmalloc(len);
-        testutil_snprintf(buf, len, "%s/%s", wtperf->home, filename);
+        testutil_snprintf(buf, WT_BACKUP_COPY_SIZE, "%s/%s", wtperf->home, filename);
         error_sys_check(rfd = open(buf, O_RDONLY, 0644));
 
         /* Get the file's size. */
         testutil_check(stat(buf, &st));
         size = (uint32_t)st.st_size;
-        free(buf);
 
-        buf = dmalloc(WT_BACKUP_COPY_SIZE);
         total = 0;
         buf_size = WT_MIN(size, WT_BACKUP_COPY_SIZE);
         while (total < size) {
