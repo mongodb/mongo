@@ -23,6 +23,7 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const mainNs = {
@@ -93,7 +94,16 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure query settings ignore cursor hints when being set on main or secondary collection.
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
-    qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, secondaryNs);
+    if (checkSbeRestrictedOrFullyEnabled(db)) {
+        // The aggregation stage will get pushed down to SBE, and index hints will get applied to
+        // secondary collections. This prevents cursor hints from also being applied.
+        qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, secondaryNs);
+    } else {
+        // No SBE push down happens. The $lookup will get executed as a separate pipeline, so we
+        // expect cursor hints to be applied on the main collection, while query settings will get
+        // applied on the secondary collection.
+        qstests.assertQuerySettingsWithCursorHints(aggregateCmd, mainNs, secondaryNs);
+    }
 
     // Ensure that providing query settings with an invalid index result in the same plan as no
     // query settings being set.
