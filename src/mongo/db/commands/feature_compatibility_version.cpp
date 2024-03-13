@@ -462,7 +462,6 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         return;
     }
 
-
     // If the server was not started with --shardsvr, the default featureCompatibilityVersion on
     // clean startup is the upgrade version. If it was started with --shardsvr, the default
     // featureCompatibilityVersion is the downgrade version, so that it can be safely added to a
