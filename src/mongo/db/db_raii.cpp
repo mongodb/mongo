@@ -1170,9 +1170,11 @@ void assertReadConcernSupported(const CollectionPtr& coll,
             !ns.isChangeCollection() ||
                 readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
     // Ban snapshot reads on capped collections.
-    uassert(ErrorCodes::SnapshotUnavailable,
-            "Reading from capped collections with readConcern snapshot is not supported",
-            !coll->isCapped() || readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+    uassert(
+        ErrorCodes::SnapshotUnavailable,
+        "Reading from non replicated capped collections with readConcern snapshot is not supported",
+        !coll->isCapped() || ns.isReplicated() ||
+            readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
 
     // Disallow snapshot reads and causal consistent majority reads on config.transactions
     // outside of transactions to avoid running the collection at a point-in-time in the middle
