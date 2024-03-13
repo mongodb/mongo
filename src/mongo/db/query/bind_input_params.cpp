@@ -43,7 +43,6 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -213,8 +212,9 @@ public:
             // its ownership from the match expression node into the SBE runtime environment. Hence,
             // we need to drop the const qualifier. This is a safe operation only when the plan is
             // being recovered from the SBE plan cache -- in this case, the visitor has exclusive
-            // access to this match expression tree. Furthermore, after all input parameters are
-            // bound the match expression tree is no longer used.
+            // access to this match expression tree. However, in case of replanning, we
+            // need to call recoverWhereExprPredicate to move predicates back to
+            // WhereMatchExpressions.
             bindParam(*slotId,
                       true /*owned*/,
                       sbe::value::TypeTags::jsFunction,
@@ -468,6 +468,63 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
                                       /*owned*/ true);
     }
 }
+
+/**
+ * This mutable MatchExpression visitor will update the JS function predicate in each $where
+ * expression by recovering it from the SBE runtime environment. The predicate was previously
+ * was put there during the input parameter binding in process, after it was extracted from the
+ * $where expression as an optimization.
+ */
+class WhereMatchExpressionVisitor final : public SelectiveMatchExpressionVisitorBase<false> {
+public:
+    explicit WhereMatchExpressionVisitor(stage_builder::PlanStageData& data) : _data(data) {}
+
+    // To avoid overloaded-virtual warnings.
+    using SelectiveMatchExpressionVisitorBase<false>::visit;
+
+    void visit(WhereMatchExpression* expr) final {
+        auto paramId = expr->getInputParamId();
+        if (!paramId) {
+            return;
+        }
+
+        auto it = _data.staticData->inputParamToSlotMap.find(*paramId);
+        if (it == _data.staticData->inputParamToSlotMap.end()) {
+            return;
+        }
+
+        auto accessor = _data.env->getAccessor(it->second);
+        auto [type, value] = accessor->copyOrMoveValue();
+        const auto valueType = type;  // a workaround for a compiler bug
+        tassert(8415201,
+                str::stream() << "Unexpected value type: " << valueType,
+                type == sbe::value::TypeTags::jsFunction);
+        expr->setPredicate(std::unique_ptr<JsFunction>(sbe::value::bitcastTo<JsFunction*>(value)));
+    }
+
+private:
+    stage_builder::PlanStageData& _data;
+};
+
+/**
+ * A match expression tree walker to visit the tree nodes with the 'WhereMatchExpressionVisitor'.
+ */
+class WhereMatchExpressionWalker {
+public:
+    explicit WhereMatchExpressionWalker(WhereMatchExpressionVisitor* visitor) : _visitor{visitor} {
+        invariant(_visitor);
+    }
+
+    void preVisit(MatchExpression* expr) {
+        expr->acceptVisitor(_visitor);
+    }
+
+    void postVisit(MatchExpression* expr) {}
+    void inVisit(long count, MatchExpression* expr) {}
+
+private:
+    WhereMatchExpressionVisitor* _visitor;
+};
 }  // namespace
 
 void bind(const MatchExpression* matchExpr,
@@ -578,6 +635,12 @@ void bindLimitSkipInputSlots(const CanonicalQuery& cq,
                           cq.getFindCommandRequest().getLimit());
     setLimitSkipInputSlot(data->staticData->limitSkipSlots.skip,
                           cq.getFindCommandRequest().getSkip());
+}
+
+void recoverWhereExprPredicate(MatchExpression* filter, stage_builder::PlanStageData& data) {
+    WhereMatchExpressionVisitor visitor{data};
+    WhereMatchExpressionWalker walker{&visitor};
+    tree_walker::walk<false, MatchExpression>(filter, &walker);
 }
 
 }  // namespace mongo::input_params

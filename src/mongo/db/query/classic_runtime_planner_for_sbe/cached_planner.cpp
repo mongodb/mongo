@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
@@ -79,6 +80,15 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
                                                   candidate.data.stageData.debugInfo);
 
     if (!candidate.status.isOK()) {
+        // Recover $where expression JS function predicate from the SBE runtime environemnt, if
+        // necessary, so we could successfully replan the query. The primary match expression was
+        // modified during the input parameters bind-in process while we were collecting execution
+        // stats above.
+        if (cq()->getExpCtxRaw()->hasWhereClause) {
+            input_params::recoverWhereExprPredicate(cq()->getPrimaryMatchExpression(),
+                                                    candidate.data.stageData);
+        }
+
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
         LOGV2_DEBUG(8523802,
@@ -96,11 +106,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
     // candidate so that the executor will be able to reuse them.
     if (!candidate.exitedEarly) {
         auto nss = cq()->nss();
-        auto remoteCursors = cq()->getExpCtx()->explain
-            ? nullptr
-            : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
-        auto remoteExplains = cq()->getExpCtx()->explain
-            ? search_helpers::getSearchRemoteExplains(cq()->getExpCtxRaw(), cq()->cqPipeline())
+        auto expCtx = cq()->getExpCtxRaw();
+        auto remoteCursors =
+            expCtx->explain ? nullptr : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
+        auto remoteExplains = expCtx->explain
+            ? search_helpers::getSearchRemoteExplains(expCtx, cq()->cqPipeline())
             : nullptr;
         return uassertStatusOK(
             plan_executor_factory::make(opCtx(),
@@ -128,6 +138,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
         "numReads"_attr = numReads,
         "query"_attr = redact(cq()->toStringShort()),
         "planSummary"_attr = explainer->getPlanSummary());
+    // Recover $where expression JS function predicate from the SBE runtime environemnt, if
+    // necessary, so we could successfully replan the query. The primary match expression was
+    // modified during the input parameters bind-in process while we were collecting execution
+    // stats above.
+    if (cq()->getExpCtxRaw()->hasWhereClause) {
+        input_params::recoverWhereExprPredicate(cq()->getPrimaryMatchExpression(),
+                                                candidate.data.stageData);
+    }
     return _replan(
         true /*shouldCache*/,
         str::stream()

@@ -11,13 +11,6 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("test");
 
-// TODO SERVER-87769: Remove this check when the error on JsFunction is fixed.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since featureFlagClassicRuntimePlanningForSbe is enabled");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
-
 const coll = db.plan_cache_replan_where;
 coll.drop();
 
