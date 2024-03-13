@@ -50,7 +50,7 @@ namespace mongo::classic_runtime_planner_for_sbe {
  */
 struct PlannerDataForSBE final : public PlannerData {
     PlannerDataForSBE(OperationContext* opCtx,
-                      std::unique_ptr<CanonicalQuery> ownedCq,
+                      CanonicalQuery* cq,
                       std::unique_ptr<WorkingSet> workingSet,
                       const MultipleCollectionAccessor& collections,
                       QueryPlannerParams plannerParams,
@@ -58,31 +58,17 @@ struct PlannerDataForSBE final : public PlannerData {
                       boost::optional<size_t> cachedPlanHash,
                       std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy)
         : PlannerData(opCtx,
-                      ownedCq.get(),
+                      cq,
                       std::move(workingSet),
                       collections,
                       std::move(plannerParams),
                       yieldPolicy,
                       cachedPlanHash),
-          ownedCq(std::move(ownedCq)),
           sbeYieldPolicy(std::move(sbeYieldPolicy)) {}
 
-    std::unique_ptr<CanonicalQuery> ownedCq;
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
 };
 
-class PlannerInterface {
-public:
-    virtual ~PlannerInterface() = default;
-
-    /**
-     * Function that picks the best plan and returns PlanExecutor for the selected plan. Can be
-     * called only once, as it may transfer ownership of some data to returned PlanExecutor.
-     */
-    virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() = 0;
-};
-
-// TODO SERVER-87055 Inherit 'src/mongo/db/query/planner_interface.h::PlannerInterface'.
 class PlannerBase : public PlannerInterface {
 public:
     PlannerBase(PlannerDataForSBE plannerData);
@@ -95,6 +81,7 @@ protected:
      * generate the correct explain output when using the classic multiplanner with SBE.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> prepareSbePlanExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery,
         std::unique_ptr<QuerySolution> solution,
         std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
         bool isFromPlanCache,
@@ -111,10 +98,6 @@ protected:
 
     const CanonicalQuery* cq() const {
         return _plannerData.cq;
-    }
-
-    std::unique_ptr<CanonicalQuery> extractCq() {
-        return std::move(_plannerData.ownedCq);
     }
 
     const MultipleCollectionAccessor& collections() const {
@@ -172,7 +155,8 @@ public:
     /**
      * Builds and caches SBE plan for the given solution and returns PlanExecutor for it.
      */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
 private:
     std::unique_ptr<QuerySolution> _solution;
@@ -191,7 +175,8 @@ public:
      *
      * Returns PlanExecutor for the final selected plan.
      */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
 private:
     /**
@@ -216,8 +201,8 @@ private:
      * to indicate the reason for replanning, which can be included, for example, into plan stats
      * summary.
      */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _replan(bool shouldCache,
-                                                                 std::string replanReason);
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _replan(
+        std::unique_ptr<CanonicalQuery> canonicalQuery, bool shouldCache, std::string replanReason);
 
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<sbe::CachedPlanHolder> _cachedPlanHolder;
@@ -235,7 +220,8 @@ public:
      * the planner finished running the best solution during multiplanning, we return the documents
      * and exit, otherwise we pick the best plan and return the SBE plan executor.
      */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
 private:
     using SbePlanAndData = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
@@ -258,7 +244,8 @@ public:
      * solution with the cq pipeline, creates a pinned plan cache entry containing the resulting SBE
      * plan, and returns a plan executor.
      */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
 
 private:
     std::unique_ptr<SubplanStage> _subplanStage;

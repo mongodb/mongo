@@ -403,7 +403,7 @@ public:
         // runtime planner.
     }
 
-    std::unique_ptr<crp_sbe::PlannerInterface> runtimePlanner;
+    std::unique_ptr<PlannerInterface> runtimePlanner;
 
 private:
     PlanCacheInfo _cacheInfo;
@@ -906,20 +906,19 @@ public:
         OperationContext* opCtx,
         const MultipleCollectionAccessor& collections,
         std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<CanonicalQuery> cq,
+        CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
         QueryPlannerParams plannerParams)
-        : PrepareExecutionHelper{opCtx, collections, cq.get(), std::move(plannerParams)},
+        : PrepareExecutionHelper{opCtx, collections, cq, std::move(plannerParams)},
           _ws{std::move(ws)},
-          _ownedCq{std::move(cq)},
           _yieldPolicy{policy},
           _sbeYieldPolicy{std::move(sbeYieldPolicy)} {}
 
 private:
     crp_sbe::PlannerDataForSBE makePlannerData() {
         return crp_sbe::PlannerDataForSBE{_opCtx,
-                                          std::move(_ownedCq),
+                                          _cq,
                                           std::move(_ws),
                                           _collections,
                                           std::move(_plannerParams),
@@ -1002,7 +1001,6 @@ private:
     }
 
     std::unique_ptr<WorkingSet> _ws;
-    std::unique_ptr<CanonicalQuery> _ownedCq;
 
     // When using the classic multi-planner for SBE, we need both classic and SBE yield policy to
     // support yielding during trial period in classic engine.
@@ -1013,31 +1011,23 @@ private:
     boost::optional<size_t> _cachedPlanHash;
 };
 
-// TODO SERVER-87055 Return 'PlannerInterface' instead of 'PlanExecutor'.
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    QueryPlannerParams plannerParams) {
+std::unique_ptr<PlannerInterface> getClassicPlanner(OperationContext* opCtx,
+                                                    const MultipleCollectionAccessor& collections,
+                                                    CanonicalQuery* canonicalQuery,
+                                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                                    QueryPlannerParams plannerParams) {
     ClassicPrepareExecutionHelper helper{
         opCtx,
         collections,
         std::make_unique<WorkingSet>(),
-        canonicalQuery.get(),
+        canonicalQuery,
         yieldPolicy,
         std::move(plannerParams),
     };
-    auto planningResultWithStatus = helper.prepare();
-    if (!planningResultWithStatus.isOK()) {
-        return planningResultWithStatus.getStatus();
-    }
-    setOpDebugPlanCacheInfo(opCtx, planningResultWithStatus.getValue()->planCacheInfo());
-    auto* planner = planningResultWithStatus.getValue()->runtimePlanner.get();
-    if (auto status = planner->plan(); !status.isOK()) {
-        return status;
-    }
-    return planner->makeExecutor(std::move(canonicalQuery));
+    auto planningResult = uassertStatusOK(helper.prepare());
+    setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
+    uassertStatusOK(planningResult->runtimePlanner->plan());
+    return std::move(planningResult->runtimePlanner);
 }
 
 /**
@@ -1086,14 +1076,13 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
-// TODO SERVER-87055 Return 'PlannerInterface' instead of 'PlanExecutor'.
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
-                                               const MultipleCollectionAccessor& collections,
-                                               std::unique_ptr<CanonicalQuery> canonicalQuery,
-                                               PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                               std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
-                                               QueryPlannerParams plannerParams) {
+std::unique_ptr<PlannerInterface> getClassicPlannerForSbe(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    CanonicalQuery* canonicalQuery,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
+    QueryPlannerParams plannerParams) {
     SbeWithClassicRuntimePlanningPrepareExecutionHelper helper{
         opCtx,
         collections,
@@ -1103,13 +1092,9 @@ getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
         std::move(sbeYieldPolicy),
         std::move(plannerParams),
     };
-    auto planningResultWithStatus = helper.prepare();
-    if (!planningResultWithStatus.isOK()) {
-        return planningResultWithStatus.getStatus();
-    }
-    setOpDebugPlanCacheInfo(opCtx, planningResultWithStatus.getValue()->planCacheInfo());
-    auto* planner = planningResultWithStatus.getValue()->runtimePlanner.get();
-    return planner->plan();
+    auto planningResult = uassertStatusOK(helper.prepare());
+    setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
+    return std::move(planningResult->runtimePlanner);
 }
 
 std::unique_ptr<PlannerInterface> getSbePlannerForSbe(
@@ -1270,6 +1255,86 @@ boost::optional<PlanExecutorExpressParams> tryGetExpressIndexEqualityParams(
     }
     return boost::none;
 }
+
+boost::optional<ExecParams> tryGetBonsaiParams(OperationContext* opCtx,
+                                               CanonicalQuery* canonicalQuery,
+                                               const MultipleCollectionAccessor& collections) {
+    auto eligibility =
+        determineBonsaiEligibility(opCtx, collections.getMainCollection(), *canonicalQuery);
+    const bool hasExplain = canonicalQuery->getExplain().has_value();
+    if (!isEligibleForBonsaiUnderFrameworkControl(opCtx, hasExplain, eligibility)) {
+        return boost::none;
+    }
+
+    // If the query is eligible for a fast path, use the fast path plan instead of
+    // invoking the optimizer.
+    if (auto execParams =
+            optimizer::fast_path::tryGetSBEExecutorViaFastPath(collections, canonicalQuery)) {
+        return execParams;
+    }
+
+    auto queryHints = getHintsFromQueryKnobs();
+    const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
+    if (auto execParams = getSBEExecutorViaCascadesOptimizer(
+            collections, std::move(queryHints), eligibility, canonicalQuery)) {
+        return execParams;
+    }
+
+    auto queryControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    auto hasHint = !canonicalQuery->getFindCommandRequest().getHint().isEmpty();
+    tassert(7319400,
+            "Optimization failed either with forceBonsai set, or without a hint.",
+            queryControl != QueryFrameworkControlEnum::kForceBonsai && hasHint &&
+                !fastIndexNullHandling);
+    return boost::none;
+}
+
+using PlanExecutorSbeParams = std::pair<std::unique_ptr<PlanYieldPolicySBE>, bool>;
+boost::optional<PlanExecutorSbeParams> tryGetSbeParams(
+    OperationContext* opCtx,
+    CanonicalQuery* canonicalQuery,
+    const MultipleCollectionAccessor& collections,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    Pipeline* pipeline,
+    bool needsMerge) {
+    if (!shouldAttemptSBE(canonicalQuery)) {
+        return boost::none;
+    }
+
+    // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
+    // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
+    // creating SlotBasedPrepareExecutionHelper because both inspect the pipeline on the
+    // canonical query.
+    attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery);
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
+    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
+    const bool querySettingsHintSbe = [&]() {
+        if (auto queryFramework =
+                canonicalQuery->getExpCtx()->getQuerySettings().getQueryFramework()) {
+            return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
+        }
+        return false;
+    }();
+    const bool canUseSbe = canUseRegularSbe || sbeFull || querySettingsHintSbe;
+    if (!canUseSbe) {
+        return boost::none;
+    }
+
+    auto sbeYieldPolicy =
+        PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
+    const bool useClassicRuntimePlanner =
+        feature_flags::gFeatureFlagClassicRuntimePlanningForSbe.isEnabled(fcvSnapshot);
+    return {{std::move(sbeYieldPolicy), useClassicRuntimePlanner}};
+}
+
+void setCurOpQueryFramework(const PlanExecutor* executor) {
+    auto opCtx = executor->getOpCtx();
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    CurOp::get(opCtx)->debug().queryFramework = executor->getQueryFramework();
+}
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
@@ -1289,135 +1354,105 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
-    auto exec = [&]() -> StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> {
-        const auto& mainColl = collections.getMainCollection();
-        // First try to use the express id point query fast path.
-        const auto expressEligibility = isExpressEligible(opCtx, mainColl, *canonicalQuery);
-        if (expressEligibility == ExpressEligibility::IdPointQueryEligible) {
+    // First try to use the express id point query fast path.
+    const auto& mainColl = collections.getMainCollection();
+    const auto expressEligibility = isExpressEligible(opCtx, mainColl, *canonicalQuery);
+    if (expressEligibility == ExpressEligibility::IdPointQueryEligible) {
+        planCacheCounters.incrementClassicSkippedCounter();
+        auto expressParams =
+            getExpressIdPointParams(opCtx, *canonicalQuery, collections, plannerOptions);
+        auto expressExecutor =
+            PlanExecutorExpress::makeExecutor(std::move(canonicalQuery), std::move(expressParams));
+        setCurOpQueryFramework(expressExecutor.get());
+        return std::move(expressExecutor);
+    }
+
+    // The query might still be eligible for express execution via the index equality fast path.
+    // However, that requires the full set of planner parameters for the main collection to be
+    // available and creating those now allows them to be reused for subsequent strategies if
+    // the express one fails.
+    QueryPlannerParams plannerParams{
+        QueryPlannerParams::ArgsForSingleCollectionQuery{
+            .opCtx = opCtx,
+            .canonicalQuery = *canonicalQuery,
+            .collections = collections,
+            .plannerOptions = plannerOptions,
+            .ignoreQuerySettings = false,
+            .traversalPreference = std::move(traversalPreference),
+        },
+    };
+    if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
+        if (auto expressParams = tryGetExpressIndexEqualityParams(
+                opCtx, collections, *canonicalQuery, plannerParams)) {
             planCacheCounters.incrementClassicSkippedCounter();
-            auto expressParams =
-                getExpressIdPointParams(opCtx, *canonicalQuery, collections, plannerOptions);
-            return PlanExecutorExpress::makeExecutor(std::move(canonicalQuery),
-                                                     std::move(expressParams));
+            auto expressExecutor = PlanExecutorExpress::makeExecutor(std::move(canonicalQuery),
+                                                                     std::move(*expressParams));
+            setCurOpQueryFramework(expressExecutor.get());
+            return std::move(expressExecutor);
         }
+    }
 
-        // The query might still be eligible for express execution via the index equality fast path.
-        // However, that requires the full set of planner parameters for the main collection to be
-        // available and creating those now allows them to be reused for subsequent strategies if
-        // the express one fails.
-        QueryPlannerParams plannerParams{
-            QueryPlannerParams::ArgsForSingleCollectionQuery{
-                .opCtx = opCtx,
-                .canonicalQuery = *canonicalQuery,
-                .collections = collections,
-                .plannerOptions = plannerOptions,
-                .ignoreQuerySettings = false,
-                .traversalPreference = std::move(traversalPreference),
-            },
-        };
-        if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
-            if (auto expressParams = tryGetExpressIndexEqualityParams(
-                    opCtx, collections, *canonicalQuery, plannerParams)) {
-                planCacheCounters.incrementClassicSkippedCounter();
-                return PlanExecutorExpress::makeExecutor(std::move(canonicalQuery),
-                                                         std::move(*expressParams));
-            }
-        }
+    // Set whether the query is suitable for SBE. This will be later needed for eligibility checks.
+    canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
 
-        canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
+    // Next try to use Bonsai if eligible.
+    if (auto execParams = tryGetBonsaiParams(opCtx, canonicalQuery.get(), collections)) {
+        auto executor = uassertStatusOK(makeExecFromParams(std::move(canonicalQuery),
+                                                           /* pipeline */ nullptr,
+                                                           collections,
+                                                           std::move(*execParams)));
+        setCurOpQueryFramework(executor.get());
+        return std::move(executor);
+    }
 
-        auto eligibility = determineBonsaiEligibility(opCtx, mainColl, *canonicalQuery);
-        if (isEligibleForBonsaiUnderFrameworkControl(
-                opCtx, canonicalQuery->getExplain().has_value(), eligibility)) {
-            optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
-            const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
+    // None of the previous paths are viable, so generate one of the following three plan executor
+    // planners:
+    //     * SBE, with classic planner.
+    //     * SBE, with SBE planner.
+    //     * Classic, with classic planner.
+    auto planner = [&]() -> std::unique_ptr<PlannerInterface> {
+        // Prioritize using SBE if allowed. This implies having a query with greater compatibility
+        // levels than the configured thresholds.
+        if (auto sbeParams = tryGetSbeParams(
+                opCtx, canonicalQuery.get(), collections, yieldPolicy, pipeline, needsMerge)) {
+            auto [sbeYieldPolicy, useClassicRuntimePlanner] = std::move(*sbeParams);
 
-            auto maybeExec = [&] {
-                // If the query is eligible for a fast path, use the fast path plan instead of
-                // invoking the optimizer.
-                if (auto fastPathExec = optimizer::fast_path::tryGetSBEExecutorViaFastPath(
-                        collections, canonicalQuery.get())) {
-                    return fastPathExec;
-                }
+            // Push down compatible stages to SBE land and fill out secondary collections
+            // planner parameters.
+            finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+            plannerParams.fillOutSecondaryCollectionsPlannerParams(
+                opCtx, *canonicalQuery, collections, /* shouldIgnoreQuerySettings */ false);
 
-                return getSBEExecutorViaCascadesOptimizer(
-                    collections, std::move(queryHints), eligibility, canonicalQuery.get());
-            }();
-            if (maybeExec) {
-                auto exec = uassertStatusOK(makeExecFromParams(std::move(canonicalQuery),
-                                                               nullptr /*pipeline*/,
-                                                               collections,
-                                                               std::move(*maybeExec)));
-                return std::move(exec);
-            } else {
-                auto queryControl = QueryKnobConfiguration::decoration(opCtx)
-                                        .getInternalQueryFrameworkControlForOp();
-                tassert(7319400,
-                        "Optimization failed either with forceBonsai set, or without a hint.",
-                        queryControl != QueryFrameworkControlEnum::kForceBonsai &&
-                            !canonicalQuery->getFindCommandRequest().getHint().isEmpty() &&
-                            !fastIndexNullHandling);
-            }
-        }
-
-        if (shouldAttemptSBE(canonicalQuery.get())) {
-            // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
-            // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
-            // creating SlotBasedPrepareExecutionHelper because both inspect the pipline on the
-            // canonical query.
-            attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
-
-            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
-            const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
-            const bool querySettingsHintSbe = [&]() {
-                if (auto queryFramework =
-                        canonicalQuery->getExpCtx()->getQuerySettings().getQueryFramework()) {
-                    return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
-                }
-                return false;
-            }();
-
-            if (canUseRegularSbe || sbeFull || querySettingsHintSbe) {
-                auto sbeYieldPolicy = PlanYieldPolicySBE::make(
-                    opCtx, yieldPolicy, collections, canonicalQuery->nss());
-                finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
-                plannerParams.fillOutSecondaryCollectionsPlannerParams(
-                    opCtx, *canonicalQuery, collections, /* shouldIgnoreQuerySettings */ false);
-                if (feature_flags::gFeatureFlagClassicRuntimePlanningForSbe.isEnabled(
-                        fcvSnapshot)) {
-                    return getSlotBasedExecutorWithClassicRuntimePlanning(opCtx,
-                                                                          collections,
-                                                                          std::move(canonicalQuery),
-                                                                          yieldPolicy,
-                                                                          std::move(sbeYieldPolicy),
-                                                                          std::move(plannerParams));
-                } else {
-                    auto sbePlanner = getSbePlannerForSbe(opCtx,
-                                                          canonicalQuery.get(),
-                                                          collections,
-                                                          std::move(sbeYieldPolicy),
-                                                          std::move(plannerParams));
-                    return sbePlanner->makeExecutor(std::move(canonicalQuery));
-                }
-            }
+            // And finally return either a classic or SBE runtime planner.
+            return useClassicRuntimePlanner ? getClassicPlannerForSbe(opCtx,
+                                                                      collections,
+                                                                      canonicalQuery.get(),
+                                                                      yieldPolicy,
+                                                                      std::move(sbeYieldPolicy),
+                                                                      std::move(plannerParams))
+                                            : getSbePlannerForSbe(opCtx,
+                                                                  canonicalQuery.get(),
+                                                                  collections,
+                                                                  std::move(sbeYieldPolicy),
+                                                                  std::move(plannerParams));
         }
 
         // If we are here, it means the query cannot run in SBE and we should fallback to classic.
         canonicalQuery->setSbeCompatible(false);
+
         // There's a special case of the projection optimization being skipped when a query has any
         // user-defined "let" variable and the query may be run with SBE. Here we make sure the
         // projection is optimized for the classic engine.
         canonicalQuery->optimizeProjection();
-        return getClassicExecutor(
-            opCtx, collections, std::move(canonicalQuery), yieldPolicy, std::move(plannerParams));
+
+        // Default to using the classic executor with the classic runtime planner.
+        return getClassicPlanner(
+            opCtx, collections, canonicalQuery.get(), yieldPolicy, std::move(plannerParams));
     }();
 
-    if (exec.isOK()) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->debug().queryFramework = exec.getValue()->getQueryFramework();
-    }
-    return exec;
+    auto exec = planner->makeExecutor(std::move(canonicalQuery));
+    setCurOpQueryFramework(exec.get());
+    return std::move(exec);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(

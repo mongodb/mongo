@@ -48,7 +48,8 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
                                        PlanCachingMode::NeverCache);
 }
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::plan() {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
     LOGV2_DEBUG(8542100, 5, "Using classic subplanner for SBE");
 
     auto trialPeriodYieldPolicy =
@@ -82,7 +83,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::plan() {
                                      *sbePlanAndData.first.get(),
                                      sbePlanAndData.second);
 
-    return prepareSbePlanExecutor(std::move(solution),
+    return prepareSbePlanExecutor(std::move(canonicalQuery),
+                                  std::move(solution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
                                   cachedPlanHash(),

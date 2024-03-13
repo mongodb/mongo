@@ -47,13 +47,15 @@ CachedPlanner::CachedPlanner(PlannerDataForSBE plannerData,
       _yieldPolicy(std::move(yieldPolicy)),
       _cachedPlanHolder(std::move(cachedPlanHolder)) {}
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
     _cachedPlanHolder->cachedPlan->planStageData.debugInfo = _cachedPlanHolder->debugInfo;
     const auto& decisionReads = _cachedPlanHolder->decisionWorks;
     LOGV2_DEBUG(
         8523404, 5, "Recovering SBE plan from the cache", "decisionReads"_attr = decisionReads);
     if (!decisionReads) {
-        return prepareSbePlanExecutor(nullptr /*solution*/,
+        return prepareSbePlanExecutor(std::move(canonicalQuery),
+                                      nullptr /*solution*/,
                                       {std::move(_cachedPlanHolder->cachedPlan->root),
                                        std::move(_cachedPlanHolder->cachedPlan->planStageData)},
                                       true /*isFromPlanCache*/,
@@ -97,7 +99,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
                     "query"_attr = redact(cq()->toStringShort()),
                     "planSummary"_attr = explainer->getPlanSummary(),
                     "error"_attr = candidate.status.toString());
-        return _replan(false /*shouldCache*/,
+        return _replan(std::move(canonicalQuery),
+                       false /*shouldCache*/,
                        str::stream() << "cached plan returned: " << candidate.status);
     }
 
@@ -114,7 +117,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
             : nullptr;
         return uassertStatusOK(
             plan_executor_factory::make(opCtx(),
-                                        extractCq(),
+                                        std::move(canonicalQuery),
                                         {makeVector(std::move(candidate)), 0 /*winnerIdx*/},
                                         collections(),
                                         plannerOptions(),
@@ -147,6 +150,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
                                                 candidate.data.stageData);
     }
     return _replan(
+        std::move(canonicalQuery),
         true /*shouldCache*/,
         str::stream()
             << "cached plan was less efficient than expected: expected trial execution to take "
@@ -194,7 +198,7 @@ sbe::plan_ranker::CandidatePlan CachedPlanner::_collectExecutionStatsForCachedPl
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::_replan(
-    bool shouldCache, std::string replanReason) {
+    std::unique_ptr<CanonicalQuery> canonicalQuery, bool shouldCache, std::string replanReason) {
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
     // yield policy.
     sbeYieldPolicy()->clearRegisteredPlans();
@@ -225,7 +229,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::_replan(
                     "query"_attr = redact(cq()->toStringShort()),
                     "planSummary"_attr = explainer->getPlanSummary(),
                     "shouldCache"_attr = (shouldCache ? "yes" : "no"));
-        return prepareSbePlanExecutor(std::move(solutions[0]),
+        return prepareSbePlanExecutor(std::move(canonicalQuery),
+                                      std::move(solutions[0]),
                                       std::make_pair(std::move(root), std::move(data)),
                                       false /*isFromPlanCache*/,
                                       cachedPlanHash(),
@@ -235,7 +240,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::_replan(
         shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
     MultiPlanner multiPlanner{
         extractPlannerData(), std::move(solutions), cachingMode, replanReason};
-    auto exec = multiPlanner.plan();
+    auto exec = multiPlanner.makeExecutor(std::move(canonicalQuery));
     LOGV2_DEBUG(8523805,
                 1,
                 "Query plan after replanning and its cache status",

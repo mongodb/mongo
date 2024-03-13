@@ -60,7 +60,8 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
     }
 }
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
     LOGV2_DEBUG(6215001, 5, "Using classic multi-planner for SBE");
 
     auto trialPeriodYieldPolicy =
@@ -90,7 +91,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
         _buildSbePlanAndUpdatePlanCache(_multiPlanStage->bestSolution(), ranking);
         auto nss = cq()->nss();
         return uassertStatusOK(
-            plan_executor_factory::make(extractCq(),
+            plan_executor_factory::make(std::move(canonicalQuery),
                                         extractWs(),
                                         std::move(_multiPlanStage),
                                         collections().getMainCollectionPtrOrAcquisition(),
@@ -110,7 +111,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
     }
 
     auto sbePlanAndData = _buildSbePlanAndUpdatePlanCache(winningSolution.get(), ranking);
-    return prepareSbePlanExecutor(std::move(winningSolution),
+    return prepareSbePlanExecutor(std::move(canonicalQuery),
+                                  std::move(winningSolution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
                                   cachedPlanHash(),

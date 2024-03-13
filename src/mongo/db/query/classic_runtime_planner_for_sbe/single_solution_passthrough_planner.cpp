@@ -43,7 +43,8 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     PlannerDataForSBE plannerData, std::unique_ptr<QuerySolution> solution)
     : PlannerBase(std::move(plannerData)), _solution(std::move(solution)) {}
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::plan() {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
     LOGV2_DEBUG(8523405, 5, "Using SBE single solution planner");
     if (!cq()->cqPipeline().empty()) {
         _solution = QueryPlanner::extendWithAggPipeline(
@@ -57,7 +58,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPl
     plan_cache_util::updatePlanCache(
         opCtx(), collections(), *cq(), *_solution, *sbePlanAndData.first, sbePlanAndData.second);
 
-    return prepareSbePlanExecutor(std::move(_solution),
+    return prepareSbePlanExecutor(std::move(canonicalQuery),
+                                  std::move(_solution),
                                   std::move(sbePlanAndData),
                                   false /*isFromPlanCache*/,
                                   cachedPlanHash(),

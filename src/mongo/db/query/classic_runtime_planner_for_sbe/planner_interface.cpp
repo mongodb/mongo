@@ -37,6 +37,7 @@ namespace mongo::classic_runtime_planner_for_sbe {
 PlannerBase::PlannerBase(PlannerDataForSBE plannerData) : _plannerData(std::move(plannerData)) {}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlanExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
     bool isFromPlanCache,
@@ -64,7 +65,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
             solution != nullptr || !cachedPlanHash.has_value());
     return uassertStatusOK(
         plan_executor_factory::make(opCtx(),
-                                    extractCq(),
+                                    std::move(canonicalQuery),
                                     nullptr /* pipeline - It is not nullptr only in Bonsai */,
                                     std::move(solution),
                                     std::move(sbePlanAndData),
