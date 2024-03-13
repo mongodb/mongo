@@ -47,8 +47,8 @@ namespace mongo {
 // This is called in _encode while iterating through _pendingValues. For the base selector, we just
 // return val. Contains unsed vars in order to seamlessly integrate with seven and eight selector
 // extensions.
-template <typename T>
-struct Simple8bBuilder<T>::BaseSelectorEncodeFunctor {
+template <typename T, class Allocator>
+struct Simple8bBuilder<T, Allocator>::BaseSelectorEncodeFunctor {
     uint64_t operator()(const PendingValue& value) {
         return static_cast<uint64_t>(value.value());
     };
@@ -57,8 +57,8 @@ struct Simple8bBuilder<T>::BaseSelectorEncodeFunctor {
 // This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
 // word according to the specifications of the sevenSelector extension. This value is then appended
 // to the full simple8b word in _encode.
-template <typename T>
-struct Simple8bBuilder<T>::SevenSelectorEncodeFunctor {
+template <typename T, class Allocator>
+struct Simple8bBuilder<T, Allocator>::SevenSelectorEncodeFunctor {
     uint64_t operator()(const PendingValue& value) {
         using namespace simple8b_internal;
 
@@ -75,9 +75,9 @@ struct Simple8bBuilder<T>::SevenSelectorEncodeFunctor {
 // This is a helper functor that is extended by the EightSelectorSmall and EightSelectorLarge encode
 // functors. It provides the logic for encoding with the eight selector where the extension type is
 // designated by the inheritance in the EightSelectorSmall and EightSelectorLarge functors.
-template <typename T>
+template <typename T, class Allocator>
 template <uint8_t ExtensionType>
-struct Simple8bBuilder<T>::EightSelectorEncodeFunctor {
+struct Simple8bBuilder<T, Allocator>::EightSelectorEncodeFunctor {
     uint64_t operator()(const PendingValue& value) {
         using namespace simple8b_internal;
 
@@ -95,48 +95,48 @@ struct Simple8bBuilder<T>::EightSelectorEncodeFunctor {
 // This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
 // word according to the specifications of the eightSelectorSmall extension. This value is then
 // appended to the full simple8b word in _encode.
-template <typename T>
-struct Simple8bBuilder<T>::EightSelectorSmallEncodeFunctor
+template <typename T, class Allocator>
+struct Simple8bBuilder<T, Allocator>::EightSelectorSmallEncodeFunctor
     : public EightSelectorEncodeFunctor<simple8b_internal::kEightSelectorSmall> {};
 
 // This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
 // word according to the specifications of the eightSelectorLarge extension. This value is then
 // appended to the full simple8b word in _encode.
-template <typename T>
-struct Simple8bBuilder<T>::EightSelectorLargeEncodeFunctor
+template <typename T, class Allocator>
+struct Simple8bBuilder<T, Allocator>::EightSelectorLargeEncodeFunctor
     : public EightSelectorEncodeFunctor<simple8b_internal::kEightSelectorLarge> {};
 
 // Base Constructor for PendingValue
-template <typename T>
-Simple8bBuilder<T>::PendingValue::PendingValue(
+template <typename T, class Allocator>
+Simple8bBuilder<T, Allocator>::PendingValue::PendingValue(
     boost::optional<T> val,
     std::array<uint8_t, kNumOfSelectorTypes> bitCount,
     std::array<uint8_t, kNumOfSelectorTypes> trailingZerosCount)
     : val(val), bitCount(bitCount), trailingZerosCount(trailingZerosCount){};
 
-template <typename T>
-Simple8bBuilder<T>::PendingIterator::PendingIterator(
-    typename std::vector<PendingValue>::const_iterator beginning,
-    typename std::vector<PendingValue>::const_iterator it,
+template <typename T, class Allocator>
+Simple8bBuilder<T, Allocator>::PendingIterator::PendingIterator(
+    typename std::vector<PendingValue, PendingValueAllocator>::const_iterator beginning,
+    typename std::vector<PendingValue, PendingValueAllocator>::const_iterator it,
     reference rleValue,
     uint32_t rleCount)
     : _begin(beginning), _it(it), _rleValue(rleValue), _rleCount(rleCount) {}
 
-template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator->() const -> pointer {
+template <typename T, class Allocator>
+auto Simple8bBuilder<T, Allocator>::PendingIterator::operator->() const -> pointer {
     return &operator*();
 }
 
-template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator*() const -> reference {
+template <typename T, class Allocator>
+auto Simple8bBuilder<T, Allocator>::PendingIterator::operator*() const -> reference {
     if (_rleCount > 0)
         return _rleValue;
 
     return _it->val;
 }
 
-template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator++() -> PendingIterator& {
+template <typename T, class Allocator>
+auto Simple8bBuilder<T, Allocator>::PendingIterator::operator++() -> PendingIterator& {
     if (_rleCount > 0) {
         --_rleCount;
         return *this;
@@ -146,15 +146,15 @@ auto Simple8bBuilder<T>::PendingIterator::operator++() -> PendingIterator& {
     return *this;
 }
 
-template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator++(int) -> PendingIterator {
+template <typename T, class Allocator>
+auto Simple8bBuilder<T, Allocator>::PendingIterator::operator++(int) -> PendingIterator {
     auto ret = *this;
     ++(*this);
     return ret;
 }
 
-template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator--() -> PendingIterator& {
+template <typename T, class Allocator>
+auto Simple8bBuilder<T, Allocator>::PendingIterator::operator--() -> PendingIterator& {
     if (_rleCount > 0 || _it == _begin) {
         ++_rleCount;
         return *this;
@@ -164,35 +164,35 @@ auto Simple8bBuilder<T>::PendingIterator::operator--() -> PendingIterator& {
     return *this;
 }
 
-template <typename T>
-auto Simple8bBuilder<T>::PendingIterator::operator--(int) -> PendingIterator {
+template <typename T, class Allocator>
+auto Simple8bBuilder<T, Allocator>::PendingIterator::operator--(int) -> PendingIterator {
     auto ret = *this;
     --(*this);
     return ret;
 }
 
-template <typename T>
-bool Simple8bBuilder<T>::PendingIterator::operator==(
-    const Simple8bBuilder<T>::PendingIterator& rhs) const {
+template <typename T, class Allocator>
+bool Simple8bBuilder<T, Allocator>::PendingIterator::operator==(
+    const Simple8bBuilder<T, Allocator>::PendingIterator& rhs) const {
     return _it == rhs._it && _rleCount == rhs._rleCount;
 }
 
-template <typename T>
-bool Simple8bBuilder<T>::PendingIterator::operator!=(
-    const Simple8bBuilder<T>::PendingIterator& rhs) const {
+template <typename T, class Allocator>
+bool Simple8bBuilder<T, Allocator>::PendingIterator::operator!=(
+    const Simple8bBuilder<T, Allocator>::PendingIterator& rhs) const {
     return !operator==(rhs);
 }
 
-template <typename T>
-Simple8bBuilder<T>::Simple8bBuilder() {}
+template <typename T, class Allocator>
+Simple8bBuilder<T, Allocator>::Simple8bBuilder(Allocator allocator) : _pendingValues(allocator) {}
 
-template <typename T>
-Simple8bBuilder<T>::~Simple8bBuilder() = default;
+template <typename T, class Allocator>
+Simple8bBuilder<T, Allocator>::~Simple8bBuilder() = default;
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
 requires Simple8bBlockWriter<F>
-bool Simple8bBuilder<T>::append(T value, F&& writeFn) {
+bool Simple8bBuilder<T, Allocator>::append(T value, F&& writeFn) {
     if (_rlePossible()) {
         if (_lastValueInPrevWord == value) {
             ++_rleCount;
@@ -204,10 +204,10 @@ bool Simple8bBuilder<T>::append(T value, F&& writeFn) {
     return _appendValue(value, true, writeFn);
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
 requires Simple8bBlockWriter<F>
-void Simple8bBuilder<T>::skip(F&& writeFn) {
+void Simple8bBuilder<T, Allocator>::skip(F&& writeFn) {
     if (_rlePossible() && !_lastValueInPrevWord.has_value()) {
         ++_rleCount;
         return;
@@ -217,10 +217,10 @@ void Simple8bBuilder<T>::skip(F&& writeFn) {
     _appendSkip(true /* tryRle */, writeFn);
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
 requires Simple8bBlockWriter<F>
-void Simple8bBuilder<T>::flush(F&& writeFn) {
+void Simple8bBuilder<T, Allocator>::flush(F&& writeFn) {
     // Flush repeating integers that have been kept for RLE.
     _handleRleTermination(writeFn);
     // Flush buffered values in _pendingValues.
@@ -242,28 +242,28 @@ void Simple8bBuilder<T>::flush(F&& writeFn) {
     _lastValidExtensionType = 0;
 }
 
-template <typename T>
-void Simple8bBuilder<T>::setLastForRLE(boost::optional<T> val) {
+template <typename T, class Allocator>
+void Simple8bBuilder<T, Allocator>::setLastForRLE(boost::optional<T> val) {
     _lastValueInPrevWord = val;
 }
 
-template <typename T>
-void Simple8bBuilder<T>::resetLastForRLEIfNeeded() {
+template <typename T, class Allocator>
+void Simple8bBuilder<T, Allocator>::resetLastForRLEIfNeeded() {
     if (!_rlePossible()) {
         _lastValueInPrevWord = 0;
     }
 }
 
-template <typename T>
-void Simple8bBuilder<T>::initializeRLEFrom(const Simple8bBuilder<T>& other) {
+template <typename T, class Allocator>
+void Simple8bBuilder<T, Allocator>::initializeRLEFrom(const Simple8bBuilder<T, Allocator>& other) {
     if (other._rlePossible()) {
         _lastValueInPrevWord = other._lastValueInPrevWord;
     }
 }
 
-template <typename T>
-boost::optional<typename Simple8bBuilder<T>::PendingValue>
-Simple8bBuilder<T>::_calculatePendingValue(T value) {
+template <typename T, class Allocator>
+boost::optional<typename Simple8bBuilder<T, Allocator>::PendingValue>
+Simple8bBuilder<T, Allocator>::_calculatePendingValue(T value) {
     using namespace simple8b_internal;
 
     // Early exit if we try to store max value. They are not handled when counting zeros.
@@ -338,9 +338,9 @@ Simple8bBuilder<T>::_calculatePendingValue(T value) {
                         zeroCount};
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
-bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle, F&& writeFn) {
+bool Simple8bBuilder<T, Allocator>::_appendValue(T value, bool tryRle, F&& writeFn) {
     auto pendingValue = _calculatePendingValue(value);
     if (!pendingValue) {
         return false;
@@ -377,9 +377,9 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle, F&& writeFn) {
     return true;
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
-void Simple8bBuilder<T>::_appendSkip(bool tryRle, F&& writeFn) {
+void Simple8bBuilder<T, Allocator>::_appendSkip(bool tryRle, F&& writeFn) {
     using namespace simple8b_internal;
 
     if (!_pendingValues.empty()) {
@@ -406,9 +406,9 @@ void Simple8bBuilder<T>::_appendSkip(bool tryRle, F&& writeFn) {
     _pendingValues.push_back({boost::none, {0, 0, 0, 0}, {0, 0, 0, 0}});
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
-void Simple8bBuilder<T>::_handleRleTermination(F&& writeFn) {
+void Simple8bBuilder<T, Allocator>::_handleRleTermination(F&& writeFn) {
     if (_rleCount == 0)
         return;
 
@@ -429,9 +429,9 @@ void Simple8bBuilder<T>::_handleRleTermination(F&& writeFn) {
     isSelectorPossible.fill(true);
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <class F>
-void Simple8bBuilder<T>::_appendRleEncoding(F&& writeFn) {
+void Simple8bBuilder<T, Allocator>::_appendRleEncoding(F&& writeFn) {
     using namespace simple8b_internal;
 
     // This encodes a value using rle. The selector is set as 15 and the count is added in the next
@@ -457,14 +457,14 @@ void Simple8bBuilder<T>::_appendRleEncoding(F&& writeFn) {
     }
 }
 
-template <typename T>
-bool Simple8bBuilder<T>::_rlePossible() const {
+template <typename T, class Allocator>
+bool Simple8bBuilder<T, Allocator>::_rlePossible() const {
     return _pendingValues.empty() || _rleCount != 0;
 }
 
 
-template <typename T>
-bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWord(const PendingValue& value) {
+template <typename T, class Allocator>
+bool Simple8bBuilder<T, Allocator>::_doesIntegerFitInCurrentWord(const PendingValue& value) {
     bool fitsInCurrentWord = false;
     for (uint8_t i = 0; i < kNumOfSelectorTypes; ++i) {
         if (isSelectorPossible[i]) {
@@ -478,8 +478,8 @@ bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWord(const PendingValue& value)
     return false;
 }
 
-template <typename T>
-bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWordWithGivenSelectorType(
+template <typename T, class Allocator>
+bool Simple8bBuilder<T, Allocator>::_doesIntegerFitInCurrentWordWithGivenSelectorType(
     const PendingValue& value, uint8_t extensionType) {
     using namespace simple8b_internal;
 
@@ -499,8 +499,8 @@ bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWordWithGivenSelectorType(
     return true;
 }
 
-template <typename T>
-int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
+template <typename T, class Allocator>
+int64_t Simple8bBuilder<T, Allocator>::_encodeLargestPossibleWord(uint8_t extensionType) {
     using namespace simple8b_internal;
 
     // Since this is always called right after _doesIntegerFitInCurrentWord fails for the first
@@ -536,9 +536,11 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
     return encodedWord;
 }
 
-template <typename T>
+template <typename T, class Allocator>
 template <typename Func>
-uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t extensionType) {
+uint64_t Simple8bBuilder<T, Allocator>::_encode(Func func,
+                                                uint8_t selectorIdx,
+                                                uint8_t extensionType) {
     using namespace simple8b_internal;
 
     uint8_t baseSelector = kExtensionToBaseSelector[extensionType][selectorIdx];
@@ -565,8 +567,8 @@ uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t ext
     return encodedWord;
 }
 
-template <typename T>
-void Simple8bBuilder<T>::_updateSimple8bCurrentState(const PendingValue& val) {
+template <typename T, class Allocator>
+void Simple8bBuilder<T, Allocator>::_updateSimple8bCurrentState(const PendingValue& val) {
     using namespace simple8b_internal;
 
     for (uint8_t i = 0; i < kNumOfSelectorTypes; ++i) {
@@ -574,30 +576,32 @@ void Simple8bBuilder<T>::_updateSimple8bCurrentState(const PendingValue& val) {
     }
 }
 
-template <typename T>
-typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::begin() const {
+template <typename T, class Allocator>
+typename Simple8bBuilder<T, Allocator>::PendingIterator Simple8bBuilder<T, Allocator>::begin()
+    const {
     return {_pendingValues.begin(), _pendingValues.begin(), _lastValueInPrevWord, _rleCount};
 }
 
-template <typename T>
-typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::end() const {
+template <typename T, class Allocator>
+typename Simple8bBuilder<T, Allocator>::PendingIterator Simple8bBuilder<T, Allocator>::end() const {
     return {_pendingValues.begin(), _pendingValues.end(), _lastValueInPrevWord, 0};
 }
 
-template <typename T>
-std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuilder<T>::rbegin()
-    const {
-    return std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator>(end());
+template <typename T, class Allocator>
+std::reverse_iterator<typename Simple8bBuilder<T, Allocator>::PendingIterator>
+Simple8bBuilder<T, Allocator>::rbegin() const {
+    return std::reverse_iterator<typename Simple8bBuilder<T, Allocator>::PendingIterator>(end());
 }
 
-template <typename T>
-std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuilder<T>::rend()
-    const {
-    return std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator>(begin());
+template <typename T, class Allocator>
+std::reverse_iterator<typename Simple8bBuilder<T, Allocator>::PendingIterator>
+Simple8bBuilder<T, Allocator>::rend() const {
+    return std::reverse_iterator<typename Simple8bBuilder<T, Allocator>::PendingIterator>(begin());
 }
 
-template <typename T>
-bool Simple8bBuilder<T>::isInternalStateIdentical(const Simple8bBuilder<T>& other) const {
+template <typename T, class Allocator>
+bool Simple8bBuilder<T, Allocator>::isInternalStateIdentical(
+    const Simple8bBuilder<T, Allocator>& other) const {
     // Verifies the pending values
     if (!std::equal(begin(), end(), other.begin(), other.end())) {
         return false;

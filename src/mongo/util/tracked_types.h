@@ -315,6 +315,26 @@ tracked_inlined_vector<T, N> make_tracked_inlined_vector(TrackingContext& tracki
     return tracked_inlined_vector<T, N>(trackingContext.makeAllocator<T>());
 }
 
+class TrackedBufBuilder : public BasicBufBuilder<TrackingSharedBufferAllocator> {
+public:
+    static constexpr size_t kDefaultInitSizeBytes = 512;
+    TrackedBufBuilder(TrackingAllocatorStats& stats, size_t size = kDefaultInitSizeBytes)
+        : BasicBufBuilder(stats, size) {}
+
+    TrackedBufBuilder(TrackingAllocator<void> allocator, size_t size = kDefaultInitSizeBytes)
+        : TrackedBufBuilder(allocator.getStats(), size) {}
+
+    SharedBuffer release() {
+        return _buf.release();
+    }
+};
+
+class UntrackedBufBuilder : public BufBuilder {
+public:
+    UntrackedBufBuilder(std::allocator<void> = {}, size_t size = kDefaultInitSizeBytes)
+        : BufBuilder(size) {}
+};
+
 class TrackableBSONObj {
 public:
     explicit TrackableBSONObj(BSONObj obj) : _obj(std::move(obj)) {
@@ -337,6 +357,7 @@ private:
     BSONObj _obj;
 };
 using TrackedBSONObj = Tracked<TrackableBSONObj>;
+using UntrackedBSONObj = Untracked<TrackableBSONObj>;
 
 inline TrackedBSONObj makeTrackedBson(TrackingContext& trackingContext, BSONObj obj) {
     return trackingContext.makeTracked(TrackableBSONObj{std::move(obj)});

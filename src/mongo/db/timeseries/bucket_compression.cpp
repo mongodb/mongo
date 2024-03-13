@@ -283,11 +283,11 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
         };
 
         BSONObjBuilder dataBuilder = builder.subobjStart(kBucketDataFieldName);
-        BufBuilder columnBuffer;  // Reusable buffer to avoid extra allocs per column.
+        UntrackedBufBuilder columnBuffer;  // Reusable buffer to avoid extra allocs per column.
 
         // Add compressed time field first
         {
-            BSONColumnBuilder timeColumn(std::move(columnBuffer));
+            BSONColumnBuilder<> timeColumn(std::move(columnBuffer));
             for (const auto& measurement : measurements) {
                 timeColumn.append(measurement.timeField);
             }
@@ -320,7 +320,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
 
         // Then add compressed data fields.
         for (size_t i = 0; i < columns.size(); ++i) {
-            BSONColumnBuilder column(std::move(columnBuffer));
+            BSONColumnBuilder<> column(std::move(columnBuffer));
             for (const auto& measurement : measurements) {
                 if (auto elem = measurement.dataFields[i]) {
                     column.append(elem);

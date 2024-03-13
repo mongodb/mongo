@@ -48,6 +48,8 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/platform/int128.h"
+#include "mongo/util/tracked_types.h"
+#include "mongo/util/tracking_context.h"
 
 namespace mongo {
 namespace bsoncolumn {
@@ -73,6 +75,7 @@ struct Element {
  * compression. When compressing Objects one Encoding state is used per sub-field within the
  * object to compress.
  */
+template <class BufBuilderType, class Allocator>
 struct EncodingState {
     struct Encoder64;
     struct Encoder128;
@@ -80,7 +83,7 @@ struct EncodingState {
     template <class F>
     class Simple8bBlockWriter128 {
     public:
-        Simple8bBlockWriter128(BufBuilder& buffer,
+        Simple8bBlockWriter128(BufBuilderType& buffer,
                                ptrdiff_t& controlByteOffset,
                                F controlBlockWriter)
             : _buffer(buffer),
@@ -90,7 +93,7 @@ struct EncodingState {
         void operator()(uint64_t block);
 
     private:
-        BufBuilder& _buffer;
+        BufBuilderType& _buffer;
         ptrdiff_t& _controlByteOffset;
         F _controlBlockWriter;
     };
@@ -99,7 +102,7 @@ struct EncodingState {
     class Simple8bBlockWriter64 {
     public:
         Simple8bBlockWriter64(Encoder64& encoder,
-                              BufBuilder& buffer,
+                              BufBuilderType& buffer,
                               ptrdiff_t& controlByteOffset,
                               BSONType type,
                               F controlBlockWriter)
@@ -113,7 +116,7 @@ struct EncodingState {
 
     private:
         Encoder64& _encoder;
-        BufBuilder& _buffer;
+        BufBuilderType& _buffer;
         ptrdiff_t& _controlByteOffset;
         BSONType _type;
         F _controlBlockWriter;
@@ -125,7 +128,7 @@ struct EncodingState {
 
     // Encoder state for 64bit types
     struct Encoder64 {
-        Encoder64();
+        explicit Encoder64(Allocator);
 
         // Initializes this encoder to uncompressed element to allow for future delta calculations.
         void initialize(Element elem);
@@ -134,34 +137,35 @@ struct EncodingState {
         template <class F>
         bool appendDelta(Element elem,
                          Element previous,
-                         BufBuilder& buffer,
+                         BufBuilderType& buffer,
                          ptrdiff_t& controlByteOffset,
-                         F controlBlockWriter);
+                         F controlBlockWriter,
+                         Allocator);
 
         // Appends encoded value to simple8b builder
         template <class F>
         bool append(BSONType type,
                     uint64_t value,
-                    BufBuilder& buffer,
+                    BufBuilderType& buffer,
                     ptrdiff_t& controlByteOffset,
                     F controlBlockWriter);
 
         // Appends skip to simple8b builder
         template <class F>
         void skip(BSONType type,
-                  BufBuilder& buffer,
+                  BufBuilderType& buffer,
                   ptrdiff_t& controlByteOffset,
                   F controlBlockWriter);
 
         // Flushes simple8b builder, causes all pending values to be written as blocks
         template <class F>
         void flush(BSONType type,
-                   BufBuilder& buffer,
+                   BufBuilderType& buffer,
                    ptrdiff_t& controlByteOffset,
                    F controlBlockWriter);
 
         // Simple-8b builder for storing compressed deltas
-        Simple8bBuilder<uint64_t> simple8bBuilder;
+        Simple8bBuilder<uint64_t, Allocator> simple8bBuilder;
         // Additional variables needed for tracking previous state
         int64_t prevDelta = 0;
         int64_t prevEncoded64 = 0;
@@ -174,19 +178,22 @@ struct EncodingState {
         template <class F>
         bool _appendDouble(double value,
                            double previous,
-                           BufBuilder& buffer,
+                           BufBuilderType& buffer,
                            ptrdiff_t& controlByteOffset,
-                           F controlBlockWriter);
+                           F controlBlockWriter,
+                           Allocator);
 
         // Tries to rescale current pending values + one additional value into a new
         // Simple8bBuilder. Returns the new Simple8bBuilder if rescaling was possible and none
         // otherwise.
-        boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
-                                                                      uint8_t newScaleIndex) const;
+        boost::optional<Simple8bBuilder<uint64_t, Allocator>> _tryRescalePending(
+            int64_t encoded, uint8_t newScaleIndex, Allocator) const;
     };
 
     // Encoder state for 128bit types
     struct Encoder128 {
+        explicit Encoder128(Allocator);
+
         // Initializes this encoder to uncompressed element to allow for future delta calculations.
         void initialize(Element elem);
 
@@ -194,80 +201,71 @@ struct EncodingState {
         template <class F>
         bool appendDelta(Element elem,
                          Element previous,
-                         BufBuilder& buffer,
+                         BufBuilderType& buffer,
                          ptrdiff_t& controlByteOffset,
-                         F controlBlockWriter);
+                         F controlBlockWriter,
+                         Allocator);
 
         // Appends encoded value to simple8b builder
         template <class F>
         bool append(BSONType type,
                     uint128_t value,
-                    BufBuilder& buffer,
+                    BufBuilderType& buffer,
                     ptrdiff_t& controlByteOffset,
                     F controlBlockWriter);
 
         // Appends skip to simple8b builder
         template <class F>
         void skip(BSONType type,
-                  BufBuilder& buffer,
+                  BufBuilderType& buffer,
                   ptrdiff_t& controlByteOffset,
                   F controlBlockWriter);
 
         // Flushes simple8b builder, causes all pending values to be written as blocks
         template <class F>
         void flush(BSONType type,
-                   BufBuilder& buffer,
+                   BufBuilderType& buffer,
                    ptrdiff_t& controlByteOffset,
                    F controlBlockWriter);
 
         // Simple-8b builder for storing compressed deltas
-        Simple8bBuilder<uint128_t> simple8bBuilder;
+        Simple8bBuilder<uint128_t, Allocator> simple8bBuilder;
         // Additional variables needed for previous state
         boost::optional<int128_t> prevEncoded128;
     };
 
-    EncodingState();
+    explicit EncodingState(Allocator);
 
     template <class F>
-    void append(Element elem, BufBuilder& buffer, F controlBlockWriter);
+    void append(Element elem, BufBuilderType& buffer, F controlBlockWriter, Allocator);
     template <class F>
-    void skip(BufBuilder& buffer, F controlBlockWriter);
+    void skip(BufBuilderType& buffer, F controlBlockWriter);
     template <class F>
-    void flush(BufBuilder& buffer, F controlBlockWriter);
+    void flush(BufBuilderType& buffer, F controlBlockWriter);
 
     template <class Encoder, class F>
-    void appendDelta(
-        Encoder& encoder, Element elem, Element previous, BufBuilder& buffer, F controlBlockWriter);
+    void appendDelta(Encoder& encoder,
+                     Element elem,
+                     Element previous,
+                     BufBuilderType& buffer,
+                     F controlBlockWriter,
+                     Allocator);
     Element _previous() const;
     void _storePrevious(Element elem);
     template <class F>
-    void _writeLiteralFromPrevious(BufBuilder& buffer, F controlBlockWriter);
-    void _initializeFromPrevious();
+    void _writeLiteralFromPrevious(BufBuilderType& buffer, F controlBlockWriter, Allocator);
+    void _initializeFromPrevious(Allocator);
     template <class F>
-    ptrdiff_t _incrementSimple8bCount(BufBuilder& buffer, F controlBlockWriter);
-
-    /**
-     * Copyable memory buffer
-     */
-    struct CloneableBuffer {
-        CloneableBuffer() = default;
-
-        CloneableBuffer(CloneableBuffer&&) = default;
-        CloneableBuffer(const CloneableBuffer&);
-
-        CloneableBuffer& operator=(CloneableBuffer&&) = default;
-        CloneableBuffer& operator=(const CloneableBuffer&);
-
-        std::unique_ptr<char[]> buffer;
-        int size = 0;
-        int capacity = 0;
-    };
+    ptrdiff_t _incrementSimple8bCount(BufBuilderType& buffer, F controlBlockWriter);
 
     // Encoders for 64bit and 128bit types.
     std::variant<Encoder64, Encoder128> _encoder;
 
     // Storage for the previously appended BSONElement
-    CloneableBuffer _prev;
+    std::basic_string<char,
+                      std::char_traits<char>,
+                      typename std::allocator_traits<Allocator>::template rebind_alloc<char>>
+        _prev;
 
     // Offset to last Simple-8b control byte
     std::ptrdiff_t _controlByteOffset;
@@ -277,10 +275,13 @@ struct EncodingState {
 /**
  * Class to build BSON Subtype 7 (Column) binaries.
  */
+template <class BufBuilderType = UntrackedBufBuilder,
+          class BSONObjType = UntrackedBSONObj,
+          class Allocator = std::allocator<void>>
 class BSONColumnBuilder {
 public:
-    BSONColumnBuilder();
-    explicit BSONColumnBuilder(BufBuilder builder);
+    explicit BSONColumnBuilder(Allocator = {});
+    BSONColumnBuilder(BufBuilderType, Allocator = {});
 
     /**
      * Initializes this BSONColumnBuilder from a BSONColumn binary. Leaves the BSONColumnBuilder in
@@ -290,7 +291,7 @@ public:
      *
      * finalize() may not be used after this constructor.
      */
-    BSONColumnBuilder(const char* binary, int size);
+    BSONColumnBuilder(const char* binary, int size, Allocator = {});
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.
@@ -389,7 +390,7 @@ public:
      * Detaches the buffer associated with this BSONColumnBuilder. Allows the memory to be reused
      * for building another BSONColumn.
      */
-    BufBuilder detach();
+    BufBuilderType detach();
 
     /**
      * Returns the number of interleaved start control bytes this BSONColumnBuilder has written.
@@ -429,56 +430,80 @@ private:
      * finalize.
      */
     struct InternalState {
-        InternalState();
+        explicit InternalState(Allocator);
+
+        // TODO (SERVER-87887): Use default copy constructor.
+        InternalState(InternalState&);
+        InternalState(InternalState&&) = default;
+
+        // TODO (SERVER-87887): Use default copy assignment operator.
+        InternalState& operator=(InternalState&);
+        InternalState& operator=(InternalState&&) = default;
+
+        MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator allocator;
 
         Mode mode = Mode::kRegular;
 
         // Encoding state for kRegular mode
-        bsoncolumn::EncodingState regular;
+        bsoncolumn::EncodingState<BufBuilderType, Allocator> regular;
 
         struct SubObjState {
+            using ControlBlock = std::pair<ptrdiff_t, size_t>;
+            using ControlBlockAllocator =
+                typename std::allocator_traits<Allocator>::template rebind_alloc<ControlBlock>;
+
             // We need to buffer all control blocks written by the EncodingStates
             // so they can be added to the main buffer in the right order.
             class InterleavedControlBlockWriter {
             public:
                 InterleavedControlBlockWriter(
-                    std::vector<std::pair<ptrdiff_t, size_t>>& controlBlocks);
+                    std::vector<ControlBlock, ControlBlockAllocator>& controlBlocks);
 
                 void operator()(ptrdiff_t, size_t);
 
             private:
-                std::vector<std::pair<ptrdiff_t, size_t>>& _controlBlocks;
+                std::vector<ControlBlock, ControlBlockAllocator>& _controlBlocks;
             };
 
-            SubObjState();
-            SubObjState(SubObjState&&);
+            explicit SubObjState(Allocator);
+
+            SubObjState(SubObjState&&) = default;
             SubObjState(const SubObjState&);
 
-            SubObjState& operator=(SubObjState&&);
+            SubObjState& operator=(SubObjState&&) = default;
             SubObjState& operator=(const SubObjState&);
 
-            bsoncolumn::EncodingState state;
-            BufBuilder buffer;
-            std::vector<std::pair<ptrdiff_t, size_t>> controlBlocks;
+            // TODO (SERVER-87887): Remove allocator.
+            MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator allocator;
+
+            bsoncolumn::EncodingState<BufBuilderType, Allocator> state;
+            BufBuilderType buffer;
+            std::vector<ControlBlock, ControlBlockAllocator> controlBlocks;
 
             InterleavedControlBlockWriter controlBlockWriter();
         };
 
         // Encoding states when in sub-object compression mode. There should be one encoding state
         // per scalar field in '_referenceSubObj'.
-        std::vector<SubObjState> subobjStates;
+        std::vector<SubObjState,
+                    typename std::allocator_traits<Allocator>::template rebind_alloc<SubObjState>>
+            subobjStates;
 
         // Reference object that is used to match object hierarchy to encoding states. Appending
         // objects for sub-object compression need to check their hierarchy against this object.
-        BSONObj referenceSubObj;
-        BSONType referenceSubObjType;
+        BSONObjType referenceSubObj;
+        BSONType referenceSubObjType = BSONType::EOO;
 
         // Buffered BSONObj when determining reference object. Will be compressed when this is
         // complete and we transition into kSubObjAppending.
-        std::vector<BSONObj> bufferedObjElements;
+        std::vector<BSONObj,
+                    typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObj>>
+            bufferedObjElements;
 
         // Helper to flatten Object to compress to match _subobjStates
-        std::vector<BSONElement> flattenedAppendedObj;
+        std::vector<BSONElement,
+                    typename std::allocator_traits<Allocator>::template rebind_alloc<BSONElement>>
+            flattenedAppendedObj;
 
         // Current offset of the binary relative to previous intermediate() calls.
         int offset = 0;
@@ -491,6 +516,11 @@ private:
 
     // Internal helper to perform reopen/initialization of this class from a BSONColumn binary.
     class BinaryReopen;
+
+    using NoopControlBlockWriter =
+        typename bsoncolumn::EncodingState<BufBuilderType, Allocator>::NoopControlBlockWriter;
+    using Encoder64 = typename bsoncolumn::EncodingState<BufBuilderType, Allocator>::Encoder64;
+    using Encoder128 = typename bsoncolumn::EncodingState<BufBuilderType, Allocator>::Encoder128;
 
     // Append helper for appending a BSONObj
     BSONColumnBuilder& _appendObj(bsoncolumn::Element elem);
@@ -510,9 +540,13 @@ private:
     InternalState _is;
 
     // Buffer for the BSON Column binary
-    BufBuilder _bufBuilder;
+    BufBuilderType _bufBuilder;
 
     int _numInterleavedStartWritten = 0;
 };
+
+// TODO (SERVER-87887): Remove typedef.
+using TrackedBSONColumnBuilder =
+    BSONColumnBuilder<TrackedBufBuilder, TrackedBSONObj, TrackingAllocator<void>>;
 
 }  // namespace mongo

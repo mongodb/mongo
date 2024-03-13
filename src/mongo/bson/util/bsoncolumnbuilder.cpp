@@ -69,8 +69,8 @@ static constexpr size_t kDefaultBufferSize = 32;
 static constexpr std::array<uint8_t, Simple8bTypeUtil::kMemoryAsInteger + 1>
     kControlByteForScaleIndex = {0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0x80};
 
-template <class F>
-ptrdiff_t incrementSimple8bCount(BufBuilder& buffer,
+template <class BufBuilderType, class F>
+ptrdiff_t incrementSimple8bCount(BufBuilderType& buffer,
                                  ptrdiff_t& controlByteOffset,
                                  uint8_t scaleIndex,
                                  F controlBlockWriter) {
@@ -353,7 +353,8 @@ BSONObj mergeObj(const BSONObj& reference, const BSONObj& obj) {
 
 }  // namespace
 
-class BSONColumnBuilder::BinaryReopen {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+class BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen {
 public:
     /*
      * Traverse compressed binary and perform the following two:
@@ -376,20 +377,20 @@ public:
      * Effectively undos the 'finalize()' call from the BSONColumnBuilder used to produce this
      * binary.
      */
-    void reopen(BSONColumnBuilder& builder) const;
+    void reopen(BSONColumnBuilder& builder, Allocator) const;
 
 private:
     /*
      * Performs the reopen for 64 and 128 bit types respectively.
      */
-    void _reopen64BitTypes(EncodingState& regular,
-                           EncodingState::Encoder64& encoder,
-                           BufBuilder& buffer,
+    void _reopen64BitTypes(EncodingState<BufBuilderType, Allocator>& regular,
+                           Encoder64& encoder,
+                           BufBuilderType& buffer,
                            int& offset,
                            uint8_t& lastControl) const;
-    void _reopen128BitTypes(EncodingState& regular,
-                            EncodingState::Encoder128& encoder,
-                            BufBuilder& buffer,
+    void _reopen128BitTypes(EncodingState<BufBuilderType, Allocator>& regular,
+                            Encoder128& encoder,
+                            BufBuilderType& buffer,
                             int& offset,
                             uint8_t& lastControl) const;
 
@@ -409,7 +410,7 @@ private:
      */
     template <typename T>
     static int _appendUntilOverflow(Simple8bBuilder<T>& overflowDetector,
-                                    Simple8bBuilder<T>& mainBuilder,
+                                    Simple8bBuilder<T, Allocator>& mainBuilder,
                                     bool& overflow,
                                     const boost::optional<T>& lastValForRLE,
                                     const char* s8bBlock,
@@ -421,7 +422,10 @@ private:
      */
     template <typename T>
     static std::pair<boost::optional<T>, int> _appendUntilOverflowForRLE(
-        Simple8bBuilder<T>& mainBuilder, bool& overflow, const char* s8bBlock, int index);
+        Simple8bBuilder<T, Allocator>& mainBuilder,
+        bool& overflow,
+        const char* s8bBlock,
+        int index);
 
     struct ControlBlock {
         const char* control = nullptr;
@@ -438,7 +442,9 @@ private:
     ControlBlock last;
 };
 
-bool BSONColumnBuilder::BinaryReopen::scan(const char* binary, int size) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::scan(
+    const char* binary, int size) {
     // Attempt to initialize the compressor from the provided binary, we have a fallback of full
     // decompress+recompress if anything unsupported is detected. This allows us to "support" the
     // full BSONColumn spec.
@@ -541,12 +547,13 @@ bool BSONColumnBuilder::BinaryReopen::scan(const char* binary, int size) {
     uasserted(8288102, "Unexpected end of BSONColumn binary");
 }
 
-void BSONColumnBuilder::BinaryReopen::reopen(BSONColumnBuilder& builder) const {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::reopen(
+    BSONColumnBuilder& builder, Allocator allocator) const {
     // When the binary ends with an uncompressed element it is simple to re-initialize the
     // compressor
     if (!current.control) {
-        EncodingState::Encoder64& encoder =
-            std::get<EncodingState::Encoder64>(builder._is.regular._encoder);
+        auto& encoder = std::get<Encoder64>(builder._is.regular._encoder);
         // Set last double in previous block (if any).
         encoder.lastValueInPrevBlock = last.lastAtEndOfBlock;
 
@@ -561,8 +568,7 @@ void BSONColumnBuilder::BinaryReopen::reopen(BSONColumnBuilder& builder) const {
     }
 
     if (!uses128bit(lastUncompressed.type())) {
-        EncodingState::Encoder64& encoder =
-            std::get<EncodingState::Encoder64>(builder._is.regular._encoder);
+        auto& encoder = std::get<Encoder64>(builder._is.regular._encoder);
         encoder.scaleIndex = current.scaleIndex;
 
         _reopen64BitTypes(builder._is.regular,
@@ -571,8 +577,7 @@ void BSONColumnBuilder::BinaryReopen::reopen(BSONColumnBuilder& builder) const {
                           builder._is.offset,
                           builder._is.lastControl);
     } else {
-        EncodingState::Encoder128& encoder =
-            builder._is.regular._encoder.emplace<EncodingState::Encoder128>();
+        auto& encoder = builder._is.regular._encoder.template emplace<Encoder128>(allocator);
         _reopen128BitTypes(builder._is.regular,
                            encoder,
                            builder._bufBuilder,
@@ -583,11 +588,13 @@ void BSONColumnBuilder::BinaryReopen::reopen(BSONColumnBuilder& builder) const {
     builder._is.lastBufLength = builder._bufBuilder.len();
 }
 
-void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
-                                                        EncodingState::Encoder64& encoder,
-                                                        BufBuilder& buffer,
-                                                        int& offset,
-                                                        uint8_t& lastControl) const {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_reopen64BitTypes(
+    EncodingState<BufBuilderType, Allocator>& regular,
+    Encoder64& encoder,
+    BufBuilderType& buffer,
+    int& offset,
+    uint8_t& lastControl) const {
     // The main difficulty with re-initializing the compressor from a compressed binary is
     // to undo the 'finalize()' call where pending values are flushed out to simple8b
     // blocks. We need to undo this operation by putting values back into the pending state.
@@ -728,16 +735,10 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
     auto appendPending = [&](const Simple8b<uint64_t>& s8b) {
         for (auto&& elem : s8b) {
             if (elem) {
-                encoder.append(type,
-                               *elem,
-                               buffer,
-                               regular._controlByteOffset,
-                               EncodingState::NoopControlBlockWriter{});
+                encoder.append(
+                    type, *elem, buffer, regular._controlByteOffset, NoopControlBlockWriter{});
             } else {
-                encoder.skip(type,
-                             buffer,
-                             regular._controlByteOffset,
-                             EncodingState::NoopControlBlockWriter{});
+                encoder.skip(type, buffer, regular._controlByteOffset, NoopControlBlockWriter{});
             }
         }
     };
@@ -828,11 +829,13 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
     }
 }
 
-void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
-                                                         EncodingState::Encoder128& encoder,
-                                                         BufBuilder& buffer,
-                                                         int& offset,
-                                                         uint8_t& lastControl) const {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_reopen128BitTypes(
+    EncodingState<BufBuilderType, Allocator>& regular,
+    Encoder128& encoder,
+    BufBuilderType& buffer,
+    int& offset,
+    uint8_t& lastControl) const {
     // The main difficulty with re-initializing the compressor from a compressed binary is
     // to undo the 'finalize()' call where pending values are flushed out to simple8b
     // blocks. We need to undo this operation by putting values back into the pending state.
@@ -937,12 +940,12 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
                                *elem,
                                buffer,
                                regular._controlByteOffset,
-                               EncodingState::NoopControlBlockWriter{});
+                               NoopControlBlockWriter{});
             } else {
                 encoder.skip(lastUncompressed.type(),
                              buffer,
                              regular._controlByteOffset,
-                             EncodingState::NoopControlBlockWriter{});
+                             NoopControlBlockWriter{});
             }
         }
     };
@@ -989,9 +992,12 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
     }
 }
 
+template <class BufBuilderType, class BSONObjType, class Allocator>
 template <typename T>
-boost::optional<T> BSONColumnBuilder::BinaryReopen::_setupRLEForOverflowDetector(
-    Simple8bBuilder<T>& overflowDetector, const char* s8bBlock, int index) {
+boost::optional<T> BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::
+    _setupRLEForOverflowDetector(Simple8bBuilder<T>& overflowDetector,
+                                 const char* s8bBlock,
+                                 int index) {
     for (; index >= 0; --index) {
         const char* block = s8bBlock + sizeof(uint64_t) * index + 1;
         bool rle = (ConstDataView(block).read<LittleEndian<uint64_t>>() &
@@ -1022,13 +1028,15 @@ boost::optional<T> BSONColumnBuilder::BinaryReopen::_setupRLEForOverflowDetector
     return boost::none;
 }
 
+template <class BufBuilderType, class BSONObjType, class Allocator>
 template <typename T>
-int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& overflowDetector,
-                                                          Simple8bBuilder<T>& mainBuilder,
-                                                          bool& overflow,
-                                                          const boost::optional<T>& lastValForRLE,
-                                                          const char* s8bBlock,
-                                                          int index) {
+int BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_appendUntilOverflow(
+    Simple8bBuilder<T>& overflowDetector,
+    Simple8bBuilder<T, Allocator>& mainBuilder,
+    bool& overflow,
+    const boost::optional<T>& lastValForRLE,
+    const char* s8bBlock,
+    int index) {
     auto writeFn = [&overflow](uint64_t block) mutable {
         overflow = true;
     };
@@ -1059,9 +1067,11 @@ int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& ov
     return index;
 }
 
+template <class BufBuilderType, class BSONObjType, class Allocator>
 template <typename T>
-std::pair<boost::optional<T>, int> BSONColumnBuilder::BinaryReopen::_appendUntilOverflowForRLE(
-    Simple8bBuilder<T>& mainBuilder, bool& overflow, const char* s8bBlock, int index) {
+std::pair<boost::optional<T>, int>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_appendUntilOverflowForRLE(
+    Simple8bBuilder<T, Allocator>& mainBuilder, bool& overflow, const char* s8bBlock, int index) {
     for (; index >= 0; --index) {
         const char* block = s8bBlock +
             /* offset to block at index */ index * sizeof(uint64_t) +
@@ -1093,16 +1103,70 @@ std::pair<boost::optional<T>, int> BSONColumnBuilder::BinaryReopen::_appendUntil
     return std::make_pair(boost::none, index);
 }
 
-BSONColumnBuilder::InternalState::InternalState() : lastControl(bsoncolumn::kInvalidControlByte) {}
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::InternalState(Allocator a)
+    : allocator(a),
+      regular(allocator),
+      subobjStates(allocator),
+      referenceSubObj(TrackableBSONObj{BSONObj{}}, allocator),
+      bufferedObjElements(allocator),
+      flattenedAppendedObj(allocator),
+      lastControl(bsoncolumn::kInvalidControlByte) {}
 
-BSONColumnBuilder::BSONColumnBuilder() : BSONColumnBuilder(BufBuilder(kDefaultBufferSize)) {}
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::InternalState(
+    InternalState& other)
+    : allocator(other.allocator),
+      mode(other.mode),
+      regular(other.regular),
+      subobjStates(other.subobjStates),
+      referenceSubObj(TrackableBSONObj{other.referenceSubObj.get().get()}, allocator),
+      referenceSubObjType(other.referenceSubObjType),
+      bufferedObjElements(other.bufferedObjElements),
+      flattenedAppendedObj(other.flattenedAppendedObj),
+      offset(other.offset),
+      lastBufLength(other.lastBufLength),
+      lastControl(other.lastControl) {}
 
-BSONColumnBuilder::BSONColumnBuilder(BufBuilder builder) : _bufBuilder(std::move(builder)) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::operator=(
+    InternalState& other) {
+    if (&other == this) {
+        return *this;
+    }
+
+    allocator = other.allocator;
+    mode = other.mode;
+    regular = other.regular;
+    subobjStates = other.subobjStates;
+    referenceSubObj = {TrackableBSONObj{other.referenceSubObj.get().get()}, allocator};
+    referenceSubObjType = other.referenceSubObjType;
+    bufferedObjElements = other.bufferedObjElements;
+    flattenedAppendedObj = other.flattenedAppendedObj;
+    offset = other.offset;
+    lastBufLength = other.lastBufLength;
+    lastControl = other.lastControl;
+
+    return *this;
+}
+
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BSONColumnBuilder(Allocator allocator)
+    : BSONColumnBuilder(BufBuilderType{allocator, kDefaultBufferSize}, allocator) {}
+
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BSONColumnBuilder(BufBuilderType builder,
+                                                                             Allocator allocator)
+    : _is(allocator), _bufBuilder(std::move(builder)) {
     _bufBuilder.reset();
 }
 
-BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
-    : BSONColumnBuilder(BufBuilder(kDefaultBufferSize)) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BSONColumnBuilder(const char* binary,
+                                                                             int size,
+                                                                             Allocator allocator)
+    : BSONColumnBuilder(BufBuilderType{allocator, kDefaultBufferSize}, allocator) {
     using namespace bsoncolumn;
 
     // Handle empty case
@@ -1114,11 +1178,11 @@ BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
 
     BinaryReopen helper;
 
-    // Handle interleaved mode separately. Fully reset this BSONColumnBuilder and then decompress
-    // and append all data.
+    // Handle interleaved mode separately. Fully reset this BSONColumnBuilder and then
+    // decompress and append all data.
     if (!helper.scan(binary, size)) {
         _bufBuilder.reset();
-        _is.regular = {};
+        _is.regular = EncodingState<BufBuilderType, Allocator>{allocator};
 
         BSONColumn decompressor(binary, size);
         for (auto&& elem : decompressor) {
@@ -1129,10 +1193,12 @@ BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
     }
 
     // Perform the reopen from the scanned state
-    helper.reopen(*this);
+    helper.reopen(*this, _is.allocator);
 }
 
-BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::append(BSONElement elem) {
     auto type = elem.type();
     if (elem.eoo()) {
         return skip();
@@ -1143,28 +1209,35 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         if (_is.mode != Mode::kRegular) {
             _flushSubObjMode();
         }
-        _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
+        _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
         return *this;
     }
 
     return _appendObj(elem);
 }
 
-BSONColumnBuilder& BSONColumnBuilder::append(const BSONObj& obj) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::append(const BSONObj& obj) {
     return _appendObj({obj, Object});
 }
-BSONColumnBuilder& BSONColumnBuilder::append(const BSONArray& arr) {
+
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::append(const BSONArray& arr) {
     return _appendObj({arr, Array});
 }
 
-BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element elem) {
     auto type = elem.type;
     auto obj = elem.value.Obj();
     bool containsScalars = _containsScalars(obj);
 
     if (_is.mode == Mode::kRegular) {
         if (!containsScalars) {
-            _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
+            _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -1187,9 +1260,9 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
                                                                    const BSONElement& elem) {
             ++numElementsReferenceObj;
         };
-        if (!traverseLockStep(_is.referenceSubObj, obj, perElementLockStep)) {
+        if (!traverseLockStep(_is.referenceSubObj.get().get(), obj, perElementLockStep)) {
             BSONObj merged = [&] {
-                return mergeObj(_is.referenceSubObj, obj);
+                return mergeObj(_is.referenceSubObj.get().get(), obj);
             }();
             if (merged.isEmptyPrototype()) {
                 // If merge failed, flush current sub-object compression and start over.
@@ -1198,16 +1271,16 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
                 // If we only contain empty subobj (no value elements) then append in regular mode
                 // instead of re-starting subobj compression.
                 if (!containsScalars) {
-                    _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
+                    _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
                     return *this;
                 }
 
-                _is.referenceSubObj = obj.getOwned();
-                _is.bufferedObjElements.push_back(_is.referenceSubObj);
+                _is.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
+                _is.bufferedObjElements.push_back(_is.referenceSubObj.get().get());
                 _is.mode = Mode::kSubObjDeterminingReference;
                 return *this;
             }
-            _is.referenceSubObj = merged;
+            _is.referenceSubObj = {TrackableBSONObj{merged}, _is.allocator};
         }
 
         // If we've buffered twice as many objects as we have sub-elements we will achieve good
@@ -1225,7 +1298,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
         // If we were not compatible restart subobj compression unless our object contain no value
         // fields (just empty subobjects)
         if (!containsScalars) {
-            _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
+            _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -1233,16 +1306,17 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
     return *this;
 }
 
-
-BSONColumnBuilder& BSONColumnBuilder::skip() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::skip() {
     if (_is.mode == Mode::kRegular) {
-        _is.regular.skip(_bufBuilder, EncodingState::NoopControlBlockWriter{});
+        _is.regular.skip(_bufBuilder, NoopControlBlockWriter{});
         return *this;
     }
 
     // If the reference object contain any empty subobjects we need to end interleaved mode as
     // skipping in all substreams would not be encoded as skipped root object.
-    if (_hasEmptyObj(_is.referenceSubObj)) {
+    if (_hasEmptyObj(_is.referenceSubObj.get().get())) {
         _flushSubObjMode();
         return skip();
     }
@@ -1258,7 +1332,9 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
     return *this;
 }
 
-BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryDiff
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::intermediate() {
     // If we are finalized it is not possible to calculate an intermediate diff
     invariant(_is.offset != kFinalizedOffset);
 
@@ -1283,18 +1359,18 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
     // Copy data into new buffer that we need to keep in the builder. If we have no control byte in
     // regular mode we're currently writing on, then we can consume the entire binary. Otherwise we
     // can only consume up to this control byte as it may change in the future.
-    BufBuilder buffer = [&]() {
+    auto buffer = [&]() {
         if (controlOffset == kNoSimple8bControl) {
             newState.offset += length;
             newState.lastControl = kInvalidControlByte;
             newState.lastBufLength = 0;
-            return BufBuilder(/*initsize=*/0);
+            return BufBuilderType{_is.allocator, 0};
         }
 
         // After calling intermediate, the control byte we're currently working on need to be the
         // first byte in the new binary going forward. This is the first byte that may change when
         // more data is appended.
-        BufBuilder buffer(length - controlOffset);
+        auto buffer = BufBuilderType{_is.allocator, static_cast<size_t>(length - controlOffset)};
         buffer.appendChar(lastControlByte);
         buffer.appendBuf(_bufBuilder.buf() + controlOffset + 1, length - controlOffset - 1);
         newState.regular._controlByteOffset = 0;
@@ -1335,12 +1411,13 @@ BSONColumnBuilder::BinaryDiff BSONColumnBuilder::intermediate() {
     return {buffer.release(), bufSize, identicalBytes, prevOffset + identicalBytes};
 }
 
-BSONBinData BSONColumnBuilder::finalize() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONBinData BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::finalize() {
     // We may only finalize when we have the full binary
     invariant(_is.offset == 0);
 
     if (_is.mode == Mode::kRegular) {
-        _is.regular.flush(_bufBuilder, EncodingState::NoopControlBlockWriter{});
+        _is.regular.flush(_bufBuilder, NoopControlBlockWriter{});
     } else {
         _flushSubObjMode();
     }
@@ -1353,22 +1430,25 @@ BSONBinData BSONColumnBuilder::finalize() {
     return {_bufBuilder.buf(), _bufBuilder.len(), BinDataType::Column};
 }
 
-BufBuilder BSONColumnBuilder::detach() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BufBuilderType BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::detach() {
     return std::move(_bufBuilder);
 }
 
-int BSONColumnBuilder::numInterleavedStartWritten() const {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+int BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::numInterleavedStartWritten() const {
     return _numInterleavedStartWritten;
 }
 
-BSONElement BSONColumnBuilder::last() const {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONElement BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::last() const {
     if (_is.mode != Mode::kRegular) {
         return {};
     }
 
-    return BSONElement(_is.regular._prev.buffer.get(),
+    return BSONElement(_is.regular._prev.data(),
                        /*field name size including null terminator*/ 1,
-                       /*total size*/ _is.regular._prev.size,
+                       /*total size*/ _is.regular._prev.size(),
                        BSONElement::TrustedInitTag{});
 }
 
@@ -1380,9 +1460,12 @@ bool Element::operator==(const Element& rhs) const {
     return memcmp(value.value(), rhs.value.value(), size) == 0;
 }
 
-EncodingState::Encoder64::Encoder64() : scaleIndex(Simple8bTypeUtil::kMemoryAsInteger) {}
+template <class BufBuilderType, class Allocator>
+EncodingState<BufBuilderType, Allocator>::Encoder64::Encoder64(Allocator allocator)
+    : simple8bBuilder(allocator), scaleIndex(Simple8bTypeUtil::kMemoryAsInteger) {}
 
-void EncodingState::Encoder64::initialize(Element elem) {
+template <class BufBuilderType, class Allocator>
+void EncodingState<BufBuilderType, Allocator>::Encoder64::initialize(Element elem) {
     switch (elem.type) {
         case NumberDouble: {
             lastValueInPrevBlock = elem.value.Double();
@@ -1396,12 +1479,14 @@ void EncodingState::Encoder64::initialize(Element elem) {
     }
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-bool EncodingState::Encoder64::appendDelta(Element elem,
-                                           Element previous,
-                                           BufBuilder& buffer,
-                                           ptrdiff_t& controlByteOffset,
-                                           F controlBlockWriter) {
+bool EncodingState<BufBuilderType, Allocator>::Encoder64::appendDelta(Element elem,
+                                                                      Element previous,
+                                                                      BufBuilderType& buffer,
+                                                                      ptrdiff_t& controlByteOffset,
+                                                                      F controlBlockWriter,
+                                                                      Allocator allocator) {
     // Variable to indicate that it was possible to encode this BSONElement as an integer
     // for storage inside Simple8b. If encoding is not possible the element is stored as
     // uncompressed.
@@ -1414,7 +1499,8 @@ bool EncodingState::Encoder64::appendDelta(Element elem,
                                  previous.value.Double(),
                                  buffer,
                                  controlByteOffset,
-                                 controlBlockWriter);
+                                 controlBlockWriter,
+                                 allocator);
         case NumberInt:
             value = calcDelta(elem.value.Int32(), previous.value.Int32());
             break;
@@ -1474,36 +1560,44 @@ bool EncodingState::Encoder64::appendDelta(Element elem,
     return false;
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-bool EncodingState::Encoder64::append(BSONType type,
-                                      uint64_t value,
-                                      BufBuilder& buffer,
-                                      ptrdiff_t& controlByteOffset,
-                                      F controlBlockWriter) {
+bool EncodingState<BufBuilderType, Allocator>::Encoder64::append(BSONType type,
+                                                                 uint64_t value,
+                                                                 BufBuilderType& buffer,
+                                                                 ptrdiff_t& controlByteOffset,
+                                                                 F controlBlockWriter) {
     return simple8bBuilder.append(
         value,
         Simple8bBlockWriter64<F>(*this, buffer, controlByteOffset, type, controlBlockWriter));
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::Encoder64::skip(BSONType type,
-                                    BufBuilder& buffer,
-                                    ptrdiff_t& controlByteOffset,
-                                    F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::Encoder64::skip(BSONType type,
+                                                               BufBuilderType& buffer,
+                                                               ptrdiff_t& controlByteOffset,
+                                                               F controlBlockWriter) {
     simple8bBuilder.skip(
         Simple8bBlockWriter64<F>(*this, buffer, controlByteOffset, type, controlBlockWriter));
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::Encoder64::flush(BSONType type,
-                                     BufBuilder& buffer,
-                                     ptrdiff_t& controlByteOffset,
-                                     F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::Encoder64::flush(BSONType type,
+                                                                BufBuilderType& buffer,
+                                                                ptrdiff_t& controlByteOffset,
+                                                                F controlBlockWriter) {
     simple8bBuilder.flush(
         Simple8bBlockWriter64<F>(*this, buffer, controlByteOffset, type, controlBlockWriter));
 }
 
-void EncodingState::Encoder128::initialize(Element elem) {
+template <class BufBuilderType, class Allocator>
+EncodingState<BufBuilderType, Allocator>::Encoder128::Encoder128(Allocator allocator)
+    : simple8bBuilder(allocator) {}
+
+template <class BufBuilderType, class Allocator>
+void EncodingState<BufBuilderType, Allocator>::Encoder128::initialize(Element elem) {
     switch (elem.type) {
         case String:
         case Code: {
@@ -1522,12 +1616,14 @@ void EncodingState::Encoder128::initialize(Element elem) {
     }
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-bool EncodingState::Encoder128::appendDelta(Element elem,
-                                            Element previous,
-                                            BufBuilder& buffer,
-                                            ptrdiff_t& controlByteOffset,
-                                            F controlBlockWriter) {
+bool EncodingState<BufBuilderType, Allocator>::Encoder128::appendDelta(Element elem,
+                                                                       Element previous,
+                                                                       BufBuilderType& buffer,
+                                                                       ptrdiff_t& controlByteOffset,
+                                                                       F controlBlockWriter,
+                                                                       Allocator) {
     auto appendEncoded = [&](int128_t encoded) {
         // If previous wasn't encodable we cannot store 0 in Simple8b as that would create
         // an ambiguity between 0 and repeat of previous
@@ -1575,39 +1671,50 @@ bool EncodingState::Encoder128::appendDelta(Element elem,
     return false;
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-bool EncodingState::Encoder128::append(BSONType type,
-                                       uint128_t value,
-                                       BufBuilder& buffer,
-                                       ptrdiff_t& controlByteOffset,
-                                       F controlBlockWriter) {
+bool EncodingState<BufBuilderType, Allocator>::Encoder128::append(BSONType type,
+                                                                  uint128_t value,
+                                                                  BufBuilderType& buffer,
+                                                                  ptrdiff_t& controlByteOffset,
+                                                                  F controlBlockWriter) {
     return simple8bBuilder.append(
         value, Simple8bBlockWriter128<F>(buffer, controlByteOffset, controlBlockWriter));
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::Encoder128::skip(BSONType type,
-                                     BufBuilder& buffer,
-                                     ptrdiff_t& controlByteOffset,
-                                     F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::Encoder128::skip(BSONType type,
+                                                                BufBuilderType& buffer,
+                                                                ptrdiff_t& controlByteOffset,
+                                                                F controlBlockWriter) {
     simple8bBuilder.skip(Simple8bBlockWriter128<F>(buffer, controlByteOffset, controlBlockWriter));
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::Encoder128::flush(BSONType type,
-                                      BufBuilder& buffer,
-                                      ptrdiff_t& controlByteOffset,
-                                      F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::Encoder128::flush(BSONType type,
+                                                                 BufBuilderType& buffer,
+                                                                 ptrdiff_t& controlByteOffset,
+                                                                 F controlBlockWriter) {
     simple8bBuilder.flush(Simple8bBlockWriter128<F>(buffer, controlByteOffset, controlBlockWriter));
 }
 
-EncodingState::EncodingState() : _controlByteOffset(kNoSimple8bControl) {
+template <class BufBuilderType, class Allocator>
+EncodingState<BufBuilderType, Allocator>::EncodingState(Allocator allocator)
+    : _encoder(std::in_place_type<Encoder64>, allocator),
+      _prev(allocator),
+      _controlByteOffset(kNoSimple8bControl) {
     // Store EOO type with empty field name as previous.
     _storePrevious(BSONElement());
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::append(Element elem, BufBuilder& buffer, F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::append(Element elem,
+                                                      BufBuilderType& buffer,
+                                                      F controlBlockWriter,
+                                                      Allocator allocator) {
     auto type = elem.type;
     auto previous = _previous();
 
@@ -1621,17 +1728,25 @@ void EncodingState::append(Element elem, BufBuilder& buffer, F controlBlockWrite
             },
             _encoder);
 
-        _writeLiteralFromPrevious(buffer, controlBlockWriter);
+        _writeLiteralFromPrevious(buffer, controlBlockWriter, allocator);
         return;
     }
 
-    visit([&](auto& encoder) { appendDelta(encoder, elem, previous, buffer, controlBlockWriter); },
-          _encoder);
+    visit(
+        [&](auto& encoder) {
+            appendDelta(encoder, elem, previous, buffer, controlBlockWriter, allocator);
+        },
+        _encoder);
 }
 
+template <class BufBuilderType, class Allocator>
 template <class Encoder, class F>
-void EncodingState::appendDelta(
-    Encoder& encoder, Element elem, Element previous, BufBuilder& buffer, F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::appendDelta(Encoder& encoder,
+                                                           Element elem,
+                                                           Element previous,
+                                                           BufBuilderType& buffer,
+                                                           F controlBlockWriter,
+                                                           Allocator allocator) {
     auto type = elem.type;
     // Store delta in Simple-8b if types match
     bool compressed = !usesDeltaOfDelta(type) && elem == previous;
@@ -1640,20 +1755,21 @@ void EncodingState::appendDelta(
     }
 
     if (!compressed) {
-        compressed =
-            encoder.appendDelta(elem, previous, buffer, _controlByteOffset, controlBlockWriter);
+        compressed = encoder.appendDelta(
+            elem, previous, buffer, _controlByteOffset, controlBlockWriter, allocator);
     }
     _storePrevious(elem);
 
     // Store uncompressed literal if value is outside of range of encodable values.
     if (!compressed) {
         encoder.flush(type, buffer, _controlByteOffset, controlBlockWriter);
-        _writeLiteralFromPrevious(buffer, controlBlockWriter);
+        _writeLiteralFromPrevious(buffer, controlBlockWriter, allocator);
     }
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::skip(BufBuilder& buffer, F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::skip(BufBuilderType& buffer, F controlBlockWriter) {
     auto before = buffer.len();
     visit(
         [&](auto& encoder) {
@@ -1669,8 +1785,9 @@ void EncodingState::skip(BufBuilder& buffer, F controlBlockWriter) {
     }
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::flush(BufBuilder& buffer, F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::flush(BufBuilderType& buffer, F controlBlockWriter) {
     visit(
         [&](auto& encoder) {
             encoder.flush(_previous().type, buffer, _controlByteOffset, controlBlockWriter);
@@ -1682,8 +1799,11 @@ void EncodingState::flush(BufBuilder& buffer, F controlBlockWriter) {
     }
 }
 
-boost::optional<Simple8bBuilder<uint64_t>> EncodingState::Encoder64::_tryRescalePending(
-    int64_t encoded, uint8_t newScaleIndex) const {
+template <class BufBuilderType, class Allocator>
+boost::optional<Simple8bBuilder<uint64_t, Allocator>>
+EncodingState<BufBuilderType, Allocator>::Encoder64::_tryRescalePending(int64_t encoded,
+                                                                        uint8_t newScaleIndex,
+                                                                        Allocator allocator) const {
     // Encode last value in the previous block with old and new scale index. We know that scaling
     // with the old index is possible.
     int64_t prev = *Simple8bTypeUtil::encodeDouble(lastValueInPrevBlock, scaleIndex);
@@ -1701,7 +1821,7 @@ boost::optional<Simple8bBuilder<uint64_t>> EncodingState::Encoder64::_tryRescale
     auto writeFn = [&possible](uint64_t block) {
         possible = false;
     };
-    Simple8bBuilder<uint64_t> builder;
+    Simple8bBuilder<uint64_t, Allocator> builder{allocator};
 
     // Iterate over our pending values, decode them back into double, rescale and append to our new
     // Simple8b builder
@@ -1743,12 +1863,15 @@ boost::optional<Simple8bBuilder<uint64_t>> EncodingState::Encoder64::_tryRescale
     return builder;
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-bool EncodingState::Encoder64::_appendDouble(double value,
-                                             double previous,
-                                             BufBuilder& buffer,
-                                             ptrdiff_t& controlByteOffset,
-                                             F controlBlockWriter) {
+bool EncodingState<BufBuilderType, Allocator>::Encoder64::_appendDouble(
+    double value,
+    double previous,
+    BufBuilderType& buffer,
+    ptrdiff_t& controlByteOffset,
+    F controlBlockWriter,
+    Allocator allocator) {
     // Scale with lowest possible scale index
     auto [encoded, scale] = scaleAndEncodeDouble(value, scaleIndex);
 
@@ -1757,7 +1880,7 @@ bool EncodingState::Encoder64::_appendDouble(double value,
         // (1) Re-scale pending values to use this larger scale factor
         // (2) Flush pending and start a new block with this higher scale factor
         // We try both options and select the one that compresses best
-        auto rescaled = _tryRescalePending(encoded, scale);
+        auto rescaled = _tryRescalePending(encoded, scale, allocator);
         if (rescaled) {
             // Re-scale possible, use this Simple8b builder
             std::swap(simple8bBuilder, *rescaled);
@@ -1806,7 +1929,7 @@ bool EncodingState::Encoder64::_appendDouble(double value,
     std::tie(prevEncoded64, scaleIndex) = scaleAndEncodeDouble(lastValueInPrevBlock, 0);
 
     // Create a new Simple8bBuilder.
-    Simple8bBuilder<uint64_t> builder;
+    Simple8bBuilder<uint64_t, Allocator> builder{allocator};
     builder.initializeRLEFrom(simple8bBuilder);
     std::swap(simple8bBuilder, builder);
 
@@ -1819,7 +1942,7 @@ bool EncodingState::Encoder64::_appendDouble(double value,
         if (pending) {
             prevEncoded = expandDelta(prevEncoded, Simple8bTypeUtil::decodeInt64(*pending));
             auto val = Simple8bTypeUtil::decodeDouble(prevEncoded, prevScale);
-            _appendDouble(val, prev, buffer, controlByteOffset, controlBlockWriter);
+            _appendDouble(val, prev, buffer, controlByteOffset, controlBlockWriter, allocator);
             prev = val;
         } else {
             skip(NumberDouble, buffer, controlByteOffset, controlBlockWriter);
@@ -1828,60 +1951,61 @@ bool EncodingState::Encoder64::_appendDouble(double value,
     return true;
 }
 
-Element EncodingState::_previous() const {
+template <class BufBuilderType, class Allocator>
+Element EncodingState<BufBuilderType, Allocator>::_previous() const {
     // The first two bytes are type and field name null terminator
-    return {static_cast<BSONType>(static_cast<signed char>(*_prev.buffer.get())),
-            BSONElementValue(_prev.buffer.get() + 2),
-            _prev.size - 2};
+    return {static_cast<BSONType>(static_cast<signed char>(*_prev.data())),
+            BSONElementValue(_prev.data() + 2),
+            static_cast<int>(_prev.size() - 2)};
 }
 
-void EncodingState::_storePrevious(Element elem) {
+template <class BufBuilderType, class Allocator>
+void EncodingState<BufBuilderType, Allocator>::_storePrevious(Element elem) {
     // Add space for type byte and field name null terminator
     auto size = elem.size + 2;
-
-    // Re-allocate buffer if not large enough
-    if (size > _prev.capacity) {
-        _prev.capacity = size;
-        _prev.buffer = std::make_unique<char[]>(_prev.capacity);
-
-        // Store null terminator, this byte will never change
-        _prev.buffer[1] = '\0';
-    }
+    _prev.resize(size);
 
     // Copy element into buffer for previous. Omit field name.
-    _prev.buffer[0] = elem.type;
-    memcpy(_prev.buffer.get() + 2, elem.value.value(), elem.size);
-    _prev.size = size;
+    _prev[0] = elem.type;
+    // Store null terminator, this byte will never change
+    _prev[1] = '\0';
+    memcpy(_prev.data() + 2, elem.value.value(), elem.size);
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::_writeLiteralFromPrevious(BufBuilder& buffer, F controlBlockWriter) {
+void EncodingState<BufBuilderType, Allocator>::_writeLiteralFromPrevious(BufBuilderType& buffer,
+                                                                         F controlBlockWriter,
+                                                                         Allocator allocator) {
     // Write literal without field name and reset control byte to force new one to be written when
     // appending next value.
     if (_controlByteOffset != kNoSimple8bControl) {
         controlBlockWriter(_controlByteOffset, buffer.len() - _controlByteOffset);
     }
-    buffer.appendBuf(_prev.buffer.get(), _prev.size);
-    controlBlockWriter(buffer.len() - _prev.size, _prev.size);
+    buffer.appendBuf(_prev.data(), _prev.size());
+    controlBlockWriter(buffer.len() - _prev.size(), _prev.size());
 
     // Reset state
     _controlByteOffset = kNoSimple8bControl;
 
-    _initializeFromPrevious();
+    _initializeFromPrevious(allocator);
 }
 
-void EncodingState::_initializeFromPrevious() {
+template <class BufBuilderType, class Allocator>
+void EncodingState<BufBuilderType, Allocator>::_initializeFromPrevious(Allocator allocator) {
     // Initialize previous encoded when needed
     auto previous = _previous();
     if (uses128bit(previous.type)) {
-        _encoder.emplace<Encoder128>().initialize(previous);
+        _encoder.template emplace<Encoder128>(allocator).initialize(previous);
     } else {
-        _encoder.emplace<Encoder64>().initialize(previous);
+        _encoder.template emplace<Encoder64>(allocator).initialize(previous);
     }
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-ptrdiff_t EncodingState::_incrementSimple8bCount(BufBuilder& buffer, F controlBlockWriter) {
+ptrdiff_t EncodingState<BufBuilderType, Allocator>::_incrementSimple8bCount(BufBuilderType& buffer,
+                                                                            F controlBlockWriter) {
     char* byte;
     uint8_t count;
     uint8_t scaleIndex = Simple8bTypeUtil::kMemoryAsInteger;
@@ -1923,8 +2047,10 @@ ptrdiff_t EncodingState::_incrementSimple8bCount(BufBuilder& buffer, F controlBl
     return kNoSimple8bControl;
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::Simple8bBlockWriter128<F>::operator()(uint64_t block) {
+void EncodingState<BufBuilderType, Allocator>::Simple8bBlockWriter128<F>::operator()(
+    uint64_t block) {
     // Write/update block count
     ptrdiff_t fullControlOffset = incrementSimple8bCount(
         _buffer, _controlByteOffset, Simple8bTypeUtil::kMemoryAsInteger, _controlBlockWriter);
@@ -1938,8 +2064,10 @@ void EncodingState::Simple8bBlockWriter128<F>::operator()(uint64_t block) {
     }
 }
 
+template <class BufBuilderType, class Allocator>
 template <class F>
-void EncodingState::Simple8bBlockWriter64<F>::operator()(uint64_t block) {
+void EncodingState<BufBuilderType, Allocator>::Simple8bBlockWriter64<F>::operator()(
+    uint64_t block) {
     // Write/update block count
     ptrdiff_t fullControlOffset = incrementSimple8bCount(
         _buffer, _controlByteOffset, _encoder.scaleIndex, _controlBlockWriter);
@@ -1972,53 +2100,36 @@ void EncodingState::Simple8bBlockWriter64<F>::operator()(uint64_t block) {
     _encoder.lastValueInPrevBlock = Simple8bTypeUtil::decodeDouble(current, _encoder.scaleIndex);
 }
 
-EncodingState::CloneableBuffer::CloneableBuffer(const CloneableBuffer& other) {
-    if (other.size <= 0) {
-        return;
-    }
-
-    buffer = std::make_unique<char[]>(other.size);
-    memcpy(buffer.get(), other.buffer.get(), other.size);
-    size = other.size;
-    capacity = other.size;
-}
-
-EncodingState::CloneableBuffer& EncodingState::CloneableBuffer::operator=(
-    const CloneableBuffer& rhs) {
-    if (&rhs == this)
-        return *this;
-
-    if (rhs.size > capacity) {
-        buffer = std::make_unique<char[]>(rhs.size);
-        capacity = rhs.size;
-    }
-
-    if (rhs.size > 0) {
-        memcpy(buffer.get(), rhs.buffer.get(), rhs.size);
-    }
-
-    size = rhs.size;
-    return *this;
-}
+template struct EncodingState<BufBuilder, std::allocator<void>>;
+template struct EncodingState<TrackedBufBuilder, TrackingAllocator<void>>;
 }  // namespace bsoncolumn
 
-BSONColumnBuilder::InternalState::SubObjState::SubObjState() : buffer(kDefaultBufferSize) {}
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::SubObjState(
+    Allocator a)
+    : allocator(a),
+      state(allocator),
+      buffer(allocator, kDefaultBufferSize),
+      controlBlocks(allocator) {}
 
-BSONColumnBuilder::InternalState::SubObjState::SubObjState(const SubObjState& other)
-    : state(other.state), buffer(other.buffer.capacity()), controlBlocks(other.controlBlocks) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::SubObjState(
+    const SubObjState& other)
+    : allocator(other.allocator),
+      state(other.state),
+      buffer(allocator, static_cast<size_t>(other.buffer.capacity())),
+      controlBlocks(other.controlBlocks) {
     buffer.appendBuf(other.buffer.buf(), other.buffer.len());
 }
 
-BSONColumnBuilder::InternalState::SubObjState::SubObjState(SubObjState&& other)
-    : state(std::move(other.state)),
-      buffer(std::move(other.buffer)),
-      controlBlocks(std::move(other.controlBlocks)) {}
-
-BSONColumnBuilder::InternalState::SubObjState&
-BSONColumnBuilder::InternalState::SubObjState::operator=(const SubObjState& rhs) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::operator=(
+    const SubObjState& rhs) {
     if (&rhs == this)
         return *this;
 
+    allocator = rhs.allocator;
     state = rhs.state;
     controlBlocks = rhs.controlBlocks;
     buffer.reset();
@@ -2026,33 +2137,29 @@ BSONColumnBuilder::InternalState::SubObjState::operator=(const SubObjState& rhs)
     return *this;
 }
 
-BSONColumnBuilder::InternalState::SubObjState&
-BSONColumnBuilder::InternalState::SubObjState::operator=(SubObjState&& rhs) {
-    if (&rhs == this)
-        return *this;
-
-    state = std::move(rhs.state);
-    buffer = std::move(rhs.buffer);
-    controlBlocks = std::move(rhs.controlBlocks);
-
-    return *this;
-}
-
-BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter::
-    InterleavedControlBlockWriter(std::vector<std::pair<ptrdiff_t, size_t>>& controlBlocks)
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::
+    InterleavedControlBlockWriter::InterleavedControlBlockWriter(
+        std::vector<ControlBlock, ControlBlockAllocator>& controlBlocks)
     : _controlBlocks(controlBlocks) {}
 
-void BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter::operator()(
-    ptrdiff_t controlBlockOffset, size_t size) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::
+    InterleavedControlBlockWriter::operator()(ptrdiff_t controlBlockOffset, size_t size) {
     _controlBlocks.emplace_back(controlBlockOffset, size);
 }
 
-BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter
-BSONColumnBuilder::InternalState::SubObjState::controlBlockWriter() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::
+    InterleavedControlBlockWriter
+    BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::SubObjState::
+        controlBlockWriter() {
     return InterleavedControlBlockWriter(controlBlocks);
 }
 
-bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendSubElements(
+    const BSONObj& obj) {
     // Check if added object is compatible with selected reference object. Collect a flat vector of
     // all elements while we are doing this.
     _is.flattenedAppendedObj.clear();
@@ -2060,7 +2167,7 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
     auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
         _is.flattenedAppendedObj.push_back(elem);
     };
-    if (!traverseLockStep(_is.referenceSubObj, obj, perElement)) {
+    if (!traverseLockStep(_is.referenceSubObj.get().get(), obj, perElement)) {
         _flushSubObjMode();
         return false;
     }
@@ -2077,26 +2184,29 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
         const auto& subelem = *subElemIt;
         auto& subobj = *statesIt;
         if (!subelem.eoo())
-            subobj.state.append(subelem, subobj.buffer, subobj.controlBlockWriter());
+            subobj.state.append(subelem, subobj.buffer, subobj.controlBlockWriter(), _is.allocator);
         else
             subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
     }
     return true;
 }
 
-void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj, BSONType type) {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_startDetermineSubObjReference(
+    const BSONObj& obj, BSONType type) {
     // Start sub-object compression. Enter DeterminingReference mode, we use this first Object
     // as the first reference
-    _is.regular.flush(_bufBuilder, EncodingState::NoopControlBlockWriter{});
-    _is.regular = {};
+    _is.regular.flush(_bufBuilder, NoopControlBlockWriter{});
+    _is.regular = bsoncolumn::EncodingState<BufBuilderType, Allocator>{_is.allocator};
 
-    _is.referenceSubObj = obj.getOwned();
+    _is.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
     _is.referenceSubObjType = type;
-    _is.bufferedObjElements.push_back(_is.referenceSubObj);
+    _is.bufferedObjElements.push_back(_is.referenceSubObj.get().get());
     _is.mode = Mode::kSubObjDeterminingReference;
 }
 
-void BSONColumnBuilder::_finishDetermineSubObjReference() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_finishDetermineSubObjReference() {
     // Done determining reference sub-object. Write this control byte and object to stream.
     const char interleavedStartControlByte = [&] {
         return _is.referenceSubObjType == Object
@@ -2104,7 +2214,8 @@ void BSONColumnBuilder::_finishDetermineSubObjReference() {
             : bsoncolumn::kInterleavedStartArrayRootControlByte;
     }();
     _bufBuilder.appendChar(interleavedStartControlByte);
-    _bufBuilder.appendBuf(_is.referenceSubObj.objdata(), _is.referenceSubObj.objsize());
+    _bufBuilder.appendBuf(_is.referenceSubObj.get().get().objdata(),
+                          _is.referenceSubObj.get().get().objsize());
     ++_numInterleavedStartWritten;
 
     // Initialize all encoding states. We do this by traversing in lock-step between the reference
@@ -2115,18 +2226,19 @@ void BSONColumnBuilder::_finishDetermineSubObjReference() {
         // literal to be written when we append the first element. We want this
         // to be a zero delta as the reference object already contain this
         // literal.
-        _is.subobjStates.emplace_back();
+        _is.subobjStates.emplace_back(_is.allocator);
         auto& subobj = _is.subobjStates.back();
         subobj.state._storePrevious(ref);
-        subobj.state._initializeFromPrevious();
+        subobj.state._initializeFromPrevious(_is.allocator);
         if (!elem.eoo()) {
-            subobj.state.append(elem, subobj.buffer, subobj.controlBlockWriter());
+            subobj.state.append(elem, subobj.buffer, subobj.controlBlockWriter(), _is.allocator);
         } else {
             subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
         }
     };
 
-    invariant(traverseLockStep(_is.referenceSubObj, _is.bufferedObjElements.front(), perElement));
+    invariant(traverseLockStep(
+        _is.referenceSubObj.get().get(), _is.bufferedObjElements.front(), perElement));
     _is.mode = Mode::kSubObjAppending;
 
     // Append remaining buffered objects.
@@ -2140,7 +2252,8 @@ void BSONColumnBuilder::_finishDetermineSubObjReference() {
     _is.bufferedObjElements.clear();
 }
 
-void BSONColumnBuilder::_flushSubObjMode() {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_flushSubObjMode() {
     if (_is.mode == Mode::kSubObjDeterminingReference) {
         _finishDetermineSubObjReference();
     }
@@ -2209,7 +2322,9 @@ void BSONColumnBuilder::_flushSubObjMode() {
     _is.mode = Mode::kRegular;
 }
 
-bool BSONColumnBuilder::isInternalStateIdentical(const BSONColumnBuilder& other) const {
+template <class BufBuilderType, class BSONObjType, class Allocator>
+bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateIdentical(
+    const BSONColumnBuilder& other) const {
     // Verify that buffers are identical
     if (_bufBuilder.len() != other._bufBuilder.len()) {
         return false;
@@ -2227,8 +2342,8 @@ bool BSONColumnBuilder::isInternalStateIdentical(const BSONColumnBuilder& other)
     if (_is.regular._controlByteOffset != other._is.regular._controlByteOffset) {
         return false;
     }
-    if (auto encoder = std::get_if<bsoncolumn::EncodingState::Encoder64>(&_is.regular._encoder)) {
-        auto encoderOther = std::get_if<EncodingState::Encoder64>(&other._is.regular._encoder);
+    if (auto encoder = std::get_if<Encoder64>(&_is.regular._encoder)) {
+        auto encoderOther = std::get_if<Encoder64>(&other._is.regular._encoder);
         if (!encoderOther) {
             return false;
         }
@@ -2262,9 +2377,8 @@ bool BSONColumnBuilder::isInternalStateIdentical(const BSONColumnBuilder& other)
         }
 
 
-    } else if (auto encoder =
-                   std::get_if<bsoncolumn::EncodingState::Encoder128>(&_is.regular._encoder)) {
-        auto encoderOther = std::get_if<EncodingState::Encoder128>(&other._is.regular._encoder);
+    } else if (auto encoder = std::get_if<Encoder128>(&_is.regular._encoder)) {
+        auto encoderOther = std::get_if<Encoder128>(&other._is.regular._encoder);
         if (!encoderOther) {
             return false;
         }
@@ -2280,12 +2394,7 @@ bool BSONColumnBuilder::isInternalStateIdentical(const BSONColumnBuilder& other)
         return false;
     }
 
-    if (_is.regular._prev.size != other._is.regular._prev.size) {
-        return false;
-    }
-    if (memcmp(_is.regular._prev.buffer.get(),
-               other._is.regular._prev.buffer.get(),
-               _is.regular._prev.size) != 0) {
+    if (_is.regular._prev != other._is.regular._prev) {
         return false;
     }
 
@@ -2301,5 +2410,8 @@ bool BSONColumnBuilder::isInternalStateIdentical(const BSONColumnBuilder& other)
     }
     return true;
 }
+
+template class BSONColumnBuilder<UntrackedBufBuilder, UntrackedBSONObj, std::allocator<void>>;
+template class BSONColumnBuilder<TrackedBufBuilder, TrackedBSONObj, TrackingAllocator<void>>;
 
 }  // namespace mongo

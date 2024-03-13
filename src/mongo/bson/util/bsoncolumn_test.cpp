@@ -583,7 +583,7 @@ public:
             reference.append(elem);
         }
 
-        BSONColumnBuilder reopen(buffer, size);
+        BSONColumnBuilder<> reopen(buffer, size);
         [[maybe_unused]] auto diff = reference.intermediate();
 
         // Verify that the internal state is identical to the reference builder
@@ -7205,8 +7205,8 @@ TEST_F(BSONColumnTest, NoLiteralStart) {
 TEST_F(BSONColumnTest, InvalidInterleavedCount) {
     // This test sets up an interleaved reference object with two fields but only provides one
     // interleaved substream.
-    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb(arrayCompression);
+    auto test = [&](auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb;
         BufBuilder expected;
         appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7218,10 +7218,10 @@ TEST_F(BSONColumnTest, InvalidInterleavedCount) {
         ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
     };
 
-    test(false, appendInterleavedStartLegacy);
-    test(true, appendInterleavedStart);
+    test(appendInterleavedStartLegacy);
+    test(appendInterleavedStart);
 
-    BSONColumnBuilder cb(true);
+    BSONColumnBuilder cb;
     BufBuilder expected;
     appendInterleavedStartArrayRoot(expected, BSON_ARRAY(1 << 1));
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7235,8 +7235,8 @@ TEST_F(BSONColumnTest, InvalidInterleavedCount) {
 
 TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
     // This tests that we handle the interleaved start byte when already in interleaved mode.
-    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
-        BSONColumnBuilder cb(arrayCompression);
+    auto test = [&](auto appendInterleavedStartFunc) {
+        BSONColumnBuilder cb;
         BufBuilder expected;
         appendInterleavedStartFunc(expected, BSON("a" << 1 << "b" << 1));
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7249,10 +7249,10 @@ TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
         ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
     };
 
-    test(false, appendInterleavedStartLegacy);
-    test(true, appendInterleavedStart);
+    test(appendInterleavedStartLegacy);
+    test(appendInterleavedStart);
 
-    BSONColumnBuilder cb(true);
+    BSONColumnBuilder cb;
     BufBuilder expected;
     appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
     appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7267,7 +7267,7 @@ TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
 
 TEST_F(BSONColumnTest, InvalidDeltaAfterInterleaved) {
     // This test uses a non-zero delta value after an interleaved object, which is invalid.
-    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+    auto test = [&](auto appendInterleavedStartFunc) {
         BufBuilder expected;
         appendInterleavedStartFunc(expected, BSON("a" << 1));
         appendSimple8bControl(expected, 0b1000, 0b0000);
@@ -7281,8 +7281,8 @@ TEST_F(BSONColumnTest, InvalidDeltaAfterInterleaved) {
         ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
     };
 
-    test(false, appendInterleavedStartLegacy);
-    test(true, appendInterleavedStart);
+    test(appendInterleavedStartLegacy);
+    test(appendInterleavedStart);
 
     BufBuilder expected;
     appendInterleavedStartArrayRoot(expected, BSON_ARRAY(1));
@@ -7635,8 +7635,8 @@ TEST_F(BSONColumnTest, AppendObjDirectly) {
 }
 
 TEST_F(BSONColumnTest, AppendArrayDirectly) {
-    BSONColumnBuilder cb(true);
-    BSONColumnBuilder cb2(true);
+    BSONColumnBuilder cb;
+    BSONColumnBuilder cb2;
 
     std::vector<BSONElement> elems = {createElementArray(BSON_ARRAY(1 << 2 << 3)),
                                       createElementArray(BSON_ARRAY(2 << 4 << 6))};
@@ -7721,7 +7721,7 @@ TEST_F(BSONColumnTest, Intermediate) {
     BufBuilder buffer;
     // Vector of reopen builders, we will reopen all intermediate binaries and continue appending to
     // make sure they all produce the same binaries in the end.
-    std::vector<std::pair<BSONColumnBuilder, BufBuilder>> reopenBuilders;
+    std::vector<std::pair<BSONColumnBuilder<>, BufBuilder>> reopenBuilders;
     for (auto&& elem : elems) {
         // Append element to all builders, inclusive our reopenBuilders
         cb.append(elem);
@@ -7744,7 +7744,7 @@ TEST_F(BSONColumnTest, Intermediate) {
         BufBuilder reopenBuf;
         reopenBuf.appendBuf(buffer.buf(), buffer.len());
         reopenBuilders.push_back(
-            std::make_pair(BSONColumnBuilder(buffer.buf(), buffer.len()), std::move(reopenBuf)));
+            std::make_pair(BSONColumnBuilder<>(buffer.buf(), buffer.len()), std::move(reopenBuf)));
     }
 
     // Verify that the binaries are exactly compared to a builder using finalize

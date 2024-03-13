@@ -145,7 +145,7 @@ public:
         if (useTsImpl) {
             // Shred the bsons here, produce a time series "bucket"-like thing, and pass it to the
             // TS decoding implementation.
-            StringMap<std::unique_ptr<BSONColumnBuilder>> shredMap;
+            StringMap<std::unique_ptr<BSONColumnBuilder<>>> shredMap;
 
             size_t bsonIdx = 0;
             for (auto&& bson : bsons) {
@@ -154,7 +154,7 @@ public:
                 StringDataSet fieldsVisited;
                 for (auto elt : bson) {
                     auto [it, inserted] = shredMap.insert(
-                        std::pair(elt.fieldName(), std::make_unique<BSONColumnBuilder>()));
+                        std::pair(elt.fieldName(), std::make_unique<BSONColumnBuilder<>>()));
 
                     if (inserted) {
                         // Backfill with missing values.

@@ -42,12 +42,15 @@ public:
         _stats.get().bytesAllocated(_obj.allocated());
     }
 
-    Tracked(Tracked&) = delete;
+    Tracked(T obj, TrackingAllocator<void> allocator)
+        : Tracked(allocator.getStats(), std::move(obj)) {}
+
+    Tracked(Tracked& other) = delete;
     Tracked(Tracked&& other) : _stats(other._stats), _obj(std::move(other._obj)) {
         invariant(other._obj.allocated() == 0);
     }
 
-    Tracked& operator=(Tracked&) = delete;
+    Tracked& operator=(Tracked& other) = delete;
     Tracked& operator=(Tracked&& other) {
         if (&other == this) {
             return *this;
@@ -77,6 +80,23 @@ private:
     T _obj;
 };
 
+template <class T>
+class Untracked {
+public:
+    Untracked(T obj, std::allocator<void> = {}) : _obj(std::move(obj)) {}
+
+    T& get() {
+        return _obj;
+    }
+
+    const T& get() const {
+        return _obj;
+    }
+
+private:
+    T _obj;
+};
+
 /**
  * A TrackingContext is a factory style class that constructs TrackingAllocator objects under a
  * single instance of TrackingAllocatorStats and provides access to these stats.
@@ -93,7 +113,11 @@ public:
 
     template <class T>
     TrackingAllocator<T> makeAllocator() {
-        return TrackingAllocator<T>(&_stats);
+        return TrackingAllocator<T>(_stats);
+    }
+
+    TrackingAllocatorStats& stats() {
+        return _stats;
     }
 
     uint64_t allocated() const {

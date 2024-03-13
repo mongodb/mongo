@@ -52,7 +52,7 @@ using namespace std;
 namespace {
 
 /* Finalize a BSONColumn and write it to an ofstream, pre-pended with length of encoding */
-void finishBSONColumn(BSONColumnBuilder& columnBuilder, char* lenBuf, ofstream& outputStream) {
+void finishBSONColumn(BSONColumnBuilder<>& columnBuilder, char* lenBuf, ofstream& outputStream) {
     BSONBinData binData = columnBuilder.finalize();
     DataView(lenBuf).write<LittleEndian<uint32_t>>(binData.length);
     outputStream.write(lenBuf, sizeof(uint32_t));

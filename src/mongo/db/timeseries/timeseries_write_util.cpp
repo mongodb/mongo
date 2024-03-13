@@ -570,7 +570,7 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
             bucketsColl->getTimeseriesOptions());
 }
 
-BSONObj makeBSONColumnDocDiff(const BSONColumnBuilder::BinaryDiff& binaryDiff) {
+BSONObj makeBSONColumnDocDiff(const TrackedBSONColumnBuilder::BinaryDiff& binaryDiff) {
     return BSON(
         "o" << binaryDiff.offset() << "d"
             << BSONBinData(binaryDiff.data(), binaryDiff.size(), BinDataType::BinDataGeneral));

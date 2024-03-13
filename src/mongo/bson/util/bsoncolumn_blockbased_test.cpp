@@ -48,7 +48,7 @@ struct BSONColumnBlockBasedTest : public unittest::Test {
     }
 
 private:
-    BSONColumnBuilder _columnBuilder;
+    BSONColumnBuilder<> _columnBuilder;
 };
 
 /**

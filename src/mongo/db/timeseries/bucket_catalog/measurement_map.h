@@ -69,7 +69,8 @@ public:
     /**
      * Calls BSONColumnBuilder::intermediate() for all builders and updates the compressed size.
      */
-    std::vector<std::pair<StringData, BSONColumnBuilder::BinaryDiff>> intermediate(int32_t& size);
+    std::vector<std::pair<StringData, TrackedBSONColumnBuilder::BinaryDiff>> intermediate(
+        int32_t& size);
 
     /**
      * Returns the timestamp of the last measurement in the time column.
@@ -91,12 +92,12 @@ private:
     void _assertInternalStateIdentical_forTest();
     void _insertNewKey(StringData key,
                        const BSONElement& elem,
-                       BSONColumnBuilder builder,
+                       TrackedBSONColumnBuilder builder,
                        size_t numMeasurements = 1);
 
     std::reference_wrapper<TrackingContext> _trackingContext;
 
-    TrackedStringMap<std::tuple<size_t, BSONColumnBuilder>> _builders;
+    TrackedStringMap<std::tuple<size_t, TrackedBSONColumnBuilder>> _builders;
     size_t _measurementCount{0};
 
     // The size of the compressed binary data across all builders since the last call to

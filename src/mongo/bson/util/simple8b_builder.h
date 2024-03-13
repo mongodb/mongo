@@ -57,15 +57,17 @@ concept Simple8bBlockWriter = requires(F&& f) {
  *
  * T may be uint64_t and uint128_t only.
  */
-template <typename T>
+template <typename T, class Allocator = std::allocator<void>>
 class Simple8bBuilder {
 private:
     struct PendingValue;
+    using PendingValueAllocator =
+        typename std::allocator_traits<Allocator>::template rebind_alloc<PendingValue>;
 
 public:
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order, the
     // value need to be converted to Little Endian before persisting.
-    Simple8bBuilder();
+    explicit Simple8bBuilder(Allocator = {});
     ~Simple8bBuilder();
 
     /**
@@ -125,13 +127,14 @@ public:
         bool operator!=(const PendingIterator& rhs) const;
 
     private:
-        PendingIterator(typename std::vector<PendingValue>::const_iterator beginning,
-                        typename std::vector<PendingValue>::const_iterator it,
-                        reference rleValue,
-                        uint32_t rleCount);
+        PendingIterator(
+            typename std::vector<PendingValue, PendingValueAllocator>::const_iterator beginning,
+            typename std::vector<PendingValue, PendingValueAllocator>::const_iterator it,
+            reference rleValue,
+            uint32_t rleCount);
 
-        typename std::vector<PendingValue>::const_iterator _begin;
-        typename std::vector<PendingValue>::const_iterator _it;
+        typename std::vector<PendingValue, PendingValueAllocator>::const_iterator _begin;
+        typename std::vector<PendingValue, PendingValueAllocator>::const_iterator _it;
 
         const boost::optional<T>& _rleValue;
         uint32_t _rleCount;
@@ -163,13 +166,13 @@ public:
     /**
      * Initialize RLE state from another builder
      */
-    void initializeRLEFrom(const Simple8bBuilder<T>& other);
+    void initializeRLEFrom(const Simple8bBuilder<T, Allocator>& other);
 
     /**
      * Validates that the internal state of this Simple8bBuilder is identical to the provided one.
      * This guarantees that appending more data to either of them would produce the same binary.
      */
-    bool isInternalStateIdentical(const Simple8bBuilder<T>& other) const;
+    bool isInternalStateIdentical(const Simple8bBuilder<T, Allocator>& other) const;
 
 private:
     // Number of different type of selectors and their extensions available
@@ -333,7 +336,7 @@ private:
 
     // This holds values that have not be encoded to the simple8b buffer, but are waiting for a full
     // simple8b word to be filled before writing to buffer.
-    std::vector<PendingValue> _pendingValues;
+    std::vector<PendingValue, PendingValueAllocator> _pendingValues;
 };
 
 }  // namespace mongo
