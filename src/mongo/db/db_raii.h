@@ -605,8 +605,8 @@ public:
     }
 
 protected:
+    boost::optional<AutoStatsTracker> _statsTracker;
     AutoGetCollectionForReadType _autoCollForRead;
-    AutoStatsTracker _statsTracker;
 };
 
 /**
@@ -627,13 +627,15 @@ public:
 /**
  * Same as AutoGetCollectionForReadCommand except no collection, database or RSTL lock is taken.
  */
-class AutoGetCollectionForReadCommandLockFree {
+class AutoGetCollectionForReadCommandLockFree
+    : public AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree> {
 public:
     AutoGetCollectionForReadCommandLockFree(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
         AutoGetCollection::Options options = {},
-        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp)
+        : AutoGetCollectionForReadCommandBase(opCtx, nsOrUUID, options, logMode) {}
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -646,26 +648,6 @@ public:
     const CollectionPtr& operator*() const {
         return getCollection();
     }
-
-    const CollectionPtr& getCollection() const {
-        return _autoCollForReadCommandBase->getCollection();
-    }
-
-    const ViewDefinition* getView() const {
-        return _autoCollForReadCommandBase->getView();
-    }
-
-    const NamespaceString& getNss() const {
-        return _autoCollForReadCommandBase->getNss();
-    }
-
-    bool isAnySecondaryNamespaceAViewOrSharded() const {
-        return _autoCollForReadCommandBase->isAnySecondaryNamespaceAViewOrSharded();
-    }
-
-private:
-    boost::optional<AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree>>
-        _autoCollForReadCommandBase;
 };
 
 /**

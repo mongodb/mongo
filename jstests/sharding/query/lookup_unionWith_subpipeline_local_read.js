@@ -462,6 +462,9 @@ assertAggResultAndRouting(
 // but it is stale.
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
+// Ensure the secondaries know about the local collection.
+assert.eq(local.aggregate([], {$readPreference: {mode: 'secondary'}}).itcount(), 0);
+
 // Ensure the secondary knows about the foreign collection, and thinks it is unsharded.
 assert.eq(foreign.aggregate([], {$readPreference: {mode: 'secondary'}}).itcount(), 0);
 

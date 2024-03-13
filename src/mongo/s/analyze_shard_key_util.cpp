@@ -57,7 +57,7 @@ Status validateNamespace(const NamespaceString& nss) {
 }
 
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForReadMaybeLockFree collection(
+    AutoGetCollectionForReadCommandMaybeLockFree collection(
         opCtx,
         nss,
         AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
