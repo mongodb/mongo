@@ -166,11 +166,11 @@ __wt_tret_error_ok(int *pret, int a, int e)
  * information to improve performance at runtime. This is not supported for MSVC compilers.
  */
 #if !defined(_MSC_VER)
-#define LIKELY(x) __builtin_expect(!!(x), 1)
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define WT_LIKELY(x) __builtin_expect(!!(x), 1)
+#define WT_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
-#define LIKELY(x) (x)
-#define UNLIKELY(x) (x)
+#define WT_LIKELY(x) (x)
+#define WT_UNLIKELY(x) (x)
 #endif
 
 #define WT_ERR_MSG_BUF_LEN 1024
@@ -227,7 +227,7 @@ __wt_tret_error_ok(int *pret, int a, int e)
  */
 #define EXTRA_DIAGNOSTICS_ENABLED(session, category) \
     ((session != NULL) &&                            \
-      UNLIKELY(FLD_ISSET(S2C(session)->extra_diagnostics_flags, category | WT_DIAGNOSTIC_ALL)))
+      WT_UNLIKELY(FLD_ISSET(S2C(session)->extra_diagnostics_flags, category | WT_DIAGNOSTIC_ALL)))
 
 /*
  * WT_ASSERT --
@@ -237,7 +237,7 @@ __wt_tret_error_ok(int *pret, int a, int e)
 #ifdef HAVE_DIAGNOSTIC
 #define WT_ASSERT(session, exp)                                       \
     do {                                                              \
-        if (UNLIKELY(!(exp)))                                         \
+        if (WT_UNLIKELY(!(exp)))                                      \
             TRIGGER_ABORT(session, exp, "Expression returned false"); \
     } while (0)
 #else
@@ -248,11 +248,11 @@ __wt_tret_error_ok(int *pret, int a, int e)
  * WT_ASSERT_OPTIONAL --
  *  Assert an expression if the relevant assertion category is enabled.
  */
-#define WT_ASSERT_OPTIONAL(session, category, exp, ...)             \
-    do {                                                            \
-        if (UNLIKELY(EXTRA_DIAGNOSTICS_ENABLED(session, category))) \
-            if (UNLIKELY(!(exp)))                                   \
-                TRIGGER_ABORT(session, exp, __VA_ARGS__);           \
+#define WT_ASSERT_OPTIONAL(session, category, exp, ...)                \
+    do {                                                               \
+        if (WT_UNLIKELY(EXTRA_DIAGNOSTICS_ENABLED(session, category))) \
+            if (WT_UNLIKELY(!(exp)))                                   \
+                TRIGGER_ABORT(session, exp, __VA_ARGS__);              \
     } while (0)
 
 /*
@@ -261,7 +261,7 @@ __wt_tret_error_ok(int *pret, int a, int e)
  */
 #define WT_ASSERT_ALWAYS(session, exp, ...)           \
     do {                                              \
-        if (UNLIKELY(!(exp)))                         \
+        if (WT_UNLIKELY(!(exp)))                      \
             TRIGGER_ABORT(session, exp, __VA_ARGS__); \
     } while (0)
 
@@ -272,7 +272,7 @@ __wt_tret_error_ok(int *pret, int a, int e)
  */
 #define WT_ERR_ASSERT(session, category, exp, v, ...)         \
     do {                                                      \
-        if (UNLIKELY(!(exp))) {                               \
+        if (WT_UNLIKELY(!(exp))) {                            \
             if (EXTRA_DIAGNOSTICS_ENABLED(session, category)) \
                 TRIGGER_ABORT(session, exp, __VA_ARGS__);     \
             else                                              \
@@ -287,7 +287,7 @@ __wt_tret_error_ok(int *pret, int a, int e)
  */
 #define WT_RET_ASSERT(session, category, exp, v, ...)         \
     do {                                                      \
-        if (UNLIKELY(!(exp))) {                               \
+        if (WT_UNLIKELY(!(exp))) {                            \
             if (EXTRA_DIAGNOSTICS_ENABLED(session, category)) \
                 TRIGGER_ABORT(session, exp, __VA_ARGS__);     \
             else                                              \
@@ -302,7 +302,7 @@ __wt_tret_error_ok(int *pret, int a, int e)
  */
 #define WT_RET_PANIC_ASSERT(session, category, exp, v, ...)   \
     do {                                                      \
-        if (UNLIKELY(!(exp))) {                               \
+        if (WT_UNLIKELY(!(exp))) {                            \
             if (EXTRA_DIAGNOSTICS_ENABLED(session, category)) \
                 TRIGGER_ABORT(session, exp, __VA_ARGS__);     \
             else                                              \
