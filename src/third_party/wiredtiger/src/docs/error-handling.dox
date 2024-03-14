@@ -10,7 +10,7 @@ codes are WiredTiger-specific (for example, \c WT_ROLLBACK).
 
 WiredTiger returns \c EBUSY for operations requiring exclusive access, when
 an object is not available for exclusive access. These operations include the
-WT_SESSION::alter, WT_SESSION::drop, WT_SESSION::rename, WT_SESSION::salvage,
+WT_SESSION::alter, WT_SESSION::drop, WT_SESSION::salvage,
 WT_SESSION::upgrade and WT_SESSION::verify methods, all of which will return
 \c EBUSY and fail if there are open cursors on the target object. Internal
 WiredTiger threads may temporarily open cursors on objects (for example,

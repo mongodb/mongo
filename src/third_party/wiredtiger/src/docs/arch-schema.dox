@@ -99,11 +99,6 @@ WT_SESSION::drop operation drops the specified \c uri. The method will delete al
 and metadata entries. It is possible to keep the underlying files by specifying
 \c "remove_files=false" in the config string.
 
-@subsection schema_rename Rename
-
-WT_SESSION::rename schema operation renames the underlying data objects on the filesystem and
-updates the metadata accordingly.
-
 @subsection schema_alter Alter
 
 WT_SESSION::alter allows modification of some table settings after creation.

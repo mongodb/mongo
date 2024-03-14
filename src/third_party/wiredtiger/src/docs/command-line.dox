@@ -412,18 +412,6 @@ The \c read command exits non-zero if a specified record is not found.
 The \c read command has no command-specific options.
 
 <hr>
-@section util_rename wt rename
-Rename a table.
-
-The \c rename command renames the specified table.
-
-@subsection util_rename_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] rename uri new-uri`
-
-@subsection util_rename_options Options
-The \c rename command has no command-specific options.
-
-<hr>
 @section util_salvage wt salvage
 Recover data from a corrupted table.
 
