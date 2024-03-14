@@ -44,7 +44,6 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     auto curop = CurOp::get(*opCtx);
 
     Milliseconds executionTime = Milliseconds(16);
-    Milliseconds waitForWriteConcern = Milliseconds(1);
     Milliseconds waitForTickets = Milliseconds(2);
     Milliseconds waitForFlowControlTicket = Milliseconds(4);
 
@@ -60,23 +59,17 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     curop->done();
     ASSERT_EQ(duration_cast<Milliseconds>(curop->elapsedTimeExcludingPauses()), executionTime);
 
-    // Check that workingTimeMillis correctly accounts for waitForWriteConcern
-    curop->debug().waitForWriteConcernDurationMillis = waitForWriteConcern;
-    curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
-    ASSERT_EQ(curop->debug().workingTimeMillis, executionTime - waitForWriteConcern);
-
     // Check that workingTimeMillis correctly accounts for ticket wait time
     auto locker = shard_role_details::getLocker(opCtx.get());
     locker->setTicketQueueTime(waitForTickets);
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
-    ASSERT_EQ(curop->debug().workingTimeMillis,
-              executionTime - waitForWriteConcern - waitForTickets);
+    ASSERT_EQ(curop->debug().workingTimeMillis, executionTime - waitForTickets);
 
     // Check that workintTimeMillis correctly account for time acquiring flow control tickets
     locker->setFlowControlTicketQueueTime(waitForFlowControlTicket);
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop->debug().workingTimeMillis,
-              executionTime - waitForWriteConcern - waitForTickets - waitForFlowControlTicket);
+              executionTime - waitForTickets - waitForFlowControlTicket);
 
     // Check that workingTimeMillis correctly accounts for lock wait time
     const ResourceId resId(
@@ -104,8 +97,7 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
 
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop->debug().workingTimeMillis,
-              executionTime - waitForWriteConcern - waitForTickets - waitForFlowControlTicket -
-                  waitForLocks);
+              executionTime - waitForTickets - waitForFlowControlTicket - waitForLocks);
 }
 }  // namespace
 }  // namespace mongo
