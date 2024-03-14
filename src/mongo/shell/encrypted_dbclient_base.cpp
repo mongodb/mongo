@@ -642,7 +642,8 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
                        efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
     }
 
-    if (efc && extra["encryptionInformation"_sd].eoo()) {
+    if (efc && extra["encryptionInformation"_sd].eoo() &&
+        hasQueryType(*efc, QueryTypeEnum::Range)) {
         EncryptionInformation ei;
         ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << efc->toBSON()));
         builder.append("encryptionInformation"_sd, ei.toBSON());
