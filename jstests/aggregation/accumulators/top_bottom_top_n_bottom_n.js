@@ -328,6 +328,23 @@ const embeddedResult =
         .toArray();
 assert.eq([2, 3, 4], embeddedResult[0].result);
 
+// Sort on array
+assert(coll.drop());
+const makeArray = (i) => [i, i + 1, i + 2]
+assert.commandWorked(coll.insertMany([4, 2, 3, 1].map((i) => ({a: makeArray(i)}))));
+const nestedResult =
+    coll.aggregate({$group: {_id: "", result: {$bottomN: {n: 3, output: "$a", sortBy: {"a": 1}}}}})
+        .toArray();
+assert.eq([makeArray(2), makeArray(3), makeArray(4)], nestedResult[0].result);
+
+// Sort on doubly nested array.
+assert(coll.drop());
+assert.commandWorked(coll.insertMany([4, 2, 3, 1].map((i) => ({a: [makeArray(i)]}))));
+const doublyNestedResult =
+    coll.aggregate({$group: {_id: "", result: {$bottomN: {n: 3, output: "$a", sortBy: {"a": 1}}}}})
+        .toArray();
+assert.eq([[makeArray(2)], [makeArray(3)], [makeArray(4)]], doublyNestedResult[0].result);
+
 // Compound Sorting.
 coll.drop();
 const as = [1, 2, 3];

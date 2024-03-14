@@ -408,6 +408,9 @@ bool SortKeyGenerator::fastFillOutSortKeyPartsHelper(const BSONObj& bson,
             }
 
             if (childNode->part) {
+                tassert(8770401,
+                        "Expected partIdx to be less than the size of the output",
+                        childNode->partIdx < out->size());
                 (*out)[childNode->partIdx] = elt;
             }
 
@@ -450,7 +453,6 @@ void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
                 }
             }
         }
-
         // Fast path succeeded, we're done.
         return;
     }
@@ -463,11 +465,23 @@ void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
 
     Document outDoc(std::vector<std::pair<StringData, Value>>{{""_sd, sortKeyVal}});
     _localObjStorage = outDoc.toBson();
-    if (_localObjStorage.firstElement().type() == BSONType::Array) {
+    tassert(8770400,
+            "Expected BSONElement array to be the same size as the sortPattern",
+            eltsOut->size() == _sortPattern.size());
+    if (_sortPattern.size() > 1) {
+        tassert(8770404,
+                "If the sort pattern size is > 1, the sortKey should be an array",
+                _localObjStorage.firstElement().type() == BSONType::Array);
+        BSONObjIterator sortKeyIt(_localObjStorage.firstElement().embeddedObject());
         size_t i = 0;
-        for (auto& elt : _localObjStorage.firstElement().embeddedObject()) {
-            (*eltsOut)[i++] = elt;
+        while (i < eltsOut->size() && sortKeyIt.more()) {
+            (*eltsOut)[i++] = sortKeyIt.next();
         }
+        tassert(8770402,
+                "Expected the number of elements in the sort key to the equal to eltsOut.size()",
+                i == eltsOut->size());
+        tassert(
+            8770403, "Expected to exhaust the elements in the sort key array", !sortKeyIt.more());
     } else {
         (*eltsOut)[0] = _localObjStorage.firstElement();
     }
