@@ -62,8 +62,6 @@ bool ExpressionConstEval::optimize(optimizer::ABT& n) {
     invariant(_letRefs.empty());
 
     while (_changed) {
-        _env.rebuild(n);
-
         if (_singleRef.empty()) {
             break;
         }
@@ -80,34 +78,40 @@ bool ExpressionConstEval::optimize(optimizer::ABT& n) {
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n, const optimizer::Variable& var) {
-    auto def = _env.getDefinition(var);
+    if (auto it = _variableDefinitions.find(var.name()); it != _variableDefinitions.end()) {
+        auto& def = it->second;
 
-    if (!def.definition.empty()) {
-        // See if we have already manipulated this definition and if so then use the newer version.
-        if (auto it = _staleDefs.find(def.definition); it != _staleDefs.end()) {
-            def.definition = it->second;
-        }
-        if (auto it = _staleDefs.find(def.definedBy); it != _staleDefs.end()) {
-            def.definedBy = it->second;
-        }
+        if (!def.definition.empty()) {
+            // See if we have already manipulated this definition and if so then use the newer
+            // version.
+            if (auto it = _staleDefs.find(def.definition); it != _staleDefs.end()) {
+                def.definition = it->second;
+            }
+            if (auto it = _staleDefs.find(def.definedBy); it != _staleDefs.end()) {
+                def.definedBy = it->second;
+            }
 
-        if (auto constant = def.definition.cast<optimizer::Constant>(); constant && !_inRefBlock) {
-            // If we find the definition and it is a simple constant then substitute the variable.
-            swapAndUpdate(n, def.definition.copy());
-        } else if (auto variable = def.definition.cast<optimizer::Variable>();
-                   variable && !_inRefBlock) {
-            swapAndUpdate(n, def.definition.copy());
-        } else if (_singleRef.erase(&var)) {
-            swapAndUpdate(n, def.definition.copy());
-        } else if (auto let = def.definedBy.cast<optimizer::Let>(); let) {
-            invariant(_letRefs.count(let));
-            _letRefs[let].emplace_back(&var);
+            if (auto constant = def.definition.cast<optimizer::Constant>();
+                constant && !_inRefBlock) {
+                // If we find the definition and it is a simple constant then substitute the
+                // variable.
+                swapAndUpdate(n, def.definition.copy());
+            } else if (auto variable = def.definition.cast<optimizer::Variable>();
+                       variable && !_inRefBlock) {
+                swapAndUpdate(n, def.definition.copy());
+            } else if (_singleRef.erase(&var)) {
+                swapAndUpdate(n, def.definition.copy());
+            } else if (auto let = def.definedBy.cast<optimizer::Let>(); let) {
+                invariant(_letRefs.count(let));
+                _letRefs[let].emplace_back(&var);
+            }
         }
     }
 }
 
-void ExpressionConstEval::prepare(optimizer::ABT&, const optimizer::Let& let) {
+void ExpressionConstEval::prepare(optimizer::ABT& n, const optimizer::Let& let) {
     _letRefs[&let] = {};
+    _variableDefinitions.emplace(let.varName(), optimizer::Definition{n.ref(), let.bind().ref()});
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n,
@@ -140,6 +144,7 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
         _changed = true;
     }
     _letRefs.erase(&let);
+    _variableDefinitions.erase(let.varName());
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n,
@@ -463,14 +468,17 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
     }
 }
 
-void ExpressionConstEval::prepare(optimizer::ABT&, const optimizer::LambdaAbstraction&) {
+void ExpressionConstEval::prepare(optimizer::ABT& n, const optimizer::LambdaAbstraction& lam) {
     ++_inCostlyCtx;
+    _variableDefinitions.emplace(lam.varName(),
+                                 optimizer::Definition{n.ref(), optimizer::ABT::reference_type{}});
 }
 
 void ExpressionConstEval::transport(optimizer::ABT&,
-                                    const optimizer::LambdaAbstraction&,
+                                    const optimizer::LambdaAbstraction& lam,
                                     optimizer::ABT&) {
     --_inCostlyCtx;
+    _variableDefinitions.erase(lam.varName());
 }
 
 void ExpressionConstEval::prepare(optimizer::ABT&, const optimizer::References& refs) {

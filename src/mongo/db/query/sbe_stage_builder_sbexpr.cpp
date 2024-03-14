@@ -131,8 +131,7 @@ VariableTypes excludeTypes(VariableTypes varTypes, TypeSignature typesToExclude)
     return varTypes;
 }
 
-TypeSignature constantFold(optimizer::VariableEnvironment& env,
-                           optimizer::ABT& abt,
+TypeSignature constantFold(optimizer::ABT& abt,
                            StageBuilderState& state,
                            const VariableTypes* slotInfo) {
     auto& runtimeEnv = *state.env;
@@ -141,7 +140,7 @@ TypeSignature constantFold(optimizer::VariableEnvironment& env,
     auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
 
     // Convert paths into ABT expressions.
-    optimizer::EvalPathLowering pathLower{prefixId, env};
+    optimizer::EvalPathLowering pathLower{prefixId};
     pathLower.optimize(abt);
 
     const CollatorInterface* collator = nullptr;
@@ -159,7 +158,7 @@ TypeSignature constantFold(optimizer::VariableEnvironment& env,
     do {
         // Run the constant folding to eliminate lambda applications as they are not directly
         // supported by the SBE VM.
-        ExpressionConstEval constEval{env, collator};
+        ExpressionConstEval constEval{collator};
 
         constEval.optimize(abt);
 
@@ -172,20 +171,9 @@ TypeSignature constantFold(optimizer::VariableEnvironment& env,
         signature = typeChecker.typeCheck(abt);
 
         modified = typeChecker.modified();
-        if (modified) {
-            env.rebuild(abt);
-        }
     } while (modified);
 
     return signature;
-}
-
-TypeSignature constantFold(optimizer::ABT& abt,
-                           StageBuilderState& state,
-                           const VariableTypes* slotInfo) {
-    auto env = optimizer::VariableEnvironment::build(abt);
-
-    return constantFold(env, abt, state, slotInfo);
 }
 
 SbVar::SbVar(const optimizer::ProjectionName& name, boost::optional<TypeSignature> typeSig)

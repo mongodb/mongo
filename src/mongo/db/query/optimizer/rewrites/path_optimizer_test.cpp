@@ -582,7 +582,7 @@ void runPathLowering(VariableEnvironment& env, PrefixId& prefixId, ABT& tree) {
     bool changed = false;
     do {
         changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
+        if (PathLowering{prefixId}.optimize(tree)) {
             changed = true;
             env.rebuild(tree);
         }

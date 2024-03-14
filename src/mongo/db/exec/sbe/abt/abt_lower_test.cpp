@@ -277,7 +277,7 @@ protected:
         bool changed = false;
         do {
             changed = false;
-            if (PathLowering{prefixId, env}.optimize(tree)) {
+            if (PathLowering{prefixId}.optimize(tree)) {
                 changed = true;
             }
             if (ConstEval{env}.optimize(tree)) {

@@ -56,8 +56,7 @@ namespace mongo::stage_builder {
  */
 class ExpressionConstEval {
 public:
-    ExpressionConstEval(optimizer::VariableEnvironment& env, const CollatorInterface* collator)
-        : _env(env), _collator(collator) {}
+    ExpressionConstEval(const CollatorInterface* collator) : _collator(collator) {}
 
     template <typename T, typename... Ts>
     void transport(optimizer::ABT&, const T&, Ts&&...) {}
@@ -107,7 +106,7 @@ private:
 
     void swapAndUpdate(optimizer::ABT& n, optimizer::ABT newN);
 
-    optimizer::VariableEnvironment& _env;
+    optimizer::DefinitionsMap _variableDefinitions;
     const CollatorInterface* _collator;
 
     optimizer::opt::unordered_set<const optimizer::Variable*> _singleRef;

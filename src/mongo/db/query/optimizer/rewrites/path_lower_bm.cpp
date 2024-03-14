@@ -50,10 +50,9 @@ namespace optimizer {
 namespace {
 
 void benchmarkPath(benchmark::State& state, ABT& path) {
-    auto env = VariableEnvironment::build(path);
     auto prefixId = PrefixId::createForTests();
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(PathLowering{prefixId, env}.optimize(path));
+        benchmark::DoNotOptimize(PathLowering{prefixId}.optimize(path));
         benchmark::ClobberMemory();
     }
 }

@@ -113,7 +113,7 @@ ABT Eval(ABT path, ABT input) {
 bool runPathLower(ABT& tree, bool constFold = false) {
     auto env = VariableEnvironment::build(tree);
     auto prefixId = PrefixId::createForTests();
-    if (!PathLowering{prefixId, env}.optimize(tree)) {
+    if (!PathLowering{prefixId}.optimize(tree)) {
         return false;
     }
     while (constFold && ConstEval{env}.optimize(tree))

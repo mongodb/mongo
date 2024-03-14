@@ -231,7 +231,7 @@ TEST_F(ABTSBE, Lower6) {
     bool changed = false;
     do {
         changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
+        if (PathLowering{prefixId}.optimize(tree)) {
             changed = true;
             env.rebuild(tree);
         }
@@ -285,7 +285,7 @@ TEST_F(ABTSBE, Lower7) {
     bool changed = false;
     do {
         changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
+        if (PathLowering{prefixId}.optimize(tree)) {
             changed = true;
         }
         if (ConstEval{env}.optimize(tree)) {

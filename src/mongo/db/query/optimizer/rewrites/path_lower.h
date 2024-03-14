@@ -45,8 +45,7 @@ namespace mongo::optimizer {
  */
 class EvalPathLowering {
 public:
-    EvalPathLowering(PrefixId& prefixId, VariableEnvironment& env)
-        : _prefixId(prefixId), _env(env) {}
+    EvalPathLowering(PrefixId& prefixId) : _prefixId(prefixId) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -77,14 +76,11 @@ public:
 
     // The tree is passed in as NON-const reference as we will be updating it.
     // Returns true if the tree changed.
-    // If 'rebuild' is set to false will assume the caller will rebuild the VariableEnvironment and
-    // so will skip the rebuild on the passed in ABT.
-    bool optimize(ABT& n, bool rebuild = true);
+    bool optimize(ABT& n);
 
 private:
     // We don't own these.
     PrefixId& _prefixId;
-    VariableEnvironment& _env;
 
     bool _changed{false};
 };
@@ -94,8 +90,7 @@ private:
  */
 class EvalFilterLowering {
 public:
-    EvalFilterLowering(PrefixId& prefixId, VariableEnvironment& env)
-        : _prefixId(prefixId), _env(env) {}
+    EvalFilterLowering(PrefixId& prefixId) : _prefixId(prefixId) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -127,14 +122,11 @@ public:
 
     // The tree is passed in as NON-const reference as we will be updating it.
     // Returns true if the tree changed.
-    // If 'rebuild' is set to false will assume the caller will rebuild the VariableEnvironment and
-    // so will skip the rebuild on the passed in ABT.
-    bool optimize(ABT& n, bool rebuild = true);
+    bool optimize(ABT& n);
 
 private:
     // We don't own these.
     PrefixId& _prefixId;
-    VariableEnvironment& _env;
 
     std::vector<ABT::reference_type> _traverseStack;
 
@@ -143,8 +135,8 @@ private:
 
 class PathLowering {
 public:
-    PathLowering(PrefixId& prefixId, VariableEnvironment& env)
-        : _prefixId(prefixId), _env(env), _project(_prefixId, _env), _filter(_prefixId, _env) {}
+    PathLowering(PrefixId& prefixId)
+        : _prefixId(prefixId), _project(_prefixId), _filter(_prefixId) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -153,14 +145,12 @@ public:
     void transport(ABT& n, const EvalPath&, ABT&, ABT&);
     void transport(ABT& n, const EvalFilter&, ABT&, ABT&);
 
-    // Returns true if the tree changed. Does not rebuild the VariableEnvironment and hence might
-    // leave it in an invalid state. The caller is responsible rebuilding the VariableEnvironment.
+    // Returns true if the tree changed.
     bool optimize(ABT& n);
 
 private:
     // We don't own these.
     PrefixId& _prefixId;
-    VariableEnvironment& _env;
 
     EvalPathLowering _project;
     EvalFilterLowering _filter;

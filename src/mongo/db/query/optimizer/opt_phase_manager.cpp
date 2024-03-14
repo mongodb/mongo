@@ -388,7 +388,7 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
 
     for (auto& planEntry : planExtractionResult) {
         runStructuralPhase<OptPhase::PathLower, PathLowering>(
-            PathLowering{_prefixId, env}, env, planEntry._node);
+            PathLowering{_prefixId}, env, planEntry._node);
 
         // The constant folding phase below may inline or erase projections which are referred to by
         // the plan's projection requirement properties. We need to respond to the ConstEval's

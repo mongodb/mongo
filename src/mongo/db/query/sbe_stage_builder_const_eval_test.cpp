@@ -47,8 +47,7 @@ using namespace optimizer;
 using namespace unit_test_abt_literals;
 
 Constant* constEval(ABT& tree, const CollatorInterface* collator = nullptr) {
-    auto env = VariableEnvironment::build(tree);
-    ExpressionConstEval evaluator{env, collator};
+    ExpressionConstEval evaluator{collator};
     evaluator.optimize(tree);
 
     // The result must be Constant.

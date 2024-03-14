@@ -795,12 +795,8 @@ private:
             .lower(planAndProps._node);
         BuildingPropsTransport{planAndProps._map}.buildProps(planAndProps._node);
 
-        // TODO: Remove ref tracker by refactoring path lowering constructor.
-        VariableEnvironment env = VariableEnvironment::build(
-            planAndProps._node, &memo /*memoInterface*/, false /*computeLastRefs*/);
-
         if (_phaseManager.hasPhase(OptPhase::PathLower)) {
-            PathLowering instance{_prefixId, env};
+            PathLowering instance{_prefixId};
             int optimizeIterations = 0;
             for (; instance.optimize(planAndProps._node); optimizeIterations++) {
                 tassert(
