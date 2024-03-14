@@ -642,14 +642,12 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
     // value. In this case, we expect the oldest timestamp to be advanced in lockstep with the
     // stable timestamp during any recovery process, and so the oldest timestamp should never exceed
     // the stable timestamp.
-    // TODO (SERVER-85688): Re-enable this invariant once the stable timestamp is correctly handled
-    // during startup recovery for restore.
-    // const Timestamp oldest = getOldestTimestamp();
-    // const Timestamp stable = getStableTimestamp();
-    // uassert(8470600,
-    //         str::stream() << "Oldest timestamp " << oldest
-    //                       << " is ahead of non-zero stable timestamp " << stable,
-    //         (stable.isNull() || oldest.isNull() || oldest <= stable));
+    const Timestamp oldest = getOldestTimestamp();
+    const Timestamp stable = getStableTimestamp();
+    uassert(8470600,
+            str::stream() << "Oldest timestamp " << oldest
+                          << " is ahead of non-zero stable timestamp " << stable,
+            (stable.isNull() || oldest.isNull() || oldest <= stable));
 
     if (!gEnableAutoCompaction)
         return;

@@ -2271,15 +2271,21 @@ populated internally from the `currentCommittedSnapshot` timestamp inside `Repli
 **`stable_timestamp`**: The newest timestamp at which the storage engine is allowed to take a
 checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
-majority committed so that RTT rollback can use it. In the case when
-[`eMRC=false`](#enableMajorityReadConcern-flag), the stable timestamp may not be majority committed,
-which is why we must use the Rollback via Refetch rollback algorithm.  
+majority committed (other than a specific caveat during restore noted below) so that RTT rollback
+can use it. In the case when [`eMRC=false`](#enableMajorityReadConcern-flag), the stable timestamp
+may not be majority committed, which is why we must use the Rollback via Refetch rollback algorithm.
 This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
 special case during rollback it is possible for the `stableTimestamp` to move backwards.  
 The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
 The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921)
 if it is earlier than the `initialDataTimestamp`, since data earlier than that timestamp may be
 inconsistent.
+During restore, we may proactively set the stable timestamp as we apply oplog batches even before
+we set the `initialDataTimestamp`. This means that after startup recovery for restore (and for
+File Copy Based Initial Sync), we cannot guarantee that the stable timestamp is actually majority
+committed. However, this is safe because we do not allow rollbacks before the
+`initialDataTimestamp` and when both FCBIS and startup recovery for restore complete, the
+`initialDataTimestamp` will be equal to the stable timestamp.
 
 #### Timestamps related to both prepared and non-prepared transactions:
 

@@ -556,6 +556,57 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
     ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
 }
 
+/**
+ * Test the various cases for the relationship between oldestTimestamp and stableTimestamp at the
+ * end of startup recovery.
+ */
+TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecovery) {
+    auto opCtxRaii = _makeOperationContext();
+
+    // oldest and stable are both null.
+    ASSERT_DOES_NOT_THROW(
+        _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()));
+
+    // oldest is null, stable is not null.
+    const Timestamp initTs = Timestamp(10, 0);
+    _helper.getWiredTigerKVEngine()->setStableTimestamp(initTs, true);
+    ASSERT_DOES_NOT_THROW(
+        _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()));
+
+    // oldest and stable equal.
+    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
+    ASSERT_DOES_NOT_THROW(
+        _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()));
+
+    // stable > oldest.
+    Timestamp laterTs = Timestamp(15, 0);
+    _helper.getWiredTigerKVEngine()->setStableTimestamp(laterTs, true);
+    ASSERT_DOES_NOT_THROW(
+        _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()));
+
+    // oldest > stable.
+    laterTs = Timestamp(20, 0);
+    _helper.getWiredTigerKVEngine()->setOldestTimestamp(laterTs, true);
+    ASSERT_THROWS_CODE(
+        _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()),
+        AssertionException,
+        8470600);
+}
+
+/**
+ * Test that oldestTimestamp is allowed to advance past stableTimestamp when we notify that
+ * startup recovery is complete. This case happens when we complete logical initial sync.
+ */
+TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecoveryStableNull) {
+    auto opCtxRaii = _makeOperationContext();
+
+    // oldest is not null, stable is null.
+    const Timestamp initTs = Timestamp(10, 0);
+    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
+    ASSERT_DOES_NOT_THROW(
+        _helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(opCtxRaii.get()));
+}
+
 TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
     // Initializing this value to silence Coverity warning. Doesn't matter what value
     // _startupVersion is set to since shouldDowngrade() & getDowngradeString() only look at

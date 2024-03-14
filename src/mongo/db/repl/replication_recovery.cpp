@@ -589,8 +589,6 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
         // Take only unstable checkpoints during the recovery process.
         _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
                                                    Timestamp::kAllowUnstableCheckpointsSentinel);
-        // Allow "oldest" timestamp to move forward freely.
-        _storageInterface->setStableTimestamp(opCtx->getServiceContext(), Timestamp::min());
     }
     auto startPoint = _adjustStartPointIfNecessary(opCtx, stableTimestamp);
     _applyToEndOfOplog(opCtx, startPoint, topOfOplog.getTimestamp(), recoveryMode);
@@ -796,10 +794,10 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
         if (advanceTimestampsEachBatch) {
             invariant(!applyThroughOpTime.isNull());
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
-            // TODO SERVER-85688: Use force=false once we start setting the stable timestamp after
-            // applying each batch during startup recovery for restore.
+            replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
+                applyThroughOpTime.getTimestamp(), false /*force*/);
             replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                applyThroughOpTime.getTimestamp(), true /*force*/);
+                applyThroughOpTime.getTimestamp(), false /*force*/);
         }
     }
     stats.complete(applyThroughOpTime);
