@@ -206,15 +206,10 @@ DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetN
 
 bool DocumentSourceReshardingIterateTransaction::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
-    auto ctx = IDLParserContext("ReshardingEntry.op");
-    auto opType = repl::OpType_parse(ctx, op.getStringData());
+    auto opType = repl::OpType_parse(IDLParserContext("ReshardingEntry.op"), op.getStringData());
     auto commandVal = doc["o"];
-    repl::MultiOplogEntryType multiOpType = repl::MultiOplogEntryType::kLegacyMultiOpType;
-    if (doc["multiOpType"].getType() == NumberInt)
-        multiOpType = repl::MultiOplogEntryType_parse(ctx, doc["multiOpType"].getInt());
 
     if (opType != repl::OpTypeEnum::kCommand || doc["txnNumber"].missing() ||
-        multiOpType == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately ||
         (commandVal["applyOps"].missing() && commandVal["commitTransaction"].missing())) {
         return false;
     }

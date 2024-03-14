@@ -33,30 +33,15 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         ],
     });
 
-    // Test batched insert with multiple batches on shard 0, let it be one batch on shard 1.
-    const rst0 = reshardingTest.getReplSetForShard(donorShardNames[0]);
-    rst0.nodes.forEach(node => {assert.commandWorked(
-                           node.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}))});
-
     assert.commandWorked(sourceCollection.insert([
         {_id: "stays on shard0", oldKey: -10, newKey: -10, counter: 0},
         {_id: "moves to shard0", oldKey: 10, newKey: -10, counter: 0},
     ]));
 
-    // We test both updates, which use 'u' oplog entries, and vectored inserts, which use 'applyOps'
-    // oplog entries when featureFlagReplicateVectoredInsertsTransactionally is turned on.
     const mongos = sourceCollection.getMongo();
     const session = mongos.startSession({causalConsistency: false, retryWrites: false});
     const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())
                                   .getCollection(sourceCollection.getName());
-    const insertSession = mongos.startSession({causalConsistency: false, retryWrites: false});
-    const insertSessionCollection = insertSession.getDatabase(sourceCollection.getDB().getName())
-                                        .getCollection(sourceCollection.getName());
-    const insertDuringReshardingSession =
-        mongos.startSession({causalConsistency: false, retryWrites: false});
-    const insertDuringReshardingSessionCollection =
-        insertDuringReshardingSession.getDatabase(sourceCollection.getDB().getName())
-            .getCollection(sourceCollection.getName());
     const updateCommand = {
         update: sourceCollection.getName(),
         updates: [
@@ -66,72 +51,21 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         txnNumber: NumberLong(1)
     };
 
-    const insertCommand = {
-        insert: sourceCollection.getName(),
-        documents: [
-            {_id: "ins_stays_on_shard0_0", oldKey: -20, newKey: -20, tag: "before"},
-            {_id: "ins_stays_on_shard0_1", oldKey: -20, newKey: -20, tag: "before"},
-            {_id: "ins_moves_to_shard1_0", oldKey: -20, newKey: 20, tag: "before"},
-            {_id: "ins_moves_to_shard1_1", oldKey: -20, newKey: 20, tag: "before"},
-            {_id: "ins_stays_on_shard1_0", oldKey: 20, newKey: 20, tag: "before"},
-            {_id: "ins_stays_on_shard1_1", oldKey: 20, newKey: 20, tag: "before"},
-            {_id: "ins_moves_to_shard0_0", oldKey: 20, newKey: -20, tag: "before"},
-            {_id: "ins_moves_to_shard0_1", oldKey: 20, newKey: -20, tag: "before"},
-        ],
-        txnNumber: NumberLong(2)
-    };
-    const insertDuringReshardingCommand = {
-        insert: sourceCollection.getName(),
-        documents: [
-            {_id: "ins_dur_stays_on_shard0_0", oldKey: -20, newKey: -20, tag: "during"},
-            {_id: "ins_dur_stays_on_shard0_1", oldKey: -20, newKey: -20, tag: "during"},
-            {_id: "ins_dur_moves_to_shard1_0", oldKey: -20, newKey: 20, tag: "during"},
-            {_id: "ins_dur_moves_to_shard1_1", oldKey: -20, newKey: 20, tag: "during"},
-            {_id: "ins_dur_stays_on_shard1_0", oldKey: 20, newKey: 20, tag: "during"},
-            {_id: "ins_dur_stays_on_shard1_1", oldKey: 20, newKey: 20, tag: "during"},
-            {_id: "ins_dur_moves_to_shard0_0", oldKey: 20, newKey: -20, tag: "during"},
-            {_id: "ins_dur_moves_to_shard0_1", oldKey: 20, newKey: -20, tag: "during"},
-        ],
-        txnNumber: NumberLong(2)
-    };
+    function runRetryableWrite(phase, expectedErrorCode = ErrorCodes.OK) {
+        RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, expectedErrorCode);
 
-    function runRetryableWrites(
-        phase, expectedUpdateErrorCode = ErrorCodes.OK, expectedInsertErrorCode = ErrorCodes.OK) {
-        RetryableWritesUtil.runRetryableWrite(
-            sessionCollection, updateCommand, expectedUpdateErrorCode);
+        const docs = sourceCollection.find().toArray();
+        assert.eq(2, docs.length, {docs});
 
-        const updateDocs = sourceCollection.find({counter: {$exists: true}}).toArray();
-        assert.eq(2, updateDocs.length, {updateDocs});
-
-        for (const updateDoc of updateDocs) {
-            assert.eq(1, updateDoc.counter, {
-                message: `retryable write executed more than once ${phase}`,
-                id: updateDoc._id,
-                updateDocs
-            });
-        }
-
-        // If an insert runs more than once, we'll get a DuplicateKeyError.
-        RetryableWritesUtil.runRetryableWrite(
-            insertSessionCollection, insertCommand, expectedInsertErrorCode);
-        const insertDocs = sourceCollection.find({tag: "before"}).toArray();
-        assert.eq(8, insertDocs.length, {insertDocs});
-
-        if (phase != "before resharding" && phase != "during resharding") {
-            // We only want to run these after the clone timestamp is chosen, because that
-            // ensures they will be applied as oplog operations after cloning.
-            RetryableWritesUtil.runRetryableWrite(insertDuringReshardingSessionCollection,
-                                                  insertDuringReshardingCommand,
-                                                  expectedInsertErrorCode);
-            const insertDuringDocs = sourceCollection.find({tag: "during"}).toArray();
-            assert.eq(8, insertDuringDocs.length, {insertDuringDocs});
-        } else {
-            const insertDuringDocs = sourceCollection.find({tag: "during"}).toArray();
-            assert.eq(0, insertDuringDocs.length, {insertDuringDocs});
+        for (const doc of docs) {
+            assert.eq(
+                1,
+                doc.counter,
+                {message: `retryable write executed more than once ${phase}`, id: doc._id, docs});
         }
     }
 
-    runRetryableWrites("before resharding");
+    runRetryableWrite("before resharding");
 
     const recipientShardNames = reshardingTest.recipientShardNames;
     reshardingTest.withReshardingInBackground(
@@ -153,7 +87,7 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             // say that the resharding coordinator waited for minimumOperationDurationMS.
             let startTime = Date.now();
 
-            runRetryableWrites("during resharding");
+            runRetryableWrite("during resharding");
 
             assert.soon(() => {
                 const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
@@ -163,7 +97,7 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
                 return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
             });
 
-            runRetryableWrites("during resharding after cloneTimestamp was chosen");
+            runRetryableWrite("during resharding after cloneTimestamp was chosen");
 
             assert.soon(() => {
                 const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
@@ -173,7 +107,7 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
                 return coordinatorDoc !== null && coordinatorDoc.state === "cloning";
             });
 
-            runRetryableWrites("during resharding when in coordinator in cloning state");
+            runRetryableWrite("during resharding when in coordinator in cloning state");
 
             assert.soon(() => {
                 const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
@@ -187,20 +121,17 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             const elapsed = Date.now() - startTime;
             assert.gt(elapsed, minimumOperationDurationMS - epsilon);
             if (FeatureFlagUtil.isPresentAndEnabled(mongos, "UpdateOneWithIdWithoutShardKey")) {
-                runRetryableWrites("during resharding after collection cloning had finished");
+                runRetryableWrite("during resharding after collection cloning had finished");
             } else {
-                runRetryableWrites("during resharding after collection cloning had finished",
-                                   ErrorCodes.IncompleteTransactionHistory);
+                runRetryableWrite("during resharding after collection cloning had finished",
+                                  ErrorCodes.IncompleteTransactionHistory);
             }
         });
 
     if (FeatureFlagUtil.isPresentAndEnabled(mongos, "UpdateOneWithIdWithoutShardKey")) {
-        runRetryableWrites(
-            "after resharding", ErrorCodes.OK, ErrorCodes.IncompleteTransactionHistory);
+        runRetryableWrite("after resharding");
     } else {
-        runRetryableWrites("after resharding",
-                           ErrorCodes.IncompleteTransactionHistory,
-                           ErrorCodes.IncompleteTransactionHistory);
+        runRetryableWrite("after resharding", ErrorCodes.IncompleteTransactionHistory);
     }
     reshardingTest.teardown();
 }
