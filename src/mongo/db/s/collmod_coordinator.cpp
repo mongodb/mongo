@@ -185,7 +185,9 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
                 opCtx, _collInfo->nsForTargeting));
 
-        info.primaryShard = chunkManager.dbPrimary();
+        // Coordinator is guaranteed to be running on primary shard
+        info.primaryShard = ShardingState::get(opCtx)->shardId();
+
         std::set<ShardId> shardIdsSet;
         chunkManager.getAllShardIds(&shardIdsSet);
         std::vector<ShardId> participantsNotOwningChunks;
