@@ -113,13 +113,17 @@ if (!isMongos && getOptimizer(explain) == "classic") {
 if (!isMongos && !TestData.testingReplicaSetEndpoint) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
+    // Must set 'fromMongos: true' as otherwise 'runtimeConstants' is disallowed on mongod.
     let constants = {
         localNow: new Date(),
         clusterTime: new Timestamp(0, 0),
     };
 
-    assert.eq(coll.aggregate(pipeline,
-                             {runtimeConstants: constants, let : {target_trend: "weak decline"}})
+    assert.eq(coll.aggregate(pipeline, {
+                      runtimeConstants: constants,
+                      let : {target_trend: "weak decline"},
+                      fromMongos: true
+                  })
                   .toArray(),
               expectedResults);
 
@@ -129,7 +133,8 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         pipeline: pipeline,
         runtimeConstants: constants,
         cursor: {},
-        let : {cat: "not_a_bird"}
+        let : {cat: "not_a_bird"},
+        fromMongos: true
     }),
                                  17276);
     // Test null and empty let parameters
@@ -139,15 +144,18 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         {$match: {$expr: {$eq: ["$population_trends.trend", "weak decline"]}}},
         {$sort: {Species: 1}}
     ];
-    assert.eq(coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}}).toArray(),
-              expectedResults);
+    assert.eq(
+        coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}, fromMongos: true})
+            .toArray(),
+        expectedResults);
 
     assert.commandWorked(testDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline_no_lets,
         runtimeConstants: constants,
         cursor: {},
-        let : null
+        let : null,
+        fromMongos: true
     }));
 
     assert.commandFailedWithCode(testDB.runCommand({
@@ -155,7 +163,8 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         pipeline: pipeline_no_lets,
         runtimeConstants: constants,
         cursor: {},
-        let : 1
+        let : 1,
+        fromMongos: true
     }),
                                  ErrorCodes.TypeMismatch);
 }

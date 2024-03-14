@@ -2,6 +2,7 @@
 // specified in runtimeConstants.
 //
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
+// Must also set 'fromMongos: true' as otherwise 'runtimeConstants' is disallowed on mongod.
 // @tags: [
 //   assumes_against_mongod_not_mongos,
 //   requires_scripting,
@@ -38,6 +39,7 @@ const command = {
             }
         }
     }],
+    fromMongos: true,
 };
 
 const expectedResults = [

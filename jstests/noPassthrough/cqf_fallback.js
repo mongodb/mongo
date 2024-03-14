@@ -344,7 +344,8 @@ const rtc = {
 };
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, runtimeConstants: rtc}, false);
 assertNotSupportedByBonsai(
-    {aggregate: coll.getName(), pipeline: [], cursor: {}, runtimeConstants: rtc}, false);
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, runtimeConstants: rtc, fromMongos: true},
+    false);
 // showRecordId
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, showRecordId: true}, false);
 // singleBatch

@@ -1488,6 +1488,12 @@ Status _runAggregate(OperationContext* opCtx,
                                                origRequest);
         expCtx = pipeline->getContext();
 
+        // Only allow the use of runtime constants when from Mongos is true.
+        uassert(463840,
+                "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
+                "constants.",
+                expCtx->fromMongos || !request.getLegacyRuntimeConstants());
+
         CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         // This prevents opening a new change stream in the critical section of a serverless shard
