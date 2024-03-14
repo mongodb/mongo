@@ -51,7 +51,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
-#include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -646,25 +645,7 @@ RoutingTableHistory::RoutingTableHistory(
       _timeseriesFields(std::move(timeseriesFields)),
       _reshardingFields(std::move(reshardingFields)),
       _allowMigrations(allowMigrations),
-      _chunkMap(std::move(chunkMap)),
-      _placementVersions(_chunkMap.getShardPlacementVersionMap()) {}
-
-void RoutingTableHistory::setShardStale(const ShardId& shardId) {
-    if (gEnableFinerGrainedCatalogCacheRefresh) {
-        auto it = _placementVersions.find(shardId);
-        if (it != _placementVersions.end()) {
-            it->second.isStale.store(true);
-        }
-    }
-}
-
-void RoutingTableHistory::setAllShardsRefreshed() {
-    if (gEnableFinerGrainedCatalogCacheRefresh) {
-        for (auto& [shard, targetingInfo] : _placementVersions) {
-            targetingInfo.isStale.store(false);
-        }
-    }
-}
+      _chunkMap(std::move(chunkMap)) {}
 
 Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
                                           const BSONObj& collation,
@@ -748,7 +729,7 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
         // because _placementVersions contains shards with chunks and is built based on the last
         // refresh. Therefore, it is possible for _placementVersions to have fewer entries if a
         // shard no longer owns chunks when it used to at _clusterTime.
-        if (!_clusterTime && shardIds->size() == _rt->optRt->_placementVersions.size()) {
+        if (!_clusterTime && shardIds->size() == _rt->optRt->getNShardsOwningChunks()) {
             return false;
         }
 
@@ -802,8 +783,9 @@ ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
 void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
     invariant(all->empty());
 
-    std::transform(_placementVersions.begin(),
-                   _placementVersions.end(),
+    const auto& shardPlacementVersionMap = _chunkMap.getShardPlacementVersionMap();
+    std::transform(shardPlacementVersionMap.begin(),
+                   shardPlacementVersionMap.end(),
                    std::inserter(*all, all->begin()),
                    [](const ShardPlacementVersionMap::value_type& pair) { return pair.first; });
 }
@@ -829,21 +811,14 @@ std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
 
-PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& shardName,
-                                                               bool throwOnStaleShard) const {
-    auto it = _placementVersions.find(shardName);
-    if (it == _placementVersions.end()) {
+PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& shardName) const {
+    auto it = _chunkMap.getShardPlacementVersionMap().find(shardName);
+    if (it == _chunkMap.getShardPlacementVersionMap().end()) {
         // Shards without explicitly tracked placement versions (meaning they have no chunks) always
         // have a version of (epoch, timestamp, 0, 0)
         auto collPlacementVersion = _chunkMap.getVersion();
         return PlacementVersionTargetingInfo(ChunkVersion(collPlacementVersion, {0, 0}),
                                              Timestamp(0, 0));
-    }
-
-    if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
-        uassert(ShardInvalidatedForTargetingInfo(_nss),
-                "shard has been marked stale",
-                !it->second.isStale.load());
     }
 
     const auto& placementVersionTargetingInfo = it->second;
@@ -857,12 +832,6 @@ std::string RoutingTableHistory::toString() const {
        << " key: " << _shardKeyPattern.toString() << '\n';
 
     sb << _chunkMap.toString();
-
-    sb << "Shard placement versions:\n";
-    for (const auto& entry : _placementVersions) {
-        sb << "\t" << entry.first << ": " << entry.second.placementVersion.toString() << " @ "
-           << entry.second.validAfter.toString() << '\n';
-    }
 
     return sb.str();
 }

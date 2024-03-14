@@ -115,9 +115,6 @@ public:
     /**
      * Returns the current shard's placement version for the collection or UNSHARDED if it is not
      * sharded.
-     *
-     * Will throw ShardInvalidatedForTargeting if _thisShardId is marked as stale by
-     * the CollectionMetadata's current chunk manager.
      */
     ChunkVersion getShardPlacementVersion() const {
         return (hasRoutingTable() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
@@ -128,9 +125,6 @@ public:
      * sharded. This value indicates the commit time of the latest placement change that this shard
      * participated in and is used to answer the question of "did any chunks move since some
      * timestamp".
-     *
-     * Will throw ShardInvalidatedForTargeting if _thisShardId is marked as stale by
-     * the CollectionMetadata's current chunk manager.
      */
     Timestamp getShardMaxValidAfter() const {
         return (hasRoutingTable() ? _cm->getMaxValidAfter(_thisShardId) : Timestamp(0, 0));

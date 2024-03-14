@@ -77,7 +77,6 @@
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -101,9 +100,6 @@ const int kMaxInconsistentCollectionRefreshAttempts = 3;
 const int kDatabaseCacheSize = 10000;
 const int kCollectionCacheSize = 10000;
 const int kIndexCacheSize = 10000;
-
-const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh =
-    OperationContext::declareDecoration<bool>();
 
 std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     OperationContext* opCtx,
@@ -384,12 +380,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
 
         const auto dbInfo = std::move(swDbInfo.getValue());
 
-        const auto cacheConsistency = gEnableFinerGrainedCatalogCacheRefresh &&
-                !operationShouldBlockBehindCatalogCacheRefresh(opCtx)
-            ? CacheCausalConsistency::kLatestCached
-            : CacheCausalConsistency::kLatestKnown;
-
-        auto collEntryFuture = _collectionCache.acquireAsync(nss, cacheConsistency);
+        auto collEntryFuture =
+            _collectionCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);
 
         if (allowLocks) {
             // When allowLocks is true we may be holding a lock, so we don't
@@ -397,7 +389,6 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             // use it, otherwise return an error
 
             if (collEntryFuture.isReady()) {
-                setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
                 return ChunkManager(dbInfo->getPrimary(),
                                     dbInfo->getVersion(),
                                     collEntryFuture.get(opCtx),
@@ -416,8 +407,6 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             try {
                 auto collEntry = collEntryFuture.get(opCtx);
                 _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
-
-                setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
 
                 return ChunkManager(dbInfo->getPrimary(),
                                     dbInfo->getVersion(),
@@ -443,7 +432,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
                 }
             }
 
-            collEntryFuture = _collectionCache.acquireAsync(nss, cacheConsistency);
+            collEntryFuture =
+                _collectionCache.acquireAsync(nss, CacheCausalConsistency::kLatestKnown);
             t.reset();
         }
     } catch (const DBException& ex) {
@@ -596,18 +586,14 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationCon
     return getDatabase(opCtx, dbName);
 }
 
-void CatalogCache::_triggerPlacementVersionRefresh(OperationContext* opCtx,
-                                                   const NamespaceString& nss) {
+void CatalogCache::_triggerPlacementVersionRefresh(const NamespaceString& nss) {
     _collectionCache.advanceTimeInStore(
         nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
-    setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 }
 
-void CatalogCache::_triggerIndexVersionRefresh(OperationContext* opCtx,
-                                               const NamespaceString& nss) {
+void CatalogCache::_triggerIndexVersionRefresh(const NamespaceString& nss) {
     _indexCache.advanceTimeInStore(
         nss, ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh());
-    setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 }
 
 StatusWith<CollectionRoutingInfo> CatalogCache::_retryUntilConsistentRoutingInfo(
@@ -636,8 +622,8 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_retryUntilConsistentRoutingInfo
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        _triggerPlacementVersionRefresh(opCtx, nss);
-        _triggerIndexVersionRefresh(opCtx, nss);
+        _triggerPlacementVersionRefresh(nss);
+        _triggerIndexVersionRefresh(nss);
         return _getCollectionRoutingInfoWithoutOptimization(opCtx, nss);
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -647,7 +633,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefr
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithPlacementRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        _triggerPlacementVersionRefresh(opCtx, nss);
+        _triggerPlacementVersionRefresh(nss);
         return getCollectionRoutingInfo(opCtx, nss, false);
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -657,7 +643,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithPlac
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithIndexRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        _triggerIndexVersionRefresh(opCtx, nss);
+        _triggerIndexVersionRefresh(nss);
         return _getCollectionRoutingInfoWithoutOptimization(opCtx, nss);
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -756,41 +742,21 @@ void CatalogCache::onStaleDatabaseVersion(const DatabaseName& dbName,
     }
 }
 
-void CatalogCache::setOperationShouldBlockBehindCatalogCacheRefresh(OperationContext* opCtx,
-                                                                    bool shouldBlock) {
-    if (gEnableFinerGrainedCatalogCacheRefresh) {
-        operationShouldBlockBehindCatalogCacheRefresh(opCtx) = shouldBlock;
-    }
-}
-
 void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     const NamespaceString& nss,
     const boost::optional<ShardVersion>& wantedVersion,
     const ShardId& shardId) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
-    auto collectionEntry = _collectionCache.peekLatestCached(nss);
-
     const auto newChunkVersion = wantedVersion
         ? ComparableChunkVersion::makeComparableChunkVersion(wantedVersion->placementVersion())
         : ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
-
-    const bool routingInfoTimeAdvanced = _collectionCache.advanceTimeInStore(nss, newChunkVersion);
+    _collectionCache.advanceTimeInStore(nss, newChunkVersion);
 
     const auto newIndexVersion = wantedVersion
         ? ComparableIndexVersion::makeComparableIndexVersion(wantedVersion->indexVersion())
         : ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh();
-
     _indexCache.advanceTimeInStore(nss, newIndexVersion);
-
-    if (routingInfoTimeAdvanced && collectionEntry && collectionEntry->optRt) {
-        // Shards marked stale will be reset on the next refresh.
-        // We can mark the shard stale only if the time advanced, otherwise no refresh would happen
-        // and the shard will remain marked stale.
-        // Even if a concurrent refresh is happening this is still the old collectionEntry,
-        // so it is safe to call setShardStale.
-        collectionEntry->optRt->setShardStale(shardId);
-    }
 }
 
 void CatalogCache::advanceCollectionTimeInStore(const NamespaceString& nss,
@@ -1034,8 +1000,6 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         std::shared_ptr<RoutingTableHistory> newRoutingHistory = createUpdatedRoutingTableHistory(
             opCtx, nss, isIncremental, existingHistory, collectionAndChunks);
         invariant(newRoutingHistory);
-
-        newRoutingHistory->setAllShardsRefreshed();
 
         // Check that the shards all match with what is on the config server
         std::set<ShardId> shardIds;

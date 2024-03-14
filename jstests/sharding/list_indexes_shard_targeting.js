@@ -14,13 +14,7 @@ const nodeOptions = {
     setParameter: {enableShardedIndexConsistencyCheck: false}
 };
 
-const st = new ShardingTest({
-    shards: 3,
-    other: {
-        configOptions: nodeOptions,
-        mongosOptions: {setParameter: {enableFinerGrainedCatalogCacheRefresh: true}}
-    }
-});
+const st = new ShardingTest({shards: 3, other: {configOptions: nodeOptions}});
 const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;
@@ -54,10 +48,8 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: null}}));
 ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard1, st.shard2, {_id: MinKey});
 
 const latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1, ns).collVersion;
-const mongosCollectionVersion = st.s.adminCommand({getShardVersion: ns}).version;
 
-// Assert that the mongos and all non-donor shards have a stale collection version.
-assert.lt(mongosCollectionVersion, latestCollectionVersion);
+// Assert that all non-donor shards have a stale collection version.
 ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
 ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
 ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, latestCollectionVersion);

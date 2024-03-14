@@ -266,7 +266,6 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         case ErrorCodes::LockTimeout:
         case ErrorCodes::PreparedTransactionInProgress:
         case ErrorCodes::ShardCannotRefreshDueToLocksHeld:
-        case ErrorCodes::ShardInvalidatedForTargeting:
         case ErrorCodes::StaleDbVersion:
         case ErrorCodes::TenantMigrationAborted:
         case ErrorCodes::TenantMigrationCommitted:

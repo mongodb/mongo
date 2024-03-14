@@ -84,7 +84,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
             ErrorCodes.PreparedTransactionInProgress,
-            ErrorCodes.ShardInvalidatedForTargeting,
             ErrorCodes.NoSuchTransaction
         ];
 

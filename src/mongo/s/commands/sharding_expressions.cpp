@@ -396,8 +396,6 @@ private:
 }  // namespace
 
 Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* variables) const {
-    // TODO SERVER-71519: Add support for handling stale exception from mongos with
-    // enableFinerGrainedCatalogCacheRefresh.
     uassert(6868600,
             "$_internalOwningShard is currently not supported on mongos",
             !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));

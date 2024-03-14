@@ -299,12 +299,6 @@ public:
                                 const boost::optional<DatabaseVersion>& wantedVersion);
 
     /**
-     * Sets whether this operation should block behind a catalog cache refresh.
-     */
-    static void setOperationShouldBlockBehindCatalogCacheRefresh(OperationContext* opCtx,
-                                                                 bool shouldBlock);
-
-    /**
      * Invalidates a single shard for the current collection if the epochs given in the chunk
      * versions match. Otherwise, invalidates the entire collection, causing any future targetting
      * requests to block on an upcoming catalog cache refresh.
@@ -454,9 +448,9 @@ private:
     boost::optional<ShardingIndexesCatalogCache> _getCollectionIndexInfoAt(
         OperationContext* opCtx, const NamespaceString& nss, bool allowLocks = false);
 
-    void _triggerPlacementVersionRefresh(OperationContext* opCtx, const NamespaceString& nss);
+    void _triggerPlacementVersionRefresh(const NamespaceString& nss);
 
-    void _triggerIndexVersionRefresh(OperationContext* opCtx, const NamespaceString& nss);
+    void _triggerIndexVersionRefresh(const NamespaceString& nss);
 
     // Same as getCollectionRoutingInfo but will fetch the index information from the cache even if
     // the placement information is not sharded. Used internally when the a refresh is requested for

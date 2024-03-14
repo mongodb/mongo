@@ -64,7 +64,7 @@ server_parameters:
 
   enableFinerGrainedCatalogCacheRefresh:
     description: >-
-        Enables the finer grained catalog cache refresh behavior.
+        DEPRECATED: This parameter has been deprecated and is here only for maintaining backward compatibility.
     set_at: [ startup ]
     cpp_vartype: bool
     cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"

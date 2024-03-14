@@ -3812,29 +3812,6 @@ For example, the following sets the interval at 300000 milliseconds
 .RE
 .RE
 .PP
-\fBenableFinerGrainedCatalogCacheRefresh\f1
-.RS
-.PP
-Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
-.PP
-\fIType\f1: boolean
-.PP
-\fIDefault\f1: true
-.PP
-This parameter allows the catalog cache to be refreshed only if the
-shard needs to be refreshed. If disabled, any stale chunk will cause
-the entire chunk distribution for a collection to be considered stale
-and force all \fBrouters\f1 who
-contact the shard to refresh their shard catalog cache.
-.PP
-You can only set this parameter during start\-up and cannot change
-this setting using the \fBsetParameter\f1\f1 database command.
-.PP
-.EX
-  mongod \-\-setParameter enableFinerGrainedCatalogCacheRefresh=true
-  mongos \-\-setParameter enableFinerGrainedCatalogCacheRefresh=true
-.EE
-.RS
 .IP \(bu 2
 \fBSharding\f1
 .IP \(bu 2

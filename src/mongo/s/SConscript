@@ -292,7 +292,6 @@ env.Library(
         'resharding/resume_token.idl',
         'resharding/type_collection_fields.idl',
         'shard_cannot_refresh_due_to_locks_held_exception.cpp',
-        'shard_invalidated_for_targeting_exception.cpp',
         'shard_key_pattern.cpp',
         'shard_version.cpp',
         'shard_version.idl',

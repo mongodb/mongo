@@ -97,8 +97,6 @@ auto shardVersionRetry(OperationContext* opCtx,
     size_t numAttempts = 0;
 
     while (true) {
-        catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, numAttempts);
-
         try {
             return callbackFn();
         } catch (const DBException& ex) {
@@ -140,7 +138,6 @@ auto shardVersionRetry(ServiceContext* service,
         auto cancelableOpCtx = opCtxFactory.makeOperationContext(&cc());
         auto opCtx = cancelableOpCtx.get();
 
-        catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, *numAttempts);
         return _callbackFn(opCtx);
     };
 

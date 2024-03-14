@@ -110,7 +110,6 @@
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/session_catalog_router.h"
-#include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/transport/hello_metrics.h"
@@ -188,9 +187,7 @@ Future<void> invokeInTransactionRouter(TransactionRouter::Router& txnRouter,
     return runCommandInvocation(rec, std::move(invocation))
         .tapError([rec = std::move(rec)](Status status) {
             if (auto code = status.code(); ErrorCodes::isSnapshotError(code) ||
-                ErrorCodes::isNeedRetargettingError(code) ||
-                code == ErrorCodes::ShardInvalidatedForTargeting ||
-                code == ErrorCodes::StaleDbVersion ||
+                ErrorCodes::isNeedRetargettingError(code) || code == ErrorCodes::StaleDbVersion ||
                 code == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
                 code == ErrorCodes::WouldChangeOwningShard) {
                 // Don't abort on possibly retryable errors.
@@ -443,7 +440,6 @@ private:
     // Exception handler for error codes that may trigger a retry. All methods will throw `status`
     // unless an attempt to retry is possible.
     void _checkRetryForTransaction(Status& status);
-    void _onShardInvalidatedForTargeting(Status& status);
     void _onNeedRetargetting(Status& status);
     void _onStaleDbVersion(Status& status);
     void _onSnapshotError(Status& status);
@@ -1027,17 +1023,10 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
         txnRouter.onSnapshotError(opCtx, status);
     } else {
         invariant(ErrorCodes::isA<ErrorCategory::NeedRetargettingError>(status) ||
-                  status.code() == ErrorCodes::ShardInvalidatedForTargeting ||
                   status.code() == ErrorCodes::StaleDbVersion ||
                   status.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
 
         if (!txnRouter.canContinueOnStaleShardOrDbError(_parc->_commandName, status)) {
-            if (status.code() == ErrorCodes::ShardInvalidatedForTargeting) {
-                auto catalogCache = Grid::get(opCtx)->catalogCache();
-                (void)catalogCache->getCollectionRoutingInfoWithPlacementRefresh(
-                    opCtx, status.extraInfo<ShardInvalidatedForTargetingInfo>()->getNss());
-            }
-
             addContextForTransactionAbortingError(txnRouter.txnIdToString(),
                                                   txnRouter.getLatestStmtId(),
                                                   status,
@@ -1050,19 +1039,6 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
     }
 
     abortGuard.dismiss();
-}
-
-void ParseAndRunCommand::RunAndRetry::_onShardInvalidatedForTargeting(Status& status) {
-    invariant(status.code() == ErrorCodes::ShardInvalidatedForTargeting);
-
-    auto opCtx = _parc->_rec->getOpCtx();
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
-
-    _checkRetryForTransaction(status);
-
-    if (!_canRetry())
-        iassert(status);
 }
 
 void ParseAndRunCommand::RunAndRetry::_onNeedRetargetting(Status& status) {
@@ -1088,8 +1064,6 @@ void ParseAndRunCommand::RunAndRetry::_onNeedRetargetting(Status& status) {
             ->invalidateShardOrEntireCollectionEntryForShardedCollection(
                 originalNs, boost::none, staleInfo->getShardId());
     }
-
-    catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 
     _checkRetryForTransaction(status);
 
@@ -1168,10 +1142,6 @@ Future<void> ParseAndRunCommand::RunAndRetry::run() {
                _setup();
                return _run();
            })
-        .onError<ErrorCodes::ShardInvalidatedForTargeting>([this](Status status) {
-            _onShardInvalidatedForTargeting(status);
-            return run();  // Retry
-        })
         .onErrorCategory<ErrorCategory::NeedRetargettingError>([this](Status status) {
             _onNeedRetargetting(status);
             return run();  // Retry

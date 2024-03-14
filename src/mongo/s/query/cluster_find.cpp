@@ -769,7 +769,6 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                               << "Failed to run query after " << kMaxRetries << " retries");
                 throw;
             } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
-                       ex.code() != ErrorCodes::ShardInvalidatedForTargeting &&
                        ex.code() != ErrorCodes::ShardNotFound) {
 
                 if (ErrorCodes::isRetriableError(ex.code())) {
@@ -791,23 +790,15 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                         "maxRetries"_attr = kMaxRetries,
                         "error"_attr = redact(ex));
 
-            if (ex.code() != ErrorCodes::ShardInvalidatedForTargeting) {
-                if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                        query.nss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
-                } else {
-                    catalogCache->invalidateCollectionEntry_LINEARIZABLE(query.nss());
-                }
+            if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                    query.nss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
+            } else {
+                catalogCache->invalidateCollectionEntry_LINEARIZABLE(query.nss());
             }
-
-            catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
-                    if (ex.code() == ErrorCodes::ShardInvalidatedForTargeting) {
-                        (void)catalogCache->getCollectionRoutingInfoWithPlacementRefresh(
-                            opCtx, query.nss());
-                    }
                     throw;
                 }
 

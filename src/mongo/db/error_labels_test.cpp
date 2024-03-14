@@ -93,12 +93,6 @@ TEST(IsTransientTransactionErrorTest, ShardCannotRefreshDueToLocksHeldIsTransien
                                             false /* isCommitOrAbort */));
 }
 
-TEST(IsTransientTransactionErrorTest, ShardInvalidatedForTargetingIsTransient) {
-    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::ShardInvalidatedForTargeting,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
-}
-
 TEST(IsTransientTransactionErrorTest, StaleDbVersionIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(
         ErrorCodes::StaleDbVersion, false /* hasWriteConcernError */, false /* isCommitOrAbort */));

@@ -66,11 +66,6 @@ namespace mongo {
 class ChunkManager;
 
 struct PlacementVersionTargetingInfo {
-
-    PlacementVersionTargetingInfo(const PlacementVersionTargetingInfo& other)
-        : placementVersion(other.placementVersion),
-          validAfter(other.validAfter),
-          isStale(other.isStale.load()) {}
     /**
      * Constructs a placement information for a collection with the specified generation, starting
      * at placementVersion {0, 0} and maxValidAfter of Timestamp{0, 0}. The expectation is that the
@@ -86,9 +81,6 @@ struct PlacementVersionTargetingInfo {
     // Max validAfter for the shard, effectively this is the timestamp of the latest placement
     // change that occurred on a particular shard.
     Timestamp validAfter;
-
-    // Indicates whether the shard is stale and thus needs a catalog cache refresh
-    AtomicWord<bool> isStale{false};
 };
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
@@ -347,18 +339,6 @@ public:
     }
 
     /**
-     * Mark the given shard as stale, indicating that requests targetted to this shard (for this
-     * namespace) need to block on a catalog cache refresh.
-     */
-    void setShardStale(const ShardId& shardId);
-
-    /**
-     * Mark all shards as not stale, indicating that a refresh has happened and requests targeted
-     * to all shards (for this namespace) do not currently need to block on a catalog cache refresh.
-     */
-    void setAllShardsRefreshed();
-
-    /**
      * Returns the maximum version across all shards (also known as the "collection placement
      * version").
      */
@@ -367,11 +347,10 @@ public:
     }
 
     /**
-     * Retrieves the placement version for the given shard. Will throw a
-     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     * Retrieves the placement version for the given shard.
      */
     ChunkVersion getVersion(const ShardId& shardId) const {
-        return _getVersion(shardId, true).placementVersion;
+        return _getVersion(shardId).placementVersion;
     }
 
     /**
@@ -380,15 +359,14 @@ public:
      * based on the returned version, use getVersion() instead.
      */
     ChunkVersion getVersionForLogging(const ShardId& shardId) const {
-        return _getVersion(shardId, false).placementVersion;
+        return _getVersion(shardId).placementVersion;
     }
 
     /**
-     * Retrieves the maximum validAfter timestamp for the given shard. Will throw a
-     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     * Retrieves the maximum validAfter timestamp for the given shard.
      */
     Timestamp getMaxValidAfter(const ShardId& shardId) const {
-        return _getVersion(shardId, true).validAfter;
+        return _getVersion(shardId).validAfter;
     }
 
     size_t numChunks() const {
@@ -427,7 +405,7 @@ public:
      * Returns the number of shards on which the collection has any chunks
      */
     size_t getNShardsOwningChunks() const {
-        return _placementVersions.size();
+        return _chunkMap.getShardPlacementVersionMap().size();
     }
 
     std::string toString() const;
@@ -466,7 +444,7 @@ private:
                         bool allowMigrations,
                         ChunkMap chunkMap);
 
-    PlacementVersionTargetingInfo _getVersion(const ShardId& shardId, bool throwOnStaleShard) const;
+    PlacementVersionTargetingInfo _getVersion(const ShardId& shardId) const;
 
     // Namespace to which this routing information corresponds
     NamespaceString _nss;
@@ -500,11 +478,6 @@ private:
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
     ChunkMap _chunkMap;
-
-    // The representation of shards' placement versions and staleness indicators for this namespace.
-    // If a shard does not exist, it will not have an entry in the map. Note: this declaration must
-    // not be moved before _chunkMap since it is initialized by using the _chunkMap instance.
-    ShardPlacementVersionMap _placementVersions;
 };
 
 /**
@@ -733,8 +706,7 @@ public:
     }
 
     /**
-     * Retrieves the placement version for the given shard. Will throw a
-     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     * Retrieves the placement version for the given shard.
      */
     ChunkVersion getVersion(const ShardId& shardId) const {
         tassert(7626404, "Expected routing table to be initialized", _rt->optRt);
@@ -742,8 +714,7 @@ public:
     }
 
     /**
-     * Retrieves the maximum validAfter timestamp for the given shard. Will throw a
-     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     * Retrieves the maximum validAfter timestamp for the given shard.
      */
     Timestamp getMaxValidAfter(const ShardId& shardId) const {
         tassert(7626405, "Expected routing table to be initialized", _rt->optRt);
@@ -751,8 +722,8 @@ public:
     }
 
     /**
-     * Retrieves the placement version for the given shard. Will not throw if the shard is marked as
-     * stale. Only use when logging the given chunk version -- if the caller must execute logic
+     * Retrieves the placement version for the given shard.
+     * Only use when logging the given chunk version -- if the caller must execute logic
      * based on the returned version, use getVersion() instead.
      */
     ChunkVersion getVersionForLogging(const ShardId& shardId) const {

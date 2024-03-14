@@ -17,10 +17,7 @@ if (isStepdownSuite && isCodeCoverageEnabled) {
 // query collecting the routing table metadata to fail due to max document size exceeded).
 TestData.skipCheckRoutingTableConsistency = true;
 
-const st = new ShardingTest({
-    shards: 2,
-    other: {mongosOptions: {setParameter: {enableFinerGrainedCatalogCacheRefresh: true}}}
-});
+const st = new ShardingTest({shards: 2});
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
@@ -106,17 +103,13 @@ st.configRS.awaitLastOpCommitted();
 // last two splits were performed directly on the shards.
 assert.neq(null, st.s.getDB('config').databases.findOne());
 
-// Verify that moving a chunk won't trigger mongos's routing entry to get marked as stale until
-// a request comes in to target that chunk.
+// Trigger a refresh on the mongos through a moveChunk command.
 assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: splitPoint, to: otherShard.shardName}));
 
-// Chunks should not be included in the response regardless of the mongos version
-// because the chunk size exceeds the limit.
+// Chunks should not be included in the response because the chunk size exceeds the limit.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});
 assert.commandWorked(res);
-assert.eq(res.version.t, 1);
-assert.eq(res.version.i, 20002);
 assert.eq(undefined, res.chunks);
 
 st.stop();

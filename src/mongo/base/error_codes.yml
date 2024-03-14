@@ -360,11 +360,6 @@ error_codes:
     - {code: 302,name: OCSPCertificateStatusUnknown}
     - {code: 303,name: SplitHorizonChange,categories: [CloseConnectionError]}
 
-    # This code should only be used upon finding that a shard has been marked stale in the sharding
-    # catalog cache, and as such does not belong in the StaleShardVersionError or
-    # NeedRetargettingError categories.
-    - {code: 304,name: ShardInvalidatedForTargeting,extra: ShardInvalidatedForTargetingInfo}
-
     - {code: 306,name: ReadThroughCacheLookupCanceled,categories: [InternalOnly]}
 
     - {code: 307,name: RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist}

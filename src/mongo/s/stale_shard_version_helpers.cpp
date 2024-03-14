@@ -89,11 +89,6 @@ void checkErrorStatusAndMaxRetries(const Status& status,
         return;
     }
 
-    if (status == ErrorCodes::ShardInvalidatedForTargeting) {
-        logAndTestMaxRetries(status);
-        return;
-    }
-
     uassertStatusOK(status);
 }
 
