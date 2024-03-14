@@ -47,6 +47,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -132,6 +133,12 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        bool defaultFromMigrate,
                                        OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
+        return;
+    }
+
+    // When doing a magic restore, we want to be able to write config.shards without triggering the
+    // below.
+    if (storageGlobalParams.magicRestore) {
         return;
     }
 

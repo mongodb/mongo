@@ -991,7 +991,6 @@ StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
 Status _updateWithQuery(OperationContext* opCtx,
                         const UpdateRequest& request,
                         const Timestamp& ts) {
-    invariant(!request.isMulti());  // We only want to update one document for performance.
     invariant(!request.shouldReturnAnyDocs());
     invariant(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY == request.getYieldPolicy());
 
@@ -1129,6 +1128,7 @@ Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     request.setUpsert(true);
+    invariant(!request.isMulti());  // We only want to update one document for performance.
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
 
@@ -1141,6 +1141,21 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
     request.setQuery(query);
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
+    invariant(!request.isUpsert());
+    invariant(!request.isMulti());  // We only want to update one document for performance.
+    return _updateWithQuery(opCtx, request, update.timestamp);
+}
+
+Status StorageInterfaceImpl::updateDocuments(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const BSONObj& query,
+                                             const TimestampedBSONObj& update) {
+    auto request = UpdateRequest();
+    request.setNamespaceString(nss);
+    request.setQuery(query);
+    request.setUpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
+    request.setMulti(true);
     invariant(!request.isUpsert());
     return _updateWithQuery(opCtx, request, update.timestamp);
 }

@@ -301,6 +301,20 @@ public:
                                    const TimestampedBSONObj& update) = 0;
 
     /**
+     * Updates all matching documents in a collection. Never upsert.
+     *
+     * If the collection has more than 1 document, the update will be performed on all the documents
+     * found. The update is performed at the given timestamp.
+     * Returns 'NamespaceNotFound' if the collection does not exist. This does not implicitly
+     * create the collection so that the caller can create the collection with any collection
+     * options they want (ex: capped, temp, collation, etc.).
+     */
+    virtual Status updateDocuments(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const BSONObj& query,
+                                   const TimestampedBSONObj& update) = 0;
+
+    /**
      * Finds a single document in the collection referenced by the specified _id.
      *
      * Not supported on collections with a default collation.

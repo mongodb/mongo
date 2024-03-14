@@ -5012,6 +5012,39 @@ TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
     ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getUpdateWallClockTime());
 }
 
+TEST_F(OpObserverTest, MagicRestoreNoOplog) {
+    // Same as StartIndexBuildExpectedOplogEntry but with magicRestore = true.
+
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+    auto uuid = UUID::gen();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
+    UUID indexBuildUUID = UUID::gen();
+
+    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
+                               << "x_1"
+                               << "v" << 2);
+    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
+                               << "a_1"
+                               << "v" << 2);
+    std::vector<BSONObj> specs = {specX, specA};
+
+    storageGlobalParams.magicRestore = true;
+
+    // Should not write to the oplog with magicRestore = true;
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onStartIndexBuild(
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+        wunit.commit();
+    }
+
+    getNOplogEntries(opCtx.get(), 0);  // This asserts that there are 0 entries.
+
+    storageGlobalParams.magicRestore = false;
+}
+
 class OpObserverServerlessTest : public OpObserverTest {
 private:
     // Need to set serverless.

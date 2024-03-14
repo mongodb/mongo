@@ -150,6 +150,11 @@ public:
                            const BSONObj& query,
                            const TimestampedBSONObj& update) override;
 
+    Status updateDocuments(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const BSONObj& query,
+                           const TimestampedBSONObj& update) override;
+
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceStringOrUUID& nsOrUUID,
                                  const BSONElement& idKey) override;

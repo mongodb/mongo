@@ -270,6 +270,13 @@ public:
         return Status{ErrorCodes::IllegalOperation, "updateSingleton not implemented."};
     }
 
+    Status updateDocuments(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const BSONObj& query,
+                           const TimestampedBSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "updateDocuments not implemented."};
+    }
+
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceStringOrUUID&,
                                  const BSONElement& idKey) override {

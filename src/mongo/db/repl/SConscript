@@ -920,6 +920,7 @@ env.Library(
         'split_prepare_session_manager',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'repl_settings',
     ],
 )
@@ -2005,6 +2006,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/serverless/shard_split_utils',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'isself',
         'repl_coordinator_impl',
         'repl_coordinator_test_fixture',
