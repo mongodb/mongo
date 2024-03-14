@@ -492,7 +492,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
     counterCheckPtr->setSignalOnCount(counterCheckCount);
 
     // Restart the monitor with a different interval.
-    monitor.setPeriod(Milliseconds(1007));
+    monitor.setPeriod(Milliseconds(57));
 
     counterCheckPtr->waitForCount();
     // Wait for monitor to run at least once.
