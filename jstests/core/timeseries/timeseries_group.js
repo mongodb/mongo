@@ -97,8 +97,12 @@ TimeseriesTest.run((insert) => {
         const options = {allowDiskUse: allowDiskUse};
         const allowDiskUseStr = allowDiskUse ? "true" : "false";
 
-        const testcases = blockProcessingTestCases(
-            timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound);
+        const testcases = blockProcessingTestCases(timeFieldName,
+                                                   metaFieldName,
+                                                   datePrefix,
+                                                   dateUpperBound,
+                                                   dateLowerBound,
+                                                   sbeFullEnabled);
 
         const expectedResults = {
             GroupByNull: [{_id: null}],

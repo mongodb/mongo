@@ -1164,12 +1164,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     // 'useBlockHashAgg' flag to true and we will use BlockHashAggStage. Otherwise, we use the
     // normal HashAggStage.
 
-    // TODO SERVER-87560 re-enable block hashagg end-to-end.
-    const bool disableBlockHashAgg = true;
-
     const bool tryToUseBlockHashAgg = sbeFullEnabled && childOutputs.hasBlockOutput() &&
-        idIsSingleKey && !hasVariableGroupInit && !collatorSlot && !_cq.getExpCtx()->allowDiskUse &&
-        canBuildBlockExprsAndBlockAggs() && !disableBlockHashAgg;
+        idIsSingleKey && !hasVariableGroupInit && !collatorSlot && canBuildBlockExprsAndBlockAggs();
 
     bool useBlockHashAgg = false;
 

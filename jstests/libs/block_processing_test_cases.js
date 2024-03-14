@@ -2,7 +2,7 @@
  * Test cases and common TS queries that use block processing.
  */
 export function blockProcessingTestCases(
-    timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound) {
+    timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, sbeFullEnabled) {
     return [
         {
             name: "GroupByNull",
@@ -11,7 +11,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null}},
                 {$project: {_id: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Min_GroupByNull",
@@ -20,7 +20,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Min_GroupByNullAllPass",
@@ -29,7 +29,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByNull",
@@ -37,7 +37,7 @@ export function blockProcessingTestCases(
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, a: {$min: '$y'}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Max_GroupByNull",
@@ -46,7 +46,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Max_GroupByNullAllPass",
@@ -55,7 +55,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxWithId_GroupByNull",
@@ -63,7 +63,7 @@ export function blockProcessingTestCases(
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, a: {$max: '$y'}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMin_GroupByNull",
@@ -72,7 +72,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMin_GroupByNullAllPass",
@@ -81,7 +81,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByNull",
@@ -90,7 +90,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinAndMaxWithId_GroupByNull",
@@ -98,7 +98,7 @@ export function blockProcessingTestCases(
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Min_GroupByX",
@@ -107,7 +107,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: '$x', a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByX",
@@ -115,7 +115,7 @@ export function blockProcessingTestCases(
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$min: '$y'}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Max_GroupByX",
@@ -124,7 +124,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: '$x', a: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxWithId_GroupByX",
@@ -132,7 +132,7 @@ export function blockProcessingTestCases(
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$max: '$y'}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMin_GroupByX",
@@ -141,7 +141,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByX",
@@ -150,7 +150,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinAndMaxWithId_GroupByX",
@@ -158,7 +158,7 @@ export function blockProcessingTestCases(
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByDateTrunc",
@@ -173,7 +173,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByDateAdd",
@@ -187,7 +187,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: '$a'}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByDateAddAndDateDiff",
@@ -228,7 +228,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: '$a'}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByDateSubtractAndDateDiff",
@@ -303,7 +303,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 0, a: 1, b: 1, c: 1, d: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxAndMinOfDateAddDateSubtractDateTruncWithId_GroupByNull",
@@ -326,7 +326,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 0, a: 1, b: 1, c: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByDateTruncAndDateAdd",
@@ -348,7 +348,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByDateTruncAndDateSubtract",
@@ -371,7 +371,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByDateDiffAndDateAdd",
@@ -393,7 +393,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: 1}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinOfDateDiffWithId_GroupByNull_InvalidDate",
@@ -416,7 +416,7 @@ export function blockProcessingTestCases(
                 {$project: {_id: 0, a: 1}}
             ],
             expectedErrorCode: 7157922,
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinOfDateAddWithId_GroupByNull_MissingAmount",
@@ -459,7 +459,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: {$add: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxPlusMinWithId_GroupByFilteredComputedDateDiff",
@@ -480,27 +480,27 @@ export function blockProcessingTestCases(
                 {$group: {_id: "$msDiff", a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 1, a: {$add: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Min_GroupByX_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}, {$project: {_id: 0, a: 1}}],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinWithId_GroupByX_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "Max_GroupByX_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}, {$project: {_id: 0, a: 1}}],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxWithId_GroupByX_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMin_GroupByX_NoFilter",
@@ -508,7 +508,7 @@ export function blockProcessingTestCases(
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByX_NoFilter",
@@ -516,12 +516,12 @@ export function blockProcessingTestCases(
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MinAndMaxWithId_GroupByX_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByDateTrunc_NoFilter",
@@ -535,7 +535,7 @@ export function blockProcessingTestCases(
                 },
                 {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "MaxMinusMinWithId_GroupByDateTruncAndDateDiff_NoFilter",
@@ -628,7 +628,7 @@ export function blockProcessingTestCases(
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: null, minY: {$min: "$y"}}},
             ],
-            usesBlockProcessing: false,
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "GroupWithProjectedOutFieldInGb",
@@ -637,7 +637,7 @@ export function blockProcessingTestCases(
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: "$y", a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false,
+            usesBlockProcessing: sbeFullEnabled
         },
         {
             name: "GroupWithMixOfProjectedOutField",
@@ -646,7 +646,7 @@ export function blockProcessingTestCases(
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: "$y", a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false,
+            usesBlockProcessing: false
         }
     ];
 }

@@ -154,7 +154,7 @@ function runTestCases(allowDiskUse, forceSpilling) {
         internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
     }));
     let testcases = blockProcessingTestCases(
-        timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound);
+        timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, false);
     // Filter out tests with known accepted differences between SBE and Classic.
     testcases = testcases.filter(function(test) {
         return test.name !== 'MinOfMetaSortKey_GroupByX';

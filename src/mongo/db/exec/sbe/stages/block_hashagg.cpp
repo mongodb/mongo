@@ -784,14 +784,19 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
         bob.append("groupBySlots", _groupSlots.begin(), _groupSlots.end());
         bob.append("rowAccSlotId", _rowAccSlotId);
 
-        BSONObjBuilder blockExprBob(bob.subobjStart("blockExpressions"));
-        for (auto&& [slot, expr] : _blockRowAggs) {
-            blockExprBob.append(str::stream() << slot, printer.print(expr.blockAgg->debugPrint()));
+        {
+            BSONObjBuilder blockExprBob(bob.subobjStart("blockExpressions"));
+            for (auto&& [slot, expr] : _blockRowAggs) {
+                blockExprBob.append(str::stream() << slot,
+                                    printer.print(expr.blockAgg->debugPrint()));
+            }
         }
 
-        BSONObjBuilder rowExprBob(bob.subobjStart("rowExpressions"));
-        for (auto&& [slot, expr] : _blockRowAggs) {
-            rowExprBob.append(str::stream() << slot, printer.print(expr.rowAgg->debugPrint()));
+        {
+            BSONObjBuilder rowExprBob(bob.subobjStart("rowExpressions"));
+            for (auto&& [slot, expr] : _blockRowAggs) {
+                rowExprBob.append(str::stream() << slot, printer.print(expr.rowAgg->debugPrint()));
+            }
         }
 
         ret->debugInfo = bob.obj();
