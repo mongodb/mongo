@@ -367,6 +367,9 @@ DEFN_QUERY_COUNTER(updateOneNonTargetedShardedCount);
 DEFN_QUERY_COUNTER(deleteOneNonTargetedShardedCount);
 DEFN_QUERY_COUNTER(findAndModifyNonTargetedShardedCount);
 DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdCount);
+DEFN_QUERY_COUNTER(nonRetryableDeleteOneWithoutShardKeyWithIdCount);
+DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdCount);
+DEFN_QUERY_COUNTER(nonRetryableUpdateOneWithoutShardKeyWithIdCount);
 DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdRetryCount);
 DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdRetryCount);
 #undef DEFN_QUERY_COUNTER

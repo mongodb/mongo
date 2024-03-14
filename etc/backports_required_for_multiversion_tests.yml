@@ -503,7 +503,7 @@ last-continuous:
     ticket: SERVER-82717
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
     ticket: SERVER-80842
-  - test_file: jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
+  - test_file: jstests/sharding/server_status_crud_metrics_write_without_shard_key_with_id.js
     ticket: SERVER-80842
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-75604
@@ -1148,7 +1148,7 @@ last-lts:
     ticket: SERVER-82717
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
     ticket: SERVER-80842
-  - test_file: jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
+  - test_file: jstests/sharding/server_status_crud_metrics_write_without_shard_key_with_id.js
     ticket: SERVER-80842
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-75604

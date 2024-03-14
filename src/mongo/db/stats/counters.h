@@ -648,13 +648,22 @@ extern Counter64& updateOneNonTargetedShardedCount;
 extern Counter64& deleteOneNonTargetedShardedCount;
 // Track the number of non-targeted findAndModify commands on sharded collections
 extern Counter64& findAndModifyNonTargetedShardedCount;
-// Track the number of non-targeted deleteOne commands (without shard key with _id) on sharded
-// collections.
+// Track the number of non-targeted retryable deleteOne commands (without shard key with _id) on
+// sharded collections.
 extern Counter64& deleteOneWithoutShardKeyWithIdCount;
-// Track the number of retries for non-targeted updateOne commands (without shard key with _id) on
-// sharded collections
+// Track the number of non-targeted non-retryable deleteOne commands (without shard key with _id) on
+// sharded collections.
+extern Counter64& nonRetryableDeleteOneWithoutShardKeyWithIdCount;
+// Track the number of non-targeted retryable updateOne commands (without shard key with _id) on
+// sharded collections.
+extern Counter64& updateOneWithoutShardKeyWithIdCount;
+// Track the number of non-targeted non-retryable updateOne commands (without shard key with _id) on
+// sharded collections.
+extern Counter64& nonRetryableUpdateOneWithoutShardKeyWithIdCount;
+// Track the number of retries for retryable non-targeted updateOne commands (without shard key with
+// _id) on sharded collections
 extern Counter64& updateOneWithoutShardKeyWithIdRetryCount;
-// Track the number of retries for non-targeted deleteOne commands (without shard key with _id) on
-// sharded collections
+// Track the number of retries for retryable non-targeted deleteOne commands (without shard key with
+// _id) on sharded collections
 extern Counter64& deleteOneWithoutShardKeyWithIdRetryCount;
 }  // namespace mongo

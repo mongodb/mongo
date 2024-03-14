@@ -642,8 +642,13 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             if (isUpsert && useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
             } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
-                       isUpdateOneWithIdWithoutShardKeyEnabled(opCtx) && isRetryableWrite(opCtx)) {
-                *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+                       isUpdateOneWithIdWithoutShardKeyEnabled(opCtx)) {
+                if (isRetryableWrite(opCtx)) {
+                    updateOneWithoutShardKeyWithIdCount.increment(1);
+                    *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+                } else {
+                    nonRetryableUpdateOneWithoutShardKeyWithIdCount.increment(1);
+                }
             }
         } else {
             if (useTwoPhaseWriteProtocol) {
@@ -749,9 +754,13 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         deleteOneNonTargetedShardedCount.increment(1);
         if (isExactId) {
             if (isNonTargetedWriteWithoutShardKeyWithExactId &&
-                isUpdateOneWithIdWithoutShardKeyEnabled(opCtx) && isRetryableWrite(opCtx)) {
-                *isNonTargetedWriteWithoutShardKeyWithExactId = true;
-                deleteOneWithoutShardKeyWithIdCount.increment(1);
+                isUpdateOneWithIdWithoutShardKeyEnabled(opCtx)) {
+                if (isRetryableWrite(opCtx)) {
+                    *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+                    deleteOneWithoutShardKeyWithIdCount.increment(1);
+                } else {
+                    nonRetryableDeleteOneWithoutShardKeyWithIdCount.increment(1);
+                }
             }
         } else {
             if (useTwoPhaseWriteProtocol) {
