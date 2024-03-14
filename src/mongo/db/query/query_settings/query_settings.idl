@@ -34,7 +34,6 @@ global:
 
 imports:
   - "mongo/db/basic_types.idl"
-  - "mongo/db/namespace_spec.idl"
   - "mongo/db/query/index_hint.idl"
   - "mongo/db/query/query_knobs.idl"
   - "mongo/db/query/query_shape/query_shape_hash.idl"
@@ -51,11 +50,24 @@ types:
     is_view: false
 
 structs:
+  Namespace:
+    description: >-
+      Struct representing a namespace. An alternative definition of the
+      NamespaceString.
+    fields:
+      db:
+        type: string
+        stability: unstable
+      coll:
+        type: string
+        stability: unstable
+
   IndexHintSpec:
     description: "Struct representing the index hint spec."
     fields:
       ns:
-        type: NamespaceSpec
+        type: Namespace
+        optional: true
         stability: unstable
       allowedIndexes:
         type: array<IndexHint>

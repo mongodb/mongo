@@ -48,6 +48,7 @@
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo::query_settings {
@@ -245,12 +246,7 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
                                           const boost::optional<TenantId>& tenantId) {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     auto newSettings = QuerySettingsClusterParameterValue::parse(
-        IDLParserContext("querySettingsParameterValue",
-                         false /* apiStrict */,
-                         boost::none /* vts */,
-                         tenantId,
-                         SerializationContext::stateDefault()),
-        newValueElement.Obj());
+        IDLParserContext("querySettingsParameterValue"), newValueElement.Obj());
     size_t rejectCount = 0;
     for (const auto& config : newSettings.getSettingsArray()) {
         if (config.getSettings().getReject()) {

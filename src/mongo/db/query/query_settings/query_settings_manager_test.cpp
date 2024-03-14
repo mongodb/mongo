@@ -106,31 +106,21 @@ void assertQueryShapeConfigurationsEquals(
 
 }  // namespace
 
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix,
-                         true /* nonPrefixedTenantId */};
-
 class QuerySettingsManagerTest : public ServiceContextTest {
 public:
     static constexpr StringData kCollName = "exampleCol"_sd;
     static constexpr StringData kDbName = "foo"_sd;
 
     static std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
-        OperationContext* opCtx, TenantId tenantId) {
-        OID tenantOid = OID::parse(tenantId.toString()).getValue();
-        NamespaceSpec ns;
-        ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
-        ns.setColl(kCollName);
-
+        OperationContext* opCtx, boost::optional<TenantId> tenantId) {
         QuerySettings settings;
         settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-        settings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a_1")})}});
+        settings.setIndexHints({{IndexHintSpec({IndexHint("a_1")})}});
         QueryInstance queryA = BSON("find" << kCollName << "$db" << kDbName << "filter"
-                                           << BSON("a" << 2) << "$tenant" << tenantOid);
-        QueryInstance queryB = BSON("find" << kCollName << "$db" << kDbName << "filter"
-                                           << BSON("a" << BSONNULL) << "$tenant" << tenantOid);
+                                           << BSON("a" << 2) << "$tenant" << TenantId{OID::gen()});
+        QueryInstance queryB =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL)
+                        << "$tenant" << TenantId{OID::gen()});
         return {makeQueryShapeConfiguration(settings, queryA, opCtx, tenantId),
                 makeQueryShapeConfiguration(settings, queryB, opCtx, tenantId)};
     }
