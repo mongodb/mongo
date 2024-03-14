@@ -51,7 +51,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/direct_connection_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -370,10 +369,6 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             }
         }
     }
-
-    // Recheck if this operation is a direct connection and if it is authorized to be one after
-    // acquiring collection locks.
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedNss.dbName());
 
     const auto receivedShardVersion{
         OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
@@ -791,21 +786,12 @@ const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationC
         auto catalogStateForNamespace =
             acquireCatalogStateForNamespace(opCtx, nsOrUUID, readConcernArgs, _options);
 
-        // Check if this operation is a direct connection and if it is authorized to be one after
-        // acquiring the snapshot.
-        direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedDbName);
-
         _resolvedNss = std::move(catalogStateForNamespace.resolvedNss);
         _view = std::move(catalogStateForNamespace.view);
         CollectionCatalog::stash(opCtx, std::move(catalogStateForNamespace.catalog));
 
         return catalogStateForNamespace.collection;
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // In the case that direct connections have been disallowed during the yield, it is possible
-        // that the collection has been moved and therefore appears to have been dropped locally. In
-        // this case, we should still inform the user that direct connections are no longer allowed.
-        direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedDbName);
-
         // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
         // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
         // collection corresponding to the UUID passed as a parameter no longer exists. This can
@@ -896,10 +882,6 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
                 return _restoreFromYield(opCtx, std::move(uuid));
             });
     }
-
-    // Check if this operation is a direct connection and if it is authorized to be one after
-    // acquiring the snapshot.
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, nsOrUUID.dbName());
 
     // Post-snapshot shard version checks.
     auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
@@ -1119,10 +1101,6 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
       }()) {
 
     acquireConsistentCatalogAndSnapshotUnsafe(opCtx, dbName);
-
-    // Check if this operation is a direct connection and if it is authorized to be one after
-    // acquiring the snapshot.
-    direct_connection_util::checkDirectShardOperationAllowed(opCtx, dbName);
 }
 
 AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,

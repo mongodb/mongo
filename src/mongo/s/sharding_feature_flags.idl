@@ -143,8 +143,3 @@ feature_flags:
     cpp_varname: feature_flags::gTrackUnshardedCollectionsUponMoveCollection
     default: false
     shouldBeFCVGated: true
-  featureFlagFailOnDirectShardOperations:
-    description: "Feature flag for erroring when a direct shard operation is detected."
-    cpp_varname: feature_flags::gFailOnDirectShardOperations
-    default: false
-    shouldBeFCVGated: true

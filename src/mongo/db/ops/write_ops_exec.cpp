@@ -643,11 +643,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         // Otherwise, proceed as though the batch insert block failed, since the batch insert block
         // assumes `acquireCollection` is successful.
         shouldProceedWithBatchInsert = false;
-        // We can get an unauthorized error in the case of direct shard operations. This command
-        // will not succeed upon the next collection acquisition either.
-        if (ex.code() == ErrorCodes::Unauthorized) {
-            throw;
-        }
     }
 
     if (shouldProceedWithBatchInsert) {

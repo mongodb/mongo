@@ -312,8 +312,6 @@ protected:
     // Disable the QueryAnalysisWriter because the fixture doesn't construct the ServiceEntryPoint
     // or the PeriodicRunner.
     FailPointEnableBlock disableQueryAnalysisWriter{"disableQueryAnalysisWriter"};
-    // Disable direct connection checks because this fixture doesn't set up the ShardingState
-    FailPointEnableBlock _skipDirectConnectionChecks{"skipDirectConnectionChecks"};
 };
 
 

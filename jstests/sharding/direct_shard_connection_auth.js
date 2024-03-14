@@ -3,8 +3,6 @@
  *
  * @tags: [featureFlagCheckForDirectShardOperations, requires_fcv_70]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 // Create a new sharded cluster for testing and enable auth.
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
 
@@ -13,13 +11,6 @@ const shardAdminDB = shardConn.getDB("admin");
 const shardAdminTestDB = shardConn.getDB("test");
 const userConn = new Mongo(st.shard0.host);
 const userTestDB = userConn.getDB("test");
-
-shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
-assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
-
-// TODO: (SERVER-87190) Remove once 8.0 becomes last lts.
-const failOnDirectOps =
-    FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "FailOnDirectShardOperations");
 
 function getUnauthorizedDirectWritesCount() {
     return assert.commandWorked(shardAdminDB.runCommand({serverStatus: 1}))
@@ -30,6 +21,8 @@ function getUnauthorizedDirectWritesCount() {
 jsTest.log("Running tests with only one shard.");
 {
     // Direct writes to collections with root priviledge should be authorized.
+    shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
+    assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
     assert.commandWorked(shardAdminTestDB.getCollection("coll").insert({value: 1}));
     assert.eq(getUnauthorizedDirectWritesCount(), 0);
 
@@ -68,12 +61,7 @@ jsTest.log("Running tests with two shards.");
     // Direct writes to collections with read/write priviledge should not be authorized.
     shardAdminTestDB.createUser({user: "user", pwd: "y", roles: ["readWrite"]});
     assert(userTestDB.auth("user", "y"), "Authentication failed");
-    if (failOnDirectOps) {
-        assert.commandFailedWithCode(userTestDB.getCollection("coll").insert({value: 4}),
-                                     ErrorCodes.Unauthorized);
-    } else {
-        assert.commandWorked(userTestDB.getCollection("coll").insert({value: 4}));
-    }
+    assert.commandWorked(userTestDB.getCollection("coll").insert({value: 4}));
     assert.eq(getUnauthorizedDirectWritesCount(), 1);
     userTestDB.logout();
     assert.eq(getUnauthorizedDirectWritesCount(), 1);

@@ -997,7 +997,6 @@ env.Library(
         'catalog/collection_yield_restore.cpp',
         'catalog_raii.cpp',
         'db_raii.cpp',
-        'direct_connection_util.cpp',
         'shard_role.cpp',
     ],
     LIBDEPS=[
