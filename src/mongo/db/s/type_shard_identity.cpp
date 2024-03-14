@@ -93,8 +93,7 @@ Status ShardIdentityType::validate(bool fassert) const {
                                 "Shard identity document for a shard server was detected, but the "
                                 "server is not a dedicated shard server. To fix this, restart this "
                                 "server with --shardsvr.");
-        } else if (isShardIdConfigServer &&
-                   serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+        } else if (isShardIdConfigServer && serverGlobalParams.clusterRole.isShardOnly()) {
             LOGV2_FATAL_NOTRACE(8024902,
                                 "Shard identity document for a config server was detected, but the "
                                 "server is not a config server. To fix this, restart this server "

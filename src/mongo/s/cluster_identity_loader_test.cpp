@@ -82,7 +82,8 @@ class ClusterIdentityTest : public ShardingTestFixture {
 public:
     void setUp() {
         // TODO SERVER-78051: Remove once shards can access the loaded cluster id.
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+        serverGlobalParams.clusterRole = {
+            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
 
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);

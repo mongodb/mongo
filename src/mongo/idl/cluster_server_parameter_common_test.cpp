@@ -55,7 +55,8 @@ class ClusterServerParameterCommonTest : public ClusterServerParameterTestBase {
 public:
     void setUp() override {
         ClusterServerParameterTestBase::setUp();
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+        serverGlobalParams.clusterRole = {
+            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
         _shardLocal = std::make_unique<ShardLocal>(ShardId::kConfigServerId);
     }
 
