@@ -367,6 +367,12 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
                                             const ChunkManager& cm,
                                             const BSONObj& query,
                                             const BSONObj& collation);
+/**
+ * Returns the shards that would be targeted for the given query according to the given routing
+ * info.
+ */
+std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query,
+                                                     const ChunkManager& cm);
 
 /**
  * Determines the shard(s) to which the given query will be targeted, and builds a separate

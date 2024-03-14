@@ -54,6 +54,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -793,6 +794,43 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
         // query and collation.
         std::set<ShardId> shardIds;
         getShardIdsForQuery(expCtx, query, collation, cm, &shardIds, nullptr /* info */);
+        return shardIds;
+    }
+
+    // The collection does not have a routing table. Target only the primary shard for the database.
+    return {cm.dbPrimary()};
+}
+
+std::set<ShardId> getTargetedShardsForCanonicalQuery(const CanonicalQuery& query,
+                                                     const ChunkManager& cm) {
+    if (cm.hasRoutingTable()) {
+        // The collection has a routing table. Use it to decide which shards to target based on the
+        // query and collation.
+
+        // If the query has a hint or geo expression, fall back to re-creating a find command from
+        // scratch. Hint can interfere with query planning, which we rely on for targeting. Shard
+        // targeting modifies geo queries and this helper shouldn't have a side effect on 'query'.
+        const auto& findCommand = query.getFindCommandRequest();
+        if (!findCommand.getHint().isEmpty() ||
+            QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(),
+                                        MatchExpression::GEO_NEAR)) {
+            return getTargetedShardsForQuery(
+                query.getExpCtx(), cm, findCommand.getFilter(), findCommand.getCollation());
+        }
+
+        query.getExpCtx()->uuid = cm.getUUID();
+
+        // 'getShardIdsForCanonicalQuery' assumes that the ExpressionContext has the appropriate
+        // collation set. Here, if the query collation is empty, we use the collection default
+        // collation for targeting.
+        const auto& collation = query.getFindCommandRequest().getCollation();
+        if (collation.isEmpty() && cm.getDefaultCollator()) {
+            auto defaultCollator = cm.getDefaultCollator();
+            query.getExpCtx()->setCollator(defaultCollator->clone());
+        }
+
+        std::set<ShardId> shardIds;
+        getShardIdsForCanonicalQuery(query, cm, &shardIds, nullptr /* info */);
         return shardIds;
     }
 

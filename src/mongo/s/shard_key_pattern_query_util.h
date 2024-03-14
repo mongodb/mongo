@@ -147,14 +147,13 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          bool bypassIsFieldHashedCheck = false);
 
 /**
- * Populates 'shardIds' with the shard ids for a query with given filter and collation. If 'info' is
+ * Populates 'shardIds' with the shard ids for a query with given filter. If 'info' is
  * not null, populates it with the ChunkRanges that the query targets and a description about
  * whether the query targets a single shard key value, multiple but not all shard key values or all
  * shard key values.  If 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was
  * hashed and assumes that any non-collatable shard key was not hashed from a collatable type.
  */
 void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
-                                  const BSONObj& collation,
                                   const ChunkManager& cm,
                                   std::set<ShardId>* shardIds,
                                   shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,

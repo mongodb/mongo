@@ -233,12 +233,12 @@ private:
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
-     * Returns !OK with message if query could not be targeted.
+     * Uses the collation specified on the CanonicalQuery for targeting. If there is no query
+     * collation, uses the collection default.
      *
-     * If 'collation' is empty, we use the collection default collation for targeting.
+     * Returns !OK with message if query could not be targeted.
      */
     StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query,
-                                                        const BSONObj& collation,
                                                         std::set<ChunkRange>* chunkRanges) const;
 
     /**

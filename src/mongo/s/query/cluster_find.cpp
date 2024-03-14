@@ -347,10 +347,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  bool* partialResultsReturned) {
     const auto& cm = cri.cm;
 
-    auto findCommand = query.getFindCommandRequest();
+    const auto& findCommand = query.getFindCommandRequest();
     // Get the set of shards on which we will run the query.
-    auto shardIds = getTargetedShardsForQuery(
-        query.getExpCtx(), cm, findCommand.getFilter(), findCommand.getCollation());
+    auto shardIds = getTargetedShardsForCanonicalQuery(query, cm);
 
     bool requestQueryStatsFromRemotes =
         feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
@@ -688,7 +687,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // We must always have a BSONObj vector into which to output our results.
     invariant(results);
 
-    auto findCommand = query.getFindCommandRequest();
+    const auto& findCommand = query.getFindCommandRequest();
     // Projection on the reserved sort key field is illegal in mongos.
     if (findCommand.getProjection().hasField(AsyncResultsMerger::kSortKeyField)) {
         uasserted(ErrorCodes::BadValue,

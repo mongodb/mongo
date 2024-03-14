@@ -575,7 +575,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
 
     // We first try to target based on the update's query. It is always valid to forward any update
     // or upsert to a single shard, so return immediately if we are able to target a single shard.
-    auto endPoints = uassertStatusOK(_targetQuery(*cq, collation, chunkRanges));
+    auto endPoints = uassertStatusOK(_targetQuery(*cq, chunkRanges));
     if (endPoints.size() == 1) {
         // The check is structured in this way to check if the query does not contain a shard key,
         // but is still targetable to a single shard. We don't explicitly use the result of
@@ -724,7 +724,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
 
     // We first try to target based on the delete's query. It is always valid to forward any delete
     // to a single shard, so return immediately if we are able to target a single shard.
-    auto endpoints = uassertStatusOK(_targetQuery(*cq, collation, chunkRanges));
+    auto endpoints = uassertStatusOK(_targetQuery(*cq, chunkRanges));
     if (endpoints.size() == 1) {
         if (!deleteOp.getMulti()) {
             deleteOneTargetedShardedCount.increment(1);
@@ -789,7 +789,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
         findCommand->setCollation(collation.getOwned());
     } else if (cm.getDefaultCollator()) {
         auto defaultCollator = cm.getDefaultCollator();
-        findCommand->setCollation(defaultCollator->getSpec().toBSON());
         expCtx->setCollator(defaultCollator->clone());
     }
 
@@ -802,14 +801,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
 }
 
 StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQuery(
-    const CanonicalQuery& query,
-    const BSONObj& collation,
-    std::set<ChunkRange>* chunkRanges) const {
+    const CanonicalQuery& query, std::set<ChunkRange>* chunkRanges) const {
 
     std::set<ShardId> shardIds;
     QueryTargetingInfo info;
     try {
-        getShardIdsForCanonicalQuery(query, collation, _cri.cm, &shardIds, &info);
+        getShardIdsForCanonicalQuery(query, _cri.cm, &shardIds, &info);
         if (chunkRanges) {
             chunkRanges->swap(info.chunkRanges);
         }

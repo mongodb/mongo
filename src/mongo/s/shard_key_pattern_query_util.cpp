@@ -473,7 +473,6 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
         findCommand->setCollation(collation.getOwned());
     } else if (cm.getDefaultCollator()) {
         auto defaultCollator = cm.getDefaultCollator();
-        findCommand->setCollation(defaultCollator->getSpec().toBSON());
         expCtx->setCollator(defaultCollator->clone());
     }
 
@@ -487,11 +486,10 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
             .findCommand = std::move(findCommand),
             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
 
-    getShardIdsForCanonicalQuery(*cq, collation, cm, shardIds, info, bypassIsFieldHashedCheck);
+    getShardIdsForCanonicalQuery(*cq, cm, shardIds, info, bypassIsFieldHashedCheck);
 }
 
 void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
-                                  const BSONObj& collation,
                                   const ChunkManager& cm,
                                   std::set<ShardId>* shardIds,
                                   QueryTargetingInfo* info,
@@ -504,8 +502,10 @@ void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
     auto shardKeyToFind = extractShardKeyFromQuery(cm.getShardKeyPattern(), query);
     if (!shardKeyToFind.isEmpty()) {
         try {
-            auto chunk =
-                cm.findIntersectingChunk(shardKeyToFind, collation, bypassIsFieldHashedCheck);
+            const auto& commandCollation = query.getFindCommandRequest().getCollation();
+
+            auto chunk = cm.findIntersectingChunk(
+                shardKeyToFind, commandCollation, bypassIsFieldHashedCheck);
             shardIds->insert(chunk.getShardId());
             if (info) {
                 info->desc = QueryTargetingInfo::Description::kSingleKey;
@@ -533,8 +533,13 @@ void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
     auto ranges = flattenBounds(cm.getShardKeyPattern(), bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        const auto& min = it->first;
-        const auto& max = it->second;
+        // We need to know which endpoint is the min/max to call getShardIdsForRange(). Normally,
+        // the index bounds should look like [min, max]. If the query was specified with a sort,
+        // however, the index bounds may be out of order, like [max, min].
+        const bool minFirst = !query.getSortPattern() ||
+            SimpleBSONObjComparator::kInstance.evaluate(it->first < it->second);
+        const auto& min = minFirst ? it->first : it->second;
+        const auto& max = minFirst ? it->second : it->first;
 
         cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
 
