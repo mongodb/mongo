@@ -240,19 +240,17 @@ private:
     // Write concern responses from all write batches so far
     std::vector<ShardWCError> _wcErrors;
 
-    // Optionally stores a vector of write concern errors from all shards encountered during
+    // Optionally stores a map of write concern errors from all shards encountered during
     // the current round of execution. This is used only in the specific case where we are
-    // processing a write of type WriteType::WithoutShardKeyWithId, and is necessary because
+    // processing writes of type WriteType::WithoutShardKeyWithId, and is necessary because
     // if we see a staleness error we restart the broadcasting protocol and do not care about
     // results or WC errors from previous rounds of the protocol. Thus we temporarily save the
-    // errors here, and at the end of each round of execution we check if the operation specified
-    // by the opIdx has reached a terminal state. If so, these errors are final and will be moved
+    // errors here, and at the end of each round of execution we check if the operations specified
+    // by the opIdx have reached a terminal state. If so, these errors are final and will be moved
     // to _wcErrors. If the op is not in a terminal state, we must be restarting the protocol and
     // therefore we discard the errors.
-    // We always process writes of type WithoutShardKeyWithId in their own round and thus there is
-    // only ever a single op in consideration here.
-    // TODO : SERVER-86649
-    boost::optional<std::pair<int /* opIdx */, std::vector<ShardWCError>>> _deferredWCErrors;
+    boost::optional<stdx::unordered_map<int /* opIdx */, std::vector<ShardWCError>>>
+        _deferredWCErrors;
 
     // Optionally stores a vector of TargetedWriteBatch and response pair for writes of type
     // WithoutShardKeyWithId in a targeted batch to defer updating batch stats until we are sure

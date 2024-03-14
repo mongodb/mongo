@@ -415,8 +415,8 @@ void executeChildBatches(OperationContext* opCtx,
                 }
             }
         }
-        batchOp.handleDeferredWriteConcernErrors();
         batchOp.handleDeferredResponses(targeter.hasStaleShardResponse());
+        batchOp.handleDeferredWriteConcernErrors();
     }
 }
 

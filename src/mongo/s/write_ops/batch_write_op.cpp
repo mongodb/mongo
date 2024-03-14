@@ -748,12 +748,9 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         auto shardId = targetedBatch.getWrites()[0]->endpoint.shardName;
         if (_writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId) {
             if (!_deferredWCErrors) {
-                _deferredWCErrors = std::make_pair(firstTargetedWriteOpIdx,
-                                                   std::vector{ShardWCError(shardId, wce)});
-            } else {
-                invariant(_deferredWCErrors->first == firstTargetedWriteOpIdx);
-                _deferredWCErrors->second.push_back(ShardWCError(shardId, wce));
+                _deferredWCErrors.emplace();
             }
+            (*_deferredWCErrors)[firstTargetedWriteOpIdx].push_back(ShardWCError(shardId, wce));
         } else {
             // For BatchWriteOp, all writes in the batch should share the same endpoint since they
             // target the same shard and namespace. So we just use the endpoint from the first
@@ -1048,11 +1045,16 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
 
 void BatchWriteOp::handleDeferredWriteConcernErrors() {
     if (_deferredWCErrors) {
-        auto& [opIdx, wcErrors] = _deferredWCErrors.value();
-        auto& op = _writeOps[opIdx];
-        invariant(op.getWriteType() == WriteType::WithoutShardKeyWithId);
-        if (op.getWriteState() >= WriteOpState_Completed) {
-            _wcErrors.insert(_wcErrors.end(), wcErrors.begin(), wcErrors.end());
+        for (auto& it : *_deferredWCErrors) {
+            auto& op = _writeOps[it.first];
+            auto& wcErrors = it.second;
+            invariant(op.getWriteType() == WriteType::WithoutShardKeyWithId);
+            if (op.getWriteState() >= WriteOpState_Completed) {
+                _wcErrors.insert(_wcErrors.end(), wcErrors.begin(), wcErrors.end());
+            } else {
+                // If we are here for any op it means that the whole batch is retried.
+                break;
+            }
         }
         _deferredWCErrors = boost::none;
     }
