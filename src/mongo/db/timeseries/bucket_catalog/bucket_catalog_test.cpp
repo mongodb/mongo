@@ -2432,9 +2432,9 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
 
     // Set the catalog memory usage to be above the memory usage threshold by the amount of memory
     // used by the idle bucket.
-    sideBucketCatalog->memoryUsage.store(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
-                                         sideBucketCatalog->trackingContext.allocated() +
-                                         trackingContext.allocated());
+    sideBucketCatalog->trackingContext.stats().bytesAllocated(
+        getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
+        sideBucketCatalog->trackingContext.allocated() + trackingContext.allocated());
 
     // When we exceed the memory usage threshold we will first try to archive idle buckets to try
     // to get below the threshold. If this does not get us beneath the threshold, we will then try
@@ -2463,8 +2463,8 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // Set the memory usage to be back at the threshold. Now, when we run expire idle buckets again,
     // because there are no idle buckets left to archive, we will close the bucket that we
     // previously archived.
-    sideBucketCatalog->memoryUsage.store(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() +
-                                         1);
+    sideBucketCatalog->trackingContext.stats().bytesAllocated(
+        getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() + 1);
     internal::expireIdleBuckets(_makeOperationContext().second.get(),
                                 *sideBucketCatalog,
                                 stripe,

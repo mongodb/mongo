@@ -203,9 +203,6 @@ public:
     // Global execution stats used to report aggregated metrics in server status.
     ExecutionStats globalExecutionStats;
 
-    // Approximate memory usage of the bucket catalog across all stripes.
-    AtomicWord<uint64_t> memoryUsage;
-
     // Memory usage threshold in bytes after which idle buckets will be expired.
     std::function<uint64_t()> memoryUsageThreshold;
 

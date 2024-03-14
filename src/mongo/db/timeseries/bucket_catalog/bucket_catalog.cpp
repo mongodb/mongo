@@ -217,7 +217,7 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& handle) {
 }
 
 uint64_t getMemoryUsage(const BucketCatalog& catalog) {
-    return catalog.memoryUsage.load() + catalog.trackingContext.allocated();
+    return catalog.trackingContext.allocated();
 }
 
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
