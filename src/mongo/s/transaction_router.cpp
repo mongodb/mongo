@@ -435,6 +435,10 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
             } else if (participantPair.second.readOnly == Participant::ReadOnly::kNotReadOnly) {
                 participantBuilder.append("readOnly", false);
                 ++numNonReadOnlyParticipants;
+            } else if (participantPair.second.readOnly ==
+                       Participant::ReadOnly::kOutstandingAdditionalParticipant) {
+                participantBuilder.append("readOnly", false);
+                ++numNonReadOnlyParticipants;
             }
             participantsArrayBuilder.append(participantBuilder.obj());
         }
@@ -591,12 +595,55 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
 
     auto setReadOnly = [&](const ShardId& shardIdToUpdate,
                            Participant::ReadOnly readOnlyCurrent,
-                           boost::optional<bool> readOnlyResponse) {
-        uassert(8516900,
-                str::stream() << "readOnly is missing from participant " << shardIdToUpdate
-                              << " response metadata",
-                readOnlyResponse);
+                           boost::optional<bool> readOnlyResponse,
+                           bool isAdditionalParticipant) {
+        if (!readOnlyResponse) {
+            // It's possible not to have a readOnly value for an additional participant shard yet in
+            // the following cases:
+            // 1. A shard acting as a sub-router targets itself. This shard acting as the
+            // participant targeted by the sub-router would include itself as an additional
+            // participant in its response back to itself, but the sub-router would not yet track a
+            // readOnly value for itself.
+            // 2. Some getMore responses. It's possible that a batch is filled before all additional
+            // shards have responded. All additional participants will be included in the response,
+            // even if they have not responded yet (and thus, don't have a readOnly value yet).
+            uassert(8755800,
+                    str::stream() << "readOnly is missing from participant " << shardIdToUpdate
+                                  << " response metadata",
+                    isAdditionalParticipant);
+
+            // If we had previously marked this shard as readOnly, mark this shard as outstanding to
+            // ensure we never accidentally perform the read-only transaction optimization when we
+            // should not.
+            if (readOnlyCurrent == Participant::ReadOnly::kReadOnly) {
+                LOGV2_DEBUG(
+                    87558,
+                    3,
+                    "Received a response with an unknown readOnly value for additional particpant. "
+                    "Marking the additional participant readOnly value as outstanding",
+                    "sessionId"_attr = _sessionId(),
+                    "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                    "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                    "shardId"_attr = shardId,
+                    "additionalParticipantShardId"_attr = shardIdToUpdate);
+
+                _setReadOnlyForParticipant(
+                    opCtx,
+                    shardIdToUpdate,
+                    Participant::ReadOnly::kOutstandingAdditionalParticipant);
+                return;
+            }
+
+            return;
+        }
+
+        // The shard reported readOnly: true
         if (*readOnlyResponse) {
+            // We do not mark the shard as readOnly if it is marked outstanding, because we can't
+            // know whether this response is for the same request that led us to mark the shard as
+            // outstanding, or for a different request. E.g. it's possible that multiple shards
+            // target the same additional shard, and only one of these shards has received a
+            // response from the targeted shard.
             if (readOnlyCurrent == Participant::ReadOnly::kUnset) {
                 LOGV2_DEBUG(22880,
                             3,
@@ -616,12 +663,13 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                     str::stream() << "Participant shard " << shardIdToUpdate
                                   << " claimed to be read-only for a transaction after previously "
                                      "claiming to have done a write for the transaction",
-                    readOnlyCurrent == Participant::ReadOnly::kReadOnly);
+                    readOnlyCurrent == Participant::ReadOnly::kReadOnly ||
+                        readOnlyCurrent ==
+                            Participant::ReadOnly::kOutstandingAdditionalParticipant);
             return;
         }
 
-        // The shard reported readOnly:false on this statement.
-
+        // The shard reported readOnly: false
         if (readOnlyCurrent != Participant::ReadOnly::kNotReadOnly) {
             LOGV2_DEBUG(22881,
                         3,
@@ -654,7 +702,6 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
 
         for (auto&& participantElem : *additionalParticipants) {
             auto participantToAdd = participantElem.getShardId();
-
             Participant::ReadOnly currentReadOnly;
             auto existingParticipant = getParticipant(participantToAdd);
             if (!existingParticipant) {
@@ -664,21 +711,11 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                 currentReadOnly = existingParticipant->readOnly;
             }
 
-            // Only check that all additional participants have a readOnly value on the parent
-            // router. It's possible for a shard to act as a sub-router and target itself, in which
-            // case the shard acting as the participant targeted by the sub-router would include
-            // itself as an additional participant in its response to the sub-router, and would not
-            // have a value for readOnly yet (this value would be set when the shard acting as the
-            // participant targeted by the parent router builds its response to the parent router).
             if (okResponse) {
-                if (!o().subRouter)
-                    uassert(8664400,
-                            str::stream() << "readOnly is missing from additional participant "
-                                          << participantToAdd << " response metadata",
-                            participantElem.getReadOnly());
-
-                if (participantElem.getReadOnly())
-                    setReadOnly(participantToAdd, currentReadOnly, participantElem.getReadOnly());
+                setReadOnly(participantToAdd,
+                            currentReadOnly,
+                            participantElem.getReadOnly(),
+                            true /* isAdditionalParticipant */);
             }
 
             if (!p().isRecoveringCommit) {
@@ -699,16 +736,11 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
         return;
     }
 
-    if (participant->stmtIdCreatedAt != p().latestStmtId) {
-        uassert(
-            51112,
-            str::stream() << "readOnly field for participant " << shardId
-                          << " should have been set on the participant's first successful response",
-            participant->readOnly != Participant::ReadOnly::kUnset);
-    }
-
     // Set readOnly for this participant
-    setReadOnly(shardId, participant->readOnly, txnResponseMetadata.getReadOnly());
+    setReadOnly(shardId,
+                participant->readOnly,
+                txnResponseMetadata.getReadOnly(),
+                false /* isAdditionalParticipant */);
 
     // Create any participants added by the shard 'shardId'
     processAdditionalParticipants(true /* okResponse */);
@@ -797,9 +829,10 @@ TransactionRouter::Router::getAdditionalParticipantsForResponse(
     participants.emplace();
     for (const auto& participant : o().participants) {
         boost::optional<bool> readOnly = boost::none;
-        if (participant.second.readOnly != Participant::ReadOnly::kUnset) {
-            readOnly =
-                participant.second.readOnly == Participant::ReadOnly::kReadOnly ? true : false;
+        if (participant.second.readOnly != Participant::ReadOnly::kUnset &&
+            participant.second.readOnly !=
+                Participant::ReadOnly::kOutstandingAdditionalParticipant) {
+            readOnly = (participant.second.readOnly == Participant::ReadOnly::kReadOnly);
         }
 
         participants->try_emplace(participant.first, readOnly);
@@ -1464,6 +1497,12 @@ BSONObj TransactionRouter::Router::_commitTransaction(
                 readOnlyShards.push_back(participant.first);
                 break;
             case Participant::ReadOnly::kNotReadOnly:
+                writeShards.push_back(participant.first);
+                break;
+            case Participant::ReadOnly::kOutstandingAdditionalParticipant:
+                // We treat a participant that still has an outstanding response as a write shard,
+                // to force a 2PC. This could happen if a getMore cursor is not exhausted before
+                // committing the transaction.
                 writeShards.push_back(participant.first);
                 break;
         }

@@ -851,9 +851,8 @@ TEST_F(
     ASSERT(expectedAdditionalParticipants == seenAdditionalParticipants);
 }
 
-TEST_F(
-    TransactionRouterTestWithDefaultSession,
-    ParentRouterThrowsIfGetsSuccessResponseWithAdditionalParticipantsBeforeAllAdditionalParticpantsResponded) {
+TEST_F(TransactionRouterTestWithDefaultSession,
+       TwoPhaseCommitIfNotAllAdditionalParticpantsResponded) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
 
@@ -863,15 +862,165 @@ TEST_F(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
+    // Shard3 will be marked as read-only
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard3,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyTrueResponse);
+
+    // Shard1 targets shard3, and responds back to router before getting response from shard3
     txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                       shard1,
                                       BSON("insert"
                                            << "test"));
-    ASSERT_THROWS_CODE(
-        txnRouter.processParticipantResponse(
-            operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly),
-        AssertionException,
-        8664400);
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+
+    // The router should choose to do a 2 phase commit because shard1 did a write, and we do not yet
+    // know whether shard3 did a write on its last request
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    // Shard3 would be chosen as the coordinator, because it was the first participant
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setRecoveryShardId(shard3);
+
+    auto future =
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort3, request.target);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+        std::set<std::string> expectedParticipants = {shard1.toString(), shard3.toString()};
+        auto participantElements = request.cmdObj["participants"].Array();
+        ASSERT_EQ(expectedParticipants.size(), participantElements.size());
+
+        for (const auto& element : participantElements) {
+            auto shardId = element["shardId"].str();
+            ASSERT_EQ(1ull, expectedParticipants.count(shardId));
+            expectedParticipants.erase(shardId);
+        }
+
+        return BSON("ok" << 1);
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       OustandingAdditionalParticipantNeverMarkedReadOnly) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    // Shard1 targets shard3, and responds back to router before getting a response from shard3.
+    // Shard3's readOnly value will remain unset because it did not have a previous value.
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+    auto shard3Res = participants->find(shard3.toString());
+    ASSERT(shard3Res != participants->end());
+    ASSERT(shard3Res->second == boost::none);
+
+    // Now, we get a response with readOnly: true for shard3. The router will update the readOnly
+    // value to true
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsReadOnlyTrueResponse);
+
+    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+    shard3Res = participants->find(shard3.toString());
+    ASSERT(shard3Res != participants->end());
+    ASSERT(shard3Res->second == boost::make_optional<bool>(true));
+
+    // Shard1 targets shard3 again, and responds back to router before getting response from shard3,
+    // so shard3's readOnly value will be marked as outstanding to avoid accidentally doing a read
+    // optimized commit.
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+
+    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+    shard3Res = participants->find(shard3.toString());
+    ASSERT(shard3Res != participants->end());
+    ASSERT(shard3Res->second == boost::none);
+
+    // Now, we again get a response with readOnly: true for shard3. The router will NOT update the
+    // readOnly value.
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsReadOnlyTrueResponse);
+
+    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+    shard3Res = participants->find(shard3.toString());
+    ASSERT(shard3Res != participants->end());
+    ASSERT(shard3Res->second == boost::none);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, NotReadOnlyParticipantUnchangedOnEmptyReadOnly) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    // Shard1 targets shard3, and shard3 should be marked as not read-only
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyFalseResponse);
+
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+    auto shard3Res = participants->find(shard3.toString());
+    ASSERT(shard3Res != participants->end());
+    ASSERT(shard3Res->second == boost::make_optional<bool>(false));
+
+    // Shard1 targets shard3, and responds back to router before getting response from shard3.
+    // Shard3 was previously marked as having done a write, so the readOnly value will not be
+    // updated
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+
+    participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+    shard3Res = participants->find(shard3.toString());
+    ASSERT(shard3Res != participants->end());
+    ASSERT(shard3Res->second == boost::make_optional<bool>(false));
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, NoAdditionalParticipantsIfNotSubRouter) {
@@ -2136,7 +2285,6 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     std::set<HostAndPort> seenHostAndPorts;
     for (int i = 0; i < 2; i++) {
         onCommand([&](const RemoteCommandRequest& request) {
-            std::cout << "xxx on cmd request.target " << request.target << std::endl;
             seenHostAndPorts.insert(request.target);
 
             ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
@@ -4216,44 +4364,6 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse),
         AssertionException,
         51113);
-}
-
-TEST_F(TransactionRouterTestWithDefaultSession,
-       ProcessParticipantResponseThrowsIfParticipantReturnsErrorThenSuccessOnLaterStatement) {
-    TxnNumber txnNum{3};
-    operationContext()->setTxnNumber(txnNum);
-
-    auto txnRouter = TransactionRouter::get(operationContext());
-    txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
-    txnRouter.setDefaultAtClusterTime(operationContext());
-
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
-
-    // First response is an error.
-    txnRouter.processParticipantResponse(operationContext(), shard1, BSON("ok" << 0));
-    const auto participant = txnRouter.getParticipant(shard1);
-    ASSERT(TransactionRouter::Participant::ReadOnly::kUnset == participant->readOnly);
-
-    // The client should normally not issue another statement for the transaction, but if the client
-    // does and the participant returns success for some reason, the router should throw.
-
-    // Reset the readConcern on the OperationContext to simulate a new request.
-    repl::ReadConcernArgs secondRequestEmptyReadConcern;
-    repl::ReadConcernArgs::get(operationContext()) = secondRequestEmptyReadConcern;
-
-    txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
-
-    // The router should throw regardless of whether the response says readOnly true or false.
-    ASSERT_THROWS_CODE(
-        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyTrueResponse),
-        AssertionException,
-        51112);
-    ASSERT_THROWS_CODE(
-        txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse),
-        AssertionException,
-        51112);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
