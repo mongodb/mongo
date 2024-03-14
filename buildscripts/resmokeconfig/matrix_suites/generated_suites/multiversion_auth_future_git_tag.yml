@@ -32,6 +32,7 @@ selector:
   - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
   - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+  - jstests/multiVersion/targetedTestsLastLtsFeatures/oidc_multipurpose_idp.js
   exclude_with_any_tags:
   - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
