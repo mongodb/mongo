@@ -10,7 +10,7 @@ import pymongo.errors
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface, talk_directly_to_shardsvrs
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
@@ -154,13 +154,6 @@ class ContinuousStepdown(interface.Hook):
             # Recursively call _add_fixture on all the independent clusters.
             for cluster_fixture in fixture.get_independent_clusters():
                 self._add_fixture(cluster_fixture)
-        elif isinstance(fixture, talk_directly_to_shardsvrs.TalkDirectlyToShardsvrsFixture):
-            if not fixture.all_nodes_electable:
-                raise ValueError(
-                    "The replica sets that are the target of the ContinuousStepdown hook must have"
-                    " the 'all_nodes_electable' option set.")
-            for rs_fixture in fixture.get_replsets():
-                self._rs_fixtures.append(rs_fixture)
 
 
 def is_shard_split(fixture):

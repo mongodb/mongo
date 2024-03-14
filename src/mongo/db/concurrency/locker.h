@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/db/concurrency/cond_var_lock_grant_notification.h"
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"

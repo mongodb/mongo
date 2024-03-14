@@ -33,7 +33,6 @@
 #include <boost/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <tuple>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -48,13 +47,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/server_options.h"
@@ -462,12 +459,6 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
     stdx::lock_guard lk(_metadataManagerLock);
     switch (_metadataType) {
         case MetadataType::kUnknown:
-            // Until user collections can be sharded in serverless, the sessions collection will be
-            // the only sharded collection.
-            if (getGlobalReplSettings().isServerless() &&
-                _nss != NamespaceString::kLogicalSessionsNamespace) {
-                return kUntrackedCollection;
-            }
             return nullptr;
         case MetadataType::kUntracked:
             return kUntrackedCollection;

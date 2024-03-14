@@ -30,7 +30,6 @@
 #include "mongo/s/sharding_state.h"
 
 #include <boost/none.hpp>
-#include <mutex>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

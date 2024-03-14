@@ -661,22 +661,6 @@ tasks:
       use_large_distro: "true"
       fallback_num_sub_suites: 10
 
-- <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_kill_primary_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
 # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
 - <<: *task_template
   name: watchdog_inmemory
