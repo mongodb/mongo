@@ -498,7 +498,7 @@ env.Library(
         'migration_blocking_operation/shardsvr_begin_migration_blocking_operation.cpp',
         'migration_blocking_operation/shardsvr_coordinate_multi_update_command.cpp',
         'migration_blocking_operation/shardsvr_end_migration_blocking_operation.cpp',
-        'migration_chunk_cloner_source_legacy_commands.cpp',
+        'migration_chunk_cloner_source_commands.cpp',
         'migration_destination_manager_commands.cpp',
         'move_primary_coordinator.cpp',
         'move_primary_coordinator_document.idl',
@@ -775,7 +775,7 @@ env.CppUnitTest(
         'migration_batch_fetcher_test.cpp',
         'migration_blocking_operation/migration_blocking_operation_coordinator_test.cpp',
         'migration_blocking_operation/multi_update_coordinator_test.cpp',
-        'migration_chunk_cloner_source_legacy_test.cpp',
+        'migration_chunk_cloner_source_test.cpp',
         'migration_destination_manager_test.cpp',
         'migration_session_id_test.cpp',
         'migration_util_test.cpp',
@@ -960,9 +960,9 @@ env.Benchmark(
 )
 
 env.Benchmark(
-    target='migration_chunk_cloner_source_legacy_bm',
+    target='migration_chunk_cloner_source_bm',
     source=[
-        'migration_chunk_cloner_source_legacy_bm.cpp',
+        'migration_chunk_cloner_source_bm.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
