@@ -236,13 +236,14 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     }
 
     auto txn = getTxn(opCtx);
+    auto service = opCtx->getService();
     auto swCommitResult = txn->runNoThrow(
-        opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
+        opCtx, [service, sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
             NamespaceString nssEsc(
                 NamespaceStringUtil::deserialize(sharedBlock->dbName, sharedBlock->esc));
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
-            auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
+            auto queryInterface = FLEQueryInterfaceImpl(txnClient, service);
 
             // Rewrite the MatchExpression.
             sharedBlock->doRewrite(&queryInterface, nssEsc);

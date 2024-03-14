@@ -406,12 +406,13 @@ insertSingleDocument(OperationContext* opCtx,
     auto sharedInsertBlock = std::make_shared<decltype(insertBlock)>(insertBlock);
 
     auto reply = std::make_shared<write_ops::InsertCommandReply>();
+    auto service = opCtx->getService();
 
     auto swResult = trun->runNoThrow(
         opCtx,
-        [sharedInsertBlock, reply, ownedDocument, bypassDocumentValidation](
+        [service, sharedInsertBlock, reply, ownedDocument, bypassDocumentValidation](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+            FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [edcNss2, efc2, serverPayload2, stmtId2] = *sharedInsertBlock.get();
 
@@ -573,12 +574,13 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     // shared_ptrs
     auto deleteBlock = std::make_tuple(ownedDeleteRequest, expCtx);
     auto sharedDeleteBlock = std::make_shared<decltype(deleteBlock)>(deleteBlock);
+    auto service = opCtx->getService();
 
     auto swResult = trun->runNoThrow(
         opCtx,
-        [sharedDeleteBlock, ownedRequest, reply](const txn_api::TransactionClient& txnClient,
-                                                 ExecutorPtr txnExec) {
-            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+        [service, sharedDeleteBlock, ownedRequest, reply](
+            const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [deleteRequest2, expCtx2] = *sharedDeleteBlock.get();
 
@@ -672,12 +674,13 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     auto expCtx = makeExpCtx(opCtx, ownedUpdateRequest, ownedUpdateOpEntry);
     auto updateBlock = std::make_tuple(ownedUpdateRequest, expCtx);
     auto sharedupdateBlock = std::make_shared<decltype(updateBlock)>(updateBlock);
+    auto service = opCtx->getService();
 
     auto swResult = trun->runNoThrow(
         opCtx,
-        [sharedupdateBlock, reply, ownedRequest](const txn_api::TransactionClient& txnClient,
-                                                 ExecutorPtr txnExec) {
-            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+        [service, sharedupdateBlock, reply, ownedRequest](
+            const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [updateRequest2, expCtx2] = *sharedupdateBlock.get();
 
@@ -942,12 +945,13 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     auto findAndModifyBlock = std::make_tuple(ownedFindAndModifyRequest, expCtx);
     auto sharedFindAndModifyBlock =
         std::make_shared<decltype(findAndModifyBlock)>(findAndModifyBlock);
+    auto service = opCtx->getService();
 
     auto swResult = trun->runNoThrow(
         opCtx,
-        [sharedFindAndModifyBlock, ownedRequest, reply, processCallback](
+        [service, sharedFindAndModifyBlock, ownedRequest, reply, processCallback](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+            FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [findAndModifyRequest2, expCtx] = *sharedFindAndModifyBlock.get();
 
@@ -1591,7 +1595,7 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     // Since count() does not work in a transaction, call count() by bypassing the transaction api
     // Allow the thread to be killable. If interrupted, the call to runCommand will fail with the
     // interruption.
-    auto client = _serviceContext->getService()->makeClient("SEP-int-fle-crud");
+    auto client = _service->makeClient("SEP-int-fle-crud");
 
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();

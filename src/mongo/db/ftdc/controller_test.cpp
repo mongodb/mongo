@@ -187,7 +187,7 @@ TEST_F(FTDCControllerTest, TestFull) {
 
     c.addOnRotateCollector(std::move(c2), ClusterRole::None);
 
-    c.start();
+    c.start(getClient()->getService());
 
     // Wait for 100 samples to have occured
     c1Ptr->wait();
@@ -228,7 +228,7 @@ TEST_F(FTDCControllerTest, TestStartStop) {
 
     FTDCController c(dir, config);
 
-    c.start();
+    c.start(getClient()->getService());
 
     c.stop();
 }
@@ -255,7 +255,7 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
 
     c.addPeriodicCollector(std::move(c1), ClusterRole::None);
 
-    c.start();
+    c.start(getClient()->getService());
 
     auto files0 = scanDirectory(dir);
 

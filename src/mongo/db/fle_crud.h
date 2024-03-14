@@ -330,9 +330,8 @@ public:
  */
 class FLEQueryInterfaceImpl : public FLEQueryInterface {
 public:
-    FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient,
-                          ServiceContext* serviceContext)
-        : _txnClient(txnClient), _serviceContext(serviceContext) {}
+    FLEQueryInterfaceImpl(const txn_api::TransactionClient& txnClient, Service* service)
+        : _txnClient(txnClient), _service(service) {}
 
     BSONObj getById(const NamespaceString& nss, BSONElement element) final;
 
@@ -378,7 +377,7 @@ public:
 
 private:
     const txn_api::TransactionClient& _txnClient;
-    ServiceContext* _serviceContext;
+    Service* _service;
     std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;
 };
 

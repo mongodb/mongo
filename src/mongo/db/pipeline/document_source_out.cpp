@@ -86,8 +86,8 @@ DocumentSourceOut::~DocumentSourceOut() {
         // If creating a time-series collection, we must drop the "real" buckets collection, if
         // anything goes wrong creating the view.
         if (_tempNs.size() || (_timeseries && !_timeseriesStateConsistent)) {
-            auto cleanupClient = pExpCtx->opCtx->getServiceContext()->getService()->makeClient(
-                "$out_replace_coll_cleanup");
+            auto cleanupClient =
+                pExpCtx->opCtx->getService()->makeClient("$out_replace_coll_cleanup");
 
             AlternativeClientRegion acr(cleanupClient);
             // Create a new operation context so that any interrupts on the current operation will

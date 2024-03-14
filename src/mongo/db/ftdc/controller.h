@@ -133,7 +133,7 @@ public:
      *
      * Spawns a new thread.
      */
-    void start();
+    void start(Service* service);
 
     /**
      * Stop the controller.
@@ -156,7 +156,7 @@ private:
     /**
      * Do periodic statistics collection, and all other work on the background thread.
      */
-    void doLoop() noexcept;
+    void doLoop(Service* service) noexcept;
 
 private:
     /**

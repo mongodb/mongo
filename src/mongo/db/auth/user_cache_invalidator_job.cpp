@@ -110,7 +110,7 @@ std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
 }
 
 /**
- * TODO: SERVER-82227 - remove.
+ * TODO: SERVER-86458 - remove.
  *
  * RAII type for making the OperationContext it is instantiated with use the router service util it
  * goes out of scope.

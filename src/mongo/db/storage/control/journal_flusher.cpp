@@ -92,7 +92,7 @@ void JournalFlusher::set(ServiceContext* serviceCtx, std::unique_ptr<JournalFlus
 }
 
 void JournalFlusher::run() {
-    ThreadClient tc(name(), getGlobalServiceContext()->getService());
+    ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
     LOGV2_DEBUG(4584701, 1, "starting {name} thread", "name"_attr = name());
 
     // The thread must not run and access the service context to create an opCtx while unit test

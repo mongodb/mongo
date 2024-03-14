@@ -428,7 +428,7 @@ void startFTDC(Service* service,
 
     staticFTDC = std::move(controller);
 
-    staticFTDC->start();
+    staticFTDC->start(service);
 }
 
 void stopFTDC(Service* service) {

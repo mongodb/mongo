@@ -242,12 +242,13 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
     // shared_ptrs
     auto argsBlock = std::make_tuple(compactionTokens, ecocCompactNss);
     auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+    auto service = opCtx->getService();
 
     auto swResult = trun->runNoThrow(
         opCtx,
-        [sharedBlock, uniqueEcocEntries, innerEcocStats](
+        [service, sharedBlock, uniqueEcocEntries, innerEcocStats](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+            FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
             auto [compactionTokens2, ecocCompactNss2] = *sharedBlock.get();
 
@@ -651,12 +652,13 @@ void processFLECompactV2(OperationContext* opCtx,
         // shared_ptrs
         auto argsBlock = std::make_tuple(ecocDoc, namespaces.escNss);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+        auto service = opCtx->getService();
 
         auto swResult = trun->runNoThrow(
             opCtx,
-            [sharedBlock, innerEscStats](const txn_api::TransactionClient& txnClient,
-                                         ExecutorPtr txnExec) {
-                FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+            [service, sharedBlock, innerEscStats](const txn_api::TransactionClient& txnClient,
+                                                  ExecutorPtr txnExec) {
+                FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
                 auto [ecocDoc2, escNss] = *sharedBlock.get();
 
@@ -687,15 +689,16 @@ void processFLECompactV2(OperationContext* opCtx,
             // shared_ptrs
             auto argsBlock = std::make_tuple(namespaces.escNss, anchorPaddingFactor, rangeField);
             auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+            auto service = opCtx->getService();
 
             std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
             uassertStatusOK(
                 uassertStatusOK(
                     trun->runNoThrow(
                         opCtx,
-                        [sharedBlock](const txn_api::TransactionClient& txnClient,
-                                      ExecutorPtr txnExec) {
-                            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+                        [service, sharedBlock](const txn_api::TransactionClient& txnClient,
+                                               ExecutorPtr txnExec) {
+                            FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
                             auto [escNss, anchorPaddingFactor, rangeField] = *sharedBlock.get();
                             compactOneRangeFieldPad(&queryImpl,
@@ -748,12 +751,13 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
         auto maxAnchors = pqMaxEntries - pq.size();
         auto argsBlock = std::make_tuple(ecocDoc, namespaces.escNss, maxAnchors);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+        auto service = opCtx->getService();
 
         auto swResult = trun->runNoThrow(
             opCtx,
-            [sharedBlock, innerEscStats, anchorsToRemove](
+            [service, sharedBlock, innerEscStats, anchorsToRemove](
                 const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+                FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
                 auto [ecocDoc2, escNss, maxAnchors2] = *sharedBlock.get();
 
