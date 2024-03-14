@@ -1131,6 +1131,14 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.applicationMode = applicationMode;
+    if (repl::feature_flags::gReduceMajorityWriteLatency.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // When gReduceMajorityWriteLatency is enabled, the oplog can be written far ahead of oplog
+        // application. In this case, top of oplog will include this applyIndexBuild oplog itself so
+        // we will fall into deadlock if we wait the committedSnapshot to pass the top of oplog. So,
+        // we wait for the opTime of the applyIndexBuild oplog entry.
+        indexBuildOptions.startIndexBuildOpTime = oplogEntry.opTime;
+    }
 
     // If this is an initial syncing node, drop any conflicting ready index specs prior to
     // proceeding with building them.
@@ -2588,7 +2596,9 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             // contained a write to this collection. We need to be holding the collection lock in X
             // mode so that we ensure that there are not any uncommitted transactions on this
             // collection.
-            replState->setLastOpTimeBeforeInterceptors(getLatestOplogOpTime(opCtx));
+            auto lastOpTimeBeforeInterceptors =
+                indexBuildOptions.startIndexBuildOpTime.value_or(getLatestOplogOpTime(opCtx));
+            replState->setLastOpTimeBeforeInterceptors(lastOpTimeBeforeInterceptors);
         }
     } catch (DBException& ex) {
         // It is fine to let the build continue even if we are interrupted, interrupt check before

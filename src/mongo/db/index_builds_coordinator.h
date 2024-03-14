@@ -116,6 +116,7 @@ public:
     struct IndexBuildOptions {
         boost::optional<CommitQuorumOptions> commitQuorum;
         ApplicationMode applicationMode = ApplicationMode::kNormal;
+        boost::optional<repl::OpTime> startIndexBuildOpTime;
     };
 
     virtual ~IndexBuildsCoordinator() = default;

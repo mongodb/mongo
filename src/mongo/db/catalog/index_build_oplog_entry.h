@@ -57,6 +57,7 @@ public:
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
     boost::optional<Status> cause;
+    repl::OpTime opTime;
 };
 
 }  // namespace mongo
