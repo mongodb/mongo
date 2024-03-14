@@ -2,7 +2,7 @@
  * Tests that modifying query settings is not allowed on standalone (because of the missing
  * 'VectorClock').
  * @tags: [
- *   featureFlagQuerySettings,
+ *   requires_fcv_80,
  * ]
  */
 

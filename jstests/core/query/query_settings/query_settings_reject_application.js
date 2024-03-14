@@ -1,8 +1,8 @@
 // Tests setting query settings `reject` flag fails the relevant query (and not others).
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
-//   featureFlagQuerySettings,
 //   simulate_atlas_proxy_incompatible,
+//   requires_fcv_80,
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
 // ]

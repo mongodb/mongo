@@ -1,8 +1,8 @@
 // Tests the 'showDebugQueryShape' option for the '$querySettings' aggregation stage.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
-//   featureFlagQuerySettings,
 //   simulate_atlas_proxy_incompatible,
+//   requires_fcv_80,
 // ]
 //
 

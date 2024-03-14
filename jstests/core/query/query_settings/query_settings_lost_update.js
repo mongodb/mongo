@@ -5,9 +5,9 @@
  * @tags: [
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
- *   featureFlagQuerySettings,
  *   tenant_migration_incompatible,
  *   uses_parallel_shell,
+ *   requires_fcv_80,
  * ]
  */
 

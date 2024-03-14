@@ -1,9 +1,9 @@
 // Tests that query settings 'queryFramework' overrides framework control knob.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
-//   featureFlagQuerySettings,
 //   simulate_atlas_proxy_incompatible,
 //   cqf_incompatible,
+//   requires_fcv_80,
 // ]
 //
 

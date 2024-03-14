@@ -2285,6 +2285,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/query/query_settings/manager',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )

@@ -1,9 +1,9 @@
 // Tests query settings impact on the queries when 'queryFramework' is set.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
-//   featureFlagQuerySettings,
 //   simulate_atlas_proxy_incompatible,
 //   cqf_incompatible,
+//   requires_fcv_80,
 // ]
 //
 

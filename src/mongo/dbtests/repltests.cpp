@@ -67,6 +67,7 @@
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -204,6 +205,8 @@ public:
 
         // Start with a fresh oplog.
         deleteAll(cllNS());
+
+        query_settings::QuerySettingsManager::create(_opCtx.getServiceContext(), {});
     }
 
     ~Base() {
