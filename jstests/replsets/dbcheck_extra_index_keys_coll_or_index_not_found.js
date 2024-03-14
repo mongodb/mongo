@@ -414,7 +414,8 @@ function keyNotFoundDuringReverseLookup(nDocs) {
     awaitDbCheckCompletion(replSet, primaryDB);
 
     jsTestLog("checking primary health log");
-    // First doc was valid, second doc was not found but we continue with dbcheck.
+    // First doc (a: 0) was valid, second doc was not found (a:1) but we continue with dbcheck and
+    // find inconsistencies in the rest of the docs.
     checkHealthLog(primaryHealthLog, logQueries.recordDoesNotMatchQuery, nDocs - 2);
     checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, nDocs - 2);
     jsTestLog("checking secondary health log");

@@ -320,8 +320,11 @@ function testDbCheckParameters() {
          {validateMode: "dataConsistencyAndMissingIndexKeysCheck", maxBatchTimeMillis: 1000}]
             .forEach(parameters => {
                 clearHealthLog(replSet);
-                runDbCheck(
-                    replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), parameters);
+                runDbCheck(replSet,
+                           db.getSiblingDB("maxDbCheckMBperSec"),
+                           coll.getName(),
+                           parameters,
+                           true /*awaitCompletion*/);
 
                 // DbCheck logs (nDocs + 1) batches to account for each batch hitting the time
                 // deadline after processing only one document. Then, DbCheck will run an additional
@@ -341,7 +344,8 @@ function testDbCheckParameters() {
             replSet,
             db.getSiblingDB("maxDbCheckMBperSec"),
             coll.getName(),
-            {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxBatchTimeMillis: 1000});
+            {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxBatchTimeMillis: 1000},
+            true /*awaitCompletion*/);
 
         // DbCheck logs (nDocs) batches to account for each batch hitting the time deadline after
         // processing only one document.

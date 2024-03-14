@@ -33,7 +33,8 @@ export const logQueries = {
     warningQuery: {"severity": "warning"},
     infoOrErrorQuery:
         {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]},
-    infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"}
+    infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"},
+    inconsistentBatchQuery: {"severity": "error", "msg": "dbCheck batch inconsistent"},
 };
 
 // Apply function on all secondary nodes except arbiters.
@@ -135,6 +136,18 @@ export const resetAndInsertTwoFields = (replSet, db, collName, nDocs, docSuffix 
         assert.commandWorked(db[collName].insertMany(
             [...Array(nDocs).keys()].map(x => ({a: x, b: x})), {ordered: false}));
     }
+
+    replSet.awaitReplication();
+    assert.eq(db.getCollection(collName).find({}).count(), nDocs);
+};
+
+// Clear health log and insert nDocs documents with identical 'a' field
+export const resetAndInsertIdentical = (replSet, db, collName, nDocs) => {
+    db[collName].drop();
+    clearHealthLog(replSet);
+
+    assert.commandWorked(db[collName].insertMany(
+        [...Array(nDocs).keys()].map(x => ({_id: x, a: 0})), {ordered: false}));
 
     replSet.awaitReplication();
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
@@ -370,4 +383,18 @@ export const assertForDbCheckErrorsForAllNodes =
  */
 export function checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(conn) {
     return FeatureFlagUtil.isPresentAndEnabled(conn, 'SecondaryIndexChecksInDbCheck');
+}
+
+export function checkNumSnapshots(debugBuild, expectedNumSnapshots) {
+    if (debugBuild) {
+        const actualNumSnapshots =
+            rawMongoProgramOutput()
+                .split(/7844808.*Catalog snapshot for reverse lookup check ending/)
+                .length -
+            1;
+        assert.eq(actualNumSnapshots,
+                  expectedNumSnapshots,
+                  "expected " + expectedNumSnapshots +
+                      " catalog snapshots during reverse lookup, found " + actualNumSnapshots);
+    }
 }

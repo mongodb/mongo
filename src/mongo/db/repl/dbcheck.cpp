@@ -238,19 +238,21 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
-std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const boost::optional<UUID>& batchId,
-                                                  const NamespaceString& nss,
-                                                  const boost::optional<UUID>& collectionUUID,
-                                                  int64_t count,
-                                                  int64_t bytes,
-                                                  const std::string& expectedHash,
-                                                  const std::string& foundHash,
-                                                  const BSONObj& batchStart,
-                                                  const BSONObj& batchEnd,
-                                                  const boost::optional<Timestamp>& readTimestamp,
-                                                  const repl::OpTime& optime,
-                                                  const boost::optional<CollectionOptions>& options,
-                                                  const boost::optional<BSONObj>& indexSpec) {
+std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
+    const boost::optional<UUID>& batchId,
+    const NamespaceString& nss,
+    const boost::optional<UUID>& collectionUUID,
+    int64_t count,
+    int64_t bytes,
+    const std::string& expectedHash,
+    const std::string& foundHash,
+    const BSONObj& batchStart,
+    const BSONObj& batchEnd,
+    const int64_t nConsecutiveIdenticalIndexKeysSeenAtEnd,
+    const boost::optional<Timestamp>& readTimestamp,
+    const repl::OpTime& optime,
+    const boost::optional<CollectionOptions>& options,
+    const boost::optional<BSONObj>& indexSpec) {
     auto hashes = expectedFound(expectedHash, foundHash);
 
     BSONObjBuilder builder;
@@ -264,6 +266,10 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const boost::optional<UUID>& b
     builder.append("md5", hashes.second);
     builder.append("batchStart", batchStart);
     builder.append("batchEnd", batchEnd);
+    // Should be 0 for collection check or if no index keys were checked.
+    builder.append("nConsecutiveIdenticalIndexKeysSeenAtEnd",
+                   nConsecutiveIdenticalIndexKeysSeenAtEnd);
+
     if (readTimestamp) {
         builder.append("readTimestamp", *readTimestamp);
     }
@@ -451,6 +457,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         key_string::toBsonSafe(last.getBuffer(), last.getSize(), ordering, last.getTypeBits());
     indexCursor->setEndPosition(lastBson, true /*inclusive*/);
 
+    _nConsecutiveIdenticalIndexKeysSeenAtEnd = 0;
     // Iterate through index table.
     for (auto currEntry = indexCursor->seekForKeyString(opCtx, first); currEntry;
          currEntry = indexCursor->nextKeyString(opCtx)) {
@@ -478,17 +485,30 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
             MONGO_UNREACHABLE;
         }();
 
-        BSONObj currBSON = key_string::toBsonSafe(
-            keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
-        _last = currBSON;
         _bytesSeen += sizeWithoutRecordId;
         _countKeysSeen += 1;
         md5_append(&_state, md5Cast(keyString.getBuffer()), sizeWithoutRecordId);
+
+        _lastKeySeen = keyStringBson;
+
+        const int comparisonWithoutRecordId = key_string::compare(
+            keyString.getBuffer(), last.getBuffer(), sizeWithoutRecordId, last.getSize());
+
+        // Last keystring in batch is in a series of consecutive identical keys.
+        if (comparisonWithoutRecordId == 0) {
+            _nConsecutiveIdenticalIndexKeysSeenAtEnd += 1;
+            // TODO SERVER-86858: We should investigate storing the count in the oplog batch for
+            // secondaries to use instead.
+            if (_nConsecutiveIdenticalIndexKeysSeenAtEnd >=
+                repl::dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot.load()) {
+                break;
+            }
+        }
     }
 
     // If we got to the end of the index batch without seeing any keys, set the last key to MaxKey.
     if (_countKeysSeen == 0) {
-        _last = _maxKey;
+        _lastKeySeen = _maxKey;
     }
 
     LOGV2_DEBUG(
@@ -499,7 +519,8 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         "lastKeyString"_attr = key_string::rehydrateKey(indexDescriptor->keyPattern(), lastBson),
         "keysHashed"_attr = _countKeysSeen,
         "bytesHashed"_attr = _bytesSeen,
-        "indexName"_attr = indexName);
+        "indexName"_attr = indexName,
+        "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr = _nConsecutiveIdenticalIndexKeysSeenAtEnd);
 
     return Status::OK();
 }
@@ -674,7 +695,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
         }
 
         // If this would put us over a limit, stop here.
-        if (!_canHash(currentObj)) {
+        if (!_canHashForCollectionCheck(currentObj)) {
             return Status::OK();
         }
 
@@ -702,7 +723,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
         // Update `last` every time. We use the _id value obtained from the _id index walk so that
         // we can store our last seen _id and proceed with dbCheck even if the previous record had
         // corruption in its _id field.
-        _last = rehydratedObjId;
+        _lastKeySeen = rehydratedObjId;
         _countDocsSeen += 1;
         _bytesSeen += currentObj.objsize();
 
@@ -716,7 +737,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
 
     // If we got to the end of the collection, set the last key to MaxKey.
     if (lastState == PlanExecutor::IS_EOF) {
-        _last = _maxKey;
+        _lastKeySeen = _maxKey;
     }
 
     return Status::OK();
@@ -729,8 +750,8 @@ std::string DbCheckHasher::total(void) {
     return digestToString(digest);
 }
 
-BSONObj DbCheckHasher::lastKey(void) const {
-    return _last;
+BSONObj DbCheckHasher::lastKeySeen(void) const {
+    return _lastKeySeen;
 }
 
 int64_t DbCheckHasher::bytesSeen(void) const {
@@ -749,7 +770,11 @@ int64_t DbCheckHasher::countSeen(void) const {
     return docsSeen() + keysSeen();
 }
 
-bool DbCheckHasher::_canHash(const BSONObj& obj) {
+int64_t DbCheckHasher::nConsecutiveIdenticalIndexKeysSeenAtEnd(void) const {
+    return _nConsecutiveIdenticalIndexKeysSeenAtEnd;
+}
+
+bool DbCheckHasher::_canHashForCollectionCheck(const BSONObj& obj) {
     // Make sure we hash at least one document.
     if (countSeen() == 0) {
         return true;
@@ -927,7 +952,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                     "found"_attr = found,
                     "readTimestamp"_attr = entry.getReadTimestamp());
 
-        auto finalBatchEnd = hasher->lastKey();
+        auto finalBatchEnd = hasher->lastKeySeen();
         if (indexDescriptor) {
             // TODO (SERVER-61796): Handle cases where the _id index doesn't exist. We should still
             // log with a rehydrated index key.
@@ -947,6 +972,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             found,
             batchStart,
             finalBatchEnd,
+            hasher->nConsecutiveIdenticalIndexKeysSeenAtEnd(),
             entry.getReadTimestamp(),
             optime,
             collection->getCollectionOptions(),

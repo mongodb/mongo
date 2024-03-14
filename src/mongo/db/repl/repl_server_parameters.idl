@@ -763,13 +763,24 @@ server_parameters:
         default: ""
         validator: { callback: 'validateHostAndPort' }
     
-    dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot:
+    dbCheckMaxTotalIndexKeysPerSnapshot:
         description: >-
-            The maximum number of index keys to be checked in reverse lookup in one storage catalog
+            The maximum number of total index keys to be checked in reverse lookup in one storage catalog
             snapshot during dbcheck's extraIndexKeys mode.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot
+        cpp_varname: dbCheckMaxTotalIndexKeysPerSnapshot
+        default: 1000
+        validator:
+            gt: 0 
+    
+    dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot:
+        description: >-
+            The maximum number of consecutive identical index keys to be checked in reverse lookup in one storage catalog
+            snapshot during dbcheck's extraIndexKeys mode.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot
         default: 1000
         validator:
             gt: 0 

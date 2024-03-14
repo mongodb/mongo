@@ -719,6 +719,7 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
     do {
         DbCheckExtraIndexKeysBatchStats batchStats = {0};
         batchStats.deadline = Date_t::now() + Milliseconds(_info.maxBatchTimeMillis);
+        batchStats.nConsecutiveIdenticalKeysAtEnd = 1;
 
         // 1. Get batch bounds (stored in batchStats) and run reverse lookup if
         // skipLookupForExtraKeys is not set.
@@ -890,10 +891,20 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         const IndexCatalogEntry* indexCatalogEntry = collection->getIndexCatalog()->getEntry(index);
         auto iam = indexCatalogEntry->accessMethod()->asSortedData();
         const auto ordering = iam->getSortedDataInterface()->getOrdering();
+        const key_string::Version keyStringVersion =
+            iam->getSortedDataInterface()->getKeyStringVersion();
         auto firstBson = key_string::toBsonSafe(
             batchFirst.getBuffer(), batchFirst.getSize(), ordering, batchFirst.getTypeBits());
         auto lastBson = key_string::toBsonSafe(
             batchLast.getBuffer(), batchLast.getSize(), ordering, batchLast.getTypeBits());
+        // For the purposes of passing keystrings into the hasher with recordID stripped, rebuild
+        // first and last keystrings from their BSON format. This is because the primary & secondary
+        // have different recordIDs so seeking a key in the hasher should be done without the
+        // recordID to avoid seeking past the key we want.
+        key_string::Builder batchFirstKS(keyStringVersion);
+        batchFirstKS.resetToKey(firstBson, ordering);
+        key_string::Builder batchLastKS(keyStringVersion);
+        batchLastKS.resetToKey(lastBson, ordering);
 
         LOGV2_DEBUG(8520000,
                     3,
@@ -917,8 +928,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
             return e.toStatus();
         }
 
-        Status status =
-            hasher->hashForExtraIndexKeysCheck(opCtx, collection.get(), batchFirst, batchLast);
+        Status status = hasher->hashForExtraIndexKeysCheck(
+            opCtx, collection.get(), batchFirstKS.getValueCopy(), batchLastKS.getValueCopy());
         if (!status.isOK()) {
             return status;
         }
@@ -946,6 +957,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
                     "md5"_attr = md5,
                     "keysHashed"_attr = hasher->keysSeen(),
                     "bytesHashed"_attr = hasher->bytesSeen(),
+                    "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr =
+                        hasher->nConsecutiveIdenticalIndexKeysSeenAtEnd(),
                     "readTimestamp"_attr = readTimestamp,
                     "indexName"_attr = indexName,
                     logAttrs(_info.nss),
@@ -957,11 +970,12 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         builder.append("md5", batchStats->md5);
         builder.append("batchStart", key_string::rehydrateKey(index->keyPattern(), firstBson));
         builder.append("batchEnd", key_string::rehydrateKey(index->keyPattern(), lastBson));
+        builder.append("nConsecutiveIdenticalIndexKeysSeenAtEnd",
+                       hasher->nConsecutiveIdenticalIndexKeysSeenAtEnd());
         if (readTimestamp) {
             builder.append("readTimestamp", *readTimestamp);
         }
     }
-
     batchStats->time = _logOp(
         opCtx, _info.nss, boost::none /* tenantIdForStartStop */, _info.uuid, oplogBatch.toBSON());
 
@@ -1026,9 +1040,13 @@ Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
  * Acquires a consistent catalog snapshot and iterates through the secondary index in order
  * to get the batch bounds. Runs reverse lookup if skipLookupForExtraKeys is not set.
  *
- * We release the snapshot by exiting the function. This occurs when we've either finished
- * the whole extra index keys check, finished one batch, or the number of keys we've looked
- * at has met or exceeded dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.
+ * We release the snapshot by exiting the function. This occurs when:
+ *   * we have finished the whole extra index keys check,
+ *   * we have finished one batch
+ *   * The number of keys we've looked at has met or exceeded dbCheckMaxTotalIndexKeysPerSnapshot
+ *   * if we have identical keys at the end of the batch, one of the above conditions is met and
+ *     the number of consecutive identical keys we've looked at has met or exceeded
+ *     dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot
  *
  * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
  */
@@ -1103,8 +1121,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     // the dbcheck command.
     auto maxKey = Helpers::toKeyFormat(_info.end);
     indexCursor->setEndPosition(maxKey, true /*inclusive*/);
-    int64_t numKeys = 0;
-    int64_t numBytes = 0;
+    int64_t numKeysInSnapshot = 0;
+    int64_t numBytesInSnapshot = 0;
 
     auto snapshotFirstKeyStringBsonRehydrated =
         key_string::rehydrateKey(index->keyPattern(),
@@ -1159,7 +1177,14 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         return status;
     }
 
-    while (currIndexKey) {
+
+    // Track actual first key in batch, since it might not be the same as lookupStart if the
+    // index keys have changed between reverse lookup catalog snapshots.
+    // const auto firstKeyString = currIndexKey.get().keyString;
+    // batchStats.firstIndexKey = firstKeyString;
+
+    bool finishSnapshot = false;
+    while (!finishSnapshot) {
         iassert(opCtx->checkForInterruptNoAssert());
         const auto keyString = currIndexKey.get().keyString;
         const BSONObj keyStringBson = key_string::toBsonSafe(
@@ -1180,55 +1205,35 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         }
 
         batchStats.lastKeyChecked = keyString;
-        numBytes += keyString.getSize();
-        numKeys++;
+        numBytesInSnapshot += keyString.getSize();
+        numKeysInSnapshot++;
         batchStats.nBytes += keyString.getSize();
         batchStats.nKeys++;
 
+        // Move cursor to next keystring.
         currIndexKey = indexCursor->nextKeyString(opCtx);
 
-        // Set the next key that should be checked.
-        if (currIndexKey) {
-            batchStats.nextKeyToBeChecked = currIndexKey.get().keyString;
-        }
-
-        // TODO SERVER-79800: Fix handling of identical index keys.
-        // If the next key is the same value as this one, we must look at them in the same
-        // snapshot/batch, so skip this check.
-        if (!(currIndexKey && (keyString == currIndexKey.get().keyString))) {
-            // Check if we should finish this batch.
-            if (batchStats.nKeys >= _info.maxDocsPerBatch) {
-                LOGV2_DEBUG(8520200,
-                            3,
-                            "Finish the current batch because maxDocsPerBatch is met.",
-                            "maxDocsPerBatch"_attr = _info.maxDocsPerBatch,
-                            "batchStats.nKeys"_attr = batchStats.nKeys);
-                batchStats.finishedIndexBatch = true;
-                break;
-            }
-            // Check if we should release snapshot.
-            if (numKeys >= repl::dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.load()) {
-                break;
-            }
-        }
-
-        if (Date_t::now() > batchStats.deadline) {
-            LOGV2_DEBUG(8520201,
-                        3,
-                        "Finish the current batch because batch deadline is met.",
-                        "batch deadline"_attr = batchStats.deadline);
-            batchStats.finishedIndexBatch = true;
-            break;
-        }
+        // Check if we should end the current catalog snapshot and/or batch and/or index check.
+        // If there are more snapshots/batches left in the index check, updates batchStats with the
+        // next snapshot's starting key.
+        finishSnapshot = _shouldEndCatalogSnapshotOrBatch(opCtx,
+                                                          collection,
+                                                          indexName,
+                                                          keyString,
+                                                          keyStringBson,
+                                                          numKeysInSnapshot,
+                                                          iam,
+                                                          indexCursor,
+                                                          batchStats,
+                                                          currIndexKey);
     }
 
-
-    batchStats.finishedIndexCheck = !currIndexKey.is_initialized();
     LOGV2_DEBUG(7844808,
                 3,
                 "Catalog snapshot for reverse lookup check ending",
-                "numKeys"_attr = numKeys,
-                "numBytes"_attr = numBytes,
+                "numKeys"_attr = numKeysInSnapshot,
+                "numBytes"_attr = numBytesInSnapshot,
+                "nConsecutiveIdenticalKeysAtEnd"_attr = batchStats.nConsecutiveIdenticalKeysAtEnd,
                 "finishedIndexCheck"_attr = batchStats.finishedIndexCheck,
                 "finishedIndexBatch"_attr = batchStats.finishedIndexBatch,
                 logAttrs(_info.nss),
@@ -1236,6 +1241,141 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     return status;
 }
 
+/**
+ * Returns if we should end the current catalog snapshot based on meeting snapshot/batch limits.
+ * Also updates batchStats accordingly with the next batch's starting key, and whether
+ * the batch and/or index check has finished.
+ */
+bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const StringData& indexName,
+    const key_string::Value& keyString,
+    const BSONObj& keyStringBson,
+    const int64_t numKeysInSnapshot,
+    const SortedDataIndexAccessMethod* iam,
+    const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
+    DbCheckExtraIndexKeysBatchStats& batchStats,
+    const boost::optional<KeyStringEntry>& nextIndexKey) {
+
+    // Helper for checking if there are still keys left in the index.
+    auto checkNoMoreKeysInIndex =
+        [&batchStats](const boost::optional<KeyStringEntry>& nextIndexKey) {
+            if (!nextIndexKey) {
+                batchStats.finishedIndexCheck = true;
+                batchStats.finishedIndexBatch = true;
+                LOGV2_DEBUG(
+                    7980004,
+                    3,
+                    "Finish the batch and the index check because there are no keys left in index");
+                return true;
+            }
+            return false;
+        };
+
+    // If there are no more keys left in index, end the snapshot/batch/check.
+    if (checkNoMoreKeysInIndex(nextIndexKey)) {
+        return true;
+    }
+
+    // Otherwise, set nextKeyToBeChecked.
+    batchStats.nextKeyToBeChecked = nextIndexKey.get().keyString;
+
+
+    const auto ordering = iam->getSortedDataInterface()->getOrdering();
+    const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
+    LOGV2_DEBUG(7980000,
+                3,
+                "comparing current keystring to next keystring",
+                "curr"_attr = keyStringBson,
+                "next"_attr = key_string::toBsonSafe(batchStats.nextKeyToBeChecked.getBuffer(),
+                                                     batchStats.nextKeyToBeChecked.getSize(),
+                                                     ordering,
+                                                     batchStats.nextKeyToBeChecked.getTypeBits()));
+
+    const bool isDistinctNextKeyString = [&] {
+        switch (collection->getRecordStore()->keyFormat()) {
+            case KeyFormat::Long:
+                return keyString.compareWithoutRecordIdLong(batchStats.nextKeyToBeChecked) != 0;
+
+            case KeyFormat::String:
+                return keyString.compareWithoutRecordIdStr(batchStats.nextKeyToBeChecked) != 0;
+        }
+        MONGO_UNREACHABLE;
+    }();
+
+    const bool shouldEndSnapshot =
+        numKeysInSnapshot >= repl::dbCheckMaxTotalIndexKeysPerSnapshot.load();
+    const bool shouldEndBatch =
+        batchStats.nKeys >= _info.maxDocsPerBatch || Date_t::now() > batchStats.deadline;
+
+    // If the next key is the same value as this one, we must look at them in the same
+    // snapshot/batch, so skip this check.
+    if (isDistinctNextKeyString) {
+        // Check if we should finish this batch.
+        if (shouldEndBatch) {
+            LOGV2_DEBUG(8520200,
+                        3,
+                        "Finish the current batch because maxDocsPerBatch is met or the batch "
+                        "deadline is met.",
+                        "maxDocsPerBatch"_attr = _info.maxDocsPerBatch,
+                        "batchStats.nKeys"_attr = batchStats.nKeys,
+                        "batch deadline"_attr = batchStats.deadline);
+            batchStats.finishedIndexBatch = true;
+            return true;
+        }
+
+        // Check if we should finish this snapshot.
+        if (shouldEndSnapshot) {
+            LOGV2_DEBUG(7980001,
+                        3,
+                        "Finish the snapshot because dbCheckMaxTotalIndexKeysPerSnapshot "
+                        "was reached");
+            return true;
+        }
+
+        // Continue with same snapshot/batch.
+        // Since the next key is a distinct key, and we are continuing in the same snapshot/batch,
+        // reset nConsecutiveIdenticalKeysAtEnd.
+        batchStats.nConsecutiveIdenticalKeysAtEnd = 1;
+        return false;
+    }
+
+    // Consecutive Identical Key case.
+    // If we've reached one of the other limits AND reached the max consecutive
+    // identical index per snapshot limit, finish the batch.
+    if ((shouldEndSnapshot || shouldEndBatch) &&
+        batchStats.nConsecutiveIdenticalKeysAtEnd >=
+            repl::dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot.load()) {
+        LOGV2_DEBUG(7980002,
+                    3,
+                    "Finish the current batch because the max consecutive identical "
+                    "index keys per snapshot limit is met",
+                    "nConsecutiveIdenticalKeysAtEnd"_attr =
+                        batchStats.nConsecutiveIdenticalKeysAtEnd);
+
+        batchStats.finishedIndexBatch = true;
+
+        // We are ending this batch and the next batch should start at the next distinct key in the
+        // index. Since batchStats.nextKeyToBeChecked == keyString (the key we just checked), we
+        // need update it to the next distinct one. We make a keystring to search with
+        // kExclusiveAfter so that seekForKeyString will seek to the next distinct keyString after
+        // the current one.
+        batchStats.nextKeyToBeChecked = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            keyStringBson, version, ordering, true /*isForward*/, false /*inclusive*/);
+
+        // Check to make sure there are still more distinct keys in the index.
+        boost::optional<KeyStringEntry> maybeNextKeyToBeChecked =
+            indexCursor->seekForKeyString(opCtx, batchStats.nextKeyToBeChecked);
+        // If there are no more keys left in index, finish the batch and the index check as a whole.
+        checkNoMoreKeysInIndex(maybeNextKeyToBeChecked);
+        return true;
+    }
+
+    // Otherwise, increment to represent the next key we will check in the same snapshot/batch.
+    batchStats.nConsecutiveIdenticalKeysAtEnd++;
+    return false;
+}
 
 void DbChecker::_reverseLookup(OperationContext* opCtx,
                                StringData indexName,
@@ -1422,8 +1562,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         }
 
         if (!collectionFound) {
-            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
-            // one location.
+            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
+            // in one location.
             const auto entry = dbCheckWarningHealthLogEntry(
                 _info.nss,
                 _info.uuid,
@@ -1459,8 +1599,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
             auto logError = false;
             auto msg = "";
 
-            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
-            // one location.
+            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
+            // in one location.
             const auto code = result.getStatus().code();
             if (code == ErrorCodes::LockTimeout) {
                 // This is a retryable error.
@@ -1474,7 +1614,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
                 msg = "abandoning dbCheck batch because collection no longer exists";
             } else if (code == ErrorCodes::CommandNotSupportedOnView) {
                 msg =
-                    "abandoning dbCheck batch because collection no longer exists, but there is a "
+                    "abandoning dbCheck batch because collection no longer exists, but there "
+                    "is a "
                     "view with the identical name";
             } else if (code == ErrorCodes::IndexNotFound) {
                 msg = "skipping dbCheck on collection because it is missing an _id index";
@@ -1483,7 +1624,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
                 retryable = true;
                 msg = "stopping dbCheck because a resource is in use by another process";
             } else if (code == ErrorCodes::NoSuchKey) {
-                // We failed to parse or find an index key. Log a dbCheck error health log entry.
+                // We failed to parse or find an index key. Log a dbCheck error health log
+                // entry.
                 msg = "dbCheck found record with missing and/or mismatched index keys";
                 logError = true;
             } else {
@@ -1536,6 +1678,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
                                        stats.md5,
                                        key_string::rehydrateKey(BSON("_id" << 1), start),
                                        key_string::rehydrateKey(BSON("_id" << 1), stats.lastKey),
+                                       0 /*nConsecutiveIdenticalIndexKeysAtEnd*/,
                                        stats.readTimestamp,
                                        stats.time);
         if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info || stats.logToHealthLog) {
@@ -1547,8 +1690,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         WriteConcernResult unused;
         auto status = waitForWriteConcern(opCtx, stats.time, _info.writeConcern, &unused);
         if (!status.isOK()) {
-            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
-            // one location.
+            // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors
+            // in one location.
             auto entry = dbCheckWarningHealthLogEntry(_info.nss,
                                                       _info.uuid,
                                                       "dbCheck failed waiting for writeConcern",
@@ -1661,11 +1804,11 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
             // (info.secondaryIndexCheckParameters is only boost::none if the feature flag is
             // off).
             batch.setBatchStart(first);
-            batch.setBatchEnd(hasher->lastKey());
+            batch.setBatchEnd(hasher->lastKeySeen());
         } else {
             // Otherwise set minKey/maxKey in BSONKey format.
             batch.setMinKey(BSONKey::parseFromBSON(first.firstElement()));
-            batch.setMaxKey(BSONKey::parseFromBSON(hasher->lastKey().firstElement()));
+            batch.setMaxKey(BSONKey::parseFromBSON(hasher->lastKeySeen().firstElement()));
         }
 
         if (MONGO_unlikely(hangBeforeDbCheckLogOp.shouldFail())) {
@@ -1678,7 +1821,7 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
         result.readTimestamp = readTimestamp;
         result.nDocs = hasher->docsSeen();
         result.nBytes = hasher->bytesSeen();
-        result.lastKey = hasher->lastKey();
+        result.lastKey = hasher->lastKeySeen();
         result.md5 = md5;
     }
 

@@ -88,6 +88,8 @@ struct DbCheckExtraIndexKeysBatchStats {
     repl::OpTime time;
     boost::optional<Timestamp> readTimestamp;
     Date_t deadline;
+    // Number of consecutive identical keys at the end of the batch.
+    int64_t nConsecutiveIdenticalKeysAtEnd = 1;
 };
 
 /**
@@ -186,9 +188,14 @@ private:
      * Acquires a consistent catalog snapshot and iterates through the secondary index in order
      * to get the batch bounds. Runs reverse lookup if skipLookupForExtraKeys is not set.
      *
-     * We release the snapshot by exiting the function. This occurs when we've either finished
-     * the whole extra index keys check, finished one batch, or the number of keys we've looked
-     * at has met or exceeded dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.
+     * We release the snapshot by exiting the function. This occurs when:
+     *   * we have finished the whole extra index keys check,
+     *   * we have finished one batch
+     *   * The number of keys we've looked at has met or exceeded
+     *     dbCheckMaxTotalIndexKeysPerSnapshot
+     *   * if we have identical keys at the end of the batch, one of the above conditions is met and
+     *     the number of consecutive identical keys we've looked at has met or exceeded
+     *     dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot
      *
      * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
      */
@@ -196,6 +203,23 @@ private:
                                                   StringData indexName,
                                                   const key_string::Value& snapshotFirstKey,
                                                   DbCheckExtraIndexKeysBatchStats& batchStats);
+
+    /**
+     * Returns if we should end the current catalog snapshot based on meeting snapshot/batch limits.
+     * Also updates batchStats accordingly with the next batch's starting key, and whether
+     * the batch and/or index check has finished.
+     */
+    bool _shouldEndCatalogSnapshotOrBatch(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const StringData& indexName,
+        const key_string::Value& keyString,
+        const BSONObj& keyStringBson,
+        int64_t numKeysInSnapshot,
+        const SortedDataIndexAccessMethod* iam,
+        const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
+        DbCheckExtraIndexKeysBatchStats& batchStats,
+        const boost::optional<KeyStringEntry>& nextIndexKey);
 
     /**
      * Iterates through an index table and fetches the corresponding document for each index entry.
