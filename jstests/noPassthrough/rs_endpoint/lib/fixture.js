@@ -123,7 +123,6 @@ export var ReplicaSetEndpointTest = class {
             nodeOptions: {
                 setParameter: {
                     featureFlagReplicaSetEndpoint: true,
-                    'failpoint.enforceDirectShardOperationsCheck': "{'mode':'alwaysOn'}"
                 }
             },
             isRouterServer: true,
