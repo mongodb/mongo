@@ -500,11 +500,6 @@ private:
                     typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObj>>
             bufferedObjElements;
 
-        // Helper to flatten Object to compress to match _subobjStates
-        std::vector<BSONElement,
-                    typename std::allocator_traits<Allocator>::template rebind_alloc<BSONElement>>
-            flattenedAppendedObj;
-
         // Current offset of the binary relative to previous intermediate() calls.
         int offset = 0;
 

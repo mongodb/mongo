@@ -1110,7 +1110,6 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::Intern
       subobjStates(allocator),
       referenceSubObj(TrackableBSONObj{BSONObj{}}, allocator),
       bufferedObjElements(allocator),
-      flattenedAppendedObj(allocator),
       lastControl(bsoncolumn::kInvalidControlByte) {}
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
@@ -1123,7 +1122,6 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::Intern
       referenceSubObj(TrackableBSONObj{other.referenceSubObj.get().get()}, allocator),
       referenceSubObjType(other.referenceSubObjType),
       bufferedObjElements(other.bufferedObjElements),
-      flattenedAppendedObj(other.flattenedAppendedObj),
       offset(other.offset),
       lastBufLength(other.lastBufLength),
       lastControl(other.lastControl) {}
@@ -1143,7 +1141,6 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::operat
     referenceSubObj = {TrackableBSONObj{other.referenceSubObj.get().get()}, allocator};
     referenceSubObjType = other.referenceSubObjType;
     bufferedObjElements = other.bufferedObjElements;
-    flattenedAppendedObj = other.flattenedAppendedObj;
     offset = other.offset;
     lastBufLength = other.lastBufLength;
     lastControl = other.lastControl;
@@ -2162,10 +2159,10 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendSubElemen
     const BSONObj& obj) {
     // Check if added object is compatible with selected reference object. Collect a flat vector of
     // all elements while we are doing this.
-    _is.flattenedAppendedObj.clear();
+    std::vector<BSONElement> flattenedAppendedObj;
 
-    auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
-        _is.flattenedAppendedObj.push_back(elem);
+    auto perElement = [&flattenedAppendedObj](const BSONElement& ref, const BSONElement& elem) {
+        flattenedAppendedObj.push_back(elem);
     };
     if (!traverseLockStep(_is.referenceSubObj.get().get(), obj, perElement)) {
         _flushSubObjMode();
@@ -2174,10 +2171,10 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendSubElemen
 
     // We should have received one callback for every sub-element in reference object. This should
     // match number of encoding states setup previously.
-    invariant(_is.flattenedAppendedObj.size() == _is.subobjStates.size());
+    invariant(flattenedAppendedObj.size() == _is.subobjStates.size());
     auto statesIt = _is.subobjStates.begin();
-    auto subElemIt = _is.flattenedAppendedObj.begin();
-    auto subElemEnd = _is.flattenedAppendedObj.end();
+    auto subElemIt = flattenedAppendedObj.begin();
+    auto subElemEnd = flattenedAppendedObj.end();
 
     // Append elements to corresponding encoding state.
     for (; subElemIt != subElemEnd; ++subElemIt, ++statesIt) {
