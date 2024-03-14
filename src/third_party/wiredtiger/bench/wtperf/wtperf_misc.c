@@ -141,6 +141,8 @@ backup_read(WTPERF *wtperf, WT_SESSION *session)
         /* Open the file handle. */
         testutil_snprintf(buf, WT_BACKUP_COPY_SIZE, "%s/%s", wtperf->home, filename);
         error_sys_check(rfd = open(buf, O_RDONLY, 0644));
+        if (rfd < 0)
+            continue;
 
         /* Get the file's size. */
         testutil_check(stat(buf, &st));
