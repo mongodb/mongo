@@ -791,6 +791,10 @@ using any = std::variant<begin_transaction, checkpoint, commit_transaction, cras
 inline std::ostream &
 operator<<(std::ostream &out, const any &op)
 {
+    if (op.valueless_by_exception()) {
+        out << "(error)";
+        return out;
+    }
     std::visit([&out](auto &&x) { out << x; }, op);
     return out;
 }

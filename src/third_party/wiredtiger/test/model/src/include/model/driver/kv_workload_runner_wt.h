@@ -95,7 +95,7 @@ protected:
         static inline cursor_id_t
         cursor_id(table_id_t table_id, unsigned table_cur_id)
         {
-            if (table_cur_id < 0 || table_cur_id >= k_cursors_per_table)
+            if (table_cur_id >= k_cursors_per_table)
                 throw model_exception("Cursor ID out of range");
             return (cursor_id_t)(table_id * k_cursors_per_table + table_cur_id);
         }
@@ -181,7 +181,7 @@ protected:
     inline int
     run_operation(const operation::any &op)
     {
-        int ret;
+        int ret = WT_ERROR; /* So that Coverity does not complain. */
         std::visit([this, &ret](auto &&x) { ret = do_operation(x); }, op);
         return ret;
     }

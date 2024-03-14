@@ -31,6 +31,7 @@
 #include <cstring>
 #include <functional>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -155,10 +156,18 @@ public:
     {
         if (!_txn)
             return;
-        if (_txn->failed())
-            _txn->rollback();
-        else
-            _txn->commit(_commit_timestamp, _durable_timestamp);
+        try {
+            if (_txn->failed())
+                _txn->rollback();
+            else
+                _txn->commit(_commit_timestamp, _durable_timestamp);
+        } catch (std::exception &e) {
+            /*
+             * We cannot propagate exceptions from a destructor, so just print a warning. Exceptions
+             * at this point here are exceedingly rare.
+             */
+            std::cerr << "Error while finishing a transaction: " << e.what() << std::endl;
+        }
     }
 
 private:
