@@ -144,6 +144,7 @@ executor:
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
         await import("jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        db.adminCommand({setParameter: 1, traceExceptions: 1});
       global_vars:
         TestData:
           isHintsToQuerySettingsSuite: true
