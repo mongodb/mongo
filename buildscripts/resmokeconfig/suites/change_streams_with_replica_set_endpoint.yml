@@ -1,0 +1,82 @@
+# This suite is based on the change_streams passthrough suite. It is used for testing that there
+# is no feature parity issue between a replica set before and after it has been bootstrapped as
+# a single-shard cluster as long as the replica set endpoint is enabled. When feature parity is
+# achieved, the set of tests disabled in this suite should be the same as the set of tests
+# disabled in the change_streams passthrough suite.
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/change_streams/**/*.js
+  exclude_files:
+  # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
+  # a sharded cluster.
+  - jstests/change_streams/shell_helper.js
+  # This test runs a transaction with the internal _shardsvrDeleteGlobalIndexKey command. This
+  # command does not exist in the router command registry so the replica set endpoint allows it
+  # to bypass the router. This causes issues when the test tries to commit the transaction since
+  # the commitTransaction command does exist in the router command registry so the replica set
+  # forces it to go through the router which does not know about this transaction. So it fails
+  # with "Cannot recover the transaction decision without a recoveryToken". This issue is test-only
+  # since _shardsvrDeleteGlobalIndexKey will always be run by an internal client and the
+  # replica set endpoint allows all comments from an internal client to bypass the router.
+  - jstests/change_streams/global_index.js
+  exclude_with_any_tags:
+  ##
+  # The next tags correspond to the special errors thrown by the
+  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+  # warranted.
+  ##
+  # "Cowardly refusing to override write concern of command: ..."
+  - assumes_write_concern_unchanged
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          enableMajorityReadConcern: ''
+          testingReplicaSetEndpoint: true
+      # Enable causal consistency for change streams suites using 1 node replica sets. Some tests
+      # rely on the assumption that a w:majority write will be visible immediately in a subsequently
+      # opened change stream. In 1 node replica sets, an operation that majority commits at
+      # timestamp T will force the majority snapshot to advance to T, but the oplog visibility point
+      # may not have advanced to T yet. Subsequent majority snapshot reads will see this write in
+      # the oplog, but speculative majority reads may not, since they read from a local snapshot and
+      # are bound to the oplog visibility rules. Using causal consistency forces the visibility
+      # point to advance to the timestamp of the last write before doing a new read.
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
+  # is fsync locked and has replica set endpoint enabled.
+  # - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagAllMongodsAreSharded: 1
+        featureFlagReplicaSetEndpoint: 1
+    use_auto_bootstrap_procedure: 1
+    num_nodes: 2

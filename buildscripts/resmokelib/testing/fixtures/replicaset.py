@@ -40,6 +40,8 @@ def compare_optime(optime1, optime2):
 class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a replica set to run against."""
 
+    AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
+
     def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
                  dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
                  start_initial_sync_node=False, electable_initial_sync_node=False,
@@ -47,7 +49,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                  replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
                  use_replica_set_connection_string=None, linear_chain=False,
                  default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-                 replicaset_logging_prefix=None, replset_name=None, config_shard=None,
+                 replicaset_logging_prefix=None, replset_name=None,
                  use_auto_bootstrap_procedure=None, initial_sync_uninitialized_fcv=False,
                  hide_initial_sync_node_from_conn_string=False, launch_mongot=False):
         """Initialize ReplicaSetFixture."""
@@ -117,7 +119,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.replset_name = self.mongod_options.setdefault("replSet", self.replset_name)
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
-        self.config_shard = config_shard
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
         # This will be set in setup() after the MongoTFixture has been launched.
         self.mongot_port = None
@@ -386,6 +387,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self._await_secondaries()
         self._await_stable_recovery_timestamp()
         self._setup_cwrwc_defaults()
+        if self.use_auto_bootstrap_procedure:
+            # TODO: Remove this in SERVER-80010.
+            self._await_auto_bootstrapped_config_shard()
 
     def _await_primary(self):
         # Wait for the primary to be elected.
@@ -529,6 +533,32 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             cmd["defaultWriteConcern"] = self.default_write_concern
         primary = self.nodes[0]
         primary.mongo_client().admin.command(cmd)
+
+    # TODO: Remove this in SERVER-80010.
+    def _await_auto_bootstrapped_config_shard(self):
+        connection_string = self.get_driver_connection_url()
+        self.logger.info("Waiting for %s to auto-bootstrap as a config shard...", connection_string)
+
+        deadline = time.time() + ReplicaSetFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
+        timeout_occurred = lambda: deadline - time.time() <= 0.0
+
+        while True:
+            client = interface.build_client(self.get_primary(), self.auth_options)
+            config_shard_count = client.get_database("config").command(
+                {"count": "shards", "query": {"_id": "config"}})
+
+            if config_shard_count['n'] == 1:
+                break
+
+            if timeout_occurred():
+                port = self.get_primary().port
+                raise self.fixturelib.ServerFailure(
+                    "mongod on port: {} failed waiting for auto-bootstrapped config shard success after {} seconds"
+                    .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
+            time.sleep(0.1)
+
+        self.logger.info("%s successfully auto-bootstrapped as a config shard...",
+                         connection_string)
 
     def _check_initial_sync_node_has_uninitialized_fcv(self, initial_sync_node):
         sync_node_conn = initial_sync_node.mongo_client()

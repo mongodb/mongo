@@ -490,7 +490,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         """Raise an exception if the configuration for the sharded cluster can't support embedded_router_mode.
 
         :param kwargs: sharded cluster fixture kwargs.
-        :param is_multiversion: True if this is a multiversion test. 
+        :param is_multiversion: True if this is a multiversion test.
         """
         # TODO SERVER-81458: Support multiversion testing with embedded routers.
         # TODO SERVER-81459: Support testing a cluster with a combination of dedicated and embedded routers.

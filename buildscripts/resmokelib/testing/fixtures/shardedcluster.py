@@ -192,7 +192,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def await_ready(self):
         """Block until the fixture can be used for testing."""
         # Wait for the config server
-        if self.configsvr is not None:
+        if self.configsvr is not None and self.config_shard is None:
             self.configsvr.await_ready()
 
         # Wait for each of the shards
@@ -244,26 +244,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.refresh_logical_session_cache(shard)
 
         self.is_ready = True
-
-    # TODO: Remove with SERVER-80010.
-    def _await_auto_bootstrapped_config_shard(self, config_shard_rs):
-        deadline = time.time() + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
-        timeout_occurred = lambda: deadline - time.time() <= 0.0
-
-        while True:
-            client = interface.build_client(config_shard_rs.get_primary(), self.auth_options)
-            config_shard_count = client.get_database("config").command(
-                {"count": "shards", "query": {"_id": "config"}})
-
-            if config_shard_count['n'] == 1:
-                break
-
-            if timeout_occurred():
-                port = config_shard_rs.get_primary().port
-                raise self.fixturelib.ServerFailure(
-                    "mongod on port: {} failed waiting for auto-bootstrapped config shard success after {} seconds"
-                    .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
-            time.sleep(0.1)
 
     # TODO SERVER-76343 remove the join_migrations parameter and the if clause depending on it.
     def stop_balancer(self, timeout_ms=300000, join_migrations=True):
@@ -475,14 +455,15 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         if self.embedded_router_mode:
             mongod_options["routerPort"] = ""
 
+        use_auto_bootstrap_procedure = self.use_auto_bootstrap_procedure and self.config_shard == index
         shard_logging_prefix = self._get_rs_shard_logging_prefix(index)
 
         return {
             "mongod_options": mongod_options, "mongod_executable": self.mongod_executable,
             "auth_options": auth_options, "preserve_dbpath": preserve_dbpath,
             "replset_config_options": replset_config_options, "shard_logging_prefix":
-                shard_logging_prefix, "config_shard": self.config_shard,
-            "use_auto_bootstrap_procedure": self.use_auto_bootstrap_procedure, **shard_options
+                shard_logging_prefix, "use_auto_bootstrap_procedure": use_auto_bootstrap_procedure,
+            **shard_options
         }
 
     def install_rs_shard(self, rs_shard):
@@ -520,13 +501,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """
         connection_string = shard.get_internal_connection_string()
         if is_config_shard:
-            if self.use_auto_bootstrap_procedure:
-                self.logger.info("Waiting for %s to auto-bootstrap as a config shard...",
-                                 connection_string)
-                self._await_auto_bootstrapped_config_shard(shard)
-                self.logger.info("%s successfully auto-bootstrapped as a config shard...",
-                                 connection_string)
-            else:
+            if not self.use_auto_bootstrap_procedure:
                 self.logger.info("Adding %s as config shard...", connection_string)
                 client.admin.command({"transitionFromDedicatedConfigServer": 1})
         else:

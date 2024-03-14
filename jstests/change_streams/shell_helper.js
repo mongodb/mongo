@@ -124,7 +124,7 @@ checkNextChange(changeStreamCursor, expected);
 jsTestLog("Testing watch() with batchSize");
 // Only test mongod because mongos uses batch size 0 for aggregate commands internally to
 // establish cursors quickly. GetMore on mongos doesn't respect batch size due to SERVER-31992.
-if (!FixtureHelpers.isMongos(db)) {
+if (!FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Increase a field by 5 times and verify the batch size is respected.
     for (let i = 0; i < 5; i++) {
         assert.commandWorked(coll.update({_id: 1}, {$inc: {x: 1}}));
@@ -135,6 +135,10 @@ if (!FixtureHelpers.isMongos(db)) {
         [{$match: {$or: [{_id: resumeToken}, {documentKey: {_id: 1}, operationType: "update"}]}}],
         {resumeAfter: resumeToken, batchSize: 2});
 
+    if (TestData.testingReplicaSetEndpoint) {
+        // GetMore on mongos doesn't respect batch size due to SERVER-31992.
+        assert(changeStreamCursor.hasNext());
+    }
     // Check the first batch.
     assert.eq(changeStreamCursor.objsLeftInBatch(), 2);
     // Consume the first batch.

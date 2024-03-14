@@ -1,0 +1,67 @@
+# This suite is based on the change_streams_multi_stmt_txn passthrough suite. It is used for testing
+# that there is no feature parity issue between a replica set before and after it has been
+# bootstrapped as a single-shard cluster as long as the replica set endpoint is enabled. When
+# feature parity is achieved, the set of tests disabled in this suite should be the same as the set
+# of tests disabled in the change_streams_multi_stmt_txn passthrough suite.
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/change_streams/**/*.js
+  exclude_files:
+  # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
+  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+  exclude_with_any_tags:
+  # These tests would fail with "Cowardly refusing to override write concern of command: ..."
+  - assumes_write_concern_unchanged
+  # No need to use a passthrough to add transactions to a test that already has its own
+  # transactions.
+  - uses_transactions
+  # These tests make assumptions about change stream results that are no longer true once operations
+  # get bundled into transactions.
+  - change_stream_does_not_expect_txns
+
+executor:
+  archive:
+    hooks:
+      # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+      # that is fsync locked and has replica set endpoint enabled.
+      # - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          networkErrorAndTxnOverrideConfig:
+            wrapCRUDinTransactions: true
+            testingReplicaSetEndpoint: true
+      # Enable the transactions passthrough.
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
+        await import("jstests/libs/override_methods/network_error_and_txn_override.js");
+        await import("jstests/libs/override_methods/implicit_filter_eot_changestreams.js");
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
+  # that is fsync locked and has replica set endpoint enabled.
+  # - CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagAllMongodsAreSharded: 1
+        featureFlagReplicaSetEndpoint: 1
+    use_auto_bootstrap_procedure: 1
+    num_nodes: 1
