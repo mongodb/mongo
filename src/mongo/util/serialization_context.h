@@ -80,12 +80,8 @@ struct SerializationContext {
 
     SerializationContext(Source source = Source::Default,
                          CallerType callerType = CallerType::None,
-                         Prefix prefixState = Prefix::ExcludePrefix,
-                         bool nonPrefixedTenantId = false)
-        : _source(source),
-          _callerType(callerType),
-          _prefixState(prefixState),
-          _nonPrefixedTenantId(nonPrefixedTenantId) {}
+                         Prefix prefixState = Prefix::ExcludePrefix)
+        : _source(source), _callerType(callerType), _prefixState(prefixState) {}
 
     /**
      * Gets a copy of a commonly used immutable value for use in constructing a mutable
@@ -98,18 +94,14 @@ struct SerializationContext {
     }
 
     static SerializationContext stateCommandReply(const SerializationContext& requestCtxt) {
-        return SerializationContext(Source::Command,
-                                    CallerType::Reply,
-                                    requestCtxt._prefixState,
-                                    requestCtxt._nonPrefixedTenantId);
+        return SerializationContext(Source::Command, CallerType::Reply, requestCtxt._prefixState);
     }
 
     static SerializationContext stateCommandRequest(bool hasTenantId, bool isFromAtlasProxy) {
         return SerializationContext{Source::Command,
                                     CallerType::Request,
                                     isFromAtlasProxy ? Prefix::IncludePrefix
-                                                     : Prefix::ExcludePrefix,
-                                    hasTenantId};
+                                                     : Prefix::ExcludePrefix};
     }
 
     static const SerializationContext& stateCommandRequest() {
@@ -138,17 +130,6 @@ struct SerializationContext {
      * Setters for flags that may not be known during construction time, used by producers
      */
 
-    /**
-     * This flag is set/produced at command parsing before the deserializer is called, and
-     * consumed by the serializer.  It indicates whether the tenantId was sourced from the
-     * $tenant field or security token (ie. true), or if it was sourced from parsing the db
-     * string prefix (ie. false).  This is important as the serializer uses this flag to
-     * determine whether the reponse should contain a prefixed tenantId when serializing for
-     * commands when no expectPrefix was given (_prefixState == Default).
-     */
-    void setTenantIdSource(bool nonPrefixedTenantId) {
-        _nonPrefixedTenantId = nonPrefixedTenantId;
-    }
 
     void setPrefixState(bool prefixState) {
         _prefixState = prefixState ? Prefix::IncludePrefix : Prefix::ExcludePrefix;
@@ -166,9 +147,6 @@ struct SerializationContext {
     const CallerType& getCallerType() const {
         return _callerType;
     }
-    bool receivedNonPrefixedTenantId() const {
-        return _nonPrefixedTenantId;
-    }
 
     std::string toString() const {
         auto stream = str::stream();
@@ -184,7 +162,6 @@ struct SerializationContext {
                << (_prefixState == Prefix::IncludePrefix
                        ? "Include"
                        : (_prefixState == Prefix::ExcludePrefix ? "Exclude" : "Missing"));
-        stream << ", non-prefixed tid: " << (_nonPrefixedTenantId ? "true" : "false");
         return stream;
     }
 
@@ -201,7 +178,6 @@ private:
     Source _source;
     CallerType _callerType;
     Prefix _prefixState;
-    bool _nonPrefixedTenantId;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const SerializationContext& sc) {

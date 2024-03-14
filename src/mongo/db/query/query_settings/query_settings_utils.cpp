@@ -50,10 +50,10 @@ namespace {
 // Explicitly defines the `SerializationContext` to be used in `RepresentativeQueryInfo` factory
 // methods. This was done as part of SERVER-79909 to ensure that inner query commands correctly
 // infer the `tenantId`.
-auto const kSerializationContext = SerializationContext{SerializationContext::Source::Command,
-                                                        SerializationContext::CallerType::Request,
-                                                        SerializationContext::Prefix::ExcludePrefix,
-                                                        true /* nonPrefixedTenantId */};
+auto const kSerializationContext =
+    SerializationContext{SerializationContext::Source::Command,
+                         SerializationContext::CallerType::Request,
+                         SerializationContext::Prefix::ExcludePrefix};
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const QuerySettings& settings) {

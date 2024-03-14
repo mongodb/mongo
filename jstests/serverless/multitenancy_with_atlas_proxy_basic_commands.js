@@ -552,7 +552,7 @@ const otherSecurityToken = _createTenantToken({tenant: kOtherTenant, expectPrefi
 
     assert.commandFailedWithCode(
         testDb.runCommand({mapReduce: kCollA, map: mapFunc, reduce: reduceFunc, out: {inline: 1}}),
-        8233503);
+        31264);
 }
 
 primary._setSecurityToken(undefined);

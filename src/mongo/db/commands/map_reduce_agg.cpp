@@ -157,13 +157,13 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     Timer cmdTimer;
 
-    auto parsedMr =
-        MapReduceCommandRequest::parse(IDLParserContext("mapReduce",
-                                                        false /* apiStrict */,
-                                                        auth::ValidatedTenancyScope::get(opCtx),
-                                                        dbName.tenantId(),
-                                                        SerializationContext::stateDefault()),
-                                       cmd);
+    const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
+    auto sc = vts
+        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+        : SerializationContext::stateStorageRequest();
+    auto parsedMr = MapReduceCommandRequest::parse(
+        IDLParserContext("mapReduce", false /* apiStrict */, vts, dbName.tenantId(), sc), cmd);
+
     auto curop = CurOp::get(opCtx);
     curop->beginQueryPlanningTimer();
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);

@@ -310,8 +310,7 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
         // reportCurrentOpForClient.
         auto sc = SerializationContext(SerializationContext::Source::Command,
                                        SerializationContext::CallerType::Reply,
-                                       SerializationContext::Prefix::ExcludePrefix,
-                                       true);
+                                       SerializationContext::Prefix::ExcludePrefix);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 
         curop->reportCurrentOpForClient(expCtx, client, false, false, &curOpObj);

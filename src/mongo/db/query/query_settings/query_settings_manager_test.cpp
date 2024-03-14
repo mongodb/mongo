@@ -148,8 +148,7 @@ public:
         static auto const kSerializationContext =
             SerializationContext{SerializationContext::Source::Command,
                                  SerializationContext::CallerType::Request,
-                                 SerializationContext::Prefix::ExcludePrefix,
-                                 true /* nonPrefixedTenantId */};
+                                 SerializationContext::Prefix::ExcludePrefix};
 
         return NamespaceStringUtil::deserialize(
             tenantId, kDbName, kCollName, kSerializationContext);

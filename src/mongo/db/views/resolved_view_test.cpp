@@ -202,7 +202,6 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
                 SerializationContext::stateCommandRequest());
 
     SerializationContext scCommand = SerializationContext::stateCommandRequest();
-    scCommand.setTenantIdSource(true);
     scCommand.setPrefixState(true);
     AggregateCommandRequest requestOnViewCommand{viewNss, emptyPipeline, scCommand};
 
@@ -211,7 +210,6 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
               SerializationContext::Source::Command);
     ASSERT_EQ(resultCommand.getSerializationContext().getCallerType(),
               SerializationContext::CallerType::Request);
-    ASSERT_TRUE(resultCommand.getSerializationContext().receivedNonPrefixedTenantId());
     ASSERT_EQ(resultCommand.getSerializationContext().getPrefix(),
               SerializationContext::Prefix::IncludePrefix);
 }

@@ -47,8 +47,7 @@ namespace {
 static auto const kSerializationContext =
     SerializationContext{SerializationContext::Source::Command,
                          SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix,
-                         true /* nonPrefixedTenantId */};
+                         SerializationContext::Prefix::ExcludePrefix};
 
 NamespaceString makeNamespace(const boost::optional<TenantId>& tenantId = boost::none) {
     auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, "db");

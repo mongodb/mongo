@@ -478,51 +478,48 @@ TEST(CursorResponseTest,
 
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
-    for (bool flagStatus : {false, true}) {
-        rpc::OpMsgReplyBuilder builder;
-        BSONObj okStatus = BSON("ok" << 1);
-        BSONObj testDoc = BSON("_id" << 1);
-        auto scReply = SerializationContext::stateCommandReply();
-        scReply.setTenantIdSource(flagStatus /*nonPrefixedTenantId*/);
+    rpc::OpMsgReplyBuilder builder;
+    BSONObj okStatus = BSON("ok" << 1);
+    BSONObj testDoc = BSON("_id" << 1);
+    auto scReply = SerializationContext::stateCommandReply();
 
-        BSONObj expectedBody =
-            BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "partialResultsReturned"
-                                               << true << "id" << CursorId(123) << "ns"
-                                               << NamespaceStringUtil::serialize(nss, scReply)));
+    BSONObj expectedBody =
+        BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "partialResultsReturned"
+                                           << true << "id" << CursorId(123) << "ns"
+                                           << NamespaceStringUtil::serialize(nss, scReply)));
 
-        // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
-        CursorResponseBuilder crb(&builder, options);
-        crb.append(testDoc);
-        crb.setPartialResultsReturned(true);
-        crb.done(CursorId(123), nss, boost::none, scReply);
+    // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
+    CursorResponseBuilder crb(&builder, options);
+    crb.append(testDoc);
+    crb.setPartialResultsReturned(true);
+    crb.done(CursorId(123), nss, boost::none, scReply);
 
-        // Confirm that the resulting BSONObj response matches the expected body.
-        auto msg = builder.done();
-        auto opMsg = OpMsg::parse(msg);
-        ASSERT_BSONOBJ_EQ(expectedBody, opMsg.body);
+    // Confirm that the resulting BSONObj response matches the expected body.
+    auto msg = builder.done();
+    auto opMsg = OpMsg::parse(msg);
+    ASSERT_BSONOBJ_EQ(expectedBody, opMsg.body);
 
-        // Append {"ok": 1} to the opMsg body so that it can be parsed by CursorResponse.
-        auto swCursorResponse =
-            CursorResponse::parseFromBSON(opMsg.body.addField(okStatus["ok"]), nullptr, tid);
-        ASSERT_OK(swCursorResponse.getStatus());
+    // Append {"ok": 1} to the opMsg body so that it can be parsed by CursorResponse.
+    auto swCursorResponse =
+        CursorResponse::parseFromBSON(opMsg.body.addField(okStatus["ok"]), nullptr, tid);
+    ASSERT_OK(swCursorResponse.getStatus());
 
-        // Confirm the CursorReponse parsed from CursorResponseBuilder output has the correct
-        // content.
-        CursorResponse response = std::move(swCursorResponse.getValue());
-        ASSERT_EQ(response.getCursorId(), CursorId(123));
+    // Confirm the CursorReponse parsed from CursorResponseBuilder output has the correct
+    // content.
+    CursorResponse response = std::move(swCursorResponse.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
 
-        ASSERT_EQ(response.getNSS(), nss);
-        ASSERT_EQ(response.getBatch().size(), 1U);
-        ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
-        ASSERT_EQ(response.getPartialResultsReturned(), true);
+    ASSERT_EQ(response.getNSS(), nss);
+    ASSERT_EQ(response.getBatch().size(), 1U);
+    ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
+    ASSERT_EQ(response.getPartialResultsReturned(), true);
 
-        // Re-serialize a BSONObj response from the CursorResponse.
-        auto cursorResBSON = response.toBSONAsInitialResponse(scReply);
+    // Re-serialize a BSONObj response from the CursorResponse.
+    auto cursorResBSON = response.toBSONAsInitialResponse(scReply);
 
-        // Confirm that the BSON serialized by the CursorResponse is the same as that serialized by
-        // the CursorResponseBuilder. Field ordering differs between the two.
-        ASSERT_BSONOBJ_EQ_UNORDERED(cursorResBSON["cursor"].Obj(), opMsg.body["cursor"].Obj());
-    }
+    // Confirm that the BSON serialized by the CursorResponse is the same as that serialized by
+    // the CursorResponseBuilder. Field ordering differs between the two.
+    ASSERT_BSONOBJ_EQ_UNORDERED(cursorResBSON["cursor"].Obj(), opMsg.body["cursor"].Obj());
 }
 
 

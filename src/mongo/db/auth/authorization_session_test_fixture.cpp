@@ -78,8 +78,7 @@ void AuthorizationSessionTestFixture::setUp() {
     // assume tenantId is from security token with no expectPrefix
     _sc = SerializationContext(SerializationContext::Source::Command,
                                SerializationContext::CallerType::Request,
-                               SerializationContext::Prefix::ExcludePrefix,
-                               true /* nonPrefixedTenantId */);
+                               SerializationContext::Prefix::ExcludePrefix);
 }
 
 Status AuthorizationSessionTestFixture::createUser(const UserName& username,

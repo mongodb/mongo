@@ -1253,7 +1253,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
     OpMsgRequest request = OpMsgRequest(std::move(msg));
     ASSERT_EQ(request.getSerializationContext(),
               SerializationContext(
-                  SC::Source::Command, SC::CallerType::Request, SC::Prefix::ExcludePrefix, true));
+                  SC::Source::Command, SC::CallerType::Request, SC::Prefix::ExcludePrefix));
     ASSERT_EQ(request.getDbName(), expectedTenantDbName);
 }
 
@@ -1299,7 +1299,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTSIncludePrefix) {
     OpMsgRequest request{std::move(msg)};
     ASSERT_EQ(request.getSerializationContext(),
               SerializationContext(
-                  SC::Source::Command, SC::CallerType::Request, SC::Prefix::IncludePrefix, true));
+                  SC::Source::Command, SC::CallerType::Request, SC::Prefix::IncludePrefix));
     ASSERT_EQ(request.getDbName(), expectedDbName);
 }
 

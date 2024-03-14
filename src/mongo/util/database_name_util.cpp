@@ -83,18 +83,6 @@ std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName) {
 std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
                                                    const SerializationContext& context) {
     // tenantId came from either a $tenant field or security token.
-    if (context.receivedNonPrefixedTenantId()) {
-        switch (context.getPrefix()) {
-            case SerializationContext::Prefix::ExcludePrefix:
-                return dbName.toString();
-            case SerializationContext::Prefix::IncludePrefix:
-                return dbName.toStringWithTenantId();
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
-    // tenantId came from the prefix.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return dbName.toString();
@@ -191,7 +179,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
     // this case, essentially letting the request dictate the state of the feature.
 
     // We received a tenantId from $tenant or the security token.
-    if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
+    if (tenantId != boost::none) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix: {
                 return DatabaseName(std::move(tenantId), db);
@@ -222,7 +210,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
         }
     }
 
-    // We received the tenantId from the prefix.
+    // We shouldn't have a tenant ID prefix without an external tenant ID (from the security token).
     auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
     uassert(8233503,
             str::stream() << "Atlas Proxy protocol must be true when there is a tenantId prefix "

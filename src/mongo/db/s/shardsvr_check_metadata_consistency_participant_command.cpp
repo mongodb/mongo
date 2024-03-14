@@ -139,9 +139,9 @@ public:
                 opCtx, nss, commandLevel, shardId, primaryShardId, configsvrCollections);
 
             // If this is the primary shard of the db coordinate index check across shards
-            const auto& optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
+            const auto optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
             if (shardId == primaryShardId) {
-                if (optionalCheckIndexes.value_or(false)) {
+                if (optionalCheckIndexes) {
                     auto indexInconsistencies =
                         metadata_consistency_util::checkIndexesConsistencyAcrossShards(
                             opCtx, configsvrCollections);

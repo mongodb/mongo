@@ -240,7 +240,6 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
 
     // TODO SERVER-77000: uncomment the below
     // expCtx->serializationCtxt.setPrefixState(true);
-    // expCtx->serializationCtxt.setTenantIdSource(false);
     // std::string targetDb = str::stream()
     //     << expCtx->ns.tenantId()->toString() << "_" << expCtx->ns.dbName().toString_forTest();
     // serialized = outSource->serialize().getDocument();

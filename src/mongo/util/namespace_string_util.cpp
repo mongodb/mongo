@@ -111,18 +111,6 @@ std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
 std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
                                                       const SerializationContext& context) {
     // tenantId came from either a $tenant field or security token.
-    if (context.receivedNonPrefixedTenantId()) {
-        switch (context.getPrefix()) {
-            case SerializationContext::Prefix::ExcludePrefix:
-                return ns.toString();
-            case SerializationContext::Prefix::IncludePrefix:
-                return ns.toStringWithTenantId();
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
-    // tenantId came from the prefix.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return ns.toString();
@@ -208,8 +196,8 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
     // we only get here if we are processing a Command Request.  We disregard the feature flag
     // in this case, essentially letting the request dictate the state of the feature.
 
-    // We received a tenantId from $tenant or the security token.
-    if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
+    // We shouldn't have a tenant ID prefix without an external tenant ID (from the security token).
+    if (tenantId != boost::none) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix: {
                 return NamespaceString(std::move(tenantId), ns);

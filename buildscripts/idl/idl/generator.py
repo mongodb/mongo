@@ -1745,10 +1745,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 else:
                     validate_and_assign_or_uassert(field, object_value)
 
-                    # if we explicitly set _dollarTenant, we know we have a non-prefixed tenantId
-                    if field.name == '$tenant':
-                        self._writer.write_line('_serializationContext.setTenantIdSource(true);')
-
             if is_command_field and predicate:
                 with self._block('else {', '}'):
                     self._writer.write_line(
@@ -1975,9 +1971,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # inject a context into the IDLParserContext that tags the class as a command request
                 self._writer.write_line(
                     'setSerializationContext(SerializationContext::stateCommandRequest());')
-                self._writer.write_line(
-                    '_serializationContext.setTenantIdSource(request.getValidatedTenantId() != boost::none);'
-                )
                 with self._block(
                         'if (request.validatedTenancyScope != boost::none && request.validatedTenancyScope->isFromAtlasProxy()) {',
                         '}'):

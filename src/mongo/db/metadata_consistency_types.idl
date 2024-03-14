@@ -409,4 +409,4 @@ structs:
             checkIndexes:
                 description: "Enable index consistency checks"
                 type: safeBool
-                optional: true
+                default: false

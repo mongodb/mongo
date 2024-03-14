@@ -293,7 +293,6 @@ SerializationContext OpMsgRequest::getSerializationContext() const {
     auto serializationCtx = SerializationContext::stateCommandRequest();
     auto tenantId = getValidatedTenantId() ? getValidatedTenantId() : parseDollarTenant(body);
 
-    serializationCtx.setTenantIdSource(tenantId ? true : false);
     if (auto const expectPrefix = body.getField("expectPrefix")) {
         serializationCtx.setPrefixState(expectPrefix.boolean());
     } else if (validatedTenancyScope) {
@@ -331,22 +330,15 @@ BSONObj appendDollarDbAndTenant(const DatabaseName& dbName,
     BSONObjBuilder builder(std::move(body));
     builder.appendElements(extraFields);
 
-    if (sc != SerializationContext::stateDefault()) {
-        // Recreate each of the fields according to the sc when copying the body from an existing
-        // request.
-        if (!hasVts && sc.receivedNonPrefixedTenantId() && dbName.tenantId()) {
-            appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
-        }
-        builder.append("$db", DatabaseNameUtil::serialize(dbName, sc));
-        if (sc.getPrefix() == SerializationContext::Prefix::IncludePrefix) {
-            builder.append("expectPrefix",
-                           sc.getPrefix() == SerializationContext::Prefix::IncludePrefix);
-        }
-    } else {
-        if (!hasVts && dbName.tenantId()) {
-            appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
-        }
-        builder.append("$db", dbName.serializeWithoutTenantPrefix_UNSAFE());
+    // Recreate each of the fields according to the sc when copying the body from an existing
+    // request.
+    if (!hasVts && dbName.tenantId()) {
+        appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
+    }
+    builder.append("$db", DatabaseNameUtil::serialize(dbName, sc));
+    if (sc.getPrefix() == SerializationContext::Prefix::IncludePrefix) {
+        builder.append("expectPrefix",
+                       sc.getPrefix() == SerializationContext::Prefix::IncludePrefix);
     }
 
     return builder.obj();
