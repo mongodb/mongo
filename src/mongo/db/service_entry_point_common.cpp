@@ -197,7 +197,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
-MONGO_FAIL_POINT_DEFINE(enforceDirectShardOperationsCheck);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -1821,11 +1820,16 @@ void ExecCommandDatabase::_initiateCommand() {
     enforceRequireAPIVersion(opCtx, command);
 
     // Check that the client has the directShardOperations role if this is a direct operation to a
-    // shard.
+    // shard. This code is only used for warnings, errors will be emitted by the checks in the
+    // AutoGetX and AcquireX checks if featureFlagFailOnDirectShardOperations is enabled.
+    //
+    // TODO (SERVER-87190) Remove once 8.0 becomes last-lts. We will rely on the checks in the auto
+    // getters and collection acquisitions.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (command->requiresAuth() && ShardingState::get(opCtx)->enabled() &&
         fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot)) {
+        feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot) &&
+        !feature_flags::gFailOnDirectShardOperations.isEnabled(fcvSnapshot)) {
         bool clusterHasTwoOrMoreShards = [&]() {
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
             auto* clusterCardinalityParam =
@@ -1845,14 +1849,6 @@ void ExecCommandDatabase::_initiateCommand() {
                           ActionType::issueDirectShardOperations)));
 
             if (!hasDirectShardOperations) {
-                // TODO (SERVER-77073): Remove this failpoint.
-                if (MONGO_unlikely(enforceDirectShardOperationsCheck.shouldFail())) {
-                    uasserted(
-                        ErrorCodes::Unauthorized,
-                        "You are connecting to a sharded cluster using a replica set or standalone"
-                        "connection string. Please use the sharded connection string.");
-                }
-
                 bool timeUpdated = false;
                 auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
                 {

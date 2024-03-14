@@ -57,6 +57,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/direct_connection_util.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -431,6 +432,10 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
             acquisitions.emplace(prerequisites.nss, std::move(acquisition));
         }
     }
+
+    // Check if this operation is a direct connection and if it is authorized to be one.
+    const auto& dbName = sortedAcquisitionRequests.begin()->second.prerequisites.nss.dbName();
+    direct_connection_util::checkDirectShardOperationAllowed(opCtx, dbName);
 
     return acquisitions;
 }
@@ -1450,6 +1455,11 @@ void restoreTransactionResourcesToOperationContext(
                 acquiredCollection.ownershipFilter =
                     std::move(reacquiredServicesSnapshot.ownershipFilter);
             }
+
+            // Check if this operation is a direct connection and if it is authorized to be one
+            // after reacquiring locks or snapshots.
+            direct_connection_util::checkDirectShardOperationAllowed(
+                opCtx, transactionResources.acquiredCollections.front().prerequisites.nss.dbName());
 
             // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr
             invariant(acquiredCollection.collectionDescription);
