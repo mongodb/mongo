@@ -3,6 +3,9 @@
  * collection-dropping operations.
  *
  * @tags: [
+ *   # TODO (SERVER-88130) Remove this dependency once cluster::createWithRouterLoop uses a
+ *   # collection router
+ *   featureFlagTrackUnshardedCollectionsUponCreation
  * ]
  */
 export const $config = (function() {

@@ -45,10 +45,12 @@ feature_flags:
     featureFlagMoveCollection:
         description: "Feature flag for implementing online move collection."
         cpp_varname: gFeatureFlagMoveCollection
-        default: false
+        default: true
+        version: 8.0
         shouldBeFCVGated: true
     featureFlagUnshardCollection:
         description: "Feature flag for implementing unshard collection."
         cpp_varname: gFeatureFlagUnshardCollection
-        default: false
+        default: true
+        version: 8.0
         shouldBeFCVGated: true

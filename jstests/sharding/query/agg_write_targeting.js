@@ -6,6 +6,7 @@
  *   featureFlagMoveCollection,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
+ *   requires_fcv_80
  * ]
  */
 

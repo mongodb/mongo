@@ -2,7 +2,7 @@
  * Tests that a drop can't happen while moveCollection is in progress.
  * @tags: [
  *  featureFlagRecoverableShardsvrReshardCollectionCoordinator,
- *  requires_fcv_72,
+ *  requires_fcv_80,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
  *  # TODO (SERVER-87812) Remove multiversion_incompatible tag

@@ -7,6 +7,7 @@
  *   requires_profiling,
  *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
+ *   requires_fcv_80
  * ]
  */
 

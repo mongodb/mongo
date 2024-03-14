@@ -2,7 +2,7 @@
  * Tests unshard and move collection behaviour.
  *
  * @tags: [
- *  requires_fcv_72,
+ *  requires_fcv_80,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
  *  featureFlagUnshardCollection,

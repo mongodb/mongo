@@ -4,6 +4,7 @@
  *
  * @tags: [
  *    featureFlagAuthoritativeShardCollection,
+ *    requires_fcv_80
  * ]
  */
 

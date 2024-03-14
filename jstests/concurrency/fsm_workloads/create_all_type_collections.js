@@ -7,7 +7,8 @@
  *  # coordinator is fixed
  *  featureFlagAuthoritativeShardCollection,
  *  # this test swallow expected errors caused by concurrent DDL operations
- *  catches_command_failures
+ *  catches_command_failures,
+ *  requires_fcv_80
  * ]
  */
 

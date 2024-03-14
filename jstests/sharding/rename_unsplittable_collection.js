@@ -4,6 +4,7 @@
  *   assumes_balancer_off,
  *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
+ *   requires_fcv_80
  * ]
  */
 

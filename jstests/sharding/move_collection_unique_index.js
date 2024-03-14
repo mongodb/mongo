@@ -5,7 +5,7 @@
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   featureFlagReshardingImprovements,
- *   requires_fcv_72
+ *   requires_fcv_80
  * ]
  */
 

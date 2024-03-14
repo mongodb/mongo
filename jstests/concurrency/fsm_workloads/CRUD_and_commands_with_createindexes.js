@@ -4,6 +4,9 @@
  * dropping operations.
  *
  * @tags: [
+ *   # TODO (SERVER-88130) Remove this dependency once cluster::createWithRouterLoop uses a
+ *   # collection router
+ *   featureFlagTrackUnshardedCollectionsUponCreation
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

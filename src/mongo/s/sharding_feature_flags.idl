@@ -85,7 +85,8 @@ feature_flags:
   featureFlagAuthoritativeShardCollection:
     description: "Feature flag for enabling the authoritative version of the shardCollection DDL operation."
     cpp_varname: feature_flags::gAuthoritativeShardCollection
-    default: false
+    default: true
+    version: 8.0
     shouldBeFCVGated: true
   # TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
   featureFlagBalanceUnshardedCollections:
@@ -147,7 +148,8 @@ feature_flags:
   featureFlagTrackUnshardedCollectionsUponMoveCollection:
     description: "Feature flag for enabling the tracking of user unsharded collection upon moveCollection"
     cpp_varname: feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-    default: false
+    default: true
+    version: 8.0
     shouldBeFCVGated: true
   featureFlagReplicaSetEndpoint:
     description: When enabled, allows users to connect to a single-shard cluster with no dedicated config
@@ -168,5 +170,6 @@ feature_flags:
                   sharded cluster. Namely, no implicit creations by the shards and no usage of the
                   storage-level create command."
     cpp_varname: feature_flags::g80CollectionCreationPath
-    default: false
+    default: true
+    version: 8.0
     shouldBeFCVGated: true

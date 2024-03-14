@@ -5,6 +5,7 @@
  * @tags: [
  *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
+ *   requires_fcv_80
  * ]
  *
  */
