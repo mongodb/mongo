@@ -194,6 +194,11 @@ void BlockBasedInterleavedDecompressor::DecodingState::loadUncompressed(const BS
             case NumberLong:
                 d64.lastEncodedValue = elem._numberLong();
                 break;
+            case NumberDouble:
+                // We don't have an encoding for doubles until we get the scale index from the next
+                // delta control byte.
+                d64.lastEncodedValue = boost::none;
+                break;
             case bsonTimestamp:
                 d64.lastEncodedValue = elem.timestampValue();
                 break;
@@ -235,18 +240,26 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
     visit(OverloadedVisitor{
               [&](DecodingState::Decoder64& d64) {
                   // Simple-8b delta block, load its scale factor and validate for sanity
-                  d64.scaleIndex = bsoncolumn::scaleIndexForControlByte(control);
+                  uint8_t newScaleIndex = bsoncolumn::scaleIndexForControlByte(control);
                   uassert(8690002,
                           "Invalid control byte in BSON Column",
-                          d64.scaleIndex != bsoncolumn::kInvalidScaleIndex);
+                          newScaleIndex != bsoncolumn::kInvalidScaleIndex);
+
                   // If Double, scale last value according to this scale factor
                   auto type = _lastLiteral.type();
                   if (type == NumberDouble) {
-                      auto encoded = Simple8bTypeUtil::encodeDouble(_lastLiteral._numberDouble(),
-                                                                    d64.scaleIndex);
+                      // Get the current double value, decoding with the old scale index if needed
+                      double val = d64.lastEncodedValue
+                          ? Simple8bTypeUtil::decodeDouble(*d64.lastEncodedValue, d64.scaleIndex)
+                          : _lastLiteral.Double();
+
+                      auto encoded = Simple8bTypeUtil::encodeDouble(val, newScaleIndex);
                       uassert(8690001, "Invalid double encoding in BSON Column", encoded);
                       d64.lastEncodedValue = *encoded;
                   }
+
+                  d64.scaleIndex = newScaleIndex;
+
                   // We can read the last known value from the decoder iterator even as it has
                   // reached end.
                   boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;

@@ -3748,7 +3748,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
+    // TODO(SERVER-85860): This will be fixed by table decoder changes
     verifyDecompression(binData, elems, false);
 }
 
@@ -4145,8 +4145,7 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescaleLegacyDecompress) {
@@ -4173,8 +4172,7 @@ TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescaleLegacyDec
     appendEOO(expected);
     appendEOO(expected);
 
-    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, InterleavedScalarToObject) {
@@ -6998,7 +6996,7 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87305): faling binaryEqualValues check when block-based testing turned on
+    // TODO(SERVER-85860): This will be fixed by table decoder changes
     verifyDecompression(binData, elems, false);
 }
 
