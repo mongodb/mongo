@@ -576,7 +576,7 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
             DataView(elem.value()).write<LittleEndian<long long>>(valueToWrite);
             break;
         case Bool:
-            DataView(elem.value()).write<LittleEndian<char>>(valueToWrite);
+            DataView(elem.value()).write<LittleEndian<char>>(static_cast<bool>(valueToWrite));
             break;
         case NumberInt:
             DataView(elem.value()).write<LittleEndian<int>>(valueToWrite);
