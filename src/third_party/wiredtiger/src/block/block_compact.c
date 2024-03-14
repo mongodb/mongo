@@ -27,6 +27,7 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     /* Reset the compaction state information. */
     block->compact_bytes_reviewed = 0;
     block->compact_bytes_rewritten = 0;
+    block->compact_bytes_rewritten_expected = 0;
     block->compact_estimated = false;
     block->compact_internal_pages_reviewed = 0;
     block->compact_pages_reviewed = 0;
@@ -84,11 +85,13 @@ __wt_block_compact_get_progress_stats(
     block = bm->block;
     *pages_reviewedp = block->compact_pages_reviewed;
 
+    WT_STAT_DATA_SET(
+      session, btree_compact_bytes_rewritten_expected, block->compact_bytes_rewritten_expected);
     WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, block->compact_pages_reviewed);
-    WT_STAT_DATA_SET(session, btree_compact_pages_skipped, block->compact_pages_skipped);
     WT_STAT_DATA_SET(session, btree_compact_pages_rewritten, block->compact_pages_rewritten);
     WT_STAT_DATA_SET(
       session, btree_compact_pages_rewritten_expected, block->compact_pages_rewritten_expected);
+    WT_STAT_DATA_SET(session, btree_compact_pages_skipped, block->compact_pages_skipped);
 }
 
 /*
@@ -403,6 +406,8 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
 
     block->compact_estimated = true;
     block->compact_pages_rewritten_expected = block->compact_pages_rewritten + total_pages_to_move;
+    block->compact_bytes_rewritten_expected =
+      block->compact_pages_rewritten_expected * (uint64_t)avg_block_size;
 
     __wt_verbose_level(session, WT_VERB_COMPACT, verbose_level,
       "%s: expecting to move approx. %" PRIu64 " more pages (%" PRIu64 "MB), %" PRIu64

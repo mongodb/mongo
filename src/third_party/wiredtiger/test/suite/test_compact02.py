@@ -88,10 +88,11 @@ class test_compact02(wttest.WiredTigerTestCase):
         cstat = self.session.open_cursor(
             'statistics:' + self.uri, None, 'statistics=(all)')
         statDict = {}
+        statDict["bytes_rewritten_expected"] = cstat[stat.dsrc.btree_compact_bytes_rewritten_expected][2]
         statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
         statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
         statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
-        statDict["rewritten_expected"] = cstat[stat.dsrc.btree_compact_pages_rewritten_expected][2]
+        statDict["pages_rewritten_expected"] = cstat[stat.dsrc.btree_compact_pages_rewritten_expected][2]
         cstat.close()
         return statDict
 
@@ -194,5 +195,6 @@ class test_compact02(wttest.WiredTigerTestCase):
                             statDict["pages_reviewed"])
 
         # Dryrun uses the estimation phase which only works after reviewing at least 1000 pages.
-        if self.dryrun and statDict["pages_reviewed"] > 1000:
-            self.assertGreater(statDict["rewritten_expected"], 0)
+        if self.dryrun and statDict["pages_reviewed"] >= 1000:
+            self.assertGreater(statDict["bytes_rewritten_expected"], 0)
+            self.assertGreater(statDict["pages_rewritten_expected"], 0)

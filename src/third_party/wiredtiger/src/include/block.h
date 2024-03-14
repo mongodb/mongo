@@ -296,6 +296,7 @@ struct __wt_block {
     int compact_pct_tenths;                    /* Percent to compact */
     uint64_t compact_bytes_reviewed;           /* Bytes reviewed */
     uint64_t compact_bytes_rewritten;          /* Bytes rewritten */
+    uint64_t compact_bytes_rewritten_expected; /* The expected number of bytes to rewrite */
     uint64_t compact_internal_pages_reviewed;  /* Internal pages reviewed */
     uint64_t compact_pages_reviewed;           /* Pages reviewed */
     uint64_t compact_pages_rewritten;          /* Pages rewritten */
