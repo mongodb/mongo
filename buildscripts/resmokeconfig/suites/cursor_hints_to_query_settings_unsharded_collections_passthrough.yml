@@ -44,6 +44,11 @@ selector:
     - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
     - jstests/core/**/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
 
+    # The following tests fail because of divergent dropCollection behavior between standalones and
+    # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+    # we expect a second drop to return status OK.
+    - jstests/core/**/explain_upsert.js
+
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
     - jstests/core/index/geo/geo6.js
     - jstests/core/index/index_check6.js

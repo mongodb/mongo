@@ -450,69 +450,36 @@ bool isDefault(const QuerySettings& settings) {
 }
 
 /**
- * Returns the namespace field of the hint, in case it is present. In case it is not present, it
- * returns the inferred namespace or throws an error if multiple collections are involved.
+ * Validates that no index hint applies to the same collection more than once.
  */
-NamespaceString getHintNamespace(const mongo::query_settings::IndexHintSpec& hint,
-                                 const stdx::unordered_set<NamespaceString>& namespacesSet,
-                                 const boost::optional<TenantId>& tenantId) {
-    tassert(7746607, "involved namespaces cannot be empty!", !namespacesSet.empty());
-    const auto& ns = hint.getNs();
-    if (ns) {
-        return NamespaceStringUtil::deserialize(
-            tenantId, ns->getDb(), ns->getColl(), SerializationContext::stateDefault());
-    }
-    uassert(7746602,
-            str::stream() << "Hint: '" << hint.toBSON().toString()
-                          << "' does not contain a namespace field and more than one "
-                             "collection is involved the query",
-            namespacesSet.size() == 1);
-    // In case the namespace is not defined but there is only one collection involved,
-    // we can infer the namespace.
-    return *namespacesSet.begin();
-}
-
-/**
- * Validates that `setQuerySettings` command namespace can naïvely be deduced
- * from the query shape if only one collection is involved. In case multiple collections are
- * involved, the method ensures that each index hint is used at most once.
- *
- * This method also checks that every index hint namespace specified refers to an “involved”
- * collection and that two index hints cannot refer to the same collection.
- */
-void validateQuerySettingsNamespacesNotAmbiguous(
-    const QueryShapeConfiguration& config,
-    const RepresentativeQueryInfo& representativeQueryInfo,
-    const boost::optional<TenantId>& tenantId) {
+void validateQuerySettingsIndexHints(const auto& indexHints) {
     // If there are no index hints involved, no validation is required.
-    if (!config.getSettings().getIndexHints()) {
+    if (!indexHints) {
         return;
     }
 
-    auto hints = visit(
+    const auto& hints = visit(
         OverloadedVisitor{
             [](const std::vector<mongo::query_settings::IndexHintSpec>& hints) { return hints; },
             [](const mongo::query_settings::IndexHintSpec& hints) { return std::vector{hints}; },
         },
-        (*config.getSettings().getIndexHints()));
+        *indexHints);
 
-    auto& namespacesSet = representativeQueryInfo.involvedNamespaces;
     stdx::unordered_map<NamespaceString, mongo::query_settings::IndexHintSpec>
         collectionsWithAppliedIndexHints;
     for (const auto& hint : hints) {
-        NamespaceString nss = getHintNamespace(hint, namespacesSet, tenantId);
-
-        uassert(7746603,
-                str::stream() << "Namespace: '" << nss.toStringForErrorMsg()
-                              << "' does not refer to any involved collection",
-                namespacesSet.contains(nss));
-
+        uassert(8727500,
+                "invalid index hint: 'ns.db' field is missing",
+                hint.getNs().getDb().has_value());
+        uassert(8727501,
+                "invalid index hint: 'ns.coll' field is missing",
+                hint.getNs().getColl().has_value());
+        auto nss = NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
         auto [it, emplaced] = collectionsWithAppliedIndexHints.emplace(nss, hint);
         uassert(7746608,
-                str::stream() << "Collections can be applied at most one index hint, but indices '"
+                str::stream() << "Collection '"
                               << collectionsWithAppliedIndexHints[nss].toBSON().toString()
-                              << "' and '" << hint.toBSON().toString()
-                              << "' refer to the same collection",
+                              << "' has already index hints specified",
                 emplaced);
     }
 }
@@ -536,9 +503,7 @@ void validateQuerySettingsEncryptionInformation(
             !containsFLE2StateCollection);
 }
 
-void validateQuerySettings(const QueryShapeConfiguration& config,
-                           const RepresentativeQueryInfo& representativeQueryInfo,
-                           const boost::optional<TenantId>& tenantId) {
+void validateRepresentativeQuery(const RepresentativeQueryInfo& representativeQueryInfo) {
     uassert(8584900,
             "setQuerySettings command cannot be used on internal databases",
             !representativeQueryInfo.namespaceString.isOnInternalDb());
@@ -553,8 +518,15 @@ void validateQuerySettings(const QueryShapeConfiguration& config,
     uassert(7746606,
             "setQuerySettings command cannot be used on find queries eligible for IDHACK",
             !representativeQueryInfo.isIdHackQuery);
+}
 
-    validateQuerySettingsNamespacesNotAmbiguous(config, representativeQueryInfo, tenantId);
+void validateQuerySettings(const QuerySettings& querySettings) {
+    // Validates that the settings field for query settings is not empty.
+    uassert(7746604,
+            "the resulting settings cannot be empty or contain only default values",
+            !isDefault(querySettings));
+
+    validateQuerySettingsIndexHints(querySettings.getIndexHints());
 }
 
 }  // namespace utils
