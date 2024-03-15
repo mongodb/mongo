@@ -388,6 +388,17 @@ env.Library(
 )
 
 env.Library(
+    target='namespace_spec',
+    source=[
+        'namespace_spec.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'server_base',
+    ],
+)
+
+env.Library(
     target='mongod_options',
     source=[
         'mongod_options.cpp',

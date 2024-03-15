@@ -85,12 +85,8 @@ bool allowQuerySettingsFromClient(const Client* client);
  */
 bool isDefault(const QuerySettings& settings);
 
-/**
- * Runs all validation rules on the 'setQuerySettings' command.
- */
-void validateQuerySettings(const QueryShapeConfiguration& config,
-                           const RepresentativeQueryInfo& representativeQueryInfo,
-                           const boost::optional<TenantId>& tenantId);
+void validateRepresentativeQuery(const RepresentativeQueryInfo& representativeQueryInfo);
+void validateQuerySettings(const QuerySettings& settings);
 
 }  // namespace utils
 }  // namespace mongo::query_settings

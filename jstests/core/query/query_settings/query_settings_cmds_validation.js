@@ -10,6 +10,7 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
+assertDropAndRecreateCollection(db, collName);
 
 const qsutils = new QuerySettingsUtils(db, collName)
 
@@ -27,6 +28,21 @@ const nonExistentQueryShapeHash = "0".repeat(64);
         db.adminCommand(
             {setQuerySettings: qsutils.makeFindQueryInstance(), settings: {notAValid: "settings"}}),
         40415);
+    assert.commandFailedWithCode(db.adminCommand({
+        setQuerySettings: qsutils.makeFindQueryInstance(),
+        settings: {indexHints: {allowedIndexes: ["a_1"]}}
+    }),
+                                 40414);
+    assert.commandFailedWithCode(db.adminCommand({
+        setQuerySettings: qsutils.makeFindQueryInstance(),
+        settings: {indexHints: {ns: {db: db.getName()}, allowedIndexes: ["a_1"]}}
+    }),
+                                 8727501);
+    assert.commandFailedWithCode(db.adminCommand({
+        setQuerySettings: qsutils.makeFindQueryInstance(),
+        settings: {indexHints: {ns: {coll: collName}, allowedIndexes: ["a_1"]}}
+    }),
+                                 8727500);
 }
 
 {
@@ -43,50 +59,6 @@ const nonExistentQueryShapeHash = "0".repeat(64);
         db.adminCommand(
             {aggregate: 1, pipeline: [{$documents: []}, {$querySettings: {}}], cursor: {}}),
         40602);
-}
-
-{
-    // Ensure that setQuerySettings command fails when there are more than one collection in the
-    // input query and namespaces are not explicitly given.
-    assertDropAndRecreateCollection(db, "order");
-    assert.commandFailedWithCode(
-            db.adminCommand({
-                setQuerySettings: {
-                  aggregate: "order",
-                  $db: db.getName(),
-                  pipeline: [{
-                    $lookup: {
-                      from: "inventory",
-                      localField: "item",
-                      foreignField: "sku",
-                      as: "inventory_docs"
-                    }
-                  }]
-                },
-                settings: {
-                  "indexHints": {
-                    "allowedIndexes": [{ "sku": 1 }]
-                  }
-                }
-              }
-              ), 7746602);
-
-    const queryInstance = {
-        aggregate: "order",
-        $db: db.getName(),
-        pipeline: [{
-            $lookup:
-                {from: "inventory", localField: "item", foreignField: "sku", as: "inventory_docs"}
-        }]
-    };
-    const settings = {
-        "indexHints":
-            {"ns": {"db": db.getName(), "coll": "inventory"}, "allowedIndexes": [{"sku": 1}]}
-    };
-    assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(settings, queryInstance)]);
-    qsutils.removeAllQuerySettings();
 }
 
 {
@@ -140,14 +112,21 @@ const nonExistentQueryShapeHash = "0".repeat(64);
 
 {
     // Ensure that inserting empty settings fails.
-    let query = qsutils.makeFindQueryInstance({filter: {a: 15}});
+    const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 7746604);
 
     // Insert some settings.
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
+    qsutils.assertQueryShapeConfiguration(
+        [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
 
-    // Ensure that updating with empty settings fails.
-    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 7746604);
+    // Ensure updating with empty query settings fails.
+    const queryShapeHash = qsutils.getQueryHashFromQuerySettings(query);
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: queryShapeHash, settings: {}}),
+                                 8727502);
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727503);
+    qsutils.assertQueryShapeConfiguration(
+        [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
 
     // Clean-up after the end of the test.
     qsutils.removeAllQuerySettings();
