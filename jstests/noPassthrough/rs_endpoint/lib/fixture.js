@@ -187,6 +187,9 @@ export var ReplicaSetEndpointTest = class {
                 return res.state == "completed";
             });
         });
+        this._authenticateShard0AdminUser();
+        this._waitForHasTwoOrMoreShardsClusterParameter(this.shard0AuthDB, false);
+        this._authenticateShard0TestUser();
     }
 
     tearDown() {

@@ -30,6 +30,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   featureFlagRSEndpointClusterCardinalityParameter,
  *   featureFlagTransitionToCatalogShard
  * ]
  */
