@@ -109,7 +109,7 @@ let testCases = {
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrDropIndexCatalogEntry: {skip: "internal command"},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
-    _configsvrGetHistoricalPlacement: {skip: "internal command"},  // TODO SERVER-73029 remove
+    _configsvrGetHistoricalPlacement: {skip: "internal command"},
     _configsvrMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
     _configsvrMoveRange: {skip: "internal command"},
     _configsvrRefineCollectionShardKey: {skip: "internal command"},

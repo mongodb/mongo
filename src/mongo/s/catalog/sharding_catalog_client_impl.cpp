@@ -1539,7 +1539,6 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     const Timestamp& atClusterTime,
     const boost::optional<NamespaceString>& nss) {
 
-    // TODO (SERVER-73029): Remove the invariant
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     auto configShard = _getConfigShard(opCtx);
     /*

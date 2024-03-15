@@ -48,7 +48,7 @@ const allCommands = {
     _configsvrCreateDatabase: {skip: isPrimaryOnly},
     _configsvrDropIndexCatalogEntry: {skip: isPrimaryOnly},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isPrimaryOnly},
-    _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},  // TODO SERVER-73029 remove
+    _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},
     _configsvrMoveRange: {skip: isPrimaryOnly},
     _configsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _configsvrRemoveChunks: {skip: isPrimaryOnly},

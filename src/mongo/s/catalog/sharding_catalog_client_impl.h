@@ -303,8 +303,6 @@ private:
 
     /**
      * Queries the config server to retrieve placement data based on the Request object.
-     * TODO (SERVER-73029): Remove the method - and replace its invocations with
-     * runPlacementHistoryAggregation()
      */
     HistoricalPlacement _fetchPlacementMetadata(OperationContext* opCtx,
                                                 ConfigsvrGetHistoricalPlacement&& request);

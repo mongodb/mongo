@@ -60,7 +60,6 @@ commands:
         api_version: ""
         strict: false
 
-    # TODO (SERVER-73029): remove the _configsvrGetHistoricalPlacement and the code supporting it.
     _configsvrGetHistoricalPlacement:
         command_name: _configsvrGetHistoricalPlacement
         cpp_name: ConfigsvrGetHistoricalPlacement

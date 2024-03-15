@@ -479,8 +479,6 @@ public:
      * a specific point in time. When no namespace is specified, placement metadata on the whole
      * cluster will be returned. This function is meant to be exclusively invoked by config server
      * nodes.
-     *
-     * TODO (SERVER-73029): convert to private method of ShardingCatalogClientImpl
      */
     virtual HistoricalPlacement getHistoricalPlacement(
         OperationContext* opCtx,
