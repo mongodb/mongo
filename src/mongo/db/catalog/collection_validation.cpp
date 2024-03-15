@@ -503,8 +503,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
             index_key_validate::validateIndexSpec(opCtx, indexEntry->descriptor()->infoObj())
                 .getStatus();
         if (!status.isOK()) {
-            results->valid = false;
-            results->errors.push_back(
+            results->warnings.push_back(
                 fmt::format("The index specification for index '{}' contains invalid fields. {}. "
                             "Run the 'collMod' command on the collection without any arguments "
                             "to fix the invalid index options",
@@ -733,8 +732,7 @@ Status validate(OperationContext* opCtx,
         }
 
         string err = str::stream() << "exception during collection validation: " << e.toString();
-        results->errors.push_back(err);
-        results->valid = false;
+        results->warnings.push_back(err);
         LOGV2_OPTIONS(5160302,
                       {LogComponent::kIndex},
                       "Validation failed due to exception",

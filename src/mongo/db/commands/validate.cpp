@@ -434,7 +434,6 @@ public:
         CollectionValidation::AdditionalOptions additionalOptions;
         additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed =
             cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue();
-        additionalOptions.warnOnSchemaValidation = cmdObj["warnOnSchemaValidation"].trueValue();
         additionalOptions.validationVersion = getTestCommandsEnabled()
             ? (ValidationVersion)bsonTestValidationVersion
             : currentValidationVersion;

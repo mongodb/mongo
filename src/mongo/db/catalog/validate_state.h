@@ -213,10 +213,6 @@ public:
         return _enforceTimeseriesBucketsAreAlwaysCompressed;
     }
 
-    bool warnOnSchemaValidation() const {
-        return _warnOnSchemaValidation;
-    }
-
     ValidationVersion validationVersion() const {
         return _validationVersion;
     }
@@ -235,7 +231,6 @@ private:
     bool _timeseriesDataInconsistency = false;
     bool _BSONDataNonConformant = false;
     bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
-    bool _warnOnSchemaValidation = false;
     ValidationVersion _validationVersion = currentValidationVersion;
 
     // To avoid racing with shutdown.
