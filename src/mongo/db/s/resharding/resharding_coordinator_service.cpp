@@ -2119,7 +2119,7 @@ SemiFuture<void> ReshardingCoordinator::_waitForMajority(const CancellationToken
     repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
     auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
     return WaitForMajorityService::get(client->getServiceContext())
-        .waitUntilMajorityForWrite(client->getServiceContext(), opTime, token);
+        .waitUntilMajorityForWrite(opTime, token);
 }
 
 ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(

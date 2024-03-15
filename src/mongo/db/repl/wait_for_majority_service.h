@@ -94,9 +94,9 @@ private:
 }  // namespace detail
 
 
-class WaitForMajorityServiceForReadImpl {
+class WaitForMajorityServiceImplBase {
 public:
-    virtual ~WaitForMajorityServiceForReadImpl();
+    virtual ~WaitForMajorityServiceImplBase();
     void startup(ServiceContext* ctx);
     void shutDown();
     SemiFuture<void> waitUntilMajority(const repl::OpTime& opTime,
@@ -125,7 +125,9 @@ private:
      */
     SemiFuture<void> _periodicallyWaitForMajority();
 
-    virtual Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime);
+    virtual Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) = 0;
+
+    virtual StringData _getReadOrWrite() const = 0;
 
     // The pool of threads available to wait on opTimes and cancel existing requests.
     std::shared_ptr<ThreadPool> _pool;
@@ -155,13 +157,21 @@ private:
     detail::AsyncConditionVariable _hasNewOpTimeCV;
 };
 
-class WaitForMajorityServiceForWriteImpl {
-public:
-    SemiFuture<void> waitUntilMajority(ServiceContext* service,
-                                       const repl::OpTime& opTime,
-                                       const CancellationToken& cancelToken);
+class WaitForMajorityServiceForReadImpl : public WaitForMajorityServiceImplBase {
+private:
+    Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
+    StringData _getReadOrWrite() const final {
+        return "Read"_sd;
+    }
 };
 
+class WaitForMajorityServiceForWriteImpl : public WaitForMajorityServiceImplBase {
+private:
+    Status _waitForOpTime(OperationContext* opCtx, const repl::OpTime& opTime) final;
+    StringData _getReadOrWrite() const final {
+        return "Write"_sd;
+    }
+};
 /**
  * Provides a facility for asynchronously waiting a local opTime to be majority committed.
  */
@@ -189,10 +199,11 @@ public:
     SemiFuture<void> waitUntilMajorityForRead(const repl::OpTime& opTime,
                                               const CancellationToken& cancelToken);
     /**
-     * Wait until the given opTime to be majority committed for writes.
+     * Enqueue a request to wait for the given opTime to be majority committed on this primary.
+     * Returns a PrimarySteppedDown error if the primary steps down while waiting or if this is
+     * a secondary.
      */
-    SemiFuture<void> waitUntilMajorityForWrite(ServiceContext* service,
-                                               const repl::OpTime& opTime,
+    SemiFuture<void> waitUntilMajorityForWrite(const repl::OpTime& opTime,
                                                const CancellationToken& cancelToken);
 
 private:

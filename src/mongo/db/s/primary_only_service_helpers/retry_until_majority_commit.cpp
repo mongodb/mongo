@@ -78,7 +78,7 @@ ExecutorFuture<void> RetryUntilMajorityCommit::_waitForMajorityOrStepdown(
             repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
             auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
             return WaitForMajorityService::get(client->getServiceContext())
-                .waitUntilMajorityForWrite(client->getServiceContext(), opTime, cancelToken);
+                .waitUntilMajorityForWrite(opTime, cancelToken);
         });
 }
 

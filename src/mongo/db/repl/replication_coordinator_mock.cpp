@@ -168,7 +168,7 @@ void ReplicationCoordinatorMock::clearSyncSourceDenylist() {}
 
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
     OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-    return _awaitReplicationReturnValueFunction(opTime);
+    return _awaitReplicationReturnValueFunction(opCtx, opTime);
 }
 
 void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
@@ -183,8 +183,8 @@ void ReplicationCoordinatorMock::setRunCmdOnPrimaryAndAwaitResponseFunction(
 
 SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeout(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-
-    auto result = _awaitReplicationReturnValueFunction(opTime);
+    auto opCtx = cc().makeOperationContext();
+    auto result = _awaitReplicationReturnValueFunction(opCtx.get(), opTime);
     return Future<ReplicationCoordinator::StatusAndDuration>::makeReady(result).ignoreValue();
 }
 

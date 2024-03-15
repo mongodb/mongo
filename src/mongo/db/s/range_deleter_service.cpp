@@ -285,9 +285,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                     // out of order the deletions of orphans and the removal of the
                     // entry persisted in `config.rangeDeletions`
                     WaitForMajorityService::get(opCtx->getServiceContext())
-                        .waitUntilMajorityForWrite(opCtx->getServiceContext(),
-                                                   clientOpTime,
-                                                   CancellationToken::uncancelable())
+                        .waitUntilMajorityForWrite(clientOpTime, CancellationToken::uncancelable())
                         .get(opCtx);
                 }
 

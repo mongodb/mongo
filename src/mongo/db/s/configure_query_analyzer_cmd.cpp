@@ -133,8 +133,7 @@ private:
 void waitUntilMajorityLastOpTime(OperationContext* opCtx) {
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajorityForWrite(opCtx->getServiceContext(),
-                                   repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+        .waitUntilMajorityForWrite(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
                                    CancellationToken::uncancelable())
         .get();
 }
