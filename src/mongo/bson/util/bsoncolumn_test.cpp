@@ -7403,8 +7403,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(binData, {createElementObj(ref)}, false);
+    verifyDecompression(binData, {createElementObj(ref)});
 }
 
 TEST_F(BSONColumnTest, AppendMaxKeyInSubObj) {
@@ -7428,8 +7427,7 @@ TEST_F(BSONColumnTest, AppendMaxKeyInSubObj) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(binData, {createElementObj(ref)}, false);
+    verifyDecompression(binData, {createElementObj(ref)});
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStart) {
@@ -7458,8 +7456,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStart) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
@@ -7496,8 +7493,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
@@ -7543,8 +7539,7 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DecompressMinKey) {
@@ -7552,8 +7547,7 @@ TEST_F(BSONColumnTest, DecompressMinKey) {
     appendLiteral(expected, createElementMinKey());
     appendEOO(expected);
 
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(expected, {createElementMinKey()}, false);
+    verifyDecompression(expected, {createElementMinKey()});
 }
 
 TEST_F(BSONColumnTest, DecompressMaxKey) {
@@ -7561,8 +7555,7 @@ TEST_F(BSONColumnTest, DecompressMaxKey) {
     appendLiteral(expected, createElementMaxKey());
     appendEOO(expected);
 
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(expected, {createElementMaxKey()}, false);
+    verifyDecompression(expected, {createElementMaxKey()});
 }
 
 TEST_F(BSONColumnTest, DecompressMinKeyInSubObj) {
@@ -7581,8 +7574,7 @@ TEST_F(BSONColumnTest, DecompressMinKeyInSubObj) {
     appendEOO(expected);
     appendEOO(expected);
 
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(expected, {createElementObj(ref)}, false);
+    verifyDecompression(expected, {createElementObj(ref)});
 }
 
 TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterInterleaveStart) {
@@ -7604,8 +7596,7 @@ TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterInterleaveStart) {
     appendEOO(expected);
     appendEOO(expected);
 
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterInterleaveStartInAppendMode) {
@@ -7634,8 +7625,7 @@ TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterInterleaveStartInAppendMode)
     appendEOO(expected);
     appendEOO(expected);
 
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterMerge) {
@@ -7673,8 +7663,7 @@ TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterMerge) {
     appendEOO(expected);
     appendEOO(expected);
 
-    // TODO(SERVER-87525): MinKey not supported in block-based interleaved decompression
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, AppendObjDirectly) {

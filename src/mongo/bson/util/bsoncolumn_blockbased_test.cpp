@@ -651,6 +651,28 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithBinData) {
     }
 }
 
+TEST_F(BSONColumnBlockBasedTest, DecompressWithMaxKey) {
+    std::vector<MaxKeyLabeler> maxKeys{MAXKEY, MAXKEY, MAXKEY, MAXKEY, MAXKEY, MAXKEY};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(maxKeys, allocator);
+
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].type(), MaxKey);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressWithMinKey) {
+    std::vector<MinKeyLabeler> minKeys{MINKEY, MINKEY, MINKEY, MINKEY, MINKEY, MINKEY};
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    const std::vector<BSONElement> result = decompressArraysAndFullColumns(minKeys, allocator);
+
+    for (size_t i = 0; i < result.size(); ++i) {
+        ASSERT_EQ(result[i].type(), MinKey);
+    }
+}
+
 TEST_F(BSONColumnBlockBasedTest, DecompressWithDoublesSameScale) {
     const std::vector<double> doubles = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6};
 
@@ -951,6 +973,40 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
         // Make sure that decompressing zero paths doesn't segfault or anything like that.
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{}};
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
+    auto col = bsonColumnFromObjs({
+        BSON("a" << BSON_ARRAY(BSON("b" << MINKEY) << BSON("b" << MINKEY))),
+        BSON("a" << BSON_ARRAY(BSON("b" << MINKEY))),
+        BSON("a" << BSON_ARRAY(BSON("b" << MINKEY) << BSON("b" << MINKEY))),
+        BSON("a" << BSON_ARRAY(BSON("b" << MINKEY))),
+    });
+
+    // Create a path that will get the "b" fields of both array elements.
+    TestArrayPath path;
+    auto mockRefObj = BSON("a" << BSON_ARRAY(BSON("b" << MINKEY) << BSON("b" << MINKEY)));
+
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<BSONElement> vec0;
+    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> paths{{path, vec0}};
+
+    // This is decompressing scalars, but since a single path is accessing two fields that need to
+    // be interleaved in the output, we still need to use the slow path.
+    col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+    // TODO(SERVER-87339): This is not the right answer for Traverse paths ,which is what this test
+    // is simulating. We should be getting only 6 elements back, and no missing/EOO elements.
+    ASSERT_EQ(paths[0].second.size(), 8);
+    for (int i = 0; i < 8; ++i) {
+        if (i == 3 || i == 7) {
+            ASSERT(paths[0].second[i].eoo());
+        } else {
+            ASSERT_EQ(paths[0].second[i].type(), MinKey);
+        }
     }
 }
 

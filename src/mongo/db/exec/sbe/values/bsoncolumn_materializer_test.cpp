@@ -873,5 +873,15 @@ TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithDoublesDifferentScale) {
     verifyDecompressWithDifferentTypes(doubles);
 }
 
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithMinKey) {
+    std::vector<MinKeyLabeler> minKeys{MINKEY, MINKEY, MINKEY, MINKEY, MINKEY, MINKEY};
+    verifyDecompressWithDifferentTypes(minKeys);
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressGeneralWithMaxKey) {
+    std::vector<MaxKeyLabeler> maxKeys{MAXKEY, MAXKEY, MAXKEY, MAXKEY, MAXKEY, MAXKEY};
+    verifyDecompressWithDifferentTypes(maxKeys);
+}
+
 }  // namespace
 }  // namespace mongo::sbe::bsoncolumn
