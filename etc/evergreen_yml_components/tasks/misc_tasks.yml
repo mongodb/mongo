@@ -775,7 +775,7 @@ tasks:
   - func: "monitor mongo fork 10gen"
 
 - name: powercycle
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -785,11 +785,15 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_gen
-  tags: ["assigned_to_jira_team_server_storage_engines"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "experimental", "incompatible_windows"]
   commands:
   - func: "generate powercycle tasks"
     vars:
@@ -801,7 +805,7 @@ tasks:
       num_tasks: 1
 
 - name: powercycle_kill_mongod
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -811,11 +815,15 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_last_lts_fcv
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -825,11 +833,15 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -839,11 +851,15 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -853,11 +869,15 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_sentinel
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "incompatible_windows"]
   exec_timeout_secs: 604800 # 7 days
   commands:
   - func: "run powercycle sentinel"
@@ -865,7 +885,7 @@ tasks:
       gen_task: powercycle_smoke_skip_compile_gen
 
 - name: powercycle_smoke
-  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "incompatible_windows"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -883,7 +903,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_smoke_skip_compile_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "incompatible_windows"]
   commands:
   - func: "generate powercycle tasks"
     vars:
@@ -896,7 +916,7 @@ tasks:
       run_powercycle_args: --sshAccessRetryCount=1800
 
 - name: powercycle_syncdelay
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -906,11 +926,15 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "incompatible_windows", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -920,7 +944,11 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: selinux_rhel7_enterprise
