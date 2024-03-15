@@ -41,15 +41,14 @@
 #  define DECLARE_SYMBOL_VISIBILITY(name)
 #endif
 
-#define DEFINE_COMPILERRT_FUNCTION(name)                             \
-  .globl SYMBOL_NAME(name) SEPARATOR DECLARE_SYMBOL_VISIBILITY(name) \
-      SYMBOL_NAME(name)                                              \
-      :
+#define DEFINE_COMPILERRT_FUNCTION(name) \
+  .globl SYMBOL_NAME(name)               \
+  SEPARATOR DECLARE_SYMBOL_VISIBILITY(name) SYMBOL_NAME(name) :
 
-#define DEFINE_COMPILERRT_PRIVATE_FUNCTION(name)                        \
-  .globl SYMBOL_NAME(name) SEPARATOR HIDDEN_DIRECTIVE SYMBOL_NAME(name) \
-      SEPARATOR SYMBOL_NAME(name)                                       \
-      :
+#define DEFINE_COMPILERRT_PRIVATE_FUNCTION(name) \
+  .globl SYMBOL_NAME(name)                       \
+  SEPARATOR HIDDEN_DIRECTIVE SYMBOL_NAME(name)   \
+  SEPARATOR SYMBOL_NAME(name) :
 
 #define DEFINE_COMPILERRT_PRIVATE_FUNCTION_UNMANGLED(name) \
   .globl name SEPARATOR HIDDEN_DIRECTIVE name SEPARATOR name:

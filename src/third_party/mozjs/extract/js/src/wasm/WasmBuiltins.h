@@ -19,7 +19,9 @@
 #ifndef wasm_builtins_h
 #define wasm_builtins_h
 
+#include "intgemm/IntegerGemmIntrinsic.h"
 #include "jit/IonTypes.h"
+#include "wasm/WasmIntrinsicGenerated.h"
 
 namespace js {
 namespace jit {
@@ -45,9 +47,12 @@ enum class SymbolicAddress {
   aeabi_uidivmod,
 #endif
   ModD,
-  SinD,
-  CosD,
-  TanD,
+  SinNativeD,
+  SinFdlibmD,
+  CosNativeD,
+  CosFdlibmD,
+  TanNativeD,
+  TanFdlibmD,
   ASinD,
   ACosD,
   ATanD,
@@ -86,17 +91,31 @@ enum class SymbolicAddress {
   Uint64ToDouble,
   Int64ToFloat32,
   Int64ToDouble,
-  MemoryGrow,
-  MemorySize,
-  WaitI32,
-  WaitI64,
-  Wake,
-  MemCopy32,
-  MemCopyShared32,
+  MemoryGrowM32,
+  MemoryGrowM64,
+  MemorySizeM32,
+  MemorySizeM64,
+  WaitI32M32,
+  WaitI32M64,
+  WaitI64M32,
+  WaitI64M64,
+  WakeM32,
+  WakeM64,
+  MemCopyM32,
+  MemCopySharedM32,
+  MemCopyM64,
+  MemCopySharedM64,
   DataDrop,
-  MemFill32,
-  MemFillShared32,
-  MemInit32,
+  MemFillM32,
+  MemFillSharedM32,
+  MemFillM64,
+  MemFillSharedM64,
+  MemDiscardM32,
+  MemDiscardSharedM32,
+  MemDiscardM64,
+  MemDiscardSharedM64,
+  MemInitM32,
+  MemInitM64,
   TableCopy,
   ElemDrop,
   TableFill,
@@ -106,25 +125,23 @@ enum class SymbolicAddress {
   TableSet,
   TableSize,
   RefFunc,
-  RefTest,
-  RttSub,
-  PreBarrierFiltering,
   PostBarrier,
-  PostBarrierFiltering,
-  StructNew,
-#if defined(ENABLE_WASM_EXCEPTIONS)
+  PostBarrierPrecise,
+  PostBarrierPreciseWithOffset,
   ExceptionNew,
   ThrowException,
-  GetLocalExceptionIndex,
-  PushRefIntoExn,
-#endif
+  StructNew,
+  StructNewUninit,
   ArrayNew,
-  InlineTypedObjectClass,
-#if defined(JS_CODEGEN_MIPS32)
-  js_jit_gAtomic64Lock,
-#endif
+  ArrayNewUninit,
+  ArrayNewData,
+  ArrayNewElem,
+  ArrayCopy,
+#define DECL_INTRINSIC_SA(op, export, sa_name, abitype, entry, idx) sa_name,
+  FOR_EACH_INTRINSIC(DECL_INTRINSIC_SA)
+#undef DECL_INTRINSIC_SA
 #ifdef WASM_CODEGEN_DEBUG
-  PrintI32,
+      PrintI32,
   PrintPtr,
   PrintF32,
   PrintF64,
@@ -148,12 +165,12 @@ enum class FailureMode : uint8_t {
 // SymbolicAddressSignature carries type information for a function referred
 // to by a SymbolicAddress.  In order that |argTypes| can be written out as a
 // static initialiser, it has to have fixed length.  At present
-// SymbolicAddressType is used to describe functions with at most 6 arguments,
-// so |argTypes| has 7 entries in order to allow the last value to be
+// SymbolicAddressType is used to describe functions with at most 14 arguments,
+// so |argTypes| has 15 entries in order to allow the last value to be
 // MIRType::None, in the hope of catching any accidental overruns of the
 // defined section of the array.
 
-static constexpr size_t SymbolicAddressSignatureMaxArgs = 6;
+static constexpr size_t SymbolicAddressSignatureMaxArgs = 14;
 
 struct SymbolicAddressSignature {
   // The SymbolicAddress that is described.
@@ -169,24 +186,27 @@ struct SymbolicAddressSignature {
   const jit::MIRType argTypes[SymbolicAddressSignatureMaxArgs + 1];
 };
 
-// The 16 in this assertion is derived as follows: SymbolicAddress is probably
+// The 32 in this assertion is derived as follows: SymbolicAddress is probably
 // size-4 aligned-4, but it's at the start of the struct, so there's no
 // alignment hole before it.  All other components (MIRType and uint8_t) are
-// size-1 aligned-1, and there are 8 in total, so it is reasonable to assume
+// size-1 aligned-1, and there are 18 in total, so it is reasonable to assume
 // that they also don't create any alignment holes.  Hence it is also
-// reasonable to assume that the actual size is 1 * 4 + 8 * 1 == 12.  The
-// worst-plausible-case rounding will take that up to 16.  Hence, the
-// assertion uses 16.
+// reasonable to assume that the actual size is 1 * 4 + 18 * 1 == 22.  The
+// worst-plausible-case rounding will take that up to 32.  Hence, the
+// assertion uses 32.
 
-static_assert(sizeof(SymbolicAddressSignature) <= 16,
+static_assert(sizeof(SymbolicAddressSignature) <= 32,
               "SymbolicAddressSignature unexpectedly large");
 
 // These provide argument type information for a subset of the SymbolicAddress
 // targets, for which type info is needed to generate correct stackmaps.
 
-extern const SymbolicAddressSignature SASigSinD;
-extern const SymbolicAddressSignature SASigCosD;
-extern const SymbolicAddressSignature SASigTanD;
+extern const SymbolicAddressSignature SASigSinNativeD;
+extern const SymbolicAddressSignature SASigSinFdlibmD;
+extern const SymbolicAddressSignature SASigCosNativeD;
+extern const SymbolicAddressSignature SASigCosFdlibmD;
+extern const SymbolicAddressSignature SASigTanNativeD;
+extern const SymbolicAddressSignature SASigTanFdlibmD;
 extern const SymbolicAddressSignature SASigASinD;
 extern const SymbolicAddressSignature SASigACosD;
 extern const SymbolicAddressSignature SASigATanD;
@@ -202,17 +222,31 @@ extern const SymbolicAddressSignature SASigExpD;
 extern const SymbolicAddressSignature SASigLogD;
 extern const SymbolicAddressSignature SASigPowD;
 extern const SymbolicAddressSignature SASigATan2D;
-extern const SymbolicAddressSignature SASigMemoryGrow;
-extern const SymbolicAddressSignature SASigMemorySize;
-extern const SymbolicAddressSignature SASigWaitI32;
-extern const SymbolicAddressSignature SASigWaitI64;
-extern const SymbolicAddressSignature SASigWake;
-extern const SymbolicAddressSignature SASigMemCopy32;
-extern const SymbolicAddressSignature SASigMemCopyShared32;
+extern const SymbolicAddressSignature SASigMemoryGrowM32;
+extern const SymbolicAddressSignature SASigMemoryGrowM64;
+extern const SymbolicAddressSignature SASigMemorySizeM32;
+extern const SymbolicAddressSignature SASigMemorySizeM64;
+extern const SymbolicAddressSignature SASigWaitI32M32;
+extern const SymbolicAddressSignature SASigWaitI32M64;
+extern const SymbolicAddressSignature SASigWaitI64M32;
+extern const SymbolicAddressSignature SASigWaitI64M64;
+extern const SymbolicAddressSignature SASigWakeM32;
+extern const SymbolicAddressSignature SASigWakeM64;
+extern const SymbolicAddressSignature SASigMemCopyM32;
+extern const SymbolicAddressSignature SASigMemCopySharedM32;
+extern const SymbolicAddressSignature SASigMemCopyM64;
+extern const SymbolicAddressSignature SASigMemCopySharedM64;
 extern const SymbolicAddressSignature SASigDataDrop;
-extern const SymbolicAddressSignature SASigMemFill32;
-extern const SymbolicAddressSignature SASigMemFillShared32;
-extern const SymbolicAddressSignature SASigMemInit32;
+extern const SymbolicAddressSignature SASigMemFillM32;
+extern const SymbolicAddressSignature SASigMemFillSharedM32;
+extern const SymbolicAddressSignature SASigMemFillM64;
+extern const SymbolicAddressSignature SASigMemFillSharedM64;
+extern const SymbolicAddressSignature SASigMemDiscardM32;
+extern const SymbolicAddressSignature SASigMemDiscardSharedM32;
+extern const SymbolicAddressSignature SASigMemDiscardM64;
+extern const SymbolicAddressSignature SASigMemDiscardSharedM64;
+extern const SymbolicAddressSignature SASigMemInitM32;
+extern const SymbolicAddressSignature SASigMemInitM64;
 extern const SymbolicAddressSignature SASigTableCopy;
 extern const SymbolicAddressSignature SASigElemDrop;
 extern const SymbolicAddressSignature SASigTableFill;
@@ -222,25 +256,29 @@ extern const SymbolicAddressSignature SASigTableInit;
 extern const SymbolicAddressSignature SASigTableSet;
 extern const SymbolicAddressSignature SASigTableSize;
 extern const SymbolicAddressSignature SASigRefFunc;
-extern const SymbolicAddressSignature SASigPreBarrierFiltering;
 extern const SymbolicAddressSignature SASigPostBarrier;
-extern const SymbolicAddressSignature SASigPostBarrierFiltering;
-extern const SymbolicAddressSignature SASigStructNew;
-#ifdef ENABLE_WASM_EXCEPTIONS
+extern const SymbolicAddressSignature SASigPostBarrierPrecise;
+extern const SymbolicAddressSignature SASigPostBarrierPreciseWithOffset;
 extern const SymbolicAddressSignature SASigExceptionNew;
 extern const SymbolicAddressSignature SASigThrowException;
-extern const SymbolicAddressSignature SASigGetLocalExceptionIndex;
-extern const SymbolicAddressSignature SASigPushRefIntoExn;
-#endif
+extern const SymbolicAddressSignature SASigStructNew;
+extern const SymbolicAddressSignature SASigStructNewUninit;
 extern const SymbolicAddressSignature SASigArrayNew;
-extern const SymbolicAddressSignature SASigRefTest;
-extern const SymbolicAddressSignature SASigRttSub;
+extern const SymbolicAddressSignature SASigArrayNewUninit;
+extern const SymbolicAddressSignature SASigArrayNewData;
+extern const SymbolicAddressSignature SASigArrayNewElem;
+extern const SymbolicAddressSignature SASigArrayCopy;
+#define EXT_INTR_SA_DECL(op, export, sa_name, abitype, entry, idx) \
+  extern const SymbolicAddressSignature SASig##sa_name;
+FOR_EACH_INTRINSIC(EXT_INTR_SA_DECL)
+#undef EXT_INTR_SA_DECL
 
 bool IsRoundingFunction(SymbolicAddress callee, jit::RoundingMode* mode);
 
 // A SymbolicAddress that NeedsBuiltinThunk() will call through a thunk to the
 // C++ function. This will be true for all normal calls from normal wasm
 // function code. Only calls to C++ from other exits/thunks do not need a thunk.
+// See "The Wasm-builtin ABIs in WasmFrame.h".
 
 bool NeedsBuiltinThunk(SymbolicAddress sym);
 

@@ -9,8 +9,7 @@
 // Expands to all the defines from configure.
 #define CROSS_COMPILE 
 #define ENABLE_SHARED_MEMORY 1
-#define ENABLE_WASM_SIMD 1
-#define ENABLE_WASM_SIMD_WORMHOLE 1
+#define ENABLE_WASM_EXTENDED_CONST 1
 #define HAVE_64BIT_BUILD 1
 #define HAVE_ALIGNED_MALLOC 1
 #define HAVE_CPUID_H 1
@@ -23,18 +22,18 @@
 #define HAVE__GETC_NOLOCK 1
 #define HAVE__MSIZE 1
 #define JS_64BIT 1
-#define JS_CODEGEN_X64 1
+#define JS_CODEGEN_NONE 1
 #define JS_DEFAULT_JITREPORT_GRANULARITY 3
 #define JS_PUNBOX64 1
 #define JS_STANDALONE 1
 #define JS_WITHOUT_NSPR 1
 #define MALLOC_H <malloc.h>
 #define MALLOC_USABLE_SIZE_CONST_PTR const
-#define MOZILLA_UAVERSION "91.0"
-#define MOZILLA_VERSION "91.3.0"
-#define MOZILLA_VERSION_U 91.3.0
-#define MOZJS_MAJOR_VERSION 91
-#define MOZJS_MINOR_VERSION 3
+#define MOZILLA_UAVERSION "115.0"
+#define MOZILLA_VERSION "115.8.0"
+#define MOZILLA_VERSION_U 115.8.0
+#define MOZJS_MAJOR_VERSION 115
+#define MOZJS_MINOR_VERSION 8
 #define MOZ_AARCH64_JSCVT 0
 #define MOZ_BUILD_APP js
 #define MOZ_DLL_PREFIX ""
@@ -42,22 +41,26 @@
 #define MOZ_UPDATE_CHANNEL default
 #define NOMINMAX 1
 #define NO_NSPR_10_SUPPORT 1
-#define NO_RUST_PANIC_HOOK 1
 #define RELEASE_OR_BETA 1
 #define STDC_HEADERS 1
 #define U_STATIC_IMPLEMENTATION 1
-#define WIN32 1
+#define WASM_HAS_HEAPREG 1
 #define WIN32_LEAN_AND_MEAN 1
 #define XP_WIN 1
-#define X_DISPLAY_MISSING 1
 #define _AMD64_ 1
 #define _CRT_NONSTDC_NO_WARNINGS 1
 #define _CRT_SECURE_NO_WARNINGS 1
+#define _SILENCE_CLANG_COROUTINE_MESSAGE 
 #define _USE_MATH_DEFINES 1
-#define _WIN32_IE 0x0800
 #define _WINDOWS 1
+#if !defined(WIN32)
+#define WIN32 1
+#endif
 #if !defined(WINVER)
 #define WINVER 0x601
+#endif
+#if !defined(_WIN32_IE)
+#define _WIN32_IE 0x0800
 #endif
 #if !defined(_WIN32_WINNT)
 #define _WIN32_WINNT 0x601

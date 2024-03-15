@@ -12,12 +12,10 @@
 
 #include "NamespaceImports.h"
 
+#include "ds/LifoAlloc.h"
 #include "frontend/FunctionSyntaxKind.h"
-#include "js/CompileOptions.h"  // JS::ReadOnlyCompileOptions
 #include "js/SourceText.h"
 #include "js/UniquePtr.h"  // js::UniquePtr
-#include "vm/Scope.h"
-#include "vm/TraceLogging.h"
 
 /*
  * Structure of all of the support classes.
@@ -98,40 +96,54 @@
 
 class JSLinearString;
 
+namespace JS {
+class JS_PUBLIC_API ReadOnlyCompileOptions;
+}
+
 namespace js {
 
 class ModuleObject;
 class ScriptSourceObject;
+class FrontendContext;
 
 namespace frontend {
 
+struct CompilationInput;
 struct CompilationStencil;
 struct ExtensibleCompilationStencil;
 struct CompilationGCOutput;
 class ErrorReporter;
 class FunctionBox;
 class ParseNode;
+class TaggedParserAtomIndex;
+class ScopeBindingCache;
 
 // Compile a module of the given source using the given options.
-ModuleObject* CompileModule(JSContext* cx,
+ModuleObject* CompileModule(JSContext* cx, FrontendContext* fc,
                             const JS::ReadOnlyCompileOptions& options,
                             JS::SourceText<char16_t>& srcBuf);
-ModuleObject* CompileModule(JSContext* cx,
+ModuleObject* CompileModule(JSContext* cx, FrontendContext* fc,
                             const JS::ReadOnlyCompileOptions& options,
                             JS::SourceText<mozilla::Utf8Unit>& srcBuf);
 
 // Parse a module of the given source.  This is an internal API; if you want to
 // compile a module as a user, use CompileModule above.
-UniquePtr<CompilationStencil> ParseModuleToStencil(
-    JSContext* cx, CompilationInput& input, JS::SourceText<char16_t>& srcBuf);
-UniquePtr<CompilationStencil> ParseModuleToStencil(
-    JSContext* cx, CompilationInput& input,
+already_AddRefed<CompilationStencil> ParseModuleToStencil(
+    JSContext* maybeCx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
+    CompilationInput& input, ScopeBindingCache* scopeCache,
+    JS::SourceText<char16_t>& srcBuf);
+already_AddRefed<CompilationStencil> ParseModuleToStencil(
+    JSContext* maybeCx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
+    CompilationInput& input, ScopeBindingCache* scopeCache,
     JS::SourceText<mozilla::Utf8Unit>& srcBuf);
 
 UniquePtr<ExtensibleCompilationStencil> ParseModuleToExtensibleStencil(
-    JSContext* cx, CompilationInput& input, JS::SourceText<char16_t>& srcBuf);
+    JSContext* cx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
+    CompilationInput& input, ScopeBindingCache* scopeCache,
+    JS::SourceText<char16_t>& srcBuf);
 UniquePtr<ExtensibleCompilationStencil> ParseModuleToExtensibleStencil(
-    JSContext* cx, CompilationInput& input,
+    JSContext* cx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
+    CompilationInput& input, ScopeBindingCache* scopeCache,
     JS::SourceText<mozilla::Utf8Unit>& srcBuf);
 
 //
@@ -175,7 +187,7 @@ UniquePtr<ExtensibleCompilationStencil> ParseModuleToExtensibleStencil(
     JSContext* cx, const JS::ReadOnlyCompileOptions& options,
     JS::SourceText<char16_t>& srcBuf,
     const mozilla::Maybe<uint32_t>& parameterListEnd,
-    frontend::FunctionSyntaxKind syntaxKind, HandleScope enclosingScope);
+    frontend::FunctionSyntaxKind syntaxKind, Handle<Scope*> enclosingScope);
 
 /*
  * True if str consists of an IdentifierStart character, followed by one or
@@ -207,25 +219,6 @@ bool IsIdentifierNameOrPrivateName(const char16_t* chars, size_t length);
 
 /* True if str is a keyword. Defined in TokenStream.cpp. */
 bool IsKeyword(TaggedParserAtomIndex atom);
-
-class MOZ_STACK_CLASS AutoFrontendTraceLog {
-#ifdef JS_TRACE_LOGGING
-  TraceLoggerThread* logger_;
-  mozilla::Maybe<TraceLoggerEvent> frontendEvent_;
-  mozilla::Maybe<AutoTraceLog> frontendLog_;
-  mozilla::Maybe<AutoTraceLog> typeLog_;
-#endif
-
- public:
-  AutoFrontendTraceLog(JSContext* cx, const TraceLoggerTextId id,
-                       const ErrorReporter& reporter);
-
-  AutoFrontendTraceLog(JSContext* cx, const TraceLoggerTextId id,
-                       const ErrorReporter& reporter, FunctionBox* funbox);
-
-  AutoFrontendTraceLog(JSContext* cx, const TraceLoggerTextId id,
-                       const ErrorReporter& reporter, ParseNode* pn);
-};
 
 } /* namespace frontend */
 } /* namespace js */

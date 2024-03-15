@@ -36,23 +36,26 @@ namespace jit {
   _(SetElemSuper)                        \
   _(StrictSetPropSuper)                  \
   _(StrictSetElemSuper)                  \
-  /* Environments (bug 1366470) */       \
-  _(PushVarEnv)                          \
   /* Compound assignment */              \
   _(GetBoundName)                        \
   /* Generators / Async (bug 1317690) */ \
   _(IsGenClosing)                        \
   _(Resume)                              \
-  /* try-finally */                      \
-  _(Finally)                             \
-  _(Gosub)                               \
-  _(Retsub)                              \
   /* Misc */                             \
   _(DelName)                             \
   _(SetIntrinsic)                        \
   /* Private Fields */                   \
-  _(InitLockedElem)                      \
   _(GetAliasedDebugVar)                  \
+  /* Non-syntactic scope */              \
+  _(NonSyntacticGlobalThis)              \
+  /* Records and Tuples */               \
+  IF_RECORD_TUPLE(_(InitRecord))         \
+  IF_RECORD_TUPLE(_(AddRecordProperty))  \
+  IF_RECORD_TUPLE(_(AddRecordSpread))    \
+  IF_RECORD_TUPLE(_(FinishRecord))       \
+  IF_RECORD_TUPLE(_(InitTuple))          \
+  IF_RECORD_TUPLE(_(AddTupleElement))    \
+  IF_RECORD_TUPLE(_(FinishTuple))        \
   // === !! WARNING WARNING WARNING !! ===
   // Do you really want to sacrifice performance by not implementing this
   // operation in the optimizing compiler?
@@ -109,50 +112,27 @@ enum class CacheKind : uint8_t;
 // Baseline does not attempt OSR into Warp at loops that are only reachable via
 // catch/finally blocks.
 //
-// Finally-blocks are currently not supported by WarpBuilder.
+// Finally-blocks are compiled by WarpBuilder, but when we have to enter a
+// finally-block from the exception handler, we bail out to the Baseline
+// Interpreter.
 
 // PendingEdge is used whenever a block is terminated with a forward branch in
 // the bytecode. When we reach the jump target we use this information to link
 // the block to the jump target's block.
 class PendingEdge {
- public:
-  enum class Kind : uint8_t {
-    // MTest true-successor.
-    TestTrue,
-
-    // MTest false-successor.
-    TestFalse,
-
-    // MGoto successor.
-    Goto,
-  };
-
- private:
   MBasicBlock* block_;
-  Kind kind_;
-  JSOp testOp_ = JSOp::Undefined;
-
-  PendingEdge(MBasicBlock* block, Kind kind, JSOp testOp = JSOp::Undefined)
-      : block_(block), kind_(kind), testOp_(testOp) {}
+  uint32_t successor_;
+  uint8_t numToPop_;
 
  public:
-  static PendingEdge NewTestTrue(MBasicBlock* block, JSOp op) {
-    return PendingEdge(block, Kind::TestTrue, op);
-  }
-  static PendingEdge NewTestFalse(MBasicBlock* block, JSOp op) {
-    return PendingEdge(block, Kind::TestFalse, op);
-  }
-  static PendingEdge NewGoto(MBasicBlock* block) {
-    return PendingEdge(block, Kind::Goto);
+  PendingEdge(MBasicBlock* block, uint32_t successor, uint32_t numToPop)
+      : block_(block), successor_(successor), numToPop_(numToPop) {
+    MOZ_ASSERT(numToPop_ == numToPop, "value must fit in field");
   }
 
   MBasicBlock* block() const { return block_; }
-  Kind kind() const { return kind_; }
-
-  JSOp testOp() const {
-    MOZ_ASSERT(kind_ == Kind::TestTrue || kind_ == Kind::TestFalse);
-    return testOp_;
-  }
+  uint32_t successor() const { return successor_; }
+  uint8_t numToPop() const { return numToPop_; }
 };
 
 // PendingEdgesMap maps a bytecode instruction to a Vector of PendingEdges
@@ -257,8 +237,8 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
   bool hasTerminatedBlock() const { return current == nullptr; }
   void setTerminatedBlock() { current = nullptr; }
 
-  [[nodiscard]] bool addPendingEdge(const PendingEdge& edge,
-                                    BytecodeLocation target);
+  [[nodiscard]] bool addPendingEdge(BytecodeLocation target, MBasicBlock* block,
+                                    uint32_t successor, uint32_t numToPop = 0);
   [[nodiscard]] bool buildForwardGoto(BytecodeLocation target);
   [[nodiscard]] bool buildBackedge();
   [[nodiscard]] bool buildTestBackedge(BytecodeLocation loc);
@@ -298,11 +278,12 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
   [[nodiscard]] bool buildSuspend(BytecodeLocation loc, MDefinition* gen,
                                   MDefinition* retVal);
 
-  void buildCopyLexicalEnvOp(bool copySlots);
   void buildCheckLexicalOp(BytecodeLocation loc);
 
   bool usesEnvironmentChain() const;
   MDefinition* walkEnvironmentChain(uint32_t numHops);
+
+  void buildCreateThis(CallInfo& callInfo);
 
   [[nodiscard]] bool transpileCall(BytecodeLocation loc,
                                    const WarpCacheIR* cacheIRSnapshot,
@@ -334,6 +315,9 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
   [[nodiscard]] bool buildInline();
 
   CallInfo* inlineCallInfo() const { return inlineCallInfo_; }
+  bool isMonomorphicInlined() const {
+    return scriptSnapshot_->isMonomorphicInlined();
+  }
 };
 
 }  // namespace jit

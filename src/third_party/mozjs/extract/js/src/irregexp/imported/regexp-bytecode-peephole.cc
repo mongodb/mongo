@@ -258,13 +258,10 @@ int32_t GetArgumentValue(const byte* bytecode, int offset, int length) {
   switch (length) {
     case 1:
       return GetValue<byte>(bytecode, offset);
-      break;
     case 2:
       return GetValue<int16_t>(bytecode, offset);
-      break;
     case 4:
       return GetValue<int32_t>(bytecode, offset);
-      break;
     default:
       UNREACHABLE();
   }
@@ -1015,7 +1012,7 @@ Handle<ByteArray> RegExpBytecodePeepholeOptimization::OptimizeBytecode(
   Handle<ByteArray> array = isolate->factory()->NewByteArray(peephole.Length());
   peephole.CopyOptimizedBytecode(array->GetDataStartAddress());
 
-  if (did_optimize && FLAG_trace_regexp_peephole_optimization) {
+  if (did_optimize && v8_flags.trace_regexp_peephole_optimization) {
     PrintF("Original Bytecode:\n");
     RegExpBytecodeDisassemble(bytecode, length, source->ToCString().get());
     PrintF("Optimized Bytecode:\n");

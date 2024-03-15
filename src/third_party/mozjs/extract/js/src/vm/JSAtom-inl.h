@@ -9,67 +9,35 @@
 
 #include "vm/JSAtom.h"
 
-#include "mozilla/FloatingPoint.h"
 #include "mozilla/RangedPtr.h"
 
 #include "jsnum.h"
 
 #include "gc/MaybeRooted.h"
-#include "vm/Runtime.h"
+#include "vm/JSAtomState.h"
+#include "vm/JSContext.h"
 #include "vm/StringType.h"
 
 namespace js {
 
 MOZ_ALWAYS_INLINE jsid AtomToId(JSAtom* atom) {
-  static_assert(JSID_INT_MIN == 0);
+  static_assert(JS::PropertyKey::IntMin == 0);
 
   uint32_t index;
-  if (atom->isIndex(&index) && index <= JSID_INT_MAX) {
-    return INT_TO_JSID(int32_t(index));
+  if (atom->isIndex(&index) && index <= JS::PropertyKey::IntMax) {
+    return JS::PropertyKey::Int(int32_t(index));
   }
 
-  return JS::PropertyKey::fromNonIntAtom(atom);
+  return JS::PropertyKey::NonIntAtom(atom);
 }
 
 // Use the NameToId method instead!
 inline jsid AtomToId(PropertyName* name) = delete;
 
-MOZ_ALWAYS_INLINE bool ValueToIntId(const Value& v, jsid* id) {
-  int32_t i;
-  if (v.isInt32()) {
-    i = v.toInt32();
-  } else if (!v.isDouble() || !mozilla::NumberEqualsInt32(v.toDouble(), &i)) {
-    return false;
-  }
-
-  if (!INT_FITS_IN_JSID(i)) {
-    return false;
-  }
-
-  *id = INT_TO_JSID(i);
-  return true;
-}
-
-inline bool ValueToIdPure(const Value& v, jsid* id) {
-  if (v.isString()) {
-    if (v.toString()->isAtom()) {
-      *id = AtomToId(&v.toString()->asAtom());
-      return true;
-    }
-    return false;
-  }
-
-  if (ValueToIntId(v, id)) {
-    return true;
-  }
-
-  if (v.isSymbol()) {
-    *id = SYMBOL_TO_JSID(v.toSymbol());
-    return true;
-  }
-
-  return false;
-}
+template <AllowGC allowGC>
+extern bool PrimitiveValueToIdSlow(
+    JSContext* cx, typename MaybeRooted<JS::Value, allowGC>::HandleType v,
+    typename MaybeRooted<jsid, allowGC>::MutableHandleType idp);
 
 template <AllowGC allowGC>
 inline bool PrimitiveValueToId(
@@ -79,28 +47,33 @@ inline bool PrimitiveValueToId(
   MOZ_ASSERT(v.isPrimitive());
 
   if (v.isString()) {
+    JSAtom* atom;
     if (v.toString()->isAtom()) {
-      idp.set(AtomToId(&v.toString()->asAtom()));
-      return true;
+      atom = &v.toString()->asAtom();
+    } else {
+      atom = AtomizeString(cx, v.toString());
+      if (!atom) {
+        if constexpr (!allowGC) {
+          cx->recoverFromOutOfMemory();
+        }
+        return false;
+      }
     }
-  } else {
-    if (ValueToIntId(v, idp.address())) {
-      return true;
-    }
-
-    if (v.isSymbol()) {
-      idp.set(SYMBOL_TO_JSID(v.toSymbol()));
-      return true;
-    }
+    idp.set(AtomToId(atom));
+    return true;
   }
 
-  JSAtom* atom = ToAtom<allowGC>(cx, v);
-  if (!atom) {
-    return false;
+  if (v.isInt32()) {
+    if (PropertyKey::fitsInInt(v.toInt32())) {
+      idp.set(PropertyKey::Int(v.toInt32()));
+      return true;
+    }
+  } else if (v.isSymbol()) {
+    idp.set(PropertyKey::Symbol(v.toSymbol()));
+    return true;
   }
 
-  idp.set(AtomToId(atom));
-  return true;
+  return PrimitiveValueToIdSlow<allowGC>(cx, v, idp);
 }
 
 /*
@@ -134,8 +107,8 @@ inline mozilla::RangedPtr<T> BackfillIndexInCharBuffer(
 bool IndexToIdSlow(JSContext* cx, uint32_t index, MutableHandleId idp);
 
 inline bool IndexToId(JSContext* cx, uint32_t index, MutableHandleId idp) {
-  if (index <= JSID_INT_MAX) {
-    idp.set(INT_TO_JSID(index));
+  if (index <= PropertyKey::IntMax) {
+    idp.set(PropertyKey::Int(index));
     return true;
   }
 
@@ -143,12 +116,12 @@ inline bool IndexToId(JSContext* cx, uint32_t index, MutableHandleId idp) {
 }
 
 static MOZ_ALWAYS_INLINE JSLinearString* IdToString(JSContext* cx, jsid id) {
-  if (JSID_IS_STRING(id)) {
+  if (id.isString()) {
     return id.toAtom();
   }
 
-  if (MOZ_LIKELY(JSID_IS_INT(id))) {
-    return Int32ToString<CanGC>(cx, JSID_TO_INT(id));
+  if (MOZ_LIKELY(id.isInt())) {
+    return Int32ToString<CanGC>(cx, id.toInt());
   }
 
   RootedValue idv(cx, IdToValue(id));
@@ -163,7 +136,7 @@ static MOZ_ALWAYS_INLINE JSLinearString* IdToString(JSContext* cx, jsid id) {
 inline Handle<PropertyName*> TypeName(JSType type, const JSAtomState& names) {
   MOZ_ASSERT(type < JSTYPE_LIMIT);
   static_assert(offsetof(JSAtomState, undefined) +
-                    JSTYPE_LIMIT * sizeof(ImmutablePropertyNamePtr) <=
+                    JSTYPE_LIMIT * sizeof(ImmutableTenuredPtr<PropertyName*>) <=
                 sizeof(JSAtomState));
   static_assert(JSTYPE_UNDEFINED == 0);
   return (&names.undefined)[type];
@@ -172,7 +145,8 @@ inline Handle<PropertyName*> TypeName(JSType type, const JSAtomState& names) {
 inline Handle<PropertyName*> ClassName(JSProtoKey key, JSAtomState& atomState) {
   MOZ_ASSERT(key < JSProto_LIMIT);
   static_assert(offsetof(JSAtomState, Null) +
-                    JSProto_LIMIT * sizeof(ImmutablePropertyNamePtr) <=
+                    JSProto_LIMIT *
+                        sizeof(ImmutableTenuredPtr<PropertyName*>) <=
                 sizeof(JSAtomState));
   static_assert(JSProto_Null == 0);
   return (&atomState.Null)[key];

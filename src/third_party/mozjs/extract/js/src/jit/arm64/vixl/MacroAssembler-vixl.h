@@ -1,4 +1,4 @@
-// Copyright 2015, ARM Limited
+// Copyright 2015, VIXL authors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -972,6 +972,112 @@ class MacroAssembler : public js::jit::Assembler {
     SingleEmissionCheckScope guard(this);
     ldaxrh(rt, src);
   }
+
+// clang-format off
+#define COMPARE_AND_SWAP_SINGLE_MACRO_LIST(V) \
+  V(cas,    Cas)                              \
+  V(casa,   Casa)                             \
+  V(casl,   Casl)                             \
+  V(casal,  Casal)                            \
+  V(casb,   Casb)                             \
+  V(casab,  Casab)                            \
+  V(caslb,  Caslb)                            \
+  V(casalb, Casalb)                           \
+  V(cash,   Cash)                             \
+  V(casah,  Casah)                            \
+  V(caslh,  Caslh)                            \
+  V(casalh, Casalh)
+  // clang-format on
+
+#define DEFINE_MACRO_ASM_FUNC(ASM, MASM)                                     \
+  void MASM(const Register& rs, const Register& rt, const MemOperand& src) { \
+    SingleEmissionCheckScope guard(this);                                    \
+    ASM(rs, rt, src);                                                        \
+  }
+  COMPARE_AND_SWAP_SINGLE_MACRO_LIST(DEFINE_MACRO_ASM_FUNC)
+#undef DEFINE_MACRO_ASM_FUNC
+
+// clang-format off
+#define COMPARE_AND_SWAP_PAIR_MACRO_LIST(V) \
+  V(casp,   Casp)                           \
+  V(caspa,  Caspa)                          \
+  V(caspl,  Caspl)                          \
+  V(caspal, Caspal)
+  // clang-format on
+
+#define DEFINE_MACRO_ASM_FUNC(ASM, MASM)                                 \
+  void MASM(const Register& rs, const Register& rs2, const Register& rt, \
+            const Register& rt2, const MemOperand& src) {                \
+    SingleEmissionCheckScope guard(this);                                \
+    ASM(rs, rs2, rt, rt2, src);                                          \
+  }
+  COMPARE_AND_SWAP_PAIR_MACRO_LIST(DEFINE_MACRO_ASM_FUNC)
+#undef DEFINE_MACRO_ASM_FUNC
+
+// These macros generate all the variations of the atomic memory operations,
+// e.g. ldadd, ldadda, ldaddb, staddl, etc.
+
+// clang-format off
+#define ATOMIC_MEMORY_SIMPLE_MACRO_LIST(V, DEF, MASM_PRE, ASM_PRE) \
+  V(DEF, MASM_PRE##add,  ASM_PRE##add)                             \
+  V(DEF, MASM_PRE##clr,  ASM_PRE##clr)                             \
+  V(DEF, MASM_PRE##eor,  ASM_PRE##eor)                             \
+  V(DEF, MASM_PRE##set,  ASM_PRE##set)                             \
+  V(DEF, MASM_PRE##smax, ASM_PRE##smax)                            \
+  V(DEF, MASM_PRE##smin, ASM_PRE##smin)                            \
+  V(DEF, MASM_PRE##umax, ASM_PRE##umax)                            \
+  V(DEF, MASM_PRE##umin, ASM_PRE##umin)
+
+#define ATOMIC_MEMORY_STORE_MACRO_MODES(V, MASM, ASM) \
+  V(MASM,     ASM)                                    \
+  V(MASM##l,  ASM##l)                                 \
+  V(MASM##b,  ASM##b)                                 \
+  V(MASM##lb, ASM##lb)                                \
+  V(MASM##h,  ASM##h)                                 \
+  V(MASM##lh, ASM##lh)
+
+#define ATOMIC_MEMORY_LOAD_MACRO_MODES(V, MASM, ASM) \
+  ATOMIC_MEMORY_STORE_MACRO_MODES(V, MASM, ASM)      \
+  V(MASM##a,   ASM##a)                               \
+  V(MASM##al,  ASM##al)                              \
+  V(MASM##ab,  ASM##ab)                              \
+  V(MASM##alb, ASM##alb)                             \
+  V(MASM##ah,  ASM##ah)                              \
+  V(MASM##alh, ASM##alh)
+  // clang-format on
+
+#define DEFINE_MACRO_LOAD_ASM_FUNC(MASM, ASM)                                \
+  void MASM(const Register& rs, const Register& rt, const MemOperand& src) { \
+    SingleEmissionCheckScope guard(this);                                    \
+    ASM(rs, rt, src);                                                        \
+  }
+#define DEFINE_MACRO_STORE_ASM_FUNC(MASM, ASM)           \
+  void MASM(const Register& rs, const MemOperand& src) { \
+    SingleEmissionCheckScope guard(this);                \
+    ASM(rs, src);                                        \
+  }
+
+  ATOMIC_MEMORY_SIMPLE_MACRO_LIST(ATOMIC_MEMORY_LOAD_MACRO_MODES,
+                                  DEFINE_MACRO_LOAD_ASM_FUNC,
+                                  Ld,
+                                  ld)
+  ATOMIC_MEMORY_SIMPLE_MACRO_LIST(ATOMIC_MEMORY_STORE_MACRO_MODES,
+                                  DEFINE_MACRO_STORE_ASM_FUNC,
+                                  St,
+                                  st)
+
+#define DEFINE_MACRO_SWP_ASM_FUNC(MASM, ASM)                                 \
+  void MASM(const Register& rs, const Register& rt, const MemOperand& src) { \
+    SingleEmissionCheckScope guard(this);                                    \
+    ASM(rs, rt, src);                                                        \
+  }
+
+  ATOMIC_MEMORY_LOAD_MACRO_MODES(DEFINE_MACRO_SWP_ASM_FUNC, Swp, swp)
+
+#undef DEFINE_MACRO_LOAD_ASM_FUNC
+#undef DEFINE_MACRO_STORE_ASM_FUNC
+#undef DEFINE_MACRO_SWP_ASM_FUNC
+
   void Ldnp(const CPURegister& rt,
             const CPURegister& rt2,
             const MemOperand& src) {

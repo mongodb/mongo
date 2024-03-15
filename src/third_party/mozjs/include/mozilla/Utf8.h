@@ -18,10 +18,10 @@
 #include "mozilla/Span.h"       // for mozilla::Span
 #include "mozilla/TextUtils.h"  // for mozilla::IsAscii and via Latin1.h for
                                 // encoding_rs_mem.h and MOZ_HAS_JSRUST.
-#include "mozilla/Tuple.h"      // for mozilla::Tuple
 #include "mozilla/Types.h"      // for MFBT_API
 
-#include <limits>    // for CHAR_BIT / std::numeric_limits
+#include <limits>    // for std::numeric_limits
+#include <limits.h>  // for CHAR_BIT
 #include <stddef.h>  // for size_t
 #include <stdint.h>  // for uint8_t
 
@@ -304,8 +304,8 @@ inline bool IsUtf8(mozilla::Span<const char8_t> aString) {
  * sequence or the length of the string if there are none.
  */
 inline size_t Utf8ValidUpTo(mozilla::Span<const char> aString) {
-  return encoding_utf8_valid_up_to(
-      reinterpret_cast<const uint8_t*>(aString.Elements()), aString.Length());
+ return encoding_utf8_valid_up_to(
+  reinterpret_cast<const uint8_t*>(aString.Elements()), aString.Length());
 }
 
 /**
@@ -319,7 +319,7 @@ inline size_t Utf8ValidUpTo(mozilla::Span<const char> aString) {
 inline size_t ConvertUtf16toUtf8(mozilla::Span<const char16_t> aSource,
                                  mozilla::Span<char> aDest) {
   return encoding_mem_convert_utf16_to_utf8(
-      aSource.Elements(), aSource.Length(), aDest.Elements(), aDest.Length());
+   aSource.Elements(), aSource.Length(), aDest.Elements(), aDest.Length());
 }
 
 /**
@@ -341,13 +341,13 @@ inline size_t ConvertUtf16toUtf8(mozilla::Span<const char16_t> aSource,
  * TextEncoder.encodeInto.
  * https://encoding.spec.whatwg.org/#dom-textencoder-encodeinto
  */
-inline mozilla::Tuple<size_t, size_t> ConvertUtf16toUtf8Partial(
+inline std::tuple<size_t, size_t> ConvertUtf16toUtf8Partial(
     mozilla::Span<const char16_t> aSource, mozilla::Span<char> aDest) {
   size_t srcLen = aSource.Length();
   size_t dstLen = aDest.Length();
   encoding_mem_convert_utf16_to_utf8_partial(aSource.Elements(), &srcLen,
                                              aDest.Elements(), &dstLen);
-  return mozilla::MakeTuple(srcLen, dstLen);
+  return std::make_tuple(srcLen, dstLen);
 }
 
 /**
@@ -364,8 +364,8 @@ inline mozilla::Tuple<size_t, size_t> ConvertUtf16toUtf8Partial(
  */
 inline size_t ConvertUtf8toUtf16(mozilla::Span<const char> aSource,
                                  mozilla::Span<char16_t> aDest) {
-  return encoding_mem_convert_utf8_to_utf16(
-      aSource.Elements(), aSource.Length(), aDest.Elements(), aDest.Length());
+return encoding_mem_convert_utf8_to_utf16(
+  aSource.Elements(), aSource.Length(), aDest.Elements(), aDest.Length());
 }
 
 /**
@@ -378,8 +378,8 @@ inline size_t ConvertUtf8toUtf16(mozilla::Span<const char> aSource,
  */
 inline size_t UnsafeConvertValidUtf8toUtf16(mozilla::Span<const char> aSource,
                                             mozilla::Span<char16_t> aDest) {
-  return encoding_mem_convert_utf8_to_utf16(
-      aSource.Elements(), aSource.Length(), aDest.Elements(), aDest.Length());
+  return encoding_mem_convert_utf8_to_utf16(aSource.Elements(), aSource.Length(),
+                                            aDest.Elements(), aDest.Length());
 }
 
 /**
@@ -416,7 +416,7 @@ inline mozilla::Maybe<size_t> ConvertUtf8toUtf16WithoutReplacement(
  * sequence or the length of the string if there are none.
  */
 inline size_t Utf8ValidUpTo(mozilla::Span<const char> aString) {
-  return Utf8ValidUpToIndex(aString);
+  return mozilla::Utf8ValidUpToIndex(aString);
 }
 
 #  define SINGLE_BYTE_REPLACEMENT_CHAR "?"
@@ -442,7 +442,7 @@ inline size_t Utf8ValidUpTo(mozilla::Span<const char> aString) {
  * TextEncoder.encodeInto.
  * https://encoding.spec.whatwg.org/#dom-textencoder-encodeinto
  */
-mozilla::Tuple<size_t, size_t> ConvertUtf16toUtf8Partial(
+std::tuple<size_t, size_t> ConvertUtf16toUtf8Partial(
     mozilla::Span<const char16_t> aSource, mozilla::Span<char> aDest);
 
 /**

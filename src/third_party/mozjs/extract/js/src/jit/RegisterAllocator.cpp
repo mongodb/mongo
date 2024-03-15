@@ -254,6 +254,19 @@ bool AllocationIntegrityState::checkIntegrity(LBlock* block, LInstruction* ins,
         continue;
       }
       if (info.outputs[i].virtualRegister() == vreg) {
+#  ifdef JS_JITSPEW
+        // If the following assertion is about to fail, print some useful info.
+        if (!(*def->output() == alloc) && JitSpewEnabled(JitSpew_RegAlloc)) {
+          CodePosition input(ins->id(), CodePosition::INPUT);
+          CodePosition output(ins->id(), CodePosition::OUTPUT);
+          JitSpew(JitSpew_RegAlloc,
+                  "Instruction at %u-%u, output number %u:", input.bits(),
+                  output.bits(), unsigned(i));
+          JitSpew(JitSpew_RegAlloc,
+                  "  Error: conflicting allocations: %s vs %s",
+                  (*def->output()).toString().get(), alloc.toString().get());
+        }
+#  endif
         MOZ_ASSERT(*def->output() == alloc);
 
         // Found the original definition, done scanning.
@@ -408,7 +421,7 @@ void AllocationIntegrityState::dump() {
                           CodePosition::OUTPUT);
 
       JitSpewHeader(JitSpew_RegAlloc);
-      JitSpewCont(JitSpew_RegAlloc, "    [%u,%u Phi] [def %s] ", input.bits(),
+      JitSpewCont(JitSpew_RegAlloc, "    %u-%u Phi [def %s] ", input.bits(),
                   output.bits(), phi->getDef(0)->toString().get());
       for (size_t j = 0; j < phi->numOperands(); j++) {
         JitSpewCont(JitSpew_RegAlloc, " [use %s]",
@@ -426,18 +439,18 @@ void AllocationIntegrityState::dump() {
       CodePosition output(ins->id(), CodePosition::OUTPUT);
 
       JitSpewHeader(JitSpew_RegAlloc);
-      JitSpewCont(JitSpew_RegAlloc, "    [");
+      JitSpewCont(JitSpew_RegAlloc, "    ");
       if (input != CodePosition::MIN) {
-        JitSpewCont(JitSpew_RegAlloc, "%u,%u ", input.bits(), output.bits());
+        JitSpewCont(JitSpew_RegAlloc, "%u-%u ", input.bits(), output.bits());
       }
-      JitSpewCont(JitSpew_RegAlloc, "%s]", ins->opName());
+      JitSpewCont(JitSpew_RegAlloc, "%s", ins->opName());
 
       if (ins->isMoveGroup()) {
         LMoveGroup* group = ins->toMoveGroup();
         for (int i = group->numMoves() - 1; i >= 0; i--) {
-          JitSpewCont(JitSpew_RegAlloc, " [%s -> %s]",
-                      group->getMove(i).from().toString().get(),
-                      group->getMove(i).to().toString().get());
+          JitSpewCont(JitSpew_RegAlloc, " [%s <- %s]",
+                      group->getMove(i).to().toString().get(),
+                      group->getMove(i).from().toString().get());
         }
         JitSpewCont(JitSpew_RegAlloc, "\n");
         continue;
@@ -573,10 +586,9 @@ LMoveGroup* RegisterAllocator::getMoveGroupAfter(LInstruction* ins) {
   return moves;
 }
 
-void RegisterAllocator::dumpInstructions() {
+void RegisterAllocator::dumpInstructions(const char* who) {
 #ifdef JS_JITSPEW
-  JitSpewCont(JitSpew_RegAlloc, "\n");
-  JitSpew(JitSpew_RegAlloc, "Instructions:");
+  JitSpew(JitSpew_RegAlloc, "LIR instructions %s", who);
 
   for (size_t blockIndex = 0; blockIndex < graph.numBlocks(); blockIndex++) {
     LBlock* block = graph.getBlock(blockIndex);
@@ -595,7 +607,7 @@ void RegisterAllocator::dumpInstructions() {
       LPhi* phi = block->getPhi(i);
 
       JitSpewHeader(JitSpew_RegAlloc);
-      JitSpewCont(JitSpew_RegAlloc, "    [%u,%u Phi] [def %s]",
+      JitSpewCont(JitSpew_RegAlloc, "    %u-%u Phi [def %s]",
                   inputOf(phi).bits(), outputOf(phi).bits(),
                   phi->getDef(0)->toString().get());
       for (size_t j = 0; j < phi->numOperands(); j++) {
@@ -610,21 +622,21 @@ void RegisterAllocator::dumpInstructions() {
       LInstruction* ins = *iter;
 
       JitSpewHeader(JitSpew_RegAlloc);
-      JitSpewCont(JitSpew_RegAlloc, "    [");
+      JitSpewCont(JitSpew_RegAlloc, "    ");
       if (ins->id() != 0) {
-        JitSpewCont(JitSpew_RegAlloc, "%u,%u ", inputOf(ins).bits(),
+        JitSpewCont(JitSpew_RegAlloc, "%u-%u ", inputOf(ins).bits(),
                     outputOf(ins).bits());
       }
-      JitSpewCont(JitSpew_RegAlloc, "%s]", ins->opName());
+      JitSpewCont(JitSpew_RegAlloc, "%s", ins->opName());
 
       if (ins->isMoveGroup()) {
         LMoveGroup* group = ins->toMoveGroup();
         for (int i = group->numMoves() - 1; i >= 0; i--) {
           // Use two printfs, as LAllocation::toString is not reentant.
           JitSpewCont(JitSpew_RegAlloc, " [%s",
-                      group->getMove(i).from().toString().get());
-          JitSpewCont(JitSpew_RegAlloc, " -> %s]",
                       group->getMove(i).to().toString().get());
+          JitSpewCont(JitSpew_RegAlloc, " <- %s]",
+                      group->getMove(i).from().toString().get());
         }
         JitSpewCont(JitSpew_RegAlloc, "\n");
         continue;

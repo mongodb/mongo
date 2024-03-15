@@ -19,23 +19,24 @@
 #include "jsmath.h"
 
 #include "gc/Memory.h"
-#ifdef JS_CODEGEN_ARM64
-#  include "jit/arm64/vixl/Cpu-vixl.h"
-#endif
-#include "jit/AtomicOperations.h"
 #include "jit/FlushICache.h"  // js::jit::FlushICache
+#include "jit/JitOptions.h"
 #include "threading/LockGuard.h"
 #include "threading/Mutex.h"
 #include "util/Memory.h"
 #include "util/Poison.h"
-#include "util/Windows.h"
+#include "util/WindowsWrapper.h"
 #include "vm/MutexIDs.h"
 
 #ifdef XP_WIN
 #  include "mozilla/StackWalk_windows.h"
 #  include "mozilla/WindowsVersion.h"
 #elif defined(__wasi__)
+#  if defined(JS_CODEGEN_WASM32)
+#    include <cstdlib>
+#  else
 // Nothing.
+#  endif
 #else
 #  include <sys/mman.h>
 #  include <unistd.h>
@@ -81,6 +82,7 @@ static void* ComputeRandomAllocationAddress() {
 
 #  ifdef NEED_JIT_UNWIND_HANDLING
 static js::JitExceptionHandler sJitExceptionHandler;
+static bool sHasInstalledFunctionTable = false;
 #  endif
 
 JS_PUBLIC_API void js::SetJitExceptionHandler(JitExceptionHandler handler) {
@@ -99,7 +101,7 @@ JS_PUBLIC_API void js::SetJitExceptionHandler(JitExceptionHandler handler) {
 // These records can have various fields present or absent depending on the
 // bits set in the header. Our struct will use one 32-bit slot for unwind codes,
 // and no slots for epilog scopes.
-struct UnwindInfo {
+struct UnwindData {
   uint32_t functionLength : 18;
   uint32_t version : 2;
   uint32_t hasExceptionHandler : 1;
@@ -109,10 +111,11 @@ struct UnwindInfo {
   uint8_t unwindCodes[4];
   uint32_t exceptionHandler;
 };
+
 static const unsigned ThunkLength = 20;
 #    else
 // From documentation for UNWIND_INFO on
-// http://msdn.microsoft.com/en-us/library/ddssxxy8.aspx
+// https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64
 struct UnwindInfo {
   uint8_t version : 3;
   uint8_t flags : 5;
@@ -120,15 +123,57 @@ struct UnwindInfo {
   uint8_t countOfUnwindCodes;
   uint8_t frameRegister : 4;
   uint8_t frameOffset : 4;
-  ULONG exceptionHandler;
 };
 static const unsigned ThunkLength = 12;
+union UnwindCode {
+  struct {
+    uint8_t codeOffset;
+    uint8_t unwindOp : 4;
+    uint8_t opInfo : 4;
+  };
+  uint16_t frameOffset;
+};
+
+static constexpr int kNumberOfUnwindCodes = 2;
+static constexpr int kPushRbpInstructionLength = 1;
+static constexpr int kMovRbpRspInstructionLength = 3;
+static constexpr int kRbpPrefixCodes = 2;
+static constexpr int kRbpPrefixLength =
+    kPushRbpInstructionLength + kMovRbpRspInstructionLength;
+
+struct UnwindData {
+  UnwindInfo unwindInfo;
+  UnwindCode unwindCodes[kNumberOfUnwindCodes];
+  uint32_t exceptionHandler;
+
+  UnwindData() {
+    static constexpr int kOpPushNonvol = 0;
+    static constexpr int kOpSetFPReg = 3;
+
+    unwindInfo.version = 1;
+    unwindInfo.flags = UNW_FLAG_EHANDLER;
+    unwindInfo.sizeOfPrologue = kRbpPrefixLength;
+    unwindInfo.countOfUnwindCodes = kRbpPrefixCodes;
+    unwindInfo.frameRegister = 5;
+    unwindInfo.frameOffset = 0;
+
+    // Offset here are specified to beginning of the -next- instruction.
+    unwindCodes[0].codeOffset = kRbpPrefixLength;  // movq rbp, rsp
+    unwindCodes[0].unwindOp = kOpSetFPReg;
+    unwindCodes[0].opInfo = 0;
+
+    unwindCodes[1].codeOffset = kPushRbpInstructionLength;  // push rbp
+    unwindCodes[1].unwindOp = kOpPushNonvol;
+    unwindCodes[1].opInfo = 5;
+  }
+};
 #    endif
 
 struct ExceptionHandlerRecord {
-  RUNTIME_FUNCTION runtimeFunction;
-  UnwindInfo unwindInfo;
+  void* dynamicTable;
+  UnwindData unwindData;
   uint8_t thunk[ThunkLength];
+  RUNTIME_FUNCTION runtimeFunction;
 };
 
 // This function must match the function pointer type PEXCEPTION_HANDLER
@@ -139,10 +184,19 @@ struct ExceptionHandlerRecord {
 static DWORD ExceptionHandler(PEXCEPTION_RECORD exceptionRecord,
                               _EXCEPTION_REGISTRATION_RECORD*, PCONTEXT context,
                               _EXCEPTION_REGISTRATION_RECORD**) {
-  return sJitExceptionHandler(exceptionRecord, context);
+  if (sJitExceptionHandler) {
+    return sJitExceptionHandler(exceptionRecord, context);
+  }
+
+  return ExceptionContinueSearch;
 }
 
 PRUNTIME_FUNCTION RuntimeFunctionCallback(DWORD64 ControlPc, PVOID Context);
+
+// Required for enabling Stackwalking on windows using external tools.
+NTSYSAPI DWORD NTAPI RtlAddGrowableFunctionTable(
+    PVOID* DynamicTable, PRUNTIME_FUNCTION FunctionTable, DWORD EntryCount,
+    DWORD MaximumEntryCount, ULONG_PTR RangeBase, ULONG_PTR RangeEnd);
 
 // For an explanation of the problem being solved here, see
 // SetJitExceptionFilter in jsfriendapi.h.
@@ -151,7 +205,10 @@ static bool RegisterExecutableMemory(void* p, size_t bytes, size_t pageSize) {
     MOZ_CRASH();
   }
 
-  ExceptionHandlerRecord* r = reinterpret_cast<ExceptionHandlerRecord*>(p);
+  // A page was reserved inside this structure for the record. This is because
+  // all entries in the record are describes as an offset from the start of the
+  // memory region. We construct the record there.
+  ExceptionHandlerRecord* r = new (p) ExceptionHandlerRecord();
   void* handler = JS_FUNC_TO_DATA_PTR(void*, ExceptionHandler);
 
   // Because the .xdata format on ARM64 can only encode sizes up to 1M (much
@@ -170,23 +227,27 @@ static bool RegisterExecutableMemory(void* p, size_t bytes, size_t pageSize) {
   // access to protect against accidental clobbering.
 
 #    if defined(_M_ARM64)
+  if (!sJitExceptionHandler) {
+    return false;
+  }
+
   r->runtimeFunction.BeginAddress = pageSize;
-  r->runtimeFunction.UnwindData = offsetof(ExceptionHandlerRecord, unwindInfo);
-  static_assert(offsetof(ExceptionHandlerRecord, unwindInfo) % 4 == 0,
+  r->runtimeFunction.UnwindData = offsetof(ExceptionHandlerRecord, unwindData);
+  static_assert(offsetof(ExceptionHandlerRecord, unwindData) % 4 == 0,
                 "The ARM64 .pdata format requires that exception information "
                 "RVAs be 4-byte aligned.");
 
-  memset(&r->unwindInfo, 0, sizeof(r->unwindInfo));
-  r->unwindInfo.hasExceptionHandler = true;
-  r->unwindInfo.exceptionHandler = offsetof(ExceptionHandlerRecord, thunk);
+  memset(&r->unwindData, 0, sizeof(r->unwindData));
+  r->unwindData.hasExceptionHandler = true;
+  r->unwindData.exceptionHandler = offsetof(ExceptionHandlerRecord, thunk);
 
   // Use a fake unwind code to make the Windows unwinder do _something_. If the
   // PC and SP both stay unchanged, we'll fail the unwinder's sanity checks and
   // it won't call our exception handler.
-  r->unwindInfo.codeWords = 1;  // one 32-bit word gives us up to 4 codes
-  r->unwindInfo.unwindCodes[0] =
+  r->unwindData.codeWords = 1;  // one 32-bit word gives us up to 4 codes
+  r->unwindData.unwindCodes[0] =
       0b00000001;  // alloc_s small stack of size 1*16
-  r->unwindInfo.unwindCodes[1] = 0b11100100;  // end
+  r->unwindData.unwindCodes[1] = 0b11100100;  // end
 
   uint32_t* thunk = (uint32_t*)r->thunk;
   uint16_t* addr = (uint16_t*)&handler;
@@ -203,15 +264,8 @@ static bool RegisterExecutableMemory(void* p, size_t bytes, size_t pageSize) {
 #    else
   r->runtimeFunction.BeginAddress = pageSize;
   r->runtimeFunction.EndAddress = (DWORD)bytes;
-  r->runtimeFunction.UnwindData = offsetof(ExceptionHandlerRecord, unwindInfo);
-
-  r->unwindInfo.version = 1;
-  r->unwindInfo.flags = UNW_FLAG_EHANDLER;
-  r->unwindInfo.sizeOfPrologue = 0;
-  r->unwindInfo.countOfUnwindCodes = 0;
-  r->unwindInfo.frameRegister = 0;
-  r->unwindInfo.frameOffset = 0;
-  r->unwindInfo.exceptionHandler = offsetof(ExceptionHandlerRecord, thunk);
+  r->runtimeFunction.UnwindData = offsetof(ExceptionHandlerRecord, unwindData);
+  r->unwindData.exceptionHandler = offsetof(ExceptionHandlerRecord, thunk);
 
   // mov imm64, rax
   r->thunk[0] = 0x48;
@@ -223,17 +277,47 @@ static bool RegisterExecutableMemory(void* p, size_t bytes, size_t pageSize) {
   r->thunk[11] = 0xe0;
 #    endif
 
+  BOOLEAN result = false;
+
+  // RtlAddGrowableFunctionTable is only available in Windows 8.1 and higher.
+  // This can be simplified if our compile target changes.
+  HMODULE ntdll_module =
+      LoadLibraryExW(L"ntdll.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+
+  static decltype(&::RtlAddGrowableFunctionTable) addGrowableFunctionTable =
+      reinterpret_cast<decltype(&::RtlAddGrowableFunctionTable)>(
+          ::GetProcAddress(ntdll_module, "RtlAddGrowableFunctionTable"));
+
+  // AddGrowableFunctionTable will write into the region. We must therefore
+  // only write-protect is after this has been called.
+  if (addGrowableFunctionTable) {
+    // XXX NB: The profiler believes this function is only called from the main
+    // thread. If that ever becomes untrue, the profiler must be updated
+    // immediately.
+    AutoSuppressStackWalking suppress;
+    result = addGrowableFunctionTable(&r->dynamicTable, &r->runtimeFunction, 1,
+                                      1, (ULONG_PTR)p,
+                                      (ULONG_PTR)p + bytes - pageSize) == S_OK;
+  } else {
+    if (!sJitExceptionHandler) {
+      // No point installing this.
+      return false;
+    }
+    // XXX NB: The profiler believes this function is only called from the main
+    // thread. If that ever becomes untrue, the profiler must be updated
+    // immediately.
+    AutoSuppressStackWalking suppress;
+    result =
+        RtlInstallFunctionTableCallback((DWORD64)p | 0x3, (DWORD64)p, bytes,
+                                        RuntimeFunctionCallback, NULL, NULL);
+  }
+
   DWORD oldProtect;
-  if (!VirtualProtect(p, pageSize, PAGE_EXECUTE_READ, &oldProtect)) {
+  if (result && !VirtualProtect(p, pageSize, PAGE_EXECUTE_READ, &oldProtect)) {
     MOZ_CRASH();
   }
 
-  // XXX NB: The profiler believes this function is only called from the main
-  // thread. If that ever becomes untrue, the profiler must be updated
-  // immediately.
-  AutoSuppressStackWalking suppress;
-  return RtlInstallFunctionTableCallback((DWORD64)p | 0x3, (DWORD64)p, bytes,
-                                         RuntimeFunctionCallback, NULL, NULL);
+  return result;
 }
 
 static void UnregisterExecutableMemory(void* p, size_t bytes, size_t pageSize) {
@@ -245,9 +329,8 @@ static void UnregisterExecutableMemory(void* p, size_t bytes, size_t pageSize) {
 static void* ReserveProcessExecutableMemory(size_t bytes) {
 #  ifdef NEED_JIT_UNWIND_HANDLING
   size_t pageSize = gc::SystemPageSize();
-  if (sJitExceptionHandler) {
-    bytes += pageSize;
-  }
+  // Always reserve space for the unwind information.
+  bytes += pageSize;
 #  endif
 
   void* p = nullptr;
@@ -268,19 +351,23 @@ static void* ReserveProcessExecutableMemory(size_t bytes) {
   }
 
 #  ifdef NEED_JIT_UNWIND_HANDLING
-  if (sJitExceptionHandler) {
-    if (!RegisterExecutableMemory(p, bytes, pageSize)) {
+  if (RegisterExecutableMemory(p, bytes, pageSize)) {
+    sHasInstalledFunctionTable = true;
+  } else {
+    if (sJitExceptionHandler) {
+      // This should have succeeded if we have an exception handler. Bail.
       VirtualFree(p, 0, MEM_RELEASE);
       return nullptr;
     }
-
-    p = (uint8_t*)p + pageSize;
-    bytes -= pageSize;
   }
+
+  // Skip the first page where we might have allocated an exception handler
+  // record.
+  p = (uint8_t*)p + pageSize;
+  bytes -= pageSize;
 
   RegisterJitCodeRegion((uint8_t*)p, bytes);
 #  endif
-
   return p;
 }
 
@@ -288,9 +375,10 @@ static void DeallocateProcessExecutableMemory(void* addr, size_t bytes) {
 #  ifdef NEED_JIT_UNWIND_HANDLING
   UnregisterJitCodeRegion((uint8_t*)addr, bytes);
 
-  if (sJitExceptionHandler) {
-    size_t pageSize = gc::SystemPageSize();
-    addr = (uint8_t*)addr - pageSize;
+  size_t pageSize = gc::SystemPageSize();
+  addr = (uint8_t*)addr - pageSize;
+
+  if (sHasInstalledFunctionTable) {
     UnregisterExecutableMemory(addr, bytes, pageSize);
   }
 #  endif
@@ -327,9 +415,29 @@ static void DecommitPages(void* addr, size_t bytes) {
   }
 }
 #elif defined(__wasi__)
+#  if defined(JS_CODEGEN_WASM32)
+static void* ReserveProcessExecutableMemory(size_t bytes) {
+  return malloc(bytes);
+}
+
+static void DeallocateProcessExecutableMemory(void* addr, size_t bytes) {
+  free(addr);
+}
+
+[[nodiscard]] static bool CommitPages(void* addr, size_t bytes,
+                                      ProtectionSetting protection) {
+  return true;
+}
+
+static void DecommitPages(void* addr, size_t bytes) {}
+
+#  else
 static void* ReserveProcessExecutableMemory(size_t bytes) {
   MOZ_CRASH("NYI for WASI.");
   return nullptr;
+}
+static void DeallocateProcessExecutableMemory(void* addr, size_t bytes) {
+  MOZ_CRASH("NYI for WASI.");
 }
 [[nodiscard]] static bool CommitPages(void* addr, size_t bytes,
                                       ProtectionSetting protection) {
@@ -339,6 +447,7 @@ static void* ReserveProcessExecutableMemory(size_t bytes) {
 static void DecommitPages(void* addr, size_t bytes) {
   MOZ_CRASH("NYI for WASI.");
 }
+#  endif
 #else  // !XP_WIN && !__wasi__
 #  ifndef MAP_NORESERVE
 #    define MAP_NORESERVE 0
@@ -521,7 +630,7 @@ class ProcessExecutableMemory {
   uint8_t* base_;
 
   // The fields below should only be accessed while we hold the lock.
-  Mutex lock_;
+  Mutex lock_ MOZ_UNANNOTATED;
 
   // pagesAllocated_ is an Atomic so that bytesAllocated does not have to
   // take the lock.
@@ -546,6 +655,7 @@ class ProcessExecutableMemory {
     pages_.init();
 
     MOZ_RELEASE_ASSERT(!initialized());
+    MOZ_RELEASE_ASSERT(HasJitBackend());
     MOZ_RELEASE_ASSERT(gc::SystemPageSize() <= ExecutableCodePageSize);
 
     void* p = ReserveProcessExecutableMemory(MaxCodeBytesPerProcess);
@@ -571,9 +681,6 @@ class ProcessExecutableMemory {
   }
 
   void release() {
-#if defined(__wasi__)
-    MOZ_ASSERT(!initialized());
-#else
     MOZ_ASSERT(initialized());
     MOZ_ASSERT(pages_.empty());
     MOZ_ASSERT(pagesAllocated_ == 0);
@@ -581,7 +688,6 @@ class ProcessExecutableMemory {
     base_ = nullptr;
     rng_.reset();
     MOZ_ASSERT(!initialized());
-#endif
   }
 
   void assertValidAddress(void* p, size_t bytes) const {
@@ -604,6 +710,7 @@ void* ProcessExecutableMemory::allocate(size_t bytes,
                                         ProtectionSetting protection,
                                         MemCheckKind checkKind) {
   MOZ_ASSERT(initialized());
+  MOZ_ASSERT(HasJitBackend());
   MOZ_ASSERT(bytes > 0);
   MOZ_ASSERT((bytes % ExecutableCodePageSize) == 0);
 
@@ -724,15 +831,7 @@ void js::jit::DeallocateExecutableMemory(void* addr, size_t bytes) {
   execMemory.deallocate(addr, bytes, /* decommit = */ true);
 }
 
-bool js::jit::InitProcessExecutableMemory() {
-#ifdef JS_CODEGEN_ARM64
-  // Initialize instruction cache flushing.
-  vixl::CPU::SetUp();
-#elif defined(__wasi__)
-  return true;
-#endif
-  return execMemory.init();
-}
+bool js::jit::InitProcessExecutableMemory() { return execMemory.init(); }
 
 void js::jit::ReleaseProcessExecutableMemory() { execMemory.release(); }
 
@@ -758,12 +857,14 @@ bool js::jit::AddressIsInExecutableMemory(const void* p) {
 bool js::jit::ReprotectRegion(void* start, size_t size,
                               ProtectionSetting protection,
                               MustFlushICache flushICache) {
+#if defined(JS_CODEGEN_WASM32)
+  return true;
+#endif
+
   // Flush ICache when making code executable, before we modify |size|.
-  if (flushICache == MustFlushICache::LocalThreadOnly ||
-      flushICache == MustFlushICache::AllThreads) {
+  if (flushICache == MustFlushICache::Yes) {
     MOZ_ASSERT(protection == ProtectionSetting::Executable);
-    bool codeIsThreadLocal = flushICache == MustFlushICache::LocalThreadOnly;
-    jit::FlushICache(start, size, codeIsThreadLocal);
+    jit::FlushICache(start, size);
   }
 
   // Calculate the start of the page containing this region,
@@ -799,9 +900,10 @@ bool js::jit::ReprotectRegion(void* start, size_t size,
   std::atomic_thread_fence(std::memory_order_seq_cst);
 
 #  ifdef XP_WIN
-  DWORD oldProtect;
   DWORD flags = ProtectionSettingToFlags(protection);
-  if (!VirtualProtect(pageStart, size, flags, &oldProtect)) {
+  // This is a essentially a VirtualProtect, but with lighter impact on
+  // antivirus analysis. See bug 1823634.
+  if (!VirtualAlloc(pageStart, size, MEM_COMMIT, flags)) {
     return false;
   }
 #  else
@@ -827,6 +929,7 @@ static PRUNTIME_FUNCTION RuntimeFunctionCallback(DWORD64 ControlPc,
   if (!p) {
     return nullptr;
   }
-  return (PRUNTIME_FUNCTION)(p - gc::SystemPageSize());
+  return (PRUNTIME_FUNCTION)(p - gc::SystemPageSize() +
+                             offsetof(ExceptionHandlerRecord, runtimeFunction));
 }
 #endif

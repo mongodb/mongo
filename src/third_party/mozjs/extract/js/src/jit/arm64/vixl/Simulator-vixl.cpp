@@ -1,4 +1,4 @@
-// Copyright 2015, ARM Limited
+// Copyright 2015, VIXL authors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -1264,160 +1264,538 @@ void Simulator::PrintExclusiveAccessWarning() {
   }
 }
 
-
-void Simulator::VisitLoadStoreExclusive(const Instruction* instr) {
-  PrintExclusiveAccessWarning();
-
+template <typename T>
+void Simulator::CompareAndSwapHelper(const Instruction* instr) {
   unsigned rs = instr->Rs();
   unsigned rt = instr->Rt();
-  unsigned rt2 = instr->Rt2();
   unsigned rn = instr->Rn();
 
-  LoadStoreExclusive op =
-      static_cast<LoadStoreExclusive>(instr->Mask(LoadStoreExclusiveMask));
-
-  bool is_acquire_release = instr->LdStXAcquireRelease();
-  bool is_exclusive = !instr->LdStXNotExclusive();
-  bool is_load = instr->LdStXLoad();
-  bool is_pair = instr->LdStXPair();
-
-  unsigned element_size = 1 << instr->LdStXSizeLog2();
-  unsigned access_size = is_pair ? element_size * 2 : element_size;
+  unsigned element_size = sizeof(T);
   uint64_t address = reg<uint64_t>(rn, Reg31IsStackPointer);
 
   // Verify that the address is available to the host.
   VIXL_ASSERT(address == static_cast<uintptr_t>(address));
 
-  // Check the alignment of `address`.
-  if (AlignDown(address, access_size) != address) {
-    VIXL_ALIGNMENT_EXCEPTION();
+  address = Memory::AddressUntag(address);
+  if (handle_wasm_seg_fault(address, element_size))
+    return;
+
+  bool is_acquire = instr->Bit(22) == 1;
+  bool is_release = instr->Bit(15) == 1;
+
+  T comparevalue = reg<T>(rs);
+  T newvalue = reg<T>(rt);
+
+  // The architecture permits that the data read clears any exclusive monitors
+  // associated with that location, even if the compare subsequently fails.
+  local_monitor_.Clear();
+
+  T data = Memory::Read<T>(address);
+  if (is_acquire) {
+    // Approximate load-acquire by issuing a full barrier after the load.
+    __sync_synchronize();
   }
 
-  // The sp must be aligned to 16 bytes when it is accessed.
-  if ((rn == 31) && (AlignDown(address, 16) != address)) {
-    VIXL_ALIGNMENT_EXCEPTION();
-  }
-
-  if (is_load) {
-    if (is_exclusive) {
-      local_monitor_.MarkExclusive(address, access_size);
-    } else {
-      // Any non-exclusive load can clear the local monitor as a side effect. We
-      // don't need to do this, but it is useful to stress the simulated code.
-      local_monitor_.Clear();
-    }
-
-    // Use NoRegLog to suppress the register trace (LOG_REGS, LOG_FP_REGS). We
-    // will print a more detailed log.
-    switch (op) {
-      case LDXRB_w:
-      case LDAXRB_w:
-      case LDARB_w:
-        set_wreg(rt, Read<uint8_t>(address), NoRegLog);
-        break;
-      case LDXRH_w:
-      case LDAXRH_w:
-      case LDARH_w:
-        set_wreg(rt, Read<uint16_t>(address), NoRegLog);
-        break;
-      case LDXR_w:
-      case LDAXR_w:
-      case LDAR_w:
-        set_wreg(rt, Read<uint32_t>(address), NoRegLog);
-        break;
-      case LDXR_x:
-      case LDAXR_x:
-      case LDAR_x:
-        set_xreg(rt, Read<uint64_t>(address), NoRegLog);
-        break;
-      case LDXP_w:
-      case LDAXP_w:
-        set_wreg(rt, Read<uint32_t>(address), NoRegLog);
-        set_wreg(rt2, Read<uint32_t>(address + element_size), NoRegLog);
-        break;
-      case LDXP_x:
-      case LDAXP_x:
-        set_xreg(rt, Read<uint64_t>(address), NoRegLog);
-        set_xreg(rt2, Read<uint64_t>(address + element_size), NoRegLog);
-        break;
-      default:
-        VIXL_UNREACHABLE();
-    }
-
-    if (is_acquire_release) {
-      // Approximate load-acquire by issuing a full barrier after the load.
-      js::jit::AtomicOperations::fenceSeqCst();
-    }
-
-    LogRead(address, rt, GetPrintRegisterFormatForSize(element_size));
-    if (is_pair) {
-      LogRead(address + element_size, rt2,
-              GetPrintRegisterFormatForSize(element_size));
-    }
-  } else {
-    if (is_acquire_release) {
+  if (data == comparevalue) {
+    if (is_release) {
       // Approximate store-release by issuing a full barrier before the store.
-      js::jit::AtomicOperations::fenceSeqCst();
+      __sync_synchronize();
+    }
+    Memory::Write<T>(address, newvalue);
+    LogWrite(address, rt, GetPrintRegisterFormatForSize(element_size));
+  }
+  set_reg<T>(rs, data);
+  LogRead(address, rs, GetPrintRegisterFormatForSize(element_size));
+}
+
+template <typename T>
+void Simulator::CompareAndSwapPairHelper(const Instruction* instr) {
+  VIXL_ASSERT((sizeof(T) == 4) || (sizeof(T) == 8));
+  unsigned rs = instr->Rs();
+  unsigned rt = instr->Rt();
+  unsigned rn = instr->Rn();
+
+  VIXL_ASSERT((rs % 2 == 0) && (rs % 2 == 0));
+
+  unsigned element_size = sizeof(T);
+  uint64_t address = reg<uint64_t>(rn, Reg31IsStackPointer);
+
+  // Verify that the address is available to the host.
+  VIXL_ASSERT(address == static_cast<uintptr_t>(address));
+
+  address = Memory::AddressUntag(address);
+  if (handle_wasm_seg_fault(address, element_size))
+    return;
+
+  uint64_t address2 = address + element_size;
+
+  bool is_acquire = instr->Bit(22) == 1;
+  bool is_release = instr->Bit(15) == 1;
+
+  T comparevalue_high = reg<T>(rs + 1);
+  T comparevalue_low = reg<T>(rs);
+  T newvalue_high = reg<T>(rt + 1);
+  T newvalue_low = reg<T>(rt);
+
+  // The architecture permits that the data read clears any exclusive monitors
+  // associated with that location, even if the compare subsequently fails.
+  local_monitor_.Clear();
+
+  T data_high = Memory::Read<T>(address);
+  T data_low = Memory::Read<T>(address2);
+
+  if (is_acquire) {
+    // Approximate load-acquire by issuing a full barrier after the load.
+    __sync_synchronize();
+  }
+
+  bool same =
+      (data_high == comparevalue_high) && (data_low == comparevalue_low);
+  if (same) {
+    if (is_release) {
+      // Approximate store-release by issuing a full barrier before the store.
+      __sync_synchronize();
     }
 
-    bool do_store = true;
-    if (is_exclusive) {
-      do_store = local_monitor_.IsExclusive(address, access_size) &&
-                 global_monitor_.IsExclusive(address, access_size);
-      set_wreg(rs, do_store ? 0 : 1);
+    Memory::Write<T>(address, newvalue_high);
+    Memory::Write<T>(address2, newvalue_low);
+  }
 
-      //  - All exclusive stores explicitly clear the local monitor.
-      local_monitor_.Clear();
-    } else {
-      //  - Any other store can clear the local monitor as a side effect.
-      local_monitor_.MaybeClear();
-    }
+  set_reg<T>(rs + 1, data_high);
+  set_reg<T>(rs, data_low);
 
-    if (do_store) {
-      switch (op) {
-        case STXRB_w:
-        case STLXRB_w:
-        case STLRB_w:
-          Write<uint8_t>(address, wreg(rt));
-          break;
-        case STXRH_w:
-        case STLXRH_w:
-        case STLRH_w:
-          Write<uint16_t>(address, wreg(rt));
-          break;
-        case STXR_w:
-        case STLXR_w:
-        case STLR_w:
-          Write<uint32_t>(address, wreg(rt));
-          break;
-        case STXR_x:
-        case STLXR_x:
-        case STLR_x:
-          Write<uint64_t>(address, xreg(rt));
-          break;
-        case STXP_w:
-        case STLXP_w:
-          Write<uint32_t>(address, wreg(rt));
-          Write<uint32_t>(address + element_size, wreg(rt2));
-          break;
-        case STXP_x:
-        case STLXP_x:
-          Write<uint64_t>(address, xreg(rt));
-          Write<uint64_t>(address + element_size, xreg(rt2));
-          break;
-        default:
-          VIXL_UNREACHABLE();
-      }
+  LogRead(address, rs + 1, GetPrintRegisterFormatForSize(element_size));
+  LogRead(address2, rs, GetPrintRegisterFormatForSize(element_size));
 
-      LogWrite(address, rt, GetPrintRegisterFormatForSize(element_size));
-      if (is_pair) {
-        LogWrite(address + element_size, rt2,
-                 GetPrintRegisterFormatForSize(element_size));
-      }
-    }
+  if (same) {
+    LogWrite(address, rt + 1, GetPrintRegisterFormatForSize(element_size));
+    LogWrite(address2, rt, GetPrintRegisterFormatForSize(element_size));
   }
 }
 
+void Simulator::VisitLoadStoreExclusive(const Instruction* instr) {
+  LoadStoreExclusive op =
+      static_cast<LoadStoreExclusive>(instr->Mask(LoadStoreExclusiveMask));
+
+  switch (op) {
+    case CAS_w:
+    case CASA_w:
+    case CASL_w:
+    case CASAL_w:
+      CompareAndSwapHelper<uint32_t>(instr);
+      break;
+    case CAS_x:
+    case CASA_x:
+    case CASL_x:
+    case CASAL_x:
+      CompareAndSwapHelper<uint64_t>(instr);
+      break;
+    case CASB:
+    case CASAB:
+    case CASLB:
+    case CASALB:
+      CompareAndSwapHelper<uint8_t>(instr);
+      break;
+    case CASH:
+    case CASAH:
+    case CASLH:
+    case CASALH:
+      CompareAndSwapHelper<uint16_t>(instr);
+      break;
+    case CASP_w:
+    case CASPA_w:
+    case CASPL_w:
+    case CASPAL_w:
+      CompareAndSwapPairHelper<uint32_t>(instr);
+      break;
+    case CASP_x:
+    case CASPA_x:
+    case CASPL_x:
+    case CASPAL_x:
+      CompareAndSwapPairHelper<uint64_t>(instr);
+      break;
+    default:
+      PrintExclusiveAccessWarning();
+
+      unsigned rs = instr->Rs();
+      unsigned rt = instr->Rt();
+      unsigned rt2 = instr->Rt2();
+      unsigned rn = instr->Rn();
+
+      bool is_exclusive = !instr->LdStXNotExclusive();
+      bool is_acquire_release = !is_exclusive || instr->LdStXAcquireRelease();
+      bool is_load = instr->LdStXLoad();
+      bool is_pair = instr->LdStXPair();
+
+      unsigned element_size = 1 << instr->LdStXSizeLog2();
+      unsigned access_size = is_pair ? element_size * 2 : element_size;
+      uint64_t address = reg<uint64_t>(rn, Reg31IsStackPointer);
+
+      // Verify that the address is available to the host.
+      VIXL_ASSERT(address == static_cast<uintptr_t>(address));
+
+      // Check the alignment of `address`.
+      if (AlignDown(address, access_size) != address) {
+        VIXL_ALIGNMENT_EXCEPTION();
+      }
+
+      // The sp must be aligned to 16 bytes when it is accessed.
+      if ((rn == 31) && (AlignDown(address, 16) != address)) {
+        VIXL_ALIGNMENT_EXCEPTION();
+      }
+
+      if (is_load) {
+        if (is_exclusive) {
+          local_monitor_.MarkExclusive(address, access_size);
+        } else {
+          // Any non-exclusive load can clear the local monitor as a side
+          // effect. We don't need to do this, but it is useful to stress the
+          // simulated code.
+          local_monitor_.Clear();
+        }
+
+        // Use NoRegLog to suppress the register trace (LOG_REGS, LOG_FP_REGS).
+        // We will print a more detailed log.
+        switch (op) {
+          case LDXRB_w:
+          case LDAXRB_w:
+          case LDARB_w:
+            set_wreg(rt, Read<uint8_t>(address), NoRegLog);
+            break;
+          case LDXRH_w:
+          case LDAXRH_w:
+          case LDARH_w:
+            set_wreg(rt, Read<uint16_t>(address), NoRegLog);
+            break;
+          case LDXR_w:
+          case LDAXR_w:
+          case LDAR_w:
+            set_wreg(rt, Read<uint32_t>(address), NoRegLog);
+            break;
+          case LDXR_x:
+          case LDAXR_x:
+          case LDAR_x:
+            set_xreg(rt, Read<uint64_t>(address), NoRegLog);
+            break;
+          case LDXP_w:
+          case LDAXP_w:
+            set_wreg(rt, Read<uint32_t>(address), NoRegLog);
+            set_wreg(rt2, Read<uint32_t>(address + element_size), NoRegLog);
+            break;
+          case LDXP_x:
+          case LDAXP_x:
+            set_xreg(rt, Read<uint64_t>(address), NoRegLog);
+            set_xreg(rt2, Read<uint64_t>(address + element_size), NoRegLog);
+            break;
+          default:
+            VIXL_UNREACHABLE();
+        }
+
+        if (is_acquire_release) {
+          // Approximate load-acquire by issuing a full barrier after the load.
+          js::jit::AtomicOperations::fenceSeqCst();
+        }
+
+        LogRead(address, rt, GetPrintRegisterFormatForSize(element_size));
+        if (is_pair) {
+          LogRead(address + element_size, rt2,
+                  GetPrintRegisterFormatForSize(element_size));
+        }
+      } else {
+        if (is_acquire_release) {
+          // Approximate store-release by issuing a full barrier before the
+          // store.
+          js::jit::AtomicOperations::fenceSeqCst();
+        }
+
+        bool do_store = true;
+        if (is_exclusive) {
+          do_store = local_monitor_.IsExclusive(address, access_size) &&
+                     global_monitor_.IsExclusive(address, access_size);
+          set_wreg(rs, do_store ? 0 : 1);
+
+          //  - All exclusive stores explicitly clear the local monitor.
+          local_monitor_.Clear();
+        } else {
+          //  - Any other store can clear the local monitor as a side effect.
+          local_monitor_.MaybeClear();
+        }
+
+        if (do_store) {
+          switch (op) {
+            case STXRB_w:
+            case STLXRB_w:
+            case STLRB_w:
+              Write<uint8_t>(address, wreg(rt));
+              break;
+            case STXRH_w:
+            case STLXRH_w:
+            case STLRH_w:
+              Write<uint16_t>(address, wreg(rt));
+              break;
+            case STXR_w:
+            case STLXR_w:
+            case STLR_w:
+              Write<uint32_t>(address, wreg(rt));
+              break;
+            case STXR_x:
+            case STLXR_x:
+            case STLR_x:
+              Write<uint64_t>(address, xreg(rt));
+              break;
+            case STXP_w:
+            case STLXP_w:
+              Write<uint32_t>(address, wreg(rt));
+              Write<uint32_t>(address + element_size, wreg(rt2));
+              break;
+            case STXP_x:
+            case STLXP_x:
+              Write<uint64_t>(address, xreg(rt));
+              Write<uint64_t>(address + element_size, xreg(rt2));
+              break;
+            default:
+              VIXL_UNREACHABLE();
+          }
+
+          LogWrite(address, rt, GetPrintRegisterFormatForSize(element_size));
+          if (is_pair) {
+            LogWrite(address + element_size, rt2,
+                     GetPrintRegisterFormatForSize(element_size));
+          }
+        }
+      }
+  }
+}
+
+template <typename T>
+void Simulator::AtomicMemorySimpleHelper(const Instruction* instr) {
+  unsigned rs = instr->Rs();
+  unsigned rt = instr->Rt();
+  unsigned rn = instr->Rn();
+
+  bool is_acquire = (instr->Bit(23) == 1) && (rt != kZeroRegCode);
+  bool is_release = instr->Bit(22) == 1;
+
+  unsigned element_size = sizeof(T);
+  uint64_t address = reg<uint64_t>(rn, Reg31IsStackPointer);
+
+  // Verify that the address is available to the host.
+  VIXL_ASSERT(address == static_cast<uintptr_t>(address));
+
+  address = Memory::AddressUntag(address);
+  if (handle_wasm_seg_fault(address, sizeof(T)))
+    return;
+
+  T value = reg<T>(rs);
+
+  T data = Memory::Read<T>(address);
+
+  if (is_acquire) {
+    // Approximate load-acquire by issuing a full barrier after the load.
+    __sync_synchronize();
+  }
+
+  T result = 0;
+  switch (instr->Mask(AtomicMemorySimpleOpMask)) {
+    case LDADDOp:
+      result = data + value;
+      break;
+    case LDCLROp:
+      VIXL_ASSERT(!std::numeric_limits<T>::is_signed);
+      result = data & ~value;
+      break;
+    case LDEOROp:
+      VIXL_ASSERT(!std::numeric_limits<T>::is_signed);
+      result = data ^ value;
+      break;
+    case LDSETOp:
+      VIXL_ASSERT(!std::numeric_limits<T>::is_signed);
+      result = data | value;
+      break;
+
+    // Signed/Unsigned difference is done via the templated type T.
+    case LDSMAXOp:
+    case LDUMAXOp:
+      result = (data > value) ? data : value;
+      break;
+    case LDSMINOp:
+    case LDUMINOp:
+      result = (data > value) ? value : data;
+      break;
+  }
+
+  if (is_release) {
+    // Approximate store-release by issuing a full barrier before the store.
+    __sync_synchronize();
+  }
+
+  Memory::Write<T>(address, result);
+  set_reg<T>(rt, data, NoRegLog);
+
+  LogRead(address, rt, GetPrintRegisterFormatForSize(element_size));
+  LogWrite(address, rs, GetPrintRegisterFormatForSize(element_size));
+}
+
+template <typename T>
+void Simulator::AtomicMemorySwapHelper(const Instruction* instr) {
+  unsigned rs = instr->Rs();
+  unsigned rt = instr->Rt();
+  unsigned rn = instr->Rn();
+
+  bool is_acquire = (instr->Bit(23) == 1) && (rt != kZeroRegCode);
+  bool is_release = instr->Bit(22) == 1;
+
+  unsigned element_size = sizeof(T);
+  uint64_t address = reg<uint64_t>(rn, Reg31IsStackPointer);
+
+  // Verify that the address is available to the host.
+  VIXL_ASSERT(address == static_cast<uintptr_t>(address));
+
+  address = Memory::AddressUntag(address);
+  if (handle_wasm_seg_fault(address, sizeof(T)))
+    return;
+
+  T data = Memory::Read<T>(address);
+  if (is_acquire) {
+    // Approximate load-acquire by issuing a full barrier after the load.
+    __sync_synchronize();
+  }
+
+  if (is_release) {
+    // Approximate store-release by issuing a full barrier before the store.
+    __sync_synchronize();
+  }
+  Memory::Write<T>(address, reg<T>(rs));
+
+  set_reg<T>(rt, data);
+
+  LogRead(address, rt, GetPrintRegisterFormat(element_size));
+  LogWrite(address, rs, GetPrintRegisterFormat(element_size));
+}
+
+template <typename T>
+void Simulator::LoadAcquireRCpcHelper(const Instruction* instr) {
+  unsigned rt = instr->Rt();
+  unsigned rn = instr->Rn();
+
+  unsigned element_size = sizeof(T);
+  uint64_t address = reg<uint64_t>(rn, Reg31IsStackPointer);
+
+  // Verify that the address is available to the host.
+  VIXL_ASSERT(address == static_cast<uintptr_t>(address));
+
+  address = Memory::AddressUntag(address);
+  if (handle_wasm_seg_fault(address, sizeof(T)))
+    return;
+
+  set_reg<T>(rt, Memory::Read<T>(address));
+
+  // Approximate load-acquire by issuing a full barrier after the load.
+  __sync_synchronize();
+
+  LogRead(address, rt, GetPrintRegisterFormat(element_size));
+}
+
+#define ATOMIC_MEMORY_SIMPLE_UINT_LIST(V) \
+  V(LDADD)                                \
+  V(LDCLR)                                \
+  V(LDEOR)                                \
+  V(LDSET)                                \
+  V(LDUMAX)                               \
+  V(LDUMIN)
+
+#define ATOMIC_MEMORY_SIMPLE_INT_LIST(V) \
+  V(LDSMAX)                              \
+  V(LDSMIN)
+
+void Simulator::VisitAtomicMemory(const Instruction* instr) {
+  switch (instr->Mask(AtomicMemoryMask)) {
+// clang-format off
+#define SIM_FUNC_B(A) \
+    case A##B:        \
+    case A##AB:       \
+    case A##LB:       \
+    case A##ALB:
+#define SIM_FUNC_H(A) \
+    case A##H:        \
+    case A##AH:       \
+    case A##LH:       \
+    case A##ALH:
+#define SIM_FUNC_w(A) \
+    case A##_w:       \
+    case A##A_w:      \
+    case A##L_w:      \
+    case A##AL_w:
+#define SIM_FUNC_x(A) \
+    case A##_x:       \
+    case A##A_x:      \
+    case A##L_x:      \
+    case A##AL_x:
+
+    ATOMIC_MEMORY_SIMPLE_UINT_LIST(SIM_FUNC_B)
+      AtomicMemorySimpleHelper<uint8_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_INT_LIST(SIM_FUNC_B)
+      AtomicMemorySimpleHelper<int8_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_UINT_LIST(SIM_FUNC_H)
+      AtomicMemorySimpleHelper<uint16_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_INT_LIST(SIM_FUNC_H)
+      AtomicMemorySimpleHelper<int16_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_UINT_LIST(SIM_FUNC_w)
+      AtomicMemorySimpleHelper<uint32_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_INT_LIST(SIM_FUNC_w)
+      AtomicMemorySimpleHelper<int32_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_UINT_LIST(SIM_FUNC_x)
+      AtomicMemorySimpleHelper<uint64_t>(instr);
+      break;
+    ATOMIC_MEMORY_SIMPLE_INT_LIST(SIM_FUNC_x)
+      AtomicMemorySimpleHelper<int64_t>(instr);
+      break;
+      // clang-format on
+
+    case SWPB:
+    case SWPAB:
+    case SWPLB:
+    case SWPALB:
+      AtomicMemorySwapHelper<uint8_t>(instr);
+      break;
+    case SWPH:
+    case SWPAH:
+    case SWPLH:
+    case SWPALH:
+      AtomicMemorySwapHelper<uint16_t>(instr);
+      break;
+    case SWP_w:
+    case SWPA_w:
+    case SWPL_w:
+    case SWPAL_w:
+      AtomicMemorySwapHelper<uint32_t>(instr);
+      break;
+    case SWP_x:
+    case SWPA_x:
+    case SWPL_x:
+    case SWPAL_x:
+      AtomicMemorySwapHelper<uint64_t>(instr);
+      break;
+    case LDAPRB:
+      LoadAcquireRCpcHelper<uint8_t>(instr);
+      break;
+    case LDAPRH:
+      LoadAcquireRCpcHelper<uint16_t>(instr);
+      break;
+    case LDAPR_w:
+      LoadAcquireRCpcHelper<uint32_t>(instr);
+      break;
+    case LDAPR_x:
+      LoadAcquireRCpcHelper<uint64_t>(instr);
+      break;
+  }
+}
 
 void Simulator::VisitLoadLiteral(const Instruction* instr) {
   unsigned rt = instr->Rt();

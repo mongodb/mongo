@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/GlobalObject.cpp"
+#include "vm/RegExpObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/GlobalObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/RegExpObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/GlobalObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/RegExpObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/HelperThreads.cpp"
+#include "vm/RegExpStatics.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/HelperThreads.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/RegExpStatics.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/HelperThreads.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/RegExpStatics.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Id.cpp"
+#include "vm/Runtime.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Id.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Runtime.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Id.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Runtime.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Initialization.cpp"
+#include "vm/SavedStacks.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Initialization.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SavedStacks.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Initialization.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SavedStacks.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/InternalThreadPool.cpp"
+#include "vm/Scope.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/InternalThreadPool.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Scope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/InternalThreadPool.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Scope.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Iteration.cpp"
+#include "vm/SelfHosting.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Iteration.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SelfHosting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Iteration.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SelfHosting.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

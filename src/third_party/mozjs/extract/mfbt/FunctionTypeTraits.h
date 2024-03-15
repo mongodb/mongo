@@ -4,8 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* Helpers to manipulate function types that don't fit in TypeTraits.h */
-
 #ifndef mozilla_FunctionTypeTraits_h
 #define mozilla_FunctionTypeTraits_h
 

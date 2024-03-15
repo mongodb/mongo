@@ -8,7 +8,7 @@
 
 #include "jit/JitSpewer.h"
 #include "jit/Label.h"
-#include "vm/Printer.h"
+#include "js/Printer.h"
 
 using namespace js::jit;
 

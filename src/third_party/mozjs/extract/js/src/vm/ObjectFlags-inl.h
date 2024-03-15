@@ -9,10 +9,11 @@
 
 #include "vm/ObjectFlags.h"
 
+#include "builtin/Array.h"
+#include "vm/JSAtomState.h"
+#include "vm/JSContext.h"
 #include "vm/PlainObject.h"
 #include "vm/PropertyInfo.h"
-#include "vm/PropertyKey.h"
-#include "vm/Shape.h"
 
 namespace js {
 
@@ -29,6 +30,10 @@ GetObjectFlagsForNewProperty(const JSClass* clasp, ObjectFlags flags, jsid id,
   if ((!propFlags.isDataProperty() || !propFlags.writable()) &&
       clasp == &PlainObject::class_ && !id.isAtom(cx->names().proto)) {
     flags.setFlag(ObjectFlag::HasNonWritableOrAccessorPropExclProto);
+  }
+
+  if (propFlags.enumerable()) {
+    flags.setFlag(ObjectFlag::HasEnumerable);
   }
 
   return flags;

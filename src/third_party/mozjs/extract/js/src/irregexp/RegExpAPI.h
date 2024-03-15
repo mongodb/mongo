@@ -11,38 +11,66 @@
 
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/Range.h"
 
-#include "frontend/TokenStream.h"
+#include <stddef.h>
+#include <stdint.h>
+
+#include "jstypes.h"
+
 #include "irregexp/RegExpTypes.h"
-#include "vm/JSContext.h"
+#include "js/Stack.h"  // JS::NativeStackLimit
 #include "vm/RegExpShared.h"
 
+struct JS_PUBLIC_API JSContext;
+class JS_PUBLIC_API JSTracer;
+
+namespace JS {
+class RegExpFlags;
+}
+
+namespace v8::internal {
+class RegExpStack;
+}
+
 namespace js {
+
+class VectorMatchPairs;
+class LifoAlloc;
+
+namespace frontend {
+class TokenStreamAnyChars;
+}
+
 namespace irregexp {
 
 Isolate* CreateIsolate(JSContext* cx);
+void TraceIsolate(JSTracer* trc, Isolate* isolate);
 void DestroyIsolate(Isolate* isolate);
 
 size_t IsolateSizeOfIncludingThis(Isolate* isolate,
                                   mozilla::MallocSizeOf mallocSizeOf);
 
-bool CheckPatternSyntax(JSContext* cx, frontend::TokenStreamAnyChars& ts,
+bool CheckPatternSyntax(js::LifoAlloc& alloc, JS::NativeStackLimit stackLimit,
+                        frontend::TokenStreamAnyChars& ts,
                         const mozilla::Range<const char16_t> chars,
                         JS::RegExpFlags flags,
                         mozilla::Maybe<uint32_t> line = mozilla::Nothing(),
                         mozilla::Maybe<uint32_t> column = mozilla::Nothing());
-bool CheckPatternSyntax(JSContext* cx, frontend::TokenStreamAnyChars& ts,
-                        HandleAtom pattern, JS::RegExpFlags flags);
+bool CheckPatternSyntax(JSContext* cx, JS::NativeStackLimit stackLimit,
+                        frontend::TokenStreamAnyChars& ts,
+                        Handle<JSAtom*> pattern, JS::RegExpFlags flags);
 
 bool CompilePattern(JSContext* cx, MutableHandleRegExpShared re,
-                    HandleLinearString input, RegExpShared::CodeKind codeKind);
+                    Handle<JSLinearString*> input,
+                    RegExpShared::CodeKind codeKind);
 
 RegExpRunStatus Execute(JSContext* cx, MutableHandleRegExpShared re,
-                        HandleLinearString input, size_t start,
+                        Handle<JSLinearString*> input, size_t start,
                         VectorMatchPairs* matches);
 
-RegExpRunStatus ExecuteForFuzzing(JSContext* cx, HandleAtom pattern,
-                                  HandleLinearString input,
+RegExpRunStatus ExecuteForFuzzing(JSContext* cx, Handle<JSAtom*> pattern,
+                                  Handle<JSLinearString*> input,
                                   JS::RegExpFlags flags, size_t startIndex,
                                   VectorMatchPairs* matches,
                                   RegExpShared::CodeKind codeKind);
@@ -55,6 +83,8 @@ uint32_t CaseInsensitiveCompareNonUnicode(const char16_t* substring1,
 uint32_t CaseInsensitiveCompareUnicode(const char16_t* substring1,
                                        const char16_t* substring2,
                                        size_t byteLength);
+bool IsCharacterInRangeArray(uint32_t c, ByteArrayData* ranges);
+
 #ifdef DEBUG
 bool IsolateShouldSimulateInterrupt(Isolate* isolate);
 void IsolateSetShouldSimulateInterrupt(Isolate* isolate);

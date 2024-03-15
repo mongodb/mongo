@@ -9,10 +9,7 @@
 
 #include "mozilla/DebugOnly.h"
 
-#include "ds/BitArray.h"
 #include "gc/AllocKind.h"
-#include "gc/GCEnum.h"
-#include "gc/Memory.h"
 #include "gc/Pretenuring.h"
 #include "js/HeapAPI.h"
 #include "js/TypeDecls.h"
@@ -23,7 +20,10 @@ namespace js {
 class AutoLockGC;
 class AutoLockGCBgAlloc;
 class Nursery;
-class NurseryDecommitTask;
+
+// To prevent false sharing, some data structures are aligned to a typical cache
+// line size.
+static constexpr size_t TypicalCacheLineSize = 64;
 
 namespace gc {
 
@@ -33,7 +33,6 @@ class ArenaList;
 class GCRuntime;
 class MarkingValidator;
 class SortedArenaList;
-class StoreBuffer;
 class TenuredCell;
 
 // Cells are aligned to CellAlignShift, so the largest tagged null pointer is:
@@ -203,7 +202,7 @@ class alignas(ArenaSize) Arena {
   /*
    * True until the arena is swept for the first time.
    */
-  size_t isNewlyCreated : 1;
+  size_t isNewlyCreated_ : 1;
 
   /*
    * When recursive marking uses too much stack we delay marking of arenas and
@@ -343,28 +342,32 @@ class alignas(ArenaSize) Arena {
   size_t countFreeCells() { return numFreeThings(getThingSize()); }
   size_t countUsedCells() { return getThingsPerArena() - countFreeCells(); }
 
+#ifdef DEBUG
   bool inFreeList(uintptr_t thing) {
     uintptr_t base = address();
     const FreeSpan* span = &firstFreeSpan;
     for (; !span->isEmpty(); span = span->nextSpan(this)) {
-      /* If the thing comes before the current span, it's not free. */
+      // If the thing comes before the current span, it's not free.
       if (thing < base + span->first) {
         return false;
       }
 
-      /* If we find it before the end of the span, it's free. */
+      // If we find it before the end of the span, it's free.
       if (thing <= base + span->last) {
         return true;
       }
     }
     return false;
   }
+#endif
 
   static bool isAligned(uintptr_t thing, size_t thingSize) {
     /* Things ends at the arena end. */
     uintptr_t tailOffset = ArenaSize - (thing & ArenaMask);
     return tailOffset % thingSize == 0;
   }
+
+  bool isNewlyCreated() const { return isNewlyCreated_; }
 
   bool onDelayedMarkingList() const { return onDelayedMarkingList_; }
 
@@ -423,7 +426,7 @@ class alignas(ArenaSize) Arena {
   inline size_t& atomBitmapStart();
 
   template <typename T>
-  size_t finalize(JSFreeOp* fop, AllocKind thingKind, size_t thingSize);
+  size_t finalize(JS::GCContext* gcx, AllocKind thingKind, size_t thingSize);
 
   static void staticAsserts();
   static void checkLookupTables();
@@ -516,6 +519,16 @@ MOZ_ALWAYS_INLINE bool MarkBitmap::isMarkedGray(const TenuredCell* cell) {
          markBit(cell, ColorBit::GrayOrBlackBit);
 }
 
+// The following methods that update the mark bits are not thread safe and must
+// not be called in parallel with each other.
+//
+// They use separate read and write operations to avoid an unnecessarily strict
+// atomic update on the marking bitmap.
+//
+// They may be called in parallel with read operations on the mark bitmap where
+// there is no required ordering between the operations. This happens when gray
+// unmarking occurs in parallel with background sweeping.
+
 // The return value indicates if the cell went from unmarked to marked.
 MOZ_ALWAYS_INLINE bool MarkBitmap::markIfUnmarked(const TenuredCell* cell,
                                                   MarkColor color) {
@@ -526,12 +539,38 @@ MOZ_ALWAYS_INLINE bool MarkBitmap::markIfUnmarked(const TenuredCell* cell,
     return false;
   }
   if (color == MarkColor::Black) {
+    uintptr_t bits = *word;
+    *word = bits | mask;
+  } else {
+    // We use getMarkWordAndMask to recalculate both mask and word as doing just
+    // mask << color may overflow the mask.
+    getMarkWordAndMask(cell, ColorBit::GrayOrBlackBit, &word, &mask);
+    if (*word & mask) {
+      return false;
+    }
+    uintptr_t bits = *word;
+    *word = bits | mask;
+  }
+  return true;
+}
+
+MOZ_ALWAYS_INLINE bool MarkBitmap::markIfUnmarkedAtomic(const TenuredCell* cell,
+                                                        MarkColor color) {
+  // This version of the method is safe in the face of concurrent writes to the
+  // mark bitmap but may return false positives. The extra synchronisation
+  // necessary to avoid this resulted in worse performance overall.
+
+  MarkBitmapWord* word;
+  uintptr_t mask;
+  getMarkWordAndMask(cell, ColorBit::BlackBit, &word, &mask);
+  if (*word & mask) {
+    return false;
+  }
+  if (color == MarkColor::Black) {
     *word |= mask;
   } else {
-    /*
-     * We use getMarkWordAndMask to recalculate both mask and word as
-     * doing just mask << color may overflow the mask.
-     */
+    // We use getMarkWordAndMask to recalculate both mask and word as doing just
+    // mask << color may overflow the mask.
     getMarkWordAndMask(cell, ColorBit::GrayOrBlackBit, &word, &mask);
     if (*word & mask) {
       return false;
@@ -542,6 +581,14 @@ MOZ_ALWAYS_INLINE bool MarkBitmap::markIfUnmarked(const TenuredCell* cell,
 }
 
 MOZ_ALWAYS_INLINE void MarkBitmap::markBlack(const TenuredCell* cell) {
+  MarkBitmapWord* word;
+  uintptr_t mask;
+  getMarkWordAndMask(cell, ColorBit::BlackBit, &word, &mask);
+  uintptr_t bits = *word;
+  *word = bits | mask;
+}
+
+MOZ_ALWAYS_INLINE void MarkBitmap::markBlackAtomic(const TenuredCell* cell) {
   MarkBitmapWord* word;
   uintptr_t mask;
   getMarkWordAndMask(cell, ColorBit::BlackBit, &word, &mask);
@@ -560,25 +607,24 @@ MOZ_ALWAYS_INLINE void MarkBitmap::copyMarkBit(TenuredCell* dst,
   uintptr_t dstMask;
   getMarkWordAndMask(dst, colorBit, &dstWord, &dstMask);
 
-  *dstWord &= ~dstMask;
+  uintptr_t bits = *dstWord;
+  bits &= ~dstMask;
   if (*srcWord & srcMask) {
-    *dstWord |= dstMask;
+    bits |= dstMask;
   }
+  *dstWord = bits;
 }
 
 MOZ_ALWAYS_INLINE void MarkBitmap::unmark(const TenuredCell* cell) {
   MarkBitmapWord* word;
   uintptr_t mask;
+  uintptr_t bits;
   getMarkWordAndMask(cell, ColorBit::BlackBit, &word, &mask);
-  *word &= ~mask;
+  bits = *word;
+  *word = bits & ~mask;
   getMarkWordAndMask(cell, ColorBit::GrayOrBlackBit, &word, &mask);
-  *word &= ~mask;
-}
-
-inline void MarkBitmap::clear() {
-  for (size_t i = 0; i < MarkBitmap::WordCount; i++) {
-    bitmap[i] = 0;
-  }
+  bits = *word;
+  *word = bits & ~mask;
 }
 
 inline MarkBitmapWord* MarkBitmap::arenaBits(Arena* arena) {
@@ -619,7 +665,8 @@ class TenuredChunk : public TenuredChunkBase {
     return offset >= offsetof(TenuredChunk, arenas) && offset < ChunkSize;
   }
 
-  static size_t arenaIndex(uintptr_t addr) {
+  static size_t arenaIndex(const Arena* arena) {
+    uintptr_t addr = arena->address();
     MOZ_ASSERT(!TenuredChunk::fromAddress(addr)->isNurseryChunk());
     MOZ_ASSERT(withinValidRange(addr));
     uintptr_t offset = addr & ChunkMask;
@@ -655,37 +702,29 @@ class TenuredChunk : public TenuredChunkBase {
   // system call for each arena but is only used during OOM.
   void decommitFreeArenasWithoutUnlocking(const AutoLockGC& lock);
 
-  static TenuredChunk* allocate(GCRuntime* gc);
-  void init(GCRuntime* gc);
+  static void* allocate(GCRuntime* gc);
+  static TenuredChunk* emplace(void* ptr, GCRuntime* gc,
+                               bool allMemoryCommitted);
 
   /* Unlink and return the freeArenasHead. */
   Arena* fetchNextFreeArena(GCRuntime* gc);
 
 #ifdef DEBUG
   void verify() const;
+#else
+  void verify() const {}
 #endif
 
  private:
-  /* Search for a decommitted page to allocate. */
-  unsigned findDecommittedPageOffset();
   void commitOnePage(GCRuntime* gc);
-
-  void addArenaToFreeList(GCRuntime* gc, Arena* arena);
-
-  // Add Arenas located in the page of pageIndex to the free list.
-  void addArenasInPageToFreeList(GCRuntime* gc, size_t pageIndex);
-  // Mark areans located in the same page of arena as decommitted.
-  void markArenasInPageDecommitted(size_t pageIndex);
 
   void updateChunkListAfterAlloc(GCRuntime* gc, const AutoLockGC& lock);
   void updateChunkListAfterFree(GCRuntime* gc, size_t numArenasFree,
                                 const AutoLockGC& lock);
 
-  // Rebuild info.freeArenasHead by ascending order of arenas' address.
-  void rebuildFreeArenasList();
+  // Check if all arenas in a page are free.
+  bool canDecommitPage(size_t pageIndex) const;
 
-  // Check if the page is free.
-  bool isPageFree(size_t pageIndex) const;
   // Check the arena from freeArenasList is located in a free page.
   // Unlike the isPageFree(size_t) version, this isPageFree(Arena*) will see the
   // following arenas from the freeArenasHead are also located in the same page,
@@ -695,7 +734,7 @@ class TenuredChunk : public TenuredChunkBase {
 
   // Get the page index of the arena.
   size_t pageIndex(const Arena* arena) const {
-    return pageIndex(arenaIndex(arena->address()));
+    return pageIndex(arenaIndex(arena));
   }
   size_t pageIndex(size_t arenaIndex) const {
     return arenaIndex / ArenasPerPage;
@@ -716,15 +755,6 @@ inline void Arena::checkAddress() const {
 inline TenuredChunk* Arena::chunk() const {
   return TenuredChunk::fromAddress(address());
 }
-
-inline bool InFreeList(Arena* arena, void* thing) {
-  uintptr_t addr = reinterpret_cast<uintptr_t>(thing);
-  MOZ_ASSERT(Arena::isAligned(addr, arena->getThingSize()));
-  return arena->inFreeList(addr);
-}
-
-static const int32_t ChunkStoreBufferOffsetFromLastByte =
-    int32_t(gc::ChunkStoreBufferOffset) - int32_t(gc::ChunkMask);
 
 // Cell header stored before all nursery cells.
 struct alignas(gc::CellAlignBytes) NurseryCellHeader {

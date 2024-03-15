@@ -67,9 +67,17 @@ enum PromiseSlots {
 // The PromiseSlot_RejectFunction slot is not used.
 #define PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS 0x08
 
+// This promise's Promise Resolve Function's [[AlreadyResolved]].[[Value]] is
+// set to true.
+//
+// Valid only for promises with PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS.
+// For promises without PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS, Promise
+// Resolve/Reject Function's "Promise" slot represents the value.
+#define PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS_ALREADY_RESOLVED 0x10
+
 // This promise is either the return value of an async function invocation or
 // an async generator's method.
-#define PROMISE_FLAG_ASYNC 0x10
+#define PROMISE_FLAG_ASYNC 0x20
 
 // This promise knows how to propagate information required to keep track of
 // whether an activation behavior was in progress when the original promise in
@@ -78,7 +86,7 @@ enum PromiseSlots {
 // It is used by the embedder in order to request SpiderMonkey to keep track of
 // this information in a Promise, and also to propagate it to newly created
 // promises while processing Promise#then.
-#define PROMISE_FLAG_REQUIRES_USER_INTERACTION_HANDLING 0x20
+#define PROMISE_FLAG_REQUIRES_USER_INTERACTION_HANDLING 0x40
 
 // This flag indicates whether an activation behavior was in progress when the
 // original promise in the promise chain was created.  Activation behavior is a
@@ -86,7 +94,7 @@ enum PromiseSlots {
 // https://html.spec.whatwg.org/multipage/interaction.html#triggered-by-user-activation
 // This flag is only effective when the
 // PROMISE_FLAG_REQUIRES_USER_INTERACTION_HANDLING is set.
-#define PROMISE_FLAG_HAD_USER_INTERACTION_UPON_CREATION 0x40
+#define PROMISE_FLAG_HAD_USER_INTERACTION_UPON_CREATION 0x80
 
 struct PromiseReactionRecordBuilder;
 

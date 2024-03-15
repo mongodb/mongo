@@ -63,16 +63,16 @@ const JSFunctionSpec OIDInfo::methods[3] = {
 
 const char* const OIDInfo::className = "ObjectId";
 
-void OIDInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto oid = static_cast<OID*>(JS::GetPrivate(obj));
+void OIDInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto oid = JS::GetMaybePtrFromReservedSlot<OID>(obj, OIDSlot);
 
     if (oid) {
-        getScope(fop)->trackedDelete(oid);
+        getScope(gcCtx)->trackedDelete(oid);
     }
 }
 
 void OIDInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
-    auto oid = static_cast<OID*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto oid = JS::GetMaybePtrFromReservedSlot<OID>(args.thisv().toObjectOrNull(), OIDSlot);
 
     std::string str = str::stream() << "ObjectId(\"" << oid->toString() << "\")";
 
@@ -80,13 +80,13 @@ void OIDInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void OIDInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
-    auto oid = static_cast<OID*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto oid = JS::GetMaybePtrFromReservedSlot<OID>(args.thisv().toObjectOrNull(), OIDSlot);
 
     ValueReader(cx, args.rval()).fromBSON(BSON("$oid" << oid->toString()), nullptr, false);
 }
 
 void OIDInfo::Functions::getter::call(JSContext* cx, JS::CallArgs args) {
-    auto oid = static_cast<OID*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto oid = JS::GetMaybePtrFromReservedSlot<OID>(args.thisv().toObjectOrNull(), OIDSlot);
 
     ValueReader(cx, args.rval()).fromStringData(oid->toString());
 }
@@ -110,7 +110,7 @@ void OIDInfo::make(JSContext* cx, const OID& oid, JS::MutableHandleValue out) {
 
     JS::RootedObject thisv(cx);
     scope->getProto<OIDInfo>().newObject(&thisv);
-    JS::SetPrivate(thisv, scope->trackedNew<OID>(oid));
+    JS::SetReservedSlot(thisv, OIDSlot, JS::PrivateValue(scope->trackedNew<OID>(oid)));
 
     out.setObjectOrNull(thisv);
 }
@@ -121,7 +121,7 @@ OID OIDInfo::getOID(JSContext* cx, JS::HandleValue value) {
 }
 
 OID OIDInfo::getOID(JSContext* cx, JS::HandleObject object) {
-    auto oid = static_cast<OID*>(JS::GetPrivate(object));
+    auto oid = JS::GetMaybePtrFromReservedSlot<OID>(object, OIDSlot);
 
     if (oid) {
         return *oid;

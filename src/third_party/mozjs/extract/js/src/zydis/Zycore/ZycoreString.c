@@ -32,13 +32,13 @@
 /* ============================================================================================== */
 
 /**
- * @brief   Writes a terminating '\0' character at the end of the string data.
+ * Writes a terminating '\0' character at the end of the string data.
  */
 #define ZYCORE_STRING_NULLTERMINATE(string) \
       *(char*)((ZyanU8*)(string)->vector.data + (string)->vector.size - 1) = '\0';
 
 /**
- * @brief   Checks for a terminating '\0' character at the end of the string data.
+ * Checks for a terminating '\0' character at the end of the string data.
  */
 #define ZYCORE_STRING_ASSERT_NULLTERMINATION(string) \
       ZYAN_ASSERT(*(char*)((ZyanU8*)(string)->vector.data + (string)->vector.size - 1) == '\0');
@@ -62,7 +62,7 @@ ZyanStatus ZyanStringInit(ZyanString* string, ZyanUSize capacity)
 #endif // ZYAN_NO_LIBC
 
 ZyanStatus ZyanStringInitEx(ZyanString* string, ZyanUSize capacity, ZyanAllocator* allocator,
-    float growth_factor, float shrink_threshold)
+    ZyanU8 growth_factor, ZyanU8 shrink_threshold)
 {
     if (!string)
     {
@@ -91,7 +91,7 @@ ZyanStatus ZyanStringInitCustomBuffer(ZyanString* string, char* buffer, ZyanUSiz
     }
 
     string->flags = ZYAN_STRING_HAS_FIXED_CAPACITY;
-    ZYAN_CHECK(ZyanVectorInitCustomBuffer(&string->vector, sizeof(char), (void*)buffer, capacity, 
+    ZYAN_CHECK(ZyanVectorInitCustomBuffer(&string->vector, sizeof(char), (void*)buffer, capacity,
         ZYAN_NULL));
     ZYAN_ASSERT(string->vector.capacity == capacity);
     // Some of the string code relies on `sizeof(char) == 1`
@@ -133,7 +133,7 @@ ZyanStatus ZyanStringDuplicate(ZyanString* destination, const ZyanStringView* so
 #endif // ZYAN_NO_LIBC
 
 ZyanStatus ZyanStringDuplicateEx(ZyanString* destination, const ZyanStringView* source,
-    ZyanUSize capacity, ZyanAllocator* allocator, float growth_factor, float shrink_threshold)
+    ZyanUSize capacity, ZyanAllocator* allocator, ZyanU8 growth_factor, ZyanU8 shrink_threshold)
 {
     if (!source || !source->string.vector.size)
     {
@@ -194,8 +194,8 @@ ZyanStatus ZyanStringConcat(ZyanString* destination, const ZyanStringView* s1,
 #endif // ZYAN_NO_LIBC
 
 ZyanStatus ZyanStringConcatEx(ZyanString* destination, const ZyanStringView* s1,
-    const ZyanStringView* s2, ZyanUSize capacity, ZyanAllocator* allocator, float growth_factor,
-    float shrink_threshold)
+    const ZyanStringView* s2, ZyanUSize capacity, ZyanAllocator* allocator, ZyanU8 growth_factor,
+    ZyanU8 shrink_threshold)
 {
     if (!s1 || !s2 || !s1->string.vector.size || !s2->string.vector.size)
     {

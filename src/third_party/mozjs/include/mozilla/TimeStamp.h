@@ -7,14 +7,14 @@
 #ifndef mozilla_TimeStamp_h
 #define mozilla_TimeStamp_h
 
-#include <stdint.h>
-#include <algorithm>  // for std::min, std::max
-#include <ostream>
-#include <type_traits>
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/Types.h"
+#include <algorithm>  // for std::min, std::max
+#include <ostream>
+#include <stdint.h>
+#include <type_traits>
 
 namespace IPC {
 template <typename T>
@@ -25,41 +25,14 @@ struct ParamTraits;
 // defines TimeStampValue as a complex value keeping both
 // GetTickCount and QueryPerformanceCounter values
 #  include "TimeStamp_windows.h"
+
+#  include "mozilla/Maybe.h"  // For TimeStamp::RawQueryPerformanceCounterValue
 #endif
 
 namespace mozilla {
 
 #ifndef XP_WIN
-struct TimeStamp63Bit {
-  uint64_t mUsedCanonicalNow : 1;
-  uint64_t mTimeStamp : 63;
-
-  constexpr TimeStamp63Bit() : mUsedCanonicalNow(0), mTimeStamp(0) {}
-
-  MOZ_IMPLICIT constexpr TimeStamp63Bit(const uint64_t aValue)
-      : mUsedCanonicalNow(0), mTimeStamp(aValue) {}
-
-  constexpr TimeStamp63Bit(const bool aUsedCanonicalNow,
-                           const int64_t aTimeStamp)
-      : mUsedCanonicalNow(aUsedCanonicalNow ? 1 : 0), mTimeStamp(aTimeStamp) {}
-
-  bool operator==(const TimeStamp63Bit aOther) const {
-    uint64_t here, there;
-    memcpy(&here, this, sizeof(TimeStamp63Bit));
-    memcpy(&there, &aOther, sizeof(TimeStamp63Bit));
-    return here == there;
-  }
-
-  operator uint64_t() const { return mTimeStamp; }
-
-  bool IsNull() const { return mTimeStamp == 0; }
-
-  bool UsedCanonicalNow() const { return mUsedCanonicalNow; }
-
-  void SetCanonicalNow() { mUsedCanonicalNow = 1; }
-};
-
-typedef TimeStamp63Bit TimeStampValue;
+typedef uint64_t TimeStampValue;
 #endif
 
 class TimeStamp;
@@ -197,6 +170,10 @@ class BaseTimeDuration {
                               const BaseTimeDuration& aB) {
     return FromTicks(std::min(aA.mValue, aB.mValue));
   }
+
+#if defined(DEBUG)
+  int64_t GetValue() const { return mValue; }
+#endif
 
  private:
   // Block double multiplier (slower, imprecise if long duration) - Bug 853398.
@@ -397,7 +374,7 @@ class TimeStamp {
   /**
    * Initialize to the "null" moment
    */
-  constexpr TimeStamp() : mValue() {}
+  constexpr TimeStamp() : mValue(0) {}
   // Default copy-constructor and assignment are OK
 
   /**
@@ -417,24 +394,20 @@ class TimeStamp {
   static TimeStamp FromSystemTime(int64_t aSystemTime) {
     static_assert(sizeof(aSystemTime) == sizeof(TimeStampValue),
                   "System timestamp should be same units as TimeStampValue");
-    return TimeStamp(TimeStampValue(false, aSystemTime));
+    return TimeStamp(aSystemTime);
   }
 #endif
 
   /**
    * Return true if this is the "null" moment
    */
-  bool IsNull() const { return mValue.IsNull(); }
+  bool IsNull() const { return mValue == 0; }
 
   /**
    * Return true if this is not the "null" moment, may be used in tests, e.g.:
    * |if (timestamp) { ... }|
    */
-  explicit operator bool() const { return !IsNull(); }
-
-  bool UsedCanonicalNow() const { return mValue.UsedCanonicalNow(); }
-  static MFBT_API bool GetFuzzyfoxEnabled();
-  static MFBT_API void SetFuzzyfoxEnabled(bool aValue);
+  explicit operator bool() const { return mValue != 0; }
 
   /**
    * Return a timestamp reflecting the current elapsed system time. This
@@ -451,22 +424,26 @@ class TimeStamp {
    */
   static TimeStamp Now() { return Now(true); }
   static TimeStamp NowLoRes() { return Now(false); }
-  static TimeStamp NowUnfuzzed() { return NowUnfuzzed(true); }
 
-  static MFBT_API int64_t NowFuzzyTime();
   /**
    * Return a timestamp representing the time when the current process was
    * created which will be comparable with other timestamps taken with this
-   * class. If the actual process creation time is detected to be inconsistent
-   * the @a aIsInconsistent parameter will be set to true, the returned
-   * timestamp however will still be valid though inaccurate.
+   * class.
    *
-   * @param aIsInconsistent If non-null, set to true if an inconsistency was
-   * detected in the process creation time
-   * @returns A timestamp representing the time when the process was created,
-   * this timestamp is always valid even when errors are reported
+   * @returns A timestamp representing the time when the process was created
    */
-  static MFBT_API TimeStamp ProcessCreation(bool* aIsInconsistent = nullptr);
+  static MFBT_API TimeStamp ProcessCreation();
+
+  /**
+   * Return the very first timestamp that was taken. This can be used instead
+   * of TimeStamp::ProcessCreation() by code that might not allow running the
+   * complex logic required to compute the real process creation. This will
+   * necessarily have been recorded sometimes after TimeStamp::ProcessCreation()
+   * or at best should be equal to it.
+   *
+   * @returns The first tiemstamp that was taken by this process
+   */
+  static MFBT_API TimeStamp FirstTimeStamp();
 
   /**
    * Records a process restart. After this call ProcessCreation() will return
@@ -474,6 +451,24 @@ class TimeStamp {
    * the process was created.
    */
   static MFBT_API void RecordProcessRestart();
+
+#ifdef XP_LINUX
+  uint64_t RawClockMonotonicNanosecondsSinceBoot() {
+    return static_cast<uint64_t>(mValue);
+  }
+#endif
+
+#ifdef XP_MACOSX
+  uint64_t RawMachAbsoluteTimeValue() { return static_cast<uint64_t>(mValue); }
+#endif
+
+#ifdef XP_WIN
+  Maybe<uint64_t> RawQueryPerformanceCounterValue() {
+    // mQPC is stored in `mt` i.e. QueryPerformanceCounter * 1000
+    // so divide out the 1000
+    return mValue.mHasQPC ? Some(mValue.mQPC / 1000ULL) : Nothing();
+  }
+#endif
 
   /**
    * Compute the difference between two timestamps. Both must be non-null.
@@ -513,10 +508,7 @@ class TimeStamp {
     // (We don't check for overflow because it's not obvious what the error
     //  behavior should be in that case.)
     if (aOther.mValue < 0 && value > mValue) {
-      value = TimeStampValue();
-    }
-    if (mValue.UsedCanonicalNow()) {
-      value.SetCanonicalNow();
+      value = 0;
     }
     mValue = value;
     return *this;
@@ -528,10 +520,7 @@ class TimeStamp {
     // (We don't check for overflow because it's not obvious what the error
     //  behavior should be in that case.)
     if (aOther.mValue > 0 && value > mValue) {
-      value = TimeStampValue();
-    }
-    if (mValue.UsedCanonicalNow()) {
-      value.SetCanonicalNow();
+      value = 0;
     }
     mValue = value;
     return *this;
@@ -570,17 +559,18 @@ class TimeStamp {
   static MFBT_API void Startup();
   static MFBT_API void Shutdown();
 
+#if defined(DEBUG)
+  TimeStampValue GetValue() const { return mValue; }
+#endif
+
  private:
   friend struct IPC::ParamTraits<mozilla::TimeStamp>;
+  friend struct TimeStampInitialization;
 
-  MOZ_IMPLICIT TimeStamp(TimeStampValue aValue) : mValue(aValue) {}
+  MOZ_IMPLICIT
+  TimeStamp(TimeStampValue aValue) : mValue(aValue) {}
 
   static MFBT_API TimeStamp Now(bool aHighResolution);
-  static MFBT_API TimeStamp NowUnfuzzed(bool aHighResolution);
-  static MFBT_API TimeStamp NowFuzzy(TimeStampValue aValue);
-
-  static MFBT_API void UpdateFuzzyTime(int64_t aValue);
-  static MFBT_API void UpdateFuzzyTimeStamp(TimeStamp aValue);
 
   /**
    * Computes the uptime of the current process in microseconds. The result
@@ -606,8 +596,6 @@ class TimeStamp {
    * When using a system clock, a value is system dependent.
    */
   TimeStampValue mValue;
-
-  friend class Fuzzyfox;
 };
 
 }  // namespace mozilla

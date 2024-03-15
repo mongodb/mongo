@@ -22,8 +22,9 @@ constexpr int BYTECODE_MASK = kRegExpPaddedBytecodeCount - 1;
 // positive values.
 const unsigned int MAX_FIRST_ARG = 0x7fffffu;
 const int BYTECODE_SHIFT = 8;
-STATIC_ASSERT(1 << BYTECODE_SHIFT > BYTECODE_MASK);
+static_assert(1 << BYTECODE_SHIFT > BYTECODE_MASK);
 
+// The list of bytecodes, in format: V(Name, Code, ByteLength).
 // TODO(pthier): Argument offsets of bytecodes should be easily accessible by
 // name or at least by position.
 // TODO(jgruber): More precise types (e.g. int32/uint32 instead of value32).
@@ -85,12 +86,14 @@ STATIC_ASSERT(1 << BYTECODE_SHIFT > BYTECODE_MASK);
   /* 0x10 - 0x1F:   Character to match against (after mask aplied)          */ \
   /* 0x20 - 0x3F:   Bitmask bitwise and combined with current character     */ \
   /* 0x40 - 0x5F:   Address of bytecode when matched                        */ \
-  V(AND_CHECK_CHAR, 28, 12)           /* bc8 pad8 uint16 uint32 addr32      */ \
-  V(AND_CHECK_NOT_4_CHARS, 29, 16)    /* bc8 pad24 uint32 uint32 addr32 */     \
-  V(AND_CHECK_NOT_CHAR, 30, 12)       /* bc8 pad8 uint16 uint32 addr32 */      \
-  V(MINUS_AND_CHECK_NOT_CHAR, 31, 12) /* bc8 pad8 uc16 uc16 uc16 addr32 */     \
-  V(CHECK_CHAR_IN_RANGE, 32, 12)      /* bc8 pad24 uc16 uc16 addr32 */         \
-  V(CHECK_CHAR_NOT_IN_RANGE, 33, 12)  /* bc8 pad24 uc16 uc16 addr32 */         \
+  V(AND_CHECK_CHAR, 28, 12)        /* bc8 pad8 uint16 uint32 addr32      */    \
+  V(AND_CHECK_NOT_4_CHARS, 29, 16) /* bc8 pad24 uint32 uint32 addr32 */        \
+  V(AND_CHECK_NOT_CHAR, 30, 12)    /* bc8 pad8 uint16 uint32 addr32 */         \
+  V(MINUS_AND_CHECK_NOT_CHAR, 31,                                              \
+    12) /* bc8 pad8 base::uc16 base::uc16 base::uc16 addr32 */                 \
+  V(CHECK_CHAR_IN_RANGE, 32, 12) /* bc8 pad24 base::uc16 base::uc16 addr32 */  \
+  V(CHECK_CHAR_NOT_IN_RANGE, 33,                                               \
+    12) /* bc8 pad24 base::uc16 base::uc16 addr32 */                           \
   /* Checks if the current character matches any of the characters encoded  */ \
   /* in a bit table. Similar to/inspired by boyer moore string search       */ \
   /* Bit Layout:                                                            */ \
@@ -99,8 +102,8 @@ STATIC_ASSERT(1 << BYTECODE_SHIFT > BYTECODE_MASK);
   /* 0x20 - 0x3F:   Address of bytecode when bit is set                     */ \
   /* 0x40 - 0xBF:   Bit table                                               */ \
   V(CHECK_BIT_IN_TABLE, 34, 24) /* bc8 pad24 addr32 bits128           */       \
-  V(CHECK_LT, 35, 8) /* bc8 pad8 uc16 addr32                       */          \
-  V(CHECK_GT, 36, 8) /* bc8 pad8 uc16 addr32                       */          \
+  V(CHECK_LT, 35, 8) /* bc8 pad8 base::uc16 addr32                       */    \
+  V(CHECK_GT, 36, 8) /* bc8 pad8 base::uc16 addr32                       */    \
   V(CHECK_NOT_BACK_REF, 37, 8)         /* bc8 reg_idx24 addr32 */              \
   V(CHECK_NOT_BACK_REF_NO_CASE, 38, 8) /* bc8 reg_idx24 addr32 */              \
   V(CHECK_NOT_BACK_REF_NO_CASE_UNICODE, 39, 8)                                 \
@@ -215,7 +218,7 @@ static constexpr int kRegExpBytecodeCount = BYTECODE_ITERATOR(COUNT);
 // contiguous, strictly increasing, and start at 0.
 // TODO(jgruber): Do not explicitly assign values, instead generate them
 // implicitly from the list order.
-STATIC_ASSERT(kRegExpBytecodeCount == 59);
+static_assert(kRegExpBytecodeCount == 59);
 
 #define DECLARE_BYTECODES(name, code, length) \
   static constexpr int BC_##name = code;

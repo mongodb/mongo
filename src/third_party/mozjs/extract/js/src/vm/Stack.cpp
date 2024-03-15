@@ -12,10 +12,7 @@
 #include <iterator>   // std::size
 #include <stddef.h>   // size_t
 #include <stdint.h>   // uint8_t, uint32_t
-#include <utility>    // std::move
 
-#include "debugger/DebugAPI.h"
-#include "gc/Marking.h"
 #include "gc/Tracer.h"  // js::TraceRoot
 #include "jit/JitcodeMap.h"
 #include "jit/JitRuntime.h"
@@ -23,13 +20,9 @@
 #include "js/Value.h"                 // JS::Value
 #include "vm/FrameIter.h"             // js::FrameIter
 #include "vm/JSContext.h"
-#include "vm/Opcodes.h"
-#include "wasm/WasmInstance.h"
+#include "wasm/WasmProcess.h"
 
 #include "jit/JSJitFrameIter-inl.h"
-#include "vm/Compartment-inl.h"
-#include "vm/EnvironmentObject-inl.h"
-#include "vm/Interpreter-inl.h"
 #include "vm/Probes-inl.h"
 
 using namespace js;
@@ -42,13 +35,9 @@ using JS::Value;
 
 void InterpreterFrame::initExecuteFrame(JSContext* cx, HandleScript script,
                                         AbstractFramePtr evalInFramePrev,
-                                        HandleValue newTargetValue,
                                         HandleObject envChain) {
   flags_ = 0;
   script_ = script;
-
-  Value* dstvp = (Value*)this - 1;
-  dstvp[0] = newTargetValue;
 
   envChain_ = envChain.get();
   prev_ = nullptr;
@@ -233,13 +222,15 @@ void InterpreterFrame::epilogue(JSContext* cx, jsbytecode* pc) {
   MOZ_ASSERT(isEvalFrame() || isGlobalFrame() || isModuleFrame());
 }
 
-bool InterpreterFrame::checkReturn(JSContext* cx, HandleValue thisv) {
+bool InterpreterFrame::checkReturn(JSContext* cx, HandleValue thisv,
+                                   MutableHandleValue result) {
   MOZ_ASSERT(script()->isDerivedClassConstructor());
   MOZ_ASSERT(isFunctionFrame());
   MOZ_ASSERT(callee().isClassConstructor());
 
   HandleValue retVal = returnValue();
   if (retVal.isObject()) {
+    result.set(retVal);
     return true;
   }
 
@@ -253,11 +244,11 @@ bool InterpreterFrame::checkReturn(JSContext* cx, HandleValue thisv) {
     return ThrowUninitializedThis(cx);
   }
 
-  setReturnValue(thisv);
+  result.set(thisv);
   return true;
 }
 
-bool InterpreterFrame::pushVarEnvironment(JSContext* cx, HandleScope scope) {
+bool InterpreterFrame::pushVarEnvironment(JSContext* cx, Handle<Scope*> scope) {
   return js::PushVarEnvironmentObject(cx, scope, this);
 }
 
@@ -334,9 +325,6 @@ void InterpreterFrame::trace(JSTracer* trc, Value* sp, jsbytecode* pc) {
     // Trace arguments.
     unsigned argc = std::max(numActualArgs(), numFormalArgs());
     TraceRootRange(trc, argc + isConstructing(), argv_, "fp argv");
-  } else {
-    // Trace newTarget.
-    TraceRoot(trc, ((Value*)this) - 1, "stack newTarget");
   }
 
   JSScript* script = this->script();
@@ -416,21 +404,20 @@ InterpreterFrame* InterpreterStack::pushInvokeFrame(
 }
 
 InterpreterFrame* InterpreterStack::pushExecuteFrame(
-    JSContext* cx, HandleScript script, HandleValue newTargetValue,
-    HandleObject envChain, AbstractFramePtr evalInFrame) {
+    JSContext* cx, HandleScript script, HandleObject envChain,
+    AbstractFramePtr evalInFrame) {
   LifoAlloc::Mark mark = allocator_.mark();
 
-  unsigned nvars = 1 /* newTarget */ + script->nslots();
+  unsigned nvars = script->nslots();
   uint8_t* buffer =
       allocateFrame(cx, sizeof(InterpreterFrame) + nvars * sizeof(Value));
   if (!buffer) {
     return nullptr;
   }
 
-  InterpreterFrame* fp =
-      reinterpret_cast<InterpreterFrame*>(buffer + 1 * sizeof(Value));
+  InterpreterFrame* fp = reinterpret_cast<InterpreterFrame*>(buffer);
   fp->mark_ = mark;
-  fp->initExecuteFrame(cx, script, evalInFrame, newTargetValue, envChain);
+  fp->initExecuteFrame(cx, script, evalInFrame, envChain);
   fp->initLocals();
 
   return fp;
@@ -515,19 +502,21 @@ void JS::ProfilingFrameIterator::settleFrames() {
     new (storage()) wasm::ProfilingFrameIterator(fp);
     kind_ = Kind::Wasm;
     MOZ_ASSERT(!wasmIter().done());
+    maybeSetEndStackAddress(wasmIter().endStackAddress());
     return;
   }
 
-  if (isWasm() && wasmIter().done() && wasmIter().unwoundIonCallerFP()) {
-    uint8_t* fp = wasmIter().unwoundIonCallerFP();
+  if (isWasm() && wasmIter().done() && wasmIter().unwoundJitCallerFP()) {
+    uint8_t* fp = wasmIter().unwoundJitCallerFP();
     iteratorDestroy();
-    // Using this ctor will skip the first ion->wasm frame, which is
+    // Using this ctor will skip the first jit->wasm frame, which is
     // needed because the profiling iterator doesn't know how to unwind
     // when the callee has no script.
     new (storage())
         jit::JSJitProfilingFrameIterator((jit::CommonFrameLayout*)fp);
     kind_ = Kind::JSJit;
     MOZ_ASSERT(!jsJitIter().done());
+    maybeSetEndStackAddress(jsJitIter().endStackAddress());
     return;
   }
 }
@@ -537,6 +526,7 @@ void JS::ProfilingFrameIterator::settle() {
   while (iteratorDone()) {
     iteratorDestroy();
     activation_ = activation_->prevProfiling();
+    endStackAddress_ = nullptr;
     if (!activation_) {
       return;
     }
@@ -561,11 +551,13 @@ void JS::ProfilingFrameIterator::iteratorConstruct(const RegisterState& state) {
   if (activation->hasWasmExitFP() || wasm::InCompiledCode(state.pc)) {
     new (storage()) wasm::ProfilingFrameIterator(*activation, state);
     kind_ = Kind::Wasm;
+    maybeSetEndStackAddress(wasmIter().endStackAddress());
     return;
   }
 
-  new (storage()) jit::JSJitProfilingFrameIterator(cx_, state.pc);
+  new (storage()) jit::JSJitProfilingFrameIterator(cx_, state.pc, state.sp);
   kind_ = Kind::JSJit;
+  maybeSetEndStackAddress(jsJitIter().endStackAddress());
 }
 
 void JS::ProfilingFrameIterator::iteratorConstruct() {
@@ -580,12 +572,14 @@ void JS::ProfilingFrameIterator::iteratorConstruct() {
   if (activation->hasWasmExitFP()) {
     new (storage()) wasm::ProfilingFrameIterator(*activation);
     kind_ = Kind::Wasm;
+    maybeSetEndStackAddress(wasmIter().endStackAddress());
     return;
   }
 
   auto* fp = (jit::ExitFrameLayout*)activation->jsExitFP();
   new (storage()) jit::JSJitProfilingFrameIterator(fp);
   kind_ = Kind::JSJit;
+  maybeSetEndStackAddress(jsJitIter().endStackAddress());
 }
 
 void JS::ProfilingFrameIterator::iteratorDestroy() {
@@ -624,8 +618,13 @@ void* JS::ProfilingFrameIterator::stackAddress() const {
 
 Maybe<JS::ProfilingFrameIterator::Frame>
 JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(
-    jit::JitcodeGlobalEntry* entry) const {
+    const jit::JitcodeGlobalEntry** entry) const {
+  *entry = nullptr;
+
   void* stackAddr = stackAddress();
+
+  MOZ_DIAGNOSTIC_ASSERT(endStackAddress_);
+  MOZ_DIAGNOSTIC_ASSERT(stackAddr >= endStackAddress_);
 
   if (isWasm()) {
     Frame frame;
@@ -634,7 +633,7 @@ JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(
     frame.returnAddress_ = nullptr;
     frame.activation = activation_;
     frame.label = nullptr;
-    frame.endStackAddress = activation_->asJit()->jsOrWasmExitFP();
+    frame.endStackAddress = endStackAddress_;
     frame.interpreterScript = nullptr;
     // TODO: get the realm ID of wasm frames. Bug 1596235.
     frame.realmID = 0;
@@ -656,38 +655,34 @@ JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(
   // The calls to `lookup*` below have been changed from infallible ones to
   // fallible ones.  The proper solution to this problem is to fix all
   // the jitcode to use frame-pointers and reliably walk the stack with those.
-  const jit::JitcodeGlobalEntry* lookedUpEntry = nullptr;
   if (samplePositionInProfilerBuffer_) {
-    lookedUpEntry = table->lookupForSampler(returnAddr, cx_->runtime(),
-                                            *samplePositionInProfilerBuffer_);
+    *entry = table->lookupForSampler(returnAddr, cx_->runtime(),
+                                     *samplePositionInProfilerBuffer_);
   } else {
-    lookedUpEntry = table->lookup(returnAddr);
+    *entry = table->lookup(returnAddr);
   }
 
   // Failed to look up a jitcode entry for the given address, ignore.
-  if (!lookedUpEntry) {
+  if (!*entry) {
     return mozilla::Nothing();
   }
-  *entry = *lookedUpEntry;
-
-  MOZ_ASSERT(entry->isIon() || entry->isBaseline() ||
-             entry->isBaselineInterpreter() || entry->isDummy());
 
   // Dummy frames produce no stack frames.
-  if (entry->isDummy()) {
+  if ((*entry)->isDummy()) {
     return mozilla::Nothing();
   }
 
   Frame frame;
-  if (entry->isBaselineInterpreter()) {
+  if ((*entry)->isBaselineInterpreter()) {
     frame.kind = Frame_BaselineInterpreter;
-  } else if (entry->isBaseline()) {
+  } else if ((*entry)->isBaseline()) {
     frame.kind = Frame_Baseline;
   } else {
+    MOZ_ASSERT((*entry)->isIon() || (*entry)->isIonIC());
     frame.kind = Frame_Ion;
   }
   frame.stackAddress = stackAddr;
-  if (entry->isBaselineInterpreter()) {
+  if ((*entry)->isBaselineInterpreter()) {
     frame.label = jsJitIter().baselineInterpreterLabel();
     jsJitIter().baselineInterpreterScriptPC(
         &frame.interpreterScript, &frame.interpreterPC_, &frame.realmID);
@@ -700,7 +695,7 @@ JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(
     frame.realmID = 0;
   }
   frame.activation = activation_;
-  frame.endStackAddress = activation_->asJit()->jsOrWasmExitFP();
+  frame.endStackAddress = endStackAddress_;
   return mozilla::Some(frame);
 }
 
@@ -711,7 +706,7 @@ uint32_t JS::ProfilingFrameIterator::extractStack(Frame* frames,
     return 0;
   }
 
-  jit::JitcodeGlobalEntry entry;
+  const jit::JitcodeGlobalEntry* entry;
   Maybe<Frame> physicalFrame = getPhysicalFrameAndEntry(&entry);
 
   // Dummy frames produce no stack frames.
@@ -732,9 +727,9 @@ uint32_t JS::ProfilingFrameIterator::extractStack(Frame* frames,
 
   // Extract the stack for the entry.  Assume maximum inlining depth is <64
   const char* labels[64];
-  uint32_t depth = entry.callStackAtAddr(cx_->runtime(),
-                                         jsJitIter().resumePCinCurrentFrame(),
-                                         labels, std::size(labels));
+  uint32_t depth = entry->callStackAtAddr(cx_->runtime(),
+                                          jsJitIter().resumePCinCurrentFrame(),
+                                          labels, std::size(labels));
   MOZ_ASSERT(depth < std::size(labels));
   for (uint32_t i = 0; i < depth; i++) {
     if (offset + i >= end) {
@@ -749,7 +744,7 @@ uint32_t JS::ProfilingFrameIterator::extractStack(Frame* frames,
 
 Maybe<JS::ProfilingFrameIterator::Frame>
 JS::ProfilingFrameIterator::getPhysicalFrameWithoutLabel() const {
-  jit::JitcodeGlobalEntry unused;
+  const jit::JitcodeGlobalEntry* unused;
   return getPhysicalFrameAndEntry(&unused);
 }
 

@@ -9,17 +9,15 @@
 
 #include "mozilla/Attributes.h"
 
-#include <stdint.h>
-
 #include "frontend/NameAnalysisTypes.h"
 #include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
-#include "js/TypeDecls.h"
-#include "vm/SharedStencil.h"  // GCThingIndex
+#include "vm/SharedStencil.h"     // GCThingIndex
 
 namespace js {
 namespace frontend {
 
 struct BytecodeEmitter;
+enum class ValueUsage;
 
 // Class for emitting bytecode for name operation.
 //
@@ -175,7 +173,7 @@ class MOZ_STACK_CLASS NameOpEmitter {
   [[nodiscard]] bool emitGet();
   [[nodiscard]] bool prepareForRhs();
   [[nodiscard]] bool emitAssignment();
-  [[nodiscard]] bool emitIncDec();
+  [[nodiscard]] bool emitIncDec(ValueUsage valueUsage);
 };
 
 } /* namespace frontend */

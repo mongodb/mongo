@@ -25,6 +25,10 @@ namespace js {
 class Debugger;
 }  // namespace js
 
+/* Defined in vm/Debugger.cpp. */
+extern JS_PUBLIC_API bool JS_DefineDebuggerObject(JSContext* cx,
+                                                  JS::HandleObject obj);
+
 namespace JS {
 namespace dbg {
 
@@ -135,7 +139,7 @@ class Builder {
   // Check that |thing| is in the same compartment as our debuggerObject. Used
   // for assertions when constructing BuiltThings. We can overload this as we
   // add more instantiations of BuiltThing.
-#if DEBUG
+#ifdef DEBUG
   void assertBuilt(JSObject* obj);
 #else
   void assertBuilt(JSObject* obj) {}
@@ -156,7 +160,7 @@ class Builder {
     PersistentRooted<T> value;
 
     BuiltThing(JSContext* cx, Builder& owner_,
-               T value_ = SafelyInitialized<T>())
+               T value_ = SafelyInitialized<T>::create())
         : owner(owner_), value(cx, value_) {
       owner.assertBuilt(value_);
     }

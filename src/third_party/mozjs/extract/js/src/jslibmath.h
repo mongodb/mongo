@@ -17,9 +17,9 @@
 namespace js {
 
 inline double NumberDiv(double a, double b) {
-  AutoUnsafeCallWithABI unsafe(UnsafeABIStrictness::AllowPendingExceptions);
+  AutoUnsafeCallWithABI unsafe;
   if (b == 0) {
-    if (a == 0 || mozilla::IsNaN(a)) {
+    if (a == 0 || std::isnan(a)) {
       return JS::GenericNaN();
     }
     if (mozilla::IsNegative(a) != mozilla::IsNegative(b)) {
@@ -32,7 +32,7 @@ inline double NumberDiv(double a, double b) {
 }
 
 inline double NumberMod(double a, double b) {
-  AutoUnsafeCallWithABI unsafe(UnsafeABIStrictness::AllowPendingExceptions);
+  AutoUnsafeCallWithABI unsafe;
   if (b == 0) {
     return JS::GenericNaN();
   }

@@ -3,7 +3,8 @@ test.compile("source.cpp")
 test.run_analysis_script("gcTypes", upto="gcFunctions")
 
 # The suppressions file uses mangled names.
-suppressed = test.load_suppressed_functions()
+info = test.load_funcInfo()
+suppressed = [f for f, v in info.items() if v.get("limits", 0) | 1]
 
 # Only one of these is fully suppressed (ie, *always* called within the scope
 # of an AutoSuppressGC).

@@ -131,7 +131,7 @@ struct BSONHolder {
 };
 
 BSONHolder* getValidHolder(JSContext* cx, JSObject* obj) {
-    auto holder = static_cast<BSONHolder*>(JS::GetPrivate(obj));
+    auto holder = JS::GetMaybePtrFromReservedSlot<BSONHolder>(obj, BSONInfo::BSONHolderSlot);
 
     if (holder)
         holder->uassertValid(cx);
@@ -163,16 +163,18 @@ void BSONInfo::make(
     auto scope = getScope(cx);
 
     scope->getProto<BSONInfo>().newObject(obj);
-    JS::SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope, ro));
+    JS::SetReservedSlot(obj,
+                        BSONHolderSlot,
+                        JS::PrivateValue(scope->trackedNew<BSONHolder>(bson, parent, scope, ro)));
 }
 
-void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto holder = static_cast<BSONHolder*>(JS::GetPrivate(obj));
+void BSONInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto holder = JS::GetMaybePtrFromReservedSlot<BSONHolder>(obj, BSONHolderSlot);
 
     if (!holder)
         return;
 
-    getScope(fop)->trackedDelete(holder);
+    getScope(gcCtx)->trackedDelete(holder);
 }
 
 /*

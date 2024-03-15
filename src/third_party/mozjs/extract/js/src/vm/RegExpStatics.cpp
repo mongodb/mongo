@@ -6,66 +6,14 @@
 
 #include "vm/RegExpStatics.h"
 
-#include "gc/FreeOp.h"
-#include "vm/RegExpStaticsObject.h"
-
-#include "vm/NativeObject-inl.h"
+#include "gc/Zone.h"
+#include "vm/RegExpShared.h"
 
 using namespace js;
 
-/*
- * RegExpStatics allocates memory -- in order to keep the statics stored
- * per-global and not leak, we create a JSClass to wrap the C++ instance and
- * provide an appropriate finalizer. We lazily create and store an instance of
- * that JSClass in a global reserved slot.
- */
-
-static void resc_finalize(JSFreeOp* fop, JSObject* obj) {
-  MOZ_ASSERT(fop->onMainThread());
-  RegExpStatics* res =
-      static_cast<RegExpStatics*>(obj->as<RegExpStaticsObject>().getPrivate());
-  fop->delete_(obj, res, MemoryUse::RegExpStatics);
-}
-
-static void resc_trace(JSTracer* trc, JSObject* obj) {
-  void* pdata = obj->as<RegExpStaticsObject>().getPrivate();
-  if (pdata) {
-    static_cast<RegExpStatics*>(pdata)->trace(trc);
-  }
-}
-
-static const JSClassOps RegExpStaticsObjectClassOps = {
-    nullptr,        // addProperty
-    nullptr,        // delProperty
-    nullptr,        // enumerate
-    nullptr,        // newEnumerate
-    nullptr,        // resolve
-    nullptr,        // mayResolve
-    resc_finalize,  // finalize
-    nullptr,        // call
-    nullptr,        // hasInstance
-    nullptr,        // construct
-    resc_trace,     // trace
-};
-
-const JSClass RegExpStaticsObject::class_ = {
-    "RegExpStatics", JSCLASS_HAS_PRIVATE | JSCLASS_FOREGROUND_FINALIZE,
-    &RegExpStaticsObjectClassOps};
-
-RegExpStaticsObject* RegExpStatics::create(JSContext* cx) {
-  RegExpStaticsObject* obj =
-      NewObjectWithGivenProto<RegExpStaticsObject>(cx, nullptr);
-  if (!obj) {
-    return nullptr;
-  }
-  RegExpStatics* res = cx->new_<RegExpStatics>();
-  if (!res) {
-    return nullptr;
-  }
-  // TODO: This doesn't account for match vector heap memory used if there are
-  // more 10 matches. This is likely to be rare.
-  InitObjectPrivate(obj, res, MemoryUse::RegExpStatics);
-  return obj;
+// static
+UniquePtr<RegExpStatics> RegExpStatics::create(JSContext* cx) {
+  return cx->make_unique<RegExpStatics>();
 }
 
 bool RegExpStatics::executeLazy(JSContext* cx) {
@@ -78,7 +26,7 @@ bool RegExpStatics::executeLazy(JSContext* cx) {
   MOZ_ASSERT(lazyIndex != size_t(-1));
 
   /* Retrieve or create the RegExpShared in this zone. */
-  RootedAtom source(cx, lazySource);
+  Rooted<JSAtom*> source(cx, lazySource);
   RootedRegExpShared shared(cx,
                             cx->zone()->regExps().get(cx, source, lazyFlags));
   if (!shared) {
@@ -91,7 +39,7 @@ bool RegExpStatics::executeLazy(JSContext* cx) {
    */
 
   /* Execute the full regular expression. */
-  RootedLinearString input(cx, matchesInput);
+  Rooted<JSLinearString*> input(cx, matchesInput);
   RegExpRunStatus status =
       RegExpShared::execute(cx, &shared, input, lazyIndex, &this->matches);
   if (status == RegExpRunStatus_Error) {

@@ -1,7 +1,0 @@
-﻿UTF-8 encoded sample plain-text file
-‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
-This file is a place-holder. The original file is available from Markus Kuhn's website at http://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-demo.txt.
-
-Markus says this about copying files that are on his site:
-
-Please do not copy any of my publications onto your own Internet server for public access without explicit permission. If you want to refer to any of my texts, please use a hyperlink to my original and not a copy. I update some of the texts frequently and I want to prevent the confusion that arises if people read somewhere else obsolete versions that are not under my control.

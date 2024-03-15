@@ -20,7 +20,7 @@
 
 namespace js {
 
-class GenericPrinter;
+class JS_PUBLIC_API GenericPrinter;
 class PlainObject;
 
 namespace jit {
@@ -40,6 +40,8 @@ class MTest;
 
 [[nodiscard]] bool SplitCriticalEdges(MIRGraph& graph);
 
+[[nodiscard]] bool OptimizeIteratorIndices(MIRGenerator* mir, MIRGraph& graph);
+
 bool IsUint32Type(const MDefinition* def);
 
 enum Observability { ConservativeObservability, AggressiveObservability };
@@ -52,6 +54,9 @@ size_t MarkLoopBlocks(MIRGraph& graph, MBasicBlock* header, bool* canOsr);
 void UnmarkLoopBlocks(MIRGraph& graph, MBasicBlock* header);
 
 [[nodiscard]] bool MakeLoopsContiguous(MIRGraph& graph);
+
+[[nodiscard]] bool EliminateTriviallyDeadResumePointOperands(MIRGenerator* mir,
+                                                             MIRGraph& graph);
 
 [[nodiscard]] bool EliminateDeadResumePointOperands(MIRGenerator* mir,
                                                     MIRGraph& graph);
@@ -86,6 +91,10 @@ void AssertExtendedGraphCoherency(MIRGraph& graph,
                                   bool force = false);
 
 [[nodiscard]] bool EliminateRedundantChecks(MIRGraph& graph);
+
+[[nodiscard]] bool EliminateRedundantShapeGuards(MIRGraph& graph);
+
+[[nodiscard]] bool EliminateRedundantGCBarriers(MIRGraph& graph);
 
 [[nodiscard]] bool AddKeepAliveInstructions(MIRGraph& graph);
 
@@ -168,12 +177,15 @@ MDefinition* ConvertLinearSum(TempAllocator& alloc, MBasicBlock* block,
                               const LinearSum& sum, BailoutKind bailoutKind);
 
 bool DeadIfUnused(const MDefinition* def);
+bool DeadIfUnusedAllowEffectful(const MDefinition* def);
 
 bool IsDiscardable(const MDefinition* def);
+bool IsDiscardableAllowEffectful(const MDefinition* def);
 
 class CompileInfo;
-void DumpMIRExpressions(MIRGraph& graph, const CompileInfo& info,
-                        const char* phase);
+void DumpMIRExpressions(GenericPrinter& out, MIRGraph& graph,
+                        const CompileInfo& info, const char* phase);
+void DumpMIRDefinition(GenericPrinter& out, MDefinition* def);
 
 }  // namespace jit
 }  // namespace js

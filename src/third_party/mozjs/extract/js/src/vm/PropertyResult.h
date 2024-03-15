@@ -9,10 +9,7 @@
 
 #include "mozilla/Assertions.h"
 
-#include "js/HeapAPI.h"
-#include "js/RootingAPI.h"
-
-#include "vm/Shape.h"
+#include "vm/PropertyInfo.h"
 
 namespace js {
 
@@ -78,7 +75,7 @@ class PropertyResult {
     propInfo_ = prop;
   }
 
-  void setTypedObjectProperty() { kind_ = Kind::NonNativeProperty; }
+  void setWasmGcProperty() { kind_ = Kind::NonNativeProperty; }
   void setProxyProperty() { kind_ = Kind::NonNativeProperty; }
 
   void setDenseElement(uint32_t index) {

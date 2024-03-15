@@ -1,2 +1,0 @@
-scrptrun.cpp
-srtest.cpp

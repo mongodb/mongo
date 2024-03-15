@@ -37,7 +37,6 @@
 #include "js/Object.h"      // JS::GetClass
 #include "js/RootingAPI.h"  // JS::Handle
 
-struct JSClass;
 struct JS_PUBLIC_API JSContext;
 class JS_PUBLIC_API JSObject;
 

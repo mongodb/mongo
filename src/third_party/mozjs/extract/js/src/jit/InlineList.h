@@ -559,7 +559,7 @@ class InlineSpaghettiStackIterator {
 
   using Node = InlineSpaghettiStackNode<T>;
 
-  explicit InlineSpaghettiStackIterator<T>(const InlineSpaghettiStack<T>* owner)
+  explicit InlineSpaghettiStackIterator(const InlineSpaghettiStack<T>* owner)
       : iter(owner ? static_cast<Node*>(owner->next) : nullptr) {}
 
  public:

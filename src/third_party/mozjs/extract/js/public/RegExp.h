@@ -42,14 +42,26 @@ extern JS_PUBLIC_API bool SetRegExpInput(JSContext* cx, Handle<JSObject*> obj,
 extern JS_PUBLIC_API bool ClearRegExpStatics(JSContext* cx,
                                              Handle<JSObject*> obj);
 
+/**
+ * Execute a regexp on a given input, starting from |indexp|.
+ * Returns false on OOM or over-recursion.
+ *
+ * On no match, |rval| is set to Null.
+ * On a match, |indexp| and the RegExp statics are updated.
+ * Then, if |test| is true, |rval| is set to true.
+ * Otherwise, |rval| is set to a match result object.
+ */
 extern JS_PUBLIC_API bool ExecuteRegExp(JSContext* cx, Handle<JSObject*> obj,
                                         Handle<JSObject*> reobj,
                                         const char16_t* chars, size_t length,
                                         size_t* indexp, bool test,
                                         MutableHandle<Value> rval);
 
-/* RegExp interface for clients without a global object. */
-
+/**
+ * Execute a regexp on a given input, starting from |indexp|.
+ * This is the same as ExecuteRegExp, except it does not update the RegExp
+ * statics and can be called without a global object.
+ */
 extern JS_PUBLIC_API bool ExecuteRegExpNoStatics(
     JSContext* cx, Handle<JSObject*> reobj, const char16_t* chars,
     size_t length, size_t* indexp, bool test, MutableHandle<Value> rval);

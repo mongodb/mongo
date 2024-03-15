@@ -11,6 +11,7 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/MathAlgorithms.h"
 
 #include <initializer_list>
 #include <type_traits>
@@ -22,15 +23,16 @@ namespace mozilla {
 /**
  * EnumSet<T, U> is a set of values defined by an enumeration. It is implemented
  * using a bit mask with the size of U for each value. It works both for enum
- * and enum class types.
+ * and enum class types. EnumSet also works with U being a BitSet.
  */
 template <typename T, typename Serialized = typename std::make_unsigned<
                           typename std::underlying_type<T>::type>::type>
 class EnumSet {
  public:
-  typedef T valueType;
+  using valueType = T;
+  using serializedType = Serialized;
 
-  constexpr EnumSet() : mBitField(0) {}
+  constexpr EnumSet() : mBitField() {}
 
   constexpr MOZ_IMPLICIT EnumSet(T aEnum) : mBitField(bitFor(aEnum)) {}
 
@@ -44,7 +46,7 @@ class EnumSet {
       : mBitField(bitFor(aEnum1) | bitFor(aEnum2) | bitFor(aEnum3) |
                   bitFor(aEnum4)) {}
 
-  constexpr MOZ_IMPLICIT EnumSet(std::initializer_list<T> list) : mBitField(0) {
+  constexpr MOZ_IMPLICIT EnumSet(std::initializer_list<T> list) : mBitField() {
     for (auto value : list) {
       (*this) += value;
     }
@@ -133,7 +135,7 @@ class EnumSet {
    */
   void clear() {
     incVersion();
-    mBitField = 0;
+    mBitField = Serialized();
   }
 
   /**
@@ -180,7 +182,9 @@ class EnumSet {
   /**
    * Test is an element is contained in the set.
    */
-  bool contains(T aEnum) const { return mBitField & bitFor(aEnum); }
+  bool contains(T aEnum) const {
+    return static_cast<bool>(mBitField & bitFor(aEnum));
+  }
 
   /**
    * Test if a set is contained in the set.
@@ -192,17 +196,25 @@ class EnumSet {
   /**
    * Return the number of elements in the set.
    */
-  uint8_t size() const {
-    uint8_t count = 0;
-    for (Serialized bitField = mBitField; bitField; bitField >>= 1) {
-      if (bitField & 1) {
-        count++;
+  size_t size() const {
+    if constexpr (std::is_unsigned_v<Serialized>) {
+      if constexpr (kMaxBits > 32) {
+        return CountPopulation64(mBitField);
+      } else {
+        return CountPopulation32(mBitField);
       }
+    } else {
+      return mBitField.Count();
     }
-    return count;
   }
 
-  bool isEmpty() const { return mBitField == 0; }
+  bool isEmpty() const {
+    if constexpr (std::is_unsigned_v<Serialized>) {
+      return mBitField == 0;
+    } else {
+      return mBitField.IsEmpty();
+    }
+  }
 
   Serialized serialize() const { return mBitField; }
 
@@ -230,7 +242,9 @@ class EnumSet {
       mVersion = mSet->mVersion;
 #endif
       MOZ_ASSERT(aPos <= kMaxBits);
-      if (aPos != kMaxBits && !mSet->contains(T(mPos))) ++*this;
+      if (aPos != kMaxBits && !mSet->contains(T(mPos))) {
+        ++*this;
+      }
     }
 
     ConstIterator(const ConstIterator& aOther)
@@ -287,9 +301,15 @@ class EnumSet {
 
  private:
   constexpr static Serialized bitFor(T aEnum) {
-    auto bitNumber = static_cast<Serialized>(aEnum);
+    auto bitNumber = static_cast<size_t>(aEnum);
     MOZ_DIAGNOSTIC_ASSERT(bitNumber < kMaxBits);
-    return static_cast<Serialized>(Serialized{1} << bitNumber);
+    if constexpr (std::is_unsigned_v<Serialized>) {
+      return static_cast<Serialized>(Serialized{1} << bitNumber);
+    } else {
+      Serialized bitField;
+      bitField[bitNumber] = true;
+      return bitField;
+    }
   }
 
   constexpr void incVersion() {
@@ -298,7 +318,15 @@ class EnumSet {
 #endif
   }
 
-  static const size_t kMaxBits = sizeof(Serialized) * 8;
+  static constexpr size_t MaxBits() {
+    if constexpr (std::is_unsigned_v<Serialized>) {
+      return sizeof(Serialized) * 8;
+    } else {
+      return Serialized::Size();
+    }
+  }
+
+  static constexpr size_t kMaxBits = MaxBits();
 
   Serialized mBitField;
 

@@ -93,7 +93,7 @@ class MOZ_STACK_CLASS ScopeExit {
 
  public:
   explicit ScopeExit(ExitFunction&& cleanup)
-      : mExitFunction(cleanup), mExecuteOnDestruction(true) {}
+      : mExitFunction(std::move(cleanup)), mExecuteOnDestruction(true) {}
 
   ScopeExit(ScopeExit&& rhs)
       : mExitFunction(std::move(rhs.mExitFunction)),

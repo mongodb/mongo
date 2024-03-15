@@ -13,9 +13,12 @@
 #include "jit/JitRuntime.h"
 #include "js/friend/StackLimits.h"  // js::AutoCheckRecursionLimit
 #include "vm/Interpreter.h"
+#include "vm/JitActivation.h"
 #include "vm/JSContext.h"
+#include "vm/Realm.h"
 
-#include "vm/Stack-inl.h"
+#include "vm/Activation-inl.h"
+#include "vm/JSScript-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -33,6 +36,11 @@ static EnterJitStatus JS_HAZ_JSNATIVE_CALLER EnterJit(JSContext* cx,
   if (!recursion.check(cx)) {
     return EnterJitStatus::Error;
   }
+
+  // jit::Bailout(), jit::InvalidationBailout(), and jit::HandleException()
+  // reset the counter to zero, so assert here it's also zero when we enter
+  // JIT code.
+  MOZ_ASSERT(!cx->isInUnsafeRegion());
 
 #ifdef DEBUG
   // Assert we don't GC before entering JIT code. A GC could discard JIT code
@@ -56,16 +64,8 @@ static EnterJitStatus JS_HAZ_JSNATIVE_CALLER EnterJit(JSContext* cx,
     numActualArgs = args.length();
 
     if (TooManyActualArguments(numActualArgs)) {
-      // Too many arguments for Ion. Baseline supports more actual
-      // arguments, so in that case force Baseline code.
-      if (numActualArgs > BASELINE_MAX_ARGS_LENGTH) {
-        return EnterJitStatus::NotEntered;
-      }
-      if (script->hasBaselineScript()) {
-        code = script->baselineScript()->method()->raw();
-      } else {
-        code = cx->runtime()->jitRuntime()->baselineInterpreter().codeRaw();
-      }
+      // Fall back to the C++ interpreter to avoid running out of stack space.
+      return EnterJitStatus::NotEntered;
     }
 
     constructing = state.asInvoke()->constructing();
@@ -81,13 +81,8 @@ static EnterJitStatus JS_HAZ_JSNATIVE_CALLER EnterJit(JSContext* cx,
   } else {
     numActualArgs = 0;
     constructing = false;
-    if (script->isDirectEvalInFunction()) {
-      maxArgc = 1;
-      maxArgv = state.asExecute()->addressOfNewTarget();
-    } else {
-      maxArgc = 0;
-      maxArgv = nullptr;
-    }
+    maxArgc = 0;
+    maxArgv = nullptr;
     envChain = state.asExecute()->environmentChain();
     calleeToken = CalleeToToken(state.script());
   }
@@ -111,6 +106,9 @@ static EnterJitStatus JS_HAZ_JSNATIVE_CALLER EnterJit(JSContext* cx,
                         result.address());
   }
 
+  // Ensure the counter was reset to zero after exiting from JIT code.
+  MOZ_ASSERT(!cx->isInUnsafeRegion());
+
   // Release temporary buffer used for OSR into Ion.
   cx->runtime()->jitRuntime()->freeIonOsrTempData();
 
@@ -128,6 +126,14 @@ static EnterJitStatus JS_HAZ_JSNATIVE_CALLER EnterJit(JSContext* cx,
 
   state.setReturnValue(result);
   return EnterJitStatus::Ok;
+}
+
+// Call the per-script interpreter entry trampoline.
+bool js::jit::EnterInterpreterEntryTrampoline(uint8_t* code, JSContext* cx,
+                                              RunState* state) {
+  using EnterTrampolineCodePtr = bool (*)(JSContext * cx, RunState*);
+  auto funcPtr = JS_DATA_TO_FUNC_PTR(EnterTrampolineCodePtr, code);
+  return CALL_GENERATED_2(funcPtr, cx, state);
 }
 
 EnterJitStatus js::jit::MaybeEnterJit(JSContext* cx, RunState& state) {

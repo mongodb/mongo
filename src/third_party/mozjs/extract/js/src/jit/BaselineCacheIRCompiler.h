@@ -7,32 +7,61 @@
 #ifndef jit_BaselineCacheIRCompiler_h
 #define jit_BaselineCacheIRCompiler_h
 
+#include "mozilla/Attributes.h"
 #include "mozilla/Maybe.h"
 
-#include "gc/Barrier.h"
+#include <stddef.h>
+#include <stdint.h>
+
+#include "jstypes.h"
+
 #include "jit/CacheIR.h"
 #include "jit/CacheIRCompiler.h"
+#include "jit/CacheIROpsGenerated.h"
+#include "jit/CacheIRReader.h"
+
+struct JS_PUBLIC_API JSContext;
+
+class JSScript;
 
 namespace js {
 namespace jit {
 
-class ICCacheIRStub;
+class CacheIRWriter;
 class ICFallbackStub;
+class ICScript;
+class JitCode;
+class Label;
+class MacroAssembler;
 
-ICCacheIRStub* AttachBaselineCacheIRStub(JSContext* cx,
+struct Address;
+struct Register;
+
+enum class ICAttachResult { Attached, DuplicateStub, TooLarge, OOM };
+
+bool TryFoldingStubs(JSContext* cx, ICFallbackStub* fallback, JSScript* script,
+                     ICScript* icScript);
+
+ICAttachResult AttachBaselineCacheIRStub(JSContext* cx,
                                          const CacheIRWriter& writer,
                                          CacheKind kind, JSScript* outerScript,
                                          ICScript* icScript,
-                                         ICFallbackStub* stub, bool* attached);
+                                         ICFallbackStub* stub,
+                                         const char* name);
 
 // BaselineCacheIRCompiler compiles CacheIR to BaselineIC native code.
 class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   bool makesGCCalls_;
+  Register baselineFrameReg_ = FramePointer;
 
-  void tailCallVMInternal(MacroAssembler& masm, TailCallVMFunctionId id);
-
-  template <typename Fn, Fn fn>
-  void tailCallVM(MacroAssembler& masm);
+  // This register points to the baseline frame of the caller. It should only
+  // be used before we enter a stub frame. This is normally the frame pointer
+  // register, but with --enable-ic-frame-pointers we have to allocate a
+  // separate register.
+  inline Register baselineFrameReg() {
+    MOZ_ASSERT(!enteredStubFrame_);
+    return baselineFrameReg_;
+  }
 
   [[nodiscard]] bool emitStoreSlotShared(bool isFixed, ObjOperandId objId,
                                          uint32_t offsetOffset,
@@ -42,22 +71,28 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
       uint32_t newShapeOffset, mozilla::Maybe<uint32_t> numNewSlotsOffset);
 
   bool updateArgc(CallFlags flags, Register argcReg, Register scratch);
-  void loadStackObject(ArgumentKind kind, CallFlags flags, size_t stackPushed,
-                       Register argcReg, Register dest);
+  void loadStackObject(ArgumentKind kind, CallFlags flags, Register argcReg,
+                       Register dest);
   void pushArguments(Register argcReg, Register calleeReg, Register scratch,
-                     Register scratch2, CallFlags flags, bool isJitCall);
+                     Register scratch2, CallFlags flags, uint32_t argcFixed,
+                     bool isJitCall);
   void pushStandardArguments(Register argcReg, Register scratch,
-                             Register scratch2, bool isJitCall,
-                             bool isConstructing);
+                             Register scratch2, uint32_t argcFixed,
+                             bool isJitCall, bool isConstructing);
   void pushArrayArguments(Register argcReg, Register scratch, Register scratch2,
                           bool isJitCall, bool isConstructing);
   void pushFunCallArguments(Register argcReg, Register calleeReg,
                             Register scratch, Register scratch2,
-                            bool isJitCall);
+                            uint32_t argcFixed, bool isJitCall);
   void pushFunApplyArgsObj(Register argcReg, Register calleeReg,
                            Register scratch, Register scratch2, bool isJitCall);
+  void pushFunApplyNullUndefinedArguments(Register calleeReg, bool isJitCall);
+  void pushBoundFunctionArguments(Register argcReg, Register calleeReg,
+                                  Register scratch, Register scratch2,
+                                  CallFlags flags, uint32_t numBoundArgs,
+                                  bool isJitCall);
   void createThis(Register argcReg, Register calleeReg, Register scratch,
-                  CallFlags flags);
+                  CallFlags flags, bool isBoundFunction);
   template <typename T>
   void storeThis(const T& newThis, Register argcReg, CallFlags flags);
   void updateReturnValue();
@@ -65,11 +100,14 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   enum class NativeCallType { Native, ClassHook };
   bool emitCallNativeShared(NativeCallType callType, ObjOperandId calleeId,
                             Int32OperandId argcId, CallFlags flags,
+                            uint32_t argcFixed,
                             mozilla::Maybe<bool> ignoresReturnValue,
                             mozilla::Maybe<uint32_t> targetOffset);
 
   enum class StringCode { CodeUnit, CodePoint };
   bool emitStringFromCodeResult(Int32OperandId codeId, StringCode stringCode);
+
+  void emitAtomizeString(Register str, Register temp, Label* failure);
 
   bool emitCallScriptedGetterShared(ValOperandId receiverId,
                                     uint32_t getterOffset, bool sameRealm,
@@ -81,11 +119,15 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
                                     uint32_t nargsAndFlagsOffset,
                                     mozilla::Maybe<uint32_t> icScriptOffset);
 
+  BaselineICPerfSpewer perfSpewer_;
+
  public:
+  BaselineICPerfSpewer& perfSpewer() { return perfSpewer_; }
+
   friend class AutoStubFrame;
 
-  BaselineCacheIRCompiler(JSContext* cx, const CacheIRWriter& writer,
-                          uint32_t stubDataOffset);
+  BaselineCacheIRCompiler(JSContext* cx, TempAllocator& alloc,
+                          const CacheIRWriter& writer, uint32_t stubDataOffset);
 
   [[nodiscard]] bool init(CacheKind kind);
 

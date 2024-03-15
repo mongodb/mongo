@@ -1,4 +1,5 @@
 
+
 /**
  *    Copyright (C) 2019-present MongoDB, Inc.
  *
@@ -38,7 +39,6 @@
 #include "jsnum.h"
 #include "jstypes.h"
 
-#include "gc/FreeOp.h"
 #include "gc/Marking.h"
 #include "js/CharacterEncoding.h"
 #include "js/Wrapper.h"

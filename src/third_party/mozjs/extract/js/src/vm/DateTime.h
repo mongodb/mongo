@@ -7,7 +7,6 @@
 #ifndef vm_DateTime_h
 #define vm_DateTime_h
 
-#include "mozilla/Assertions.h"
 #include "mozilla/UniquePtr.h"
 
 #include <stdint.h>
@@ -15,13 +14,14 @@
 #include "js/Utility.h"
 #include "threading/ExclusiveData.h"
 
-#if JS_HAS_INTL_API && !MOZ_SYSTEM_ICU
-#  include "unicode/uversion.h"
+#if JS_HAS_INTL_API
+#  include "mozilla/intl/ICU4CGlue.h"
+#  include "mozilla/intl/TimeZone.h"
+#endif
 
-U_NAMESPACE_BEGIN
-class TimeZone;
-U_NAMESPACE_END
-#endif /* JS_HAS_INTL_API && !MOZ_SYSTEM_ICU */
+namespace JS {
+class Realm;
+}
 
 namespace js {
 
@@ -64,15 +64,6 @@ enum class ResetTimeZoneMode : bool {
  * time zone data.
  */
 extern void ResetTimeZoneInternal(ResetTimeZoneMode mode);
-
-/**
- * ICU's default time zone, used for various date/time formatting operations
- * that include the local time in the representation, is allowed to go stale
- * for unfortunate performance reasons.  Call this function when an up-to-date
- * default time zone is required, to resync ICU's default time zone with
- * reality.
- */
-extern void ResyncICUDefaultTimeZone();
 
 /**
  * Stores date/time information, particularly concerning the current local
@@ -121,17 +112,26 @@ extern void ResyncICUDefaultTimeZone();
  * potential win from better caching offsets the loss from extra complexity.)
  */
 class DateTimeInfo {
+ public:
+  // Whether we should resist fingerprinting. For realms in RFP mode a separate
+  // DateTimeInfo instance is used that is always in the UTC time zone.
+  enum class ShouldRFP { No, Yes };
+
+ private:
   static ExclusiveData<DateTimeInfo>* instance;
+  static ExclusiveData<DateTimeInfo>* instanceRFP;
+
   friend class ExclusiveData<DateTimeInfo>;
 
   friend bool InitDateTimeState();
   friend void FinishDateTimeState();
 
-  DateTimeInfo();
+  explicit DateTimeInfo(bool shouldResistFingerprinting);
   ~DateTimeInfo();
 
-  static auto acquireLockWithValidTimeZone() {
-    auto guard = instance->lock();
+  static auto acquireLockWithValidTimeZone(ShouldRFP shouldRFP) {
+    auto guard =
+        shouldRFP == ShouldRFP::Yes ? instanceRFP->lock() : instance->lock();
     if (guard->timeZoneStatus_ != TimeZoneStatus::Valid) {
       guard->updateTimeZone();
     }
@@ -139,6 +139,8 @@ class DateTimeInfo {
   }
 
  public:
+  static ShouldRFP shouldRFP(JS::Realm* realm);
+
   // The spec implicitly assumes DST and time zone adjustment information
   // never change in the course of a function -- sometimes even across
   // reentrancy.  So make critical sections as narrow as possible.
@@ -149,8 +151,9 @@ class DateTimeInfo {
    * zone (Lord Howe Island, Australia) has a fractional-hour offset, just to
    * keep things interesting.
    */
-  static int32_t getDSTOffsetMilliseconds(int64_t utcMilliseconds) {
-    auto guard = acquireLockWithValidTimeZone();
+  static int32_t getDSTOffsetMilliseconds(ShouldRFP shouldRFP,
+                                          int64_t utcMilliseconds) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->internalGetDSTOffsetMilliseconds(utcMilliseconds);
   }
 
@@ -159,21 +162,22 @@ class DateTimeInfo {
    * standard time (i.e. not including any offset due to DST) as computed by the
    * operating system.
    */
-  static int32_t utcToLocalStandardOffsetSeconds() {
-    auto guard = acquireLockWithValidTimeZone();
+  static int32_t utcToLocalStandardOffsetSeconds(ShouldRFP shouldRFP) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->utcToLocalStandardOffsetSeconds_;
   }
 
-#if JS_HAS_INTL_API && !MOZ_SYSTEM_ICU
+#if JS_HAS_INTL_API
   enum class TimeZoneOffset { UTC, Local };
 
   /**
    * Return the time zone offset, including DST, in milliseconds at the
    * given time. The input time can be either at UTC or at local time.
    */
-  static int32_t getOffsetMilliseconds(int64_t milliseconds,
+  static int32_t getOffsetMilliseconds(ShouldRFP shouldRFP,
+                                       int64_t milliseconds,
                                        TimeZoneOffset offset) {
-    auto guard = acquireLockWithValidTimeZone();
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->internalGetOffsetMilliseconds(milliseconds, offset);
   }
 
@@ -183,36 +187,57 @@ class DateTimeInfo {
    * buffer is too small, an empty string is stored. The stored display name
    * is null-terminated in any case.
    */
-  static bool timeZoneDisplayName(char16_t* buf, size_t buflen,
-                                  int64_t utcMilliseconds, const char* locale) {
-    auto guard = acquireLockWithValidTimeZone();
+  static bool timeZoneDisplayName(ShouldRFP shouldRFP, char16_t* buf,
+                                  size_t buflen, int64_t utcMilliseconds,
+                                  const char* locale) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->internalTimeZoneDisplayName(buf, buflen, utcMilliseconds,
                                               locale);
+  }
+
+  /**
+   * Copy the identifier for the current time zone to the provided resizable
+   * buffer.
+   */
+  template <typename B>
+  static mozilla::intl::ICUResult timeZoneId(ShouldRFP shouldRFP, B& buffer) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
+    return guard->timeZone()->GetId(buffer);
+  }
+
+  /**
+   * A number indicating the raw offset from GMT in milliseconds.
+   */
+  static mozilla::Result<int32_t, mozilla::intl::ICUError> getRawOffsetMs(
+      ShouldRFP shouldRFP) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
+    return guard->timeZone()->GetRawOffsetMs();
   }
 #else
   /**
    * Return the local time zone adjustment (ES2019 20.3.1.7) as computed by
    * the operating system.
    */
-  static int32_t localTZA() {
-    return utcToLocalStandardOffsetSeconds() * msPerSecond;
+  static int32_t localTZA(ShouldRFP shouldRFP) {
+    return utcToLocalStandardOffsetSeconds(shouldRFP) * msPerSecond;
   }
-#endif /* JS_HAS_INTL_API && !MOZ_SYSTEM_ICU */
+#endif /* JS_HAS_INTL_API */
 
  private:
-  // The two methods below should only be called via js::ResetTimeZoneInternal()
-  // and js::ResyncICUDefaultTimeZone().
+  // The method below should only be called via js::ResetTimeZoneInternal().
   friend void js::ResetTimeZoneInternal(ResetTimeZoneMode);
-  friend void js::ResyncICUDefaultTimeZone();
 
   static void resetTimeZone(ResetTimeZoneMode mode) {
-    auto guard = instance->lock();
-    guard->internalResetTimeZone(mode);
-  }
-
-  static void resyncICUDefaultTimeZone() {
-    auto guard = acquireLockWithValidTimeZone();
-    (void)guard;
+    {
+      auto guard = instance->lock();
+      guard->internalResetTimeZone(mode);
+    }
+    {
+      // Only needed to initialize the default state and any later call will
+      // perform an unnecessary reset.
+      auto guard = instanceRFP->lock();
+      guard->internalResetTimeZone(mode);
+    }
   }
 
   struct RangeCache {
@@ -229,6 +254,8 @@ class DateTimeInfo {
 
     void sanityCheck();
   };
+
+  bool shouldResistFingerprinting_;
 
   enum class TimeZoneStatus : uint8_t { Valid, NeedsUpdate, UpdateIfChanged };
 
@@ -263,22 +290,17 @@ class DateTimeInfo {
    * <https://unicode-org.atlassian.net/browse/ICU-13845>.
    *
    * When ICU is exclusively used for time zone computations, that means when
-   * |JS_HAS_INTL_API && !MOZ_SYSTEM_ICU| is true, this field is only used to
-   * detect system default time zone changes. It must not be used to convert
-   * between local and UTC time, because, as outlined above, this could lead to
-   * different results when compared to ICU.
+   * |JS_HAS_INTL_API| is true, this field is only used to detect system default
+   * time zone changes. It must not be used to convert between local and UTC
+   * time, because, as outlined above, this could lead to different results when
+   * compared to ICU.
    */
   int32_t utcToLocalStandardOffsetSeconds_;
 
   RangeCache dstRange_;  // UTC-based ranges
 
-#if JS_HAS_INTL_API && !MOZ_SYSTEM_ICU
-  // ICU's TimeZone class is currently only available through the C++ API,
-  // see <https://unicode-org.atlassian.net/browse/ICU-13706>. Due to the
-  // lack of a stable ABI in C++, we therefore need to restrict this class
-  // to only use ICU when we use our in-tree ICU copy.
-
-  // Use the full date-time range when we can use ICU's TimeZone support.
+#if JS_HAS_INTL_API
+  // Use the full date-time range when we can use mozilla::intl::TimeZone.
   static constexpr int64_t MinTimeT =
       static_cast<int64_t>(StartOfTime / msPerSecond);
   static constexpr int64_t MaxTimeT =
@@ -288,10 +310,10 @@ class DateTimeInfo {
   RangeCache localRange_;  // UTC-based ranges
 
   /**
-   * The current ICU time zone. Lazily constructed to avoid potential I/O
-   * access when initializing this class.
+   * The current time zone. Lazily constructed to avoid potential I/O access
+   * when initializing this class.
    */
-  mozilla::UniquePtr<icu::TimeZone> timeZone_;
+  mozilla::UniquePtr<mozilla::intl::TimeZone> timeZone_;
 
   /**
    * Cached names of the standard and daylight savings display names of the
@@ -309,7 +331,7 @@ class DateTimeInfo {
   // underlying operating system.
   static constexpr int64_t MinTimeT = 0;          /* time_t 01/01/1970 */
   static constexpr int64_t MaxTimeT = 2145830400; /* time_t 12/31/2037 */
-#endif /* JS_HAS_INTL_API && !MOZ_SYSTEM_ICU */
+#endif /* JS_HAS_INTL_API */
 
   static constexpr int64_t RangeExpansionAmount = 30 * SecondsPerDay;
 
@@ -338,7 +360,7 @@ class DateTimeInfo {
 
   int32_t internalGetDSTOffsetMilliseconds(int64_t utcMilliseconds);
 
-#if JS_HAS_INTL_API && !MOZ_SYSTEM_ICU
+#if JS_HAS_INTL_API
   /**
    * Compute the UTC offset in milliseconds for the given local time. Called
    * by internalGetOffsetMilliseconds on a cache miss.
@@ -357,8 +379,8 @@ class DateTimeInfo {
   bool internalTimeZoneDisplayName(char16_t* buf, size_t buflen,
                                    int64_t utcMilliseconds, const char* locale);
 
-  icu::TimeZone* timeZone();
-#endif /* JS_HAS_INTL_API && !MOZ_SYSTEM_ICU */
+  mozilla::intl::TimeZone* timeZone();
+#endif /* JS_HAS_INTL_API */
 };
 
 } /* namespace js */

@@ -10,7 +10,6 @@
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
 
 #include <algorithm>  // std::min
-#include <stdint.h>   // uintptr_t
 
 #include "js/AllocPolicy.h"         // js::SystemAllocPolicy
 #include "js/friend/StackLimits.h"  // js::AutoCheckRecursionLimit

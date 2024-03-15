@@ -38,6 +38,7 @@
 #include <js/GCVector.h>
 #include <js/Id.h>
 #include <js/Object.h>
+#include <js/PropertyAndElement.h>
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
 #include <js/ValueArray.h>

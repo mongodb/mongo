@@ -9,6 +9,7 @@
 #ifndef js_friend_DumpFunctions_h
 #define js_friend_DumpFunctions_h
 
+#include "mozilla/Attributes.h"
 #include "mozilla/MemoryReporting.h"  // mozilla::MallocSizeOf
 
 #include <stddef.h>  // size_t
@@ -16,6 +17,7 @@
 
 #include "jstypes.h"  // JS_PUBLIC_API
 
+#include "js/Printer.h"  // js::GenericPrinter
 #include "js/Utility.h"  // JS::UniqueChars
 
 class JS_PUBLIC_API JSAtom;
@@ -27,7 +29,7 @@ class JS_PUBLIC_API JSString;
 namespace JS {
 
 class JS_PUBLIC_API BigInt;
-struct JS_PUBLIC_API PropertyKey;
+class JS_PUBLIC_API PropertyKey;
 class JS_PUBLIC_API Value;
 
 }  // namespace JS
@@ -99,6 +101,8 @@ extern JS_PUBLIC_API bool DumpScript(JSContext* cx, JSScript* scriptArg);
 
 extern JS_PUBLIC_API void DumpBacktrace(JSContext* cx, FILE* fp);
 
+extern JS_PUBLIC_API void DumpBacktrace(JSContext* cx, GenericPrinter& out);
+
 extern JS_PUBLIC_API void DumpBacktrace(JSContext* cx);
 
 enum DumpHeapNurseryBehaviour {
@@ -113,6 +117,10 @@ enum DumpHeapNurseryBehaviour {
 extern JS_PUBLIC_API void DumpHeap(
     JSContext* cx, FILE* fp, DumpHeapNurseryBehaviour nurseryBehaviour,
     mozilla::MallocSizeOf mallocSizeOf = nullptr);
+
+extern JS_PUBLIC_API void DumpFmt(FILE* fp, const char* fmt, ...)
+    MOZ_FORMAT_PRINTF(2, 3);
+extern JS_PUBLIC_API void DumpFmt(const char* fmt, ...) MOZ_FORMAT_PRINTF(1, 2);
 
 }  // namespace js
 

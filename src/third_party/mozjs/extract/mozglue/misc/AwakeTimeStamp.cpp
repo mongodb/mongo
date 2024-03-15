@@ -12,8 +12,6 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/Maybe.h"
-#include "mozilla/TimeStamp.h"
 
 namespace mozilla {
 

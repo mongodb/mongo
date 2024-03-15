@@ -6,8 +6,8 @@
     "env": {
         "JITTEST_EXTRA_ARGS": "--jitflags=none",
         "JSTESTS_EXTRA_ARGS": "--jitflags=none",
-        "LLVM_SYMBOLIZER": "{MOZ_FETCHES_DIR}/llvm-symbolizer/llvm-symbolizer",
-        "ASAN_SYMBOLIZER_PATH": "{MOZ_FETCHES_DIR}/llvm-symbolizer/llvm-symbolizer"
+        "LLVM_SYMBOLIZER": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer",
+        "ASAN_SYMBOLIZER_PATH": "{MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer"
     },
     "use_minidump": false
 }

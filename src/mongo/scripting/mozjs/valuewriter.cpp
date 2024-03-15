@@ -311,7 +311,8 @@ void ValueWriter::toBinData(std::function<void(const BSONBinData&)> withBinData)
     auto subType = wrapper.getNumber(InternedString::type);
     uassert(6123400, "BinData sub type must be between 0 and 255", subType >= 0 && subType <= 255);
 
-    auto binDataStr = static_cast<std::string*>(JS::GetPrivate(obj));
+    auto binDataStr =
+        JS::GetMaybePtrFromReservedSlot<std::string>(obj, BinDataInfo::BinDataStringSlot);
     uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", binDataStr);
 
     auto binData = base64::decode(*binDataStr);
@@ -462,7 +463,8 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<BinDataInfo>().getJSClass() == jsclass) {
-                auto str = static_cast<std::string*>(JS::GetPrivate(obj));
+                auto str = JS::GetMaybePtrFromReservedSlot<std::string>(
+                    obj, BinDataInfo::BinDataStringSlot);
 
                 uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
 

@@ -24,6 +24,7 @@ struct JS_PUBLIC_API JSRuntime;
 
 namespace js {
 
+class AutoLockHelperThreadState;
 class OffThreadPromiseRuntimeState;
 
 // [SMDOC] OffThreadPromiseTask: an off-main-thread task that resolves a promise

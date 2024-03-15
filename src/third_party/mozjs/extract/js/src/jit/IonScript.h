@@ -14,18 +14,15 @@
 
 #include "jstypes.h"
 
-#include "gc/Barrier.h"          // HeapPtr{JitCode,Object}, PreBarrieredValue
+#include "gc/Barrier.h"          // HeapPtr{JitCode,Object}
 #include "jit/IonTypes.h"        // IonCompilationId
 #include "jit/JitCode.h"         // JitCode
 #include "jit/JitOptions.h"      // JitOptions
 #include "js/TypeDecls.h"        // jsbytecode
 #include "util/TrailingArray.h"  // TrailingArray
-#include "vm/TraceLogging.h"     // TraceLoggerEvent
 
 namespace js {
 namespace jit {
-
-using TraceLoggerEventVector = Vector<TraceLoggerEvent, 0, SystemAllocPolicy>;
 
 class SnapshotWriter;
 class RecoverWriter;
@@ -41,11 +38,10 @@ class IonIC;
 //
 //    <IonScript itself>
 //    --
-//    PreBarrieredValue[]   constantTable()
+//    PreBarriered<Value>[] constantTable()
 //    uint8_t[]             runtimeData()
 //    OsiIndex[]            osiIndex()
 //    SafepointIndex[]      safepointIndex()
-//    SnapshotOffset[]      bailoutTable()
 //    uint32_t[]            icIndex()
 //    --
 //    uint8_t[]             safepoints()
@@ -66,7 +62,6 @@ class alignas(8) IonScript final : public TrailingArray {
   Offset nurseryObjectsOffset_ = 0;  // pointer aligned
   Offset osiIndexOffset_ = 0;
   Offset safepointIndexOffset_ = 0;
-  Offset bailoutTableOffset_ = 0;
   Offset icIndexOffset_ = 0;
   Offset safepointsOffset_ = 0;
   Offset snapshotsOffset_ = 0;
@@ -75,7 +70,7 @@ class alignas(8) IonScript final : public TrailingArray {
   Offset allocBytes_ = 0;
 
   // Code pointer containing the actual method.
-  HeapPtrJitCode method_ = nullptr;
+  HeapPtr<JitCode*> method_ = nullptr;
 
   // Entrypoint for OSR, or nullptr.
   jsbytecode* osrPc_ = nullptr;
@@ -111,11 +106,12 @@ class alignas(8) IonScript final : public TrailingArray {
   // Flag set if IonScript was compiled with profiling enabled.
   bool hasProfilingInstrumentation_ = false;
 
-  // Number of bytes this function reserves on the stack.
-  uint32_t frameSlots_ = 0;
+  // Number of bytes this function reserves on the stack for slots spilled by
+  // the register allocator.
+  uint32_t localSlotsSize_ = 0;
 
   // Number of bytes used passed in as formal arguments or |this|.
-  uint32_t argumentSlots_ = 0;
+  uint32_t argumentSlotsSize_ = 0;
 
   // Frame size is the value that can be added to the StackPointer along
   // with the frame prefix to get a valid JitFrameLayout.
@@ -131,9 +127,6 @@ class alignas(8) IonScript final : public TrailingArray {
   // a LOOPENTRY pc other than osrPc_.
   uint32_t osrPcMismatchCounter_ = 0;
 
-  // TraceLogger events that are baked into the IonScript.
-  TraceLoggerEventVector traceLoggerEvents_;
-
 #ifdef DEBUG
   // A hash of the ICScripts used in this compilation.
   mozilla::HashNumber icHash_ = 0;
@@ -148,7 +141,6 @@ class alignas(8) IonScript final : public TrailingArray {
   Offset nurseryObjectsOffset() const { return nurseryObjectsOffset_; }
   Offset osiIndexOffset() const { return osiIndexOffset_; }
   Offset safepointIndexOffset() const { return safepointIndexOffset_; }
-  Offset bailoutTableOffset() const { return bailoutTableOffset_; }
   Offset icIndexOffset() const { return icIndexOffset_; }
   Offset safepointsOffset() const { return safepointsOffset_; }
   Offset snapshotsOffset() const { return snapshotsOffset_; }
@@ -159,20 +151,19 @@ class alignas(8) IonScript final : public TrailingArray {
   // Hardcode size of incomplete types. These are verified in Ion.cpp.
   static constexpr size_t SizeOf_OsiIndex = 2 * sizeof(uint32_t);
   static constexpr size_t SizeOf_SafepointIndex = 2 * sizeof(uint32_t);
-  static constexpr size_t SizeOf_SnapshotOffset = sizeof(uint32_t);
 
  public:
   //
   // Table of constants referenced in snapshots. (JS::Value alignment)
   //
-  PreBarrieredValue* constants() {
+  PreBarriered<Value>* constants() {
     // Nursery constants are manually barriered in CodeGenerator::link() so a
     // post barrier is not required..
-    return offsetToPointer<PreBarrieredValue>(constantTableOffset());
+    return offsetToPointer<PreBarriered<Value>>(constantTableOffset());
   }
   size_t numConstants() const {
-    return numElements<PreBarrieredValue>(constantTableOffset(),
-                                          runtimeDataOffset());
+    return numElements<PreBarriered<Value>>(constantTableOffset(),
+                                            runtimeDataOffset());
   }
 
   //
@@ -189,11 +180,12 @@ class alignas(8) IonScript final : public TrailingArray {
   // List of (originally) nursery-allocated objects referenced from JIT code.
   // (JSObject* alignment)
   //
-  HeapPtrObject* nurseryObjects() {
-    return offsetToPointer<HeapPtrObject>(nurseryObjectsOffset());
+  HeapPtr<JSObject*>* nurseryObjects() {
+    return offsetToPointer<HeapPtr<JSObject*>>(nurseryObjectsOffset());
   }
   size_t numNurseryObjects() const {
-    return numElements<HeapPtrObject>(nurseryObjectsOffset(), osiIndexOffset());
+    return numElements<HeapPtr<JSObject*>>(nurseryObjectsOffset(),
+                                           osiIndexOffset());
   }
   void* addressOfNurseryObject(uint32_t index) {
     MOZ_ASSERT(index < numNurseryObjects());
@@ -223,17 +215,6 @@ class alignas(8) IonScript final : public TrailingArray {
   }
   size_t numSafepointIndices() const {
     return numElements<SizeOf_SafepointIndex>(safepointIndexOffset(),
-                                              bailoutTableOffset());
-  }
-
-  //
-  // Table mapping bailout IDs to snapshot offsets.
-  //
-  SnapshotOffset* bailoutTable() {
-    return offsetToPointer<SnapshotOffset>(bailoutTableOffset());
-  }
-  size_t numBailoutEntries() const {
-    return numElements<SizeOf_SnapshotOffset>(bailoutTableOffset(),
                                               icIndexOffset());
   }
 
@@ -279,20 +260,20 @@ class alignas(8) IonScript final : public TrailingArray {
   }
 
  private:
-  IonScript(IonCompilationId compilationId, uint32_t frameSlots,
-            uint32_t argumentSlots, uint32_t frameSize);
+  IonScript(IonCompilationId compilationId, uint32_t localSlotsSize,
+            uint32_t argumentSlotsSize, uint32_t frameSize);
 
  public:
   static IonScript* New(JSContext* cx, IonCompilationId compilationId,
-                        uint32_t frameSlots, uint32_t argumentSlots,
+                        uint32_t localSlotsSize, uint32_t argumentSlotsSize,
                         uint32_t frameSize, size_t snapshotsListSize,
                         size_t snapshotsRVATableSize, size_t recoversSize,
-                        size_t bailoutEntries, size_t constants,
-                        size_t nurseryObjects, size_t safepointIndices,
-                        size_t osiIndices, size_t icEntries, size_t runtimeSize,
+                        size_t constants, size_t nurseryObjects,
+                        size_t safepointIndices, size_t osiIndices,
+                        size_t icEntries, size_t runtimeSize,
                         size_t safepointsSize);
 
-  static void Destroy(JSFreeOp* fop, IonScript* script);
+  static void Destroy(JS::GCContext* gcx, IonScript* script);
 
   void trace(JSTracer* trc);
 
@@ -341,6 +322,7 @@ class alignas(8) IonScript final : public TrailingArray {
   }
 
   void incNumFixableBailouts() { numFixableBailouts_++; }
+  void resetNumFixableBailouts() { numFixableBailouts_ = 0; }
   void incNumUnfixableBailouts() { numUnfixableBailouts_++; }
 
   bool shouldInvalidate() const {
@@ -369,24 +351,17 @@ class alignas(8) IonScript final : public TrailingArray {
   bool hasProfilingInstrumentation() const {
     return hasProfilingInstrumentation_;
   }
-  [[nodiscard]] bool addTraceLoggerEvent(TraceLoggerEvent& event) {
-    MOZ_ASSERT(event.hasTextId());
-    return traceLoggerEvents_.append(std::move(event));
-  }
+
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
     return mallocSizeOf(this);
   }
-  PreBarrieredValue& getConstant(size_t index) {
+  PreBarriered<Value>& getConstant(size_t index) {
     MOZ_ASSERT(index < numConstants());
     return constants()[index];
   }
-  uint32_t frameSlots() const { return frameSlots_; }
-  uint32_t argumentSlots() const { return argumentSlots_; }
+  uint32_t localSlotsSize() const { return localSlotsSize_; }
+  uint32_t argumentSlotsSize() const { return argumentSlotsSize_; }
   uint32_t frameSize() const { return frameSize_; }
-  SnapshotOffset bailoutToSnapshot(uint32_t bailoutId) {
-    MOZ_ASSERT(bailoutId < numBailoutEntries());
-    return bailoutTable()[bailoutId];
-  }
   const SafepointIndex* getSafepointIndex(uint32_t disp) const;
   const SafepointIndex* getSafepointIndex(uint8_t* retAddr) const {
     MOZ_ASSERT(containsCodeAddress(retAddr));
@@ -407,7 +382,6 @@ class alignas(8) IonScript final : public TrailingArray {
   void purgeICs(Zone* zone);
   void copySnapshots(const SnapshotWriter* writer);
   void copyRecovers(const RecoverWriter* writer);
-  void copyBailoutTable(const SnapshotOffset* table);
   void copyConstants(const Value* vp);
   void copySafepointIndices(const CodegenSafepointIndex* si);
   void copyOsiIndices(const OsiIndex* oi);
@@ -423,11 +397,11 @@ class alignas(8) IonScript final : public TrailingArray {
 
   size_t invalidationCount() const { return invalidationCount_; }
   void incrementInvalidationCount() { invalidationCount_++; }
-  void decrementInvalidationCount(JSFreeOp* fop) {
+  void decrementInvalidationCount(JS::GCContext* gcx) {
     MOZ_ASSERT(invalidationCount_);
     invalidationCount_--;
     if (!invalidationCount_) {
-      Destroy(fop, this);
+      Destroy(gcx, this);
     }
   }
   IonCompilationId compilationId() const { return compilationId_; }

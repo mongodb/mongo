@@ -12,11 +12,15 @@
 #include <type_traits>
 
 #include "mozilla/Attributes.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/fallible.h"
 #include "mozilla/UniquePtr.h"
 
 #ifdef XP_WIN
 #  include <cstdint>
+#endif
+#if defined(XP_DARWIN) && !defined(RUST_BINDGEN)
+#  include <mach/mach.h>
 #endif
 
 namespace mozilla {
@@ -149,9 +153,57 @@ struct FileHandleHelper {
 };
 
 struct FileHandleDeleter {
-  typedef FileHandleHelper pointer;
+  using pointer = FileHandleHelper;
+  using receiver = FileHandleType;
   MFBT_API void operator()(FileHandleHelper aHelper);
 };
+
+#if defined(XP_DARWIN) && !defined(RUST_BINDGEN)
+struct MachPortHelper {
+  MOZ_IMPLICIT MachPortHelper(mach_port_t aPort) : mPort(aPort) {}
+
+  MOZ_IMPLICIT constexpr MachPortHelper(std::nullptr_t)
+      : mPort(MACH_PORT_NULL) {}
+
+  bool operator!=(std::nullptr_t) const { return mPort != MACH_PORT_NULL; }
+
+  operator const mach_port_t&() const { return mPort; }
+  operator mach_port_t&() { return mPort; }
+
+ private:
+  mach_port_t mPort;
+};
+
+struct MachSendRightDeleter {
+  using pointer = MachPortHelper;
+  using receiver = mach_port_t;
+  MFBT_API void operator()(MachPortHelper aHelper) {
+    DebugOnly<kern_return_t> kr =
+        mach_port_deallocate(mach_task_self(), aHelper);
+    MOZ_ASSERT(kr == KERN_SUCCESS, "failed to deallocate mach send right");
+  }
+};
+
+struct MachReceiveRightDeleter {
+  using pointer = MachPortHelper;
+  using receiver = mach_port_t;
+  MFBT_API void operator()(MachPortHelper aHelper) {
+    DebugOnly<kern_return_t> kr = mach_port_mod_refs(
+        mach_task_self(), aHelper, MACH_PORT_RIGHT_RECEIVE, -1);
+    MOZ_ASSERT(kr == KERN_SUCCESS, "failed to release mach receive right");
+  }
+};
+
+struct MachPortSetDeleter {
+  using pointer = MachPortHelper;
+  using receiver = mach_port_t;
+  MFBT_API void operator()(MachPortHelper aHelper) {
+    DebugOnly<kern_return_t> kr = mach_port_mod_refs(
+        mach_task_self(), aHelper, MACH_PORT_RIGHT_PORT_SET, -1);
+    MOZ_ASSERT(kr == KERN_SUCCESS, "failed to release mach port set");
+  }
+};
+#endif
 
 }  // namespace detail
 
@@ -163,6 +215,85 @@ using UniqueFreePtr = UniquePtr<T, detail::FreePolicy<T>>;
 using UniqueFileHandle =
     UniquePtr<detail::FileHandleType, detail::FileHandleDeleter>;
 
+#if defined(XP_DARWIN) && !defined(RUST_BINDGEN)
+// A RAII class for a Mach port that names a send right.
+using UniqueMachSendRight =
+    UniquePtr<mach_port_t, detail::MachSendRightDeleter>;
+// A RAII class for a Mach port that names a receive right.
+using UniqueMachReceiveRight =
+    UniquePtr<mach_port_t, detail::MachReceiveRightDeleter>;
+// A RAII class for a Mach port set.
+using UniqueMachPortSet = UniquePtr<mach_port_t, detail::MachPortSetDeleter>;
+
+// Increases the user reference count for MACH_PORT_RIGHT_SEND by 1 and returns
+// a new UniqueMachSendRight to manage the additional right.
+inline UniqueMachSendRight RetainMachSendRight(mach_port_t aPort) {
+  kern_return_t kr =
+      mach_port_mod_refs(mach_task_self(), aPort, MACH_PORT_RIGHT_SEND, 1);
+  if (kr == KERN_SUCCESS) {
+    return UniqueMachSendRight(aPort);
+  }
+  return nullptr;
+}
+#endif
+
+namespace detail {
+
+struct HasReceiverTypeHelper {
+  template <class U>
+  static double Test(...);
+  template <class U>
+  static char Test(typename U::receiver* = 0);
+};
+
+template <class T>
+class HasReceiverType
+    : public std::integral_constant<bool, sizeof(HasReceiverTypeHelper::Test<T>(
+                                              0)) == 1> {};
+
+template <class T, class D, bool = HasReceiverType<D>::value>
+struct ReceiverTypeImpl {
+  using Type = typename D::receiver;
+};
+
+template <class T, class D>
+struct ReceiverTypeImpl<T, D, false> {
+  using Type = typename PointerType<T, D>::Type;
+};
+
+template <class T, class D>
+struct ReceiverType {
+  using Type = typename ReceiverTypeImpl<T, std::remove_reference_t<D>>::Type;
+};
+
+template <typename T, typename D>
+class MOZ_TEMPORARY_CLASS UniquePtrGetterTransfers {
+ public:
+  using Ptr = UniquePtr<T, D>;
+  using Receiver = typename detail::ReceiverType<T, D>::Type;
+
+  explicit UniquePtrGetterTransfers(Ptr& p)
+      : mPtr(p), mReceiver(typename Ptr::Pointer(nullptr)) {}
+  ~UniquePtrGetterTransfers() { mPtr.reset(mReceiver); }
+
+  operator Receiver*() { return &mReceiver; }
+  Receiver& operator*() { return mReceiver; }
+
+  // operator void** is conditionally enabled if `Receiver` is a pointer.
+  template <typename U = Receiver,
+            std::enable_if_t<
+                std::is_pointer_v<U> && std::is_same_v<U, Receiver>, int> = 0>
+  operator void**() {
+    return reinterpret_cast<void**>(&mReceiver);
+  }
+
+ private:
+  Ptr& mPtr;
+  Receiver mReceiver;
+};
+
+}  // namespace detail
+
 // Helper for passing a UniquePtr to an old-style function that uses raw
 // pointers for out params. Example usage:
 //
@@ -171,22 +302,7 @@ using UniqueFileHandle =
 //   AllocateFoo(getter_Transfers(foo));
 template <typename T, typename D>
 auto getter_Transfers(UniquePtr<T, D>& up) {
-  class MOZ_TEMPORARY_CLASS UniquePtrGetterTransfers {
-   public:
-    using Ptr = UniquePtr<T, D>;
-    explicit UniquePtrGetterTransfers(Ptr& p) : mPtr(p) {}
-    ~UniquePtrGetterTransfers() { mPtr.reset(mRawPtr); }
-
-    operator typename Ptr::ElementType **() { return &mRawPtr; }
-    operator void**() { return reinterpret_cast<void**>(&mRawPtr); }
-    typename Ptr::ElementType*& operator*() { return mRawPtr; }
-
-   private:
-    Ptr& mPtr;
-    typename Ptr::Pointer mRawPtr = nullptr;
-  };
-
-  return UniquePtrGetterTransfers(up);
+  return detail::UniquePtrGetterTransfers<T, D>(up);
 }
 
 }  // namespace mozilla

@@ -9,7 +9,6 @@
 #include "jit/JitSpewer.h"
 #include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
-#include "wasm/WasmTypes.h"
 
 using namespace js;
 using namespace js::jit;
@@ -46,16 +45,25 @@ bool jit::EliminateBoundsChecks(MIRGenerator* mir, MIRGraph& graph) {
           MWasmBoundsCheck* bc = def->toWasmBoundsCheck();
           MDefinition* addr = bc->index();
 
-          // Eliminate constant-address bounds checks to addresses below
+          // We only support bounds check elimination on wasm memory, not
+          // tables. See bug 1625891.
+          if (!bc->isMemory()) {
+            continue;
+          }
+
+          // Eliminate constant-address memory bounds checks to addresses below
           // the heap minimum.
           //
           // The payload of the MConstant will be Double if the constant
           // result is above 2^31-1, but we don't care about that for BCE.
 
           if (addr->isConstant() &&
-              addr->toConstant()->type() == MIRType::Int32 &&
-              uint64_t(addr->toConstant()->toInt32()) <
-                  mir->minWasmHeapLength()) {
+              ((addr->toConstant()->type() == MIRType::Int32 &&
+                uint64_t(addr->toConstant()->toInt32()) <
+                    mir->minWasmHeapLength()) ||
+               (addr->toConstant()->type() == MIRType::Int64 &&
+                uint64_t(addr->toConstant()->toInt64()) <
+                    mir->minWasmHeapLength()))) {
             bc->setRedundant();
             if (JitOptions.spectreIndexMasking) {
               bc->replaceAllUsesWith(addr);

@@ -6,9 +6,6 @@
 
 #include "vm/Probes-inl.h"
 
-#include "js/CharacterEncoding.h"
-#include "vm/JSContext.h"
-
 #ifdef INCLUDE_MOZILLA_DTRACE
 #  include "vm/JSScript-inl.h"
 #endif
@@ -39,6 +36,8 @@ static const char* FunctionName(JSContext* cx, JSFunction* fun,
   if (!fun->displayAtom()) {
     return probes::anonymousName;
   }
+  // TODO: Should be JS_EncodeStringToUTF8, but that'd introduce a rooting
+  // hazard, because JS_EncodeStringToUTF8 can GC.
   *bytes = JS_EncodeStringToLatin1(cx, fun->displayAtom());
   return *bytes ? bytes->get() : probes::nullName;
 }

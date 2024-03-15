@@ -17,26 +17,41 @@ var virtualDefinitions = new Map();
 
 // Every virtual method declaration, anywhere.
 //
-//   field : CFG of the field
+// Map from csu => Set of function-info.
+// function-info: {
+//   name : simple string
+//   typedfield : "name:nargs" ("mangled" field name)
+//   field: full Field datastructure
+//   annotations : Set of [annotation-name, annotation-value] 2-element arrays
+//   inherited : whether the method is inherited from a base class
+//   pureVirtual : whether the method is pure virtual on this CSU
+//   dtor : if this is a virtual destructor with a definition in this class or
+//     a superclass, then the full name of the definition as if it were defined
+//     in this class. This is weird, but it's how gcc emits it. We will add a
+//     synthetic call from this function to its immediate base classes' dtors,
+//     so even if the function does not actually exist and is inherited from a
+//     base class, we will get a path to the inherited function. (Regular
+//     virtual methods are *not* claimed to exist when they don't.)
+// }
+var virtualDeclarations = new Map();
+
 var virtualResolutionsSeen = new Set();
+
+var ID = {
+    jscode: 1,
+    anyfunc: 2,
+    nogcfunc: 3,
+    gc: 4,
+};
 
 // map is a map from names to sets of entries.
 function addToNamedSet(map, name, entry)
 {
     if (!map.has(name))
-        map.set(name, new Set());
-    map.get(name).add(entry);
-}
-
-function fieldKey(csuName, field)
-{
-    // This makes a minimal attempt at dealing with overloading: it will not
-    // conflate two virtual methods with differing numbers of arguments. So
-    // far, that is all that has been needed.
-    var nargs = 0;
-    if (field.Type.Kind == "Function" && "TypeFunctionArguments" in field.Type)
-        nargs = field.Type.TypeFunctionArguments.Type.length;
-    return csuName + ":" + field.Name[0] + ":" + nargs;
+      map.set(name, new Set());
+    const s = map.get(name);
+    s.add(entry);
+    return s;
 }
 
 // CSU is "Class/Struct/Union"
@@ -44,99 +59,46 @@ function processCSU(csuName, csu)
 {
     if (!("FunctionField" in csu))
         return;
-    for (const field of csu.FunctionField) {
-        if (1 in field.Field) {
-            const superclass = field.Field[1].Type.Name;
-            const subclass = field.Field[1].FieldCSU.Type.Name;
-            assert(subclass == csuName);
-            addToNamedSet(subclasses, superclass, subclass);
-            addToNamedSet(superclasses, subclass, superclass);
+
+    for (const {Base} of (csu.CSUBaseClass || [])) {
+        addToNamedSet(subclasses, Base, csuName);
+        addToNamedSet(superclasses, csuName, Base);
+    }
+
+    for (const {Field, Variable} of csu.FunctionField) {
+        // Virtual method
+        const info = Field[0];
+        const name = info.Name[0];
+        const annotations = new Set();
+        const funcInfo = {
+            name,
+            typedfield: typedField(info),
+            field: info,
+            annotations,
+            inherited: (info.FieldCSU.Type.Name != csuName), // Always false for virtual dtors
+            pureVirtual: Boolean(Variable),
+            dtor: false,
+        };
+
+        if (Variable && isSyntheticVirtualDestructor(name)) {
+            // This is one of gcc's artificial dtors.
+            funcInfo.dtor = Variable.Name[0];
+            funcInfo.pureVirtual = false;
         }
 
-        if ("Variable" in field) {
+        addToNamedSet(virtualDeclarations, csuName, funcInfo);
+        if ('Annotation' in info) {
+            for (const {Name: [annType, annValue]} of info.Annotation) {
+                annotations.add([annType, annValue]);
+            }
+        }
+
+        if (Variable) {
             // Note: not dealing with overloading correctly.
-            const name = field.Variable.Name[0];
-            addToNamedSet(virtualDefinitions, fieldKey(csuName, field.Field[0]), name);
+            const name = Variable.Name[0];
+            addToNamedSet(virtualDefinitions, fieldKey(csuName, Field[0]), name);
         }
     }
-}
-
-// Return the nearest ancestor method definition, or all nearest definitions in
-// the case of multiple inheritance.
-function nearestAncestorMethods(csu, field)
-{
-    const key = fieldKey(csu, field);
-
-    if (virtualDefinitions.has(key))
-        return new Set(virtualDefinitions.get(key));
-
-    const functions = new Set();
-    if (superclasses.has(csu)) {
-        for (const parent of superclasses.get(csu))
-            functions.update(nearestAncestorMethods(parent, field));
-    }
-
-    return functions;
-}
-
-// Return [ instantiations, limits ], where instantiations is a Set of all
-// possible implementations of 'field' given static type 'initialCSU', plus
-// null if arbitrary other implementations are possible, and limits gives
-// information about what things are not possible within it (currently, that it
-// cannot GC).
-function findVirtualFunctions(initialCSU, field)
-{
-    const fieldName = field.Name[0];
-    const worklist = [initialCSU];
-    const functions = new Set();
-
-    // Loop through all methods of initialCSU (by looking at all methods of ancestor csus).
-    //
-    // If field is nsISupports::AddRef or ::Release, return an empty list and a
-    // boolean that says we assert that it cannot GC.
-    //
-    // If this is a method that is annotated to be dangerous (eg, it could be
-    // overridden with an implementation that could GC), then use null as a
-    // signal value that it should be considered to GC, even though we'll also
-    // collect all of the instantiations for other purposes.
-
-    while (worklist.length) {
-        const csu = worklist.pop();
-        if (isSuppressedVirtualMethod(csu, fieldName))
-            return [ new Set(), LIMIT_CANNOT_GC ];
-        if (isOverridableField(initialCSU, csu, fieldName)) {
-            // We will still resolve the virtual function call, because it's
-            // nice to have as complete a callgraph as possible for other uses.
-            // But push a token saying that we can run arbitrary code.
-            functions.add(null);
-        }
-
-        if (superclasses.has(csu))
-            worklist.push(...superclasses.get(csu));
-    }
-
-    // Now return a list of all the instantiations of the method named 'field'
-    // that could execute on an instance of initialCSU or a descendant class.
-
-    // Start with the class itself, or if it doesn't define the method, all
-    // nearest ancestor definitions.
-    functions.update(nearestAncestorMethods(initialCSU, field));
-
-    // Then recurse through all descendants to add in their definitions.
-
-    worklist.push(initialCSU);
-    while (worklist.length) {
-        const csu = worklist.pop();
-        const key = fieldKey(csu, field);
-
-        if (virtualDefinitions.has(key))
-            functions.update(virtualDefinitions.get(key));
-
-        if (subclasses.has(csu))
-            worklist.push(...subclasses.get(csu));
-    }
-
-    return [ functions, LIMIT_NONE ];
 }
 
 // Return a list of all callees that the given edge might be a call to. Each
@@ -144,7 +106,7 @@ function findVirtualFunctions(initialCSU, field)
 // ('direct', 'field', 'resolved-field', 'indirect', 'unknown'), though note
 // that 'resolved-field' is really a global record of virtual method
 // resolutions, indepedent of this particular edge.
-function getCallees(edge)
+function translateCallees(edge)
 {
     if (edge.Kind != "Call")
         return [];
@@ -155,6 +117,9 @@ function getCallees(edge)
         return [{'kind': 'direct', 'name': callee.Variable.Name[0]}];
     }
 
+    // At some point, we were intentionally invoking invalid function pointers
+    // (as in, a small integer cast to a function pointer type) to convey a
+    // small amount of information in the crash address.
     if (callee.Kind == "Int")
         return []; // Intentional crash
 
@@ -170,45 +135,46 @@ function getCallees(edge)
         return [{'kind': "unknown"}];
     }
 
+    // Return one 'field' callee record giving the full description of what's
+    // happening here (which is either a virtual method call, or a call through
+    // a function pointer stored in a field), and then boil the call down to a
+    // synthetic function that incorporates both the name of the field and the
+    // static type of whatever you're calling the method on. Both refer to the
+    // same call; they're just different ways of describing it.
     const callees = [];
     const field = callee.Exp[0].Field;
-    const fieldName = field.Name[0];
-    const csuName = field.FieldCSU.Type.Name;
-    let functions;
-    let limits = LIMIT_NONE;
-    if ("FieldInstanceFunction" in field) {
-        [ functions, limits ] = findVirtualFunctions(csuName, field);
-        callees.push({'kind': "field", 'csu': csuName, 'field': fieldName,
-                      'limits': limits, 'isVirtual': true});
-    } else {
-        functions = new Set([null]); // field call
-    }
-
-    // Known set of virtual call targets. Treat them as direct calls to all
-    // possible resolved types, but also record edges from this field call to
-    // each final callee. When the analysis is checking whether an edge can GC
-    // and it sees an unrooted pointer held live across this field call, it
-    // will know whether any of the direct callees can GC or not.
-    const targets = [];
-    let fullyResolved = true;
-    for (const name of functions) {
-        if (name === null) {
-            // Unknown set of call targets, meaning either a function pointer
-            // call ("field call") or a virtual method that can be overridden
-            // in extensions. Use the isVirtual property so that callers can
-            // tell which case holds.
-            callees.push({'kind': "field", 'csu': csuName, 'field': fieldName,
-                          'limits': limits,
-			  'isVirtual': "FieldInstanceFunction" in field});
-            fullyResolved = false;
-        } else {
-            targets.push({'kind': "direct", name, limits });
-        }
-    }
-    if (fullyResolved)
-        callees.push({'kind': "resolved-field", 'csu': csuName, 'field': fieldName, 'callees': targets});
+    const staticCSU = getFieldCallInstanceCSU(edge, field);
+    callees.push({'kind': "field", 'csu': field.FieldCSU.Type.Name, staticCSU,
+                  'field': field.Name[0], 'fieldKey': fieldKey(staticCSU, field),
+                  'isVirtual': ("FieldInstanceFunction" in field)});
+    callees.push({'kind': "direct", 'name': fieldKey(staticCSU, field)});
 
     return callees;
+}
+
+function getCallees(body, edge, scopeAttrs, functionBodies) {
+    const calls = [];
+
+    // getCallEdgeProperties can set the ATTR_REPLACED attribute, which
+    // means that the call in the edge has been replaced by zero or
+    // more edges to other functions. This is used when the original
+    // edge will end up calling through a function pointer or something
+    // (eg ~shared_ptr<T> calls a function pointer that can only be
+    // T::~T()). The original call edges are left in the graph in case
+    // they are useful for other purposes.
+    for (const callee of translateCallees(edge)) {
+        if (callee.kind != "direct") {
+            calls.push({ callee, attrs: scopeAttrs });
+        } else {
+            const edgeInfo = getCallEdgeProperties(body, edge, callee.name, functionBodies);
+            for (const extra of (edgeInfo.extraCalls || [])) {
+                calls.push({ attrs: scopeAttrs | extra.attrs, callee: { name: extra.name, 'kind': "direct", } });
+            }
+            calls.push({ callee, attrs: scopeAttrs | edgeInfo.attrs});
+        }
+    }
+
+    return calls;
 }
 
 function loadTypes(type_xdb_filename) {

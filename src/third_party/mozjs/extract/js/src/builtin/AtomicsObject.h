@@ -12,8 +12,6 @@
 
 #include "threading/ConditionVariable.h"
 #include "threading/ProtectedData.h"  // js::ThreadData
-#include "vm/JSObject.h"
-#include "vm/MutexIDs.h"
 #include "vm/NativeObject.h"
 
 namespace js {

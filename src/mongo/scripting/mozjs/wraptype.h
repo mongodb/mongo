@@ -30,7 +30,9 @@
 #pragma once
 
 #include <cstddef>
+#include <js/PropertyAndElement.h>
 #include <js/ValueArray.h>
+#include <js/Wrapper.h>
 
 #include <jsapi.h>
 #include <type_traits>
@@ -66,6 +68,9 @@
 
 #define MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, flags) \
     JS_FN(#name, smUtils::wrapFunction<Functions::name>, 0, flags)
+
+#define MONGO_ATTACH_JS_FUNCTION_SYM_WITH_FLAGS(symbol, name) \
+    JS_SYM_FN(symbol, smUtils::wrapFunction<Functions::name>, 0, 0)
 
 #define MONGO_ATTACH_JS_FUNCTION(name) MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, 0)
 
@@ -183,17 +188,6 @@ bool getProperty(JSContext* cx,
 };
 
 template <typename T>
-bool hasInstance(JSContext* cx, JS::HandleObject obj, JS::MutableHandleValue vp, bool* bp) {
-    try {
-        T::hasInstance(cx, obj, vp, bp);
-        return true;
-    } catch (...) {
-        mongoToJSException(cx);
-        return false;
-    }
-};
-
-template <typename T>
 bool setProperty(JSContext* cx,
                  JS::HandleObject obj,
                  JS::HandleId id,
@@ -259,7 +253,6 @@ public:
                        T::mayResolve != BaseInfo::mayResolve ? T::mayResolve : nullptr,
                        T::finalize != BaseInfo::finalize ? T::finalize : nullptr,
                        T::call != BaseInfo::call ? smUtils::call<T> : nullptr,
-                       T::hasInstance != BaseInfo::hasInstance ? smUtils::hasInstance<T> : nullptr,
                        T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
                        T::trace != BaseInfo::trace ? smUtils::trace<T> : nullptr}),
           _jsoOps({
@@ -432,8 +425,9 @@ private:
                     _assertPtr(JS_InitClass(
                         _context,
                         global,
-                        parent,
                         &_jsclass,
+                        parent,
+                        _jsclass.name,
                         T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
                         0,
                         nullptr,
@@ -443,7 +437,7 @@ private:
 
         _installFunctions(global, T::freeFunctions);
         _postInstall(global, T::postInstall);
-        _installToStringTag();
+        _installProperties();
     }
 
     // Use this if you want your types installed, but not visible in the
@@ -463,7 +457,7 @@ private:
 
         _installFunctions(_proto, T::methods);
         _installFunctions(global, T::freeFunctions);
-        _installToStringTag();
+        _installProperties();
 
         _installConstructor(T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr);
 
@@ -480,7 +474,6 @@ private:
         invariant(T::enumerate == BaseInfo::enumerate);
         invariant(T::finalize == BaseInfo::finalize);
         invariant(T::getProperty == BaseInfo::getProperty);
-        invariant(T::hasInstance == BaseInfo::hasInstance);
         invariant(T::resolve == BaseInfo::resolve);
         invariant(T::setProperty == BaseInfo::setProperty);
 
@@ -527,7 +520,7 @@ private:
             _context, ErrorCodes::JSInterpreterFailure, "Failed to define functions");
     }
 
-    void _installToStringTag() {
+    void _installProperties() {
         static const JSPropertySpec properties[2] = {
             JS_STRING_SYM_PS(toStringTag, T::className, JSPROP_READONLY), JS_PS_END};
 

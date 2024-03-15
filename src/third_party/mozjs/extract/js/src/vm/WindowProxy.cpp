@@ -10,8 +10,7 @@
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
 
-#include "jsapi.h"  // js::AssertHeapIsIdle
-
+#include "js/Context.h"       // js::AssertHeapIsIdle
 #include "vm/GlobalObject.h"  // js::GlobalObject
 #include "vm/JSContext.h"     // JSContext, CHECK_THREAD
 #include "vm/JSObject.h"      // JSObject
@@ -36,8 +35,10 @@ void js::SetWindowProxy(JSContext* cx, Handle<JSObject*> global,
   MOZ_ASSERT(IsWindowProxy(windowProxy));
 
   GlobalObject& globalObj = global->as<GlobalObject>();
-  globalObj.setWindowProxy(windowProxy);
-  globalObj.lexicalEnvironment().setWindowProxyThisObject(windowProxy);
+  if (globalObj.maybeWindowProxy() != windowProxy) {
+    globalObj.setWindowProxy(windowProxy);
+    globalObj.lexicalEnvironment().setWindowProxyThisObject(windowProxy);
+  }
 }
 
 JSObject* js::ToWindowIfWindowProxy(JSObject* obj) {

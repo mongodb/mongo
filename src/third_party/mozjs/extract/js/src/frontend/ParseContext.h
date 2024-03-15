@@ -8,26 +8,24 @@
 #define frontend_ParseContext_h
 
 #include "ds/Nestable.h"
-#include "frontend/BytecodeCompiler.h"
-#include "frontend/CompilationStencil.h"
 #include "frontend/ErrorReporter.h"
-#include "frontend/ModuleSharedContext.h"
 #include "frontend/NameAnalysisTypes.h"  // DeclaredNameInfo, FunctionBoxVector
 #include "frontend/NameCollections.h"
 #include "frontend/ParserAtom.h"   // TaggedParserAtomIndex
 #include "frontend/ScriptIndex.h"  // ScriptIndex
 #include "frontend/SharedContext.h"
-#include "frontend/UsedNameTracker.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "vm/GeneratorAndAsyncKind.h"  // js::GeneratorKind, js::FunctionAsyncKind
-#include "vm/GeneratorObject.h"  // js::AbstractGeneratorObject::FixedSlotLimit
-#include "vm/WellKnownAtom.h"    // js_*_str
+#include "vm/WellKnownAtom.h"          // js_*_str
 
 namespace js {
 
 namespace frontend {
 
 class ParserBase;
+class UsedNameTracker;
+
+struct CompilationState;
 
 const char* DeclarationKindString(DeclarationKind kind);
 
@@ -123,7 +121,7 @@ class ParseContext : public Nestable<ParseContext> {
 
     bool maybeReportOOM(ParseContext* pc, bool result) {
       if (!result) {
-        ReportOutOfMemory(pc->sc()->cx_);
+        ReportOutOfMemory(pc->sc()->fc_);
       }
       return result;
     }
@@ -135,7 +133,7 @@ class ParseContext : public Nestable<ParseContext> {
     using Nestable<Scope>::enclosing;
 
     explicit inline Scope(ParserBase* parser);
-    explicit inline Scope(JSContext* cx, ParseContext* pc,
+    explicit inline Scope(FrontendContext* fc, ParseContext* pc,
                           UsedNameTracker& usedNames);
 
     void dump(ParseContext* pc, ParserBase* parser);
@@ -148,7 +146,7 @@ class ParseContext : public Nestable<ParseContext> {
         return false;
       }
 
-      return declared_.acquire(pc->sc()->cx_);
+      return declared_.acquire(pc->sc()->fc_);
     }
 
     bool isEmpty() const { return declared_->all().empty(); }
@@ -194,6 +192,17 @@ class ParseContext : public Nestable<ParseContext> {
       pc->varScope_ = this;
     }
 
+    // Maximum number of fixed stack slots in a generator or async function
+    // script. If a script would have more, we instead store some variables in
+    // heap EnvironmentObjects.
+    //
+    // This limit is a performance heuristic. Stack slots reduce allocations,
+    // and `Local` opcodes are a bit faster than `AliasedVar` ones; but at each
+    // `yield` or `await` the stack slots must be memcpy'd into a
+    // GeneratorObject. At some point the memcpy is too much. The limit is
+    // plenty for typical human-authored code.
+    static constexpr uint32_t FixedSlotLimit = 256;
+
     // This is called as we leave a function, var, or lexical scope in a
     // generator or async function. `ownSlotCount` is the number of `bindings_`
     // that are not closed over.
@@ -202,7 +211,7 @@ class ParseContext : public Nestable<ParseContext> {
       // slots. The meaning of sizeBits_ changes from "maximum nested slot
       // count" to "UINT32_MAX if too big".
       uint32_t slotCount = ownSlotCount + sizeBits_;
-      if (slotCount > AbstractGeneratorObject::FixedSlotLimit) {
+      if (slotCount > FixedSlotLimit) {
         slotCount = sizeBits_;
         sizeBits_ = UINT32_MAX;
       } else {
@@ -306,14 +315,11 @@ class ParseContext : public Nestable<ParseContext> {
   class VarScope : public Scope {
    public:
     explicit inline VarScope(ParserBase* parser);
-    explicit inline VarScope(JSContext* cx, ParseContext* pc,
+    explicit inline VarScope(FrontendContext* fc, ParseContext* pc,
                              UsedNameTracker& usedNames);
   };
 
  private:
-  // Trace logging of parsing time.
-  AutoFrontendTraceLog traceLog_;
-
   // Context shared between parsing and bytecode generation.
   SharedContext* sc_;
 
@@ -385,7 +391,7 @@ class ParseContext : public Nestable<ParseContext> {
   bool superScopeNeedsHomeObject_;
 
  public:
-  ParseContext(JSContext* cx, ParseContext*& parent, SharedContext* sc,
+  ParseContext(FrontendContext* fc, ParseContext*& parent, SharedContext* sc,
                ErrorReporter& errorReporter, CompilationState& compilationState,
                Directives* newDirectives, bool isFull);
 
@@ -449,7 +455,7 @@ class ParseContext : public Nestable<ParseContext> {
     return *closedOverBindingsForLazy_;
   }
 
-  enum class BreakStatementError {
+  enum class BreakStatementError : uint8_t {
     // Unlabeled break must be inside loop or switch.
     ToughBreak,
     LabelNotFound,
@@ -460,7 +466,7 @@ class ParseContext : public Nestable<ParseContext> {
   [[nodiscard]] inline JS::Result<Ok, BreakStatementError> checkBreakStatement(
       TaggedParserAtomIndex label);
 
-  enum class ContinueStatementError {
+  enum class ContinueStatementError : uint8_t {
     NotInALoop,
     LabelNotFound,
   };
@@ -587,6 +593,8 @@ class ParseContext : public Nestable<ParseContext> {
                            bool canSkipLazyClosedOverBindings);
   bool declareFunctionArgumentsObject(const UsedNameTracker& usedNames,
                                       bool canSkipLazyClosedOverBindings);
+  bool declareNewTarget(const UsedNameTracker& usedNames,
+                        bool canSkipLazyClosedOverBindings);
   bool declareDotGeneratorName();
   bool declareTopLevelDotGeneratorName();
 

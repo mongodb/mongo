@@ -19,9 +19,11 @@
 #include "wasm/WasmRealm.h"
 
 #include "vm/Realm.h"
+#include "wasm/WasmDebug.h"
 #include "wasm/WasmInstance.h"
 
 #include "debugger/DebugAPI-inl.h"
+#include "wasm/WasmInstance-inl.h"
 
 using namespace js;
 using namespace wasm;
@@ -58,7 +60,7 @@ struct InstanceComparator {
 };
 
 bool wasm::Realm::registerInstance(JSContext* cx,
-                                   HandleWasmInstanceObject instanceObj) {
+                                   Handle<WasmInstanceObject*> instanceObj) {
   MOZ_ASSERT(runtime_ == cx->runtime());
 
   Instance& instance = instanceObj->instance();
@@ -68,7 +70,7 @@ bool wasm::Realm::registerInstance(JSContext* cx,
 
   if (instance.debugEnabled() &&
       instance.realm()->debuggerObservesAllExecution()) {
-    instance.debug().ensureEnterFrameTrapsState(cx, true);
+    instance.debug().ensureEnterFrameTrapsState(cx, &instance, true);
   }
 
   {
@@ -85,6 +87,12 @@ bool wasm::Realm::registerInstance(JSContext* cx,
 
     InstanceComparator cmp(instance);
     size_t index;
+
+    // The following section is not unsafe, but simulated OOM do not consider
+    // the fact that these insert calls are guarded by the previous reserve
+    // calls.
+    AutoEnterOOMUnsafeRegion oomUnsafe;
+    (void)oomUnsafe;
 
     MOZ_ALWAYS_FALSE(
         BinarySearchIf(instances_, 0, instances_.length(), cmp, &index));
@@ -130,13 +138,13 @@ void wasm::Realm::addSizeOfExcludingThis(MallocSizeOf mallocSizeOf,
 void wasm::InterruptRunningCode(JSContext* cx) {
   auto runtimeInstances = cx->runtime()->wasmInstances.lock();
   for (Instance* instance : runtimeInstances.get()) {
-    instance->tlsData()->setInterrupt();
+    instance->setInterrupt();
   }
 }
 
 void wasm::ResetInterruptState(JSContext* cx) {
   auto runtimeInstances = cx->runtime()->wasmInstances.lock();
   for (Instance* instance : runtimeInstances.get()) {
-    instance->tlsData()->resetInterrupt(cx);
+    instance->resetInterrupt(cx);
   }
 }

@@ -99,6 +99,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -379,26 +380,42 @@ public:
     template <typename T, typename... Args>
     T* trackedNew(Args&&... args) {
         T* t = new T(std::forward<Args>(args)...);
-        _asanHandles.addPointer(t);
+        ASANHandles::getInstance().addPointer(t);
         return t;
     }
 
     template <typename T>
     void trackedDelete(T* t) {
-        _asanHandles.removePointer(t);
+        ASANHandles::getInstance().removePointer(t);
         delete (t);
     }
 
-    struct ASANHandles {
-        ASANHandles();
-        ~ASANHandles();
+    class ASANHandles {
+    public:
+        ~ASANHandles() = default;
 
         void addPointer(void* ptr);
         void removePointer(void* ptr);
 
-        stdx::unordered_set<void*> _handles;
+        static ASANHandles& getInstance() {
+            // We can't guarantee static de-initialization order across different compilation units,
+            // so we run into problems with the destruction of the ASANHandles singleton taking
+            // place before the WellKnownParserAtoms singleton in libmozjs.so. To get around this
+            // problem, we make the singleton here a StaticImmortal, which prevents the destructor
+            // from being called, allowing WellKnownParserAtoms to finish its cleanup when the
+            // program exits.
+            static StaticImmortal<ASANHandles> singleton;
+            return *singleton;
+        }
 
-        static ASANHandles* getThreadASANHandles();
+        ASANHandles() = default;
+        ASANHandles(const ASANHandles&) = delete;
+        ASANHandles& operator=(const ASANHandles&) = delete;
+#if __has_feature(address_sanitizer)
+    private:
+        Mutex _mutex = MONGO_MAKE_LATCH("ASANHandles::_mutex");
+        stdx::unordered_set<void*> _handles;
+#endif
     };
 
     void setStatus(Status status);
@@ -460,7 +477,6 @@ private:
         void invoke(JS::HandleObject global, Closure& closure) override;
     };
 
-    ASANHandles _asanHandles;
     MozJSScriptEngine* _engine;
     MozRuntime _mr;
     JSContext* _context;
@@ -524,8 +540,8 @@ inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(JS_GetContextPrivate(cx));
 }
 
-inline MozJSImplScope* getScope(JSFreeOp* fop) {
-    return getScope(freeOpToJSContext(fop));
+inline MozJSImplScope* getScope(class JS::GCContext* gcCtx) {
+    return getScope(freeOpToJSContext(gcCtx));
 }
 
 

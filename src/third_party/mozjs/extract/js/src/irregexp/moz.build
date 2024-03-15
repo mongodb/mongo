@@ -12,10 +12,13 @@ LOCAL_INCLUDES += ["!..", ".."]
 include("../js-config.mozbuild")
 include("../js-cxxflags.mozbuild")
 
-CXXFLAGS += ["-Wno-error=type-limits"]
+CXXFLAGS += ["-Wno-error=type-limits", "-Wno-error=return-type"]
+
+# Suppress spurious warnings in third-party code. See bug 1810584.
+if CONFIG["CC_TYPE"] == "gcc":
+    CXXFLAGS += ["-Wno-error=nonnull"]
 
 UNIFIED_SOURCES += [
-    "imported/regexp-ast.cc",
     "imported/regexp-bytecode-generator.cc",
     "imported/regexp-bytecode-peephole.cc",
     "imported/regexp-bytecodes.cc",
@@ -31,6 +34,7 @@ UNIFIED_SOURCES += [
     "util/UnicodeShim.cpp",
 ]
 SOURCES += [
+    "imported/regexp-ast.cc",
     "imported/regexp-compiler.cc",  # Bug 1643693
     "RegExpNativeMacroAssembler.cpp",
 ]

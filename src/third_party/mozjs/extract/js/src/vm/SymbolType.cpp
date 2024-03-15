@@ -6,10 +6,8 @@
 
 #include "vm/SymbolType.h"
 
-#include "builtin/Symbol.h"
 #include "gc/Allocator.h"
 #include "gc/HashUtil.h"
-#include "gc/Rooting.h"
 #include "util/StringBuffer.h"
 #include "vm/JSContext.h"
 #include "vm/Realm.h"
@@ -20,20 +18,15 @@ using JS::Symbol;
 using namespace js;
 
 Symbol* Symbol::newInternal(JSContext* cx, JS::SymbolCode code, uint32_t hash,
-                            HandleAtom description) {
+                            Handle<JSAtom*> description) {
   MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
   AutoAllocInAtomsZone az(cx);
-
-  Symbol* p = Allocate<JS::Symbol>(cx);
-  if (!p) {
-    return nullptr;
-  }
-  return new (p) Symbol(code, hash, description);
+  return cx->newCell<Symbol>(code, hash, description);
 }
 
 Symbol* Symbol::new_(JSContext* cx, JS::SymbolCode code,
                      HandleString description) {
-  RootedAtom atom(cx);
+  Rooted<JSAtom*> atom(cx);
   if (description) {
     atom = AtomizeString(cx, description);
     if (!atom) {
@@ -48,8 +41,13 @@ Symbol* Symbol::new_(JSContext* cx, JS::SymbolCode code,
   return sym;
 }
 
+Symbol* Symbol::newWellKnown(JSContext* cx, JS::SymbolCode code,
+                             Handle<PropertyName*> description) {
+  return newInternal(cx, code, cx->runtime()->randomHashCode(), description);
+}
+
 Symbol* Symbol::for_(JSContext* cx, HandleString description) {
-  RootedAtom atom(cx, AtomizeString(cx, description));
+  Rooted<JSAtom*> atom(cx, AtomizeString(cx, description));
   if (!atom) {
     return nullptr;
   }

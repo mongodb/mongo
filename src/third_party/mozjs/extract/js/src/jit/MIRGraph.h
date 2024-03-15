@@ -43,6 +43,7 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
     LOOP_HEADER,
     SPLIT_EDGE,
     FAKE_LOOP_PRED,
+    INTERNAL,
     DEAD
   };
 
@@ -98,6 +99,7 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
 
   void discardResumePoint(MResumePoint* rp,
                           ReferencesType refType = RefType_Default);
+  void removeResumePoint(MResumePoint* rp);
 
   // Remove all references to an instruction such that it can be removed from
   // the list of instruction, without keeping any dangling pointer to it. This
@@ -129,6 +131,11 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
                                    size_t predEdgeIdx, MBasicBlock* succ);
   static MBasicBlock* NewFakeLoopPredecessor(MIRGraph& graph,
                                              MBasicBlock* header);
+
+  // Create a new basic block for internal control flow not present in the
+  // original CFG.
+  static MBasicBlock* NewInternal(MIRGraph& graph, MBasicBlock* orig,
+                                  MResumePoint* activeResumePoint);
 
   bool dominates(const MBasicBlock* other) const {
     return other->domIndex() - domIndex() < numDominated();
@@ -199,6 +206,9 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
     slots_[stackPosition_++] = ins;
   }
   void pushArg(uint32_t arg) { pushVariable(info_.argSlot(arg)); }
+  void pushArgUnchecked(uint32_t arg) {
+    pushVariable(info_.argSlotUnchecked(arg));
+  }
   void pushLocal(uint32_t local) { pushVariable(info_.localSlot(local)); }
   void pushSlot(uint32_t slot) { pushVariable(slot); }
   void setEnvironmentChain(MDefinition* ins);
@@ -315,12 +325,23 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   // Removes an instruction with the intention to discard it.
   void discard(MInstruction* ins);
   void discardLastIns();
-  void discardDef(MDefinition* def);
   void discardAllInstructions();
   void discardAllInstructionsStartingAt(MInstructionIterator iter);
   void discardAllPhis();
   void discardAllResumePoints(bool discardEntry = true);
   void clear();
+
+  // Splits this block in two at a given instruction, inserting a new control
+  // flow diamond with |ins| in the slow path, |fastpath| in the other, and
+  // |condition| determining which path to take.
+  bool wrapInstructionInFastpath(MInstruction* ins, MInstruction* fastpath,
+                                 MInstruction* condition);
+
+  void moveOuterResumePointTo(MBasicBlock* dest);
+
+  // Move an instruction from this block to a block that has not yet been
+  // terminated.
+  void moveToNewBlock(MInstruction* ins, MBasicBlock* dst);
 
   // Same as |void discard(MInstruction* ins)| but assuming that
   // all operands are already discarded.
@@ -557,8 +578,6 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   void setLoopDepth(uint32_t loopDepth) { loopDepth_ = loopDepth; }
   uint32_t loopDepth() const { return loopDepth_; }
 
-  bool strict() const { return info_.script()->strict(); }
-
   void dumpStack(GenericPrinter& out);
   void dumpStack();
 
@@ -567,6 +586,10 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
 
   BytecodeSite* trackedSite() const { return trackedSite_; }
   InlineScriptTree* trackedTree() const { return trackedSite_->tree(); }
+
+  // Find the previous resume point that would be used if this instruction
+  // bails out.
+  MResumePoint* activeResumePoint(MInstruction* ins);
 
  private:
   MIRGraph& graph_;
@@ -616,7 +639,6 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   // profiling.
   BytecodeSite* trackedSite_;
 
-#if defined(JS_ION_PERF) || defined(DEBUG)
   unsigned lineno_;
   unsigned columnIndex_;
 
@@ -625,7 +647,6 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   unsigned lineno() const { return lineno_; }
   void setColumnIndex(unsigned c) { columnIndex_ = c; }
   unsigned columnIndex() const { return columnIndex_; }
-#endif
 };
 
 using MBasicBlockIterator = InlineListIterator<MBasicBlock>;
@@ -801,14 +822,15 @@ class MDefinitionIterator {
 };
 
 // Iterates on all resume points, phis, and instructions of a MBasicBlock.
-// Resume points are visited as long as the instruction which holds it is not
-// discarded.
+// Resume points are visited as long as they have not been discarded.
 class MNodeIterator {
  private:
-  // Last instruction which holds a resume point. To handle the entry point
-  // resume point, it is set to the last instruction, assuming that the last
-  // instruction is not discarded before we visit it.
-  MInstruction* last_;
+  // If this is non-null, the resume point that we will visit next (unless
+  // it has been discarded). Initialized to the entry resume point.
+  // Otherwise, resume point of the most recently visited instruction.
+  MResumePoint* resumePoint_;
+
+  mozilla::DebugOnly<MInstruction*> lastInstruction_ = nullptr;
 
   // Definition iterator which is one step ahead when visiting resume points.
   // This is in order to avoid incrementing the iterator while it is settled
@@ -817,35 +839,29 @@ class MNodeIterator {
 
   MBasicBlock* block() const { return defIter_.block_; }
 
-  bool atResumePoint() const { return last_ && !last_->isDiscarded(); }
+  bool atResumePoint() const {
+    MOZ_ASSERT_IF(lastInstruction_ && !lastInstruction_->isDiscarded(),
+                  lastInstruction_->resumePoint() == resumePoint_);
+    return resumePoint_ && !resumePoint_->isDiscarded();
+  }
 
   MNode* getNode() {
-    if (!atResumePoint()) {
-      return *defIter_;
+    if (atResumePoint()) {
+      return resumePoint_;
     }
-
-    // We use the last instruction as a sentinelle to iterate over the entry
-    // resume point of the basic block, before even starting to iterate on
-    // the instruction list.  Otherwise, the last_ corresponds to the
-    // previous instruction.
-    if (last_ != block()->lastIns()) {
-      return last_->resumePoint();
-    }
-    return block()->entryResumePoint();
+    return *defIter_;
   }
 
   void next() {
     if (!atResumePoint()) {
-      if (defIter_->isInstruction() &&
-          defIter_->toInstruction()->resumePoint()) {
-        // In theory, we could but in practice this does not happen.
-        MOZ_ASSERT(*defIter_ != block()->lastIns());
-        last_ = defIter_->toInstruction();
+      if (defIter_->isInstruction()) {
+        resumePoint_ = defIter_->toInstruction()->resumePoint();
+        lastInstruction_ = defIter_->toInstruction();
       }
-
       defIter_++;
     } else {
-      last_ = nullptr;
+      resumePoint_ = nullptr;
+      lastInstruction_ = nullptr;
     }
   }
 
@@ -853,14 +869,8 @@ class MNodeIterator {
 
  public:
   explicit MNodeIterator(MBasicBlock* block)
-      : last_(block->entryResumePoint() ? block->lastIns() : nullptr),
-        defIter_(block) {
+      : resumePoint_(block->entryResumePoint()), defIter_(block) {
     MOZ_ASSERT(bool(block->entryResumePoint()) == atResumePoint());
-
-    // We use the last instruction to check for the entry resume point,
-    // assert that no control instruction has any resume point.  If so, then
-    // we need to handle this case in this iterator.
-    MOZ_ASSERT(!block->lastIns()->resumePoint());
   }
 
   MNodeIterator operator++(int) {

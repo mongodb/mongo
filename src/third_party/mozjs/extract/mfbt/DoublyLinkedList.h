@@ -149,7 +149,7 @@ class DoublyLinkedList final {
     T* operator->() const { return mCurrent; }
 
     Iterator& operator++() {
-      mCurrent = ElementAccess::Get(mCurrent).mNext;
+      mCurrent = mCurrent ? ElementAccess::Get(mCurrent).mNext : nullptr;
       return *this;
     }
 
@@ -368,6 +368,209 @@ class DoublyLinkedList final {
     }
     return !ElementNotInList(aElm);
   }
+};
+
+/**
+ * @brief Double linked list that allows insertion/removal during iteration.
+ *
+ * This class uses the mozilla::DoublyLinkedList internally and keeps
+ * track of created iterator instances by putting them on a simple list on stack
+ * (compare nsTAutoObserverArray).
+ * This allows insertion or removal operations to adjust iterators and therefore
+ * keeping them valid during iteration.
+ */
+template <typename T, typename ElementAccess = GetDoublyLinkedListElement<T>>
+class SafeDoublyLinkedList {
+ public:
+  /**
+   * @brief Iterator class for SafeDoublyLinkedList.
+   *
+   * The iterator contains two iterators of the underlying list:
+   *  - mCurrent points to the current list element of the iterator.
+   *  - mNext points to the next element of the list.
+   *
+   * When removing an element from the list, mCurrent and mNext may
+   * be adjusted:
+   *  - If mCurrent is the element to be deleted, it is set to empty. mNext can
+   *    still be used to advance to the next element.
+   *  - If mNext is the element to be deleted, it is set to its next element
+   *    (or to empty if mNext is the last element of the list).
+   */
+  class SafeIterator {
+    using BaseIterator = typename DoublyLinkedList<T, ElementAccess>::Iterator;
+    friend class SafeDoublyLinkedList<T, ElementAccess>;
+
+   public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = T;
+    using difference_type = std::ptrdiff_t;
+    using pointer = T*;
+    using const_pointer = const T*;
+    using reference = T&;
+    using const_reference = const T&;
+
+    SafeIterator() = default;
+    SafeIterator(SafeIterator const& aOther)
+        : SafeIterator(aOther.mCurrent, aOther.mList) {}
+
+    SafeIterator(BaseIterator aBaseIter,
+                 SafeDoublyLinkedList<T, ElementAccess>* aList)
+        : mCurrent(aBaseIter),
+          mNext(aBaseIter ? ++aBaseIter : BaseIterator()),
+          mList(aList) {
+      if (mList) {
+        mNextIterator = mList->mIter;
+        mList->mIter = this;
+      }
+    }
+    ~SafeIterator() {
+      if (mList) {
+        MOZ_ASSERT(mList->mIter == this,
+                   "Iterators must currently be destroyed in opposite order "
+                   "from the construction order. It is suggested that you "
+                   "simply put them on the stack");
+        mList->mIter = mNextIterator;
+      }
+    }
+
+    SafeIterator& operator++() {
+      mCurrent = mNext;
+      if (mNext) {
+        ++mNext;
+      }
+      return *this;
+    }
+
+    pointer operator->() { return &*mCurrent; }
+    const_pointer operator->() const { return &*mCurrent; }
+    reference operator*() { return *mCurrent; }
+    const_reference operator*() const { return *mCurrent; }
+
+    pointer current() { return mCurrent ? &*mCurrent : nullptr; }
+    const_pointer current() const { return mCurrent ? &*mCurrent : nullptr; }
+
+    explicit operator bool() const { return bool(mCurrent); }
+    bool operator==(SafeIterator const& other) const {
+      return mCurrent == other.mCurrent;
+    }
+    bool operator!=(SafeIterator const& other) const {
+      return mCurrent != other.mCurrent;
+    }
+
+    BaseIterator& next() { return mNext; }  // mainly needed for unittests.
+   private:
+    /**
+     * Base list iterator pointing to the current list element of the iteration.
+     * If element mCurrent points to gets removed, the iterator will be set to
+     * empty. mNext keeps the iterator valid.
+     */
+    BaseIterator mCurrent{nullptr};
+    /**
+     * Base list iterator pointing to the next list element of the iteration.
+     * If element mCurrent points to gets removed, mNext is still valid.
+     * If element mNext points to gets removed, mNext advances, keeping this
+     * iterator valid.
+     */
+    BaseIterator mNext{nullptr};
+
+    /**
+     * Next element in the stack-allocated list of iterators stored in the
+     * SafeLinkedList object.
+     */
+    SafeIterator* mNextIterator{nullptr};
+    SafeDoublyLinkedList<T, ElementAccess>* mList{nullptr};
+
+    void setNext(T* aElm) { mNext = BaseIterator(aElm); }
+    void setCurrent(T* aElm) { mCurrent = BaseIterator(aElm); }
+  };
+
+ private:
+  using BaseListType = DoublyLinkedList<T, ElementAccess>;
+  friend class SafeIterator;
+
+ public:
+  SafeDoublyLinkedList() = default;
+
+  bool isEmpty() const { return mList.isEmpty(); }
+  bool contains(T* aElm) {
+    for (auto iter = mList.begin(); iter != mList.end(); ++iter) {
+      if (&*iter == aElm) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  SafeIterator begin() { return SafeIterator(mList.begin(), this); }
+  SafeIterator begin() const { return SafeIterator(mList.begin(), this); }
+  SafeIterator cbegin() const { return begin(); }
+
+  SafeIterator end() { return SafeIterator(); }
+  SafeIterator end() const { return SafeIterator(); }
+  SafeIterator cend() const { return SafeIterator(); }
+
+  void pushFront(T* aElm) { mList.pushFront(aElm); }
+
+  void pushBack(T* aElm) {
+    mList.pushBack(aElm);
+    auto* iter = mIter;
+    while (iter) {
+      if (!iter->mNext) {
+        iter->setNext(aElm);
+      }
+      iter = iter->mNextIterator;
+    }
+  }
+
+  T* popFront() {
+    T* firstElm = mList.popFront();
+    auto* iter = mIter;
+    while (iter) {
+      if (iter->current() == firstElm) {
+        iter->setCurrent(nullptr);
+      }
+      iter = iter->mNextIterator;
+    }
+
+    return firstElm;
+  }
+
+  T* popBack() {
+    T* lastElm = mList.popBack();
+    auto* iter = mIter;
+    while (iter) {
+      if (iter->current() == lastElm) {
+        iter->setCurrent(nullptr);
+      } else if (iter->mNext && &*(iter->mNext) == lastElm) {
+        iter->setNext(nullptr);
+      }
+      iter = iter->mNextIterator;
+    }
+
+    return lastElm;
+  }
+
+  void remove(T* aElm) {
+    if (!mList.ElementProbablyInList(aElm)) {
+      return;
+    }
+    auto* iter = mIter;
+    while (iter) {
+      if (iter->mNext && &*(iter->mNext) == aElm) {
+        ++(iter->mNext);
+      }
+      if (iter->current() == aElm) {
+        iter->setCurrent(nullptr);
+      }
+      iter = iter->mNextIterator;
+    }
+
+    mList.remove(aElm);
+  }
+
+ private:
+  BaseListType mList;
+  SafeIterator* mIter{nullptr};
 };
 
 }  // namespace mozilla

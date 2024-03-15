@@ -26,6 +26,10 @@
 namespace js {
 namespace wasm {
 
+using jit::FloatRegister;
+using jit::Register;
+using jit::Register64;
+
 // ValType and location for a single result: either in a register or on the
 // stack.
 
@@ -56,7 +60,6 @@ class ABIResult {
       case ValType::F64:
         MOZ_ASSERT(loc_ == Location::Fpr);
         break;
-      case ValType::Rtt:
       case ValType::Ref:
         MOZ_ASSERT(loc_ == Location::Gpr);
         break;
@@ -82,7 +85,7 @@ class ABIResult {
   static constexpr size_t StackSizeOfPtr = sizeof(intptr_t);
   static constexpr size_t StackSizeOfInt32 = StackSizeOfPtr;
   static constexpr size_t StackSizeOfInt64 = sizeof(int64_t);
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM)
   static constexpr size_t StackSizeOfFloat = sizeof(float);
 #else
   static constexpr size_t StackSizeOfFloat = sizeof(double);
@@ -258,13 +261,14 @@ extern bool GenerateStubs(const ModuleEnvironment& env,
 
 extern bool GenerateEntryStubs(jit::MacroAssembler& masm,
                                size_t funcExportIndex, const FuncExport& fe,
+                               const FuncType& funcType,
                                const Maybe<jit::ImmPtr>& callee, bool isAsmJS,
                                CodeRangeVector* codeRanges);
 
-extern void GenerateTrapExitMachineState(jit::MachineState* machine,
-                                         size_t* numWords);
+extern void GenerateTrapExitRegisterOffsets(jit::RegisterOffsets* offsets,
+                                            size_t* numWords);
 
-extern bool GenerateProvisionalLazyJitEntryStub(MacroAssembler& masm,
+extern bool GenerateProvisionalLazyJitEntryStub(jit::MacroAssembler& masm,
                                                 Offsets* offsets);
 
 // A value that is written into the trap exit frame, which is useful for
@@ -353,10 +357,12 @@ using JitCallStackArgVector = Vector<JitCallStackArg, 4, SystemAllocPolicy>;
 // - all arguments passed on stack slot are alive as defined by a corresponding
 //   JitCallStackArg.
 
-extern void GenerateDirectCallFromJit(
-    jit::MacroAssembler& masm, const FuncExport& fe, const Instance& inst,
-    const JitCallStackArgVector& stackArgs, bool profilingEnabled,
-    jit::Register scratch, uint32_t* callOffset);
+extern void GenerateDirectCallFromJit(jit::MacroAssembler& masm,
+                                      const FuncExport& fe,
+                                      const Instance& inst,
+                                      const JitCallStackArgVector& stackArgs,
+                                      jit::Register scratch,
+                                      uint32_t* callOffset);
 
 }  // namespace wasm
 }  // namespace js

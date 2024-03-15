@@ -17,6 +17,48 @@ static inline bool EqualContainers(const Container1& lhs,
   return std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
 }
 
+#define WASM_DECLARE_POD_VECTOR(Type, VectorName)                      \
+  }                                                                    \
+  }                                                                    \
+  static_assert(std::is_trivially_copyable<js::wasm::Type>::value,     \
+                "Must be trivially copyable");                         \
+  static_assert(std::is_trivially_destructible<js::wasm::Type>::value, \
+                "Must be trivially destructible");                     \
+  namespace js {                                                       \
+  namespace wasm {                                                     \
+  typedef Vector<Type, 0, SystemAllocPolicy> VectorName;
+
+using mozilla::MallocSizeOf;
+
+template <class T>
+static inline size_t SizeOfVectorElementExcludingThis(
+    const T& elem, MallocSizeOf mallocSizeOf) {
+  return elem.sizeOfExcludingThis(mallocSizeOf);
+}
+
+template <class T>
+static inline size_t SizeOfVectorElementExcludingThis(
+    const RefPtr<T>& elem, MallocSizeOf mallocSizeOf) {
+  return elem->sizeOfExcludingThis(mallocSizeOf);
+}
+
+template <class T, size_t N>
+static inline size_t SizeOfVectorExcludingThis(
+    const mozilla::Vector<T, N, SystemAllocPolicy>& vec,
+    MallocSizeOf mallocSizeOf) {
+  size_t size = vec.sizeOfExcludingThis(mallocSizeOf);
+  for (const T& t : vec) {
+    size += SizeOfVectorElementExcludingThis(t, mallocSizeOf);
+  }
+  return size;
+}
+
+template <class T>
+static inline size_t SizeOfMaybeExcludingThis(const mozilla::Maybe<T>& maybe,
+                                              MallocSizeOf mallocSizeOf) {
+  return maybe ? maybe->sizeOfExcludingThis(mallocSizeOf) : 0;
+}
+
 }  // namespace wasm
 }  // namespace js
 

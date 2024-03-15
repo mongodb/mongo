@@ -1,4 +1,4 @@
-// Copyright 2014, ARM Limited
+// Copyright 2014, VIXL authors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -399,6 +399,12 @@ void Instrument::VisitLoadStoreExclusive(const Instruction* instr) {
   counter->Increment();
 }
 
+void Instrument::VisitAtomicMemory(const Instruction* instr) {
+  USE(instr);
+  Update();
+  static Counter* counter = GetCounter("Other");
+  counter->Increment();
+}
 
 void Instrument::VisitLoadLiteral(const Instruction* instr) {
   USE(instr);

@@ -46,24 +46,19 @@ ZyanStatus ZydisFormatterATTFormatInstruction(const ZydisFormatter* formatter,
     ZYAN_ASSERT(formatter);
     ZYAN_ASSERT(buffer);
     ZYAN_ASSERT(context);
+    ZYAN_ASSERT(context->instruction);
+    ZYAN_ASSERT(context->operands);
 
     ZYAN_CHECK(formatter->func_print_prefixes(formatter, buffer, context));
     ZYAN_CHECK(formatter->func_print_mnemonic(formatter, buffer, context));
 
     ZyanUPointer state_mnemonic;
     ZYDIS_BUFFER_REMEMBER(buffer, state_mnemonic);
-    ZyanI8 c = (ZyanI8)context->instruction->operand_count - 1;
-    for (; c >= 0; --c)
-    {
-        if (context->instruction->operands[c].visibility != ZYDIS_OPERAND_VISIBILITY_HIDDEN)
-        {
-            break;
-        }
-    }
 
+    const ZyanI8 c = (ZyanI8)context->instruction->operand_count_visible - 1;
     for (ZyanI8 i = c; i >= 0; --i)
     {
-        const ZydisDecodedOperand* const operand = &context->instruction->operands[i];
+        const ZydisDecodedOperand* const operand = &context->operands[i];
 
         // Print embedded-mask registers as decorator instead of a regular operand
         if ((i == 1) && (operand->type == ZYDIS_OPERAND_TYPE_REGISTER) &&
@@ -146,8 +141,9 @@ ZyanStatus ZydisFormatterATTFormatInstruction(const ZydisFormatter* formatter,
         if ((context->instruction->encoding == ZYDIS_INSTRUCTION_ENCODING_EVEX) ||
             (context->instruction->encoding == ZYDIS_INSTRUCTION_ENCODING_MVEX))
         {
-            if  ((i == 0) &&
-                 (context->instruction->operands[i + 1].encoding == ZYDIS_OPERAND_ENCODING_MASK))
+            if  ((i == 0) && 
+                (context->instruction->operand_count_visible > 1) && 
+                (context->operands[1].encoding == ZYDIS_OPERAND_ENCODING_MASK))
             {
                 ZYAN_CHECK(formatter->func_print_decorator(formatter, buffer, context,
                     ZYDIS_DECORATOR_MASK));
@@ -165,8 +161,19 @@ ZyanStatus ZydisFormatterATTFormatInstruction(const ZydisFormatter* formatter,
                 }
             } else
             {
-                if ((i == (context->instruction->operand_count - 1)) ||
-                    (context->instruction->operands[i + 1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE))
+                ZyanBool decorate_operand;
+                if (i == (context->instruction->operand_count_visible - 1))
+                {
+                    decorate_operand = operand->type != ZYDIS_OPERAND_TYPE_IMMEDIATE;
+                }
+                else
+                {
+                    decorate_operand =
+                        (context->instruction->operand_count_visible > (i + 1)) &&
+                        ((context->operands[i + 1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE) ||
+                        (context->operands[i + 1].visibility == ZYDIS_OPERAND_VISIBILITY_HIDDEN));
+                }
+                if (decorate_operand)
                 {
                     if (context->instruction->encoding == ZYDIS_INSTRUCTION_ENCODING_MVEX)
                     {
@@ -211,32 +218,39 @@ ZyanStatus ZydisFormatterATTFormatOperandMEM(const ZydisFormatter* formatter,
         ZYAN_CHECK(formatter->func_print_address_abs(formatter, buffer, context));
     } else
     {
+        const ZyanBool should_print_reg = context->operand->mem.base != ZYDIS_REGISTER_NONE;
+        const ZyanBool should_print_idx = context->operand->mem.index != ZYDIS_REGISTER_NONE;
+        const ZyanBool neither_reg_nor_idx = !should_print_reg && !should_print_idx;
+
         // Regular memory operand
-        if (context->operand->mem.disp.has_displacement && context->operand->mem.disp.value)
+        if (neither_reg_nor_idx)
+        {
+            ZYAN_CHECK(formatter->func_print_address_abs(formatter, buffer, context));
+        } else if (context->operand->mem.disp.has_displacement && context->operand->mem.disp.value)
         {
             ZYAN_CHECK(formatter->func_print_disp(formatter, buffer, context));
         }
 
-        if ((context->operand->mem.base  == ZYDIS_REGISTER_NONE) &&
-            (context->operand->mem.index == ZYDIS_REGISTER_NONE))
+        if (neither_reg_nor_idx)
         {
             return ZYAN_STATUS_SUCCESS;
         }
 
         ZYDIS_BUFFER_APPEND(buffer, MEMORY_BEGIN_ATT);
 
-        if (context->operand->mem.base != ZYDIS_REGISTER_NONE)
+        if (should_print_reg)
         {
             ZYAN_CHECK(formatter->func_print_register(formatter, buffer, context,
                 context->operand->mem.base));
         }
-        if ((context->operand->mem.index != ZYDIS_REGISTER_NONE) &&
-            (context->operand->mem.type  != ZYDIS_MEMOP_TYPE_MIB))
+        if (should_print_idx)
         {
             ZYDIS_BUFFER_APPEND(buffer, DELIM_MEMORY);
             ZYAN_CHECK(formatter->func_print_register(formatter, buffer, context,
                 context->operand->mem.index));
-            if (context->operand->mem.scale)
+            if (context->operand->mem.scale &&
+                (context->operand->mem.type != ZYDIS_MEMOP_TYPE_MIB) &&
+                ((context->operand->mem.scale > 1) || formatter->force_memory_scale))
             {
                 ZYDIS_BUFFER_APPEND_TOKEN(buffer, ZYDIS_TOKEN_DELIMITER);
                 ZYDIS_BUFFER_APPEND(buffer, DELIM_MEMORY);
@@ -263,6 +277,8 @@ ZyanStatus ZydisFormatterATTPrintMnemonic(const ZydisFormatter* formatter,
     ZYAN_ASSERT(formatter);
     ZYAN_ASSERT(buffer);
     ZYAN_ASSERT(context);
+    ZYAN_ASSERT(context->instruction);
+    ZYAN_ASSERT(context->operands);
 
     const ZydisShortString* mnemonic = ZydisMnemonicGetStringWrapped(
         context->instruction->mnemonic);
@@ -282,17 +298,14 @@ ZyanStatus ZydisFormatterATTPrintMnemonic(const ZydisFormatter* formatter,
 
     // Append operand-size suffix
     ZyanU32 size = 0;
-    for (ZyanU8 i = 0; i < context->instruction->operand_count; ++i)
+    for (ZyanU8 i = 0; i < context->instruction->operand_count_visible; ++i)
     {
-        const ZydisDecodedOperand* const operand = &context->instruction->operands[i];
-        if (operand->visibility == ZYDIS_OPERAND_VISIBILITY_HIDDEN)
-        {
-            break;
-        }
+        const ZydisDecodedOperand* const operand = &context->operands[i];
         if ((operand->type == ZYDIS_OPERAND_TYPE_MEMORY) &&
-            (operand->mem.type == ZYDIS_MEMOP_TYPE_MEM))
+            ((operand->mem.type == ZYDIS_MEMOP_TYPE_MEM) ||
+             (operand->mem.type == ZYDIS_MEMOP_TYPE_VSIB)))
         {
-            size = ZydisFormatterHelperGetExplicitSize(formatter, context, i);
+            size = ZydisFormatterHelperGetExplicitSize(formatter, context, operand);
             break;
         }
     }
@@ -349,6 +362,22 @@ ZyanStatus ZydisFormatterATTPrintRegister(const ZydisFormatter* formatter,
     return ZydisStringAppendShortCase(&buffer->string, str, formatter->case_registers);
 }
 
+ZyanStatus ZydisFormatterATTPrintAddressABS(const ZydisFormatter* formatter,
+    ZydisFormatterBuffer* buffer, ZydisFormatterContext* context)
+{
+    ZYAN_ASSERT(formatter);
+    ZYAN_ASSERT(buffer);
+    ZYAN_ASSERT(context);
+
+    if ((context->instruction->meta.branch_type != ZYDIS_BRANCH_TYPE_NONE) &&
+        (context->operand->type == ZYDIS_OPERAND_TYPE_MEMORY))
+    {
+        ZYDIS_BUFFER_APPEND(buffer, MUL);
+    }
+
+    return ZydisFormatterBasePrintAddressABS(formatter, buffer, context);
+}
+
 ZyanStatus ZydisFormatterATTPrintDISP(const ZydisFormatter* formatter,
     ZydisFormatterBuffer* buffer, ZydisFormatterContext* context)
 {
@@ -362,11 +391,13 @@ ZyanStatus ZydisFormatterATTPrintDISP(const ZydisFormatter* formatter,
     case ZYDIS_SIGNEDNESS_AUTO:
     case ZYDIS_SIGNEDNESS_SIGNED:
         ZYDIS_STRING_APPEND_NUM_S(formatter, formatter->disp_base, &buffer->string,
-            context->operand->mem.disp.value, formatter->disp_padding, ZYAN_FALSE);
+            context->operand->mem.disp.value, formatter->disp_padding, 
+            formatter->hex_force_leading_number, ZYAN_FALSE);
         break;
     case ZYDIS_SIGNEDNESS_UNSIGNED:
         ZYDIS_STRING_APPEND_NUM_U(formatter, formatter->disp_base, &buffer->string,
-            context->operand->mem.disp.value, formatter->disp_padding);
+            context->operand->mem.disp.value, formatter->disp_padding, 
+            formatter->hex_force_leading_number);
         break;
     default:
         return ZYAN_STATUS_INVALID_ARGUMENT;

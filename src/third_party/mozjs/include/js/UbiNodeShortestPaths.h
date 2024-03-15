@@ -7,15 +7,15 @@
 #ifndef js_UbiNodeShortestPaths_h
 #define js_UbiNodeShortestPaths_h
 
-#include "mozilla/Attributes.h"
 #include "mozilla/Maybe.h"
 
 #include <utility>
 
 #include "js/AllocPolicy.h"
+#include "js/GCAPI.h"
+#include "js/UbiNode.h"
 #include "js/UbiNodeBreadthFirst.h"
 #include "js/UniquePtr.h"
-#include "js/Vector.h"
 
 namespace JS {
 namespace ubi {

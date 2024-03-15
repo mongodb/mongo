@@ -8,8 +8,6 @@
 
 #  include "jit/JSONSpewer.h"
 
-#  include <stdarg.h>
-
 #  include "jit/BacktrackingAllocator.h"
 #  include "jit/LIR.h"
 #  include "jit/MIR.h"
@@ -47,17 +45,7 @@ void JSONSpewer::spewMResumePoint(MResumePoint* rp) {
     property("caller", rp->caller()->block()->id());
   }
 
-  switch (rp->mode()) {
-    case MResumePoint::ResumeAt:
-      property("mode", "At");
-      break;
-    case MResumePoint::ResumeAfter:
-      property("mode", "After");
-      break;
-    case MResumePoint::Outer:
-      property("mode", "Outer");
-      break;
-  }
+  property("mode", ResumeModeToString(rp->mode()));
 
   beginListProperty("operands");
   for (MResumePoint* iter = rp; iter; iter = iter->caller()) {

@@ -40,6 +40,7 @@
 
 #include <boost/optional/optional.hpp>
 #include <js/AllocPolicy.h>
+#include <js/CallAndConstruct.h>
 #include <js/CallArgs.h>
 #include <js/GCVector.h>
 #include <js/Id.h>
@@ -353,12 +354,12 @@ StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsst
     }
 
     if (rid.isInt()) {
-        *jsstr = JSStringWrapper(JSID_TO_INT(rid));
+        *jsstr = JSStringWrapper(rid.toInt());
         return jsstr->toStringData();
     }
 
     if (rid.isString()) {
-        *jsstr = JSStringWrapper(cx, JSID_TO_STRING(rid));
+        *jsstr = JSStringWrapper(cx, rid.toString());
         return jsstr->toStringData();
     }
 
@@ -720,7 +721,7 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
 
         JS::RootedId rid(cx);
         for (uint32_t i = 0; i < length; i++) {
-            rid.set(INT_TO_JSID(i));
+            rid.set(JS::PropertyKey::Int(i));
             ids.infallibleAppend(rid);
         }
     } else {

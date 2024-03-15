@@ -104,7 +104,19 @@ const uint64_t kAddressTagMask =
     ((UINT64_C(1) << kAddressTagWidth) - 1) << kAddressTagOffset;
 VIXL_STATIC_ASSERT(kAddressTagMask == UINT64_C(0xff00000000000000));
 
-unsigned CalcLSDataSize(LoadStoreOp op);
+static inline unsigned CalcLSDataSize(LoadStoreOp op) {
+  VIXL_ASSERT((LSSize_offset + LSSize_width) == (kInstructionSize * 8));
+  unsigned size = static_cast<Instr>(op) >> LSSize_offset;
+  if ((op & LSVector_mask) != 0) {
+    // Vector register memory operations encode the access size in the "size"
+    // and "opc" fields.
+    if ((size == 0) && ((op & LSOpc_mask) >> LSOpc_offset) >= 2) {
+      size = kQRegSizeInBytesLog2;
+    }
+  }
+  return size;
+}
+
 unsigned CalcLSPairDataSize(LoadStorePairOp op);
 
 enum ImmBranchType {

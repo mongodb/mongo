@@ -91,7 +91,16 @@ env.Library(
     ],
 )
 
-env.Library(
+shellEnv = env.Clone()
+if shellEnv.TargetOSIs('windows'):
+    shellEnv.Append(CXXFLAGS=[
+        # See the /Zc:preprocessor comment in third_party/mozjs/SConscript
+        '/Zc:preprocessor',
+        '/wd5104',
+        '/wd5105',
+    ])
+
+shellEnv.Library(
     target='shell_options_storage',
     source=[
         'shell_options_storage.cpp',
@@ -216,7 +225,11 @@ if get_option('ssl') == 'on':
         scriptingEnv = env.Clone()
 
         scriptingEnv.Append(
-            CXXFLAGS=[] if scriptingEnv.TargetOSIs('windows') else [
+            CXXFLAGS=[
+                '/Zc:preprocessor',
+                '/wd5104',
+                '/wd5105',
+            ] if scriptingEnv.TargetOSIs('windows') else [
                 # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
                 '-Wno-unknown-warning-option',
                 '-Wno-class-memaccess',

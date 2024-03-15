@@ -6,20 +6,28 @@
 
 #include "gc/GCParallelTask.h"
 
-#include "mozilla/MathAlgorithms.h"
+#include "mozilla/Maybe.h"
+#include "mozilla/TimeStamp.h"
 
+#include "gc/GCContext.h"
+#include "gc/GCInternals.h"
 #include "gc/ParallelWork.h"
 #include "vm/HelperThreadState.h"
 #include "vm/Runtime.h"
-#include "vm/TraceLogging.h"
+#include "vm/Time.h"
 
 using namespace js;
 using namespace js::gc;
 
+using mozilla::Maybe;
 using mozilla::TimeDuration;
 using mozilla::TimeStamp;
 
 js::GCParallelTask::~GCParallelTask() {
+  // The LinkedListElement destructor will remove us from any list we are part
+  // of without synchronization, so ensure that doesn't happen.
+  MOZ_DIAGNOSTIC_ASSERT(!isInList());
+
   // Only most-derived classes' destructors may do the join: base class
   // destructors run after those for derived classes' members, so a join in a
   // base class can't ensure that the task is done using the members. All we
@@ -27,10 +35,21 @@ js::GCParallelTask::~GCParallelTask() {
   assertIdle();
 }
 
+static bool ShouldMeasureTaskStartDelay() {
+  // We use many tasks during GC so randomly sample a small fraction for the
+  // purposes of recording telemetry.
+  return (rand() % 100) == 0;
+}
+
 void js::GCParallelTask::startWithLockHeld(AutoLockHelperThreadState& lock) {
   MOZ_ASSERT(CanUseExtraThreads());
   MOZ_ASSERT(HelperThreadState().isInitialized(lock));
   assertIdle();
+
+  maybeQueueTime_ = TimeStamp();
+  if (ShouldMeasureTaskStartDelay()) {
+    maybeQueueTime_ = TimeStamp::Now();
+  }
 
   setDispatched(lock);
   HelperThreadState().submitTask(this, lock);
@@ -56,8 +75,7 @@ void js::GCParallelTask::startOrRunIfIdle(AutoLockHelperThreadState& lock) {
   joinWithLockHeld(lock);
 
   if (!CanUseExtraThreads()) {
-    AutoUnlockHelperThreadState unlock(lock);
-    runFromMainThread();
+    runFromMainThread(lock);
     return;
   }
 
@@ -71,40 +89,60 @@ void js::GCParallelTask::cancelAndWait() {
   cancel_ = false;
 }
 
-void js::GCParallelTask::join() {
+void js::GCParallelTask::join(Maybe<TimeStamp> deadline) {
   AutoLockHelperThreadState lock;
-  joinWithLockHeld(lock);
+  joinWithLockHeld(lock, deadline);
 }
 
-void js::GCParallelTask::joinWithLockHeld(AutoLockHelperThreadState& lock) {
+void js::GCParallelTask::joinWithLockHeld(AutoLockHelperThreadState& lock,
+                                          Maybe<TimeStamp> deadline) {
   // Task has not been started; there's nothing to do.
   if (isIdle(lock)) {
     return;
   }
 
-  // If the task was dispatched but has not yet started then cancel the task and
-  // run it from the main thread. This stops us from blocking here when the
-  // helper threads are busy with other tasks.
-  if (isDispatched(lock)) {
+  if (isDispatched(lock) && deadline.isNothing()) {
+    // If the task was dispatched but has not yet started then cancel the task
+    // and run it from the main thread. This stops us from blocking here when
+    // the helper threads are busy with other tasks.
     cancelDispatchedTask(lock);
-    AutoUnlockHelperThreadState unlock(lock);
-    runFromMainThread();
-    return;
+    runFromMainThread(lock);
+  } else {
+    // Otherwise wait for the task to complete.
+    joinNonIdleTask(deadline, lock);
   }
 
-  joinRunningOrFinishedTask(lock);
+  if (isIdle(lock)) {
+    recordDuration();
+  }
 }
 
-void js::GCParallelTask::joinRunningOrFinishedTask(
-    AutoLockHelperThreadState& lock) {
-  MOZ_ASSERT(isRunning(lock) || isFinished(lock));
+void GCParallelTask::recordDuration() {
+  if (phaseKind != gcstats::PhaseKind::NONE) {
+    gc->stats().recordParallelPhase(phaseKind, duration_);
+  }
+}
 
-  // Wait for the task to run to completion.
+void js::GCParallelTask::joinNonIdleTask(Maybe<TimeStamp> deadline,
+                                         AutoLockHelperThreadState& lock) {
+  MOZ_ASSERT(!isIdle(lock));
+
   while (!isFinished(lock)) {
-    HelperThreadState().wait(lock);
+    TimeDuration timeout = TimeDuration::Forever();
+    if (deadline) {
+      TimeStamp now = TimeStamp::Now();
+      if (*deadline <= now) {
+        break;
+      }
+      timeout = *deadline - now;
+    }
+
+    HelperThreadState().wait(lock, timeout);
   }
 
-  setIdle(lock);
+  if (isFinished(lock)) {
+    setIdle(lock);
+  }
 }
 
 void js::GCParallelTask::cancelDispatchedTask(AutoLockHelperThreadState& lock) {
@@ -114,47 +152,67 @@ void js::GCParallelTask::cancelDispatchedTask(AutoLockHelperThreadState& lock) {
   setIdle(lock);
 }
 
-static inline TimeDuration TimeSince(TimeStamp prev) {
-  TimeStamp now = ReallyNow();
-  // Sadly this happens sometimes.
-  MOZ_ASSERT(now >= prev);
-  if (now < prev) {
-    now = prev;
-  }
-  return now - prev;
+void js::GCParallelTask::runFromMainThread(AutoLockHelperThreadState& lock) {
+  assertIdle();
+  MOZ_ASSERT(js::CurrentThreadCanAccessRuntime(gc->rt));
+  state_ = State::Running;
+  runTask(gc->rt->gcContext(), lock);
+  state_ = State::Idle;
 }
 
 void js::GCParallelTask::runFromMainThread() {
-  assertIdle();
-  MOZ_ASSERT(js::CurrentThreadCanAccessRuntime(gc->rt));
   AutoLockHelperThreadState lock;
-  runTask(lock);
+  runFromMainThread(lock);
 }
 
-void js::GCParallelTask::runHelperThreadTask(AutoLockHelperThreadState& lock) {
-  TraceLoggerThread* logger = TraceLoggerForCurrentThread();
-  AutoTraceLog logCompile(logger, TraceLogger_GC);
+class MOZ_RAII AutoGCContext {
+  JS::GCContext context;
 
+ public:
+  explicit AutoGCContext(JSRuntime* runtime) : context(runtime) {
+    MOZ_RELEASE_ASSERT(TlsGCContext.init(),
+                       "Failed to initialize TLS for GC context");
+
+    MOZ_ASSERT(!TlsGCContext.get());
+    TlsGCContext.set(&context);
+  }
+
+  ~AutoGCContext() {
+    MOZ_ASSERT(TlsGCContext.get() == &context);
+    TlsGCContext.set(nullptr);
+  }
+
+  JS::GCContext* get() { return &context; }
+};
+
+void js::GCParallelTask::runHelperThreadTask(AutoLockHelperThreadState& lock) {
   setRunning(lock);
 
-  AutoSetHelperThreadContext usesContext(lock);
-  AutoSetContextRuntime ascr(gc->rt);
-  gc::AutoSetThreadIsPerformingGC performingGC;
-  runTask(lock);
+  AutoGCContext gcContext(gc->rt);
+
+  runTask(gcContext.get(), lock);
 
   setFinished(lock);
 }
 
-void GCParallelTask::runTask(AutoLockHelperThreadState& lock) {
+void GCParallelTask::runTask(JS::GCContext* gcx,
+                             AutoLockHelperThreadState& lock) {
   // Run the task from either the main thread or a helper thread.
+
+  AutoSetThreadGCUse setUse(gcx, use);
 
   // The hazard analysis can't tell what the call to func_ will do but it's not
   // allowed to GC.
   JS::AutoSuppressGCAnalysis nogc;
 
-  TimeStamp timeStart = ReallyNow();
+  TimeStamp timeStart = TimeStamp::Now();
   run(lock);
   duration_ = TimeSince(timeStart);
+
+  if (maybeQueueTime_) {
+    TimeDuration delay = timeStart - maybeQueueTime_;
+    gc->rt->metrics().GC_TASK_START_DELAY_US(delay);
+  }
 }
 
 bool js::GCParallelTask::isIdle() const {

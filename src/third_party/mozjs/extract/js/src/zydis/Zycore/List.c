@@ -32,10 +32,10 @@
 /* ============================================================================================== */
 
 /**
- * @brief   Returns a pointer to the data of the given `node`.
- * 
+ * Returns a pointer to the data of the given `node`.
+ *
  * @param   node    A pointer to the `ZyanNodeData` struct.
- * 
+ *
  * @return  A pointer to the data of the given `node`.
  */
 #define ZYCORE_LIST_GET_NODE_DATA(node) \
@@ -50,11 +50,11 @@
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Allocates memory for a new list node.
- * 
+ * Allocates memory for a new list node.
+ *
  * @param   list    A pointer to the `ZyanList` instance.
  * @param   node    Receives a pointer to the new `ZyanListNode` struct.
- * 
+ *
  * @return  A zyan status code.
  */
 static ZyanStatus ZyanListAllocateNode(ZyanList* list, ZyanListNode** node)
@@ -66,7 +66,7 @@ static ZyanStatus ZyanListAllocateNode(ZyanList* list, ZyanListNode** node)
     if (is_dynamic)
     {
         ZYAN_ASSERT(list->allocator->allocate);
-        ZYAN_CHECK(list->allocator->allocate(list->allocator, (void**)node, 
+        ZYAN_CHECK(list->allocator->allocate(list->allocator, (void**)node,
             sizeof(ZyanListNode) + list->element_size, 1));
     } else
     {
@@ -90,11 +90,11 @@ static ZyanStatus ZyanListAllocateNode(ZyanList* list, ZyanListNode** node)
 }
 
 /**
- * @brief   Frees memory of a node.
- * 
+ * Frees memory of a node.
+ *
  * @param   list    A pointer to the `ZyanList` instance.
  * @param   node    A pointer to the `ZyanListNode` struct.
- * 
+ *
  * @return  A zyan status code.
  */
 static ZyanStatus ZyanListDeallocateNode(ZyanList* list, ZyanListNode* node)
@@ -106,7 +106,7 @@ static ZyanStatus ZyanListDeallocateNode(ZyanList* list, ZyanListNode* node)
     if (is_dynamic)
     {
         ZYAN_ASSERT(list->allocator->deallocate);
-        ZYAN_CHECK(list->allocator->deallocate(list->allocator, (void*)node, 
+        ZYAN_CHECK(list->allocator->deallocate(list->allocator, (void*)node,
             sizeof(ZyanListNode) + list->element_size, 1));
     } else
     {
@@ -137,7 +137,7 @@ ZYAN_REQUIRES_LIBC ZyanStatus ZyanListInit(ZyanList* list, ZyanUSize element_siz
 
 #endif // ZYAN_NO_LIBC
 
-ZyanStatus ZyanListInitEx(ZyanList* list, ZyanUSize element_size, ZyanMemberProcedure destructor, 
+ZyanStatus ZyanListInitEx(ZyanList* list, ZyanUSize element_size, ZyanMemberProcedure destructor,
     ZyanAllocator* allocator)
 {
     if (!list || !element_size || !allocator)
@@ -176,7 +176,7 @@ ZyanStatus ZyanListInitCustomBuffer(ZyanList* list, ZyanUSize element_size,
     list->capacity     = capacity;
     list->first_unused = ZYAN_NULL;
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 ZyanStatus ZyanListDestroy(ZyanList* list)
@@ -201,14 +201,14 @@ ZyanStatus ZyanListDestroy(ZyanList* list)
 
         if (is_dynamic)
         {
-            ZYAN_CHECK(list->allocator->deallocate(list->allocator, node, 
-                sizeof(ZyanListNode) + list->element_size, 1));    
+            ZYAN_CHECK(list->allocator->deallocate(list->allocator, node,
+                sizeof(ZyanListNode) + list->element_size, 1));
         }
 
         node = next;
     }
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -242,7 +242,7 @@ ZyanStatus ZyanListGetTailNode(const ZyanList* list, const ZyanListNode** node)
 
     *node = list->tail;
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 ZyanStatus ZyanListGetPrevNode(const ZyanListNode** node)
@@ -254,7 +254,7 @@ ZyanStatus ZyanListGetPrevNode(const ZyanListNode** node)
 
     *node = (*node)->prev;
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 ZyanStatus ZyanListGetNextNode(const ZyanListNode** node)
@@ -266,7 +266,7 @@ ZyanStatus ZyanListGetNextNode(const ZyanListNode** node)
 
     *node = (*node)->next;
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 const void* ZyanListGetNodeData(const ZyanListNode* node)
@@ -276,7 +276,7 @@ const void* ZyanListGetNodeData(const ZyanListNode* node)
         return ZYAN_NULL;
     }
 
-    return (const void*)ZYCORE_LIST_GET_NODE_DATA(node);    
+    return (const void*)ZYCORE_LIST_GET_NODE_DATA(node);
 }
 
 ZyanStatus ZyanListGetNodeDataEx(const ZyanListNode* node, const void** value)
@@ -288,7 +288,7 @@ ZyanStatus ZyanListGetNodeDataEx(const ZyanListNode* node, const void** value)
 
     *value = (const void*)ZYCORE_LIST_GET_NODE_DATA(node);
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 void* ZyanListGetNodeDataMutable(const ZyanListNode* node)
@@ -298,7 +298,7 @@ void* ZyanListGetNodeDataMutable(const ZyanListNode* node)
         return ZYAN_NULL;
     }
 
-    return ZYCORE_LIST_GET_NODE_DATA(node);     
+    return ZYCORE_LIST_GET_NODE_DATA(node);
 }
 
 ZyanStatus ZyanListGetNodeDataMutableEx(const ZyanListNode* node, void** value)
@@ -310,7 +310,7 @@ ZyanStatus ZyanListGetNodeDataMutableEx(const ZyanListNode* node, void** value)
 
     *value = ZYCORE_LIST_GET_NODE_DATA(node);
 
-    return ZYAN_STATUS_SUCCESS;     
+    return ZYAN_STATUS_SUCCESS;
 }
 
 ZyanStatus ZyanListSetNodeData(const ZyanList* list, const ZyanListNode* node, const void* value)
@@ -388,7 +388,7 @@ ZyanStatus ZyanListPushFront(ZyanList* list, const void* item)
     }
     ++list->size;
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 ZyanStatus ZyanListEmplaceBack(ZyanList* list, void** item, ZyanMemberFunction constructor)
@@ -452,7 +452,7 @@ ZyanStatus ZyanListEmplaceFront(ZyanList* list, void** item, ZyanMemberFunction 
     }
     ++list->size;
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -520,7 +520,7 @@ ZyanStatus ZyanListPopFront(ZyanList* list)
     }
     --list->size;
 
-    return ZyanListDeallocateNode(list, node);    
+    return ZyanListDeallocateNode(list, node);
 }
 
 ZyanStatus ZyanListRemove(ZyanList* list, const ZyanListNode* node)
@@ -535,7 +535,7 @@ ZyanStatus ZyanListRemoveRange(ZyanList* list, const ZyanListNode* first, const 
     ZYAN_UNUSED(list);
     ZYAN_UNUSED(first);
     ZYAN_UNUSED(last);
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 ZyanStatus ZyanListClear(ZyanList* list)
@@ -584,8 +584,8 @@ ZyanStatus ZyanListResizeEx(ZyanList* list, ZyanUSize size, const void* initiali
 
             if (is_dynamic)
             {
-                ZYAN_CHECK(list->allocator->deallocate(list->allocator, node, 
-                    sizeof(ZyanListNode) + list->element_size, 1));    
+                ZYAN_CHECK(list->allocator->deallocate(list->allocator, node,
+                    sizeof(ZyanListNode) + list->element_size, 1));
             }
 
             node = next;
@@ -610,9 +610,9 @@ ZyanStatus ZyanListResizeEx(ZyanList* list, ZyanUSize size, const void* initiali
 
             if (initializer)
             {
-                ZYAN_MEMCPY(ZYCORE_LIST_GET_NODE_DATA(node), initializer, list->element_size);   
+                ZYAN_MEMCPY(ZYCORE_LIST_GET_NODE_DATA(node), initializer, list->element_size);
             }
-            
+
             if (!list->head)
             {
                 list->head = node;
@@ -649,7 +649,7 @@ ZyanStatus ZyanListResizeEx(ZyanList* list, ZyanUSize size, const void* initiali
         list->size = size;
     }
 
-    return ZYAN_STATUS_SUCCESS;    
+    return ZYAN_STATUS_SUCCESS;
 }
 
 /* ---------------------------------------------------------------------------------------------- */

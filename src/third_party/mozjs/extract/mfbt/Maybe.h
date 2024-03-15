@@ -21,6 +21,7 @@
 #include "mozilla/MemoryChecking.h"
 #include "mozilla/OperatorNewExtensions.h"
 #include "mozilla/Poison.h"
+#include "mozilla/ThreadSafety.h"
 
 class nsCycleCollectionTraversalCallback;
 
@@ -459,7 +460,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
    * avoid multiple calls. Unsafe unless |isSome()|.
    */
   T extract() {
-    MOZ_DIAGNOSTIC_ASSERT(isSome());
+    MOZ_RELEASE_ASSERT(isSome());
     T v = std::move(mStorage.val);
     reset();
     return v;
@@ -640,7 +641,13 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
   constexpr void reset() {
     if (isSome()) {
       if constexpr (!std::is_trivially_destructible_v<T>) {
+        /*
+         * Static analyzer gets confused if we have Maybe<MutexAutoLock>,
+         * so we suppress thread-safety warnings here
+         */
+        MOZ_PUSH_IGNORE_THREAD_SAFETY
         ref().T::~T();
+        MOZ_POP_THREAD_SAFETY
         poisonData();
       }
       mIsSome = false;
@@ -687,7 +694,7 @@ class Maybe<T&> {
   constexpr bool isNothing() const { return !mValue; }
 
   T& ref() const {
-    MOZ_DIAGNOSTIC_ASSERT(isSome());
+    MOZ_RELEASE_ASSERT(isSome());
     return *mValue;
   }
 
@@ -747,98 +754,98 @@ class Maybe<T&> {
 
 template <typename T>
 constexpr T Maybe<T>::value() const& {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return ref();
 }
 
 template <typename T>
 constexpr T Maybe<T>::value() && {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return std::move(ref());
 }
 
 template <typename T>
 constexpr T Maybe<T>::value() const&& {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return std::move(ref());
 }
 
 template <typename T>
 T* Maybe<T>::ptr() {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return &ref();
 }
 
 template <typename T>
 constexpr const T* Maybe<T>::ptr() const {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return &ref();
 }
 
 template <typename T>
 constexpr T* Maybe<T>::operator->() {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return ptr();
 }
 
 template <typename T>
 constexpr const T* Maybe<T>::operator->() const {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return ptr();
 }
 
 template <typename T>
 constexpr T& Maybe<T>::ref() & {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return mStorage.val;
 }
 
 template <typename T>
 constexpr const T& Maybe<T>::ref() const& {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return mStorage.val;
 }
 
 template <typename T>
 constexpr T&& Maybe<T>::ref() && {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return std::move(mStorage.val);
 }
 
 template <typename T>
 constexpr const T&& Maybe<T>::ref() const&& {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return std::move(mStorage.val);
 }
 
 template <typename T>
 constexpr T& Maybe<T>::operator*() & {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return ref();
 }
 
 template <typename T>
 constexpr const T& Maybe<T>::operator*() const& {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return ref();
 }
 
 template <typename T>
 constexpr T&& Maybe<T>::operator*() && {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return std::move(ref());
 }
 
 template <typename T>
 constexpr const T&& Maybe<T>::operator*() const&& {
-  MOZ_DIAGNOSTIC_ASSERT(isSome());
+  MOZ_RELEASE_ASSERT(isSome());
   return std::move(ref());
 }
 
 template <typename T>
 template <typename... Args>
 constexpr void Maybe<T>::emplace(Args&&... aArgs) {
-  MOZ_DIAGNOSTIC_ASSERT(!isSome());
+  MOZ_RELEASE_ASSERT(!isSome());
   ::new (KnownNotNull, &mStorage.val) T(std::forward<Args>(aArgs)...);
   mIsSome = true;
 }

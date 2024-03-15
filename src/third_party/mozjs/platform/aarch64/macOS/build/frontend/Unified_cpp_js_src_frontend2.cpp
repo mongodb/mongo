@@ -1,4 +1,13 @@
 #define MOZ_UNIFIED_BUILD
+#include "frontend/EmitterScope.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "frontend/EmitterScope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "frontend/EmitterScope.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "frontend/ExpressionStatementEmitter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "frontend/ExpressionStatementEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "frontend/ForOfLoopControl.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "frontend/FunctionEmitter.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/FunctionEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "frontend/FunctionEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

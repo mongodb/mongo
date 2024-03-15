@@ -26,13 +26,13 @@
 #error "builtin/ReflectParse.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/Stream.cpp"
+#include "builtin/ShadowRealm.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/Stream.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/ShadowRealm.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/Stream.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/ShadowRealm.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
 #include "builtin/String.cpp"

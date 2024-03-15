@@ -33,10 +33,6 @@ static const int32_t NUNBOX32_TYPE_OFFSET = 0;
 static const int32_t NUNBOX32_PAYLOAD_OFFSET = 4;
 #endif
 
-// Size of each bailout table entry.
-// For MIPS this is 2 instructions relative call.
-static const uint32_t BAILOUT_TABLE_ENTRY_SIZE = 2 * sizeof(void*);
-
 // MIPS32 can have two types of floating-point coprocessors modes:
 // - FR=0 mode/ 32-bit FPRs - Historical default, there are 32 single
 // precision registers and pairs of even and odd float registers are used as

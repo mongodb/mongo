@@ -7,36 +7,31 @@
 #ifndef jsfriendapi_h
 #define jsfriendapi_h
 
-#include "mozilla/MemoryReporting.h"
-#include "mozilla/PodOperations.h"
-
 #include "jspubtd.h"
 
 #include "js/CallArgs.h"
-#include "js/CharacterEncoding.h"
 #include "js/Class.h"
-#include "js/ErrorReport.h"
-#include "js/Exception.h"
-#include "js/friend/PerformanceHint.h"
 #include "js/GCAPI.h"
 #include "js/HeapAPI.h"
 #include "js/Object.h"           // JS::GetClass
 #include "js/shadow/Function.h"  // JS::shadow::Function
 #include "js/shadow/Object.h"    // JS::shadow::Object
 #include "js/TypeDecls.h"
-#include "js/Utility.h"
 
 class JSJitInfo;
 
-namespace JS {
-template <class T>
-class Heap;
-
-class ExceptionStack;
-} /* namespace JS */
-
+/*
+ * Set a callback used to trace gray roots.
+ *
+ * The callback is called after the first slice of GC so the embedding must
+ * implement appropriate barriers on its gray roots to ensure correctness.
+ *
+ * This callback may be called multiple times for different sets of zones. Use
+ * JS::ZoneIsGrayMarking() to determine whether roots from a particular zone are
+ * required.
+ */
 extern JS_PUBLIC_API void JS_SetGrayGCRootsTracer(JSContext* cx,
-                                                  JSTraceDataOp traceOp,
+                                                  JSGrayRootsTracer traceOp,
                                                   void* data);
 
 extern JS_PUBLIC_API JSObject* JS_FindCompilationScope(JSContext* cx,
@@ -165,6 +160,8 @@ extern JS_PUBLIC_API void SetRealmPrincipals(JS::Realm* realm,
 
 extern JS_PUBLIC_API bool GetIsSecureContext(JS::Realm* realm);
 
+extern JS_PUBLIC_API bool GetDebuggerObservesWasm(JS::Realm* realm);
+
 }  // namespace JS
 
 /**
@@ -223,6 +220,14 @@ namespace js {
  * right time(s), such as after evaluation of a script has run to completion.
  */
 extern JS_PUBLIC_API bool UseInternalJobQueues(JSContext* cx);
+
+#ifdef DEBUG
+/**
+ * Given internal job queues are used, return currently queued jobs as an
+ * array of job objects.
+ */
+extern JS_PUBLIC_API JSObject* GetJobsInInternalJobQueue(JSContext* cx);
+#endif
 
 /**
  * Enqueue |job| on the internal job queue.
@@ -383,6 +388,11 @@ JS_PUBLIC_API JSFunction* NewFunctionByIdWithReserved(JSContext* cx,
                                                       unsigned nargs,
                                                       unsigned flags, jsid id);
 
+/**
+ * Get or set function's reserved slot value.
+ * `fun` should be a function created with `*WithReserved` API above.
+ * Such functions have 2 reserved slots, and `which` can be either 0 or 1.
+ */
 JS_PUBLIC_API const JS::Value& GetFunctionNativeReserved(JSObject* fun,
                                                          size_t which);
 
@@ -554,20 +564,21 @@ static const unsigned JS_FUNCTION_INTERPRETED_BITS = 0x0060;
 static MOZ_ALWAYS_INLINE const JSJitInfo* FUNCTION_VALUE_TO_JITINFO(
     const JS::Value& v) {
   JSObject* obj = &v.toObject();
-  MOZ_ASSERT(JS::GetClass(obj) == js::FunctionClassPtr);
+  MOZ_ASSERT(JS::GetClass(obj)->isJSFunction());
 
   auto* fun = reinterpret_cast<JS::shadow::Function*>(obj);
-  MOZ_ASSERT(!(fun->flags & js::JS_FUNCTION_INTERPRETED_BITS),
+  MOZ_ASSERT(!(fun->flagsAndArgCount() & js::JS_FUNCTION_INTERPRETED_BITS),
              "Unexpected non-native function");
 
-  return fun->jitinfo;
+  return static_cast<const JSJitInfo*>(fun->jitInfoOrScript());
 }
 
 static MOZ_ALWAYS_INLINE void SET_JITINFO(JSFunction* func,
                                           const JSJitInfo* info) {
   auto* fun = reinterpret_cast<JS::shadow::Function*>(func);
-  MOZ_ASSERT(!(fun->flags & js::JS_FUNCTION_INTERPRETED_BITS));
-  fun->jitinfo = info;
+  MOZ_ASSERT(!(fun->flagsAndArgCount() & js::JS_FUNCTION_INTERPRETED_BITS));
+
+  fun->setJitInfoOrScript(const_cast<JSJitInfo*>(info));
 }
 
 static_assert(sizeof(jsid) == sizeof(void*));
@@ -727,10 +738,52 @@ class MOZ_STACK_CLASS JS_PUBLIC_API AutoAssertNoContentJS {
 };
 
 /**
+ * This function reports memory used by a zone in bytes, this includes:
+ *  * The size of this JS GC zone.
+ *  * Malloc memory referred to from this zone.
+ *  * JIT memory for this zone.
+ *
+ * Note that malloc memory referred to from this zone can include
+ * SharedArrayBuffers which may also be referred to from other zones. Adding the
+ * memory usage of multiple zones may lead to an over-estimate.
+ */
+extern JS_PUBLIC_API uint64_t GetMemoryUsageForZone(JS::Zone* zone);
+
+enum class MemoryUse : uint8_t;
+
+namespace gc {
+
+struct SharedMemoryUse {
+  explicit SharedMemoryUse(MemoryUse use) : count(0), nbytes(0) {
+#ifdef DEBUG
+    this->use = use;
+#endif
+  }
+
+  size_t count;
+  size_t nbytes;
+#ifdef DEBUG
+  MemoryUse use;
+#endif
+};
+
+// A map which tracks shared memory uses (shared in the sense that an allocation
+// can be referenced by more than one GC thing in a zone). This allows us to
+// only account for the memory once.
+using SharedMemoryMap =
+    HashMap<void*, SharedMemoryUse, DefaultHasher<void*>, SystemAllocPolicy>;
+
+} /* namespace gc */
+
+extern JS_PUBLIC_API const gc::SharedMemoryMap& GetSharedMemoryUsageForZone(
+    JS::Zone* zone);
+
+/**
  * This function only reports GC heap memory,
  * and not malloc allocated memory associated with GC things.
+ * It reports the total of all memory for the whole Runtime.
  */
-extern JS_PUBLIC_API uint64_t GetGCHeapUsageForObjectZone(JSObject* obj);
+extern JS_PUBLIC_API uint64_t GetGCHeapUsage(JSContext* cx);
 
 class JS_PUBLIC_API CompartmentTransplantCallback {
  public:

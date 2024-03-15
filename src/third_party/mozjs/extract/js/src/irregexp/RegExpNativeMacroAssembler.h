@@ -59,23 +59,30 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
 
   virtual void CheckCharacter(uint32_t c, Label* on_equal);
   virtual void CheckNotCharacter(uint32_t c, Label* on_not_equal);
-  virtual void CheckCharacterGT(uc16 limit, Label* on_greater);
-  virtual void CheckCharacterLT(uc16 limit, Label* on_less);
+  virtual void CheckCharacterGT(base::uc16 limit, Label* on_greater);
+  virtual void CheckCharacterLT(base::uc16 limit, Label* on_less);
   virtual void CheckCharacterAfterAnd(uint32_t c, uint32_t mask,
                                       Label* on_equal);
   virtual void CheckNotCharacterAfterAnd(uint32_t c, uint32_t mask,
                                          Label* on_not_equal);
-  virtual void CheckNotCharacterAfterMinusAnd(uc16 c, uc16 minus, uc16 mask,
+  virtual void CheckNotCharacterAfterMinusAnd(base::uc16 c, base::uc16 minus,
+                                              base::uc16 mask,
                                               Label* on_not_equal);
   virtual void CheckGreedyLoop(Label* on_tos_equals_current_position);
-  virtual void CheckCharacterInRange(uc16 from, uc16 to, Label* on_in_range);
-  virtual void CheckCharacterNotInRange(uc16 from, uc16 to,
+  virtual void CheckCharacterInRange(base::uc16 from, base::uc16 to,
+                                     Label* on_in_range);
+  virtual void CheckCharacterNotInRange(base::uc16 from, base::uc16 to,
                                         Label* on_not_in_range);
+  virtual bool CheckCharacterInRangeArray(
+      const ZoneList<CharacterRange>* ranges, Label* on_in_range);
+  virtual bool CheckCharacterNotInRangeArray(
+      const ZoneList<CharacterRange>* ranges, Label* on_not_in_range);
   virtual void CheckAtStart(int cp_offset, Label* on_at_start);
   virtual void CheckNotAtStart(int cp_offset, Label* on_not_at_start);
   virtual void CheckPosition(int cp_offset, Label* on_outside_input);
   virtual void CheckBitInTable(Handle<ByteArray> table, Label* on_bit_set);
-  virtual bool CheckSpecialCharacterClass(uc16 type, Label* on_no_match);
+  virtual bool CheckSpecialCharacterClass(StandardCharacterSet type,
+                                          Label* on_no_match);
   virtual void CheckNotBackReference(int start_reg, bool read_backward,
                                      Label* on_no_match);
   virtual void CheckNotBackReferenceIgnoreCase(int start_reg,
@@ -102,7 +109,7 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
 
   virtual Handle<HeapObject> GetCode(Handle<String> source);
 
-  virtual bool CanReadUnaligned();
+  virtual bool CanReadUnaligned() const;
 
  private:
   size_t frameSize_ = 0;
@@ -126,11 +133,12 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
                           js::jit::Assembler::Condition cond);
   void CheckCharacterAfterAndImpl(uint32_t c, uint32_t and_with, Label* on_cond,
                                   bool negate);
-  void CheckCharacterInRangeImpl(uc16 from, uc16 to, Label* on_cond,
+  void CheckCharacterInRangeImpl(base::uc16 from, base::uc16 to, Label* on_cond,
                                  js::jit::Assembler::Condition cond);
   void CheckNotBackReferenceImpl(int start_reg, bool read_backward,
                                  bool unicode, Label* on_no_match,
                                  bool ignore_case);
+  void CallIsCharacterInRangeArray(const ZoneList<CharacterRange>* ranges);
 
   void LoadCurrentCharacterUnchecked(int cp_offset, int characters);
 
@@ -155,6 +163,7 @@ class SMRegExpMacroAssembler final : public NativeRegExpMacroAssembler {
   static uint32_t CaseInsensitiveCompareUnicode(const char16_t* substring1,
                                                 const char16_t* substring2,
                                                 size_t byteLength);
+  static bool IsCharacterInRangeArray(uint32_t c, ByteArrayData* ranges);
 
  private:
   inline int char_size() { return static_cast<int>(mode_); }

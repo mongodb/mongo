@@ -9,30 +9,31 @@
 
 #include "vm/ErrorObject.h"
 
+#include "vm/JSAtomState.h"
 #include "vm/JSContext.h"
 
 inline JSString* js::ErrorObject::fileName(JSContext* cx) const {
-  const HeapSlot& slot = getReservedSlotRef(FILENAME_SLOT);
-  return slot.isString() ? slot.toString() : cx->names().empty;
+  Value val = getReservedSlot(FILENAME_SLOT);
+  return val.isString() ? val.toString() : cx->names().empty;
 }
 
 inline uint32_t js::ErrorObject::sourceId() const {
-  const HeapSlot& slot = getReservedSlotRef(SOURCEID_SLOT);
-  return slot.isInt32() ? slot.toInt32() : 0;
+  Value val = getReservedSlot(SOURCEID_SLOT);
+  return val.isInt32() ? val.toInt32() : 0;
 }
 
 inline uint32_t js::ErrorObject::lineNumber() const {
-  const HeapSlot& slot = getReservedSlotRef(LINENUMBER_SLOT);
-  return slot.isInt32() ? slot.toInt32() : 0;
+  Value val = getReservedSlot(LINENUMBER_SLOT);
+  return val.isInt32() ? val.toInt32() : 0;
 }
 
 inline uint32_t js::ErrorObject::columnNumber() const {
-  const HeapSlot& slot = getReservedSlotRef(COLUMNNUMBER_SLOT);
-  return slot.isInt32() ? slot.toInt32() : 0;
+  Value val = getReservedSlot(COLUMNNUMBER_SLOT);
+  return val.isInt32() ? val.toInt32() : 0;
 }
 
 inline JSObject* js::ErrorObject::stack() const {
-  return getReservedSlotRef(STACK_SLOT).toObjectOrNull();
+  return getReservedSlot(STACK_SLOT).toObjectOrNull();
 }
 
 #endif /* vm_ErrorObject_inl_h */

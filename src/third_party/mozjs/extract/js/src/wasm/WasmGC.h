@@ -21,138 +21,210 @@
 
 #include "mozilla/BinarySearch.h"
 
-#include "jit/MacroAssembler.h"  // For ABIArgIter
+#include "jit/ABIArgGenerator.h"  // For ABIArgIter
 #include "js/AllocPolicy.h"
 #include "js/Vector.h"
 #include "util/Memory.h"
+#include "wasm/WasmBuiltins.h"
+#include "wasm/WasmFrame.h"
+#include "wasm/WasmSerialize.h"
 
 namespace js {
 
 namespace jit {
+class Label;
 class MacroAssembler;
 }  // namespace jit
 
 namespace wasm {
 
-using namespace js::jit;
+class ArgTypeVector;
+class BytecodeOffset;
+
+using jit::Label;
+using jit::MIRType;
+using jit::Register;
 
 // Definitions for stackmaps.
 
 using ExitStubMapVector = Vector<bool, 32, SystemAllocPolicy>;
 
-struct StackMap final {
-  // A StackMap is a bit-array containing numMappedWords bits, one bit per
-  // word of stack.  Bit index zero is for the lowest addressed word in the
-  // range.
-  //
-  // This is a variable-length structure whose size must be known at creation
-  // time.
-  //
-  // Users of the map will know the address of the wasm::Frame that is covered
-  // by this map.  In order that they can calculate the exact address range
-  // covered by the map, the map also stores the offset, from the highest
-  // addressed word of the map, of the embedded wasm::Frame.  This is an
-  // offset down from the highest address, rather than up from the lowest, so
-  // as to limit its range to 11 bits, where
-  // 11 == ceil(log2(MaxParams * sizeof-biggest-param-type-in-words))
-  //
-  // The stackmap may also cover a DebugFrame (all DebugFrames get a map).  If
-  // so that can be noted, since users of the map need to trace pointers in a
-  // DebugFrame.
-  //
-  // Finally, for sanity checking only, for stackmaps associated with a wasm
-  // trap exit stub, the number of words used by the trap exit stub save area
-  // is also noted.  This is used in Instance::traceFrame to check that the
-  // TrapExitDummyValue is in the expected place in the frame.
-
-  // The total number of stack words covered by the map ..
-  uint32_t numMappedWords : 30;
-
-  // .. of which this many are "exit stub" extras
-  uint32_t numExitStubWords : 6;
-
-  // Where is Frame* relative to the top?  This is an offset in words.
-  uint32_t frameOffsetFromTop : 11;
-
-  // Notes the presence of a DebugFrame.  The DebugFrame may or may not contain
-  // GC-managed data but always gets a stackmap, as computing whether a stack
-  // map is definitively needed is brittle and ultimately not a worthwhile
-  // optimization.
-  uint32_t hasDebugFrame : 1;
-
- private:
-  static constexpr uint32_t maxMappedWords = (1 << 30) - 1;
-  static constexpr uint32_t maxExitStubWords = (1 << 6) - 1;
-  static constexpr uint32_t maxFrameOffsetFromTop = (1 << 11) - 1;
-
-  uint32_t bitmap[1];
-
-  explicit StackMap(uint32_t numMappedWords)
+struct StackMapHeader {
+  explicit StackMapHeader(uint32_t numMappedWords = 0)
       : numMappedWords(numMappedWords),
         numExitStubWords(0),
         frameOffsetFromTop(0),
-        hasDebugFrame(0) {
-    const uint32_t nBitmap = calcNBitmap(numMappedWords);
+        hasDebugFrameWithLiveRefs(0) {}
+
+  // The total number of stack words covered by the map ..
+  static constexpr size_t MappedWordsBits = 30;
+  uint32_t numMappedWords : MappedWordsBits;
+
+  // .. of which this many are "exit stub" extras
+  static constexpr size_t ExitStubWordsBits = 6;
+  uint32_t numExitStubWords : ExitStubWordsBits;
+
+  // Where is Frame* relative to the top?  This is an offset in words.  On every
+  // platform, FrameOffsetBits needs to be at least
+  // ceil(log2(MaxParams*sizeof-biggest-param-type-in-words)).  The most
+  // constraining platforms are 32-bit with SIMD support, currently x86-32.
+  static constexpr size_t FrameOffsetBits = 12;
+  uint32_t frameOffsetFromTop : FrameOffsetBits;
+
+  // Notes the presence of a DebugFrame with possibly-live references.  A
+  // DebugFrame may or may not contain GC-managed data; in situations when it is
+  // possible that any pointers in the DebugFrame are non-null, the DebugFrame
+  // gets a stackmap.
+  uint32_t hasDebugFrameWithLiveRefs : 1;
+
+  WASM_CHECK_CACHEABLE_POD(numMappedWords, numExitStubWords, frameOffsetFromTop,
+                           hasDebugFrameWithLiveRefs);
+
+  static constexpr uint32_t maxMappedWords = (1 << MappedWordsBits) - 1;
+  static constexpr uint32_t maxExitStubWords = (1 << ExitStubWordsBits) - 1;
+  static constexpr uint32_t maxFrameOffsetFromTop = (1 << FrameOffsetBits) - 1;
+
+  static constexpr size_t MaxParamSize =
+      std::max(sizeof(jit::FloatRegisters::RegisterContent),
+               sizeof(jit::Registers::RegisterContent));
+
+  // Add 16 words to account for the size of FrameWithInstances including any
+  // shadow stack (at worst 8 words total), and then a little headroom in case
+  // the argument area had to be aligned.
+  static_assert(FrameWithInstances::sizeOf() / sizeof(void*) <= 8);
+  static_assert(maxFrameOffsetFromTop >=
+                    (MaxParams * MaxParamSize / sizeof(void*)) + 16,
+                "limited size of the offset field");
+};
+
+WASM_DECLARE_CACHEABLE_POD(StackMapHeader);
+
+// This is the expected size for the header
+static_assert(sizeof(StackMapHeader) == 8,
+              "wasm::StackMapHeader has unexpected size");
+
+// A StackMap is a bit-array containing numMappedWords bits, one bit per
+// word of stack.  Bit index zero is for the lowest addressed word in the
+// range.
+//
+// This is a variable-length structure whose size must be known at creation
+// time.
+//
+// Users of the map will know the address of the wasm::Frame that is covered
+// by this map.  In order that they can calculate the exact address range
+// covered by the map, the map also stores the offset, from the highest
+// addressed word of the map, of the embedded wasm::Frame.  This is an offset
+// down from the highest address, rather than up from the lowest, so as to
+// limit its range to FrameOffsetBits bits.
+//
+// The stackmap may also cover a DebugFrame (all DebugFrames which may
+// potentially contain live pointers into the JS heap get a map).  If so that
+// can be noted, since users of the map need to trace pointers in a
+// DebugFrame.
+//
+// Finally, for sanity checking only, for stackmaps associated with a wasm
+// trap exit stub, the number of words used by the trap exit stub save area
+// is also noted.  This is used in Instance::traceFrame to check that the
+// TrapExitDummyValue is in the expected place in the frame.
+struct StackMap final {
+  // The header contains the constant-sized fields before the variable-sized
+  // bitmap that follows.
+  StackMapHeader header;
+
+ private:
+  // The variable-sized bitmap.
+  uint32_t bitmap[1];
+
+  explicit StackMap(uint32_t numMappedWords) : header(numMappedWords) {
+    const uint32_t nBitmap = calcNBitmap(header.numMappedWords);
+    memset(bitmap, 0, nBitmap * sizeof(bitmap[0]));
+  }
+  explicit StackMap(const StackMapHeader& header) : header(header) {
+    const uint32_t nBitmap = calcNBitmap(header.numMappedWords);
     memset(bitmap, 0, nBitmap * sizeof(bitmap[0]));
   }
 
  public:
   static StackMap* create(uint32_t numMappedWords) {
-    uint32_t nBitmap = calcNBitmap(numMappedWords);
-    char* buf =
-        (char*)js_malloc(sizeof(StackMap) + (nBitmap - 1) * sizeof(bitmap[0]));
+    size_t size = allocationSizeInBytes(numMappedWords);
+    char* buf = (char*)js_malloc(size);
     if (!buf) {
       return nullptr;
     }
     return ::new (buf) StackMap(numMappedWords);
   }
+  static StackMap* create(const StackMapHeader& header) {
+    size_t size = allocationSizeInBytes(header.numMappedWords);
+    char* buf = (char*)js_malloc(size);
+    if (!buf) {
+      return nullptr;
+    }
+    return ::new (buf) StackMap(header);
+  }
 
   void destroy() { js_free((char*)this); }
+
+  // Returns the size of a `StackMap` allocated with `numMappedWords`.
+  static size_t allocationSizeInBytes(uint32_t numMappedWords) {
+    uint32_t nBitmap = calcNBitmap(numMappedWords);
+    return sizeof(StackMap) + (nBitmap - 1) * sizeof(bitmap[0]);
+  }
+
+  // Returns the allocated size of this `StackMap`.
+  size_t allocationSizeInBytes() const {
+    return allocationSizeInBytes(header.numMappedWords);
+  }
 
   // Record the number of words in the map used as a wasm trap exit stub
   // save area.  See comment above.
   void setExitStubWords(uint32_t nWords) {
-    MOZ_ASSERT(numExitStubWords == 0);
-    MOZ_RELEASE_ASSERT(nWords <= maxExitStubWords);
-    MOZ_ASSERT(nWords <= numMappedWords);
-    numExitStubWords = nWords;
+    MOZ_ASSERT(header.numExitStubWords == 0);
+    MOZ_RELEASE_ASSERT(nWords <= header.maxExitStubWords);
+    MOZ_ASSERT(nWords <= header.numMappedWords);
+    header.numExitStubWords = nWords;
   }
 
   // Record the offset from the highest-addressed word of the map, that the
   // wasm::Frame lives at.  See comment above.
   void setFrameOffsetFromTop(uint32_t nWords) {
-    MOZ_ASSERT(frameOffsetFromTop == 0);
-    MOZ_RELEASE_ASSERT(nWords <= maxFrameOffsetFromTop);
-    MOZ_ASSERT(frameOffsetFromTop < numMappedWords);
-    frameOffsetFromTop = nWords;
+    MOZ_ASSERT(header.frameOffsetFromTop == 0);
+    MOZ_RELEASE_ASSERT(nWords <= StackMapHeader::maxFrameOffsetFromTop);
+    MOZ_ASSERT(header.frameOffsetFromTop < header.numMappedWords);
+    header.frameOffsetFromTop = nWords;
   }
 
   // If the frame described by this StackMap includes a DebugFrame, call here to
   // record that fact.
-  void setHasDebugFrame() {
-    MOZ_ASSERT(hasDebugFrame == 0);
-    hasDebugFrame = 1;
+  void setHasDebugFrameWithLiveRefs() {
+    MOZ_ASSERT(header.hasDebugFrameWithLiveRefs == 0);
+    header.hasDebugFrameWithLiveRefs = 1;
   }
 
   inline void setBit(uint32_t bitIndex) {
-    MOZ_ASSERT(bitIndex < numMappedWords);
+    MOZ_ASSERT(bitIndex < header.numMappedWords);
     uint32_t wordIndex = bitIndex / wordsPerBitmapElem;
     uint32_t wordOffset = bitIndex % wordsPerBitmapElem;
     bitmap[wordIndex] |= (1 << wordOffset);
   }
 
   inline uint32_t getBit(uint32_t bitIndex) const {
-    MOZ_ASSERT(bitIndex < numMappedWords);
+    MOZ_ASSERT(bitIndex < header.numMappedWords);
     uint32_t wordIndex = bitIndex / wordsPerBitmapElem;
     uint32_t wordOffset = bitIndex % wordsPerBitmapElem;
     return (bitmap[wordIndex] >> wordOffset) & 1;
+  }
+
+  inline uint8_t* rawBitmap() { return (uint8_t*)&bitmap; }
+  inline const uint8_t* rawBitmap() const { return (const uint8_t*)&bitmap; }
+  inline size_t rawBitmapLengthInBytes() const {
+    return calcNBitmap(header.numMappedWords) * sizeof(uint32_t);
   }
 
  private:
   static constexpr uint32_t wordsPerBitmapElem = sizeof(bitmap[0]) * 8;
 
   static uint32_t calcNBitmap(uint32_t numMappedWords) {
-    MOZ_RELEASE_ASSERT(numMappedWords <= maxMappedWords);
+    MOZ_RELEASE_ASSERT(numMappedWords <= StackMapHeader::maxMappedWords);
     uint32_t nBitmap =
         (numMappedWords + wordsPerBitmapElem - 1) / wordsPerBitmapElem;
     return nBitmap == 0 ? 1 : nBitmap;
@@ -171,9 +243,9 @@ class StackMaps {
   // this means that |nextInsnAddr| points either immediately after a call
   // instruction, after a trap instruction or after a no-op.
   struct Maplet {
-    uint8_t* nextInsnAddr;
+    const uint8_t* nextInsnAddr;
     StackMap* map;
-    Maplet(uint8_t* nextInsnAddr, StackMap* map)
+    Maplet(const uint8_t* nextInsnAddr, StackMap* map)
         : nextInsnAddr(nextInsnAddr), map(map) {}
     void offsetBy(uintptr_t delta) { nextInsnAddr += delta; }
     bool operator<(const Maplet& other) const {
@@ -193,7 +265,7 @@ class StackMaps {
       maplet.map = nullptr;
     }
   }
-  [[nodiscard]] bool add(uint8_t* nextInsnAddr, StackMap* map) {
+  [[nodiscard]] bool add(const uint8_t* nextInsnAddr, StackMap* map) {
     MOZ_ASSERT(!sorted_);
     return mapping_.append(Maplet(nextInsnAddr, map));
   }
@@ -219,12 +291,17 @@ class StackMaps {
   void offsetBy(uintptr_t delta) {
     for (auto& maplet : mapping_) maplet.offsetBy(delta);
   }
-  void sort() {
+  void finishAndSort() {
     MOZ_ASSERT(!sorted_);
     std::sort(mapping_.begin(), mapping_.end());
     sorted_ = true;
   }
-  const StackMap* findMap(uint8_t* nextInsnAddr) const {
+  void finishAlreadySorted() {
+    MOZ_ASSERT(!sorted_);
+    MOZ_ASSERT(std::is_sorted(mapping_.begin(), mapping_.end()));
+    sorted_ = true;
+  }
+  const StackMap* findMap(const uint8_t* nextInsnAddr) const {
     struct Comparator {
       int operator()(Maplet aVal) const {
         if (uintptr_t(mTarget) < uintptr_t(aVal.nextInsnAddr)) {
@@ -265,7 +342,7 @@ class StackMaps {
 // the complete native-ABI-level call signature.
 template <class T>
 static inline size_t StackArgAreaSizeUnaligned(const T& argTypes) {
-  WasmABIArgIter<const T> i(argTypes);
+  jit::WasmABIArgIter<const T> i(argTypes);
   while (!i.done()) {
     i++;
   }
@@ -300,12 +377,7 @@ static inline size_t StackArgAreaSizeUnaligned(
 }
 
 static inline size_t AlignStackArgAreaSize(size_t unalignedSize) {
-  return AlignBytes(unalignedSize, 16u);
-}
-
-template <class T>
-static inline size_t StackArgAreaSizeAligned(const T& argTypes) {
-  return AlignStackArgAreaSize(StackArgAreaSizeUnaligned(argTypes));
+  return AlignBytes(unalignedSize, jit::WasmStackAlignment);
 }
 
 // A stackmap creation helper.  Create a stackmap from a vector of booleans.
@@ -336,7 +408,7 @@ wasm::StackMap* ConvertStackMapBoolVectorToStackMap(
 // MacroAssembler::wasmReserveStackChecked, in the case where the frame is
 // "small", as determined by that function.
 [[nodiscard]] bool CreateStackMapForFunctionEntryTrap(
-    const ArgTypeVector& argTypes, const MachineState& trapExitLayout,
+    const ArgTypeVector& argTypes, const jit::RegisterOffsets& trapExitLayout,
     size_t trapExitLayoutWords, size_t nBytesReservedBeforeTrap,
     size_t nInboundStackArgBytes, wasm::StackMap** result);
 
@@ -346,7 +418,7 @@ wasm::StackMap* ConvertStackMapBoolVectorToStackMap(
 // |args[0]| corresponds to the low addressed end of the described section of
 // the save area.
 [[nodiscard]] bool GenerateStackmapEntriesForTrapExit(
-    const ArgTypeVector& args, const MachineState& trapExitLayout,
+    const ArgTypeVector& args, const jit::RegisterOffsets& trapExitLayout,
     const size_t trapExitLayoutNumWords, ExitStubMapVector* extras);
 
 // Shared write barrier code.
@@ -374,11 +446,17 @@ wasm::StackMap* ConvertStackMapBoolVectorToStackMap(
 // Before storing a GC pointer value in memory, skip to `skipBarrier` if the
 // prebarrier is not needed.  Will clobber `scratch`.
 //
-// It is OK for `tls` and `scratch` to be the same register.
+// It is OK for `instance` and `scratch` to be the same register.
+//
+// If `trapOffset` is non-null, then metadata to catch a null access and emit
+// a null pointer exception will be emitted. This will only catch a null access
+// due to an incremental GC being in progress, the write that follows this
+// pre-barrier guard must also be guarded against null.
 
-void EmitWasmPreBarrierGuard(MacroAssembler& masm, Register tls,
+void EmitWasmPreBarrierGuard(jit::MacroAssembler& masm, Register instance,
                              Register scratch, Register valueAddr,
-                             Label* skipBarrier);
+                             size_t valueOffset, Label* skipBarrier,
+                             BytecodeOffset* trapOffset);
 
 // Before storing a GC pointer value in memory, call out-of-line prebarrier
 // code. This assumes `PreBarrierReg` contains the address that will be updated.
@@ -386,10 +464,11 @@ void EmitWasmPreBarrierGuard(MacroAssembler& masm, Register tls,
 // as SP.  `PreBarrierReg` is preserved by the barrier function.  Will clobber
 // `scratch`.
 //
-// It is OK for `tls` and `scratch` to be the same register.
+// It is OK for `instance` and `scratch` to be the same register.
 
-void EmitWasmPreBarrierCall(MacroAssembler& masm, Register tls,
-                            Register scratch, Register valueAddr);
+void EmitWasmPreBarrierCall(jit::MacroAssembler& masm, Register instance,
+                            Register scratch, Register valueAddr,
+                            size_t valueOffset);
 
 // After storing a GC pointer value in memory, skip to `skipBarrier` if a
 // postbarrier is not needed.  If the location being set is in an heap-allocated
@@ -399,8 +478,8 @@ void EmitWasmPreBarrierCall(MacroAssembler& masm, Register tls,
 //
 // `otherScratch` cannot be a designated scratch register.
 
-void EmitWasmPostBarrierGuard(MacroAssembler& masm,
-                              const Maybe<Register>& object,
+void EmitWasmPostBarrierGuard(jit::MacroAssembler& masm,
+                              const mozilla::Maybe<Register>& object,
                               Register otherScratch, Register setValue,
                               Label* skipBarrier);
 

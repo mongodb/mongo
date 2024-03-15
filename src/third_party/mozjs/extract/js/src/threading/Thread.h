@@ -9,7 +9,6 @@
 
 #include "mozilla/Atomics.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/Tuple.h"
 
 #include <stdint.h>
 #include <type_traits>
@@ -185,10 +184,10 @@ class ThreadTrampoline {
   // thread. To avoid this dangerous and highly non-obvious footgun, the
   // standard requires a "decay" copy of the arguments at the cost of making it
   // impossible to pass references between threads.
-  mozilla::Tuple<std::decay_t<Args>...> args;
+  std::tuple<std::decay_t<Args>...> args;
 
   // Protect the thread id during creation.
-  Mutex createMutex;
+  Mutex createMutex MOZ_UNANNOTATED;
 
   // Thread can access createMutex.
   friend class js::Thread;
@@ -217,7 +216,7 @@ class ThreadTrampoline {
     // thread that spawned us is ready.
     createMutex.lock();
     createMutex.unlock();
-    f(mozilla::Get<Indices>(args)...);
+    f(std::move(std::get<Indices>(args))...);
   }
 };
 

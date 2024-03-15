@@ -32,7 +32,6 @@
 #ifndef ZYCORE_ALLOCATOR_H
 #define ZYCORE_ALLOCATOR_H
 
-#include "zydis/ZycoreExportConfig.h"
 #include "zydis/Zycore/Status.h"
 #include "zydis/Zycore/Types.h"
 
@@ -47,7 +46,7 @@ extern "C" {
 struct ZyanAllocator_;
 
 /**
- * @brief   Defines the `ZyanAllocatorAllocate` function prototype.
+ * Defines the `ZyanAllocatorAllocate` function prototype.
  *
  * @param   allocator       A pointer to the `ZyanAllocator` instance.
  * @param   p               Receives a pointer to the first memory block sufficient to hold an
@@ -66,7 +65,7 @@ typedef ZyanStatus (*ZyanAllocatorAllocate)(struct ZyanAllocator_* allocator, vo
     ZyanUSize element_size, ZyanUSize n);
 
 /**
- * @brief   Defines the `ZyanAllocatorDeallocate` function prototype.
+ * Defines the `ZyanAllocatorDeallocate` function prototype.
  *
  * @param   allocator       A pointer to the `ZyanAllocator` instance.
  * @param   p               The pointer obtained from `(re-)allocate()`.
@@ -79,7 +78,7 @@ typedef ZyanStatus (*ZyanAllocatorDeallocate)(struct ZyanAllocator_* allocator, 
     ZyanUSize element_size, ZyanUSize n);
 
 /**
- * @brief   Defines the `ZyanAllocator` struct.
+ * Defines the `ZyanAllocator` struct.
  *
  * This is the base class for all custom allocator implementations.
  *
@@ -89,15 +88,15 @@ typedef ZyanStatus (*ZyanAllocatorDeallocate)(struct ZyanAllocator_* allocator, 
 typedef struct ZyanAllocator_
 {
     /**
-     * @brief   The allocate function.
+     * The allocate function.
      */
     ZyanAllocatorAllocate allocate;
     /**
-     * @brief   The reallocate function.
+     * The reallocate function.
      */
     ZyanAllocatorAllocate reallocate;
     /**
-     * @brief   The deallocate function.
+     * The deallocate function.
      */
     ZyanAllocatorDeallocate deallocate;
 } ZyanAllocator;
@@ -107,7 +106,7 @@ typedef struct ZyanAllocator_
 /* ============================================================================================== */
 
 /**
- * @brief   Initializes the given `ZyanAllocator` instance.
+ * Initializes the given `ZyanAllocator` instance.
  *
  * @param   allocator   A pointer to the `ZyanAllocator` instance.
  * @param   allocate    The allocate function.
@@ -122,7 +121,7 @@ ZYCORE_EXPORT ZyanStatus ZyanAllocatorInit(ZyanAllocator* allocator, ZyanAllocat
 #ifndef ZYAN_NO_LIBC
 
 /**
- * @brief   Returns the default `ZyanAllocator` instance.
+ * Returns the default `ZyanAllocator` instance.
  *
  * @return  A pointer to the default `ZyanAllocator` instance.
  *

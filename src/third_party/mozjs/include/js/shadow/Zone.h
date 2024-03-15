@@ -10,10 +10,12 @@
 #define js_shadow_Zone_h
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
+#include "mozilla/Atomics.h"
 
 #include <stdint.h>  // uint8_t, uint32_t
 
 #include "jspubtd.h"  // js::CurrentThreadCanAccessRuntime
+#include "jstypes.h"  // js::Bit
 
 struct JS_PUBLIC_API JSRuntime;
 class JS_PUBLIC_API JSTracer;
@@ -23,27 +25,34 @@ namespace JS {
 namespace shadow {
 
 struct Zone {
-  enum GCState : uint8_t {
-    NoGC,
+  enum GCState : uint32_t {
+    NoGC = 0,
     Prepare,
     MarkBlackOnly,
     MarkBlackAndGray,
     Sweep,
     Finished,
-    Compact
+    Compact,
+    VerifyPreBarriers,
+
+    Limit
   };
 
-  enum Kind : uint8_t { NormalZone, AtomsZone, SelfHostingZone, SystemZone };
+  using BarrierState = mozilla::Atomic<uint32_t, mozilla::Relaxed>;
+
+  enum Kind : uint8_t { NormalZone, AtomsZone, SystemZone };
 
  protected:
   JSRuntime* const runtime_;
   JSTracer* const barrierTracer_;  // A pointer to the JSRuntime's |gcMarker|.
-  uint32_t needsIncrementalBarrier_ = 0;
+  BarrierState needsIncrementalBarrier_;
   GCState gcState_ = NoGC;
   const Kind kind_;
 
   Zone(JSRuntime* runtime, JSTracer* barrierTracerArg, Kind kind)
-      : runtime_(runtime), barrierTracer_(barrierTracerArg), kind_(kind) {}
+      : runtime_(runtime), barrierTracer_(barrierTracerArg), kind_(kind) {
+    MOZ_ASSERT(!needsIncrementalBarrier());
+  }
 
  public:
   bool needsIncrementalBarrier() const { return needsIncrementalBarrier_; }
@@ -63,30 +72,50 @@ struct Zone {
   // thread can easily lead to races. Use this method very carefully.
   JSRuntime* runtimeFromAnyThread() const { return runtime_; }
 
-  GCState gcState() const { return gcState_; }
-  bool wasGCStarted() const { return gcState_ != NoGC; }
-  bool isGCPreparing() const { return gcState_ == Prepare; }
-  bool isGCMarkingBlackOnly() const { return gcState_ == MarkBlackOnly; }
-  bool isGCMarkingBlackAndGray() const { return gcState_ == MarkBlackAndGray; }
-  bool isGCSweeping() const { return gcState_ == Sweep; }
-  bool isGCFinished() const { return gcState_ == Finished; }
-  bool isGCCompacting() const { return gcState_ == Compact; }
-  bool isGCMarking() const {
-    return isGCMarkingBlackOnly() || isGCMarkingBlackAndGray();
-  }
-  bool isGCMarkingOrSweeping() const {
-    return gcState_ >= MarkBlackOnly && gcState_ <= Sweep;
-  }
-  bool isGCSweepingOrCompacting() const {
-    return gcState_ == Sweep || gcState_ == Compact;
+  GCState gcState() const { return GCState(uint32_t(gcState_)); }
+
+  static constexpr uint32_t gcStateMask(GCState state) {
+    static_assert(uint32_t(Limit) < 32);
+    return js::Bit(state);
   }
 
+  bool hasAnyGCState(uint32_t stateMask) const {
+    return js::Bit(gcState_) & stateMask;
+  }
+
+  bool wasGCStarted() const { return gcState() != NoGC; }
+  bool isGCPreparing() const { return gcState() == Prepare; }
+  bool isGCMarkingBlackOnly() const { return gcState() == MarkBlackOnly; }
+  bool isGCMarkingBlackAndGray() const { return gcState() == MarkBlackAndGray; }
+  bool isGCSweeping() const { return gcState() == Sweep; }
+  bool isGCFinished() const { return gcState() == Finished; }
+  bool isGCCompacting() const { return gcState() == Compact; }
+  bool isGCMarking() const {
+    return hasAnyGCState(gcStateMask(MarkBlackOnly) |
+                         gcStateMask(MarkBlackAndGray));
+  }
+  bool isGCMarkingOrSweeping() const {
+    return hasAnyGCState(gcStateMask(MarkBlackOnly) |
+                         gcStateMask(MarkBlackAndGray) | gcStateMask(Sweep));
+  }
+  bool isGCMarkingOrVerifyingPreBarriers() const {
+    return hasAnyGCState(gcStateMask(MarkBlackOnly) |
+                         gcStateMask(MarkBlackAndGray) |
+                         gcStateMask(VerifyPreBarriers));
+  }
+  bool isGCSweepingOrCompacting() const {
+    return hasAnyGCState(gcStateMask(Sweep) | gcStateMask(Compact));
+  }
+  bool isVerifyingPreBarriers() const { return gcState() == VerifyPreBarriers; }
+
   bool isAtomsZone() const { return kind_ == AtomsZone; }
-  bool isSelfHostingZone() const { return kind_ == SelfHostingZone; }
   bool isSystemZone() const { return kind_ == SystemZone; }
 
   static shadow::Zone* from(JS::Zone* zone) {
     return reinterpret_cast<shadow::Zone*>(zone);
+  }
+  static const shadow::Zone* from(const JS::Zone* zone) {
+    return reinterpret_cast<const shadow::Zone*>(zone);
   }
 };
 

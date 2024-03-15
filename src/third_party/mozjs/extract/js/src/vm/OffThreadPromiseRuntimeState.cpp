@@ -17,6 +17,7 @@
 #include "js/Promise.h"  // JS::Dispatchable, JS::DispatchToEventLoopCallback
 #include "js/Utility.h"  // js_delete, js::AutoEnterOOMUnsafeRegion
 #include "threading/ProtectedData.h"  // js::UnprotectedData
+#include "vm/HelperThreads.h"         // js::AutoLockHelperThreadState
 #include "vm/JSContext.h"             // JSContext
 #include "vm/PromiseObject.h"         // js::PromiseObject
 #include "vm/Realm.h"                 // js::AutoRealm

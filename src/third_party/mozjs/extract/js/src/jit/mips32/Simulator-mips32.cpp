@@ -2593,32 +2593,31 @@ void Simulator::decodeTypeRegister(SimInstruction* instr) {
               setFpuRegisterFloat(fd_reg, sqrtf(fs_value));
               break;
             case ff_c_un_fmt:
-              setFCSRBit(fcsr_cc,
-                         mozilla::IsNaN(fs_value) || mozilla::IsNaN(ft_value));
+              setFCSRBit(fcsr_cc, std::isnan(fs_value) || std::isnan(ft_value));
               break;
             case ff_c_eq_fmt:
               setFCSRBit(fcsr_cc, (fs_value == ft_value));
               break;
             case ff_c_ueq_fmt:
               setFCSRBit(fcsr_cc,
-                         (fs_value == ft_value) || (mozilla::IsNaN(fs_value) ||
-                                                    mozilla::IsNaN(ft_value)));
+                         (fs_value == ft_value) ||
+                             (std::isnan(fs_value) || std::isnan(ft_value)));
               break;
             case ff_c_olt_fmt:
               setFCSRBit(fcsr_cc, (fs_value < ft_value));
               break;
             case ff_c_ult_fmt:
               setFCSRBit(fcsr_cc,
-                         (fs_value < ft_value) || (mozilla::IsNaN(fs_value) ||
-                                                   mozilla::IsNaN(ft_value)));
+                         (fs_value < ft_value) ||
+                             (std::isnan(fs_value) || std::isnan(ft_value)));
               break;
             case ff_c_ole_fmt:
               setFCSRBit(fcsr_cc, (fs_value <= ft_value));
               break;
             case ff_c_ule_fmt:
               setFCSRBit(fcsr_cc,
-                         (fs_value <= ft_value) || (mozilla::IsNaN(fs_value) ||
-                                                    mozilla::IsNaN(ft_value)));
+                         (fs_value <= ft_value) ||
+                             (std::isnan(fs_value) || std::isnan(ft_value)));
               break;
             case ff_cvt_d_fmt:
               f = getFpuRegisterFloat(fs_reg);
@@ -2741,8 +2740,7 @@ void Simulator::decodeTypeRegister(SimInstruction* instr) {
               break;
             case ff_c_un_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
-              setFCSRBit(fcsr_cc,
-                         mozilla::IsNaN(ds_value) || mozilla::IsNaN(dt_value));
+              setFCSRBit(fcsr_cc, std::isnan(ds_value) || std::isnan(dt_value));
               break;
             case ff_c_eq_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
@@ -2751,8 +2749,8 @@ void Simulator::decodeTypeRegister(SimInstruction* instr) {
             case ff_c_ueq_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
               setFCSRBit(fcsr_cc,
-                         (ds_value == dt_value) || (mozilla::IsNaN(ds_value) ||
-                                                    mozilla::IsNaN(dt_value)));
+                         (ds_value == dt_value) ||
+                             (std::isnan(ds_value) || std::isnan(dt_value)));
               break;
             case ff_c_olt_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
@@ -2761,8 +2759,8 @@ void Simulator::decodeTypeRegister(SimInstruction* instr) {
             case ff_c_ult_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
               setFCSRBit(fcsr_cc,
-                         (ds_value < dt_value) || (mozilla::IsNaN(ds_value) ||
-                                                   mozilla::IsNaN(dt_value)));
+                         (ds_value < dt_value) ||
+                             (std::isnan(ds_value) || std::isnan(dt_value)));
               break;
             case ff_c_ole_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
@@ -2771,8 +2769,8 @@ void Simulator::decodeTypeRegister(SimInstruction* instr) {
             case ff_c_ule_fmt:
               dt_value = getFpuRegisterDouble(ft_reg);
               setFCSRBit(fcsr_cc,
-                         (ds_value <= dt_value) || (mozilla::IsNaN(ds_value) ||
-                                                    mozilla::IsNaN(dt_value)));
+                         (ds_value <= dt_value) ||
+                             (std::isnan(ds_value) || std::isnan(dt_value)));
               break;
             case ff_cvt_w_fmt:  // Convert double to word.
               // Rounding modes are not yet supported.

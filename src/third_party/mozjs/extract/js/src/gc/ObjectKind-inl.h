@@ -32,21 +32,15 @@ static inline AllocKind GetGCObjectKind(size_t numSlots) {
 }
 
 static inline AllocKind GetGCObjectKind(const JSClass* clasp) {
-  if (clasp == FunctionClassPtr) {
-    return AllocKind::FUNCTION;
-  }
-
   MOZ_ASSERT(!clasp->isProxyObject(),
              "Proxies should use GetProxyGCObjectKind");
+  MOZ_ASSERT(!clasp->isJSFunction());
 
   uint32_t nslots = JSCLASS_RESERVED_SLOTS(clasp);
-  if (clasp->flags & JSCLASS_HAS_PRIVATE) {
-    nslots++;
-  }
   return GetGCObjectKind(nslots);
 }
 
-static bool CanUseFixedElementsForArray(size_t numElements) {
+static constexpr bool CanUseFixedElementsForArray(size_t numElements) {
   if (numElements > NativeObject::MAX_DENSE_ELEMENTS_COUNT) {
     return false;
   }
@@ -90,21 +84,22 @@ static inline AllocKind GetGCObjectKindForBytes(size_t nbytes) {
 }
 
 /* Get the number of fixed slots and initial capacity associated with a kind. */
-static inline size_t GetGCKindSlots(AllocKind thingKind) {
+static constexpr inline size_t GetGCKindSlots(AllocKind thingKind) {
   // Using a switch in hopes that thingKind will usually be a compile-time
   // constant.
   switch (thingKind) {
-    case AllocKind::FUNCTION:
     case AllocKind::OBJECT0:
     case AllocKind::OBJECT0_BACKGROUND:
       return 0;
-    case AllocKind::FUNCTION_EXTENDED:
     case AllocKind::OBJECT2:
     case AllocKind::OBJECT2_BACKGROUND:
       return 2;
+    case AllocKind::FUNCTION:
     case AllocKind::OBJECT4:
     case AllocKind::OBJECT4_BACKGROUND:
       return 4;
+    case AllocKind::FUNCTION_EXTENDED:
+      return 6;
     case AllocKind::OBJECT8:
     case AllocKind::OBJECT8_BACKGROUND:
       return 8;
@@ -119,28 +114,12 @@ static inline size_t GetGCKindSlots(AllocKind thingKind) {
   }
 }
 
-static inline size_t GetGCKindSlots(AllocKind thingKind, const JSClass* clasp) {
-  size_t nslots = GetGCKindSlots(thingKind);
-
-  /* An object's private data uses the space taken by its last fixed slot. */
-  if (clasp->flags & JSCLASS_HAS_PRIVATE) {
-    MOZ_ASSERT(nslots > 0);
-    nslots--;
-  }
-
-  /*
-   * Functions have a larger alloc kind than AllocKind::OBJECT to reserve
-   * space for the extra fields in JSFunction, but have no fixed slots.
-   */
-  if (clasp == FunctionClassPtr) {
-    nslots = 0;
-  }
-
-  return nslots;
-}
-
 static inline size_t GetGCKindBytes(AllocKind thingKind) {
   return sizeof(JSObject_Slots0) + GetGCKindSlots(thingKind) * sizeof(Value);
+}
+
+static inline bool CanUseBackgroundAllocKind(const JSClass* clasp) {
+  return !clasp->hasFinalize() || (clasp->flags & JSCLASS_BACKGROUND_FINALIZE);
 }
 
 static inline bool CanChangeToBackgroundAllocKind(AllocKind kind,
@@ -158,7 +137,7 @@ static inline bool CanChangeToBackgroundAllocKind(AllocKind kind,
     return false;  // This kind is already a background finalized kind.
   }
 
-  return !clasp->hasFinalize() || (clasp->flags & JSCLASS_BACKGROUND_FINALIZE);
+  return CanUseBackgroundAllocKind(clasp);
 }
 
 static inline AllocKind ForegroundToBackgroundAllocKind(AllocKind fgKind) {

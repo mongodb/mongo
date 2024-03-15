@@ -8,12 +8,13 @@
 #define gc_AtomMarking_h
 
 #include "NamespaceImports.h"
-#include "ds/Bitmap.h"
+#include "js/Vector.h"
 #include "threading/ProtectedData.h"
 
 namespace js {
 
 class AutoLockGC;
+class DenseBitmap;
 
 namespace gc {
 
@@ -69,9 +70,6 @@ class AtomMarkingRuntime {
 
   void markId(JSContext* cx, jsid id);
   void markAtomValue(JSContext* cx, const Value& value);
-
-  // Mark all atoms in |source| as being reachable within |target|.
-  void adoptMarkedAtoms(Zone* target, Zone* source);
 
 #ifdef DEBUG
   // Return whether |thing/id| is in the atom marking bitmap for |zone|.

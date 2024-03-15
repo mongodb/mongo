@@ -14,18 +14,12 @@
 namespace js {
 namespace jit {
 
-static constexpr Register BaselineFrameReg = rbp;
-static constexpr Register BaselineStackReg = rsp;
-
 static constexpr ValueOperand R0(rcx);
 static constexpr ValueOperand R1(rbx);
 static constexpr ValueOperand R2(rax);
 
 static constexpr Register ICTailCallReg = rsi;
 static constexpr Register ICStubReg = rdi;
-
-static constexpr Register ExtractTemp0 = r14;
-static constexpr Register ExtractTemp1 = r15;
 
 // FloatReg0 must be equal to ReturnFloatReg.
 static constexpr FloatRegister FloatReg0 = xmm0;

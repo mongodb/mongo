@@ -28,7 +28,8 @@
 #define ZYDIS_INTERNAL_DECODERDATA_H
 
 #include "zydis/Zycore/Defines.h"
-#include "zydis/Zydis/DecoderTypes.h"
+#include "zydis/Zycore/Types.h"
+#include "zydis/Zydis/Defines.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,126 +52,126 @@ extern "C" {
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the `ZydisDecoderTreeNodeType` data-type.
+ * Defines the `ZydisDecoderTreeNodeType` data-type.
  */
 typedef ZyanU8 ZydisDecoderTreeNodeType;
 
 /**
- * @brief   Values that represent zydis decoder tree node types.
+ * Values that represent zydis decoder tree node types.
  */
 enum ZydisDecoderTreeNodeTypes
 {
     ZYDIS_NODETYPE_INVALID                  = 0x00,
     /**
-     * @brief   Reference to an instruction-definition.
+     * Reference to an instruction-definition.
      */
     ZYDIS_NODETYPE_DEFINITION_MASK          = 0x80,
     /**
-     * @brief   Reference to an XOP-map filter.
+     * Reference to an XOP-map filter.
      */
     ZYDIS_NODETYPE_FILTER_XOP               = 0x01,
     /**
-     * @brief   Reference to an VEX-map filter.
+     * Reference to an VEX-map filter.
      */
     ZYDIS_NODETYPE_FILTER_VEX               = 0x02,
     /**
-     * @brief   Reference to an EVEX/MVEX-map filter.
+     * Reference to an EVEX/MVEX-map filter.
      */
     ZYDIS_NODETYPE_FILTER_EMVEX             = 0x03,
     /**
-     * @brief   Reference to an opcode filter.
+     * Reference to an opcode filter.
      */
     ZYDIS_NODETYPE_FILTER_OPCODE            = 0x04,
     /**
-     * @brief   Reference to an instruction-mode filter.
+     * Reference to an instruction-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE              = 0x05,
     /**
-     * @brief   Reference to an compacted instruction-mode filter.
+     * Reference to an compacted instruction-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_COMPACT      = 0x06,
     /**
-     * @brief   Reference to a ModRM.mod filter.
+     * Reference to a ModRM.mod filter.
      */
     ZYDIS_NODETYPE_FILTER_MODRM_MOD         = 0x07,
     /**
-     * @brief   Reference to a compacted ModRM.mod filter.
+     * Reference to a compacted ModRM.mod filter.
      */
     ZYDIS_NODETYPE_FILTER_MODRM_MOD_COMPACT = 0x08,
     /**
-     * @brief   Reference to a ModRM.reg filter.
+     * Reference to a ModRM.reg filter.
      */
     ZYDIS_NODETYPE_FILTER_MODRM_REG         = 0x09,
     /**
-     * @brief   Reference to a ModRM.rm filter.
+     * Reference to a ModRM.rm filter.
      */
     ZYDIS_NODETYPE_FILTER_MODRM_RM          = 0x0A,
     /**
-     * @brief   Reference to a PrefixGroup1 filter.
+     * Reference to a PrefixGroup1 filter.
      */
     ZYDIS_NODETYPE_FILTER_PREFIX_GROUP1     = 0x0B,
     /**
-     * @brief   Reference to a mandatory-prefix filter.
+     * Reference to a mandatory-prefix filter.
      */
     ZYDIS_NODETYPE_FILTER_MANDATORY_PREFIX  = 0x0C,
     /**
-     * @brief   Reference to an operand-size filter.
+     * Reference to an operand-size filter.
      */
     ZYDIS_NODETYPE_FILTER_OPERAND_SIZE      = 0x0D,
     /**
-     * @brief   Reference to an address-size filter.
+     * Reference to an address-size filter.
      */
     ZYDIS_NODETYPE_FILTER_ADDRESS_SIZE      = 0x0E,
     /**
-     * @brief   Reference to a vector-length filter.
+     * Reference to a vector-length filter.
      */
     ZYDIS_NODETYPE_FILTER_VECTOR_LENGTH     = 0x0F,
     /**
-     * @brief   Reference to an REX/VEX/EVEX.W filter.
+     * Reference to an REX/VEX/EVEX.W filter.
      */
     ZYDIS_NODETYPE_FILTER_REX_W             = 0x10,
     /**
-     * @brief   Reference to an REX/VEX/EVEX.B filter.
+     * Reference to an REX/VEX/EVEX.B filter.
      */
     ZYDIS_NODETYPE_FILTER_REX_B             = 0x11,
     /**
-     * @brief   Reference to an EVEX.b filter.
+     * Reference to an EVEX.b filter.
      */
     ZYDIS_NODETYPE_FILTER_EVEX_B            = 0x12,
     /**
-     * @brief   Reference to an MVEX.E filter.
+     * Reference to an MVEX.E filter.
      */
     ZYDIS_NODETYPE_FILTER_MVEX_E            = 0x13,
     /**
-     * @brief   Reference to a AMD-mode filter.
+     * Reference to a AMD-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_AMD          = 0x14,
     /**
-     * @brief   Reference to a KNC-mode filter.
+     * Reference to a KNC-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_KNC          = 0x15,
     /**
-     * @brief   Reference to a MPX-mode filter.
+     * Reference to a MPX-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_MPX          = 0x16,
     /**
-     * @brief   Reference to a CET-mode filter.
+     * Reference to a CET-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_CET          = 0x17,
     /**
-     * @brief   Reference to a LZCNT-mode filter.
+     * Reference to a LZCNT-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_LZCNT        = 0x18,
     /**
-     * @brief   Reference to a TZCNT-mode filter.
+     * Reference to a TZCNT-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_TZCNT        = 0x19,
     /**
-     * @brief   Reference to a WBNOINVD-mode filter.
+     * Reference to a WBNOINVD-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_WBNOINVD     = 0x1A,
     /**
-     * @brief   Reference to a CLDEMOTE-mode filter.
+     * Reference to a CLDEMOTE-mode filter.
      */
     ZYDIS_NODETYPE_FILTER_MODE_CLDEMOTE     = 0x1B
 };
@@ -178,14 +179,14 @@ enum ZydisDecoderTreeNodeTypes
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the `ZydisDecoderTreeNodeValue` data-type.
+ * Defines the `ZydisDecoderTreeNodeValue` data-type.
  */
 typedef ZyanU16 ZydisDecoderTreeNodeValue;
 
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the `ZydisDecoderTreeNode` struct.
+ * Defines the `ZydisDecoderTreeNode` struct.
  */
 typedef struct ZydisDecoderTreeNode_
 {
@@ -206,32 +207,32 @@ typedef struct ZydisDecoderTreeNode_
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the `ZydisInstructionEncodingFlags` data-type.
+ * Defines the `ZydisInstructionEncodingFlags` data-type.
  */
 typedef ZyanU8 ZydisInstructionEncodingFlags;
 
 /**
- * @brief   The instruction has an optional modrm byte.
+ * The instruction has an optional modrm byte.
  */
 #define ZYDIS_INSTR_ENC_FLAG_HAS_MODRM      0x01
 
 /**
- * @brief   The instruction has an optional displacement value.
+ * The instruction has an optional displacement value.
  */
 #define ZYDIS_INSTR_ENC_FLAG_HAS_DISP       0x02
 
 /**
- * @brief   The instruction has an optional immediate value.
+ * The instruction has an optional immediate value.
  */
 #define ZYDIS_INSTR_ENC_FLAG_HAS_IMM0       0x04
 
 /**
- * @brief   The instruction has a second optional immediate value.
+ * The instruction has a second optional immediate value.
  */
 #define ZYDIS_INSTR_ENC_FLAG_HAS_IMM1       0x08
 
 /**
- * @brief   The instruction ignores the value of `modrm.mod` and always assumes `modrm.mod == 3`
+ * The instruction ignores the value of `modrm.mod` and always assumes `modrm.mod == 3`
  *          ("reg, reg" - form).
  *
  *          Instructions with this flag can't have a SIB byte or a displacement value.
@@ -239,39 +240,39 @@ typedef ZyanU8 ZydisInstructionEncodingFlags;
 #define ZYDIS_INSTR_ENC_FLAG_FORCE_REG_FORM 0x10
 
 /**
- * @brief   Defines the `ZydisInstructionEncodingInfo` struct.
+ * Defines the `ZydisInstructionEncodingInfo` struct.
  */
 typedef struct ZydisInstructionEncodingInfo_
 {
     /**
-     * @brief   Contains flags with information about the physical instruction-encoding.
+     * Contains flags with information about the physical instruction-encoding.
      */
     ZydisInstructionEncodingFlags flags;
     /**
-     * @brief   Displacement info.
+     * Displacement info.
      */
     struct
     {
         /**
-         * @brief   The size of the displacement value.
+         * The size of the displacement value.
          */
         ZyanU8 size[3];
     } disp;
     /**
-     * @brief   Immediate info.
+     * Immediate info.
      */
     struct
     {
         /**
-         * @brief   The size of the immediate value.
+         * The size of the immediate value.
          */
         ZyanU8 size[3];
         /**
-         * @brief   Signals, if the value is signed.
+         * Signals, if the value is signed.
          */
         ZyanBool is_signed;
         /**
-         * @brief   Signals, if the value is a relative offset.
+         * Signals, if the value is a relative offset.
          */
         ZyanBool is_relative;
     } imm[2];
@@ -287,15 +288,20 @@ typedef struct ZydisInstructionEncodingInfo_
 /* Decoder tree                                                                                   */
 /* ---------------------------------------------------------------------------------------------- */
 
+extern const ZydisDecoderTreeNode zydis_decoder_tree_root;
+
 /**
- * @brief   Returns the root node of the instruction tree.
+ * Returns the root node of the instruction tree.
  *
  * @return  The root node of the instruction tree.
  */
-ZYDIS_NO_EXPORT const ZydisDecoderTreeNode* ZydisDecoderTreeGetRootNode(void);
+ZYAN_INLINE const ZydisDecoderTreeNode* ZydisDecoderTreeGetRootNode(void)
+{
+    return &zydis_decoder_tree_root;
+}
 
 /**
- * @brief   Returns the child node of `parent` specified by `index`.
+ * Returns the child node of `parent` specified by `index`.
  *
  * @param   parent  The parent node.
  * @param   index   The index of the child node to retrieve.
@@ -306,8 +312,8 @@ ZYDIS_NO_EXPORT const ZydisDecoderTreeNode* ZydisDecoderTreeGetChildNode(
     const ZydisDecoderTreeNode* parent, ZyanU16 index);
 
 /**
- * @brief   Returns information about optional instruction parts (like modrm, displacement or
- *          immediates) for the instruction that is linked to the given `node`.
+ * Returns information about optional instruction parts (like modrm, displacement or
+ * immediates) for the instruction that is linked to the given `node`.
  *
  * @param   node    The instruction definition node.
  * @param   info    A pointer to the `ZydisInstructionParts` struct.

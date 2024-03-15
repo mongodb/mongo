@@ -69,8 +69,8 @@ JS_PUBLIC_API bool JS::IsLargeArrayBufferMaybeShared(JSObject* obj) {
   return len > ArrayBufferObject::MaxByteLengthForSmallBuffer;
 #else
   // Large ArrayBuffers are not supported on 32-bit.
-  MOZ_ASSERT(ArrayBufferObject::maxBufferByteLength() ==
-             ArrayBufferObject::MaxByteLengthForSmallBuffer);
+  static_assert(ArrayBufferObject::MaxByteLength ==
+                ArrayBufferObject::MaxByteLengthForSmallBuffer);
   return false;
 #endif
 }

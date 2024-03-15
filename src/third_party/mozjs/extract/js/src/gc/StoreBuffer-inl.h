@@ -57,6 +57,15 @@ inline void ArenaCellSet::check() const {
 }
 
 inline void StoreBuffer::WholeCellBuffer::put(const Cell* cell) {
+  if (cell != last_) {
+    putDontCheckLast(cell);
+  }
+}
+
+inline void StoreBuffer::WholeCellBuffer::putDontCheckLast(const Cell* cell) {
+  // This can still be called when |cell == last_| if the caller didn't check
+  // and that's OK.
+
   MOZ_ASSERT(cell->isTenured());
 
   // BigInts don't have any children, so shouldn't show up here.
@@ -73,9 +82,14 @@ inline void StoreBuffer::WholeCellBuffer::put(const Cell* cell) {
 
   cells->putCell(&cell->asTenured());
   cells->check();
+
+  last_ = cell;
 }
 
 inline void StoreBuffer::putWholeCell(Cell* cell) { bufferWholeCell.put(cell); }
+inline void StoreBuffer::putWholeCellDontCheckLast(Cell* cell) {
+  bufferWholeCell.putDontCheckLast(cell);
+}
 
 }  // namespace gc
 }  // namespace js

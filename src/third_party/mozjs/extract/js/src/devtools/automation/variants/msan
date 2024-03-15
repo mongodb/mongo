@@ -6,7 +6,7 @@
     "env": {
         "JITTEST_EXTRA_ARGS": "--jitflags=interp --ignore-timeouts={DIR}/cgc-jittest-timeouts.txt",
         "JSTESTS_EXTRA_ARGS": "--jitflags=interp --exclude-file={DIR}/cgc-jstests-slow.txt",
-        "MSAN_OPTIONS": "external_symbolizer_path={MOZ_FETCHES_DIR}/clang/bin/llvm-symbolizer:log_path={OUTDIR}/sanitize_log"
+        "MSAN_OPTIONS": "external_symbolizer_path={MOZ_FETCHES_DIR}/llvm-symbolizer/bin/llvm-symbolizer:log_path={OUTDIR}/sanitize_log"
     },
     "ignore-test-failures": "true",
     "max-errors": 7,

@@ -247,6 +247,15 @@ enum class ImmutableScriptFlagsEnum : uint32_t {
   // Large self-hosted methods that should be inlined anyway by the JIT for
   // performance reasons can be marked with this flag.
   IsInlinableLargeFunction = 1 << 28,
+
+  // This function has an internal .newTarget binding and we need to emit
+  // JSOp::NewTarget in the prologue to initialize it. This binding may be
+  // used directly for "new.target", or indirectly (e.g. in super() calls).
+  FunctionHasNewTargetBinding = 1 << 29,
+
+  // Whether this is a self-hosted function that uses the ArgumentsLength or
+  // GetArgument intrinsic.
+  UsesArgumentsIntrinsics = 1 << 30,
 };
 
 enum class MutableScriptFlagsEnum : uint32_t {
@@ -296,7 +305,9 @@ enum class MutableScriptFlagsEnum : uint32_t {
   // has failed.
   Uninlineable = 1 << 19,
 
-  // (1 << 20) is unused.
+  // Indicates that this script has no eager baseline hint available
+  // in the cache, used to prevent further lookups.
+  NoEagerBaselineHint = 1 << 20,
 
   // *****************************************************************
   // The flags below are set when we bail out and invalidate a script.
@@ -324,6 +335,11 @@ enum class MutableScriptFlagsEnum : uint32_t {
   // An unbox folded with a load bailed out.
   HadUnboxFoldingBailout = 1 << 27,
 };
+
+// Retrievable source can be retrieved using the source hook (and therefore
+// need not be XDR'd, can be discarded if desired because it can always be
+// reconstituted later, etc.).
+enum class SourceRetrievable { No = 0, Yes };
 
 }  // namespace js
 

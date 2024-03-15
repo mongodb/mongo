@@ -4,355 +4,308 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* For documentation, see jit/AtomicOperations.h, both the comment block at the
+ * beginning and the #ifdef nest near the end.
+ *
+ * This adaptation of AtomicOperations-feeling-lucky-gcc.h uses MSVC intrinsics
+ * and compiles with MSVC targeting x86-64. Due care was taken to match the
+ * intended semantics, but these functions ARE NOT SUFFICIENTLY TESTED.
+ *
+ * MongoDB users: Use of atomic operations from JavaScript functions may work
+ * but is not supported and will not be useful.
+ *
+ * Others: Any other project that imports this header (within the license terms)
+ * should extensively test these functions to ensure they are fit for the
+ * desired purpose.
+ */
+
 #ifndef jit_shared_AtomicOperations_feeling_lucky_msvc_h
 #define jit_shared_AtomicOperations_feeling_lucky_msvc_h
+
+#include <windef.h>
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Types.h"
 
-// Explicitly exclude tier-1 platforms.
-
-#if ((defined(__x86_64__) || defined(_M_X64)) && defined(JS_CODEGEN_X64)) || \
-    ((defined(__i386__) || defined(_M_IX86)) && defined(JS_CODEGEN_X86)) ||  \
-    (defined(__arm__) && defined(JS_CODEGEN_ARM)) ||                         \
-    ((defined(__aarch64__) || defined(_M_ARM64)) && defined(JS_CODEGEN_ARM64))
-#  error "Do not use this code on a tier-1 platform when a JIT is available"
+#ifndef _MSC_VER
+#  error "Attempt to compile MSVC-specific header from another compiler"
 #endif
 
-#if !defined(_MSC_VER)
-#  error "This file only for Microsoft Visual C++"
+#ifndef JS_64BIT
+#  error "Attempt to compile a 64-bit header for a non-64-bit target"
 #endif
 
-// For overall documentation, see jit/AtomicOperations.h.
-
-// Below, _ReadWriteBarrier is a compiler directive, preventing reordering of
-// instructions and reuse of memory values across it in the compiler, but having
-// no impact on what the CPU does.
-
-// Note, here we use MSVC intrinsics directly.  But MSVC supports a slightly
-// higher level of function which uses the intrinsic when possible (8, 16, and
-// 32-bit operations, and 64-bit operations on 64-bit systems) and otherwise
-// falls back on CMPXCHG8B for 64-bit operations on 32-bit systems.  We could be
-// using those functions in many cases here (though not all).  I have not done
-// so because I don't yet know how far back those functions are supported.
-
-// Note, _InterlockedCompareExchange takes the *new* value as the second
-// argument and the *comparand* (expected old value) as the third argument.
-
-inline bool js::jit::AtomicOperations::Initialize() {
-  // Nothing
-  return true;
-}
-
-inline void js::jit::AtomicOperations::ShutDown() {
-  // Nothing
-}
+#if defined(HAS_64BIT_LOCKFREE) && !defined(HAS_64BIT_ATOMICS)
+#  error "Attempt to compile atomics with an invalid combination of features"
+#endif
 
 inline bool js::jit::AtomicOperations::hasAtomic8() { return true; }
 
-inline bool js::jit::AtomicOperations::isLockfree8() {
-  // The MSDN docs suggest very strongly that if code is compiled for Pentium
-  // or better the 64-bit primitives will be lock-free, see eg the "Remarks"
-  // secion of the page for _InterlockedCompareExchange64, currently here:
-  // https://msdn.microsoft.com/en-us/library/ttk2z1ws%28v=vs.85%29.aspx
-  //
-  // But I've found no way to assert that at compile time or run time, there
-  // appears to be no WinAPI is_lock_free() test.
-
-  return true;
-}
+inline bool js::jit::AtomicOperations::isLockfree8() { return true; }
 
 inline void js::jit::AtomicOperations::fenceSeqCst() {
-  _ReadWriteBarrier();
-#if defined(_M_IX86) || defined(_M_X64)
-  _mm_mfence();
-#elif defined(_M_ARM64)
-  // MemoryBarrier is defined in winnt.h, which we don't want to include here.
-  // This expression is the expansion of MemoryBarrier.
-  __dmb(_ARM64_BARRIER_SY);
-#else
-#  error "Unknown hardware for MSVC"
-#endif
+  // Interlocked functions serve as a memory barrier and generate a fence
+  // instruction on x86-64.
+  static volatile LONG barrier = 0;
+  (void*)InterlockedExchange(&barrier, 0);
 }
 
 template <typename T>
 inline T js::jit::AtomicOperations::loadSeqCst(T* addr) {
+  // Aligned reads of up to 8 bytes are guaranteed atomic on x86-64.
+  static_assert(sizeof(T) <= 8, "atomics supported up to 8 bytes only");
+  MOZ_ASSERT(reinterpret_cast<uintptr_t>(addr) % sizeof(*addr) == 0);
+
   _ReadWriteBarrier();
   T v = *addr;
   _ReadWriteBarrier();
+
   return v;
 }
 
-#ifdef _M_IX86
-namespace js {
-namespace jit {
-
-#  define MSC_LOADOP(T)                                                       \
-    template <>                                                               \
-    inline T AtomicOperations::loadSeqCst(T* addr) {                          \
-      _ReadWriteBarrier();                                                    \
-      return (T)_InterlockedCompareExchange64((__int64 volatile*)addr, 0, 0); \
-    }
-
-MSC_LOADOP(int64_t)
-MSC_LOADOP(uint64_t)
-
-#  undef MSC_LOADOP
-
-}  // namespace jit
-}  // namespace js
-#endif  // _M_IX86
-
 template <typename T>
 inline void js::jit::AtomicOperations::storeSeqCst(T* addr, T val) {
+  // Aligned writes of up to 8 bytes are guaranteed atomic on x86-64.
+  static_assert(sizeof(T) <= 8, "atomics supported up to 8 bytes only");
+  MOZ_ASSERT(reinterpret_cast<uintptr_t>(addr) % sizeof(*addr) == 0);
+
   _ReadWriteBarrier();
   *addr = val;
-  fenceSeqCst();
+  _ReadWriteBarrier();
 }
 
-#ifdef _M_IX86
-namespace js {
-namespace jit {
+namespace detail {
+template <class T>
+struct InterlockedIntrinsics;
 
-#  define MSC_STOREOP(T)                                             \
-    template <>                                                      \
-    inline void AtomicOperations::storeSeqCst(T* addr, T val) {      \
-      _ReadWriteBarrier();                                           \
-      T oldval = *addr;                                              \
-      for (;;) {                                                     \
-        T nextval = (T)_InterlockedCompareExchange64(                \
-            (__int64 volatile*)addr, (__int64)val, (__int64)oldval); \
-        if (nextval == oldval) break;                                \
-        oldval = nextval;                                            \
-      }                                                              \
-      _ReadWriteBarrier();                                           \
-    }
+template <class T>
+requires(sizeof(T) == 1) struct InterlockedIntrinsics<T> {
+  using ApiType = char;
 
-MSC_STOREOP(int64_t)
-MSC_STOREOP(uint64_t)
-
-#  undef MSC_STOREOP
-
-}  // namespace jit
-}  // namespace js
-#endif  // _M_IX86
-
-#define MSC_EXCHANGEOP(T, U, xchgop)                          \
-  template <>                                                 \
-  inline T AtomicOperations::exchangeSeqCst(T* addr, T val) { \
-    return (T)xchgop((U volatile*)addr, (U)val);              \
+  static ApiType exchange(volatile ApiType* addr, ApiType val) {
+    return InterlockedExchange8(addr, val);
   }
 
-#ifdef _M_IX86
-#  define MSC_EXCHANGEOP_CAS(T)                                      \
-    template <>                                                      \
-    inline T AtomicOperations::exchangeSeqCst(T* addr, T val) {      \
-      _ReadWriteBarrier();                                           \
-      T oldval = *addr;                                              \
-      for (;;) {                                                     \
-        T nextval = (T)_InterlockedCompareExchange64(                \
-            (__int64 volatile*)addr, (__int64)val, (__int64)oldval); \
-        if (nextval == oldval) break;                                \
-        oldval = nextval;                                            \
-      }                                                              \
-      _ReadWriteBarrier();                                           \
-      return oldval;                                                 \
-    }
-#endif  // _M_IX86
-
-namespace js {
-namespace jit {
-
-MSC_EXCHANGEOP(int8_t, char, _InterlockedExchange8)
-MSC_EXCHANGEOP(uint8_t, char, _InterlockedExchange8)
-MSC_EXCHANGEOP(int16_t, short, _InterlockedExchange16)
-MSC_EXCHANGEOP(uint16_t, short, _InterlockedExchange16)
-MSC_EXCHANGEOP(int32_t, long, _InterlockedExchange)
-MSC_EXCHANGEOP(uint32_t, long, _InterlockedExchange)
-
-#ifdef _M_IX86
-MSC_EXCHANGEOP_CAS(int64_t)
-MSC_EXCHANGEOP_CAS(uint64_t)
-#else
-MSC_EXCHANGEOP(int64_t, __int64, _InterlockedExchange64)
-MSC_EXCHANGEOP(uint64_t, __int64, _InterlockedExchange64)
-#endif
-
-}  // namespace jit
-}  // namespace js
-
-#undef MSC_EXCHANGEOP
-#undef MSC_EXCHANGEOP_CAS
-
-#define MSC_CAS(T, U, cmpxchg)                                        \
-  template <>                                                         \
-  inline T AtomicOperations::compareExchangeSeqCst(T* addr, T oldval, \
-                                                   T newval) {        \
-    return (T)cmpxchg((U volatile*)addr, (U)newval, (U)oldval);       \
+  static ApiType compareExchange(volatile ApiType* addr, ApiType newval,
+                                 ApiType oldval) {
+    return _InterlockedCompareExchange8(addr, newval, oldval);
   }
 
-namespace js {
-namespace jit {
-
-MSC_CAS(int8_t, char, _InterlockedCompareExchange8)
-MSC_CAS(uint8_t, char, _InterlockedCompareExchange8)
-MSC_CAS(int16_t, short, _InterlockedCompareExchange16)
-MSC_CAS(uint16_t, short, _InterlockedCompareExchange16)
-MSC_CAS(int32_t, long, _InterlockedCompareExchange)
-MSC_CAS(uint32_t, long, _InterlockedCompareExchange)
-MSC_CAS(int64_t, __int64, _InterlockedCompareExchange64)
-MSC_CAS(uint64_t, __int64, _InterlockedCompareExchange64)
-
-}  // namespace jit
-}  // namespace js
-
-#undef MSC_CAS
-
-#define MSC_FETCHADDOP(T, U, xadd)                            \
-  template <>                                                 \
-  inline T AtomicOperations::fetchAddSeqCst(T* addr, T val) { \
-    return (T)xadd((U volatile*)addr, (U)val);                \
+  static ApiType exchangeAdd(volatile ApiType* addr, ApiType val) {
+    return _InterlockedExchangeAdd8(addr, val);
   }
 
-#define MSC_FETCHSUBOP(T)                                     \
-  template <>                                                 \
-  inline T AtomicOperations::fetchSubSeqCst(T* addr, T val) { \
-    return fetchAddSeqCst(addr, (T)(0 - val));                \
+  static ApiType exchangeAnd(volatile ApiType* addr, ApiType val) {
+    // Note: InterlockedExchangeAnd8 would be a more appropriate name for this
+    // intrinsic, because like InterlockedExchangeAdd8, it returns the
+    // _original_ value stored at 'addr' rather than the result of the
+    // operation. Returning the original value is the desired behavior here.
+    return InterlockedAnd8(addr, val);
   }
 
-#ifdef _M_IX86
-#  define MSC_FETCHADDOP_CAS(T)                                               \
-    template <>                                                               \
-    inline T AtomicOperations::fetchAddSeqCst(T* addr, T val) {               \
-      _ReadWriteBarrier();                                                    \
-      T oldval = *addr;                                                       \
-      for (;;) {                                                              \
-        T nextval = (T)_InterlockedCompareExchange64((__int64 volatile*)addr, \
-                                                     (__int64)(oldval + val), \
-                                                     (__int64)oldval);        \
-        if (nextval == oldval) break;                                         \
-        oldval = nextval;                                                     \
-      }                                                                       \
-      _ReadWriteBarrier();                                                    \
-      return oldval;                                                          \
-    }
-#endif  // _M_IX86
-
-namespace js {
-namespace jit {
-
-MSC_FETCHADDOP(int8_t, char, _InterlockedExchangeAdd8)
-MSC_FETCHADDOP(uint8_t, char, _InterlockedExchangeAdd8)
-MSC_FETCHADDOP(int16_t, short, _InterlockedExchangeAdd16)
-MSC_FETCHADDOP(uint16_t, short, _InterlockedExchangeAdd16)
-MSC_FETCHADDOP(int32_t, long, _InterlockedExchangeAdd)
-MSC_FETCHADDOP(uint32_t, long, _InterlockedExchangeAdd)
-
-#ifdef _M_IX86
-MSC_FETCHADDOP_CAS(int64_t)
-MSC_FETCHADDOP_CAS(uint64_t)
-#else
-MSC_FETCHADDOP(int64_t, __int64, _InterlockedExchangeAdd64)
-MSC_FETCHADDOP(uint64_t, __int64, _InterlockedExchangeAdd64)
-#endif
-
-MSC_FETCHSUBOP(int8_t)
-MSC_FETCHSUBOP(uint8_t)
-MSC_FETCHSUBOP(int16_t)
-MSC_FETCHSUBOP(uint16_t)
-MSC_FETCHSUBOP(int32_t)
-MSC_FETCHSUBOP(uint32_t)
-MSC_FETCHSUBOP(int64_t)
-MSC_FETCHSUBOP(uint64_t)
-
-}  // namespace jit
-}  // namespace js
-
-#undef MSC_FETCHADDOP
-#undef MSC_FETCHADDOP_CAS
-#undef MSC_FETCHSUBOP
-
-#define MSC_FETCHBITOPX(T, U, name, op)             \
-  template <>                                       \
-  inline T AtomicOperations::name(T* addr, T val) { \
-    return (T)op((U volatile*)addr, (U)val);        \
+  static ApiType exchangeOr(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedOr8(addr, val);
   }
 
-#define MSC_FETCHBITOP(T, U, andop, orop, xorop) \
-  MSC_FETCHBITOPX(T, U, fetchAndSeqCst, andop)   \
-  MSC_FETCHBITOPX(T, U, fetchOrSeqCst, orop)     \
-  MSC_FETCHBITOPX(T, U, fetchXorSeqCst, xorop)
+  static ApiType exchangeXor(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedXor8(addr, val);
+  }
+};
 
-#ifdef _M_IX86
-#  define AND_OP &
-#  define OR_OP |
-#  define XOR_OP ^
-#  define MSC_FETCHBITOPX_CAS(T, name, OP)                                     \
-    template <>                                                                \
-    inline T AtomicOperations::name(T* addr, T val) {                          \
-      _ReadWriteBarrier();                                                     \
-      T oldval = *addr;                                                        \
-      for (;;) {                                                               \
-        T nextval = (T)_InterlockedCompareExchange64((__int64 volatile*)addr,  \
-                                                     (__int64)(oldval OP val), \
-                                                     (__int64)oldval);         \
-        if (nextval == oldval) break;                                          \
-        oldval = nextval;                                                      \
-      }                                                                        \
-      _ReadWriteBarrier();                                                     \
-      return oldval;                                                           \
-    }
+template <class T>
+requires(sizeof(T) == 2) struct InterlockedIntrinsics<T> {
+  using ApiType = SHORT;
 
-#  define MSC_FETCHBITOP_CAS(T)                    \
-    MSC_FETCHBITOPX_CAS(T, fetchAndSeqCst, AND_OP) \
-    MSC_FETCHBITOPX_CAS(T, fetchOrSeqCst, OR_OP)   \
-    MSC_FETCHBITOPX_CAS(T, fetchXorSeqCst, XOR_OP)
+  static ApiType exchange(volatile ApiType* addr, ApiType val) {
+    return InterlockedExchange16(addr, val);
+  }
 
-#endif
+  static ApiType compareExchange(volatile ApiType* addr, ApiType newval,
+                                 ApiType oldval) {
+    return InterlockedCompareExchange16(addr, newval, oldval);
+  }
 
-namespace js {
-namespace jit {
+  static ApiType exchangeAdd(volatile ApiType* addr, ApiType val) {
+    return _InterlockedExchangeAdd16(addr, val);
+  }
 
-MSC_FETCHBITOP(int8_t, char, _InterlockedAnd8, _InterlockedOr8,
-               _InterlockedXor8)
-MSC_FETCHBITOP(uint8_t, char, _InterlockedAnd8, _InterlockedOr8,
-               _InterlockedXor8)
-MSC_FETCHBITOP(int16_t, short, _InterlockedAnd16, _InterlockedOr16,
-               _InterlockedXor16)
-MSC_FETCHBITOP(uint16_t, short, _InterlockedAnd16, _InterlockedOr16,
-               _InterlockedXor16)
-MSC_FETCHBITOP(int32_t, long, _InterlockedAnd, _InterlockedOr, _InterlockedXor)
-MSC_FETCHBITOP(uint32_t, long, _InterlockedAnd, _InterlockedOr, _InterlockedXor)
+  static ApiType exchangeAnd(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedAnd16(addr, val);
+  }
 
-#ifdef _M_IX86
-MSC_FETCHBITOP_CAS(int64_t)
-MSC_FETCHBITOP_CAS(uint64_t)
-#else
-MSC_FETCHBITOP(int64_t, __int64, _InterlockedAnd64, _InterlockedOr64,
-               _InterlockedXor64)
-MSC_FETCHBITOP(uint64_t, __int64, _InterlockedAnd64, _InterlockedOr64,
-               _InterlockedXor64)
-#endif
+  static ApiType exchangeOr(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedOr16(addr, val);
+  }
 
-}  // namespace jit
-}  // namespace js
+  static ApiType exchangeXor(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedXor16(addr, val);
+  }
+};
 
-#undef MSC_FETCHBITOPX_CAS
-#undef MSC_FETCHBITOPX
-#undef MSC_FETCHBITOP_CAS
-#undef MSC_FETCHBITOP
+template <class T>
+requires(sizeof(T) == 4) struct InterlockedIntrinsics<T> {
+  using ApiType = LONG;
+
+  static ApiType exchange(volatile ApiType* addr, ApiType val) {
+    return InterlockedExchange(addr, val);
+  }
+
+  static ApiType compareExchange(volatile ApiType* addr, ApiType newval,
+                                 ApiType oldval) {
+    return InterlockedCompareExchange(addr, newval, oldval);
+  }
+
+  static ApiType exchangeAdd(volatile ApiType* addr, ApiType val) {
+    return InterlockedExchangeAdd(addr, val);
+  }
+
+  static ApiType exchangeAnd(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedAnd(addr, val);
+  }
+
+  static ApiType exchangeOr(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedOr(addr, val);
+  }
+
+  static ApiType exchangeXor(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedXor(addr, val);
+  }
+};
+
+template <class T>
+requires(sizeof(T) == 8) struct InterlockedIntrinsics<T> {
+  using ApiType = LONG64;
+
+  static ApiType exchange(volatile ApiType* addr, ApiType val) {
+    return InterlockedExchange64(addr, val);
+  }
+
+  static ApiType compareExchange(volatile ApiType* addr, ApiType newval,
+                                 ApiType oldval) {
+    return InterlockedCompareExchange64(addr, newval, oldval);
+  }
+
+  static ApiType exchangeAdd(volatile ApiType* addr, ApiType val) {
+    return InterlockedExchangeAdd64(addr, val);
+  }
+
+  static ApiType exchangeAnd(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedAnd64(addr, val);
+  }
+
+  static ApiType exchangeOr(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedOr64(addr, val);
+  }
+
+  static ApiType exchangeXor(volatile ApiType* addr, ApiType val) {
+    // See the note above about InterlockedAnd8.
+    return InterlockedXor64(addr, val);
+  }
+};
+}  // namespace detail
+
+template <typename T>
+inline T js::jit::AtomicOperations::exchangeSeqCst(T* addr, T val) {
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  ApiType v = ::detail::InterlockedIntrinsics<T>::exchange(
+      reinterpret_cast<ApiType*>(addr), *reinterpret_cast<ApiType*>(&val));
+
+  return *reinterpret_cast<ApiType*>(&v);
+};
+
+template <typename T>
+inline T js::jit::AtomicOperations::compareExchangeSeqCst(T* addr, T oldval,
+                                                          T newval) {
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  ApiType v = ::detail::InterlockedIntrinsics<T>::compareExchange(
+      reinterpret_cast<ApiType*>(addr), *reinterpret_cast<ApiType*>(&newval),
+      *reinterpret_cast<ApiType*>(&oldval));
+  return *reinterpret_cast<T*>(&v);
+}
+
+template <typename T>
+inline T js::jit::AtomicOperations::fetchAddSeqCst(T* addr, T val) {
+  // NB: This function is _not correct_ for unsigned T if the operation
+  // overflows.
+  static_assert(std::numeric_limits<T>::is_integer);
+
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  return Intrinsics::exchangeAdd(reinterpret_cast<ApiType*>(addr), val);
+}
+
+template <typename T>
+inline T js::jit::AtomicOperations::fetchSubSeqCst(T* addr, T val) {
+  // NB: This function is _not correct_ for unsigned T if the operation
+  // overflows.
+  static_assert(std::numeric_limits<T>::is_integer);
+
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  return Intrinsics::exchangeAdd(reinterpret_cast<ApiType*>(addr), -val);
+}
+
+template <typename T>
+inline T js::jit::AtomicOperations::fetchAndSeqCst(T* addr, T val) {
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  ApiType v = Intrinsics::exchangeAnd(reinterpret_cast<ApiType*>(addr),
+                                      *reinterpret_cast<ApiType*>(val));
+
+  return *reinterpret_cast<T*>(&v);
+}
+
+template <typename T>
+inline T js::jit::AtomicOperations::fetchOrSeqCst(T* addr, T val) {
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  ApiType v = Intrinsics::exchangeOr(reinterpret_cast<ApiType*>(addr),
+                                     *reinterpret_cast<ApiType*>(val));
+
+  return *reinterpret_cast<T*>(&v);
+}
+
+template <typename T>
+inline T js::jit::AtomicOperations::fetchXorSeqCst(T* addr, T val) {
+  using Intrinsics = typename ::detail::InterlockedIntrinsics<T>;
+  using ApiType = typename Intrinsics::ApiType;
+  ApiType v = Intrinsics::exchangeXor(reinterpret_cast<ApiType*>(addr),
+                                      *reinterpret_cast<ApiType*>(val));
+
+  return *reinterpret_cast<T*>(&v);
+}
 
 template <typename T>
 inline T js::jit::AtomicOperations::loadSafeWhenRacy(T* addr) {
-  // This is also appropriate for double, int64, and uint64 on 32-bit
-  // platforms since there are no guarantees of access-atomicity.
+  static_assert(sizeof(T) <= 8, "atomics supported up to 8 bytes only");
+  // This is actually roughly right even on 32-bit platforms since in that
+  // case, double, int64, and uint64 loads need not be access-atomic.
+  //
+  // We could use __atomic_load, but it would be needlessly expensive on
+  // 32-bit platforms that could support it and just plain wrong on others.
   return *addr;
 }
 
 template <typename T>
 inline void js::jit::AtomicOperations::storeSafeWhenRacy(T* addr, T val) {
-  // This is also appropriate for double, int64, and uint64 on 32-bit
-  // platforms since there are no guarantees of access-atomicity.
+  static_assert(sizeof(T) <= 8, "atomics supported up to 8 bytes only");
+  // This is actually roughly right even on 32-bit platforms since in that
+  // case, double, int64, and uint64 loads need not be access-atomic.
+  //
+  // We could use __atomic_store, but it would be needlessly expensive on
+  // 32-bit platforms that could support it and just plain wrong on others.
   *addr = val;
 }
 

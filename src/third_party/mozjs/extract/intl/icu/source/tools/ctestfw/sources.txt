@@ -1,6 +1,0 @@
-ctest.c
-datamap.cpp
-testdata.cpp
-tstdtmod.cpp
-ucln_ct.c
-uperf.cpp

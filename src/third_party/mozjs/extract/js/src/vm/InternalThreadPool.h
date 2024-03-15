@@ -18,6 +18,10 @@
 #include "threading/ConditionVariable.h"
 #include "threading/ProtectedData.h"
 
+namespace JS {
+enum class DispatchReason;
+};
+
 namespace js {
 
 class AutoLockHelperThreadState;
@@ -41,9 +45,9 @@ class InternalThreadPool {
                              const AutoLockHelperThreadState& lock) const;
 
  private:
-  static void DispatchTask();
+  static void DispatchTask(JS::DispatchReason reason);
 
-  void dispatchTask();
+  void dispatchTask(JS::DispatchReason reason);
   void shutDown(AutoLockHelperThreadState& lock);
 
   HelperThreadVector& threads(const AutoLockHelperThreadState& lock);

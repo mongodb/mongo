@@ -49,7 +49,6 @@
 
 #include "mozilla/Sprintf.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/Uptime.h"
 
 #if !defined(__wasi__)
 #  include <pthread.h>
@@ -189,11 +188,7 @@ void TimeStamp::Startup() {
 void TimeStamp::Shutdown() {}
 
 TimeStamp TimeStamp::Now(bool aHighResolution) {
-  return TimeStamp::NowFuzzy(TimeStampValue(false, ClockTimeNs()));
-}
-
-TimeStamp TimeStamp::NowUnfuzzed(bool aHighResolution) {
-  return TimeStamp(TimeStampValue(false, ClockTimeNs()));
+  return TimeStamp(ClockTimeNs());
 }
 
 #if defined(XP_LINUX) || defined(ANDROID)

@@ -7,9 +7,23 @@
 #ifndef jit_TrialInlining_h
 #define jit_TrialInlining_h
 
+#include "mozilla/Attributes.h"
+#include "mozilla/Maybe.h"
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include "jstypes.h"
+#include "NamespaceImports.h"
+
+#include "gc/Barrier.h"
 #include "jit/CacheIR.h"
 #include "jit/ICStubSpace.h"
-#include "vm/BytecodeLocation.h"
+#include "js/RootingAPI.h"
+#include "js/TypeDecls.h"
+#include "js/UniquePtr.h"
+#include "js/Vector.h"
+#include "vm/JSScript.h"
 
 /*
  * [SMDOC] Trial Inlining
@@ -33,13 +47,27 @@
  * The same approach can be used to inline recursively.
  */
 
+class JS_PUBLIC_API JSTracer;
+struct JS_PUBLIC_API JSContext;
+
+class JSFunction;
+
+namespace JS {
+class Zone;
+}
+
 namespace js {
+
+class BytecodeLocation;
+
 namespace jit {
 
 class BaselineFrame;
+class CacheIRWriter;
+class ICCacheIRStub;
 class ICEntry;
-class ICScript;
 class ICFallbackStub;
+class ICScript;
 
 /*
  * An InliningRoot is owned by a JitScript. In turn, it owns the set
@@ -113,11 +141,16 @@ mozilla::Maybe<InlinableGetterData> FindInlinableGetterData(
 mozilla::Maybe<InlinableSetterData> FindInlinableSetterData(
     ICCacheIRStub* stub);
 
+enum class TrialInliningDecision {
+  NoInline,
+  Inline,
+  MonomorphicInline,
+};
+
 class MOZ_RAII TrialInliner {
  public:
-  TrialInliner(JSContext* cx, HandleScript script, ICScript* icScript,
-               InliningRoot* root)
-      : cx_(cx), script_(script), icScript_(icScript), root_(root) {}
+  TrialInliner(JSContext* cx, HandleScript script, ICScript* icScript)
+      : cx_(cx), script_(script), icScript_(icScript) {}
 
   JSContext* cx() { return cx_; }
 
@@ -125,9 +158,9 @@ class MOZ_RAII TrialInliner {
   [[nodiscard]] bool maybeInlineCall(ICEntry& entry, ICFallbackStub* fallback,
                                      BytecodeLocation loc);
   [[nodiscard]] bool maybeInlineGetter(ICEntry& entry, ICFallbackStub* fallback,
-                                       BytecodeLocation loc);
+                                       BytecodeLocation loc, CacheKind kind);
   [[nodiscard]] bool maybeInlineSetter(ICEntry& entry, ICFallbackStub* fallback,
-                                       BytecodeLocation loc);
+                                       BytecodeLocation loc, CacheKind kind);
 
   static bool canInline(JSFunction* target, HandleScript caller,
                         BytecodeLocation loc);
@@ -140,13 +173,17 @@ class MOZ_RAII TrialInliner {
   [[nodiscard]] bool replaceICStub(ICEntry& entry, ICFallbackStub* fallback,
                                    CacheIRWriter& writer, CacheKind kind);
 
-  bool shouldInline(JSFunction* target, ICCacheIRStub* stub,
-                    BytecodeLocation loc);
+  TrialInliningDecision getInliningDecision(JSFunction* target,
+                                            ICCacheIRStub* stub,
+                                            BytecodeLocation loc);
+
+  InliningRoot* getOrCreateInliningRoot();
+  InliningRoot* maybeGetInliningRoot() const;
+  size_t inliningRootTotalBytecodeSize() const;
 
   JSContext* cx_;
   HandleScript script_;
   ICScript* icScript_;
-  InliningRoot* root_;
 };
 
 bool DoTrialInlining(JSContext* cx, BaselineFrame* frame);

@@ -14,14 +14,13 @@
 #include "gc/AllocKind.h"
 #include "js/GCAPI.h"
 #include "js/HeapAPI.h"
-#include "js/SliceBudget.h"
 #include "js/TypeDecls.h"
 #include "threading/ProtectedData.h"
 
 namespace js {
 
 class Nursery;
-class TenuringTracer;
+class SliceBudget;
 
 namespace gcstats {
 struct Statistics;
@@ -30,9 +29,11 @@ struct Statistics;
 namespace gc {
 
 class Arena;
+class BackgroundUnmarkTask;
 struct FinalizePhase;
 class FreeSpan;
 class TenuredCell;
+class TenuringTracer;
 
 /*
  * A single segment of a SortedArenaList. Each segment has a head and a tail,
@@ -148,6 +149,8 @@ class ArenaList {
   // |this| and clears |other|.
   inline ArenaList& insertListWithCursorAtEnd(ArenaList& other);
 
+  inline Arena* takeFirstArena();
+
   Arena* removeRemainingArenas(Arena** arenap);
   Arena** pickArenasToRelocate(size_t& arenaTotalOut, size_t& relocTotalOut);
   Arena* relocateArenas(Arena* toRelocate, Arena* relocated,
@@ -245,7 +248,7 @@ class FreeLists {
 
   MOZ_ALWAYS_INLINE TenuredCell* allocate(AllocKind kind);
 
-  inline TenuredCell* setArenaAndAllocate(Arena* arena, AllocKind kind);
+  inline void* setArenaAndAllocate(Arena* arena, AllocKind kind);
 
   inline void unmarkPreMarkedFreeCells(AllocKind kind);
 
@@ -255,12 +258,7 @@ class FreeLists {
 };
 
 class ArenaLists {
-  enum class ConcurrentUse : uint32_t {
-    None,
-    BackgroundFinalize,
-    ParallelAlloc,
-    ParallelUnmark
-  };
+  enum class ConcurrentUse : uint32_t { None, BackgroundFinalize };
 
   using ConcurrentUseState =
       mozilla::Atomic<ConcurrentUse, mozilla::SequentiallyConsistent>;
@@ -270,29 +268,29 @@ class ArenaLists {
   // Whether this structure can be accessed by other threads.
   UnprotectedData<AllAllocKindArray<ConcurrentUseState>> concurrentUseState_;
 
-  ZoneData<FreeLists> freeLists_;
+  MainThreadData<FreeLists> freeLists_;
 
   /* The main list of arenas for each alloc kind. */
-  ArenaListData<AllAllocKindArray<ArenaList>> arenaLists_;
+  MainThreadOrGCTaskData<AllAllocKindArray<ArenaList>> arenaLists_;
 
-  /* For each arena kind, a list of arenas allocated during marking. */
-  ArenaListData<AllAllocKindArray<ArenaList>> newArenasInMarkPhase_;
-
-  /* For each arena kind, a list of arenas remaining to be swept. */
-  MainThreadOrGCTaskData<AllAllocKindArray<Arena*>> arenasToSweep_;
+  /*
+   * Arenas which are currently being collected. The collector can move arenas
+   * from arenaLists_ here and back again at various points in collection.
+   */
+  MainThreadOrGCTaskData<AllAllocKindArray<ArenaList>> collectingArenaLists_;
 
   /* During incremental sweeping, a list of the arenas already swept. */
-  ZoneOrGCTaskData<AllocKind> incrementalSweptArenaKind;
-  ZoneOrGCTaskData<ArenaList> incrementalSweptArenas;
+  MainThreadOrGCTaskData<AllocKind> incrementalSweptArenaKind;
+  MainThreadOrGCTaskData<ArenaList> incrementalSweptArenas;
 
   // Arena lists which have yet to be swept, but need additional foreground
   // processing before they are swept.
-  ZoneData<Arena*> gcCompactPropMapArenasToUpdate;
-  ZoneData<Arena*> gcNormalPropMapArenasToUpdate;
+  MainThreadData<Arena*> gcCompactPropMapArenasToUpdate;
+  MainThreadData<Arena*> gcNormalPropMapArenasToUpdate;
 
   // The list of empty arenas which are collected during the sweep phase and
   // released at the end of sweeping every sweep group.
-  ZoneOrGCTaskData<Arena*> savedEmptyArenas;
+  MainThreadOrGCTaskData<Arena*> savedEmptyArenas;
 
  public:
   explicit ArenaLists(JS::Zone* zone);
@@ -306,14 +304,11 @@ class ArenaLists {
   }
 
   inline Arena* getFirstArena(AllocKind thingKind) const;
-  inline Arena* getFirstArenaToSweep(AllocKind thingKind) const;
+  inline Arena* getFirstCollectingArena(AllocKind thingKind) const;
   inline Arena* getFirstSweptArena(AllocKind thingKind) const;
-  inline Arena* getFirstNewArenaInMarkPhase(AllocKind thingKind) const;
   inline Arena* getArenaAfterCursor(AllocKind thingKind) const;
 
   inline bool arenaListsAreEmpty() const;
-
-  inline void unmarkAll();
 
   inline bool doneBackgroundFinalize(AllocKind kind) const;
   inline bool needBackgroundFinalizeWait(AllocKind kind) const;
@@ -325,9 +320,6 @@ class ArenaLists {
 
   MOZ_ALWAYS_INLINE TenuredCell* allocateFromFreeList(AllocKind thingKind);
 
-  /* Moves all arenas from |fromArenaLists| into |this|. */
-  void adoptArenas(ArenaLists* fromArenaLists, bool targetZoneIsCollecting);
-
   inline void checkEmptyFreeLists();
   inline void checkEmptyArenaLists();
   inline void checkEmptyFreeList(AllocKind kind);
@@ -337,20 +329,19 @@ class ArenaLists {
   bool relocateArenas(Arena*& relocatedListOut, JS::GCReason reason,
                       js::SliceBudget& sliceBudget, gcstats::Statistics& stats);
 
-  void queueForegroundObjectsForSweep(JSFreeOp* fop);
+  void queueForegroundObjectsForSweep(JS::GCContext* gcx);
   void queueForegroundThingsForSweep();
 
   Arena* takeSweptEmptyArenas();
 
-  bool foregroundFinalize(JSFreeOp* fop, AllocKind thingKind,
-                          js::SliceBudget& sliceBudget,
-                          SortedArenaList& sweepList);
-  static void backgroundFinalize(JSFreeOp* fop, Arena* listHead, Arena** empty);
+  void setIncrementalSweptArenas(AllocKind kind, SortedArenaList& arenas);
+  void clearIncrementalSweptArenas();
 
-  void setParallelAllocEnabled(bool enabled);
-  void setParallelUnmarkEnabled(bool enabled);
+  void mergeFinalizedArenas(AllocKind thingKind,
+                            SortedArenaList& finalizedArenas);
 
-  inline void mergeNewArenasInMarkPhase();
+  void moveArenasToCollectingLists();
+  void mergeArenasFromCollectingLists();
 
   void checkGCStateNotInUse();
   void checkSweepStateNotInUse();
@@ -361,11 +352,11 @@ class ArenaLists {
   ArenaList& arenaList(AllocKind i) { return arenaLists_.ref()[i]; }
   const ArenaList& arenaList(AllocKind i) const { return arenaLists_.ref()[i]; }
 
-  ArenaList& newArenasInMarkPhase(AllocKind i) {
-    return newArenasInMarkPhase_.ref()[i];
+  ArenaList& collectingArenaList(AllocKind i) {
+    return collectingArenaLists_.ref()[i];
   }
-  const ArenaList& newArenasInMarkPhase(AllocKind i) const {
-    return newArenasInMarkPhase_.ref()[i];
+  const ArenaList& collectingArenaList(AllocKind i) const {
+    return collectingArenaLists_.ref()[i];
   }
 
   ConcurrentUseState& concurrentUse(AllocKind i) {
@@ -375,28 +366,18 @@ class ArenaLists {
     return concurrentUseState_.ref()[i];
   }
 
-  Arena*& arenasToSweep(AllocKind i) { return arenasToSweep_.ref()[i]; }
-  Arena* arenasToSweep(AllocKind i) const { return arenasToSweep_.ref()[i]; }
-
   inline JSRuntime* runtime();
   inline JSRuntime* runtimeFromAnyThread();
 
-  inline void queueForForegroundSweep(JSFreeOp* fop,
-                                      const FinalizePhase& phase);
-  inline void queueForBackgroundSweep(JSFreeOp* fop,
-                                      const FinalizePhase& phase);
-  inline void queueForForegroundSweep(AllocKind thingKind);
-  inline void queueForBackgroundSweep(AllocKind thingKind);
+  void initBackgroundSweep(AllocKind thingKind);
 
-  TenuredCell* refillFreeListAndAllocate(FreeLists& freeLists,
-                                         AllocKind thingKind,
-                                         ShouldCheckThresholds checkThresholds);
+  void* refillFreeListAndAllocate(AllocKind thingKind,
+                                  ShouldCheckThresholds checkThresholds);
 
-  void addNewArena(Arena* arena, AllocKind thingKind);
-
+  friend class BackgroundUnmarkTask;
   friend class GCRuntime;
   friend class js::Nursery;
-  friend class js::TenuringTracer;
+  friend class TenuringTracer;
 };
 
 } /* namespace gc */

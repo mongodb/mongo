@@ -18,7 +18,7 @@ struct IdValuePair {
   JS::Value value;
   jsid id;
 
-  IdValuePair() : value(JS::UndefinedValue()), id(JSID_VOID) {}
+  IdValuePair() : value(JS::UndefinedValue()), id(JS::PropertyKey::Void()) {}
   explicit IdValuePair(jsid idArg) : value(JS::UndefinedValue()), id(idArg) {}
   IdValuePair(jsid idArg, const Value& valueArg) : value(valueArg), id(idArg) {}
 

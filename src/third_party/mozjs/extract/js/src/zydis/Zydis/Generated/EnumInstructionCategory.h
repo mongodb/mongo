@@ -1,5 +1,5 @@
 /**
- * @brief   Defines the `ZydisInstructionCategory` enum.
+ * Defines the `ZydisInstructionCategory` enum.
  */
 typedef enum ZydisInstructionCategory_
 {
@@ -7,6 +7,7 @@ typedef enum ZydisInstructionCategory_
     ZYDIS_CATEGORY_ADOX_ADCX,
     ZYDIS_CATEGORY_AES,
     ZYDIS_CATEGORY_AMD3DNOW,
+    ZYDIS_CATEGORY_AMX_TILE,
     ZYDIS_CATEGORY_AVX,
     ZYDIS_CATEGORY_AVX2,
     ZYDIS_CATEGORY_AVX2GATHER,
@@ -40,16 +41,21 @@ typedef enum ZydisInstructionCategory_
     ZYDIS_CATEGORY_FCMOV,
     ZYDIS_CATEGORY_FLAGOP,
     ZYDIS_CATEGORY_FMA4,
+    ZYDIS_CATEGORY_FP16,
     ZYDIS_CATEGORY_GATHER,
     ZYDIS_CATEGORY_GFNI,
+    ZYDIS_CATEGORY_HRESET,
     ZYDIS_CATEGORY_IFMA,
     ZYDIS_CATEGORY_INTERRUPT,
     ZYDIS_CATEGORY_IO,
     ZYDIS_CATEGORY_IOSTRINGOP,
+    ZYDIS_CATEGORY_KEYLOCKER,
+    ZYDIS_CATEGORY_KEYLOCKER_WIDE,
     ZYDIS_CATEGORY_KMASK,
     ZYDIS_CATEGORY_KNC,
     ZYDIS_CATEGORY_KNCMASK,
     ZYDIS_CATEGORY_KNCSCALAR,
+    ZYDIS_CATEGORY_LEGACY,
     ZYDIS_CATEGORY_LOGICAL,
     ZYDIS_CATEGORY_LOGICAL_FP,
     ZYDIS_CATEGORY_LZCNT,
@@ -77,6 +83,7 @@ typedef enum ZydisInstructionCategory_
     ZYDIS_CATEGORY_SCATTER,
     ZYDIS_CATEGORY_SEGOP,
     ZYDIS_CATEGORY_SEMAPHORE,
+    ZYDIS_CATEGORY_SERIALIZE,
     ZYDIS_CATEGORY_SETCC,
     ZYDIS_CATEGORY_SGX,
     ZYDIS_CATEGORY_SHA,
@@ -89,10 +96,13 @@ typedef enum ZydisInstructionCategory_
     ZYDIS_CATEGORY_SYSRET,
     ZYDIS_CATEGORY_SYSTEM,
     ZYDIS_CATEGORY_TBM,
+    ZYDIS_CATEGORY_TSX_LDTRK,
     ZYDIS_CATEGORY_UFMA,
+    ZYDIS_CATEGORY_UINTR,
     ZYDIS_CATEGORY_UNCOND_BR,
     ZYDIS_CATEGORY_VAES,
     ZYDIS_CATEGORY_VBMI2,
+    ZYDIS_CATEGORY_VEX,
     ZYDIS_CATEGORY_VFMA,
     ZYDIS_CATEGORY_VPCLMULQDQ,
     ZYDIS_CATEGORY_VTX,
@@ -104,11 +114,11 @@ typedef enum ZydisInstructionCategory_
     ZYDIS_CATEGORY_XSAVEOPT,
 
     /**
-     * @brief   Maximum value of this enum.
+     * Maximum value of this enum.
      */
     ZYDIS_CATEGORY_MAX_VALUE = ZYDIS_CATEGORY_XSAVEOPT,
     /**
-     * @brief   The minimum number of bits required to represent all values of this enum.
+     * The minimum number of bits required to represent all values of this enum.
      */
     ZYDIS_CATEGORY_REQUIRED_BITS = ZYAN_BITS_TO_REPRESENT(ZYDIS_CATEGORY_MAX_VALUE)
 } ZydisInstructionCategory;

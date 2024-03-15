@@ -137,26 +137,23 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
 
 #if __has_feature(address_sanitizer)
     {
-        auto handles = mongo::mozjs::MozJSImplScope::ASANHandles::getThreadASANHandles();
-
-        if (handles) {
-            if (bytes) {
-                if (ptr) {
-                    // realloc
-                    if (ptr != p) {
-                        // actually moved the allocation
-                        handles->removePointer(ptr);
-                        handles->addPointer(p);
-                    }
-                    // else we didn't need to realloc, don't have to register
-                } else {
-                    // malloc/calloc
-                    handles->addPointer(p);
+        auto& handles = mongo::mozjs::MozJSImplScope::ASANHandles::getInstance();
+        if (bytes) {
+            if (ptr) {
+                // realloc
+                if (ptr != p) {
+                    // actually moved the allocation
+                    handles.removePointer(ptr);
+                    handles.addPointer(p);
                 }
+                // else we didn't need to realloc, don't have to register
             } else {
-                // free
-                handles->removePointer(ptr);
+                // malloc/calloc
+                handles.addPointer(p);
             }
+        } else {
+            // free
+            handles.removePointer(ptr);
         }
     }
 #endif

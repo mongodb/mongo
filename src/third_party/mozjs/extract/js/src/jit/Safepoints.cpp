@@ -19,13 +19,14 @@ using namespace jit;
 
 using mozilla::FloorLog2;
 
-SafepointWriter::SafepointWriter(uint32_t slotCount, uint32_t argumentCount)
-    : frameSlots_((slotCount / sizeof(intptr_t)) +
+SafepointWriter::SafepointWriter(uint32_t localSlotsSize,
+                                 uint32_t argumentsSize)
+    : localSlots_((localSlotsSize / sizeof(intptr_t)) +
                   1),  // Stack slot counts are inclusive.
-      argumentSlots_(argumentCount / sizeof(intptr_t)) {}
+      argumentSlots_(argumentsSize / sizeof(intptr_t)) {}
 
 bool SafepointWriter::init(TempAllocator& alloc) {
-  return frameSlots_.init(alloc) && argumentSlots_.init(alloc);
+  return localSlots_.init(alloc) && argumentSlots_.init(alloc);
 }
 
 uint32_t SafepointWriter::startEntry() {
@@ -180,7 +181,7 @@ void SafepointWriter::writeGcSlots(LSafepoint* safepoint) {
   }
 #endif
 
-  MapSlotsToBitset(frameSlots_, argumentSlots_, stream_, slots);
+  MapSlotsToBitset(localSlots_, argumentSlots_, stream_, slots);
 }
 
 void SafepointWriter::writeSlotsOrElementsSlots(LSafepoint* safepoint) {
@@ -209,7 +210,7 @@ void SafepointWriter::writeValueSlots(LSafepoint* safepoint) {
   }
 #  endif
 
-  MapSlotsToBitset(frameSlots_, argumentSlots_, stream_, slots);
+  MapSlotsToBitset(localSlots_, argumentSlots_, stream_, slots);
 }
 #endif
 
@@ -402,9 +403,9 @@ void SafepointWriter::endEntry() {
 SafepointReader::SafepointReader(IonScript* script, const SafepointIndex* si)
     : stream_(script->safepoints() + si->safepointOffset(),
               script->safepoints() + script->safepointsSize()),
-      frameSlots_((script->frameSlots() / sizeof(intptr_t)) +
+      localSlots_((script->localSlotsSize() / sizeof(intptr_t)) +
                   1),  // Stack slot counts are inclusive.
-      argumentSlots_(script->argumentSlots() / sizeof(intptr_t)),
+      argumentSlots_(script->argumentSlotsSize() / sizeof(intptr_t)),
       nunboxSlotsRemaining_(0),
       slotsOrElementsSlotsRemaining_(0) {
   osiCallPointOffset_ = stream_.readUnsigned();
@@ -450,7 +451,7 @@ bool SafepointReader::getSlotFromBitmap(SafepointSlotEntry* entry) {
   while (currentSlotChunk_ == 0) {
     // Are there any more chunks to read?
     if (currentSlotsAreStack_) {
-      if (nextSlotChunkNumber_ == BitSet::RawLengthForBits(frameSlots_)) {
+      if (nextSlotChunkNumber_ == BitSet::RawLengthForBits(localSlots_)) {
         nextSlotChunkNumber_ = 0;
         currentSlotsAreStack_ = false;
         continue;

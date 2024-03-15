@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "wasm/WasmOpIter.cpp"
+#include "wasm/WasmIonCompile.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmOpIter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmIonCompile.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmOpIter.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmIonCompile.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "wasm/WasmProcess.cpp"
+#include "wasm/WasmJS.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmProcess.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmJS.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmProcess.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmJS.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "wasm/WasmRealm.cpp"
+#include "wasm/WasmLog.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmRealm.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmLog.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmRealm.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmLog.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "wasm/WasmSignalHandlers.cpp"
+#include "wasm/WasmMemory.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmSignalHandlers.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmMemory.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmSignalHandlers.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmMemory.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "wasm/WasmStubs.cpp"
+#include "wasm/WasmModule.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmStubs.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmModule.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmStubs.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmModule.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "wasm/WasmTable.cpp"
+#include "wasm/WasmModuleTypes.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmTable.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmModuleTypes.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmTable.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmModuleTypes.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

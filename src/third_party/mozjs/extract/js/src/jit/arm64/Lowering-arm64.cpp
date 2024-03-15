@@ -39,6 +39,10 @@ LAllocation LIRGeneratorARM64::useByteOpRegisterOrNonDoubleConstant(
   return useRegisterOrNonDoubleConstant(mir);
 }
 
+LDefinition LIRGeneratorARM64::tempByteOpRegister() { return temp(); }
+
+LDefinition LIRGeneratorARM64::tempToUnbox() { return temp(); }
+
 void LIRGenerator::visitBox(MBox* box) {
   MDefinition* opd = box->getOperand(0);
 
@@ -140,6 +144,13 @@ template void LIRGeneratorARM64::lowerForFPU(LInstructionHelper<1, 2, 1>* ins,
                                              MDefinition* mir, MDefinition* lhs,
                                              MDefinition* rhs);
 
+void LIRGeneratorARM64::lowerForALUInt64(
+    LInstructionHelper<INT64_PIECES, INT64_PIECES, 0>* ins, MDefinition* mir,
+    MDefinition* input) {
+  ins->setInt64Operand(0, useInt64RegisterAtStart(input));
+  defineInt64(ins, mir);
+}
+
 // These all currently have codegen that depends on reuse but only because the
 // masm API depends on that.  We need new three-address masm APIs, for both
 // constant and variable rhs.
@@ -211,14 +222,14 @@ void LIRGeneratorARM64::lowerWasmBuiltinTruncateToInt32(
 
   if (opd->type() == MIRType::Double) {
     define(new (alloc()) LWasmBuiltinTruncateDToInt32(
-               useRegister(opd), useFixed(ins->tls(), WasmTlsReg),
+               useRegister(opd), useFixed(ins->instance(), InstanceReg),
                LDefinition::BogusTemp()),
            ins);
     return;
   }
 
   define(new (alloc()) LWasmBuiltinTruncateFToInt32(
-             useRegister(opd), useFixed(ins->tls(), WasmTlsReg),
+             useRegister(opd), useFixed(ins->instance(), InstanceReg),
              LDefinition::BogusTemp()),
          ins);
 }
@@ -396,12 +407,17 @@ void LIRGeneratorARM64::lowerWasmSelectI64(MWasmSelect* select) {
   defineInt64(new (alloc()) LWasmSelectI64(t, f, c), select);
 }
 
+// On arm64 we specialize the cases: compare is {{U,}Int32, {U,}Int64},
+// Float32, Double}, and select is {{U,}Int32, {U,}Int64}, Float32, Double},
+// independently.
 bool LIRGeneratorARM64::canSpecializeWasmCompareAndSelect(
     MCompare::CompareType compTy, MIRType insTy) {
-  return (insTy == MIRType::Int32 || insTy == MIRType::Float32 ||
-          insTy == MIRType::Double) &&
+  return (insTy == MIRType::Int32 || insTy == MIRType::Int64 ||
+          insTy == MIRType::Float32 || insTy == MIRType::Double) &&
          (compTy == MCompare::Compare_Int32 ||
           compTy == MCompare::Compare_UInt32 ||
+          compTy == MCompare::Compare_Int64 ||
+          compTy == MCompare::Compare_UInt64 ||
           compTy == MCompare::Compare_Float32 ||
           compTy == MCompare::Compare_Double);
 }
@@ -417,7 +433,9 @@ void LIRGeneratorARM64::lowerWasmCompareAndSelect(MWasmSelect* ins,
       compTy == MCompare::Compare_Double) {
     rhsAlloc = useRegisterAtStart(rhs);
   } else if (compTy == MCompare::Compare_Int32 ||
-             compTy == MCompare::Compare_UInt32) {
+             compTy == MCompare::Compare_UInt32 ||
+             compTy == MCompare::Compare_Int64 ||
+             compTy == MCompare::Compare_UInt64) {
     rhsAlloc = useRegisterOrConstantAtStart(rhs);
   } else {
     MOZ_CRASH("Unexpected type");
@@ -460,7 +478,7 @@ void LIRGeneratorARM64::lowerPowOfTwoI(MPow* mir) {
   int32_t base = mir->input()->toConstant()->toInt32();
   MDefinition* power = mir->power();
 
-  auto* lir = new (alloc()) LPowOfTwoI(base, useRegister(power));
+  auto* lir = new (alloc()) LPowOfTwoI(useRegister(power), base);
   assignSnapshot(lir, mir->bailoutKind());
   define(lir, mir);
 }
@@ -556,10 +574,11 @@ void LIRGenerator::visitWasmNeg(MWasmNeg* ins) {
 void LIRGeneratorARM64::lowerUDiv(MDiv* div) {
   LAllocation lhs = useRegister(div->lhs());
   if (div->rhs()->isConstant()) {
-    int32_t rhs = div->rhs()->toConstant()->toInt32();
-    int32_t shift = mozilla::FloorLog2(mozilla::Abs(rhs));
+    // NOTE: the result of toInt32 is coerced to uint32_t.
+    uint32_t rhs = div->rhs()->toConstant()->toInt32();
+    int32_t shift = mozilla::FloorLog2(rhs);
 
-    if (rhs != 0 && uint32_t(1) << shift == mozilla::Abs(rhs)) {
+    if (rhs != 0 && uint32_t(1) << shift == rhs) {
       LDivPowTwoI* lir = new (alloc()) LDivPowTwoI(lhs, shift, false);
       if (div->fallible()) {
         assignSnapshot(lir, div->bailoutKind());
@@ -631,7 +650,8 @@ void LIRGenerator::visitAsmJSLoadHeap(MAsmJSLoadHeap* ins) {
   // memory base.  This follows from the definition of
   // FunctionCompiler::maybeLoadMemoryBase() in WasmIonCompile.cpp.
   MOZ_ASSERT(!ins->hasMemoryBase());
-  auto* lir = new (alloc()) LAsmJSLoadHeap(baseAlloc, limitAlloc);
+  auto* lir =
+      new (alloc()) LAsmJSLoadHeap(baseAlloc, limitAlloc, LAllocation());
   define(lir, ins);
 }
 
@@ -652,13 +672,14 @@ void LIRGenerator::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins) {
   // See comment in LIRGenerator::visitAsmJSStoreHeap just above.
   MOZ_ASSERT(!ins->hasMemoryBase());
   add(new (alloc()) LAsmJSStoreHeap(baseAlloc, useRegisterAtStart(ins->value()),
-                                    limitAlloc),
+                                    limitAlloc, LAllocation()),
       ins);
 }
 
 void LIRGenerator::visitWasmCompareExchangeHeap(MWasmCompareExchangeHeap* ins) {
   MDefinition* base = ins->base();
-  MOZ_ASSERT(base->type() == MIRType::Int32);
+  // See comment in visitWasmLoad re the type of 'base'.
+  MOZ_ASSERT(base->type() == MIRType::Int32 || base->type() == MIRType::Int64);
 
   // Note, the access type may be Int64 here.
 
@@ -671,7 +692,8 @@ void LIRGenerator::visitWasmCompareExchangeHeap(MWasmCompareExchangeHeap* ins) {
 
 void LIRGenerator::visitWasmAtomicExchangeHeap(MWasmAtomicExchangeHeap* ins) {
   MDefinition* base = ins->base();
-  MOZ_ASSERT(base->type() == MIRType::Int32);
+  // See comment in visitWasmLoad re the type of 'base'.
+  MOZ_ASSERT(base->type() == MIRType::Int32 || base->type() == MIRType::Int64);
 
   // Note, the access type may be Int64 here.
 
@@ -682,7 +704,8 @@ void LIRGenerator::visitWasmAtomicExchangeHeap(MWasmAtomicExchangeHeap* ins) {
 
 void LIRGenerator::visitWasmAtomicBinopHeap(MWasmAtomicBinopHeap* ins) {
   MDefinition* base = ins->base();
-  MOZ_ASSERT(base->type() == MIRType::Int32);
+  // See comment in visitWasmLoad re the type of 'base'.
+  MOZ_ASSERT(base->type() == MIRType::Int32 || base->type() == MIRType::Int64);
 
   // Note, the access type may be Int64 here.
 
@@ -903,7 +926,9 @@ void LIRGenerator::visitWasmHeapBase(MWasmHeapBase* ins) {
 
 void LIRGenerator::visitWasmLoad(MWasmLoad* ins) {
   MDefinition* base = ins->base();
-  MOZ_ASSERT(base->type() == MIRType::Int32);
+  // 'base' is a GPR but may be of either type.  If it is 32-bit it is
+  // zero-extended and can act as 64-bit.
+  MOZ_ASSERT(base->type() == MIRType::Int32 || base->type() == MIRType::Int64);
 
   LAllocation ptr = useRegisterOrConstantAtStart(base);
 
@@ -918,7 +943,8 @@ void LIRGenerator::visitWasmLoad(MWasmLoad* ins) {
 
 void LIRGenerator::visitWasmStore(MWasmStore* ins) {
   MDefinition* base = ins->base();
-  MOZ_ASSERT(base->type() == MIRType::Int32);
+  // See comment in visitWasmLoad re the type of 'base'.
+  MOZ_ASSERT(base->type() == MIRType::Int32 || base->type() == MIRType::Int64);
 
   MDefinition* value = ins->value();
 
@@ -960,8 +986,12 @@ void LIRGenerator::visitCopySign(MCopySign* ins) {
   }
 
   lir->setOperand(0, useRegisterAtStart(lhs));
-  lir->setOperand(1, useRegisterAtStart(rhs));
-  define(lir, ins);
+  lir->setOperand(1, willHaveDifferentLIRNodes(lhs, rhs)
+                         ? useRegister(rhs)
+                         : useRegisterAtStart(rhs));
+  // The copySignDouble and copySignFloat32 are optimized for lhs == output.
+  // It also prevents rhs == output when lhs != output, avoids clobbering.
+  defineReuseInput(lir, ins, 0);
 }
 
 void LIRGenerator::visitExtendInt32ToInt64(MExtendInt32ToInt64* ins) {
@@ -975,18 +1005,52 @@ void LIRGenerator::visitSignExtendInt64(MSignExtendInt64* ins) {
               ins);
 }
 
-void LIRGenerator::visitWasmBitselectSimd128(MWasmBitselectSimd128* ins) {
+void LIRGenerator::visitWasmTernarySimd128(MWasmTernarySimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
-  MOZ_ASSERT(ins->lhs()->type() == MIRType::Simd128);
-  MOZ_ASSERT(ins->rhs()->type() == MIRType::Simd128);
-  MOZ_ASSERT(ins->control()->type() == MIRType::Simd128);
+  MOZ_ASSERT(ins->v0()->type() == MIRType::Simd128);
+  MOZ_ASSERT(ins->v1()->type() == MIRType::Simd128);
+  MOZ_ASSERT(ins->v2()->type() == MIRType::Simd128);
   MOZ_ASSERT(ins->type() == MIRType::Simd128);
 
-  auto* lir = new (alloc())
-      LWasmBitselectSimd128(useRegister(ins->lhs()), useRegister(ins->rhs()),
-                            useRegisterAtStart(ins->control()), tempSimd128());
-  // On ARM64, control register is used as output at machine instruction.
-  defineReuseInput(lir, ins, LWasmBitselectSimd128::Control);
+  switch (ins->simdOp()) {
+    case wasm::SimdOp::V128Bitselect: {
+      auto* lir = new (alloc()) LWasmTernarySimd128(
+          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
+          useRegisterAtStart(ins->v2()));
+      // On ARM64, control register is used as output at machine instruction.
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      break;
+    }
+    case wasm::SimdOp::F32x4RelaxedFma:
+    case wasm::SimdOp::F32x4RelaxedFnma:
+    case wasm::SimdOp::F64x2RelaxedFma:
+    case wasm::SimdOp::F64x2RelaxedFnma: {
+      auto* lir = new (alloc()) LWasmTernarySimd128(
+          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
+          useRegisterAtStart(ins->v2()));
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      break;
+    }
+    case wasm::SimdOp::I32x4DotI8x16I7x16AddS: {
+      auto* lir = new (alloc()) LWasmTernarySimd128(
+          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
+          useRegisterAtStart(ins->v2()), tempSimd128());
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      break;
+    }
+    case wasm::SimdOp::I8x16RelaxedLaneSelect:
+    case wasm::SimdOp::I16x8RelaxedLaneSelect:
+    case wasm::SimdOp::I32x4RelaxedLaneSelect:
+    case wasm::SimdOp::I64x2RelaxedLaneSelect: {
+      auto* lir = new (alloc()) LWasmTernarySimd128(
+          ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
+          useRegisterAtStart(ins->v2()));
+      defineReuseInput(lir, ins, LWasmTernarySimd128::V2);
+      break;
+    }
+    default:
+      MOZ_CRASH("NYI");
+  }
 #else
   MOZ_CRASH("No SIMD");
 #endif
@@ -1019,10 +1083,13 @@ void LIRGenerator::visitWasmBinarySimd128(MWasmBinarySimd128* ins) {
 }
 
 #ifdef ENABLE_WASM_SIMD
-bool MWasmBitselectSimd128::specializeConstantMaskAsShuffle(
+bool MWasmTernarySimd128::specializeBitselectConstantMaskAsShuffle(
     int8_t shuffle[16]) {
   return false;
 }
+bool MWasmTernarySimd128::canRelaxBitselect() { return false; }
+
+bool MWasmBinarySimd128::canPmaddubsw() { return false; }
 #endif
 
 bool MWasmBinarySimd128::specializeForConstantRhs() {
@@ -1086,7 +1153,6 @@ void LIRGenerator::visitWasmShiftSimd128(MWasmShiftSimd128* ins) {
   LAllocation lhsDestAlloc = useRegisterAtStart(lhs);
   LAllocation rhsAlloc = useRegisterAtStart(rhs);
   auto* lir = new (alloc()) LWasmVariableShiftSimd128(lhsDestAlloc, rhsAlloc,
-                                                      LDefinition::BogusTemp(),
                                                       LDefinition::BogusTemp());
   define(lir, ins);
 #else
@@ -1100,29 +1166,29 @@ void LIRGenerator::visitWasmShuffleSimd128(MWasmShuffleSimd128* ins) {
   MOZ_ASSERT(ins->rhs()->type() == MIRType::Simd128);
   MOZ_ASSERT(ins->type() == MIRType::Simd128);
 
-  Shuffle s = AnalyzeShuffle(ins);
-#  ifdef DEBUG
-  ReportShuffleSpecialization(s);
-#  endif
+  SimdShuffle s = ins->shuffle();
   switch (s.opd) {
-    case Shuffle::Operand::LEFT:
-    case Shuffle::Operand::RIGHT: {
+    case SimdShuffle::Operand::LEFT:
+    case SimdShuffle::Operand::RIGHT: {
       LAllocation src;
       switch (*s.permuteOp) {
-        case LWasmPermuteSimd128::MOVE:
-        case LWasmPermuteSimd128::BROADCAST_8x16:
-        case LWasmPermuteSimd128::BROADCAST_16x8:
-        case LWasmPermuteSimd128::PERMUTE_8x16:
-        case LWasmPermuteSimd128::PERMUTE_16x8:
-        case LWasmPermuteSimd128::PERMUTE_32x4:
-        case LWasmPermuteSimd128::ROTATE_RIGHT_8x16:
-        case LWasmPermuteSimd128::SHIFT_LEFT_8x16:
-        case LWasmPermuteSimd128::SHIFT_RIGHT_8x16:
+        case SimdPermuteOp::MOVE:
+        case SimdPermuteOp::BROADCAST_8x16:
+        case SimdPermuteOp::BROADCAST_16x8:
+        case SimdPermuteOp::PERMUTE_8x16:
+        case SimdPermuteOp::PERMUTE_16x8:
+        case SimdPermuteOp::PERMUTE_32x4:
+        case SimdPermuteOp::ROTATE_RIGHT_8x16:
+        case SimdPermuteOp::SHIFT_LEFT_8x16:
+        case SimdPermuteOp::SHIFT_RIGHT_8x16:
+        case SimdPermuteOp::REVERSE_16x8:
+        case SimdPermuteOp::REVERSE_32x4:
+        case SimdPermuteOp::REVERSE_64x2:
           break;
         default:
           MOZ_CRASH("Unexpected operator");
       }
-      if (s.opd == Shuffle::Operand::LEFT) {
+      if (s.opd == SimdShuffle::Operand::LEFT) {
         src = useRegisterAtStart(ins->lhs());
       } else {
         src = useRegisterAtStart(ins->rhs());
@@ -1132,12 +1198,12 @@ void LIRGenerator::visitWasmShuffleSimd128(MWasmShuffleSimd128* ins) {
       define(lir, ins);
       break;
     }
-    case Shuffle::Operand::BOTH:
-    case Shuffle::Operand::BOTH_SWAPPED: {
+    case SimdShuffle::Operand::BOTH:
+    case SimdShuffle::Operand::BOTH_SWAPPED: {
       LDefinition temp = LDefinition::BogusTemp();
       LAllocation lhs;
       LAllocation rhs;
-      if (s.opd == Shuffle::Operand::BOTH) {
+      if (s.opd == SimdShuffle::Operand::BOTH) {
         lhs = useRegisterAtStart(ins->lhs());
         rhs = useRegisterAtStart(ins->rhs());
       } else {
@@ -1233,22 +1299,22 @@ void LIRGenerator::visitWasmUnarySimd128(MWasmUnarySimd128* ins) {
     case wasm::SimdOp::I16x8Abs:
     case wasm::SimdOp::I32x4Abs:
     case wasm::SimdOp::I64x2Abs:
-    case wasm::SimdOp::I32x4TruncSSatF32x4:
-    case wasm::SimdOp::F32x4ConvertUI32x4:
-    case wasm::SimdOp::I32x4TruncUSatF32x4:
-    case wasm::SimdOp::I16x8WidenLowSI8x16:
-    case wasm::SimdOp::I16x8WidenHighSI8x16:
-    case wasm::SimdOp::I16x8WidenLowUI8x16:
-    case wasm::SimdOp::I16x8WidenHighUI8x16:
-    case wasm::SimdOp::I32x4WidenLowSI16x8:
-    case wasm::SimdOp::I32x4WidenHighSI16x8:
-    case wasm::SimdOp::I32x4WidenLowUI16x8:
-    case wasm::SimdOp::I32x4WidenHighUI16x8:
-    case wasm::SimdOp::I64x2WidenLowSI32x4:
-    case wasm::SimdOp::I64x2WidenHighSI32x4:
-    case wasm::SimdOp::I64x2WidenLowUI32x4:
-    case wasm::SimdOp::I64x2WidenHighUI32x4:
-    case wasm::SimdOp::F32x4ConvertSI32x4:
+    case wasm::SimdOp::I32x4TruncSatF32x4S:
+    case wasm::SimdOp::F32x4ConvertI32x4U:
+    case wasm::SimdOp::I32x4TruncSatF32x4U:
+    case wasm::SimdOp::I16x8ExtendLowI8x16S:
+    case wasm::SimdOp::I16x8ExtendHighI8x16S:
+    case wasm::SimdOp::I16x8ExtendLowI8x16U:
+    case wasm::SimdOp::I16x8ExtendHighI8x16U:
+    case wasm::SimdOp::I32x4ExtendLowI16x8S:
+    case wasm::SimdOp::I32x4ExtendHighI16x8S:
+    case wasm::SimdOp::I32x4ExtendLowI16x8U:
+    case wasm::SimdOp::I32x4ExtendHighI16x8U:
+    case wasm::SimdOp::I64x2ExtendLowI32x4S:
+    case wasm::SimdOp::I64x2ExtendHighI32x4S:
+    case wasm::SimdOp::I64x2ExtendLowI32x4U:
+    case wasm::SimdOp::I64x2ExtendHighI32x4U:
+    case wasm::SimdOp::F32x4ConvertI32x4S:
     case wasm::SimdOp::F32x4Ceil:
     case wasm::SimdOp::F32x4Floor:
     case wasm::SimdOp::F32x4Trunc:
@@ -1261,11 +1327,15 @@ void LIRGenerator::visitWasmUnarySimd128(MWasmUnarySimd128* ins) {
     case wasm::SimdOp::F64x2PromoteLowF32x4:
     case wasm::SimdOp::F64x2ConvertLowI32x4S:
     case wasm::SimdOp::F64x2ConvertLowI32x4U:
-    case wasm::SimdOp::I16x8ExtAddPairwiseI8x16S:
-    case wasm::SimdOp::I16x8ExtAddPairwiseI8x16U:
-    case wasm::SimdOp::I32x4ExtAddPairwiseI16x8S:
-    case wasm::SimdOp::I32x4ExtAddPairwiseI16x8U:
+    case wasm::SimdOp::I16x8ExtaddPairwiseI8x16S:
+    case wasm::SimdOp::I16x8ExtaddPairwiseI8x16U:
+    case wasm::SimdOp::I32x4ExtaddPairwiseI16x8S:
+    case wasm::SimdOp::I32x4ExtaddPairwiseI16x8U:
     case wasm::SimdOp::I8x16Popcnt:
+    case wasm::SimdOp::I32x4RelaxedTruncF32x4S:
+    case wasm::SimdOp::I32x4RelaxedTruncF32x4U:
+    case wasm::SimdOp::I32x4RelaxedTruncF64x2SZero:
+    case wasm::SimdOp::I32x4RelaxedTruncF64x2UZero:
       break;
     case wasm::SimdOp::I32x4TruncSatF64x2SZero:
     case wasm::SimdOp::I32x4TruncSatF64x2UZero:
@@ -1334,6 +1404,9 @@ void LIRGenerator::visitWasmReduceSimd128(MWasmReduceSimd128* ins) {
 
 void LIRGenerator::visitWasmLoadLaneSimd128(MWasmLoadLaneSimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
+  // On 64-bit systems, the base pointer can be 32 bits or 64 bits.  Either way,
+  // it fits in a GPR so we can ignore the Register/Register64 distinction here.
+
   // Optimal allocation here reuses the value input for the output register
   // because codegen otherwise has to copy the input to the output; this is
   // because load-lane is implemented as load + replace-lane.  Bug 1706106 may
@@ -1351,6 +1424,8 @@ void LIRGenerator::visitWasmLoadLaneSimd128(MWasmLoadLaneSimd128* ins) {
 
 void LIRGenerator::visitWasmStoreLaneSimd128(MWasmStoreLaneSimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
+  // See comment above about the base pointer.
+
   LUse base = useRegisterAtStart(ins->base());
   LUse input = useRegisterAtStart(ins->value());
   MOZ_ASSERT(!ins->hasMemoryBase());

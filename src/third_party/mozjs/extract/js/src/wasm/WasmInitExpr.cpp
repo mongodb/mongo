@@ -20,19 +20,27 @@
 
 #include "mozilla/Maybe.h"
 
+#include "js/Value.h"
+
+#include "wasm/WasmGcObject.h"
 #include "wasm/WasmInstance.h"
 #include "wasm/WasmOpIter.h"
 #include "wasm/WasmSerialize.h"
+#include "wasm/WasmUtility.h"
 #include "wasm/WasmValidate.h"
+
+#include "wasm/WasmInstance-inl.h"
 
 using namespace js;
 using namespace js::wasm;
 
 static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
-                             ValType expected, Maybe<LitVal>* literal) {
+                             ValType expected,
+                             uint32_t maxInitializedGlobalsIndexPlus1,
+                             Maybe<LitVal>* literal) {
   ValidatingOpIter iter(*env, d, ValidatingOpIter::InitExpr);
 
-  if (!iter.startInitExpr(expected)) {
+  if (!iter.startInitExpr(expected, maxInitializedGlobalsIndexPlus1)) {
     return false;
   }
 
@@ -53,7 +61,7 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
       return false;
     }
 
-#ifdef ENABLE_WASM_EXTENDED_CONST
+#if defined(ENABLE_WASM_EXTENDED_CONST) || defined(ENABLE_WASM_GC)
     Nothing nothing;
 #endif
     NothingVector nothings{};
@@ -72,7 +80,7 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
         }
         break;
       }
-      case uint16_t(Op::GetGlobal): {
+      case uint16_t(Op::GlobalGet): {
         uint32_t index;
         if (!iter.readGetGlobal(&index)) {
           return false;
@@ -114,11 +122,11 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
       }
 #ifdef ENABLE_WASM_SIMD
       case uint16_t(Op::SimdPrefix): {
-        if (!env->v128Enabled()) {
+        if (!env->simdAvailable()) {
           return d.fail("v128 not enabled");
         }
         if (op.b1 != uint32_t(SimdOp::V128Const)) {
-          return d.fail("unexpected initializer opcode");
+          return iter.unrecognizedOpcode(&op);
         }
         V128 c;
         if (!iter.readV128Const(&c)) {
@@ -151,7 +159,7 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
       case uint16_t(Op::I32Sub):
       case uint16_t(Op::I32Mul): {
         if (!env->extendedConstEnabled()) {
-          return d.fail("unexpected initializer opcode");
+          return iter.unrecognizedOpcode(&op);
         }
         if (!iter.readBinary(ValType::I32, &nothing, &nothing)) {
           return false;
@@ -163,7 +171,7 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
       case uint16_t(Op::I64Sub):
       case uint16_t(Op::I64Mul): {
         if (!env->extendedConstEnabled()) {
-          return d.fail("unexpected initializer opcode");
+          return iter.unrecognizedOpcode(&op);
         }
         if (!iter.readBinary(ValType::I64, &nothing, &nothing)) {
           return false;
@@ -172,8 +180,57 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
         break;
       }
 #endif
+#ifdef ENABLE_WASM_GC
+      case uint16_t(Op::GcPrefix): {
+        if (!env->gcEnabled()) {
+          return iter.unrecognizedOpcode(&op);
+        }
+        switch (op.b1) {
+          case uint32_t(GcOp::StructNew): {
+            uint32_t typeIndex;
+            if (!iter.readStructNew(&typeIndex, &nothings)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(GcOp::StructNewDefault): {
+            uint32_t typeIndex;
+            if (!iter.readStructNewDefault(&typeIndex)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(GcOp::ArrayNew): {
+            uint32_t typeIndex;
+            if (!iter.readArrayNew(&typeIndex, &nothing, &nothing)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(GcOp::ArrayNewFixed): {
+            uint32_t typeIndex, len;
+            if (!iter.readArrayNewFixed(&typeIndex, &len, &nothings)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(GcOp::ArrayNewDefault): {
+            uint32_t typeIndex;
+            if (!iter.readArrayNewDefault(&typeIndex, &nothing)) {
+              return false;
+            }
+            break;
+          }
+          default: {
+            return iter.unrecognizedOpcode(&op);
+          }
+        }
+        *literal = Nothing();
+        break;
+      }
+#endif
       default: {
-        return d.fail("unexpected initializer opcode");
+        return iter.unrecognizedOpcode(&op);
       }
     }
   }
@@ -182,14 +239,13 @@ static bool ValidateInitExpr(Decoder& d, ModuleEnvironment* env,
 class MOZ_STACK_CLASS InitExprInterpreter {
  public:
   explicit InitExprInterpreter(JSContext* cx,
-                               const ValVector& globalImportValues,
-                               HandleWasmInstanceObject instanceObj)
+                               Handle<WasmInstanceObject*> instanceObj)
       : features(FeatureArgs::build(cx, FeatureOptions())),
         stack(cx),
-        globalImportValues(globalImportValues),
-        instanceObj(cx, instanceObj) {}
+        instanceObj(cx, instanceObj),
+        types(instanceObj->instance().metadata().types) {}
 
-  bool evaluate(Decoder& d);
+  bool evaluate(JSContext* cx, Decoder& d);
 
   Val result() {
     MOZ_ASSERT(stack.length() == 1);
@@ -198,28 +254,36 @@ class MOZ_STACK_CLASS InitExprInterpreter {
 
  private:
   FeatureArgs features;
-  RootedValVector stack;
-  const ValVector& globalImportValues;
-  RootedWasmInstanceObject instanceObj;
+  RootedValVectorN<48> stack;
+  Rooted<WasmInstanceObject*> instanceObj;
+  SharedTypeContext types;
 
-  bool pushI32(int32_t c) { return stack.append(Val(uint32_t(c))); }
-  bool pushI64(int64_t c) { return stack.append(Val(uint64_t(c))); }
-  bool pushF32(float c) { return stack.append(Val(c)); }
-  bool pushF64(double c) { return stack.append(Val(c)); }
-  bool pushV128(V128 c) { return stack.append(Val(c)); }
-  bool pushRef(ValType type, AnyRef ref) {
+  Instance& instance() { return instanceObj->instance(); }
+
+  [[nodiscard]] bool pushI32(int32_t c) {
+    return stack.append(Val(uint32_t(c)));
+  }
+  [[nodiscard]] bool pushI64(int64_t c) {
+    return stack.append(Val(uint64_t(c)));
+  }
+  [[nodiscard]] bool pushF32(float c) { return stack.append(Val(c)); }
+  [[nodiscard]] bool pushF64(double c) { return stack.append(Val(c)); }
+  [[nodiscard]] bool pushV128(V128 c) { return stack.append(Val(c)); }
+  [[nodiscard]] bool pushRef(ValType type, AnyRef ref) {
     return stack.append(Val(type, ref));
   }
-  bool pushFuncRef(FuncRef ref) {
+  [[nodiscard]] bool pushFuncRef(HandleFuncRef ref) {
     return stack.append(Val(RefType::func(), ref));
   }
 
-#ifdef ENABLE_WASM_EXTENDED_CONST
+#if defined(ENABLE_WASM_EXTENDED_CONST) || defined(ENABLE_WASM_GC)
   int32_t popI32() {
     uint32_t result = stack.back().i32();
     stack.popBack();
     return int32_t(result);
   }
+#endif
+#ifdef ENABLE_WASM_EXTENDED_CONST
   int64_t popI64() {
     uint64_t result = stack.back().i64();
     stack.popBack();
@@ -227,63 +291,145 @@ class MOZ_STACK_CLASS InitExprInterpreter {
   }
 #endif
 
-  bool evalGetGlobal(uint32_t index) {
-    return stack.append(globalImportValues[index]);
+  bool evalGlobalGet(JSContext* cx, uint32_t index) {
+    RootedVal val(cx);
+    instance().constantGlobalGet(index, &val);
+    return stack.append(val);
   }
   bool evalI32Const(int32_t c) { return pushI32(c); }
   bool evalI64Const(int64_t c) { return pushI64(c); }
   bool evalF32Const(float c) { return pushF32(c); }
   bool evalF64Const(double c) { return pushF64(c); }
   bool evalV128Const(V128 c) { return pushV128(c); }
-  bool evalRefFunc(uint32_t funcIndex) {
-    void* fnref = Instance::refFunc(&instanceObj->instance(), funcIndex);
-    if (fnref == AnyRef::invalid().forCompiledCode()) {
-      return false;  // OOM, which has already been reported.
+  bool evalRefFunc(JSContext* cx, uint32_t funcIndex) {
+    RootedFuncRef func(cx, FuncRef::fromJSFunction(nullptr));
+    if (!instance().constantRefFunc(funcIndex, &func)) {
+      return false;
     }
-    return pushFuncRef(FuncRef::fromCompiledCode(fnref));
+    return pushFuncRef(func);
   }
   bool evalRefNull(RefType type) { return pushRef(type, AnyRef::null()); }
 #ifdef ENABLE_WASM_EXTENDED_CONST
   bool evalI32Add() {
-    uint32_t a = popI32();
     uint32_t b = popI32();
-    pushI32(a + b);
-    return true;
+    uint32_t a = popI32();
+    return pushI32(a + b);
   }
   bool evalI32Sub() {
-    uint32_t a = popI32();
     uint32_t b = popI32();
-    pushI32(a - b);
-    return true;
+    uint32_t a = popI32();
+    return pushI32(a - b);
   }
   bool evalI32Mul() {
-    uint32_t a = popI32();
     uint32_t b = popI32();
-    pushI32(a * b);
-    return true;
+    uint32_t a = popI32();
+    return pushI32(a * b);
   }
   bool evalI64Add() {
-    uint64_t a = popI64();
     uint64_t b = popI64();
-    pushI64(a + b);
-    return true;
+    uint64_t a = popI64();
+    return pushI64(a + b);
   }
   bool evalI64Sub() {
-    uint64_t a = popI64();
     uint64_t b = popI64();
-    pushI64(a - b);
-    return true;
+    uint64_t a = popI64();
+    return pushI64(a - b);
   }
   bool evalI64Mul() {
-    uint64_t a = popI64();
     uint64_t b = popI64();
-    pushI64(a * b);
-    return true;
+    uint64_t a = popI64();
+    return pushI64(a * b);
   }
-#endif
+#endif  // ENABLE_WASM_EXTENDED_CONST
+#ifdef ENABLE_WASM_GC
+  bool evalStructNew(JSContext* cx, uint32_t typeIndex) {
+    const TypeDef& typeDef = instance().metadata().types->type(typeIndex);
+    const StructType& structType = typeDef.structType();
+
+    Rooted<WasmStructObject*> structObj(
+        cx, instance().constantStructNewDefault(cx, typeIndex));
+    if (!structObj) {
+      return false;
+    }
+
+    uint32_t numFields = structType.fields_.length();
+    for (uint32_t forwardIndex = 0; forwardIndex < numFields; forwardIndex++) {
+      uint32_t reverseIndex = numFields - forwardIndex - 1;
+      const Val& val = stack.back();
+      structObj->storeVal(val, reverseIndex);
+      stack.popBack();
+    }
+
+    return pushRef(RefType::fromTypeDef(&typeDef, false),
+                   AnyRef::fromJSObject(structObj));
+  }
+
+  bool evalStructNewDefault(JSContext* cx, uint32_t typeIndex) {
+    Rooted<WasmStructObject*> structObj(
+        cx, instance().constantStructNewDefault(cx, typeIndex));
+    if (!structObj) {
+      return false;
+    }
+
+    const TypeDef& typeDef = instance().metadata().types->type(typeIndex);
+    return pushRef(RefType::fromTypeDef(&typeDef, false),
+                   AnyRef::fromJSObject(structObj));
+  }
+
+  bool evalArrayNew(JSContext* cx, uint32_t typeIndex) {
+    uint32_t numElements = popI32();
+    Rooted<WasmArrayObject*> arrayObj(
+        cx, instance().constantArrayNewDefault(cx, typeIndex, numElements));
+    if (!arrayObj) {
+      return false;
+    }
+
+    const Val& val = stack.back();
+    arrayObj->fillVal(val, 0, numElements);
+    stack.popBack();
+
+    const TypeDef& typeDef = instance().metadata().types->type(typeIndex);
+    return pushRef(RefType::fromTypeDef(&typeDef, false),
+                   AnyRef::fromJSObject(arrayObj));
+  }
+
+  bool evalArrayNewDefault(JSContext* cx, uint32_t typeIndex) {
+    uint32_t numElements = popI32();
+    Rooted<WasmArrayObject*> arrayObj(
+        cx, instance().constantArrayNewDefault(cx, typeIndex, numElements));
+    if (!arrayObj) {
+      return false;
+    }
+
+    const TypeDef& typeDef = instance().metadata().types->type(typeIndex);
+    return pushRef(RefType::fromTypeDef(&typeDef, false),
+                   AnyRef::fromJSObject(arrayObj));
+  }
+
+  bool evalArrayNewFixed(JSContext* cx, uint32_t typeIndex,
+                         uint32_t numElements) {
+    Rooted<WasmArrayObject*> arrayObj(
+        cx, instance().constantArrayNewDefault(cx, typeIndex, numElements));
+    if (!arrayObj) {
+      return false;
+    }
+
+    for (uint32_t forwardIndex = 0; forwardIndex < numElements;
+         forwardIndex++) {
+      uint32_t reverseIndex = numElements - forwardIndex - 1;
+      const Val& val = stack.back();
+      arrayObj->storeVal(val, reverseIndex);
+      stack.popBack();
+    }
+
+    const TypeDef& typeDef = instance().metadata().types->type(typeIndex);
+    return pushRef(RefType::fromTypeDef(&typeDef, false),
+                   AnyRef::fromJSObject(arrayObj));
+  }
+#endif  // ENABLE_WASM_GC
 };
 
-bool InitExprInterpreter::evaluate(Decoder& d) {
+bool InitExprInterpreter::evaluate(JSContext* cx, Decoder& d) {
 #define CHECK(c)          \
   if (!(c)) return false; \
   break
@@ -298,12 +444,12 @@ bool InitExprInterpreter::evaluate(Decoder& d) {
       case uint16_t(Op::End): {
         return true;
       }
-      case uint16_t(Op::GetGlobal): {
+      case uint16_t(Op::GlobalGet): {
         uint32_t index;
-        if (!d.readGetGlobal(&index)) {
+        if (!d.readGlobalIndex(&index)) {
           return false;
         }
-        CHECK(evalGetGlobal(index));
+        CHECK(evalGlobalGet(cx, index));
       }
       case uint16_t(Op::I32Const): {
         int32_t c;
@@ -345,14 +491,14 @@ bool InitExprInterpreter::evaluate(Decoder& d) {
 #endif
       case uint16_t(Op::RefFunc): {
         uint32_t funcIndex;
-        if (!d.readRefFunc(&funcIndex)) {
+        if (!d.readFuncIndex(&funcIndex)) {
           return false;
         }
-        CHECK(evalRefFunc(funcIndex));
+        CHECK(evalRefFunc(cx, funcIndex));
       }
       case uint16_t(Op::RefNull): {
         RefType type;
-        if (!d.readRefNull(features, &type)) {
+        if (!d.readRefNull(*types, features, &type)) {
           return false;
         }
         CHECK(evalRefNull(type));
@@ -395,6 +541,54 @@ bool InitExprInterpreter::evaluate(Decoder& d) {
         CHECK(evalI64Mul());
       }
 #endif
+#ifdef ENABLE_WASM_GC
+      case uint16_t(Op::GcPrefix): {
+        switch (op.b1) {
+          case uint32_t(GcOp::StructNew): {
+            uint32_t typeIndex;
+            if (!d.readTypeIndex(&typeIndex)) {
+              return false;
+            }
+            CHECK(evalStructNew(cx, typeIndex));
+          }
+          case uint32_t(GcOp::StructNewDefault): {
+            uint32_t typeIndex;
+            if (!d.readTypeIndex(&typeIndex)) {
+              return false;
+            }
+            CHECK(evalStructNewDefault(cx, typeIndex));
+          }
+          case uint32_t(GcOp::ArrayNew): {
+            uint32_t typeIndex;
+            if (!d.readTypeIndex(&typeIndex)) {
+              return false;
+            }
+            CHECK(evalArrayNew(cx, typeIndex));
+          }
+          case uint32_t(GcOp::ArrayNewFixed): {
+            uint32_t typeIndex, len;
+            if (!d.readTypeIndex(&typeIndex)) {
+              return false;
+            }
+            if (!d.readVarU32(&len)) {
+              return false;
+            }
+            CHECK(evalArrayNewFixed(cx, typeIndex, len));
+          }
+          case uint32_t(GcOp::ArrayNewDefault): {
+            uint32_t typeIndex;
+            if (!d.readTypeIndex(&typeIndex)) {
+              return false;
+            }
+            CHECK(evalArrayNewDefault(cx, typeIndex));
+          }
+          default: {
+            MOZ_CRASH();
+          }
+        }
+        break;
+      }
+#endif
       default: {
         MOZ_CRASH();
       }
@@ -405,10 +599,13 @@ bool InitExprInterpreter::evaluate(Decoder& d) {
 }
 
 bool InitExpr::decodeAndValidate(Decoder& d, ModuleEnvironment* env,
-                                 ValType expected, InitExpr* expr) {
+                                 ValType expected,
+                                 uint32_t maxInitializedGlobalsIndexPlus1,
+                                 InitExpr* expr) {
   Maybe<LitVal> literal = Nothing();
   const uint8_t* exprStart = d.currentPosition();
-  if (!ValidateInitExpr(d, env, expected, &literal)) {
+  if (!ValidateInitExpr(d, env, expected, maxInitializedGlobalsIndexPlus1,
+                        &literal)) {
     return false;
   }
   const uint8_t* exprEnd = d.currentPosition();
@@ -428,8 +625,7 @@ bool InitExpr::decodeAndValidate(Decoder& d, ModuleEnvironment* env,
          expr->bytecode_.append(exprStart, exprEnd);
 }
 
-bool InitExpr::evaluate(JSContext* cx, const ValVector& globalImportValues,
-                        HandleWasmInstanceObject instanceObj,
+bool InitExpr::evaluate(JSContext* cx, Handle<WasmInstanceObject*> instanceObj,
                         MutableHandleVal result) const {
   MOZ_ASSERT(kind_ != InitExprKind::None);
 
@@ -440,8 +636,8 @@ bool InitExpr::evaluate(JSContext* cx, const ValVector& globalImportValues,
 
   UniqueChars error;
   Decoder d(bytecode_.begin(), bytecode_.end(), 0, &error);
-  InitExprInterpreter interp(cx, globalImportValues, instanceObj);
-  if (!interp.evaluate(d)) {
+  InitExprInterpreter interp(cx, instanceObj);
+  if (!interp.evaluate(cx, d)) {
     // This expression should have been validated already. So we should only be
     // able to OOM, which is reported by having no error message.
     MOZ_RELEASE_ASSERT(!error);
@@ -461,55 +657,6 @@ bool InitExpr::clone(const InitExpr& src) {
   literal_ = src.literal_;
   type_ = src.type_;
   return true;
-}
-
-size_t InitExpr::serializedSize() const {
-  size_t size = sizeof(kind_) + sizeof(type_);
-  switch (kind_) {
-    case InitExprKind::Literal:
-      size += sizeof(literal_);
-      break;
-    case InitExprKind::Variable:
-      size += SerializedPodVectorSize(bytecode_);
-      break;
-    default:
-      MOZ_CRASH();
-  }
-  return size;
-}
-
-uint8_t* InitExpr::serialize(uint8_t* cursor) const {
-  cursor = WriteBytes(cursor, &kind_, sizeof(kind_));
-  cursor = WriteBytes(cursor, &type_, sizeof(type_));
-  switch (kind_) {
-    case InitExprKind::Literal:
-      cursor = WriteBytes(cursor, &literal_, sizeof(literal_));
-      break;
-    case InitExprKind::Variable:
-      cursor = SerializePodVector(cursor, bytecode_);
-      break;
-    default:
-      MOZ_CRASH();
-  }
-  return cursor;
-}
-
-const uint8_t* InitExpr::deserialize(const uint8_t* cursor) {
-  if (!(cursor = ReadBytes(cursor, &kind_, sizeof(kind_))) ||
-      !(cursor = ReadBytes(cursor, &type_, sizeof(type_)))) {
-    return nullptr;
-  }
-  switch (kind_) {
-    case InitExprKind::Literal:
-      cursor = ReadBytes(cursor, &literal_, sizeof(literal_));
-      break;
-    case InitExprKind::Variable:
-      cursor = DeserializePodVector(cursor, &bytecode_);
-      break;
-    default:
-      MOZ_CRASH();
-  }
-  return cursor;
 }
 
 size_t InitExpr::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {

@@ -24,7 +24,7 @@ uint32_t HashBytes(const void* aBytes, size_t aLength) {
     size_t data;
     memcpy(&data, b + i, sizeof(size_t));
 
-    hash = AddToHash(hash, data, sizeof(data));
+    hash = AddToHash(hash, data);
   }
 
   /* Get the remaining bytes. */

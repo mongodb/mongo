@@ -43,6 +43,7 @@ extern "C" const char* __tsan_default_options() {
     "called_from_lib:libatk-1\n"               \
     "called_from_lib:libcairo.so\n"            \
     "called_from_lib:libcairo-gobject\n"       \
+    "called_from_lib:libfontconfig1\n"         \
     "called_from_lib:libdconfsettings\n"       \
     "called_from_lib:libgdk-3\n"               \
     "called_from_lib:libgdk_pixbuf\n"          \
@@ -57,6 +58,7 @@ extern "C" const char* __tsan_default_options() {
     "called_from_lib:libgvfsdbus\n"            \
     "called_from_lib:libibus-1\n"              \
     "called_from_lib:libogg.so\n"              \
+    "called_from_lib:libpango-1\n"             \
     "called_from_lib:libpangocairo\n"          \
     "called_from_lib:libpangoft2\n"            \
     "called_from_lib:pango-basic-fc\n"         \
@@ -67,6 +69,7 @@ extern "C" const char* __tsan_default_options() {
     "called_from_lib:libunity-gtk3-parser\n"   \
     "called_from_lib:libvorbis.so\n"           \
     "called_from_lib:libvorbisfile\n"          \
+    "called_from_lib:libwayland-client\n"      \
     "called_from_lib:libX11.so\n"              \
     "called_from_lib:libX11-xcb\n"             \
     "called_from_lib:libXau\n"                 \

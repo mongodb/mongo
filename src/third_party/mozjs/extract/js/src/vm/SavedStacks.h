@@ -12,16 +12,16 @@
 #include "mozilla/Maybe.h"
 
 #include "js/HashTable.h"
-#include "js/Wrapper.h"
-#include "vm/JSContext.h"
+#include "js/Stack.h"
 #include "vm/SavedFrame.h"
-#include "vm/Stack.h"
 
 namespace JS {
 enum class SavedFrameSelfHosted;
 }
 
 namespace js {
+
+class FrameIter;
 
 // # Saved Stacks
 //
@@ -166,11 +166,11 @@ class SavedStacks {
         creatingSavedFrame(false) {}
 
   [[nodiscard]] bool saveCurrentStack(
-      JSContext* cx, MutableHandleSavedFrame frame,
+      JSContext* cx, MutableHandle<SavedFrame*> frame,
       JS::StackCapture&& capture = JS::StackCapture(JS::AllFrames()));
   [[nodiscard]] bool copyAsyncStack(
       JSContext* cx, HandleObject asyncStack, HandleString asyncCause,
-      MutableHandleSavedFrame adoptedStack,
+      MutableHandle<SavedFrame*> adoptedStack,
       const mozilla::Maybe<size_t>& maxFrameCount);
   void traceWeak(JSTracer* trc);
   void trace(JSTracer* trc);
@@ -216,11 +216,12 @@ class SavedStacks {
     ~AutoReentrancyGuard() { stacks.creatingSavedFrame = false; }
   };
 
-  [[nodiscard]] bool insertFrames(JSContext* cx, MutableHandleSavedFrame frame,
+  [[nodiscard]] bool insertFrames(JSContext* cx,
+                                  MutableHandle<SavedFrame*> frame,
                                   JS::StackCapture&& capture);
   [[nodiscard]] bool adoptAsyncStack(
-      JSContext* cx, MutableHandleSavedFrame asyncStack, HandleAtom asyncCause,
-      const mozilla::Maybe<size_t>& maxFrameCount);
+      JSContext* cx, MutableHandle<SavedFrame*> asyncStack,
+      Handle<JSAtom*> asyncCause, const mozilla::Maybe<size_t>& maxFrameCount);
   [[nodiscard]] bool checkForEvalInFramePrev(
       JSContext* cx, MutableHandle<SavedFrame::Lookup> lookup);
   SavedFrame* getOrCreateSavedFrame(JSContext* cx,
@@ -234,7 +235,7 @@ class SavedStacks {
   struct PCKey {
     PCKey(JSScript* script, jsbytecode* pc) : script(script), pc(pc) {}
 
-    HeapPtr<JSScript*> script;
+    WeakHeapPtr<JSScript*> script;
     jsbytecode* pc;
 
     void trace(JSTracer* trc) { /* PCKey is weak. */
@@ -262,7 +263,7 @@ class SavedStacks {
       return TraceWeakEdge(trc, &source, "traceWeak");
     }
 
-    HeapPtr<JSAtom*> source;
+    WeakHeapPtr<JSAtom*> source;
     uint32_t sourceId;
     size_t line;
     uint32_t column;

@@ -26,9 +26,9 @@ struct BytecodeEmitter;
 //
 //   `while (cond) body`
 //     WhileEmitter wh(this);
-//     wh.emitCond(Some(offset_of_while),
-//                 Some(offset_of_body),
-//                 Some(offset_of_end));
+//     wh.emitCond(offset_of_while,
+//                 offset_of_body,
+//                 offset_of_end);
 //     emit(cond);
 //     wh.emitBody();
 //     emit(body);
@@ -78,11 +78,8 @@ class MOZ_STACK_CLASS WhileEmitter {
   //   |       condPos_
   //   |
   //   whilePos_
-  //
-  // Can be Nothing() if not available.
-  [[nodiscard]] bool emitCond(const mozilla::Maybe<uint32_t>& whilePos,
-                              const mozilla::Maybe<uint32_t>& condPos,
-                              const mozilla::Maybe<uint32_t>& endPos);
+  [[nodiscard]] bool emitCond(uint32_t whilePos, uint32_t condPos,
+                              uint32_t endPos);
   [[nodiscard]] bool emitBody();
   [[nodiscard]] bool emitEnd();
 };

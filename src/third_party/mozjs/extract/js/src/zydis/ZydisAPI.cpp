@@ -35,7 +35,7 @@
 void zydisDisassemble(const uint8_t* code, size_t codeLen,
                       void(*println)(const char*)) {
   ZydisDecoder decoder;
-  ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64);
+  ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
 
   ZydisFormatter formatter;
   ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_ATT);
@@ -45,12 +45,13 @@ void zydisDisassemble(const uint8_t* code, size_t codeLen,
   ZyanUSize offset = 0;
   const ZyanUSize length = (ZyanUSize)codeLen;
   ZydisDecodedInstruction instruction;
+  ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
   char buffer[1024];
-  while (ZYAN_SUCCESS(ZydisDecoderDecodeBuffer(&decoder, code + offset, length - offset,
-                                               &instruction)))
+  while (ZYAN_SUCCESS(ZydisDecoderDecodeFull(&decoder, code + offset, length - offset,
+                                             &instruction, operands)))
   {
-#  define LIMIT 36
-#  define LIMSTR "36"
+#  define LIMIT 48
+#  define LIMSTR "48"
 
     // We format the tag and the address and the bytes in a field of LIMIT
     // characters and start the menmonic at position LIMIT.  If the
@@ -84,8 +85,9 @@ void zydisDisassemble(const uint8_t* code, size_t codeLen,
 
     // Emit instruction mnemonic + operands
     size_t used = strlen(buffer);
-    ZydisFormatterFormatInstruction(&formatter, &instruction, buffer + used,
-                                    sizeof(buffer) - used, runtime_address);
+    ZydisFormatterFormatInstruction(&formatter, &instruction, operands,
+                                    instruction.operand_count_visible, buffer + used,
+                                    sizeof(buffer) - used, runtime_address, ZYAN_NULL);
     println(buffer);
 
     offset += instruction.length;

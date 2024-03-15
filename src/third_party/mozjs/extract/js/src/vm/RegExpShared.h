@@ -17,7 +17,7 @@
 #include "mozilla/MemoryReporting.h"
 
 #include "gc/Barrier.h"
-#include "gc/Marking.h"
+#include "gc/Policy.h"
 #include "gc/ZoneAllocator.h"
 #include "irregexp/RegExpTypes.h"
 #include "jit/JitCode.h"
@@ -27,11 +27,11 @@
 #include "js/UbiNode.h"
 #include "js/Vector.h"
 #include "vm/ArrayObject.h"
-#include "vm/JSAtom.h"
 
 namespace js {
 
 class ArrayObject;
+class PlainObject;
 class RegExpRealm;
 class RegExpShared;
 class RegExpStatics;
@@ -48,11 +48,7 @@ enum RegExpRunStatus : int32_t {
 };
 
 inline bool IsNativeRegExpEnabled() {
-#ifdef JS_CODEGEN_NONE
-  return false;
-#else
-  return jit::JitOptions.nativeRegExp;
-#endif
+  return jit::HasJitBackend() && jit::JitOptions.nativeRegExp;
 }
 
 /*
@@ -74,6 +70,8 @@ inline bool IsNativeRegExpEnabled() {
  */
 class RegExpShared
     : public gc::CellWithTenuredGCPointer<gc::TenuredCell, JSAtom> {
+  friend class js::gc::CellAllocator;
+
  public:
   enum class Kind { Unparsed, Atom, RegExp };
   enum class CodeKind { Bytecode, Jitcode, Any };
@@ -87,7 +85,7 @@ class RegExpShared
   friend class RegExpZone;
 
   struct RegExpCompilation {
-    WeakHeapPtr<jit::JitCode*> jitCode;
+    HeapPtr<jit::JitCode*> jitCode;
     ByteCode* byteCode = nullptr;
 
     bool compiled(CodeKind kind = CodeKind::Any) const {
@@ -119,7 +117,7 @@ class RegExpShared
   JS::RegExpFlags flags;
 
   RegExpShared::Kind kind_ = Kind::Unparsed;
-  GCPtrAtom patternAtom_;
+  GCPtr<JSAtom*> patternAtom_;
   uint32_t maxRegisters_ = 0;
   uint32_t ticks_ = 0;
 
@@ -147,16 +145,16 @@ class RegExpShared
   ~RegExpShared() = delete;
 
   static bool compileIfNecessary(JSContext* cx, MutableHandleRegExpShared res,
-                                 HandleLinearString input, CodeKind code);
+                                 Handle<JSLinearString*> input, CodeKind code);
 
   static RegExpRunStatus executeAtom(MutableHandleRegExpShared re,
-                                     HandleLinearString input, size_t start,
-                                     VectorMatchPairs* matches);
+                                     Handle<JSLinearString*> input,
+                                     size_t start, VectorMatchPairs* matches);
 
   // Execute this RegExp on input starting from searchIndex, filling in matches.
   static RegExpRunStatus execute(JSContext* cx, MutableHandleRegExpShared res,
-                                 HandleLinearString input, size_t searchIndex,
-                                 VectorMatchPairs* matches);
+                                 Handle<JSLinearString*> input,
+                                 size_t searchIndex, VectorMatchPairs* matches);
 
   // Register a table with this RegExpShared, and take ownership.
   bool addTable(JitCodeTable table) { return tables.append(std::move(table)); }
@@ -171,13 +169,15 @@ class RegExpShared
   RegExpShared::Kind kind() const { return kind_; }
 
   // Use simple string matching for this regexp.
-  void useAtomMatch(HandleAtom pattern);
+  void useAtomMatch(Handle<JSAtom*> pattern);
 
   // Use the regular expression engine for this regexp.
   void useRegExpMatch(size_t parenCount);
 
-  static bool initializeNamedCaptures(JSContext* cx, HandleRegExpShared re,
-                                      HandleNativeObject namedCaptures);
+  static void InitializeNamedCaptures(JSContext* cx, HandleRegExpShared re,
+                                      uint32_t numNamedCaptures,
+                                      Handle<PlainObject*> templateObject,
+                                      uint32_t* captureIndices);
   PlainObject* getGroupsTemplate() { return groupsTemplate_; }
 
   void tierUpTick();
@@ -226,7 +226,7 @@ class RegExpShared
 
   void traceChildren(JSTracer* trc);
   void discardJitCode();
-  void finalize(JSFreeOp* fop);
+  void finalize(JS::GCContext* gcx);
 
   static size_t offsetOfSource() { return offsetOfHeaderPtr(); }
 
@@ -254,7 +254,7 @@ class RegExpShared
 
 #ifdef DEBUG
   static bool dumpBytecode(JSContext* cx, MutableHandleRegExpShared res,
-                           HandleLinearString input);
+                           Handle<JSLinearString*> input);
 #endif
 
  public:
@@ -302,7 +302,8 @@ class RegExpZone {
     return p ? *p : nullptr;
   }
 
-  RegExpShared* get(JSContext* cx, HandleAtom source, JS::RegExpFlags flags);
+  RegExpShared* get(JSContext* cx, Handle<JSAtom*> source,
+                    JS::RegExpFlags flags);
 
 #ifdef DEBUG
   void clear() { set_.clear(); }

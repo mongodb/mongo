@@ -65,10 +65,22 @@ typedef size_t arena_id_t;
 
 typedef struct arena_params_s {
   size_t mMaxDirty;
+  // Arena specific modifiers which override the value passed to
+  // moz_set_max_dirty_page_modifier. If value > 0 is passed to that function,
+  // and mMaxDirtyIncreaseOverride != 0, mMaxDirtyIncreaseOverride will be used
+  // instead, and similarly if value < 0 is passed and mMaxDirtyDecreaseOverride
+  // != 0, mMaxDirtyDecreaseOverride will be used as the modifier.
+  int32_t mMaxDirtyIncreaseOverride;
+  int32_t mMaxDirtyDecreaseOverride;
+
   uint32_t mFlags;
 
 #ifdef __cplusplus
-  arena_params_s() : mMaxDirty(0), mFlags(0) {}
+  arena_params_s()
+      : mMaxDirty(0),
+        mMaxDirtyIncreaseOverride(0),
+        mMaxDirtyDecreaseOverride(0),
+        mFlags(0) {}
 #endif
 } arena_params_t;
 
@@ -77,16 +89,18 @@ typedef struct arena_params_s {
 // file.
 typedef struct {
   // Run-time configuration settings.
-  bool opt_junk;       // Fill allocated memory with kAllocJunk?
-  bool opt_zero;       // Fill allocated memory with 0x0?
-  size_t narenas;      // Number of arenas.
-  size_t quantum;      // Allocation quantum.
-  size_t quantum_max;  // Max quantum-spaced allocation size.
-  // The next size class, sub-pagesize's max is always page_size/2.
-  size_t large_max;  // Max sub-chunksize allocation size.
-  size_t chunksize;  // Size of each virtual memory mapping.
-  size_t page_size;  // Size of pages.
-  size_t dirty_max;  // Max dirty pages per arena.
+  bool opt_junk;            // Fill allocated memory with kAllocJunk?
+  bool opt_zero;            // Fill allocated memory with 0x0?
+  size_t narenas;           // Number of arenas.
+  size_t quantum;           // Allocation quantum.
+  size_t quantum_max;       // Max quantum-spaced allocation size.
+  size_t quantum_wide;      // Allocation quantum (QuantuWide).
+  size_t quantum_wide_max;  // Max quantum-wide-spaced allocation size.
+  size_t subpage_max;       // Max subpage allocation size.
+  size_t large_max;         // Max sub-chunksize allocation size.
+  size_t chunksize;         // Size of each virtual memory mapping.
+  size_t page_size;         // Size of pages.
+  size_t dirty_max;         // Max dirty pages per arena.
 
   // Current memory usage statistics.
   size_t mapped;       // Bytes mapped (not necessarily committed).
@@ -110,8 +124,6 @@ typedef struct {
   size_t bytes_total;        // The total storage area for runs in this bin,
   size_t bytes_per_run;      // The number of bytes per run, including headers.
 } jemalloc_bin_stats_t;
-
-#define JEMALLOC_MAX_STATS_BINS 40
 
 enum PtrInfoTag {
   // The pointer is not currently known to the allocator.

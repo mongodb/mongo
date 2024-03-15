@@ -118,7 +118,7 @@ MOZ_ALWAYS_INLINE bool ToBoolean(HandleValue v) {
   }
   if (v.isDouble()) {
     double d = v.toDouble();
-    return !mozilla::IsNaN(d) && d != 0;
+    return !std::isnan(d) && d != 0;
   }
   if (v.isSymbol()) {
     return true;
@@ -148,8 +148,8 @@ inline double ToInteger(double d) {
     return 0;
   }
 
-  if (!mozilla::IsFinite(d)) {
-    if (mozilla::IsNaN(d)) {
+  if (!std::isfinite(d)) {
+    if (std::isnan(d)) {
       return 0;
     }
     return d;
@@ -271,6 +271,17 @@ inline JSObject* ToObject(JSContext* cx, HandleValue v) {
   }
   return js::ToObjectSlow(cx, v, false);
 }
+
+#ifdef ENABLE_RECORD_TUPLE
+inline JSObject* ToObjectOrGetObjectPayload(JSContext* cx, HandleValue v) {
+  detail::AssertArgumentsAreSane(cx, v);
+
+  if (v.hasObjectPayload()) {
+    return &v.getObjectPayload();
+  }
+  return js::ToObjectSlow(cx, v, false);
+}
+#endif
 
 /**
  * Convert a double value to UnsignedInteger (an unsigned integral type) using

@@ -4,12 +4,12 @@
 
 # Works with python2.6
 
+import json
+import math
 import os
 import sys
-import math
-import json
-from subprocess import Popen, PIPE
 from operator import itemgetter
+from subprocess import PIPE, Popen
 
 
 class Test:

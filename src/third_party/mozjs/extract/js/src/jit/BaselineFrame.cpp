@@ -9,8 +9,6 @@
 #include <algorithm>
 
 #include "debugger/DebugAPI.h"
-#include "jit/BaselineJIT.h"
-#include "jit/Ion.h"
 #include "vm/EnvironmentObject.h"
 #include "vm/JSContext.h"
 
@@ -48,10 +46,6 @@ void BaselineFrame::trace(JSTracer* trc, const JSJitFrameIter& frameIterator) {
   // Trace return value.
   if (hasReturnValue()) {
     TraceRoot(trc, returnValue().address(), "baseline-rval");
-  }
-
-  if (isEvalFrame() && script()->isDirectEvalInFunction()) {
-    TraceRoot(trc, evalNewTargetAddress(), "baseline-evalNewTarget");
   }
 
   if (hasArgsObj()) {
@@ -107,7 +101,7 @@ bool BaselineFrame::initFunctionEnvironmentObjects(JSContext* cx) {
   return js::InitFunctionEnvironmentObjects(cx, this);
 }
 
-bool BaselineFrame::pushVarEnvironment(JSContext* cx, HandleScope scope) {
+bool BaselineFrame::pushVarEnvironment(JSContext* cx, Handle<Scope*> scope) {
   return js::PushVarEnvironmentObject(cx, scope, this);
 }
 

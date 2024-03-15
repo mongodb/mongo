@@ -16,6 +16,7 @@
 #include "mozilla/Maybe.h"
 
 #include <limits> /* for std::numeric_limits */
+#include <type_traits>
 
 #include "jstypes.h"
 
@@ -26,6 +27,123 @@
 namespace JS {
 class JS_PUBLIC_API Value;
 }
+
+// [SMDOC] JS::Value Boxing Formats
+//
+// JS::Value is a 64-bit value, on all architectures. It is conceptually a
+// discriminated union of all the types of values that can be represented in SM:
+// - Object Pointers
+// - 64 bit IEEE 754 floats
+// - 32-bit integer values
+// - and quite a few more (see JSValueType)
+//
+// The ECMAScript standard specifies that ECMAScript numbers are IEEE 64-bit
+// floating-point values. A JS::Value can represent any JavaScript number
+// value directly, without referring to additional storage, or represent an
+// object, string, or other ECMAScript value, and remember which type it is.
+//
+// This may seem surprising: how can a 64-bit type hold all the 64-bit IEEE
+// values, and still distinguish them from objects, strings, and so on,
+// which have 64-bit addresses ?
+//
+// This is possible for two reasons:
+//
+// - First, ECMAScript implementations aren't required to distinguish all
+//   the values the IEEE 64-bit format can represent.
+//
+//   The IEEE 754 format for floating point numbers specifies that every
+//   floating-point value whose 11-bit exponent field is all ones, and whose
+//   52-bit fraction field is non-zero, has the value NaN. EMCAScript requires
+//   only one NaN value. This means we can use one IEEE NaN to represent
+//   ECMAScript's NaN, and use all the other 2^52-2 NaN bitstrings to
+//   represent the other ECMAScript values.
+//
+// - Second, on the 64 bit architectures we suppport, only the
+//   lower 48 bits of an address are currently significant. The upper sixteen
+//   bits are required to be the sign-extension of bit 48. Furthermore, user
+//   code always runs in "positive addresses": those in which bit 48 is zero. So
+//   we only actually need 47 bits to store all possible object or string
+//   addresses, even on 64-bit platforms.
+//
+//   Our memory initialization system ensures that all pointers we will store in
+//   objects use only 47 bits. See js::gc::MapAlignedPagesRandom.
+//
+//   The introduction of 5-level page tables, supporting 57-bit virtual
+//   addresses, is a potential complication. For now, large addresses are
+//   opt-in, and we simply don't use them.
+//
+// With a 52-bit fraction field, and 47 bits needed for the 'payload', we
+// have up to five bits left to store a 'tag' value, to indicate which
+// branch of our discriminated union is live. (In practice, one of those
+// bits is used up to simplify NaN representation; see micro-optimization 5
+// below.)
+//
+// Thus, we define JS::Value representations in terms of the IEEE 64-bit
+// floating-point format:
+//
+// - Any bitstring that IEEE calls a number or an infinity represents that
+//   ECMAScript number.
+//
+// - Any bitstring that IEEE calls a NaN represents either an ECMAScript NaN
+//   or a non-number ECMAScript value, as determined by a tag field stored
+//   towards the most significant end of the fraction field (exactly where
+//   depends on the address size). If the tag field indicates that this
+//   JS::Value is an object, the fraction field's least significant end
+//   holds the address of a JSObject; if a string, the address of a
+//   JSString; and so on.
+//
+//   To enforce this invariant, anywhere that may provide a numerical value
+//   which may have a non-canonical NaN value (NaN, but not the one we've chosen
+//   for ECMAScript) we must convert that to the canonical NaN. See
+//   JS::CanonicalizeNaN.
+//
+// We have two boxing modes defined: NUNBOX32 and PUNBOX64.The first is
+// "NaN unboxed boxing" (or Nunboxing), as non-Number payload are stored
+// unaltered in the lower bits. The second is "Packed NaN boxing" (or
+// punboxing), which is 'logically like nunboxing, but with all the unused bits
+// sucked out' [1],  as we rely on unused bits of the payload to pack the
+// payload in the lower bits using Nunboxing.
+//
+// - In NUNBOX32 the tag is stored in the least-significant bits of the high
+//   word of the NaN. Since it's used on 32-bit systems, this has the nice
+//   property that boxed values are simply stored in the low-word of the 8-byte
+//   NaN.
+//
+// - In PUNBOX64, since we need to store more pointer bits (47, see above), the
+//   tag is stored in the 5 most significant bits of the fraction adjacent to
+//   the exponent.
+//
+// Tag values are carefully ordered to support a set of micro-optimizations. In
+// particular:
+//
+// 1. Object is the highest tag, to simplify isPrimitive checks. (See
+//    ValueUpperExclPrimitiveTag)
+// 2. Numbers (Double and Int32) are the lowest tags, to simplify isNumber
+//    checks. (See ValueUpperInclNumberTag)
+// 3. Non-GC tags are ordered before GC-tags, to simplify isGCThing checks. (See
+//    ValueLowerInclGCThingTag)
+// 4. The tags for Object and Null differ by a single flipped bit, to simplify
+//    toObjectOrNull. (See ValueObjectOrNullBit)
+// 5. In PUNBOX64, the most significant bit of every non-Double tag is always
+//    set. This is to simplify isDouble checks. Note that the highest bitstring
+//    that corresponds to a non-NaN double is -Infinity:
+//      0xfff0_0000_0000_0000
+//    But the canonical hardware NaN (produced by, for example, 0/0) is:
+//      0x?ff8_0000_0000_0000
+//    on all platforms with JIT support*. (The most significant bit is the sign
+//    bit; it is 1 on x86, but 0 on ARM.) The most significant bit of the
+//    fraction field is set, which corresponds to the most significant of the 5
+//    tag bits. Because we only use tags that have the high bit set, any Value
+//    represented by a bitstring less than or equal to 0xfff8_..._0000 is a
+//    Double. (If we wanted to use all five bits, we could define 0x10 as
+//    JSVAL_TYPE_NAN, and mask off the most significant bit of the tag for
+//    IsDouble checks. This is not yet necessary, because we still have room
+//    left to allocate new tags.)
+//
+//    * But see JS_NONCANONICAL_HARDWARE_NAN below.
+//
+// [1]:
+// https://wingolog.org/archives/2011/05/18/value-representation-in-javascript-implementations#969f63bbe4eb912778c9da85feb0f5763e7a7862
 
 /* JS::Value can store a full int32_t. */
 #define JSVAL_INT_BITS 32
@@ -52,6 +170,9 @@ enum JSValueType : uint8_t {
   JSVAL_TYPE_SYMBOL = 0x07,
   JSVAL_TYPE_PRIVATE_GCTHING = 0x08,
   JSVAL_TYPE_BIGINT = 0x09,
+#ifdef ENABLE_RECORD_TUPLE
+  JSVAL_TYPE_EXTENDED_PRIMITIVE = 0x0b,
+#endif
   JSVAL_TYPE_OBJECT = 0x0c,
 
   // This type never appears in a Value; it's only an out-of-band value.
@@ -70,9 +191,12 @@ enum class ValueType : uint8_t {
   Symbol = JSVAL_TYPE_SYMBOL,
   PrivateGCThing = JSVAL_TYPE_PRIVATE_GCTHING,
   BigInt = JSVAL_TYPE_BIGINT,
+#ifdef ENABLE_RECORD_TUPLE
+  ExtendedPrimitive = JSVAL_TYPE_EXTENDED_PRIMITIVE,
+#endif
   Object = JSVAL_TYPE_OBJECT,
 };
-}
+}  // namespace JS
 
 static_assert(sizeof(JSValueType) == 1,
               "compiler typed enum support is apparently buggy");
@@ -90,6 +214,10 @@ enum JSValueTag : uint32_t {
   JSVAL_TAG_SYMBOL = JSVAL_TAG_CLEAR | JSVAL_TYPE_SYMBOL,
   JSVAL_TAG_PRIVATE_GCTHING = JSVAL_TAG_CLEAR | JSVAL_TYPE_PRIVATE_GCTHING,
   JSVAL_TAG_BIGINT = JSVAL_TAG_CLEAR | JSVAL_TYPE_BIGINT,
+#  ifdef ENABLE_RECORD_TUPLE
+  JSVAL_TAG_EXTENDED_PRIMITIVE =
+      JSVAL_TAG_CLEAR | JSVAL_TYPE_EXTENDED_PRIMITIVE,
+#  endif
   JSVAL_TAG_OBJECT = JSVAL_TAG_CLEAR | JSVAL_TYPE_OBJECT
 };
 
@@ -109,6 +237,10 @@ enum JSValueTag : uint32_t {
   JSVAL_TAG_SYMBOL = JSVAL_TAG_MAX_DOUBLE | JSVAL_TYPE_SYMBOL,
   JSVAL_TAG_PRIVATE_GCTHING = JSVAL_TAG_MAX_DOUBLE | JSVAL_TYPE_PRIVATE_GCTHING,
   JSVAL_TAG_BIGINT = JSVAL_TAG_MAX_DOUBLE | JSVAL_TYPE_BIGINT,
+#  ifdef ENABLE_RECORD_TUPLE
+  JSVAL_TAG_EXTENDED_PRIMITIVE =
+      JSVAL_TAG_MAX_DOUBLE | JSVAL_TYPE_EXTENDED_PRIMITIVE,
+#  endif
   JSVAL_TAG_OBJECT = JSVAL_TAG_MAX_DOUBLE | JSVAL_TYPE_OBJECT
 };
 
@@ -130,6 +262,10 @@ enum JSValueShiftedTag : uint64_t {
   JSVAL_SHIFTED_TAG_PRIVATE_GCTHING =
       (uint64_t(JSVAL_TAG_PRIVATE_GCTHING) << JSVAL_TAG_SHIFT),
   JSVAL_SHIFTED_TAG_BIGINT = (uint64_t(JSVAL_TAG_BIGINT) << JSVAL_TAG_SHIFT),
+#  ifdef ENABLE_RECORD_TUPLE
+  JSVAL_SHIFTED_TAG_EXTENDED_PRIMITIVE =
+      (uint64_t(JSVAL_TYPE_EXTENDED_PRIMITIVE) << JSVAL_TAG_SHIFT),
+#  endif
   JSVAL_SHIFTED_TAG_OBJECT = (uint64_t(JSVAL_TAG_OBJECT) << JSVAL_TAG_SHIFT)
 };
 
@@ -144,7 +280,8 @@ namespace detail {
 #if defined(JS_NUNBOX32)
 
 constexpr JSValueTag ValueTypeToTag(JSValueType type) {
-  return static_cast<JSValueTag>(JSVAL_TAG_CLEAR | type);
+  return static_cast<JSValueTag>(JSVAL_TAG_CLEAR |
+                                 std::underlying_type_t<JSValueType>(type));
 }
 
 constexpr bool ValueIsDouble(uint64_t bits) {
@@ -158,7 +295,8 @@ constexpr JSValueTag ValueLowerInclGCThingTag = JSVAL_TAG_STRING;
 #elif defined(JS_PUNBOX64)
 
 constexpr JSValueTag ValueTypeToTag(JSValueType type) {
-  return static_cast<JSValueTag>(JSVAL_TAG_MAX_DOUBLE | type);
+  return static_cast<JSValueTag>(JSVAL_TAG_MAX_DOUBLE |
+                                 std::underlying_type_t<JSValueType>(type));
 }
 
 constexpr bool ValueIsDouble(uint64_t bits) {
@@ -169,6 +307,10 @@ constexpr uint64_t ValueTagMask = 0xFFFF'8000'0000'0000;
 
 // This should only be used in toGCThing. See the 'Spectre mitigations' comment.
 constexpr uint64_t ValueGCThingPayloadMask = 0x0000'7FFF'FFFF'FFFF;
+
+// Mask used to combine an unbox operation with getting the chunk base.
+constexpr uint64_t ValueGCThingPayloadChunkMask =
+    ValueGCThingPayloadMask & ~js::gc::ChunkMask;
 
 constexpr uint64_t ValueTypeToShiftedTag(JSValueType type) {
   return static_cast<uint64_t>(ValueTypeToTag(type)) << JSVAL_TAG_SHIFT;
@@ -241,29 +383,8 @@ enum JSWhyMagic {
   /** arguments object can't be created because environment is dead. */
   JS_MISSING_ARGUMENTS,
 
-  /** standard constructors are not created for off-thread parsing. */
-  JS_OFF_THREAD_CONSTRUCTOR,
-
   /** for local use */
   JS_GENERIC_MAGIC,
-
-  /**
-   * Write records queued up in WritableStreamDefaultController.[[queue]] in the
-   * spec are either "close" (a String) or Record { [[chunk]]: chunk }, where
-   * chunk is an arbitrary user-provided (and therefore non-magic) value.
-   * Represent "close" the String as this magic value; represent Record records
-   * as the |chunk| value within each of them.
-   */
-  JS_WRITABLESTREAM_CLOSE_RECORD,
-
-  /**
-   * The ReadableStream pipe-to operation concludes with a "finalize" operation
-   * that accepts an optional |error| argument.  In certain cases that optional
-   * |error| must be stored in a handler function, for use after a promise has
-   * settled.  We represent the argument not being provided, in those cases,
-   * using this magic value.
-   */
-  JS_READABLESTREAM_PIPETO_FINALIZE_WITHOUT_ERROR,
 
   /**
    * When an error object is created without the error cause argument, we set
@@ -276,6 +397,14 @@ enum JSWhyMagic {
 
 namespace js {
 static inline JS::Value PoisonedObjectValue(uintptr_t poison);
+#ifdef ENABLE_RECORD_TUPLE
+// Re-defined in vm/RecordTupleBoxShared.h. We cannot include that
+// file because it circularly includes this one.
+bool IsExtendedPrimitive(const JSObject& obj);
+namespace gc {
+bool MaybeForwardedIsExtendedPrimitive(const JSObject& obj);
+}  // namespace gc
+#endif
 }  // namespace js
 
 namespace JS {
@@ -288,9 +417,9 @@ constexpr uint64_t InfinityBits =
     mozilla::InfinityBits<double, detail::InfinitySignBit>::value;
 
 // This is a quiet NaN on IEEE-754[2008] compatible platforms, including X86,
-// ARM, SPARC and modern MIPS.
+// ARM, SPARC, RISC-V and modern MIPS.
 //
-// Note: The default sign bit for a hardware sythesized NaN differs between X86
+// Note: The default sign bit for a hardware synthesized NaN differs between X86
 //       and ARM. Both values are considered compatible values on both
 //       platforms.
 constexpr int CanonicalizedNaNSignBit = 0;
@@ -334,10 +463,15 @@ static MOZ_ALWAYS_INLINE double GenericNaN() {
   return mozilla::BitwiseCast<double>(detail::CanonicalizedNaNBits);
 }
 
+// Return the infinity the engine uses
+static MOZ_ALWAYS_INLINE double Infinity() {
+  return mozilla::BitwiseCast<double>(detail::InfinityBits);
+}
+
 // Convert an arbitrary double to one compatible with JS::Value representation
 // by replacing any NaN value with a canonical one.
 static MOZ_ALWAYS_INLINE double CanonicalizeNaN(double d) {
-  if (MOZ_UNLIKELY(mozilla::IsNaN(d))) {
+  if (MOZ_UNLIKELY(std::isnan(d))) {
     return GenericNaN();
   }
   return d;
@@ -491,9 +625,22 @@ class alignas(8) Value {
 
   void setObject(JSObject& obj) {
     MOZ_ASSERT(js::gc::IsCellPointerValid(&obj));
+#ifdef ENABLE_RECORD_TUPLE
+    MOZ_ASSERT(!js::gc::MaybeForwardedIsExtendedPrimitive(obj));
+#endif
     setObjectNoCheck(&obj);
     MOZ_ASSERT(&toObject() == &obj);
   }
+
+#ifdef ENABLE_RECORD_TUPLE
+  void setExtendedPrimitive(JSObject& obj) {
+    MOZ_ASSERT(js::gc::IsCellPointerValid(&obj));
+    MOZ_ASSERT(js::gc::MaybeForwardedIsExtendedPrimitive(obj));
+    asBits_ =
+        bitsFromTagAndPayload(JSVAL_TAG_EXTENDED_PRIMITIVE, PayloadType(&obj));
+    MOZ_ASSERT(&toExtendedPrimitive() == &obj);
+  }
+#endif
 
  private:
   void setObjectNoCheck(JSObject* obj) {
@@ -671,6 +818,16 @@ class alignas(8) Value {
 #endif
   }
 
+#ifdef ENABLE_RECORD_TUPLE
+  bool isExtendedPrimitive() const {
+    return toTag() == JSVAL_TAG_EXTENDED_PRIMITIVE;
+  }
+#endif
+
+  bool hasObjectPayload() const {
+    return isObject() || IF_RECORD_TUPLE(isExtendedPrimitive(), false);
+  }
+
   bool isPrimitive() const {
 #if defined(JS_NUNBOX32)
     return uint32_t(toTag()) < uint32_t(detail::ValueUpperExclPrimitiveTag);
@@ -725,6 +882,11 @@ class alignas(8) Value {
     if (MOZ_UNLIKELY(isPrivateGCThing())) {
       return JS::GCThingTraceKind(toGCThing());
     }
+#ifdef ENABLE_RECORD_TUPLE
+    if (isExtendedPrimitive()) {
+      return JS::TraceKind::Object;
+    }
+#endif
     return JS::TraceKind(toTag() & 0x03);
   }
 
@@ -800,6 +962,24 @@ class alignas(8) Value {
 #endif
   }
 
+#ifdef ENABLE_RECORD_TUPLE
+  JSObject& toExtendedPrimitive() const {
+    MOZ_ASSERT(isExtendedPrimitive());
+#  if defined(JS_PUNBOX64)
+    MOZ_ASSERT((asBits_ & detail::ValueGCThingPayloadMask) != 0);
+#  endif
+    return *unboxGCPointer<JSObject, JSVAL_TAG_EXTENDED_PRIMITIVE>();
+  }
+#endif
+
+  JSObject& getObjectPayload() const {
+#ifdef ENABLE_RECORD_TUPLE
+    return isExtendedPrimitive() ? toExtendedPrimitive() : toObject();
+#else
+    return toObject();
+#endif
+  }
+
   js::gc::Cell* toGCThing() const {
     MOZ_ASSERT(isGCThing());
 #if defined(JS_NUNBOX32)
@@ -820,11 +1000,6 @@ class alignas(8) Value {
 #elif defined(JS_PUNBOX64)
     return bool(asBits_ & 0x1);
 #endif
-  }
-
-  uint32_t payloadAsRawUint32() const {
-    MOZ_ASSERT(!isDouble());
-    return uint32_t(asBits_);
   }
 
   constexpr uint64_t asRawBits() const { return asBits_; }
@@ -1008,6 +1183,14 @@ static inline Value ObjectValue(JSObject& obj) {
   return v;
 }
 
+#ifdef ENABLE_RECORD_TUPLE
+static inline Value ExtendedPrimitiveValue(JSObject& obj) {
+  Value v;
+  v.setExtendedPrimitive(obj);
+  return v;
+}
+#endif
+
 static inline Value MagicValue(JSWhyMagic why) {
   Value v;
   v.setMagic(why);
@@ -1083,9 +1266,10 @@ JS_PUBLIC_API void HeapValueWriteBarriers(Value* valuep, const Value& prev,
 template <>
 struct GCPolicy<JS::Value> {
   static void trace(JSTracer* trc, Value* v, const char* name) {
-    // It's not safe to trace unbarriered pointers except as part of root
-    // marking.
-    UnsafeTraceRoot(trc, v, name);
+    // This should only be called as part of root marking since that's the only
+    // time we should trace unbarriered GC thing pointers. This will assert if
+    // called at other times.
+    TraceRoot(trc, v, name);
   }
   static bool isTenured(const Value& thing) {
     return !thing.isGCThing() || !IsInsideNursery(thing.toGCThing());
@@ -1109,6 +1293,11 @@ struct BarrierMethods<JS::Value> {
     JS::HeapValuePostWriteBarrier(v, prev, next);
   }
   static void exposeToJS(const JS::Value& v) { JS::ExposeValueToActiveJS(v); }
+  static void readBarrier(const JS::Value& v) {
+    if (v.isGCThing()) {
+      js::gc::IncrementalReadBarrier(v.toGCCellPtr());
+    }
+  }
 };
 
 template <class Wrapper>
@@ -1140,6 +1329,10 @@ class WrappedPtrOperations<JS::Value, Wrapper> {
   bool isSymbol() const { return value().isSymbol(); }
   bool isBigInt() const { return value().isBigInt(); }
   bool isObject() const { return value().isObject(); }
+#ifdef ENABLE_RECORD_TUPLE
+  bool isExtendedPrimitive() const { return value().isExtendedPrimitive(); }
+#endif
+  bool hasObjectPayload() const { return value().hasObjectPayload(); }
   bool isMagic() const { return value().isMagic(); }
   bool isMagic(JSWhyMagic why) const { return value().isMagic(why); }
   bool isGCThing() const { return value().isGCThing(); }
@@ -1159,6 +1352,12 @@ class WrappedPtrOperations<JS::Value, Wrapper> {
   JS::BigInt* toBigInt() const { return value().toBigInt(); }
   JSObject& toObject() const { return value().toObject(); }
   JSObject* toObjectOrNull() const { return value().toObjectOrNull(); }
+#ifdef ENABLE_RECORD_TUPLE
+  JSObject& toExtendedPrimitive() const {
+    return value().toExtendedPrimitive();
+  }
+#endif
+  JSObject& getObjectPayload() const { return value().getObjectPayload(); }
   JS::GCCellPtr toGCCellPtr() const { return value().toGCCellPtr(); }
   gc::Cell* toGCThing() const { return value().toGCThing(); }
   JS::TraceKind traceKind() const { return value().traceKind(); }
@@ -1208,6 +1407,11 @@ class MutableWrappedPtrOperations<JS::Value, Wrapper>
   void setBigInt(JS::BigInt* bi) { set(JS::BigIntValue(bi)); }
   void setObject(JSObject& obj) { set(JS::ObjectValue(obj)); }
   void setObjectOrNull(JSObject* arg) { set(JS::ObjectOrNullValue(arg)); }
+#ifdef ENABLE_RECORD_TUPLE
+  void setExtendedPrimitive(JSObject& obj) {
+    return set(JS::ExtendedPrimitiveValue(obj));
+  }
+#endif
   void setPrivate(void* ptr) { set(JS::PrivateValue(ptr)); }
   void setPrivateUint32(uint32_t ui) { set(JS::PrivateUint32Value(ui)); }
   void setPrivateGCThing(js::gc::Cell* cell) {
@@ -1220,7 +1424,7 @@ class MutableWrappedPtrOperations<JS::Value, Wrapper>
  * type-querying, value-extracting, and mutating operations.
  */
 template <typename Wrapper>
-class HeapBase<JS::Value, Wrapper>
+class HeapOperations<JS::Value, Wrapper>
     : public MutableWrappedPtrOperations<JS::Value, Wrapper> {};
 
 MOZ_HAVE_NORETURN MOZ_COLD MOZ_NEVER_INLINE void ReportBadValueTypeAndCrash(
@@ -1236,8 +1440,11 @@ auto MapGCThingTyped(const JS::Value& val, F&& f) {
       MOZ_ASSERT(gc::IsCellPointerValid(str));
       return mozilla::Some(f(str));
     }
+#ifdef ENABLE_RECORD_TUPLE
+    case JS::ValueType::ExtendedPrimitive:
+#endif
     case JS::ValueType::Object: {
-      JSObject* obj = &val.toObject();
+      JSObject* obj = &val.getObjectPayload();
       MOZ_ASSERT(gc::IsCellPointerValid(obj));
       return mozilla::Some(f(obj));
     }

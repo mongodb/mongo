@@ -77,7 +77,7 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
 
 #ifdef JS_DISASM_ARM64
   static constexpr const char* const InstrIndent = "        ";
-  static constexpr const char* const LabelIndent = "          ";
+  static constexpr const char* const LabelIndent = "                 ";
   static constexpr const char* const TargetIndent = "                    ";
 #endif
 
@@ -105,12 +105,6 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
   }
 
  public:
-  // Helper function for use with the ARMBuffer.
-  // The MacroAssembler must create an AutoJitContextAlloc before initializing the buffer.
-  void initWithAllocator() {
-    armbuffer_.initWithAllocator();
-  }
-
   // Return the Instruction at a given byte offset.
   Instruction* getInstructionAt(BufferOffset offset) {
     return armbuffer_.getInst(offset);
@@ -152,7 +146,8 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
 #ifdef JS_DISASM_ARM64
     Instruction* instruction = armbuffer_.getInstOrNull(offset);
     if (instruction)
-        spewLiteralLoad(reinterpret_cast<vixl::Instruction*>(instruction), doc);
+        spewLiteralLoad(offset,
+                        reinterpret_cast<vixl::Instruction*>(instruction), doc);
 #endif
     return offset;
   }
@@ -160,16 +155,19 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
 #ifdef JS_DISASM_ARM64
   DisassemblerSpew spew_;
 
-  void spew(const vixl::Instruction* instr) {
+  void spew(BufferOffset offs, const vixl::Instruction* instr) {
     if (spew_.isDisabled() || !instr)
       return;
 
     char buffer[2048];
     DisassembleInstruction(buffer, sizeof(buffer), instr);
-    spew_.spew("%08" PRIx32 "%s%s", instr->InstructionBits(), InstrIndent, buffer);
+    spew_.spew("%06" PRIx32 " %08" PRIx32 "%s%s",
+               (uint32_t)offs.getOffset(),
+               instr->InstructionBits(), InstrIndent, buffer);
   }
 
-  void spewBranch(const vixl::Instruction* instr, const LabelDoc& target) {
+  void spewBranch(BufferOffset offs,
+                  const vixl::Instruction* instr, const LabelDoc& target) {
     if (spew_.isDisabled() || !instr)
       return;
 
@@ -198,13 +196,16 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
       hasTarget = false;
     }
 
-    spew_.spew("%08" PRIx32 "%s%s%s", instr->InstructionBits(), InstrIndent, buffer, labelBuf);
+    spew_.spew("%06" PRIx32 " %08" PRIx32 "%s%s%s",
+               (uint32_t)offs.getOffset(),
+               instr->InstructionBits(), InstrIndent, buffer, labelBuf);
 
     if (hasTarget)
       spew_.spewRef(target);
   }
 
-  void spewLiteralLoad(const vixl::Instruction* instr, const LiteralDoc& doc) {
+  void spewLiteralLoad(BufferOffset offs,
+                       const vixl::Instruction* instr, const LiteralDoc& doc) {
     if (spew_.isDisabled() || !instr)
       return;
 
@@ -220,7 +221,9 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
     char *probe = strstr(buffer, "pc+0");
     if (probe)
       *(probe + 4) = 0;
-    spew_.spew("%08" PRIx32 "%s%s    ; .const %s", instr->InstructionBits(), InstrIndent, buffer, litbuf);
+    spew_.spew("%06" PRIx32 " %08" PRIx32 "%s%s    ; .const %s",
+               (uint32_t)offs.getOffset(),
+               instr->InstructionBits(), InstrIndent, buffer, litbuf);
   }
 
   LabelDoc refLabel(Label* label) {
@@ -240,10 +243,11 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
     static_assert(sizeof(instruction) == kInstructionSize);
     // TODO: isBranch is obsolete and should be removed.
     (void)isBranch;
+    MOZ_ASSERT(hasCreator());
     BufferOffset offs = armbuffer_.putInt(*(uint32_t*)(&instruction));
 #ifdef JS_DISASM_ARM64
     if (!isBranch)
-	spew(armbuffer_.getInstOrNull(offs));
+        spew(offs, armbuffer_.getInstOrNull(offs));
 #endif
     return offs;
   }
@@ -251,7 +255,7 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
   BufferOffset EmitBranch(Instr instruction, const LabelDoc& doc) {
     BufferOffset offs = Emit(instruction, true);
 #ifdef JS_DISASM_ARM64
-    spewBranch(armbuffer_.getInstOrNull(offs), doc);
+    spewBranch(offs, armbuffer_.getInstOrNull(offs), doc);
 #endif
     return offs;
   }
@@ -271,6 +275,7 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
   // Emit data inline in the instruction stream.
   BufferOffset EmitData(void const * data, unsigned size) {
     VIXL_ASSERT(size % 4 == 0);
+    MOZ_ASSERT(hasCreator());
     return armbuffer_.allocEntry(size / sizeof(uint32_t), 0, (uint8_t*)(data), nullptr);
   }
 

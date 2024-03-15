@@ -131,6 +131,23 @@ class MOZ_NON_PARAM MaybeOneOf {
     }
   }
 
+  template <typename Func>
+  constexpr auto mapNonEmpty(Func&& aFunc) const {
+    MOZ_ASSERT(!empty());
+    if (state == SomeT1) {
+      return std::forward<Func>(aFunc)(as<T1>());
+    }
+    return std::forward<Func>(aFunc)(as<T2>());
+  }
+  template <typename Func>
+  constexpr auto mapNonEmpty(Func&& aFunc) {
+    MOZ_ASSERT(!empty());
+    if (state == SomeT1) {
+      return std::forward<Func>(aFunc)(as<T1>());
+    }
+    return std::forward<Func>(aFunc)(as<T2>());
+  }
+
  private:
   MaybeOneOf(const MaybeOneOf& aOther) = delete;
   const MaybeOneOf& operator=(const MaybeOneOf& aOther) = delete;

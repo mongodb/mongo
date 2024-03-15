@@ -14,6 +14,7 @@
 #include "mozilla/Maybe.h"       // mozilla::Maybe
 
 #include "jit/CalleeToken.h"   // js::jit::CalleeToken
+#include "js/Debug.h"          // JS::dbg::AutoEntryMonitor
 #include "vm/FrameIter.h"      // js::FrameIter
 #include "vm/JitActivation.h"  // js::jit::JitActivation
 #include "vm/JSContext.h"      // JSContext

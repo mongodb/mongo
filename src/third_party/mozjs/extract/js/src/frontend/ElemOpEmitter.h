@@ -8,12 +8,12 @@
 #define frontend_ElemOpEmitter_h
 
 #include "mozilla/Attributes.h"
-#include "frontend/Token.h"
 
 namespace js {
 namespace frontend {
 
 struct BytecodeEmitter;
+enum class ValueUsage;
 
 // Class for emitting bytecode for element operation.
 //
@@ -258,7 +258,7 @@ class MOZ_STACK_CLASS ElemOpEmitter {
 
   [[nodiscard]] bool emitAssignment();
 
-  [[nodiscard]] bool emitIncDec();
+  [[nodiscard]] bool emitIncDec(ValueUsage valueUsage);
 };
 
 } /* namespace frontend */

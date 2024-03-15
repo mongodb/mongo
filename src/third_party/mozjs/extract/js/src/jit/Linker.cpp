@@ -6,7 +6,6 @@
 
 #include "jit/Linker.h"
 
-#include "gc/GC.h"
 #include "jit/JitZone.h"
 #include "util/Memory.h"
 

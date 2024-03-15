@@ -10,10 +10,13 @@
 
 #include "jsapi.h"
 
+#include "builtin/Object.h"
+#include "js/CallAndConstruct.h"  // JS::Construct, JS::IsCallable
 #include "js/CharacterEncoding.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/PropertyDescriptor.h"    // JS::FromPropertyDescriptor
 #include "vm/EqualityOperations.h"    // js::SameValue
+#include "vm/Interpreter.h"           // js::Call
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
 #include "vm/PlainObject.h"  // js::PlainObject
@@ -177,7 +180,7 @@ JSObject* ScriptedProxyHandler::handlerObject(const JSObject* proxy) {
 // 7.3.9 GetMethod, reimplemented for proxy handler trap-getting to produce
 // better error messages.
 static bool GetProxyTrap(JSContext* cx, HandleObject handler,
-                         HandlePropertyName name, MutableHandleValue func) {
+                         Handle<PropertyName*> name, MutableHandleValue func) {
   // Steps 2, 5.
   if (!GetProperty(cx, handler, handler, name, func)) {
     return false;
@@ -850,7 +853,7 @@ bool ScriptedProxyHandler::ownPropertyKeys(JSContext* cx, HandleObject proxy,
       cx, GCHashSet<jsid>(cx, trapResult.length()));
 
   for (size_t i = 0, len = trapResult.length(); i < len; i++) {
-    MOZ_ASSERT(!JSID_IS_VOID(trapResult[i]));
+    MOZ_ASSERT(!trapResult[i].isVoid());
 
     auto ptr = uncheckedResultKeys.lookupForAdd(trapResult[i]);
     if (ptr) {
@@ -907,7 +910,7 @@ bool ScriptedProxyHandler::ownPropertyKeys(JSContext* cx, HandleObject proxy,
 
   // Step 19.
   for (size_t i = 0; i < targetNonconfigurableKeys.length(); ++i) {
-    MOZ_ASSERT(!JSID_IS_VOID(targetNonconfigurableKeys[i]));
+    MOZ_ASSERT(!targetNonconfigurableKeys[i].isVoid());
 
     auto ptr = uncheckedResultKeys.lookup(targetNonconfigurableKeys[i]);
 
@@ -927,7 +930,7 @@ bool ScriptedProxyHandler::ownPropertyKeys(JSContext* cx, HandleObject proxy,
 
   // Step 21.
   for (size_t i = 0; i < targetConfigurableKeys.length(); ++i) {
-    MOZ_ASSERT(!JSID_IS_VOID(targetConfigurableKeys[i]));
+    MOZ_ASSERT(!targetConfigurableKeys[i].isVoid());
 
     auto ptr = uncheckedResultKeys.lookup(targetConfigurableKeys[i]);
 
@@ -1398,11 +1401,6 @@ bool ScriptedProxyHandler::nativeCall(JSContext* cx, IsAcceptableThis test,
   return false;
 }
 
-bool ScriptedProxyHandler::hasInstance(JSContext* cx, HandleObject proxy,
-                                       MutableHandleValue v, bool* bp) const {
-  return InstanceofOperator(cx, proxy, v, bp);
-}
-
 bool ScriptedProxyHandler::getBuiltinClass(JSContext* cx, HandleObject proxy,
                                            ESClass* cls) const {
   *cls = ESClass::Other;
@@ -1563,7 +1561,7 @@ bool js::proxy_revocable(JSContext* cx, unsigned argc, Value* vp) {
 
   revoker->initExtendedSlot(ScriptedProxyHandler::REVOKE_SLOT, proxyVal);
 
-  RootedPlainObject result(cx, NewBuiltinClassInstance<PlainObject>(cx));
+  Rooted<PlainObject*> result(cx, NewPlainObject(cx));
   if (!result) {
     return false;
   }

@@ -7,20 +7,24 @@
 #ifndef js_Id_h
 #define js_Id_h
 
-// [SMDOC] Property Key / JSID
+// [SMDOC] PropertyKey / jsid
 //
-// A jsid is an identifier for a property or method of an object which is
-// either a 31-bit unsigned integer, interned string or symbol.
+// A PropertyKey is an identifier for a property of an object which is either a
+// 31-bit unsigned integer, interned string or symbol.
 //
-// Also, there is an additional jsid value, JSID_VOID, which does not occur in
-// JS scripts but may be used to indicate the absence of a valid jsid.  A void
-// jsid is not a valid id and only arises as an exceptional API return value,
-// such as in JS_NextProperty. Embeddings must not pass JSID_VOID into JSAPI
-// entry points expecting a jsid and do not need to handle JSID_VOID in hooks
-// receiving a jsid except when explicitly noted in the API contract.
+// Also, there is an additional PropertyKey value, PropertyKey::Void(), which
+// does not occur in JS scripts but may be used to indicate the absence of a
+// valid key. A void PropertyKey is not a valid key and only arises as an
+// exceptional API return value. Embeddings must not pass a void PropertyKey
+// into JSAPI entry points expecting a PropertyKey and do not need to handle
+// void keys in hooks receiving a PropertyKey except when explicitly noted in
+// the API contract.
 //
-// A jsid is not implicitly convertible to or from a Value; JS_ValueToId or
-// JS_IdToValue must be used instead.
+// A PropertyKey is not implicitly convertible to or from a Value; JS_ValueToId
+// or JS_IdToValue must be used instead.
+//
+// jsid is an alias for JS::PropertyKey. New code should use PropertyKey instead
+// of jsid.
 
 #include "mozilla/Maybe.h"
 
@@ -33,76 +37,82 @@
 #include "js/TracingAPI.h"
 #include "js/TypeDecls.h"
 
-// All jsids with the low bit set are integer ids. This means the other type
-// tags must all be even.
-#define JSID_TYPE_INT_BIT 0x1
-
-// Use 0 for JSID_TYPE_STRING to avoid a bitwise op for atom <-> id conversions.
-#define JSID_TYPE_STRING 0x0
-#define JSID_TYPE_VOID 0x2
-#define JSID_TYPE_SYMBOL 0x4
-// (0x6 is unused)
-#define JSID_TYPE_MASK 0x7
-
 namespace JS {
 
 enum class SymbolCode : uint32_t;
 
-struct PropertyKey {
-  size_t asBits;
+class PropertyKey {
+  uintptr_t asBits_;
 
-  constexpr PropertyKey() : asBits(JSID_TYPE_VOID) {}
+ public:
+  // All keys with the low bit set are integer keys. This means the other type
+  // tags must all be even. These constants are public only for the JITs.
+  static constexpr uintptr_t IntTagBit = 0x1;
+  // Use 0 for StringTypeTag to avoid a bitwise op for atom <-> id conversions.
+  static constexpr uintptr_t StringTypeTag = 0x0;
+  static constexpr uintptr_t VoidTypeTag = 0x2;
+  static constexpr uintptr_t SymbolTypeTag = 0x4;
+  // (0x6 is unused)
+  static constexpr uintptr_t TypeMask = 0x7;
 
-  static constexpr MOZ_ALWAYS_INLINE PropertyKey fromRawBits(size_t bits) {
+  static constexpr uint32_t IntMin = 0;
+  static constexpr uint32_t IntMax = INT32_MAX;
+
+  constexpr PropertyKey() : asBits_(VoidTypeTag) {}
+
+  static constexpr MOZ_ALWAYS_INLINE PropertyKey fromRawBits(uintptr_t bits) {
     PropertyKey id;
-    id.asBits = bits;
+    id.asBits_ = bits;
     return id;
   }
 
-  bool operator==(const PropertyKey& rhs) const { return asBits == rhs.asBits; }
-  bool operator!=(const PropertyKey& rhs) const { return asBits != rhs.asBits; }
+  bool operator==(const PropertyKey& rhs) const {
+    return asBits_ == rhs.asBits_;
+  }
+  bool operator!=(const PropertyKey& rhs) const {
+    return asBits_ != rhs.asBits_;
+  }
 
   MOZ_ALWAYS_INLINE bool isVoid() const {
-    MOZ_ASSERT_IF((asBits & JSID_TYPE_MASK) == JSID_TYPE_VOID,
-                  asBits == JSID_TYPE_VOID);
-    return asBits == JSID_TYPE_VOID;
+    MOZ_ASSERT_IF((asBits_ & TypeMask) == VoidTypeTag, asBits_ == VoidTypeTag);
+    return asBits_ == VoidTypeTag;
   }
 
-  MOZ_ALWAYS_INLINE bool isInt() const {
-    return !!(asBits & JSID_TYPE_INT_BIT);
-  }
+  MOZ_ALWAYS_INLINE bool isInt() const { return !!(asBits_ & IntTagBit); }
 
   MOZ_ALWAYS_INLINE bool isString() const {
-    return (asBits & JSID_TYPE_MASK) == JSID_TYPE_STRING;
+    return (asBits_ & TypeMask) == StringTypeTag;
   }
 
   MOZ_ALWAYS_INLINE bool isSymbol() const {
-    return (asBits & JSID_TYPE_MASK) == JSID_TYPE_SYMBOL;
+    return (asBits_ & TypeMask) == SymbolTypeTag;
   }
 
   MOZ_ALWAYS_INLINE bool isGCThing() const { return isString() || isSymbol(); }
 
+  constexpr uintptr_t asRawBits() const { return asBits_; }
+
   MOZ_ALWAYS_INLINE int32_t toInt() const {
     MOZ_ASSERT(isInt());
-    uint32_t bits = static_cast<uint32_t>(asBits) >> 1;
+    uint32_t bits = static_cast<uint32_t>(asBits_) >> 1;
     return static_cast<int32_t>(bits);
   }
 
   MOZ_ALWAYS_INLINE JSString* toString() const {
     MOZ_ASSERT(isString());
-    // Use XOR instead of `& ~JSID_TYPE_MASK` because small immediates can be
+    // Use XOR instead of `& ~TypeMask` because small immediates can be
     // encoded more efficiently on some platorms.
-    return reinterpret_cast<JSString*>(asBits ^ JSID_TYPE_STRING);
+    return reinterpret_cast<JSString*>(asBits_ ^ StringTypeTag);
   }
 
   MOZ_ALWAYS_INLINE JS::Symbol* toSymbol() const {
     MOZ_ASSERT(isSymbol());
-    return reinterpret_cast<JS::Symbol*>(asBits ^ JSID_TYPE_SYMBOL);
+    return reinterpret_cast<JS::Symbol*>(asBits_ ^ SymbolTypeTag);
   }
 
   js::gc::Cell* toGCThing() const {
     MOZ_ASSERT(isGCThing());
-    return reinterpret_cast<js::gc::Cell*>(asBits & ~(size_t)JSID_TYPE_MASK);
+    return reinterpret_cast<js::gc::Cell*>(asBits_ & ~TypeMask);
   }
 
   GCCellPtr toGCCellPtr() const {
@@ -118,20 +128,32 @@ struct PropertyKey {
 
   bool isWellKnownSymbol(JS::SymbolCode code) const;
 
-  // This API can be used by embedders to convert pinned (aka interned) strings,
-  // as created by JS_AtomizeAndPinJSString, into PropertyKeys.
-  // This means the string does not have to be explicitly rooted.
-  //
-  // Only use this API when absolutely necessary, otherwise use JS_StringToId.
-  static PropertyKey fromPinnedString(JSString* str);
+  // A void PropertyKey. This is equivalent to a PropertyKey created by the
+  // default constructor.
+  static constexpr PropertyKey Void() { return PropertyKey(); }
+
+  static constexpr bool fitsInInt(int32_t i) { return i >= 0; }
+
+  static constexpr PropertyKey Int(int32_t i) {
+    MOZ_ASSERT(fitsInInt(i));
+    uint32_t bits = (static_cast<uint32_t>(i) << 1) | IntTagBit;
+    return PropertyKey::fromRawBits(bits);
+  }
+
+  static PropertyKey Symbol(JS::Symbol* sym) {
+    MOZ_ASSERT(sym != nullptr);
+    MOZ_ASSERT((uintptr_t(sym) & TypeMask) == 0);
+    MOZ_ASSERT(!js::gc::IsInsideNursery(reinterpret_cast<js::gc::Cell*>(sym)));
+    return PropertyKey::fromRawBits(uintptr_t(sym) | SymbolTypeTag);
+  }
 
   // Must not be used on atoms that are representable as integer PropertyKey.
   // Prefer NameToId or AtomToId over this function:
   //
   // A PropertyName is an atom that does not contain an integer in the range
   // [0, UINT32_MAX]. However, PropertyKey can only hold an integer in the range
-  // [0, JSID_INT_MAX] (where JSID_INT_MAX == 2^31-1).  Thus, for the range of
-  // integers (JSID_INT_MAX, UINT32_MAX], to represent as a 'id', it must be
+  // [0, IntMax] (where IntMax == 2^31-1).  Thus, for the range of integers
+  // (IntMax, UINT32_MAX], to represent as a 'id', it must be
   // the case id.isString() and id.toString()->isIndex(). In most
   // cases when creating a PropertyKey, code does not have to care about
   // this corner case because:
@@ -146,18 +168,25 @@ struct PropertyKey {
   // Thus, it is only the rare third case which needs this function, which
   // handles any JSAtom* that is known not to be representable with an int
   // PropertyKey.
-  static PropertyKey fromNonIntAtom(JSAtom* atom) {
-    MOZ_ASSERT((size_t(atom) & JSID_TYPE_MASK) == 0);
+  static PropertyKey NonIntAtom(JSAtom* atom) {
+    MOZ_ASSERT((uintptr_t(atom) & TypeMask) == 0);
     MOZ_ASSERT(PropertyKey::isNonIntAtom(atom));
-    return PropertyKey::fromRawBits(size_t(atom) | JSID_TYPE_STRING);
+    return PropertyKey::fromRawBits(uintptr_t(atom) | StringTypeTag);
   }
 
   // The JSAtom/JSString type exposed to embedders is opaque.
-  static PropertyKey fromNonIntAtom(JSString* str) {
-    MOZ_ASSERT((size_t(str) & JSID_TYPE_MASK) == 0);
+  static PropertyKey NonIntAtom(JSString* str) {
+    MOZ_ASSERT((uintptr_t(str) & TypeMask) == 0);
     MOZ_ASSERT(PropertyKey::isNonIntAtom(str));
-    return PropertyKey::fromRawBits(size_t(str) | JSID_TYPE_STRING);
+    return PropertyKey::fromRawBits(uintptr_t(str) | StringTypeTag);
   }
+
+  // This API can be used by embedders to convert pinned (aka interned) strings,
+  // as created by JS_AtomizeAndPinString, into PropertyKeys. This means the
+  // string does not have to be explicitly rooted.
+  //
+  // Only use this API when absolutely necessary, otherwise use JS_StringToId.
+  static PropertyKey fromPinnedString(JSString* str);
 
   // Internal API!
   // All string PropertyKeys are actually atomized.
@@ -168,7 +197,12 @@ struct PropertyKey {
     return isAtom() && toAtom() == atom;
   }
 
-  MOZ_ALWAYS_INLINE JSAtom* toAtom() const { return (JSAtom*)toString(); }
+  MOZ_ALWAYS_INLINE JSAtom* toAtom() const {
+    return reinterpret_cast<JSAtom*>(toString());
+  }
+  MOZ_ALWAYS_INLINE JSLinearString* toLinearString() const {
+    return reinterpret_cast<JSLinearString*>(toString());
+  }
 
  private:
   static bool isNonIntAtom(JSAtom* atom);
@@ -179,56 +213,18 @@ struct PropertyKey {
 
 using jsid = JS::PropertyKey;
 
-#define JSID_BITS(id) (id.asBits)
-
-static MOZ_ALWAYS_INLINE bool JSID_IS_STRING(jsid id) { return id.isString(); }
-
-static MOZ_ALWAYS_INLINE JSString* JSID_TO_STRING(jsid id) {
-  return id.toString();
-}
-
-static MOZ_ALWAYS_INLINE bool JSID_IS_INT(jsid id) { return id.isInt(); }
-
-static MOZ_ALWAYS_INLINE int32_t JSID_TO_INT(jsid id) { return id.toInt(); }
-
-#define JSID_INT_MIN 0
-#define JSID_INT_MAX INT32_MAX
-
-static MOZ_ALWAYS_INLINE bool INT_FITS_IN_JSID(int32_t i) { return i >= 0; }
-
-static MOZ_ALWAYS_INLINE jsid INT_TO_JSID(int32_t i) {
-  jsid id;
-  MOZ_ASSERT(INT_FITS_IN_JSID(i));
-  uint32_t bits = (static_cast<uint32_t>(i) << 1) | JSID_TYPE_INT_BIT;
-  JSID_BITS(id) = static_cast<size_t>(bits);
-  return id;
-}
-
-static MOZ_ALWAYS_INLINE jsid SYMBOL_TO_JSID(JS::Symbol* sym) {
-  jsid id;
-  MOZ_ASSERT(sym != nullptr);
-  MOZ_ASSERT((size_t(sym) & JSID_TYPE_MASK) == 0);
-  MOZ_ASSERT(!js::gc::IsInsideNursery(reinterpret_cast<js::gc::Cell*>(sym)));
-  JSID_BITS(id) = (size_t(sym) | JSID_TYPE_SYMBOL);
-  return id;
-}
-
-static MOZ_ALWAYS_INLINE bool JSID_IS_VOID(const jsid id) {
-  return id.isVoid();
-}
-
-constexpr const jsid JSID_VOID;
-
-extern JS_PUBLIC_DATA const JS::HandleId JSID_VOIDHANDLE;
-
 namespace JS {
+
+// Handle<PropertyKey> version of PropertyKey::Void().
+extern JS_PUBLIC_DATA const JS::HandleId VoidHandlePropertyKey;
 
 template <>
 struct GCPolicy<jsid> {
   static void trace(JSTracer* trc, jsid* idp, const char* name) {
-    // It's not safe to trace unbarriered pointers except as part of root
-    // marking.
-    UnsafeTraceRoot(trc, idp, name);
+    // This should only be called as part of root marking since that's the only
+    // time we should trace unbarriered GC thing pointers. This will assert if
+    // called at other times.
+    TraceRoot(trc, idp, name);
   }
   static bool isValid(jsid id) {
     return !id.isGCThing() ||
@@ -250,6 +246,25 @@ MOZ_ALWAYS_INLINE void AssertIdIsNotGray(jsid id) {
 }
 #endif
 
+/**
+ * Get one of the well-known symbols defined by ES6 as PropertyKey. This is
+ * equivalent to calling JS::GetWellKnownSymbol and then creating a PropertyKey.
+ *
+ * `which` must be in the range [0, WellKnownSymbolLimit).
+ */
+extern JS_PUBLIC_API PropertyKey GetWellKnownSymbolKey(JSContext* cx,
+                                                       SymbolCode which);
+
+/**
+ * Generate getter/setter id for given id, by adding "get " or "set " prefix.
+ */
+extern JS_PUBLIC_API bool ToGetterId(
+    JSContext* cx, JS::Handle<JS::PropertyKey> id,
+    JS::MutableHandle<JS::PropertyKey> getterId);
+extern JS_PUBLIC_API bool ToSetterId(
+    JSContext* cx, JS::Handle<JS::PropertyKey> id,
+    JS::MutableHandle<JS::PropertyKey> setterId);
+
 }  // namespace JS
 
 namespace js {
@@ -263,12 +278,16 @@ struct BarrierMethods<jsid> {
     return nullptr;
   }
   static void postWriteBarrier(jsid* idp, jsid prev, jsid next) {
-    MOZ_ASSERT_IF(JSID_IS_STRING(next),
-                  !gc::IsInsideNursery(JSID_TO_STRING(next)));
+    MOZ_ASSERT_IF(next.isString(), !gc::IsInsideNursery(next.toString()));
   }
   static void exposeToJS(jsid id) {
     if (id.isGCThing()) {
       js::gc::ExposeGCThingToActiveJS(id.toGCCellPtr());
+    }
+  }
+  static void readBarrier(jsid id) {
+    if (id.isGCThing()) {
+      js::gc::IncrementalReadBarrier(id.toGCCellPtr());
     }
   }
 };
@@ -323,10 +342,13 @@ class WrappedPtrOperations<JS::PropertyKey, Wrapper> {
     return id().isWellKnownSymbol(code);
   }
 
+  uintptr_t asRawBits() const { return id().asRawBits(); }
+
   // Internal API
   bool isAtom() const { return id().isAtom(); }
   bool isAtom(JSAtom* atom) const { return id().isAtom(atom); }
   JSAtom* toAtom() const { return id().toAtom(); }
+  JSLinearString* toLinearString() const { return id().toLinearString(); }
 };
 
 }  // namespace js

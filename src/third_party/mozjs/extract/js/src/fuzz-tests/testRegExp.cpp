@@ -58,12 +58,13 @@ static int testRegExpFuzz(const uint8_t* buf, size_t size) {
     inputChars = patternChars + patternLength;
   }
 
-  RootedAtom pattern(gCx, AtomizeUTF8Chars(gCx, patternChars, patternLength));
+  Rooted<JSAtom*> pattern(gCx,
+                          AtomizeUTF8Chars(gCx, patternChars, patternLength));
   if (!pattern) {
     ReportOutOfMemory(gCx);
     return 0;
   }
-  RootedAtom input(gCx, AtomizeUTF8Chars(gCx, inputChars, inputLength));
+  Rooted<JSAtom*> input(gCx, AtomizeUTF8Chars(gCx, inputChars, inputLength));
   if (!input) {
     ReportOutOfMemory(gCx);
     return 0;

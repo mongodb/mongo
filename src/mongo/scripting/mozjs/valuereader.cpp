@@ -191,7 +191,9 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
         case mongo::NumberLong: {
             JS::RootedObject thisv(_context);
             scope->getProto<NumberLongInfo>().newObject(&thisv);
-            JS::SetPrivate(thisv, scope->trackedNew<int64_t>(elem.numberLong()));
+            JS::SetReservedSlot(thisv,
+                                NumberLongInfo::Int64Slot,
+                                JS::PrivateValue(scope->trackedNew<int64_t>(elem.numberLong())));
             _value.setObjectOrNull(thisv);
             return;
         }
@@ -336,7 +338,8 @@ void ValueReader::fromInt64(int64_t i) {
     auto scope = getScope(_context);
     JS::RootedObject num(_context);
     scope->getProto<NumberLongInfo>().newObject(&num);
-    JS::SetPrivate(num, scope->trackedNew<int64_t>(i));
+    JS::SetReservedSlot(
+        num, NumberLongInfo::Int64Slot, JS::PrivateValue(scope->trackedNew<int64_t>(i)));
     _value.setObjectOrNull(num);
 }
 

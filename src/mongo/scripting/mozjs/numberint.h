@@ -46,8 +46,10 @@ namespace mozjs {
  * Wraps an actual c++ 'int' as its private member
  */
 struct NumberIntInfo : public BaseInfo {
+    enum Slots { IntSlot, NumberIntInfoSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toNumber);
@@ -59,7 +61,7 @@ struct NumberIntInfo : public BaseInfo {
     static const JSFunctionSpec methods[5];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NumberIntInfoSlotCount);
 
     static int ToNumberInt(JSContext* cx, JS::HandleObject object);
     static int ToNumberInt(JSContext* cx, JS::HandleValue value);

@@ -8,9 +8,11 @@
 #define vm_StringObject_h
 
 #include "vm/JSObject.h"
-#include "vm/Shape.h"
+#include "vm/NativeObject.h"
 
 namespace js {
+
+class Shape;
 
 class StringObject : public NativeObject {
   static const unsigned PRIMITIVE_VALUE_SLOT = 0;
@@ -36,7 +38,8 @@ class StringObject : public NativeObject {
    * encodes the initial length property. Return the shape after changing
    * |obj|'s last property to it.
    */
-  static Shape* assignInitialShape(JSContext* cx, Handle<StringObject*> obj);
+  static SharedShape* assignInitialShape(JSContext* cx,
+                                         Handle<StringObject*> obj);
 
   JSString* unbox() const {
     return getFixedSlot(PRIMITIVE_VALUE_SLOT).toString();

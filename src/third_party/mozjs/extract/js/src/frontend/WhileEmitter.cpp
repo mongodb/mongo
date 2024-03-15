@@ -7,20 +7,16 @@
 #include "frontend/WhileEmitter.h"
 
 #include "frontend/BytecodeEmitter.h"
-#include "frontend/SourceNotes.h"
 #include "vm/Opcodes.h"
 #include "vm/StencilEnums.h"  // TryNoteKind
 
 using namespace js;
 using namespace js::frontend;
 
-using mozilla::Maybe;
-
 WhileEmitter::WhileEmitter(BytecodeEmitter* bce) : bce_(bce) {}
 
-bool WhileEmitter::emitCond(const Maybe<uint32_t>& whilePos,
-                            const Maybe<uint32_t>& condPos,
-                            const Maybe<uint32_t>& endPos) {
+bool WhileEmitter::emitCond(uint32_t whilePos, uint32_t condPos,
+                            uint32_t endPos) {
   MOZ_ASSERT(state_ == State::Start);
 
   // If we have a single-line while, like "while (x) ;", we want to emit the
@@ -29,10 +25,9 @@ bool WhileEmitter::emitCond(const Maybe<uint32_t>& whilePos,
   // "next"ing will skip the whole loop. However, for the multi-line case we
   // want to emit the line note for the JSOp::LoopHead, so that "cont" stops on
   // each iteration -- but without a stop before the first iteration.
-  if (whilePos && endPos &&
-      bce_->parser->errorReporter().lineAt(*whilePos) ==
-          bce_->parser->errorReporter().lineAt(*endPos)) {
-    if (!bce_->updateSourceCoordNotes(*whilePos)) {
+  if (bce_->errorReporter().lineAt(whilePos) ==
+      bce_->errorReporter().lineAt(endPos)) {
+    if (!bce_->updateSourceCoordNotes(whilePos)) {
       return false;
     }
     // Emit a Nop to ensure the source position is not part of the loop.
@@ -43,7 +38,7 @@ bool WhileEmitter::emitCond(const Maybe<uint32_t>& whilePos,
 
   loopInfo_.emplace(bce_, StatementKind::WhileLoop);
 
-  if (!loopInfo_->emitLoopHead(bce_, condPos)) {
+  if (!loopInfo_->emitLoopHead(bce_, mozilla::Some(condPos))) {
     return false;
   }
 

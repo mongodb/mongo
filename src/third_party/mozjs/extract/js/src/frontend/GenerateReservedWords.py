@@ -6,8 +6,8 @@ import re
 import sys
 
 
-def read_reserved_word_list(filename):
-    macro_pat = re.compile(r"^\s*MACRO\(([^,]+), *[^,]+, *[^\)]+\)\s*\\?$")
+def read_reserved_word_list(filename, enable_decorators):
+    macro_pat = re.compile(r"MACRO\(([^,]+), *[^,]+, *[^\)]+\)\s*\\?")
 
     reserved_word_list = []
     index = 0
@@ -15,7 +15,10 @@ def read_reserved_word_list(filename):
         for line in f:
             m = macro_pat.search(line)
             if m:
-                reserved_word_list.append((index, m.group(1)))
+                reserved_word = m.group(1)
+                if reserved_word == "accessor" and not enable_decorators:
+                    continue
+                reserved_word_list.append((index, reserved_word))
                 index += 1
 
     assert len(reserved_word_list) != 0
@@ -213,8 +216,8 @@ def generate_switch(opt, reserved_word_list):
     line(opt, "JSRW_NO_MATCH()")
 
 
-def main(output, reserved_words_h):
-    reserved_word_list = read_reserved_word_list(reserved_words_h)
+def main(output, reserved_words_h, enable_decorators=False):
+    reserved_word_list = read_reserved_word_list(reserved_words_h, enable_decorators)
 
     opt = {
         "indent_level": 1,

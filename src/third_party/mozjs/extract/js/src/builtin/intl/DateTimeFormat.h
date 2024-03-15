@@ -7,17 +7,14 @@
 #ifndef builtin_intl_DateTimeFormat_h
 #define builtin_intl_DateTimeFormat_h
 
-#include "builtin/intl/CommonFunctions.h"
 #include "builtin/SelfHostingDefines.h"
 #include "js/Class.h"
-#include "js/RootingAPI.h"
 #include "vm/NativeObject.h"
-
-struct UDateIntervalFormat;
 
 namespace mozilla::intl {
 class DateTimeFormat;
-}
+class DateIntervalFormat;
+}  // namespace mozilla::intl
 
 namespace js {
 
@@ -27,8 +24,8 @@ class DateTimeFormatObject : public NativeObject {
   static const JSClass& protoClass_;
 
   static constexpr uint32_t INTERNALS_SLOT = 0;
-  static constexpr uint32_t UDATE_FORMAT_SLOT = 1;
-  static constexpr uint32_t UDATE_INTERVAL_FORMAT_SLOT = 2;
+  static constexpr uint32_t DATE_FORMAT_SLOT = 1;
+  static constexpr uint32_t DATE_INTERVAL_FORMAT_SLOT = 2;
   static constexpr uint32_t SLOT_COUNT = 3;
 
   static_assert(INTERNALS_SLOT == INTL_INTERNALS_OBJECT_SLOT,
@@ -36,13 +33,13 @@ class DateTimeFormatObject : public NativeObject {
                 "object slot");
 
   // Estimated memory use for UDateFormat (see IcuMemoryUsage).
-  static constexpr size_t UDateFormatEstimatedMemoryUse = 91922;
+  static constexpr size_t UDateFormatEstimatedMemoryUse = 72440;
 
   // Estimated memory use for UDateIntervalFormat (see IcuMemoryUsage).
-  static constexpr size_t UDateIntervalFormatEstimatedMemoryUse = 119856;
+  static constexpr size_t UDateIntervalFormatEstimatedMemoryUse = 175646;
 
   mozilla::intl::DateTimeFormat* getDateFormat() const {
-    const auto& slot = getFixedSlot(UDATE_FORMAT_SLOT);
+    const auto& slot = getFixedSlot(DATE_FORMAT_SLOT);
     if (slot.isUndefined()) {
       return nullptr;
     }
@@ -50,26 +47,27 @@ class DateTimeFormatObject : public NativeObject {
   }
 
   void setDateFormat(mozilla::intl::DateTimeFormat* dateFormat) {
-    setFixedSlot(UDATE_FORMAT_SLOT, PrivateValue(dateFormat));
+    setFixedSlot(DATE_FORMAT_SLOT, PrivateValue(dateFormat));
   }
 
-  UDateIntervalFormat* getDateIntervalFormat() const {
-    const auto& slot = getFixedSlot(UDATE_INTERVAL_FORMAT_SLOT);
+  mozilla::intl::DateIntervalFormat* getDateIntervalFormat() const {
+    const auto& slot = getFixedSlot(DATE_INTERVAL_FORMAT_SLOT);
     if (slot.isUndefined()) {
       return nullptr;
     }
-    return static_cast<UDateIntervalFormat*>(slot.toPrivate());
+    return static_cast<mozilla::intl::DateIntervalFormat*>(slot.toPrivate());
   }
 
-  void setDateIntervalFormat(UDateIntervalFormat* dateIntervalFormat) {
-    setFixedSlot(UDATE_INTERVAL_FORMAT_SLOT, PrivateValue(dateIntervalFormat));
+  void setDateIntervalFormat(
+      mozilla::intl::DateIntervalFormat* dateIntervalFormat) {
+    setFixedSlot(DATE_INTERVAL_FORMAT_SLOT, PrivateValue(dateIntervalFormat));
   }
 
  private:
   static const JSClassOps classOps_;
   static const ClassSpec classSpec_;
 
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 /**
@@ -153,60 +151,6 @@ class DateTimeFormatObject : public NativeObject {
                                                  JS::Value* vp);
 
 /**
- * Return a pattern in the date-time format pattern language of Unicode
- * Technical Standard 35, Unicode Locale Data Markup Language, for the
- * best-fit date-time format pattern corresponding to skeleton for the
- * given locale.
- *
- * Usage: pattern = intl_patternForSkeleton(locale, skeleton, hourCycle)
- */
-[[nodiscard]] extern bool intl_patternForSkeleton(JSContext* cx, unsigned argc,
-                                                  JS::Value* vp);
-
-/**
- * Return a pattern in the date-time format pattern language of Unicode
- * Technical Standard 35, Unicode Locale Data Markup Language, for the
- * best-fit date-time style for the given locale.
- * The function takes six arguments:
- *
- *   locale
- *     BCP47 compliant locale string
- *   dateStyle
- *     A string with values: full or long or medium or short, or `undefined`
- *   timeStyle
- *     A string with values: full or long or medium or short, or `undefined`
- *   timeZone
- *     IANA time zone name
- *   hour12
- *     A boolean to request hour12 representation, or `undefined`
- *   hourCycle
- *     A string with values: h11, h12, h23, or h24, or `undefined`
- *
- * Date and time style categories map to CLDR time/date standard
- * format patterns.
- *
- * For the definition of a pattern string, see LDML 4.8:
- * http://unicode.org/reports/tr35/tr35-dates.html#Date_Format_Patterns
- *
- * If `undefined` is passed to `dateStyle` or `timeStyle`, the respective
- * portions of the pattern will not be included in the result.
- *
- * Usage: pattern = intl_patternForStyle(locale, dateStyle, timeStyle, timeZone,
- *                                       hour12, hourCycle)
- */
-[[nodiscard]] extern bool intl_patternForStyle(JSContext* cx, unsigned argc,
-                                               JS::Value* vp);
-
-/**
- * Return a skeleton for the pattern in the date-time format pattern language of
- * Unicode Technical Standard 35, Unicode Locale Data Markup Language.
- *
- * Usage: skeleton = intl_skeletonForPattern(pattern)
- */
-[[nodiscard]] extern bool intl_skeletonForPattern(JSContext* cx, unsigned argc,
-                                                  JS::Value* vp);
-
-/**
  * Returns a String value representing x (which must be a Number value)
  * according to the effective locale and the formatting options of the
  * given DateTimeFormat.
@@ -230,6 +174,15 @@ class DateTimeFormatObject : public NativeObject {
 [[nodiscard]] extern bool intl_FormatDateTimeRange(JSContext* cx, unsigned argc,
                                                    JS::Value* vp);
 
+/**
+ * Extracts the resolved components from a DateTimeFormat and applies them to
+ * the object for resolved components.
+ *
+ * Usage: intl_resolveDateTimeFormatComponents(dateTimeFormat, resolved)
+ */
+[[nodiscard]] extern bool intl_resolveDateTimeFormatComponents(JSContext* cx,
+                                                               unsigned argc,
+                                                               JS::Value* vp);
 }  // namespace js
 
 #endif /* builtin_intl_DateTimeFormat_h */

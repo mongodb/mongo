@@ -41,24 +41,20 @@ class ArrayObject : public NativeObject {
     getElementsHeader()->length = length;
   }
 
+  // Try to add a new dense element to this array. The array must be extensible.
+  //
+  // Returns DenseElementResult::Incomplete if `index >= length`, if the array
+  // has sparse elements, if we're adding a sparse element, or if the array
+  // already contains a dense element at this index.
+  inline DenseElementResult addDenseElementNoLengthChange(JSContext* cx,
+                                                          uint32_t index,
+                                                          const Value& val);
+
   // Make an array object with the specified initial state.
-  static inline ArrayObject* createArray(JSContext* cx, gc::AllocKind kind,
-                                         gc::InitialHeap heap,
-                                         HandleShape shape, uint32_t length,
-                                         AutoSetNewObjectMetadata& metadata,
-                                         gc::AllocSite* site = nullptr);
-
- private:
-  // Helper for the above methods.
-  static inline ArrayObject* createArrayInternal(JSContext* cx,
-                                                 gc::AllocKind kind,
-                                                 gc::InitialHeap heap,
-                                                 HandleShape shape,
-                                                 AutoSetNewObjectMetadata&,
-                                                 gc::AllocSite* site = nullptr);
-
-  static inline ArrayObject* finishCreateArray(
-      ArrayObject* obj, HandleShape shape, AutoSetNewObjectMetadata& metadata);
+  static MOZ_ALWAYS_INLINE ArrayObject* create(
+      JSContext* cx, gc::AllocKind kind, gc::Heap heap,
+      Handle<SharedShape*> shape, uint32_t length, uint32_t slotSpan,
+      AutoSetNewObjectMetadata& metadata, gc::AllocSite* site = nullptr);
 };
 
 }  // namespace js

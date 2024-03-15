@@ -14,18 +14,17 @@
     https://developer.mozilla.org/en-US/docs/SpiderMonkey/Internals/Bytecode
 """
 
-import sys
 import os
-
+import sys
 
 # Allow this script to be run from anywhere.
 this_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, this_dir)
 
 
-import jsopcode
 from xml.sax.saxutils import escape
 
+import jsopcode
 
 try:
     import markdown

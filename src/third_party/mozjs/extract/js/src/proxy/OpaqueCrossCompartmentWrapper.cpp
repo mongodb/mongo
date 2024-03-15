@@ -135,14 +135,6 @@ bool OpaqueCrossCompartmentWrapper::isArray(JSContext* cx, HandleObject obj,
   return true;
 }
 
-bool OpaqueCrossCompartmentWrapper::hasInstance(JSContext* cx,
-                                                HandleObject wrapper,
-                                                MutableHandleValue v,
-                                                bool* bp) const {
-  *bp = false;
-  return true;
-}
-
 const char* OpaqueCrossCompartmentWrapper::className(JSContext* cx,
                                                      HandleObject proxy) const {
   return "Opaque";

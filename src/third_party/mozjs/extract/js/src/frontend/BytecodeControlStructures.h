@@ -12,10 +12,10 @@
 
 #include <stdint.h>  // int32_t, uint32_t
 
-#include "ds/Nestable.h"               // Nestable
-#include "frontend/BytecodeSection.h"  // BytecodeOffset
-#include "frontend/JumpList.h"         // JumpList, JumpTarget
-#include "frontend/ParserAtom.h"       // TaggedParserAtomIndex
+#include "ds/Nestable.h"              // Nestable
+#include "frontend/BytecodeOffset.h"  // BytecodeOffset
+#include "frontend/JumpList.h"        // JumpList, JumpTarget
+#include "frontend/ParserAtom.h"      // TaggedParserAtomIndex
 #include "frontend/SharedContext.h"  // StatementKind, StatementKindIsLoop, StatementKindIsUnlabeledBreakTarget
 #include "frontend/TDZCheckCache.h"  // TDZCheckCache
 #include "vm/StencilEnums.h"         // TryNoteKind
@@ -139,23 +139,65 @@ inline bool NestableControl::is<LoopControl>() const {
   return StatementKindIsLoop(kind_);
 }
 
+enum class NonLocalExitKind { Continue, Break, Return };
+
+class TryFinallyContinuation {
+ public:
+  TryFinallyContinuation(NestableControl* target, NonLocalExitKind kind)
+      : target_(target), kind_(kind) {}
+
+  NestableControl* target_;
+  NonLocalExitKind kind_;
+};
+
 class TryFinallyControl : public NestableControl {
-  bool emittingSubroutine_;
+  bool emittingSubroutine_ = false;
 
  public:
-  // The subroutine when emitting a finally block.
-  JumpList gosubs;
+  // Offset of the last jump to this `finally`.
+  JumpList finallyJumps_;
+
+  js::Vector<TryFinallyContinuation, 4, SystemAllocPolicy> continuations_;
 
   TryFinallyControl(BytecodeEmitter* bce, StatementKind kind);
 
   void setEmittingSubroutine() { emittingSubroutine_ = true; }
 
   bool emittingSubroutine() const { return emittingSubroutine_; }
+
+  enum SpecialContinuations { Fallthrough, Count };
+  bool allocateContinuation(NestableControl* target, NonLocalExitKind kind,
+                            uint32_t* idx);
+  bool emitContinuations(BytecodeEmitter* bce);
 };
 template <>
 inline bool NestableControl::is<TryFinallyControl>() const {
   return kind_ == StatementKind::Try || kind_ == StatementKind::Finally;
 }
+
+class NonLocalExitControl {
+  BytecodeEmitter* bce_;
+  const uint32_t savedScopeNoteIndex_;
+  const int savedDepth_;
+  uint32_t openScopeNoteIndex_;
+  NonLocalExitKind kind_;
+
+  // The offset of a `JSOp::SetRval` that can be rewritten as a
+  // `JSOp::Return` if we don't generate any code for this
+  // NonLocalExitControl.
+  BytecodeOffset setRvalOffset_ = BytecodeOffset::invalidOffset();
+
+  [[nodiscard]] bool leaveScope(EmitterScope* es);
+
+ public:
+  NonLocalExitControl(const NonLocalExitControl&) = delete;
+  NonLocalExitControl(BytecodeEmitter* bce, NonLocalExitKind kind);
+  ~NonLocalExitControl();
+
+  [[nodiscard]] bool emitNonLocalJump(NestableControl* target,
+                                      NestableControl* startingAfter = nullptr);
+  [[nodiscard]] bool emitReturn(BytecodeOffset setRvalOffset);
+};
 
 } /* namespace frontend */
 } /* namespace js */

@@ -11,9 +11,11 @@
 #  include "javascript-trace.h"
 #endif
 
-#include "vm/Stack.h"
+#include "vm/JSObject.h"
 
 namespace js {
+
+class InterpreterFrame;
 
 namespace probes {
 

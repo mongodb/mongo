@@ -277,7 +277,7 @@ var LatencyGraph = class extends Graph {
 var MemoryGraph = class extends Graph {
   constructor(ctx) {
     super(ctx);
-    this.worstEver = this.bestEver = gHost.gcBytes();
+    this.worstEver = this.bestEver = gHost.gcBytes;
     this.limit = Math.max(this.worstEver, gHost.gcAllocTrigger);
   }
 

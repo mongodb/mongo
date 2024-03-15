@@ -23,6 +23,7 @@
 #include <limits>
 #include <type_traits>
 
+#include "mozilla/Assertions.h"
 #include "mozilla/ReverseIterator.h"
 
 namespace mozilla {

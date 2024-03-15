@@ -791,7 +791,8 @@ std::vector<uint8_t> EncryptedDBClientBase::getBinDataArg(
             str::stream() << "Incorrect bindata type, expected" << typeName(type) << " but got "
                           << typeName(binType),
             binType == type);
-    auto str = static_cast<std::string*>(JS::GetPrivate(args.get(index).toObjectOrNull()));
+    auto str = JS::GetMaybePtrFromReservedSlot<std::string>(args.get(index).toObjectOrNull(),
+                                                            mozjs::BinDataInfo::BinDataStringSlot);
     uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
     std::string string = base64::decode(*str);
     return std::vector<uint8_t>(string.data(), string.data() + string.length());

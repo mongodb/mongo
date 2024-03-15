@@ -726,6 +726,24 @@ class MOZ_RAII PEHeaders final {
     return true;
   }
 
+  bool GetImageSize(DWORD& aResult) const {
+    if (!(*this)) {
+      return false;
+    }
+
+    aResult = mPeHeader->OptionalHeader.SizeOfImage;
+    return true;
+  }
+
+  bool GetCheckSum(DWORD& aResult) const {
+    if (!(*this)) {
+      return false;
+    }
+
+    aResult = mPeHeader->OptionalHeader.CheckSum;
+    return true;
+  }
+
   PIMAGE_IMPORT_DESCRIPTOR
   GetImportDescriptor(const char* aModuleNameASCII) const {
     for (PIMAGE_IMPORT_DESCRIPTOR curImpDesc = GetImportDirectory();
@@ -963,6 +981,11 @@ class MOZ_RAII PEHeaders final {
     auto dirEnt =
         reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(aCurLevel + 1) +
         aCurLevel->NumberOfNamedEntries;
+    if (!(IsWithinImage(dirEnt) &&
+          IsWithinImage(&dirEnt[aCurLevel->NumberOfIdEntries - 1].Id))) {
+      return nullptr;
+    }
+
     for (WORD i = 0; i < aCurLevel->NumberOfIdEntries; ++i) {
       if (dirEnt[i].Id == aId) {
         return &dirEnt[i];

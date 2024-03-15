@@ -101,14 +101,14 @@ class LDivOrModI64
 
   static const size_t Lhs = 0;
   static const size_t Rhs = INT64_PIECES;
-  static const size_t Tls = 2 * INT64_PIECES;
+  static const size_t Instance = 2 * INT64_PIECES;
 
   LDivOrModI64(const LInt64Allocation& lhs, const LInt64Allocation& rhs,
-               const LAllocation& tls)
+               const LAllocation& instance)
       : LCallInstructionHelper(classOpcode) {
     setInt64Operand(Lhs, lhs);
     setInt64Operand(Rhs, rhs);
-    setOperand(Tls, tls);
+    setOperand(Instance, instance);
   }
 
   MDefinition* mir() const {
@@ -143,14 +143,14 @@ class LUDivOrModI64
 
   static const size_t Lhs = 0;
   static const size_t Rhs = INT64_PIECES;
-  static const size_t Tls = 2 * INT64_PIECES;
+  static const size_t Instance = 2 * INT64_PIECES;
 
   LUDivOrModI64(const LInt64Allocation& lhs, const LInt64Allocation& rhs,
-                const LAllocation& tls)
+                const LAllocation& instance)
       : LCallInstructionHelper(classOpcode) {
     setInt64Operand(Lhs, lhs);
     setInt64Operand(Rhs, rhs);
-    setOperand(Tls, tls);
+    setOperand(Instance, instance);
   }
 
   MDefinition* mir() const {
@@ -361,19 +361,19 @@ class LSoftUDivOrMod : public LBinaryCallInstructionHelper<1, 0> {
 
 class LWasmTruncateToInt64 : public LCallInstructionHelper<INT64_PIECES, 2, 0> {
   static const size_t Input = 0;
-  static const size_t Tls = 1;
+  static const size_t Instance = 1;
 
  public:
   LIR_HEADER(WasmTruncateToInt64);
 
-  LWasmTruncateToInt64(const LAllocation& in, const LAllocation& tls)
+  LWasmTruncateToInt64(const LAllocation& in, const LAllocation& instance)
       : LCallInstructionHelper(classOpcode) {
     setOperand(Input, in);
-    setOperand(Tls, tls);
+    setOperand(Instance, instance);
   }
 
   LAllocation* input() { return getOperand(Input); }
-  LAllocation* tls() { return getOperand(Tls); }
+  LAllocation* instance() { return getOperand(Instance); }
 
   MWasmBuiltinTruncateToInt64* mir() const {
     return mir_->toWasmBuiltinTruncateToInt64();
@@ -386,16 +386,17 @@ class LInt64ToFloatingPointCall
   LIR_HEADER(Int64ToFloatingPointCall);
 
   static const size_t Input = 0;
-  static const size_t Tls = INT64_PIECES;
+  static const size_t Instance = INT64_PIECES;
 
-  LInt64ToFloatingPointCall(const LInt64Allocation& in, const LAllocation& tls)
+  LInt64ToFloatingPointCall(const LInt64Allocation& in,
+                            const LAllocation& instance)
       : LCallInstructionHelper(classOpcode) {
     setInt64Operand(Input, in);
-    setOperand(Tls, tls);
+    setOperand(Instance, instance);
   }
 
   LAllocation* input() { return getOperand(Input); }
-  LAllocation* tls() { return getOperand(Tls); }
+  LAllocation* instance() { return getOperand(Instance); }
 
   MBuiltinInt64ToFloatingPoint* mir() const {
     return mir_->toBuiltinInt64ToFloatingPoint();

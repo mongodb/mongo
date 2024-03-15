@@ -1,12 +1,5 @@
-commit bf4607277fa7133825cb7899015374917cd06b8f
-Author: Mike Hommey <mhommey@mozilla.com>
-Date:   Tue Jan 26 19:46:13 2021 +0900
+commit 4f7a25d8ced8c7cf6eee6fd09d6788eaa23c9afe
+Author: Florian Loitsch <florian@loitsch.com>
+Date:   Thu May 18 14:20:37 2023 +0200
 
-    Add a flag to make precision mode like printf's %g (#149)
-    
-    With this, %g can be emulated with:
-    ```
-    DoubleToStringConverter cvt(
-      UNIQUE_ZERO | NO_TRAILING_ZERO | EMIT_POSITIVE_EXPONENT_SIGN,
-      "inf", "nan", 'e', 0, 0, 4, 0, 2)
-    ```
+    Prepare v3.2.0 release. (#196)

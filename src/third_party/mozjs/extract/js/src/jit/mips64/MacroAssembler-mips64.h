@@ -10,7 +10,7 @@
 #include "jit/mips-shared/MacroAssembler-mips-shared.h"
 #include "jit/MoveResolver.h"
 #include "vm/BytecodeUtil.h"
-#include "wasm/WasmTypes.h"
+#include "wasm/WasmBuiltins.h"
 
 namespace js {
 namespace jit {
@@ -121,9 +121,13 @@ class MacroAssemblerMIPS64 : public MacroAssemblerMIPSShared {
                              Label* overflow);
   void ma_addPtrTestOverflow(Register rd, Register rs, Imm32 imm,
                              Label* overflow);
+  void ma_addPtrTestOverflow(Register rd, Register rs, ImmWord imm,
+                             Label* overflow);
   void ma_addPtrTestCarry(Condition cond, Register rd, Register rs, Register rt,
                           Label* overflow);
   void ma_addPtrTestCarry(Condition cond, Register rd, Register rs, Imm32 imm,
+                          Label* overflow);
+  void ma_addPtrTestCarry(Condition cond, Register rd, Register rs, ImmWord imm,
                           Label* overflow);
   // subtract
   void ma_dsubu(Register rd, Register rs, Imm32 imm);
@@ -179,6 +183,7 @@ class MacroAssemblerMIPS64 : public MacroAssemblerMIPSShared {
   void ma_push(FloatRegister f);
 
   void ma_cmp_set(Register dst, Register lhs, ImmWord imm, Condition c);
+  void ma_cmp_set(Register dst, Address address, ImmWord imm, Condition c);
   void ma_cmp_set(Register dst, Register lhs, ImmPtr imm, Condition c);
   void ma_cmp_set(Register dst, Address address, Imm32 imm, Condition c);
 
@@ -408,6 +413,20 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
     ma_dext(dest, src.valueReg(), Imm32(0), Imm32(JSVAL_TAG_SHIFT));
   }
 
+  // Like unboxGCThingForGCBarrier, but loads the GC thing's chunk base.
+  void getGCThingValueChunk(const Address& src, Register dest) {
+    ScratchRegisterScope scratch(asMasm());
+    MOZ_ASSERT(scratch != dest);
+    loadPtr(src, dest);
+    movePtr(ImmWord(JS::detail::ValueGCThingPayloadChunkMask), scratch);
+    as_and(dest, dest, scratch);
+  }
+  void getGCThingValueChunk(const ValueOperand& src, Register dest) {
+    MOZ_ASSERT(src.valueReg() != dest);
+    movePtr(ImmWord(JS::detail::ValueGCThingPayloadChunkMask), dest);
+    as_and(dest, dest, src.valueReg());
+  }
+
   void unboxInt32(const ValueOperand& operand, Register dest);
   void unboxInt32(Register src, Register dest);
   void unboxInt32(const Address& src, Register dest);
@@ -501,9 +520,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
   void testUndefinedSet(Condition cond, const ValueOperand& value,
                         Register dest);
 
-  // higher level tag testing code
-  Address ToPayload(Address value) { return value; }
-
   template <typename T>
   void loadUnboxedValue(const T& address, MIRType type, AnyRegister dest) {
     if (dest.isFloat()) {
@@ -583,6 +599,13 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
     storePtr(temp, dest);
   }
 
+  void storePrivateValue(Register src, const Address& dest) {
+    storePtr(src, dest);
+  }
+  void storePrivateValue(ImmGCPtr imm, const Address& dest) {
+    storePtr(imm, dest);
+  }
+
   void loadValue(Address src, ValueOperand val);
   void loadValue(Operand dest, ValueOperand val) {
     loadValue(dest.toAddress(), val);
@@ -611,8 +634,13 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
     push(ScratchRegister);
   }
   void pushValue(const Address& addr);
+  void pushValue(const BaseIndex& addr, Register scratch) {
+    loadValue(addr, ValueOperand(scratch));
+    pushValue(ValueOperand(scratch));
+  }
 
-  void handleFailureWithHandlerTail(Label* profilerExitTail);
+  void handleFailureWithHandlerTail(Label* profilerExitTail,
+                                    Label* bailoutTail);
 
   /////////////////////////////////////////////////////////////////
   // Common interface.
@@ -710,12 +738,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
   void store32(Imm32 src, const Address& address);
   void store32(Imm32 src, const BaseIndex& address);
 
-  // NOTE: This will use second scratch on MIPS64. Only ARM needs the
-  // implementation without second scratch.
-  void store32_NoSecondScratch(Imm32 src, const Address& address) {
-    store32(src, address);
-  }
-
   template <typename T>
   void store32Unaligned(Register src, const T& dest) {
     ma_store_unaligned(src, dest, SizeWord);
@@ -782,11 +804,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
   void cmp32Set(Assembler::Condition cond, Register lhs, Address rhs,
                 Register dest);
 
-  void cmp64Set(Assembler::Condition cond, Register lhs, Imm32 rhs,
-                Register dest) {
-    ma_cmp_set(dest, lhs, rhs, cond);
-  }
-
  protected:
   bool buildOOLFakeExitFrame(void* fakeReturnAddr);
 
@@ -809,15 +826,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64 {
 
   void moveFloat32(FloatRegister src, FloatRegister dest) {
     as_movs(dest, src);
-  }
-
-  void loadWasmGlobalPtr(uint32_t globalDataOffset, Register dest) {
-    loadPtr(Address(WasmTlsReg,
-                    offsetof(wasm::TlsData, globalArea) + globalDataOffset),
-            dest);
-  }
-  void loadWasmPinnedRegsFromTls() {
-    loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, memoryBase)), HeapReg);
   }
 
   // Instrumentation for entering and leaving the profiler.

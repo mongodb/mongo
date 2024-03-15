@@ -11,9 +11,17 @@
 
 #  include "mozilla/Sprintf.h"
 
+#  include "NamespaceImports.h"
+
 #  include "jit/CacheIR.h"
+#  include "js/TypeDecls.h"
+
+enum class JSOp : uint8_t;
 
 namespace js {
+
+class AutoStructuredSpewer;
+
 namespace jit {
 
 class ICEntry;
@@ -47,11 +55,11 @@ class ICFallbackStub;
 //      ex) cacheIRHealthReport(foo)
 //
 // Once you have generated a health report, you may go to
-// https://carolinecullen.github.io/cacheirhealthreport/ to visualize the data
-// and aid in understanding what may be going wrong with the CacheIR for a
+// https://mozilla-spidermonkey.github.io/cacheirhealthreport/ to visualize the
+// data and aid in understanding what may be going wrong with the CacheIR for a
 // particular stub. For more information about the tool and why a particular
 // script, inline cache entry, or stub is unhappy go to:
-// https://carolinecullen.github.io/cacheirhealthreport/info.html
+// https://mozilla-spidermonkey.github.io/cacheirhealthreport/info.html
 //
 enum SpewContext : uint8_t { Shell, Transition, TrialInlining };
 
@@ -64,13 +72,20 @@ class CacheIRHealth {
   Happiness spewStubHealth(AutoStructuredSpewer& spew, ICCacheIRStub* stub);
   // If there is more than just a fallback stub in an IC Entry, then additional
   // information about the IC entry.
-  bool spewNonFallbackICInformation(AutoStructuredSpewer& spew,
+  bool spewNonFallbackICInformation(AutoStructuredSpewer& spew, JSContext* cx,
                                     ICStub* firstStub,
                                     Happiness* entryHappiness);
   // Health of all the stubs in an individual CacheIR Entry.
-  bool spewICEntryHealth(AutoStructuredSpewer& spew, HandleScript script,
-                         ICEntry* entry, ICFallbackStub* fallback,
-                         jsbytecode* pc, JSOp op, Happiness* entryHappiness);
+  bool spewICEntryHealth(AutoStructuredSpewer& spew, JSContext* cx,
+                         HandleScript script, ICEntry* entry,
+                         ICFallbackStub* fallback, jsbytecode* pc, JSOp op,
+                         Happiness* entryHappiness);
+  // Spews first and last property name for each shape checked by
+  // GuardShape in the stub.
+  void spewShapeInformation(AutoStructuredSpewer& spew, JSContext* cx,
+                            ICStub* stub);
+  // Returns the BaseScript of a Shape if available.
+  BaseScript* maybeExtractBaseScript(JSContext* cx, Shape* shape);
 
  public:
   // Spews the final hit count for scripts where we care about its final hit

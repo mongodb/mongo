@@ -63,10 +63,6 @@
 #define PROP_DESC_GETTER_INDEX 1
 #define PROP_DESC_SETTER_INDEX 2
 
-// The extended slot of uncloned self-hosted function, in which the canonical
-// name for self-hosted builtins is stored by `_SetCanonicalName`.
-#define CANONICAL_FUNCTION_NAME_SLOT 0
-
 // The extended slot of cloned self-hosted function, in which the self-hosted
 // name for self-hosted builtins is stored.
 #define LAZY_FUNCTION_NAME_SLOT 0
@@ -106,32 +102,7 @@
 #define DATE_METHOD_LOCALE_DATE_STRING 1
 #define DATE_METHOD_LOCALE_STRING 2
 
-#define MODULE_OBJECT_ENVIRONMENT_SLOT 1
-#define MODULE_OBJECT_STATUS_SLOT 3
-#define MODULE_OBJECT_EVALUATION_ERROR_SLOT 4
-#define MODULE_OBJECT_DFS_INDEX_SLOT 14
-#define MODULE_OBJECT_DFS_ANCESTOR_INDEX_SLOT 15
-#define MODULE_OBJECT_ASYNC_EVALUATING_POST_ORDER_SLOT 17
-#define MODULE_OBJECT_TOP_LEVEL_CAPABILITY_SLOT 18
-#define MODULE_OBJECT_PENDING_ASYNC_DEPENDENCIES_SLOT 20
-
-// rev b012019fea18f29737a67c36911340a3e25bfc63
-// 15.2.1.16 Cyclic Module Records
-// Value types of [[Status]] in a Cyclic Module Record
-#define MODULE_STATUS_UNLINKED 0
-#define MODULE_STATUS_LINKING 1
-#define MODULE_STATUS_LINKED 2
-#define MODULE_STATUS_EVALUATING 3
-#define MODULE_STATUS_EVALUATED 4
-
-// rev b012019fea18f29737a67c36911340a3e25bfc63
-// 15.2.1.16 Cyclic Module Records
-// Value types of [[EvaluationError]] in a Cyclic Module Record
-#define MODULE_STATUS_EVALUATED_ERROR 5
-
 #define INTL_INTERNALS_OBJECT_SLOT 0
-
-#define NOT_OBJECT_KIND_DESCRIPTOR 0
 
 #define TYPEDARRAY_KIND_INT8 0
 #define TYPEDARRAY_KIND_UINT8 1

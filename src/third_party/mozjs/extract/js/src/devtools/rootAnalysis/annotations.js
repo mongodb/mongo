@@ -17,7 +17,7 @@ var ignoreIndirectCalls = {
 };
 
 // Types that when constructed with no arguments, are "safe" values (they do
-// not contain GC pointers).
+// not contain GC pointers, or values with nontrivial destructors.)
 var typesWithSafeConstructors = new Set([
     "mozilla::Maybe",
     "mozilla::dom::Nullable",
@@ -32,7 +32,14 @@ var resetterMethods = {
     'js::UniquePtr': new Set(["reset"]),
     'mozilla::dom::Nullable': new Set(["SetNull"]),
     'mozilla::dom::TypedArray_base': new Set(["Reset"]),
+    'RefPtr': new Set(["forget"]),
+    'nsCOMPtr': new Set(["forget"]),
+    'JS::AutoAssertNoGC': new Set(["reset"]),
 };
+
+function isRefcountedDtor(name) {
+    return name.includes("::~RefPtr(") || name.includes("::~nsCOMPtr(");
+}
 
 function indirectCallCannotGC(fullCaller, fullVariable)
 {
@@ -40,8 +47,8 @@ function indirectCallCannotGC(fullCaller, fullVariable)
 
     // This is usually a simple variable name, but sometimes a full name gets
     // passed through. And sometimes that name is truncated. Examples:
-    //   _ZL13gAbortHandler|mozalloc_oom.cpp:void (* gAbortHandler)(size_t)
-    //   _ZL14pMutexUnlockFn|umutex.cpp:void (* pMutexUnlockFn)(const void*
+    //   _ZL13gAbortHandler$mozalloc_oom.cpp:void (* gAbortHandler)(size_t)
+    //   _ZL14pMutexUnlockFn$umutex.cpp:void (* pMutexUnlockFn)(const void*
     var name = readable(fullVariable);
 
     if (name in ignoreIndirectCalls)
@@ -111,6 +118,7 @@ var ignoreCallees = {
     "struct js::gc::Callback<void (*)(JSContext*, void*)>.op" : true,
     "mozilla::ThreadSharedFloatArrayBufferList::Storage.mFree" : true,
     "mozilla::SizeOfState.mMallocSizeOf": true,
+    "mozilla::gfx::SourceSurfaceRawData.mDeallocator": true,
 };
 
 function fieldCallCannotGC(csu, fullfield)
@@ -174,12 +182,6 @@ function ignoreEdgeAddressTaken(edge)
     }
 
     return false;
-}
-
-// Return whether csu.method is one that we claim can never GC.
-function isSuppressedVirtualMethod(csu, method)
-{
-    return csu == "nsISupports" && (method == "AddRef" || method == "Release");
 }
 
 // Ignore calls of these functions (so ignore any stack containing these)
@@ -266,7 +268,7 @@ var ignoreFunctions = {
 
     // Stores a function pointer in an AutoProfilerLabelData struct and calls it.
     // And it's in mozglue, which doesn't have access to the attributes yet.
-    "void mozilla::ProfilerLabelEnd(mozilla::Tuple<void*, unsigned int>*)" : true,
+    "void mozilla::ProfilerLabelEnd(std::tuple<void*, unsigned int>*)" : true,
 
     // This gets into PLDHashTable function pointer territory, and should get
     // set up early enough to not do anything when it matters anyway.
@@ -294,9 +296,14 @@ var ignoreFunctions = {
     // nsIEventTarget.IsOnCurrentThreadInfallible does not get resolved, and
     // this is called on non-JS threads so cannot use AutoSuppressGCAnalysis.
     "uint8 nsAutoOwningEventTarget::IsCurrentThread() const": true,
+
+    // ~JSStreamConsumer calls 2 ~RefCnt/~nsCOMPtr destructors for its fields,
+    // but the body of the destructor is written so that all Releases
+    // are proxied, and the members will all be empty at destruction time.
+    "void mozilla::dom::JSStreamConsumer::~JSStreamConsumer() [[base_dtor]]": true,
 };
 
-function extraGCFunctions() {
+function extraGCFunctions(readableNames) {
     return ["ffi_call"].filter(f => f in readableNames);
 }
 
@@ -323,7 +330,7 @@ function isICU(name)
            name.match(/u(prv_malloc|prv_realloc|prv_free|case_toFullLower)_\d+/)
 }
 
-function ignoreGCFunction(mangled)
+function ignoreGCFunction(mangled, readableNames)
 {
     // Field calls will not be in readableNames
     if (!(mangled in readableNames))
@@ -408,7 +415,7 @@ function isUnsafeStorage(typeName)
     return typeName.startsWith('UniquePtr<');
 }
 
-// If edgeType is a constructor type, return whatever limits it implies for its
+// If edgeType is a constructor type, return whatever bits it implies for its
 // scope (or zero if not matching).
 function isLimitConstructor(typeInfo, edgeType, varName)
 {
@@ -422,9 +429,9 @@ function isLimitConstructor(typeInfo, edgeType, varName)
 
     // Check whether the type is a known suppression type.
     var type = edgeType.TypeFunctionCSU.Type.Name;
-    let limit = 0;
+    let attrs = 0;
     if (type in typeInfo.GCSuppressors)
-        limit = limit | LIMIT_CANNOT_GC;
+        attrs = attrs | ATTR_GC_SUPPRESSED;
 
     // And now make sure this is the constructor, not some other method on a
     // suppression type. varName[0] contains the qualified name.
@@ -438,75 +445,28 @@ function isLimitConstructor(typeInfo, edgeType, varName)
     if (m[1] != type_stem)
         return 0;
 
-    return limit;
+    return attrs;
 }
 
-// nsISupports subclasses' methods may be scriptable (or overridden
-// via binary XPCOM), and so may GC. But some fields just aren't going
-// to get overridden with something that can GC.
-function isOverridableField(staticCSU, csu, field)
+// XPIDL-generated methods may invoke JS code, depending on the IDL
+// attributes. This is not visible in the static callgraph since it
+// goes through generated asm code. We can use the JS_HAZ_CAN_RUN_SCRIPT
+// annotation to tell whether this is possible, which is set programmatically
+// by the code generator when needed (bug 1347999):
+// https://searchfox.org/mozilla-central/rev/81c52abeec336685330af5956c37b4bcf8926476/xpcom/idl-parser/xpidl/header.py#213-219
+//
+// Note that WebIDL callbacks can also invoke JS code, but our code generator
+// produces regular C++ code and so does not need any annotations. (There will
+// be a call to JS::Call() or similar.)
+function virtualCanRunJS(csu, field)
 {
-    if (csu != 'nsISupports')
+    const tags = typeInfo.OtherFieldTags;
+    const iface = tags[csu]
+    if (!iface) {
         return false;
-
-    // Now that binary XPCOM is dead, all these annotations should be replaced
-    // with something based on bug 1347999.
-    if (field == 'GetCurrentJSContext')
-        return false;
-    if (field == 'IsOnCurrentThread')
-        return false;
-    if (field == 'GetNativeContext')
-        return false;
-    if (field == "GetGlobalJSObject")
-        return false;
-    if (field == "GetGlobalJSObjectPreserveColor")
-        return false;
-    if (field == "GetIsMainThread")
-        return false;
-    if (field == "GetThreadFromPRThread")
-        return false;
-    if (field == "DocAddSizeOfIncludingThis")
-        return false;
-    if (field == "ConstructUbiNode")
-        return false;
-
-    // Fields on the [builtinclass] nsIPrincipal
-    if (field == "GetSiteOrigin")
-        return false;
-    if (field == "GetDomain")
-        return false;
-    if (field == "GetBaseDomain")
-        return false;
-    if (field == "GetOriginNoSuffix")
-        return false;
-
-    // Fields on nsIURI
-    if (field == "GetScheme")
-        return false;
-    if (field == "GetAsciiHostPort")
-        return false;
-    if (field == "GetAsciiSpec")
-        return false;
-    if (field == "SchemeIs")
-        return false;
-
-    if (staticCSU == 'nsIXPCScriptable' && field == "GetScriptableFlags")
-        return false;
-    if (staticCSU == 'nsIXPConnectJSObjectHolder' && field == 'GetJSObject')
-        return false;
-    if (staticCSU == 'nsIXPConnect' && field == 'GetSafeJSContext')
-        return false;
-
-    // nsIScriptSecurityManager is not [builtinclass], but smaug says "the
-    // interface definitely should be builtinclass", which is good enough.
-    if (staticCSU == 'nsIScriptSecurityManager' && field == 'IsSystemPrincipal')
-        return false;
-
-    if (staticCSU == 'nsIScriptContext') {
-        if (field == 'GetWindowProxy' || field == 'GetWindowProxyPreserveColor')
-            return false;
     }
-    return true;
+    const virtual_method_tags = iface[field];
+    return virtual_method_tags && virtual_method_tags.includes("Can run script");
 }
 
 function listNonGCPointers() {

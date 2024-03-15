@@ -66,8 +66,6 @@ extern JS_PUBLIC_API bool ExecuteInJSMEnvironment(JSContext* cx,
 // Additionally, target objects may be specified as required by the Gecko
 // subscript loader. These are wrapped in non-syntactic WithEnvironments and
 // temporarily placed on the environment chain.
-//
-// See also: JS::CloneAndExecuteScript(...)
 extern JS_PUBLIC_API bool ExecuteInJSMEnvironment(
     JSContext* cx, Handle<JSScript*> script, Handle<JSObject*> jsmEnv,
     Handle<StackGCVector<JSObject*>> targetObj);

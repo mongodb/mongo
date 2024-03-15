@@ -7,6 +7,10 @@
 #ifndef jit_BaselineFrameInfo_inl_h
 #define jit_BaselineFrameInfo_inl_h
 
+#include "jit/BaselineFrameInfo.h"
+
+#include "jit/MacroAssembler-inl.h"
+
 namespace js {
 namespace jit {
 
@@ -32,6 +36,12 @@ void CompilerFrameInfo::popn(uint32_t n, StackAdjustment adjust) {
   if (adjust == AdjustStack && poppedStack > 0) {
     masm.addToStackPtr(Imm32(sizeof(Value) * poppedStack));
   }
+}
+
+void InterpreterFrameInfo::pop() { popn(1); }
+
+void InterpreterFrameInfo::popn(uint32_t n) {
+  masm.addToStackPtr(Imm32(n * sizeof(Value)));
 }
 
 }  // namespace jit

@@ -30,6 +30,15 @@ namespace js {
 extern JSScript* TestingFunctionArgumentToScript(JSContext* cx, HandleValue v,
                                                  JSFunction** funp = nullptr);
 
+#ifdef FUZZING_JS_FUZZILLI
+uint32_t FuzzilliHashDouble(double value);
+
+uint32_t FuzzilliHashBigInt(BigInt* bigInt);
+
+void FuzzilliHashObjectInl(JSContext* cx, JSObject* obj, uint32_t* out);
+void FuzzilliHashObject(JSContext* cx, JSObject* obj);
+#endif
+
 } /* namespace js */
 
 #endif /* builtin_TestingFunctions_h */

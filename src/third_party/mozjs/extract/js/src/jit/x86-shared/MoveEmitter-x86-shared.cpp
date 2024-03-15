@@ -177,7 +177,8 @@ MoveEmitterX86::~MoveEmitterX86() { assertDone(); }
 Address MoveEmitterX86::cycleSlot() {
   if (pushedAtCycle_ == -1) {
     // Reserve stack for cycle resolution
-    masm.reserveStack(Simd128DataSize);
+    static_assert(SpillSlotSize == 16);
+    masm.reserveStack(SpillSlotSize);
     pushedAtCycle_ = masm.framePushed();
   }
 

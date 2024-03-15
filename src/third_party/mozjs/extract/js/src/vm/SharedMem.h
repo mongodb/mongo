@@ -7,6 +7,8 @@
 #ifndef vm_SharedMem_h
 #define vm_SharedMem_h
 
+#include "mozilla/Assertions.h"
+
 #include <type_traits>
 
 template <typename T>
@@ -87,11 +89,15 @@ class SharedMem {
     return SharedMem<U>::shared(unwrap());
   }
 
-  explicit operator bool() { return ptr_ != nullptr; }
+  explicit operator bool() const { return ptr_ != nullptr; }
 
-  SharedMem operator+(size_t offset) { return SharedMem(ptr_ + offset, *this); }
+  SharedMem operator+(size_t offset) const {
+    return SharedMem(ptr_ + offset, *this);
+  }
 
-  SharedMem operator-(size_t offset) { return SharedMem(ptr_ - offset, *this); }
+  SharedMem operator-(size_t offset) const {
+    return SharedMem(ptr_ - offset, *this);
+  }
 
   SharedMem operator++() {
     ptr_++;

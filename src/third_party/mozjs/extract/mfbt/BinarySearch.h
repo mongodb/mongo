@@ -154,7 +154,7 @@ bool BinarySearch(const Container& aContainer, size_t aBegin, size_t aEnd,
  *     const nsACString& mStr;
  *     explicit Comparator(const nsACString& aStr) : mStr(aStr) {}
  *     int32_t operator()(const char* aVal) const {
- *       return mStr.Compare(aVal);
+ *       return Compare(mStr, nsDependentCString(aVal));
  *     }
  *   };
  *

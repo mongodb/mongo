@@ -14,9 +14,9 @@
 
 #include "js/Class.h"                   // JSClassOps, JSClass
 #include "js/experimental/JSStencil.h"  // JS::Stencil
-#include "vm/NativeObject.h"            // NativeObject
+#include "js/TypeDecls.h"
+#include "vm/NativeObject.h"  // NativeObject
 
-class JSFreeOp;
 class JSObject;
 
 namespace js {
@@ -37,7 +37,7 @@ class StencilObject : public NativeObject {
   JS::Stencil* stencil() const;
 
   static StencilObject* create(JSContext* cx, RefPtr<JS::Stencil> stencil);
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 // Object that holds Stencil XDR buffer.
@@ -63,7 +63,7 @@ class StencilXDRBufferObject : public NativeObject {
  public:
   static StencilXDRBufferObject* create(JSContext* cx, uint8_t* buffer,
                                         size_t length);
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 } /* namespace js */

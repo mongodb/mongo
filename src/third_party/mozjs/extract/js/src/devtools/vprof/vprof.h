@@ -86,7 +86,7 @@ uint64_t readTimestampCounter();
 }
 #endif
 
-//#define DOPROF
+// #define DOPROF
 
 #ifndef DOPROF
 #  define _nvprof(e, v)
@@ -216,7 +216,7 @@ typedef struct hist {
   int nbins;
   int64_t* lb;
   int64_t* count;
-} * hist_t;
+}* hist_t;
 
 typedef struct entry entry;
 
@@ -242,7 +242,7 @@ typedef struct entry {
   //
 
   char pad[128];  // avoid false sharing
-} * entry_t;
+}* entry_t;
 
 #define _VAL ((entry_t)vprofID)->value
 #define _COUNT ((entry_t)vprofID)->count

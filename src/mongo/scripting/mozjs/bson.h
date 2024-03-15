@@ -53,6 +53,8 @@ namespace mozjs {
  * ::make() from C++.
  */
 struct BSONInfo : public BaseInfo {
+    enum Slots { BSONHolderSlot, BSONInfoSlotCount };
+
     static void delProperty(JSContext* cx,
                             JS::HandleObject obj,
                             JS::HandleId id,
@@ -61,7 +63,7 @@ struct BSONInfo : public BaseInfo {
                           JS::HandleObject obj,
                           JS::MutableHandleIdVector properties,
                           bool enumerableOnly);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
     static void setProperty(JSContext* cx,
                             JS::HandleObject obj,
@@ -71,7 +73,7 @@ struct BSONInfo : public BaseInfo {
                             JS::ObjectOpResult& result);
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(BSONInfoSlotCount);
     static const InstallType installType = InstallType::Private;
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 
