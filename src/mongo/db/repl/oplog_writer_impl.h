@@ -75,7 +75,6 @@ public:
                     OplogBuffer* applyBuffer,
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface,
-                    ThreadPool* writerPool,
                     Observer* observer,
                     const OplogWriter::Options& options);
 
@@ -118,8 +117,8 @@ private:
 
     void _writeOplogBatchImpl(OperationContext* opCtx,
                               const std::vector<InsertStatement>& docs,
-                              const NamespaceString& nss,
-                              writeDocsFn&& writeDocsFn);
+                              bool writeOplogColl,
+                              bool writeChangeColl);
 
     OplogBuffer* const _applyBuffer;
 
@@ -128,10 +127,6 @@ private:
 
     // Not owned by us.
     StorageInterface* _storageInterface;
-
-    // Pool of worker threads for writing oplog entries.
-    // Not owned by us.
-    ThreadPool* const _writerPool;
 
     // Not owned by us.
     Observer* const _observer;

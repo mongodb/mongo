@@ -152,8 +152,10 @@ class OplogWriter::Observer {
 public:
     virtual ~Observer() = default;
 
-    virtual void onWriteOplogCollection(const std::vector<InsertStatement>& docs) = 0;
-    virtual void onWriteChangeCollection(const std::vector<InsertStatement>& docs) = 0;
+    virtual void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
+                                        std::vector<InsertStatement>::const_iterator end) = 0;
+    virtual void onWriteChangeCollections(std::vector<InsertStatement>::const_iterator begin,
+                                          std::vector<InsertStatement>::const_iterator end) = 0;
 };
 
 /**
@@ -161,8 +163,10 @@ public:
  */
 class NoopOplogWriterObserver : public OplogWriter::Observer {
 public:
-    void onWriteOplogCollection(const std::vector<InsertStatement>& docs) final {}
-    void onWriteChangeCollection(const std::vector<InsertStatement>& docs) final {}
+    void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
+                                std::vector<InsertStatement>::const_iterator end) final {}
+    void onWriteChangeCollections(std::vector<InsertStatement>::const_iterator begin,
+                                  std::vector<InsertStatement>::const_iterator end) final {}
 };
 
 extern NoopOplogWriterObserver noopOplogWriterObserver;

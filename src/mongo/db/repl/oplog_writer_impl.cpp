@@ -55,43 +55,49 @@ auto checkFeatureFlagReduceMajorityWriteLatencyFn = [] {
 auto& oplogWriterMetric = *MetricBuilder<OplogWriterStats>{"repl.write"}.setPredicate(
     checkFeatureFlagReduceMajorityWriteLatencyFn);
 
-Status insertDocsToOplogCollection(OperationContext* opCtx,
-                                   std::vector<InsertStatement>::const_iterator begin,
-                                   std::vector<InsertStatement>::const_iterator end) {
+Status insertDocsToOplogAndChangeCollections(OperationContext* opCtx,
+                                             std::vector<InsertStatement>::const_iterator begin,
+                                             std::vector<InsertStatement>::const_iterator end,
+                                             bool writeOplogColl,
+                                             bool writeChangeColl,
+                                             OplogWriter::Observer* observer) {
     WriteUnitOfWork wuow(opCtx);
+    boost::optional<AutoGetOplog> autoOplog;
+    boost::optional<ChangeStreamChangeCollectionManager::ChangeCollectionsWriter> ccw;
 
-    // Acquire the collection lock.
-    AutoGetOplog autoOplog(opCtx, OplogAccessMode::kWrite);
-    auto& oplogColl = autoOplog.getCollection();
-    if (!oplogColl) {
-        return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
+    // Acquire locks. We must acquire the locks for all collections we intend to write to before
+    // performing any writes. This avoids potential deadlocks created by waiting for locks while
+    // having generated oplog holes.
+    if (writeOplogColl) {
+        autoOplog.emplace(opCtx, OplogAccessMode::kWrite);
+    }
+    if (writeChangeColl) {
+        ccw.emplace(ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollectionsWriter(
+            opCtx, begin, end, nullptr /* opDebug */));
+        ccw->acquireLocks();
     }
 
-    auto status = collection_internal::insertDocuments(
-        opCtx, oplogColl, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
-    if (!status.isOK()) {
-        return status;
+    // Write the oplog entries to the oplog collection.
+    if (writeOplogColl) {
+        auto& oplogColl = autoOplog->getCollection();
+        if (!oplogColl) {
+            return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
+        }
+        auto status = collection_internal::insertDocuments(
+            opCtx, oplogColl, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
+        if (!status.isOK()) {
+            return status;
+        }
+        observer->onWriteOplogCollection(begin, end);
     }
 
-    wuow.commit();
-
-    return Status::OK();
-}
-
-Status insertDocsToChangeCollection(OperationContext* opCtx,
-                                    std::vector<InsertStatement>::const_iterator begin,
-                                    std::vector<InsertStatement>::const_iterator end) {
-    WriteUnitOfWork wuow(opCtx);
-
-    // Acquire the collection lock.
-    auto writer = ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollectionsWriter(
-        opCtx, begin, end, nullptr /* opDebug */);
-
-    writer.acquireLocks();
-
-    auto status = writer.write();
-    if (!status.isOK()) {
-        return status;
+    // Write the oplog entries to the tenant respective change collections.
+    if (writeChangeColl) {
+        auto status = ccw->write();
+        if (!status.isOK()) {
+            return status;
+        }
+        observer->onWriteChangeCollections(begin, end);
     }
 
     wuow.commit();
@@ -122,14 +128,12 @@ OplogWriterImpl::OplogWriterImpl(executor::TaskExecutor* executor,
                                  OplogBuffer* applyBuffer,
                                  ReplicationCoordinator* replCoord,
                                  StorageInterface* storageInterface,
-                                 ThreadPool* writerPool,
                                  Observer* observer,
                                  const OplogWriter::Options& options)
     : OplogWriter(executor, writeBuffer, options),
       _applyBuffer(applyBuffer),
       _replCoord(replCoord),
       _storageInterface(storageInterface),
-      _writerPool(writerPool),
       _observer(observer) {}
 
 void OplogWriterImpl::_run() {
@@ -204,31 +208,29 @@ StatusWith<OpTime> OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
     invariant(!ops.empty());
     LOGV2_DEBUG(8352100, 2, "Oplog write batch size", "size"_attr = ops.size());
 
+    bool writeOplogColl = !getOptions().skipWritesToOplogColl;
+    bool writeChangeColl = change_stream_serverless_helpers::isChangeCollectionsModeActive();
+
+    // This should only happen for recovery modes.
+    if (!writeOplogColl && !writeChangeColl) {
+        return OpTime();
+    }
+
+    // Increment the batch stats.
     oplogWriterMetric.incrementBatchSize(ops.size());
     TimerHolder timer(&oplogWriterMetric.getBatches());
-    std::vector<InsertStatement> docs;
-    bool writeChangeCollection = change_stream_serverless_helpers::isChangeCollectionsModeActive();
 
     // Create insert statements from the oplog entries.
+    std::vector<InsertStatement> docs;
     docs.reserve(ops.size());
+
     for (const auto& op : ops) {
         auto opTime = invariantStatusOK(OpTime::parseFromOplogEntry(op));
         docs.emplace_back(InsertStatement{op, opTime.getTimestamp(), opTime.getTerm()});
     }
 
-    // Write to the oplog collection, this step will be skipped during startup recovery.
-    if (!getOptions().skipWritesToOplogColl) {
-        _writeOplogBatchImpl(
-            opCtx, docs, NamespaceString::kRsOplogNamespace, insertDocsToOplogCollection);
-        _observer->onWriteOplogCollection(docs);
-    }
-
-    // Write to the change collection in a separate storage transaction, this step can be
-    // skipped if not running in serverless.
-    if (writeChangeCollection) {
-        _writeOplogBatchImpl(opCtx, docs, changeCollNss, insertDocsToChangeCollection);
-        _observer->onWriteChangeCollection(docs);
-    }
+    // Perform writes to oplog collection and/or change collection.
+    _writeOplogBatchImpl(opCtx, docs, writeOplogColl, writeChangeColl);
 
     return docs.back().oplogSlot;
 }
@@ -254,17 +256,27 @@ void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
 
 void OplogWriterImpl::_writeOplogBatchImpl(OperationContext* opCtx,
                                            const std::vector<InsertStatement>& docs,
-                                           const NamespaceString& nss,
-                                           writeDocsFn&& writeDocsFn) {
+                                           bool writeOplogColl,
+                                           bool writeChangeColl) {
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
     ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kExempt);
     UnreplicatedWritesBlock uwb(opCtx);
 
-    fassert(8352101,
+    // The 'nsOrUUID' is used only to log the debug message when retrying inserts on the
+    // oplog and change collections. The 'writeConflictRetry' helper assumes operations
+    // are done on a single a single namespace. But the provided insert function can do
+    // inserts on the oplog and/or multiple change collections, ie. multiple namespaces.
+    // As such 'writeConflictRetry' will not log the correct namespace when retrying.
+    NamespaceStringOrUUID nsOrUUID = writeOplogColl
+        ? NamespaceString::kRsOplogNamespace
+        : NamespaceString::makeChangeCollectionNSS(boost::none /* tenantId */);
+
+    fassert(8792300,
             storage_helpers::insertBatchAndHandleRetry(
-                opCtx, nss, docs, [&](auto* opCtx, auto begin, auto end) {
-                    return writeDocsFn(opCtx, begin, end);
+                opCtx, nsOrUUID, docs, [&](auto* opCtx, auto begin, auto end) {
+                    return insertDocsToOplogAndChangeCollections(
+                        opCtx, begin, end, writeOplogColl, writeChangeColl, _observer);
                 }));
 }
 

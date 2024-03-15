@@ -57,16 +57,18 @@ BSONObj makeRawInsertOplogEntry(int t, const NamespaceString& nss) {
 
 class CountOpsObserver : public OplogWriterImpl::Observer {
 public:
-    void onWriteOplogCollection(const std::vector<InsertStatement>& docs) final {
-        oplogCollDocsCount += docs.size();
+    void onWriteOplogCollection(std::vector<InsertStatement>::const_iterator begin,
+                                std::vector<InsertStatement>::const_iterator end) final {
+        oplogCollDocsCount.addAndFetch(std::distance(begin, end));
     }
 
-    void onWriteChangeCollection(const std::vector<InsertStatement>& docs) final {
-        changeCollDocsCount += docs.size();
+    void onWriteChangeCollections(std::vector<InsertStatement>::const_iterator begin,
+                                  std::vector<InsertStatement>::const_iterator end) final {
+        changeCollDocsCount.addAndFetch(std::distance(begin, end));
     }
 
-    int oplogCollDocsCount = 0;
-    int changeCollDocsCount = 0;
+    AtomicWord<int> oplogCollDocsCount{0};
+    AtomicWord<int> changeCollDocsCount{0};
 };
 
 class JournalListenerMock : public JournalListener {
@@ -108,7 +110,6 @@ protected:
 
     ServiceContext* _serviceContext;
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    std::unique_ptr<ThreadPool> _writerPool;
     std::unique_ptr<CountOpsObserver> _observer;
 };
 
@@ -131,13 +132,11 @@ void OplogWriterImplTest::setUp() {
 
     repl::createOplog(opCtx());
 
-    _writerPool = makeReplWriterPool();
     _observer = std::make_unique<CountOpsObserver>();
 }
 
 void OplogWriterImplTest::tearDown() {
     _opCtxHolder = {};
-    _writerPool = {};
     _observer = {};
     StorageInterface::set(_serviceContext, {});
     ServiceContextMongoDTest::tearDown();
@@ -165,7 +164,6 @@ DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
-                                _writerPool.get(),
                                 &noopOplogWriterObserver,
                                 OplogWriter::Options());
 
@@ -179,7 +177,6 @@ TEST_F(OplogWriterImplTest, WriteOplogCollectionOnly) {
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
-                                _writerPool.get(),
                                 _observer.get(),
                                 OplogWriter::Options());
 
@@ -194,11 +191,11 @@ TEST_F(OplogWriterImplTest, WriteOplogCollectionOnly) {
     ASSERT_EQ(returnOpTime, statusWith.getValue());
 
     // Verify that the batch is only written to the oplog collection.
-    ASSERT_EQ(2, _observer->oplogCollDocsCount);
-    ASSERT_EQ(0, _observer->changeCollDocsCount);
+    ASSERT_EQ(2, _observer->oplogCollDocsCount.load());
+    ASSERT_EQ(0, _observer->changeCollDocsCount.load());
 }
 
-TEST_F(OplogWriterImplTest, WriteChangeCollectionOnly) {
+TEST_F(OplogWriterImplTest, WriteChangeCollectionsOnly) {
     RAIIServerParameterControllerForTest changeStreamFeatureFlagController{
         "featureFlagServerlessChangeStreams", true};
     RAIIServerParameterControllerForTest changeStreamTestFlagController{
@@ -211,7 +208,6 @@ TEST_F(OplogWriterImplTest, WriteChangeCollectionOnly) {
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
-                                _writerPool.get(),
                                 _observer.get(),
                                 OplogWriter::Options(true /* skipWritesToOplogColl */));
 
@@ -225,12 +221,12 @@ TEST_F(OplogWriterImplTest, WriteChangeCollectionOnly) {
     ASSERT_OK(statusWith);
     ASSERT_EQ(returnOpTime, statusWith.getValue());
 
-    // Verify that the batch is only written to the change collection.
-    ASSERT_EQ(0, _observer->oplogCollDocsCount);
-    ASSERT_EQ(2, _observer->changeCollDocsCount);
+    // Verify that the batch is only written to the change collections.
+    ASSERT_EQ(0, _observer->oplogCollDocsCount.load());
+    ASSERT_EQ(2, _observer->changeCollDocsCount.load());
 }
 
-TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollection) {
+TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollections) {
     RAIIServerParameterControllerForTest changeStreamFeatureFlagController{
         "featureFlagServerlessChangeStreams", true};
     RAIIServerParameterControllerForTest changeStreamTestFlagController{
@@ -243,7 +239,6 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollection) {
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
-                                _writerPool.get(),
                                 _observer.get(),
                                 OplogWriter::Options());
 
@@ -257,9 +252,32 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollection) {
     ASSERT_OK(statusWith);
     ASSERT_EQ(returnOpTime, statusWith.getValue());
 
-    // Verify that the batch written to both the oplog and change collection.
-    ASSERT_EQ(2, _observer->oplogCollDocsCount);
-    ASSERT_EQ(2, _observer->changeCollDocsCount);
+    // Verify that the batch written to both the oplog and change collections.
+    ASSERT_EQ(2, _observer->oplogCollDocsCount.load());
+    ASSERT_EQ(2, _observer->changeCollDocsCount.load());
+}
+
+TEST_F(OplogWriterImplTest, WriteNeitherOplogNorChangeCollections) {
+    OplogWriterImpl oplogWriter(nullptr,  // executor
+                                nullptr,  // writeBuffer
+                                nullptr,  // applyBuffer
+                                getReplCoord(),
+                                getStorageInterface(),
+                                _observer.get(),
+                                OplogWriter::Options(true /* skipWritesToOplogColl */));
+
+    std::vector<BSONObj> ops;
+    ops.push_back(makeRawInsertOplogEntry(1, kNss1));
+    ops.push_back(makeRawInsertOplogEntry(2, kNss2));
+
+    auto statusWith = oplogWriter.writeOplogBatch(opCtx(), std::move(ops));
+
+    ASSERT_OK(statusWith);
+    ASSERT_EQ(OpTime(), statusWith.getValue());
+
+    // Verify that the batch is only written to the oplog collection.
+    ASSERT_EQ(0, _observer->oplogCollDocsCount.load());
+    ASSERT_EQ(0, _observer->changeCollDocsCount.load());
 }
 
 TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
@@ -268,7 +286,6 @@ TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
                                 nullptr,  // applyBuffer
                                 getReplCoord(),
                                 getStorageInterface(),
-                                _writerPool.get(),
                                 &noopOplogWriterObserver,
                                 OplogWriter::Options());
 

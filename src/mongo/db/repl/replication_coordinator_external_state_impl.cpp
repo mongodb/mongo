@@ -303,7 +303,6 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
                                                          _oplogApplyBuffer.get(),
                                                          replCoord,
                                                          _storageInterface,
-                                                         _writerPool.get(),
                                                          &noopOplogWriterObserver,
                                                          OplogWriter::Options());
     }
