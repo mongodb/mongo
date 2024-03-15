@@ -60,29 +60,64 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
     auto& oss = OperationShardingState::get(opCtx);
 
-    if (shardVersion) {
-        auto emplaceResult = oss._shardVersions.try_emplace(nss.ns(), *shardVersion);
-        auto& tracker = emplaceResult.first->second;
-        if (!emplaceResult.second) {
-            uassert(640570,
-                    str::stream() << "Illegal attempt to change the expected shard version for "
-                                  << nss << " from " << tracker.v << " to " << *shardVersion,
-                    tracker.v == *shardVersion);
+    bool shardVersionInserted = false;
+    bool databaseVersionInserted = false;
+    try {
+        boost::optional<OperationShardingState::ShardVersionTracker&> shardVersionTracker;
+        if (shardVersion) {
+            auto emplaceResult = oss._shardVersions.try_emplace(nss.ns(), *shardVersion);
+            shardVersionInserted = emplaceResult.second;
+            shardVersionTracker = emplaceResult.first->second;
+            if (!shardVersionInserted) {
+                uassert(640570,
+                        str::stream()
+                            << "Illegal attempt to change the expected shard version for " << nss
+                            << " from " << shardVersionTracker->v << " to " << *shardVersion
+                            << " at recursion level " << shardVersionTracker->recursion,
+                        shardVersionTracker->v == *shardVersion);
+                invariant(shardVersionTracker->recursion > 0);
+            } else {
+                invariant(shardVersionTracker->recursion == 0);
+            }
         }
-        invariant(++tracker.recursion > 0);
-    }
 
-    if (databaseVersion) {
-        auto emplaceResult = oss._databaseVersions.try_emplace(nss.db(), *databaseVersion);
-        auto& tracker = emplaceResult.first->second;
-        if (!emplaceResult.second) {
-            uassert(640571,
-                    str::stream() << "Illegal attempt to change the expected database version for "
-                                  << nss.dbName().toStringForErrorMsg() << " from " << tracker.v
-                                  << " to " << *databaseVersion,
-                    tracker.v == *databaseVersion);
+        boost::optional<OperationShardingState::DatabaseVersionTracker&> dbVersionTracker;
+        if (databaseVersion) {
+            auto emplaceResult = oss._databaseVersions.try_emplace(nss.db(), *databaseVersion);
+            databaseVersionInserted = emplaceResult.second;
+            dbVersionTracker = emplaceResult.first->second;
+            if (!databaseVersionInserted) {
+                uassert(640571,
+                        str::stream()
+                            << "Illegal attempt to change the expected database version for "
+                            << nss.dbName().toStringForErrorMsg() << " from " << dbVersionTracker->v
+                            << " to " << *databaseVersion << " at recursion level "
+                            << dbVersionTracker->recursion,
+                        dbVersionTracker->v == *databaseVersion);
+                invariant(dbVersionTracker->recursion > 0);
+            } else {
+                invariant(dbVersionTracker->recursion == 0);
+            }
         }
-        invariant(++tracker.recursion > 0);
+
+        // Update the recursion at the end to preserve the strong exception guarantee.
+        if (shardVersionTracker) {
+            shardVersionTracker->recursion++;
+        }
+        if (dbVersionTracker) {
+            dbVersionTracker->recursion++;
+        }
+    } catch (const DBException&) {
+        // Clean any oss update done within this method on failure to get a strong exception
+        // guarantee on ScopedSetShardRole objects.
+        if (shardVersionInserted) {
+            oss._shardVersions.erase(nss.ns());
+        }
+        if (databaseVersionInserted) {
+            oss._databaseVersions.erase(nss.db());
+        }
+
+        throw;
     }
 }
 

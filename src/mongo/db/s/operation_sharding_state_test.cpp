@@ -132,5 +132,31 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFix
     }
 }
 
+TEST_F(OperationShardingStateTest, ScopeSetShardRoleHasStrongExceptionGuarantee) {
+    CollectionGeneration gen(OID::gen(), Timestamp(1, 0));
+    ShardVersion shardVersion =
+        ShardVersionFactory::make({gen, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+    auto uuid = UUID::gen();
+    DatabaseVersion dbv1{uuid, Timestamp(1, 0)};
+    DatabaseVersion dbv2{uuid, Timestamp(2, 0)};
+
+    auto& oss = OperationShardingState::get(operationContext());
+    {
+        ScopedSetShardRole scopedSetShardRole1(operationContext(), kNss, shardVersion, dbv1);
+        ASSERT_THROWS_CODE(
+            [&] {
+                ScopedSetShardRole scopedSetShardRole2(
+                    operationContext(), kNss, shardVersion, dbv2);
+            }(),
+            DBException,
+            640571);
+        ASSERT_EQ(shardVersion, *oss.getShardVersion(kNss));
+        ASSERT_EQ(dbv1, *oss.getDbVersion(kNss.db()));
+    }
+
+    ASSERT_EQ(boost::none, oss.getShardVersion(kNss));
+    ASSERT_EQ(boost::none, oss.getDbVersion(kNss.db()));
+}
+
 }  // namespace
 }  // namespace mongo
