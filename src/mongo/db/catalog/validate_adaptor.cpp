@@ -161,13 +161,8 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
 
     state->setCollectionSchemaViolated();
 
-    // When testing is enabled, only warn about non-compliant documents to prevent test failures.
-    if (TestingProctor::instance().isEnabled() ||
-        Collection::SchemaValidationResult::kWarn == result || state->warnOnSchemaValidation()) {
+    if (result != Collection::SchemaValidationResult::kPass) {
         results->warnings.push_back(kSchemaValidationFailedReason);
-    } else if (Collection::SchemaValidationResult::kError == result) {
-        results->errors.push_back(kSchemaValidationFailedReason);
-        results->valid = false;
     }
 }
 

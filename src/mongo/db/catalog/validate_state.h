@@ -213,10 +213,6 @@ public:
         return _enforceTimeseriesBucketsAreAlwaysCompressed;
     }
 
-    bool warnOnSchemaValidation() const {
-        return _warnOnSchemaValidation;
-    }
-
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
@@ -231,7 +227,6 @@ private:
     bool _timeseriesDataInconsistency = false;
     bool _BSONDataNonConformant = false;
     bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
-    bool _warnOnSchemaValidation = false;
 
     // To avoid racing with shutdown.
     boost::optional<Lock::GlobalLock> _globalLock;

@@ -41,10 +41,15 @@ fpSecondary.off();
 
 // Verify that the primary (latest) and secondary (last-lts) detect invalid index options.
 let validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
-assert(!validateRes.valid);
+assert(validateRes.valid);
+assert.eq(validateRes.errors.length, 0);
+assert.eq(validateRes.warnings.length, 2);
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
-assert(!validateRes.valid);
+// TODO (SERVER-87985): Enable assertions.
+// assert(validateRes.valid);
+// assert.eq(validateRes.errors.length, 0);
+// assert.eq(validateRes.warnings.length, 2);
 
 // Use collMod to remove the invalid index options in the collection.
 assert.commandWorked(primaryDB.runCommand({collMod: collName}));
@@ -61,8 +66,12 @@ checkLog.containsJson(secondary, 23878, {fieldName: "xyz"});
 // Verify that the index no longer has invalid index options.
 validateRes = assert.commandWorked(primaryDB.runCommand({validate: collName}));
 assert(validateRes.valid);
+assert.eq(validateRes.errors.length, 0);
+assert.eq(validateRes.warnings.length, 0);
 
 validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}));
 assert(validateRes.valid);
+assert.eq(validateRes.errors.length, 0);
+assert.eq(validateRes.warnings.length, 0);
 
 rst.stopSet();

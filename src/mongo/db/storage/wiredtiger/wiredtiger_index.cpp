@@ -68,7 +68,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForIdIndex);
 MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForKeyOnIdUnindex);
 
 static const WiredTigerItem emptyItem(nullptr, 0);
@@ -107,8 +106,9 @@ void addDataCorruptionEntryToHealthLog(OperationContext* opCtx,
  * or when 'forceUassert' is specified (for instance because a failpoint is enabled), we should log
  * and throw DataCorruptionDetected.
  */
-logv2::LogOptions getLogOptionsForDataCorruption(bool forceUassert = false) {
-    if (!TestingProctor::instance().isEnabled() || forceUassert) {
+logv2::LogOptions getLogOptionsForDataCorruption(RecoveryUnit& ru, bool forceUassert = false) {
+    if (ru.getDataCorruptionDetectionMode() == DataCorruptionDetectionMode::kThrow ||
+        MONGO_unlikely(forceUassert)) {
         return logv2::LogOptions{logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
     } else {
         return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
@@ -1439,13 +1439,14 @@ private:
                 _indexName,
                 _uri);
 
-            LOGV2_ERROR_OPTIONS(7623202,
-                                getLogOptionsForDataCorruption(),
-                                "Unique index cursor seeing multiple records for key in index",
-                                "key"_attr = bsonKey,
-                                "index"_attr = _indexName,
-                                "uri"_attr = _uri,
-                                logAttrs(collectionNamespace));
+            LOGV2_ERROR_OPTIONS(
+                7623202,
+                getLogOptionsForDataCorruption(*shard_role_details::getRecoveryUnit(_opCtx)),
+                "Unique index cursor seeing multiple records for key in index",
+                "key"_attr = bsonKey,
+                "index"_attr = _indexName,
+                "uri"_attr = _uri,
+                logAttrs(collectionNamespace));
         }
     }
 
@@ -1483,10 +1484,7 @@ public:
         _id = key_string::decodeRecordIdLong(&br);
         _typeBits.resetFromBuffer(&br);
 
-        const auto failWithDataCorruptionForTest =
-            WTIndexUassertDuplicateRecordForIdIndex.shouldFail();
-
-        if (!br.atEof() || MONGO_unlikely(failWithDataCorruptionForTest)) {
+        if (!br.atEof()) {
             const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
             const auto collectionNamespace = getCollectionNamespace(_opCtx);
 
@@ -1499,13 +1497,14 @@ public:
                 _indexName,
                 _uri);
 
-            LOGV2_ERROR_OPTIONS(5176200,
-                                getLogOptionsForDataCorruption(failWithDataCorruptionForTest),
-                                "Index cursor seeing multiple records for key in _id index",
-                                "key"_attr = bsonKey,
-                                "index"_attr = _indexName,
-                                "uri"_attr = _uri,
-                                logAttrs(collectionNamespace));
+            LOGV2_ERROR_OPTIONS(
+                5176200,
+                getLogOptionsForDataCorruption(*shard_role_details::getRecoveryUnit(_opCtx)),
+                "Index cursor seeing multiple records for key in _id index",
+                "key"_attr = bsonKey,
+                "index"_attr = _indexName,
+                "uri"_attr = _uri,
+                logAttrs(collectionNamespace));
         }
     }
 
@@ -1786,13 +1785,15 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
                                           _indexName,
                                           _uri);
 
-        LOGV2_ERROR_OPTIONS(5176201,
-                            getLogOptionsForDataCorruption(failWithDataCorruptionForTest),
-                            "Un-index seeing multiple records for key",
-                            "key"_attr = bsonKey,
-                            "index"_attr = _indexName,
-                            "uri"_attr = _uri,
-                            logAttrs(collectionNamespace));
+        LOGV2_ERROR_OPTIONS(
+            5176201,
+            getLogOptionsForDataCorruption(*shard_role_details::getRecoveryUnit(opCtx),
+                                           failWithDataCorruptionForTest),
+            "Un-index seeing multiple records for key",
+            "key"_attr = bsonKey,
+            "index"_attr = _indexName,
+            "uri"_attr = _uri,
+            logAttrs(collectionNamespace));
     }
 
     // The RecordId matches, so remove the entry.

@@ -101,7 +101,6 @@ enum class RepairMode {
  */
 struct AdditionalOptions {
     bool enforceTimeseriesBucketsAreAlwaysCompressed = false;
-    bool warnOnSchemaValidation = false;  // only warn on schema validation failure
 };
 
 /**
