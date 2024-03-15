@@ -173,3 +173,9 @@ feature_flags:
         cpp_varname: gFeatureFlagPrefetch
         default: false
         shouldBeFCVGated: false
+    featureFlagDefaultReadMaxTimeMS:
+        description: "Feature flag to allow setting a server-wide default maxTimeMS used for all
+        read operations"
+        cpp_varname: gFeatureFlagDefaultReadMaxTimeMS
+        default: false
+        shouldBeFCVGated: true
