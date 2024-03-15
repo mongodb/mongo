@@ -47,12 +47,12 @@ public:
     using ServerStatusSection::ServerStatusSection;
 
     bool includeByDefault() const override {
-        return !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer);
+        return !serverGlobalParams.clusterRole.isShardOnly();
     }
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer) ||
+        if (serverGlobalParams.clusterRole.isShardOnly() ||
             !repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             return {};
         }

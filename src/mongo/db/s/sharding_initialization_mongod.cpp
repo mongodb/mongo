@@ -758,7 +758,7 @@ boost::optional<ShardIdentity> ShardingInitializationMongoD::getShardIdentityDoc
     // In sharded queryableBackupMode mode, we ignore the shardIdentity document on disk and instead
     // *require* a shardIdentity document to be passed through --overrideShardIdentity
     if (storageGlobalParams.queryableBackupMode) {
-        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+        if (serverGlobalParams.clusterRole.isShardOnly()) {
             uassert(ErrorCodes::InvalidOptions,
                     "If started with --shardsvr in queryableBackupMode, a shardIdentity document "
                     "must be provided through --overrideShardIdentity",

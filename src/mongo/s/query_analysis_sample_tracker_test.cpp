@@ -428,7 +428,7 @@ TEST_F(QueryAnalysisSampleTrackerTest, RefreshConfigIncrementAndReportMongos) {
 TEST_F(QueryAnalysisSampleTrackerTest, RefreshConfigIncrementAndReportShardSvrMongod) {
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
     testRefreshConfigIncrementAndReport();
 }
 

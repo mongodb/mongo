@@ -276,7 +276,7 @@ Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
             // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
             // config server node's local cache will be correct and explicitly checking for a
             // default write concern via remote command is unnecessary.
-            if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+            if (serverGlobalParams.clusterRole.isShardOnly()) {
                 // Assert will be raised on failure to talk to config server.
                 repl::ReplicationCoordinator::get(opCtx)->recordIfCWWCIsSetOnConfigServerOnStartup(
                     opCtx);

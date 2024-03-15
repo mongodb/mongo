@@ -1968,7 +1968,7 @@ class ShardTxnParticipantTest : public ShardedClusterParticipantTest {
 protected:
     void setUp() final {
         TxnParticipantTest::setUp();
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
     }
 
     void tearDown() final {
@@ -2040,7 +2040,8 @@ class ConfigTxnParticipantTest : public ShardedClusterParticipantTest {
 protected:
     void setUp() final {
         TxnParticipantTest::setUp();
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+        serverGlobalParams.clusterRole = {
+            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     }
 
     void tearDown() final {

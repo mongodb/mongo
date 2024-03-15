@@ -361,8 +361,7 @@ void startFTDC(ServiceContext* serviceContext,
             serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer);
         const bool isReplNode = !isMongoS &&
             repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
-        const bool isShardServerOnly =
-            serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer);
+        const bool isShardServerOnly = serverGlobalParams.clusterRole.isShardOnly();
         if (isMongoS || (isReplNode && !isShardServerOnly)) {
             // GetDefaultRWConcern
             controller->addOnRotateCollector(

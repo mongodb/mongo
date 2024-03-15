@@ -75,14 +75,14 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     ServerParameter* serverParameter = _sps->get(parameterName);
     auto tenantId = cmd.getDbName().tenantId();
 
-    auto [query, update] = normalizeParameter(
-        opCtx,
-        cmdParamObj,
-        clusterParameterTime,
-        previousTime,
-        serverParameter,
-        tenantId,
-        skipValidation || serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer));
+    auto [query, update] =
+        normalizeParameter(opCtx,
+                           cmdParamObj,
+                           clusterParameterTime,
+                           previousTime,
+                           serverParameter,
+                           tenantId,
+                           skipValidation || serverGlobalParams.clusterRole.isShardOnly());
 
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);

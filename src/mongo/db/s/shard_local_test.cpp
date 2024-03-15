@@ -64,7 +64,8 @@ namespace {
 class ShardLocalTest : public ServiceContextMongoDTest {
 protected:
     ShardLocalTest() {
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+        serverGlobalParams.clusterRole = {
+            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     }
 
     ~ShardLocalTest() {
@@ -158,7 +159,7 @@ protected:
         return cursorResponse.getValue().getBatch();
     }
 
-    service_context_test::ShardRouterRoleOverride _shardRole;
+    service_context_test::ShardRoleOverride _shardRole;
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ShardLocal> _shardLocal;

@@ -83,7 +83,7 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoD(
 }
 
 void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx, bool isReplicaSet) {
-    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+    if (serverGlobalParams.clusterRole.isShardOnly()) {
         DBDirectClient client(opCtx);
         const auto numPersistedDocuments =
             client.count(NamespaceString::kConfigSettingsNamespace,

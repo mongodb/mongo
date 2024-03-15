@@ -118,7 +118,8 @@ void ConfigServerTestFixture::setUp() {
     replicationCoordinator()->alwaysAllowWrites(true);
 
     // Initialize sharding components as a config server.
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    serverGlobalParams.clusterRole = {
+        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
 
     // The catalog manager requires a special executor used for operations during addShard.
     auto specialNet(std::make_unique<executor::NetworkInterfaceMock>());

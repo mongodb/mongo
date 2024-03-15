@@ -55,7 +55,7 @@ class SplitPrepareSessionManagerTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
         auto sessPool = InternalSessionPool::get(getServiceContext());
         _splitSessManager = std::make_unique<SplitPrepareSessionManager>(sessPool);
     }
