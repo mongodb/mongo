@@ -331,8 +331,6 @@ public:
         }
 
         CollectionValidation::AdditionalOptions additionalOptions;
-        additionalOptions.warnOnSchemaValidation = cmdObj["warnOnSchemaValidation"].trueValue();
-
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(opCtx,
                                                        nss,

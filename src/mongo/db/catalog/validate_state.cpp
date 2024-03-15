@@ -89,9 +89,6 @@ ValidateState::ValidateState(OperationContext* opCtx,
                   str::stream() << "Collection '" << _nss << "' does not exist to validate.");
     }
 
-    // Return warnings instead of errors on schema validation failures.
-    _warnOnSchemaValidation = additionalOptions.warnOnSchemaValidation;
-
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFastCount.
     if (fixErrors()) {

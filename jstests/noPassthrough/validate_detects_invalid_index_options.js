@@ -25,22 +25,26 @@ assert.commandWorked(coll.createIndex({x: 1}, {safe: true, sparse: true, force: 
 
 fp.off();
 
+const checkValidateWarns = function(options = {}) {
+    const res = assert.commandWorked(db.runCommand(Object.assign({validate: collName}, options)));
+    assert(res.valid, res);
+    assert.eq(res.errors.length, 0, res);
+    assert.eq(res.warnings.length, 1, res);
+    assert(res.warnings[0].includes("contains invalid fields"));
+};
+
 // Foreground and background validations can detect invalid index options.
-let validateRes = assert.commandWorked(db.runCommand({validate: collName}));
-assert(!validateRes.valid);
+checkValidateWarns();
 
-// Ensure that $collStats info gets logged when validation fails.
-checkLog.containsJson(conn, 7463200);
-
-validateRes = assert.commandWorked(db.runCommand({validate: collName, background: true}));
-assert(!validateRes.valid);
+// Forces a checkpoint to make the background validation see the data.
+assert.commandWorked(db.adminCommand({fsync: 1}));
+checkValidateWarns({background: true});
 
 // Validating only the metadata can detect invalid index options.
-validateRes = assert.commandWorked(db.runCommand({validate: collName, metadata: true}));
-assert(!validateRes.valid);
+checkValidateWarns({metadata: true});
 
-// Validation of metadata complete for collection. Problems detected.
-checkLog.containsJson(conn, 5980501);
+// Validation of metadata complete for collection. No problems detected.
+checkLog.containsJson(conn, 5980500);
 
 // Cannot use { metadata: true } with any other options. Background validation is converted into a
 // foreground validation on the ephemeralForTest storage engine, making it incompatible with this
@@ -58,7 +62,7 @@ assert.commandFailedWithCode(
 // Drop the index with the invalid index options and validate only the metadata.
 assert.commandWorked(coll.dropIndex({x: 1}));
 
-validateRes = assert.commandWorked(db.runCommand({validate: collName, metadata: true}));
+let validateRes = assert.commandWorked(db.runCommand({validate: collName, metadata: true}));
 assert(validateRes.valid);
 
 // Validation of metadata complete for collection. No problems detected.
