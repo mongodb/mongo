@@ -176,8 +176,8 @@ constexpr std::size_t kOplogApplyBufferSize = 100 * 1024 * 1024;
 constexpr std::size_t kOplogApplyBufferSizeLegacy = 256 * 1024 * 1024;
 
 
-// The count of items in the buffer
-OplogBuffer::Counters bufferGauge("repl.buffer");
+// The count of items in the oplog application buffer
+OplogBuffer::Counters& applyBufferGauge = *MetricBuilder<OplogBuffer::Counters>("repl.buffer");
 
 /**
  * Returns new thread pool for thread pool task executor.
@@ -281,8 +281,8 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     // for downgrades to work.
     OplogBufferBlockingQueue::Options bufferOptions;
     bufferOptions.clearOnShutdown = !useOplogWriter;
-    _oplogApplyBuffer =
-        std::make_unique<OplogBufferBlockingQueue>(applyBufferSize, &bufferGauge, bufferOptions);
+    _oplogApplyBuffer = std::make_unique<OplogBufferBlockingQueue>(
+        applyBufferSize, &applyBufferGauge, bufferOptions);
 
     // No need to log OplogBuffer::startup because the blocking queue and batched queue
     // implementations does not start any threads or access the storage layer.

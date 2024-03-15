@@ -36,7 +36,9 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"
@@ -214,10 +216,14 @@ public:
 
 class OplogBuffer::Counters {
 public:
-    explicit Counters(const std::string& prefix)
-        : count{*MetricBuilder<Counter64>{prefix + ".count"}},
-          size{*MetricBuilder<Counter64>{prefix + ".sizeBytes"}},
-          maxSize{*MetricBuilder<Counter64>{prefix + ".maxSizeBytes"}} {}
+    // Number of operations in this OplogBuffer.
+    Counter64 count;
+
+    // Total size of operations in this OplogBuffer. Measured in bytes.
+    Counter64 size;
+
+    // Maximum size of operations in this OplogBuffer. Measured in bytes.
+    Counter64 maxSize;
 
     /**
      * Sets maximum size of operations for this OplogBuffer.
@@ -256,14 +262,23 @@ public:
         size.decrement(sz);
     }
 
-    // Number of operations in this OplogBuffer.
-    Counter64& count;
+    BSONObj getReport() const {
+        BSONObjBuilder subBuilder;
+        subBuilder.append("count", count.get());
+        subBuilder.append("sizeBytes", size.get());
+        subBuilder.append("maxSizeBytes", maxSize.get());
+        if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            BSONObjBuilder builder;
+            builder.append("apply", subBuilder.obj());
+            return builder.obj();
+        }
+        return subBuilder.obj();
+    }
 
-    // Total size of operations in this OplogBuffer. Measured in bytes.
-    Counter64& size;
-
-    // Maximum size of operations in this OplogBuffer. Measured in bytes.
-    Counter64& maxSize;
+    operator BSONObj() const {
+        return getReport();
+    }
 };
 
 /**

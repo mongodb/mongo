@@ -9,6 +9,8 @@
 // 7. Enable applying ops.
 // 8. Ensure the ops in queue are applied and that the PRIMARY begins to accept writes as usual.
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replSet.nodeList();
 replSet.startSet();
@@ -41,7 +43,11 @@ assert.commandWorked(
     secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
     'failed to enable fail point on secondary');
 
-var bufferCountBefore = secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
+const reduceMajorityWriteLatency =
+    FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
+var bufferCountBefore = (reduceMajorityWriteLatency)
+    ? secondary.getDB('foo').serverStatus().metrics.repl.buffer.apply.count
+    : secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
 for (var i = 1; i < numDocuments; ++i) {
     bulk.insert({big: bigString});
 }
@@ -51,7 +57,8 @@ assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());
 
 assert.soon(function() {
     var serverStatus = secondary.getDB('foo').serverStatus();
-    var bufferCount = serverStatus.metrics.repl.buffer.count;
+    var bufferCount = (reduceMajorityWriteLatency) ? serverStatus.metrics.repl.buffer.apply.count
+                                                   : serverStatus.metrics.repl.buffer.count;
     var bufferCountChange = bufferCount - bufferCountBefore;
     jsTestLog('Number of operations buffered on secondary since stopping applier: ' +
               bufferCountChange);

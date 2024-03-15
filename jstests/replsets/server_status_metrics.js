@@ -48,9 +48,15 @@ function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOps
     assert.gt(ss.metrics.repl.syncSource.numSelections, 0, "num selections not incremented");
     assert.gt(ss.metrics.repl.syncSource.numTimesChoseDifferent, 0, "no new sync source chosen");
 
-    assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
-    assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
-    assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
+    if (FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")) {
+        assert(ss.metrics.repl.buffer.apply.count >= 0, "buffer count missing");
+        assert(ss.metrics.repl.buffer.apply.sizeBytes >= 0, "size (bytes)] missing");
+        assert(ss.metrics.repl.buffer.apply.maxSizeBytes >= 0, "maxSize (bytes) missing");
+    } else {
+        assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
+        assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
+        assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
+    }
 
     assert.eq(ss.metrics.repl.apply.batchSize,
               opCount + baseOpsReceived,
@@ -70,7 +76,8 @@ function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOps
     }
 }
 
-// Metrics are racy, e.g. repl.buffer.count could over- or under-reported briefly. Retry on error.
+// Metrics are racy, e.g. repl.buffer.apply.count could over- or under-reported briefly. Retry on
+// error.
 function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived) {
     assert.soon(() => {
         try {
