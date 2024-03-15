@@ -59,7 +59,7 @@
 namespace mongo {
 namespace {
 
-class AsyncShardVersionRetry : public ShardingTestFixture {
+class SyncShardVersionRetry : public ShardingTestFixture {
 public:
     NamespaceString nss() const {
         return NamespaceString::createNamespaceString_forTest("test", "foo");
@@ -81,43 +81,36 @@ private:
     CancellationSource _cancellationSource;
 };
 
-TEST_F(AsyncShardVersionRetry, NoErrorsWithVoidReturnTypeCallback) {
+TEST_F(SyncShardVersionRetry, NoErrorsWithVoidReturnTypeCallback) {
     CancellationSource cancellationSource;
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
-    auto future = shardVersionRetry(
-        service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {});
-
-    future.get();
+    shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {});
 }
 
-TEST_F(AsyncShardVersionRetry, NoErrorsWithNonVoidReturnTypeCallback) {
+TEST_F(SyncShardVersionRetry, NoErrorsWithNonVoidReturnTypeCallback) {
     CancellationSource cancellationSource;
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
-    auto future = shardVersionRetry(
-        service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
-            return "pass";
-        });
+    auto retVal = shardVersionRetry(
+        operationContext(), catalogCache, nss(), desc(), [&]() { return "pass"; });
 
-    ASSERT_EQ("pass", future.get());
+    ASSERT_EQ("pass", retVal);
 }
 
-TEST_F(AsyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
+TEST_F(SyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
     CancellationSource cancellationSource;
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
     int tries = 0;
-    auto future = shardVersionRetry(
-        service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
-            if (++tries < 5) {
-                const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
-                const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
-                uassert(
-                    StaleConfigInfo(
+    auto retVal = shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {
+        if (++tries < 5) {
+            const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
+            const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
+            uassert(StaleConfigInfo(
                         nss(),
                         ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
                                                   boost::optional<CollectionIndexes>(boost::none)),
@@ -126,22 +119,22 @@ TEST_F(AsyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
                         ShardId("sB")),
                     "testX",
                     false);
-            }
+        }
 
-            return 10;
-        });
+        return 10;
+    });
 
-    ASSERT_EQ(10, future.get());
+    ASSERT_EQ(10, retVal);
 }
 
-TEST_F(AsyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
+TEST_F(SyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
     CancellationSource cancellationSource;
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
     int tries = 0;
-    auto future = shardVersionRetry(
-        service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
+    auto shardVersionRetryInvocation = [&]() {
+        return shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {
             if (++tries < 2 * kMaxNumStaleVersionRetries) {
                 uassert(StaleDbRoutingVersion(nss().dbName(),
                                               DatabaseVersion(UUID::gen(), Timestamp(2, 3)),
@@ -149,26 +142,24 @@ TEST_F(AsyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
                         "testX",
                         false);
             }
-
             return 10;
         });
+    };
 
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::StaleDbVersion);
+    ASSERT_THROWS_CODE(shardVersionRetryInvocation(), DBException, ErrorCodes::StaleDbVersion);
 }
 
-TEST_F(AsyncShardVersionRetry, ShouldNotBreakOnTimeseriesBucketNamespaceRewrite) {
+TEST_F(SyncShardVersionRetry, ShouldNotBreakOnTimeseriesBucketNamespaceRewrite) {
     CancellationSource cancellationSource;
     auto token = cancellationSource.token();
     auto catalogCache = Grid::get(service())->catalogCache();
 
     int tries = 0;
-    auto future = shardVersionRetry(
-        service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
-            if (++tries < 5) {
-                const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
-                const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
-                uassert(
-                    StaleConfigInfo(
+    auto retVal = shardVersionRetry(operationContext(), catalogCache, nss(), desc(), [&]() {
+        if (++tries < 5) {
+            const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
+            const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
+            uassert(StaleConfigInfo(
                         nss().makeTimeseriesBucketsNamespace(),
                         ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
                                                   boost::optional<CollectionIndexes>(boost::none)),
@@ -177,12 +168,12 @@ TEST_F(AsyncShardVersionRetry, ShouldNotBreakOnTimeseriesBucketNamespaceRewrite)
                         ShardId("sB")),
                     "testX",
                     false);
-            }
+        }
 
-            return 10;
-        });
+        return 10;
+    });
 
-    ASSERT_EQ(10, future.get());
+    ASSERT_EQ(10, retVal);
 }
 
 }  // namespace
