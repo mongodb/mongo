@@ -156,6 +156,24 @@ void testSimple8b(const std::vector<boost::optional<T>>& expectedValues,
     // Test prefix sum with different initial prefixes
     testPrefixSum(make_signed_t<T>(0));
     testPrefixSum(make_signed_t<T>(1));
+
+    // Test visitAll
+    std::vector<boost::optional<make_signed_t<T>>> decodedValues;
+
+    prev = 0xE;
+    simple8b::visitAll<make_signed_t<T>>(
+        reinterpret_cast<const char*>(expectedBinary.data()),
+        expectedBinary.size(),
+        prev,
+        [&decodedValues](const make_signed_t<T> v) { decodedValues.push_back(v); },
+        [&decodedValues]() { decodedValues.push_back(boost::none); });
+    ASSERT_EQ(expectedValues.size(), decodedValues.size());
+    for (size_t i = 0; i < expectedValues.size(); ++i) {
+        if (expectedValues[i])
+            ASSERT_EQ(Simple8bTypeUtil::decodeInt(*(expectedValues[i])), *(decodedValues[i]));
+        else
+            ASSERT_EQ(boost::none, decodedValues[i]);
+    }
 }
 
 template <typename T>

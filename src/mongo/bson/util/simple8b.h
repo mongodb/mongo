@@ -346,6 +346,22 @@ namespace simple8b {
 // Constant for a simple8b block containing a single 'missing' value.
 static constexpr uint64_t kSingleSkip = 0xFFFFFFFFFFFFFFFE;
 
+// Constant for a simple8b block containing a single zero value.
+static constexpr uint64_t kSingleZero = 0xE;
+
+/**
+ * Visits all values in sequence with provided callbacks
+ * visit - a callback for receiving values, it is expected to accept
+ *         a newly decoded value and a last value
+ * visitMissing - a callback for receiving missing
+ */
+template <typename T, typename Visit, typename VisitMissing>
+inline void visitAll(const char* buffer,
+                     size_t size,
+                     uint64_t& prevNonRLE,
+                     const Visit& visit,
+                     const VisitMissing& visitMissing);
+
 /**
  * Calculates the sum for multiple simple8b blocks in a buffer. 'prevNonRLE' should be initialized
  * to 'kSingleSkip' when calculating sum for the first buffer. If the caller needs sum from multiple
@@ -366,3 +382,5 @@ T prefixSum(const char* buffer, size_t size, T& prefix, uint64_t& prevNonRLE);
 }  // namespace simple8b
 
 }  // namespace mongo
+
+#include "simple8b.inl"

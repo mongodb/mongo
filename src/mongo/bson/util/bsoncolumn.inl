@@ -43,6 +43,7 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
                                                      const BSONElement& reference,
                                                      const Materialize& materialize) {
     // iterate until we stop seeing simple8b block sequences
+    uint64_t prev = simple8b::kSingleZero;
     while (ptr < end) {
         uint8_t control = *ptr;
         if (control == EOO || isUncompressedLiteralControlByte(control) ||
@@ -50,36 +51,20 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
             return ptr;
 
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
-        Simple8b<make_unsigned_t<Encoding>> s8b(ptr + 1, size);
-        auto it = s8b.begin();
-        // after reading a literal, the the buffer's last value is incorrect so we
-        // process all copies of the reference object until we materialize something
-        // otherwise the buffer will reference the wrong value on calls to appendLast()
-        for (; it != s8b.end(); ++it) {
-            const auto& delta = *it;
-            if (delta) {
-                if (*delta == 0)
-                    buffer.template append<T>(reference);
-                else
-                    break;
-            } else {
-                buffer.appendMissing();
-            }
-        }
-        for (; it != s8b.end(); ++it) {
-            const auto& delta = *it;
-            if (delta) {
-                if (*delta == 0) {
+
+        simple8b::visitAll<Encoding>(ptr + 1, size, prev,
+            [&materialize, &buffer, &reference, &last](const Encoding v) {
+                if (v == 0)
                     buffer.appendLast();
-                } else {
-                    last = expandDelta(
-                        last, Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
+                else {
+                    last = expandDelta(last, v);
                     materialize(last, reference, buffer);
                 }
-            } else {
+            },
+            [&buffer]() {
                 buffer.appendMissing();
-            }
-        }
+            });
+
         ptr += 1 + size;
     }
 
@@ -95,6 +80,7 @@ const char* BSONColumnBlockBased::decompressAllDeltaPrimitive(const char* ptr,
                                                               const BSONElement& reference,
                                                               const Materialize& materialize) {
     // iterate until we stop seeing simple8b block sequences
+    uint64_t prev = simple8b::kSingleZero;
     while (ptr < end) {
         uint8_t control = *ptr;
         if (control == EOO || isUncompressedLiteralControlByte(control) ||
@@ -105,18 +91,16 @@ const char* BSONColumnBlockBased::decompressAllDeltaPrimitive(const char* ptr,
         uassert(8762800,
                 "Invalid control byte in BSON Column",
                 bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
-        Simple8b<make_unsigned_t<Encoding>> s8b(ptr + 1, size);
-        auto it = s8b.begin();
-        for (; it != s8b.end(); ++it) {
-            const auto& delta = *it;
-            if (delta) {
-                last = expandDelta(last,
-                                   Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
+
+        simple8b::visitAll<Encoding>(ptr + 1, size, prev,
+            [&materialize, &buffer, &reference, &last](const Encoding v) {
+                last = expandDelta(last, v);
                 materialize(last, reference, buffer);
-            } else {
+            },
+            [&buffer]() {
                 buffer.appendMissing();
-            }
-        }
+            });
+
         ptr += 1 + size;
     }
 
@@ -134,6 +118,7 @@ const char* BSONColumnBlockBased::decompressAllDeltaOfDelta(const char* ptr,
                                                             const Decode& decode) {
     // iterate until we stop seeing simple8b block sequences
     int64_t lastlast = 0;
+    uint64_t prev = simple8b::kSingleZero;
     while (ptr < end) {
         uint8_t control = *ptr;
         if (control == EOO || isUncompressedLiteralControlByte(control) ||
@@ -144,17 +129,17 @@ const char* BSONColumnBlockBased::decompressAllDeltaOfDelta(const char* ptr,
         uassert(8762801,
                 "Invalid control byte in BSON Column",
                 bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
-        Simple8b<uint64_t> s8b(ptr + 1, size);
-        for (auto it = s8b.begin(); it != s8b.end(); ++it) {
-            const auto& delta = *it;
-            if (delta) {
-                lastlast = expandDelta(lastlast, decode(*delta));
+
+        simple8b::visitAll<int64_t>(ptr + 1, size, prev,
+            [&materialize, &lastlast, &buffer, &reference, &last](int64_t v) {
+                lastlast = expandDelta(lastlast, v);
                 last = expandDelta(last, lastlast);
                 materialize(last, reference, buffer);
-            } else {
+            },
+            [&buffer]() {
                 buffer.appendMissing();
-            }
-        }
+            });
+
         ptr += 1 + size;
     }
 
@@ -169,6 +154,7 @@ const char* BSONColumnBlockBased::decompressAllDouble(const char* ptr,
                                                       double last) {
     // iterate until we stop seeing simple8b block sequences
     int64_t lastValue = 0;
+    uint64_t prev = simple8b::kSingleZero;
     while (ptr < end) {
         uint8_t control = *ptr;
         if (control == EOO || isUncompressedLiteralControlByte(control) ||
@@ -183,17 +169,17 @@ const char* BSONColumnBlockBased::decompressAllDouble(const char* ptr,
         auto encodedDouble = Simple8bTypeUtil::encodeDouble(last, scaleIndex);
         uassert(8295701, "Invalid double encoding in BSON Column", encodedDouble);
         lastValue = *encodedDouble;
-        Simple8b<uint64_t> s8b(ptr + 1, size);
-        for (auto it = s8b.begin(); it != s8b.end(); ++it) {
-            const auto& delta = *it;
-            if (delta) {
-                lastValue = expandDelta(lastValue, Simple8bTypeUtil::decodeInt64(*delta));
+
+        simple8b::visitAll<int64_t>(ptr + 1, size, prev,
+            [&last, &buffer, &scaleIndex, &lastValue](int64_t v) {
+                lastValue = expandDelta(lastValue, v);
                 last = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
                 buffer.append(last);
-            } else {
+            },
+            [&buffer]() {
                 buffer.appendMissing();
-            }
-        }
+            });
+
         ptr += 1 + size;
     }
 
@@ -206,6 +192,7 @@ const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
                                                        const char* end,
                                                        Buffer& buffer,
                                                        const BSONElement& reference) {
+    uint64_t prev = simple8b::kSingleZero;
     while (ptr < end) {
         const uint8_t control = *ptr;
         if (control == EOO || isUncompressedLiteralControlByte(control) ||
@@ -216,16 +203,16 @@ const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
         uassert(8762803,
                 "Invalid control byte in BSON Column",
                 bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
-        Simple8b<uint64_t> s8b(ptr + 1, size);
-        for (auto it = s8b.begin(); it != s8b.end(); ++it) {
-            const auto& delta = *it;
-            if (!delta)
-                buffer.appendMissing();
-            else if (*delta == 0)
+
+        simple8b::visitAll<int64_t>(ptr + 1, size, prev,
+            [&buffer, &reference](int64_t v) {
+                uassert(8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
                 buffer.template append<BSONElement>(reference);
-            else
-                uasserted(8609800, "Post literal delta blocks should only contain skip or 0");
-        }
+            },
+            [&buffer]() {
+                buffer.appendMissing();
+            });
+
         ptr += 1 + size;
     }
 

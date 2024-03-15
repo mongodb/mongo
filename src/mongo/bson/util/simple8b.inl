@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/util/simple8b.h"
 #include "mongo/bson/util/simple8b_type_util.h"
 
 #include <limits>
@@ -58,6 +57,23 @@ struct SimpleDecoder {
 
     // Bit mask to extract a single slot and to check for the missing bit pattern.
     static constexpr uint64_t mask = (1ull << bits) - 1;
+
+    // Visit all values
+    template <typename T,
+              typename Visit,
+              typename VisitMissing>
+    inline void visitAll(uint64_t encoded,
+                  const Visit& visit,
+                  const VisitMissing& visitMissing) const {
+        for (int i = iters; i; --i) {
+            uint64_t slot = encoded & mask;
+            if (slot != mask)
+                visit(Simple8bTypeUtil::decodeInt64(slot));
+            else
+                visitMissing();
+            encoded >>= bits;
+        };
+    }
 
     // Calculate the sum of all slots.
     template <typename T>
@@ -152,10 +168,27 @@ struct TableDecoder {
             uint64_t slot = i;
             bool skip = slot == mask;
             if (!skip) {
-                table[i].decoded += Simple8bTypeUtil::decodeInt64(slot);
+                table[i].decoded = Simple8bTypeUtil::decodeInt64(slot);
                 ++table[i].num;
             }
         }
+    }
+
+    // Visit all values
+    template <typename T,
+              typename Visit,
+              typename VisitMissing>
+    inline void visitAll(uint64_t encoded,
+                  const Visit& visit,
+                  const VisitMissing& visitMissing) const {
+        for (int i = iters; i; --i) {
+            const auto& entry = table[encoded % entries];
+            if (entry.num)
+                visit(entry.decoded);
+            else
+                visitMissing();
+            encoded >>= shift;
+        };
     }
 
     // Calculate the sum of all slots
@@ -316,6 +349,7 @@ struct OneDecoder {
     static constexpr int kMaxTableSize = 1 << kMaxTableSizeExp;
 
     static constexpr int bits = 1;
+    static constexpr int values = 60;
 
     // Number of slots that we can decode together
     static constexpr int parallel = kMaxTableSizeExp / bits;
@@ -341,6 +375,22 @@ struct OneDecoder {
                     ++table[i];
                 }
             }
+        }
+    }
+
+    // Visit all values
+    template <typename T,
+              typename Visit,
+              typename VisitMissing>
+    inline void visitAll(uint64_t encoded,
+                  const Visit& visit,
+                  const VisitMissing& visitMissing) const {
+        for (int i = 0; i < values; ++i) {
+            if (encoded % 2)
+                visitMissing();
+            else
+                visit(0);
+            encoded >>= 1;
         }
     }
 
@@ -378,6 +428,27 @@ struct ExtendedDecoder {
     static constexpr uint64_t mask = (1ull << bits) - 1;
     static constexpr uint64_t valueMask = (1ull << valueBits) - 1;
     static constexpr uint64_t countMask = (1ull << countBits) - 1;
+
+    // Visit all values
+    template <typename T,
+              typename Visit,
+              typename VisitMissing>
+    inline void visitAll(uint64_t encoded,
+                  const Visit& visit,
+                  const VisitMissing& visitMissing) const {
+        for (int i = iters; i; --i) {
+            if ((encoded & mask) != mask) {
+                uint64_t count = encoded & countMask;
+                make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+
+                visit(Simple8bTypeUtil::decodeInt(value << (count * countScale)));
+            } else {
+                visitMissing();
+            }
+
+            encoded >>= bits;
+        };
+    }
 
     // Calculate the sum of all slots
     template <typename T>
@@ -697,6 +768,186 @@ T decodeLastSlot(uint64_t encoded) {
     return 0;
 }
 
+// Decodes and visits all slots in simple8b block.
+template <typename T, typename Visit, typename VisitMissing>
+inline void decodeAndVisit(uint64_t encoded,
+                    uint64_t* prevNonRLE,
+                    const Visit& visit,
+                    const VisitMissing& visitMissing) {
+    auto selector = encoded & simple8b_internal::kBaseSelectorMask;
+    if (selector != simple8b_internal::kRleSelector) {
+        *prevNonRLE = encoded;
+    }
+    encoded >>= 4;
+    switch (selector) {
+        case 1:  // Only 0 or missing deltas
+            decoder1.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 2:
+            decoder2.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 3:
+            decoder3.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 4:
+            decoder4.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 5:
+            decoder5.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 6:
+            decoder6.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 7: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    decoder7.visitAll<T>(encoded, visit, visitMissing);
+                    break;
+                case 1:
+                    decoderExtended7_1.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 2:
+                    decoderExtended7_2.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 3:
+                    decoderExtended7_3.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 4:
+                    decoderExtended7_4.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 5:
+                    decoderExtended7_5.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 6:
+                    decoderExtended7_6.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 7:
+                    decoderExtended7_7.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 8:
+                    decoderExtended7_8.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 9:
+                    decoderExtended7_9.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case 8: {
+            auto extended = encoded & simple8b_internal::kBaseSelectorMask;
+            encoded >>= 4;
+            switch (extended) {
+                case 0:
+                    decoder8.visitAll<T>(encoded, visit, visitMissing);
+                    break;
+                case 1:
+                    decoderExtended8_1.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 2:
+                    decoderExtended8_2.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 3:
+                    decoderExtended8_3.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 4:
+                    decoderExtended8_4.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 5:
+                    decoderExtended8_5.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 6:
+                    decoderExtended8_6.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 7:
+                    decoderExtended8_7.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 8:
+                    decoderExtended8_8.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 9:
+                    decoderExtended8_9.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 10:
+                    decoderExtended8_10.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 11:
+                    decoderExtended8_11.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 12:
+                    decoderExtended8_12.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                case 13:
+                    decoderExtended8_13.visitAll<T>(
+                        encoded, visit, visitMissing);
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case 9:
+            decoder10.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 10:
+            decoder12.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 11:
+            decoder15.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 12:
+            decoder20.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 13:
+            decoder30.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case 14:
+            decoder60.visitAll<T>(encoded, visit, visitMissing);
+            break;
+        case simple8b_internal::kRleSelector: {
+            const T lastValue = decodeLastSlot<T>(*prevNonRLE);
+            size_t count = ((encoded & 0xf) + 1) * simple8b_internal::kRleMultiplier;
+            if (lastValue == kMissing) {
+                for (size_t i = 0; i < count; ++i) {
+                    visitMissing();
+                }
+            } else {
+                for (size_t i = 0; i < count; ++i) {
+                    visit(lastValue);
+                }
+            }
+            break;
+        }
+        default:
+            fassertFailed(8586000);
+            break;
+    }
+}
+
 // Decodes and sums all slots in simple8b block, writes last encountered non-rle block in
 // 'prevNonRLE'.
 template <typename T>
@@ -929,6 +1180,21 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
 
 }  // namespace
 
+template <typename T, typename Visit, typename VisitMissing>
+inline void visitAll(const char* buffer,
+              size_t size,
+              uint64_t& prevNonRLE,
+              const Visit& visit,
+              const VisitMissing& visitMissing) {
+    invariant(size % 8 == 0);
+    const char* end = buffer + size;
+    while (buffer != end) {
+        uint64_t encoded = ConstDataView(buffer).read<LittleEndian<uint64_t>>();
+        decodeAndVisit<T>(encoded, &prevNonRLE, visit, visitMissing);
+        buffer += sizeof(uint64_t);
+    }
+}
+
 template <typename T>
 T sum(const char* buffer, size_t size, uint64_t& prevNonRLE) {
     invariant(size % 8 == 0);
@@ -954,11 +1220,5 @@ T prefixSum(const char* buffer, size_t size, T& prefix, uint64_t& prevNonRLE) {
     }
     return sum;
 }
-
-// Explicit template instantiations for our supported types
-template int64_t sum<int64_t>(const char*, size_t, uint64_t&);
-template int128_t sum<int128_t>(const char*, size_t, uint64_t&);
-template int64_t prefixSum<int64_t>(const char*, size_t, int64_t&, uint64_t&);
-template int128_t prefixSum<int128_t>(const char*, size_t, int128_t&, uint64_t&);
 
 }  // namespace mongo::simple8b

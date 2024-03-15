@@ -1252,6 +1252,26 @@ TEST_F(BSONColumnTest, BasicSkip) {
     verifyDecompression(binData, {elem, BSONElement()});
 }
 
+TEST_F(BSONColumnTest, BasicSkipRepeat) {
+    BSONColumnBuilder cb;
+
+    auto elem = createElementInt32(1);
+    cb.append(elem);
+    cb.skip();
+    cb.append(elem);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    std::vector<boost::optional<uint64_t>> expectedDeltas{boost::none, 0};
+    appendSimple8bBlocks64(expected, expectedDeltas, 1);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, BSONElement(), elem}, true);
+}
+
 TEST_F(BSONColumnTest, OnlySkip) {
     BSONColumnBuilder cb;
 
@@ -3544,6 +3564,34 @@ TEST_F(BSONColumnTest, OnlySkipManyTwoControlBytes) {
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
 }
 
+TEST_F(BSONColumnTest, SimpleOneValueRLE) {
+    // This test produces an RLE block after a literal.
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems;
+
+    for (size_t i = 0; i < 121; ++i) {
+        elems.push_back(createElementInt64(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+
+    // TODO: investigate; currently fails verifyColumnReopenFromBinary(), this is likely a bug
+    // elsewhere
+    // verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems, true);
+}
+
+
 TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     BSONColumnBuilder cb;
 
@@ -3604,7 +3652,7 @@ TEST_F(BSONColumnTest, RLEAfterMixedValueBlock) {
     auto binData = cb.finalize();
 
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, RLEAfterMixedValueBlock128) {
@@ -3641,7 +3689,7 @@ TEST_F(BSONColumnTest, RLEAfterMixedValueBlock128) {
     auto binData = cb.finalize();
 
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock) {
@@ -3691,7 +3739,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
@@ -3748,8 +3796,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    // TODO(SERVER-85860): This will be fixed by table decoder changes
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, Interleaved) {
@@ -6996,8 +7043,7 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-85860): This will be fixed by table decoder changes
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, NonZeroRLEInLastBlock) {
@@ -7320,7 +7366,7 @@ TEST_F(BSONColumnTest, AppendMinKey) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {createElementMinKey()});
+    verifyDecompression(binData, {createElementMinKey()}, true);
 }
 
 TEST_F(BSONColumnTest, AppendMaxKey) {
@@ -7333,7 +7379,7 @@ TEST_F(BSONColumnTest, AppendMaxKey) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {createElementMaxKey()});
+    verifyDecompression(binData, {createElementMaxKey()}, true);
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {

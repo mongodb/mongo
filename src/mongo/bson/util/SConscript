@@ -20,7 +20,6 @@ env.Library(
         'bsoncolumn.cpp',
         'bsoncolumn_interleaved.cpp',
         'bsoncolumnbuilder.cpp',
-        'simple8b.cpp',
         'simple8b_type_util.cpp',
     ],
     LIBDEPS=[
