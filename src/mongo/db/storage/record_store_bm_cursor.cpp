@@ -141,17 +141,6 @@ void BM_RecordStoreMultiSeekExact(benchmark::State& state, Direction direction) 
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
-void BM_RecordStoreSeekNear(benchmark::State& state, Direction direction) {
-    Fixture fix(direction, 100'000, true /* capped */);
-    for (auto _ : state) {
-        fix.cursor->seekNear(RecordId(1));
-        fix.cursor->seekNear(RecordId(50'000));
-        fix.cursor->seekNear(RecordId(100'000));
-        fix.itemsProcessed += 3;
-    }
-    state.SetItemsProcessed(fix.itemsProcessed);
-};
-
 void BM_RecordStoreAdvance(benchmark::State& state, Direction direction) {
     Fixture fix(direction, 100'000);
     int start;
@@ -191,9 +180,6 @@ BENCHMARK_CAPTURE(BM_RecordStoreMultiSeekExact, MultiSeekExactForward, kForward)
 
 BENCHMARK_CAPTURE(BM_RecordStoreSeekExact, SeekExactForward, kForward);
 BENCHMARK_CAPTURE(BM_RecordStoreSeekExact, SeekExactBackward, kBackward);
-
-BENCHMARK_CAPTURE(BM_RecordStoreSeekNear, SeekNearForward, kForward);
-BENCHMARK_CAPTURE(BM_RecordStoreSeekNear, SeekNearBackward, kBackward);
 
 BENCHMARK_CAPTURE(BM_RecordStoreAdvance, AdvanceForward, kForward);
 BENCHMARK_CAPTURE(BM_RecordStoreAdvance, AdvanceBackward, kBackward);

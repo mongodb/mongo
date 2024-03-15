@@ -108,9 +108,20 @@ public:
         if (_records->empty()) {
             return boost::none;
         }
-        auto& next = _records->front();
-        _records->pop_front();
-        return next;
+
+        if (!_initialized) {
+            _initialized = true;
+            _it = _records->cbegin();
+        } else {
+            _it++;
+        }
+
+        if (_it == _records->cend()) {
+            _initialized = false;
+            return boost::none;
+        }
+
+        return *_it;
     }
 
     boost::optional<Record> seekExact(const RecordId& id) override {
@@ -118,13 +129,23 @@ public:
         result.emplace();
         return result;
     }
-    boost::optional<Record> seekNear(const RecordId& id) override {
-        return boost::none;
-    }
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
+        invariant(boundInclusion == BoundInclusion::kInclude);
+        for (auto&& it = _records->cbegin(); it != _records->cend(); it++) {
+            if (it->id >= start) {
+                _initialized = true;
+                _it = it;
+                return *it;
+            }
+        }
         return {};
     }
+
     void save() override {}
+
+    void saveUnpositioned() override {
+        _initialized = false;
+    }
     bool restore(bool tolerateCappedRepositioning) override {
         return true;
     }
@@ -133,6 +154,8 @@ public:
     void setSaveStorageCursorOnDetachFromOperationContext(bool) {}
 
 private:
+    bool _initialized = false;
+    std::deque<Record>::const_iterator _it;
     std::deque<Record>* _records;
 };
 
@@ -256,19 +279,36 @@ protected:
             if (nextResult.isPaused()) {
                 return nextResult;
             }
+
             // Otherwise, retrieve the document via the CollectionScan stage.
             auto id = WorkingSet::INVALID_ID;
             switch (_collScan->doWork(&id)) {
                 case PlanStage::IS_EOF:
+                    // The CollectionScan can immediately return EOF, in which case document in the
+                    // pipeline should not be returned.
+                    while (nextResult.isAdvanced()) {
+                        nextResult = DocumentSourceMock::doGetNext();
+                    }
                     invariant(nextResult.isEOF());
                     return nextResult;
                 case PlanStage::ADVANCED: {
                     // We need to restore the _id field which was removed when we added this
                     // entry into the oplog. This is like a stripped-down DSCSTransform stage.
                     MutableDocument mutableDoc{_ws.get(id)->doc.value()};
+
+                    // The CollectionScan may immediately start returning our document, which means
+                    // we have to skip forward to get the _id of the correct document at the same
+                    // timestamp.
+                    while (nextResult.isAdvanced() &&
+                           nextResult.getDocument()["ts"].getTimestamp() <
+                               _ws.get(id)->doc.value()["ts"].getTimestamp()) {
+                        nextResult = DocumentSourceMock::doGetNext();
+                    }
+                    ASSERT(nextResult.isAdvanced());
                     mutableDoc["_id"] = nextResult.getDocument()["_id"];
                     mutableDoc.metadata().setSortKey(nextResult.getDocument()["_id"], true);
-                    return mutableDoc.freeze();
+                    auto frozen = mutableDoc.freeze();
+                    return frozen;
                 }
                 case PlanStage::NEED_TIME:
                     continue;
@@ -959,8 +999,8 @@ TEST_F(CheckResumabilityTest,
 TEST_F(CheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
     Timestamp oplogTimestamp(100, 1);
     Timestamp resumeTimestamp(100, 2);
-    Timestamp oplogFutureTimestamp(100, 3);
-    Timestamp docTimestamp(100, 4);
+    Timestamp docTimestamp(100, 3);
+    Timestamp oplogFutureTimestamp(100, 4);
 
     auto dsCheckResumability = createDSCheckResumability(resumeTimestamp);
     addOplogEntryOnOtherNS(oplogTimestamp);
