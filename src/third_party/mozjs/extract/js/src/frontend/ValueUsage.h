@@ -10,10 +10,12 @@
 namespace js {
 namespace frontend {
 
-// Used to control whether JSOp::CallIgnoresRv is emitted for function calls.
+// Used to control whether the expression result is used. This enables various
+// optimizations, for example it allows to emit JSOp::CallIgnoresRv for function
+// calls.
 enum class ValueUsage {
   // Assume the value of the current expression may be used. This is always
-  // correct but prohibits JSOp::CallIgnoresRv.
+  // correct but prohibits optimizations like JSOp::CallIgnoresRv.
   WantValue,
 
   // Pass this when emitting an expression if the expression's value is

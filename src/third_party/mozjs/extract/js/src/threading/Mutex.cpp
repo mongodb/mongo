@@ -21,6 +21,16 @@ void js::Mutex::lock() {
   postLockChecks();
 }
 
+bool js::Mutex::tryLock() {
+  preLockChecks();
+  if (!impl_.tryLock()) {
+    return false;
+  }
+
+  postLockChecks();
+  return true;
+}
+
 void js::Mutex::preLockChecks() const {
   Mutex* prev = HeldMutexStack.get();
   if (prev) {

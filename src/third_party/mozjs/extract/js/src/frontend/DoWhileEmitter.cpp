@@ -7,27 +7,20 @@
 #include "frontend/DoWhileEmitter.h"
 
 #include "frontend/BytecodeEmitter.h"
-#include "frontend/SourceNotes.h"
 #include "vm/Opcodes.h"
 #include "vm/StencilEnums.h"  // TryNoteKind
 
 using namespace js;
 using namespace js::frontend;
 
-using mozilla::Maybe;
-using mozilla::Nothing;
-
 DoWhileEmitter::DoWhileEmitter(BytecodeEmitter* bce) : bce_(bce) {}
 
-bool DoWhileEmitter::emitBody(const Maybe<uint32_t>& doPos,
-                              const Maybe<uint32_t>& bodyPos) {
+bool DoWhileEmitter::emitBody(uint32_t doPos, uint32_t bodyPos) {
   MOZ_ASSERT(state_ == State::Start);
 
   // Ensure that the column of the 'do' is set properly.
-  if (doPos) {
-    if (!bce_->updateSourceCoordNotes(*doPos)) {
-      return false;
-    }
+  if (!bce_->updateSourceCoordNotes(doPos)) {
+    return false;
   }
 
   // We need a nop here to make it possible to set a breakpoint on `do`.
@@ -37,7 +30,7 @@ bool DoWhileEmitter::emitBody(const Maybe<uint32_t>& doPos,
 
   loopInfo_.emplace(bce_, StatementKind::DoLoop);
 
-  if (!loopInfo_->emitLoopHead(bce_, bodyPos)) {
+  if (!loopInfo_->emitLoopHead(bce_, mozilla::Some(bodyPos))) {
     return false;
   }
 

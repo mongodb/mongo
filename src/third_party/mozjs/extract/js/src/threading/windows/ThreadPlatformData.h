@@ -13,7 +13,7 @@
 
 #include "threading/Thread.h"
 
-#include "util/Windows.h"
+#include "util/WindowsWrapper.h"
 
 namespace js {
 

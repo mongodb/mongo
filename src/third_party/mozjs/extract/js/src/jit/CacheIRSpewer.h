@@ -12,6 +12,9 @@
 #  include "mozilla/Maybe.h"
 
 #  include "jit/CacheIR.h"
+#  include "jit/CacheIRGenerator.h"
+#  include "jit/CacheIRReader.h"
+#  include "jit/CacheIRWriter.h"
 #  include "js/TypeDecls.h"
 #  include "threading/LockGuard.h"
 #  include "vm/JSONPrinter.h"
@@ -21,7 +24,7 @@ namespace js {
 namespace jit {
 
 class CacheIRSpewer {
-  Mutex outputLock_;
+  Mutex outputLock_ MOZ_UNANNOTATED;
   Fprinter output_;
   mozilla::Maybe<JSONPrinter> json_;
   static CacheIRSpewer cacheIRspewer;

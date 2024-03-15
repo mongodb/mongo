@@ -4,11 +4,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "jsapi.h"
 #include "NamespaceImports.h"
 
+#include "gc/GC.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/Proxy.h"
 #include "proxy/DeadObjectProxy.h"
+#include "vm/Interpreter.h"
 #include "vm/ProxyObject.h"
 #include "vm/WellKnownAtom.h"  // js_*_str
 #include "vm/WrapperObject.h"
@@ -243,7 +246,7 @@ bool js::SetPropertyIgnoringNamedGetter(
 
 bool BaseProxyHandler::getOwnEnumerablePropertyKeys(
     JSContext* cx, HandleObject proxy, MutableHandleIdVector props) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, ENUMERATE);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), ENUMERATE);
   MOZ_ASSERT(props.length() == 0);
 
   if (!ownPropertyKeys(cx, proxy, props)) {
@@ -284,7 +287,7 @@ bool BaseProxyHandler::getOwnEnumerablePropertyKeys(
 
 bool BaseProxyHandler::enumerate(JSContext* cx, HandleObject proxy,
                                  MutableHandleIdVector props) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, ENUMERATE);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), ENUMERATE);
 
   // GetPropertyKeys will invoke getOwnEnumerablePropertyKeys along the proto
   // chain for us.
@@ -336,13 +339,6 @@ bool BaseProxyHandler::nativeCall(JSContext* cx, IsAcceptableThis test,
   return false;
 }
 
-bool BaseProxyHandler::hasInstance(JSContext* cx, HandleObject proxy,
-                                   MutableHandleValue v, bool* bp) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
-  cx->check(proxy, v);
-  return JS::InstanceofOperator(cx, proxy, v, bp);
-}
-
 bool BaseProxyHandler::getBuiltinClass(JSContext* cx, HandleObject proxy,
                                        ESClass* cls) const {
   *cls = ESClass::Other;
@@ -357,7 +353,7 @@ bool BaseProxyHandler::isArray(JSContext* cx, HandleObject proxy,
 
 void BaseProxyHandler::trace(JSTracer* trc, JSObject* proxy) const {}
 
-void BaseProxyHandler::finalize(JSFreeOp* fop, JSObject* proxy) const {}
+void BaseProxyHandler::finalize(JS::GCContext* gcx, JSObject* proxy) const {}
 
 size_t BaseProxyHandler::objectMoved(JSObject* proxy, JSObject* old) const {
   return 0;
@@ -388,7 +384,7 @@ bool BaseProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy,
 bool BaseProxyHandler::getElements(JSContext* cx, HandleObject proxy,
                                    uint32_t begin, uint32_t end,
                                    ElementAdder* adder) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), GET);
 
   return js::GetElementsWithAdder(cx, proxy, proxy, begin, end, adder);
 }
@@ -405,7 +401,7 @@ JS_PUBLIC_API void js::NukeNonCCWProxy(JSContext* cx, HandleObject proxy) {
 
   // The proxy is about to be replaced, so we need to do any necessary
   // cleanup first.
-  proxy->as<ProxyObject>().handler()->finalize(cx->defaultFreeOp(), proxy);
+  proxy->as<ProxyObject>().handler()->finalize(cx->gcContext(), proxy);
 
   proxy->as<ProxyObject>().nuke();
 
@@ -416,7 +412,7 @@ JS_PUBLIC_API void js::NukeRemovedCrossCompartmentWrapper(JSContext* cx,
                                                           JSObject* wrapper) {
   MOZ_ASSERT(wrapper->is<CrossCompartmentWrapperObject>());
 
-  NotifyGCNukeWrapper(wrapper);
+  NotifyGCNukeWrapper(cx, wrapper);
 
   // We don't need to call finalize here because the CCW finalizer doesn't do
   // anything. Skipping finalize means that |wrapper| doesn't need to be rooted

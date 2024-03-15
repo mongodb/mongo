@@ -35,6 +35,9 @@
 /* Address calculation                                                                            */
 /* ---------------------------------------------------------------------------------------------- */
 
+// Signed integer overflow is expected behavior in this function, for wrapping around the
+// instruction pointer on jumps right at the end of the address space.
+ZYAN_NO_SANITIZE("signed-integer-overflow")
 ZyanStatus ZydisCalcAbsoluteAddress(const ZydisDecodedInstruction* instruction,
     const ZydisDecodedOperand* operand, ZyanU64 runtime_address, ZyanU64* result_address)
 {
@@ -93,7 +96,12 @@ ZyanStatus ZydisCalcAbsoluteAddress(const ZydisDecodedInstruction* instruction,
             case ZYDIS_MACHINE_MODE_REAL_16:
             case ZYDIS_MACHINE_MODE_LONG_COMPAT_32:
             case ZYDIS_MACHINE_MODE_LEGACY_32:
-                if (operand->size == 16)
+                // `XBEGIN` is a special case as it doesn't truncate computed address
+                // This behavior is documented by Intel (SDM Vol. 2C):
+                // Use of the 16-bit operand size does not cause this address to be truncated to
+                // 16 bits, unlike a near jump to a relative offset.
+                if ((instruction->operand_width == 16) &&
+                    (instruction->mnemonic != ZYDIS_MNEMONIC_XBEGIN))
                 {
                     *result_address &= 0xFFFF;
                 }
@@ -159,211 +167,5 @@ ZyanStatus ZydisCalcAbsoluteAddressEx(const ZydisDecodedInstruction* instruction
         return ZYAN_STATUS_INVALID_ARGUMENT;
     }
 }
-
-/* ---------------------------------------------------------------------------------------------- */
-/* Accessed CPU flags                                                                             */
-/* ---------------------------------------------------------------------------------------------- */
-
-ZyanStatus ZydisGetAccessedFlagsByAction(const ZydisDecodedInstruction* instruction,
-    ZydisCPUFlagAction action, ZydisCPUFlags* flags)
-{
-    if (!instruction || !flags)
-    {
-        return ZYAN_STATUS_INVALID_ARGUMENT;
-    }
-
-    *flags = 0;
-    for (ZyanUSize i = 0; i < ZYAN_ARRAY_LENGTH(instruction->accessed_flags); ++i)
-    {
-        if (instruction->accessed_flags[i].action == action)
-        {
-            *flags |= (1 << i);
-        }
-    }
-
-    return ZYAN_STATUS_SUCCESS;
-}
-
-ZyanStatus ZydisGetAccessedFlagsRead(const ZydisDecodedInstruction* instruction,
-    ZydisCPUFlags* flags)
-{
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_TESTED, flags));
-    ZydisCPUFlags temp;
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_TESTED_MODIFIED,
-        &temp));
-    *flags |= temp;
-
-    return ZYAN_STATUS_SUCCESS;
-}
-
-ZyanStatus ZydisGetAccessedFlagsWritten(const ZydisDecodedInstruction* instruction,
-    ZydisCPUFlags* flags)
-{
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_TESTED_MODIFIED,
-        flags));
-    ZydisCPUFlags temp;
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_MODIFIED, &temp));
-    *flags |= temp;
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_SET_0, &temp));
-    *flags |= temp;
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_SET_1, &temp));
-    *flags |= temp;
-    ZYAN_CHECK(ZydisGetAccessedFlagsByAction(instruction, ZYDIS_CPUFLAG_ACTION_UNDEFINED, &temp));
-    *flags |= temp;
-
-    return ZYAN_STATUS_SUCCESS;
-}
-
-/* ---------------------------------------------------------------------------------------------- */
-/* Instruction segments                                                                           */
-/* ---------------------------------------------------------------------------------------------- */
-
-ZyanStatus ZydisGetInstructionSegments(const ZydisDecodedInstruction* instruction,
-    ZydisInstructionSegments* segments)
-{
-    if (!instruction || !segments)
-    {
-        return ZYAN_STATUS_INVALID_ARGUMENT;
-    }
-
-    ZYAN_MEMSET(segments, 0, sizeof(*segments));
-
-    // Legacy prefixes and `REX`
-    if (instruction->raw.prefix_count)
-    {
-        const ZyanU8 rex_offset = (instruction->attributes & ZYDIS_ATTRIB_HAS_REX) ? 1 : 0;
-        if (!rex_offset || (instruction->raw.prefix_count > 1))
-        {
-            segments->segments[segments->count  ].type   = ZYDIS_INSTR_SEGMENT_PREFIXES;
-            segments->segments[segments->count  ].offset = 0;
-            segments->segments[segments->count++].size   =
-                instruction->raw.prefix_count - rex_offset;
-        }
-        if (rex_offset)
-        {
-            segments->segments[segments->count  ].type   = ZYDIS_INSTR_SEGMENT_REX;
-            segments->segments[segments->count  ].offset =
-                instruction->raw.prefix_count - rex_offset;
-            segments->segments[segments->count++].size   = 1;
-        }
-    }
-
-    // Encoding prefixes
-    ZydisInstructionSegment segment_type = ZYDIS_INSTR_SEGMENT_NONE;
-    ZyanU8 segment_offset = 0;
-    ZyanU8 segment_size = 0;
-    switch (instruction->encoding)
-    {
-    case ZYDIS_INSTRUCTION_ENCODING_XOP:
-        segment_type = ZYDIS_INSTR_SEGMENT_XOP;
-        segment_offset = instruction->raw.xop.offset;
-        segment_size = 3;
-        break;
-    case ZYDIS_INSTRUCTION_ENCODING_VEX:
-        segment_type = ZYDIS_INSTR_SEGMENT_VEX;
-        segment_offset = instruction->raw.vex.offset;
-        segment_size = instruction->raw.vex.size;
-        break;
-    case ZYDIS_INSTRUCTION_ENCODING_EVEX:
-        segment_type = ZYDIS_INSTR_SEGMENT_EVEX;
-        segment_offset = instruction->raw.evex.offset;
-        segment_size = 4;
-        break;
-    case ZYDIS_INSTRUCTION_ENCODING_MVEX:
-        segment_type = ZYDIS_INSTR_SEGMENT_MVEX;
-        segment_offset = instruction->raw.mvex.offset;
-        segment_size = 4;
-        break;
-    default:
-        break;
-    }
-    if (segment_type)
-    {
-        segments->segments[segments->count  ].type   = segment_type;
-        segments->segments[segments->count  ].offset = segment_offset;
-        segments->segments[segments->count++].size   = segment_size;
-    }
-
-    // Opcode
-    segment_size = 1;
-    if ((instruction->encoding == ZYDIS_INSTRUCTION_ENCODING_LEGACY) ||
-        (instruction->encoding == ZYDIS_INSTRUCTION_ENCODING_3DNOW))
-    {
-        switch (instruction->opcode_map)
-        {
-        case ZYDIS_OPCODE_MAP_DEFAULT:
-            break;
-        case ZYDIS_OPCODE_MAP_0F:
-            ZYAN_FALLTHROUGH;
-        case ZYDIS_OPCODE_MAP_0F0F:
-            segment_size = 2;
-            break;
-        case ZYDIS_OPCODE_MAP_0F38:
-            ZYAN_FALLTHROUGH;
-        case ZYDIS_OPCODE_MAP_0F3A:
-            segment_size = 3;
-            break;
-        default:
-            ZYAN_UNREACHABLE;
-        }
-    }
-    segments->segments[segments->count  ].type = ZYDIS_INSTR_SEGMENT_OPCODE;
-    if (segments->count)
-    {
-        segments->segments[segments->count].offset =
-            segments->segments[segments->count - 1].offset +
-            segments->segments[segments->count - 1].size;
-    } else
-    {
-        segments->segments[segments->count].offset = 0;
-    }
-    segments->segments[segments->count++].size = segment_size;
-
-    // ModRM
-    if (instruction->attributes & ZYDIS_ATTRIB_HAS_MODRM)
-    {
-        segments->segments[segments->count  ].type = ZYDIS_INSTR_SEGMENT_MODRM;
-        segments->segments[segments->count  ].offset = instruction->raw.modrm.offset;
-        segments->segments[segments->count++].size = 1;
-    }
-
-    // SIB
-    if (instruction->attributes & ZYDIS_ATTRIB_HAS_SIB)
-    {
-        segments->segments[segments->count  ].type = ZYDIS_INSTR_SEGMENT_SIB;
-        segments->segments[segments->count  ].offset = instruction->raw.sib.offset;
-        segments->segments[segments->count++].size = 1;
-    }
-
-    // Displacement
-    if (instruction->raw.disp.size)
-    {
-        segments->segments[segments->count  ].type = ZYDIS_INSTR_SEGMENT_DISPLACEMENT;
-        segments->segments[segments->count  ].offset = instruction->raw.disp.offset;
-        segments->segments[segments->count++].size = instruction->raw.disp.size / 8;
-    }
-
-    // Immediates
-    for (ZyanU8 i = 0; i < 2; ++i)
-    {
-        if (instruction->raw.imm[i].size)
-        {
-            segments->segments[segments->count  ].type = ZYDIS_INSTR_SEGMENT_IMMEDIATE;
-            segments->segments[segments->count  ].offset = instruction->raw.imm[i].offset;
-            segments->segments[segments->count++].size = instruction->raw.imm[i].size / 8;
-        }
-    }
-
-    if (instruction->encoding == ZYDIS_INSTRUCTION_ENCODING_3DNOW)
-    {
-        segments->segments[segments->count].type = ZYDIS_INSTR_SEGMENT_OPCODE;
-        segments->segments[segments->count].offset = instruction->length -1;
-        segments->segments[segments->count++].size = 1;
-    }
-
-    return ZYAN_STATUS_SUCCESS;
-}
-
-/* ---------------------------------------------------------------------------------------------- */
 
 /* ============================================================================================== */

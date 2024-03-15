@@ -80,12 +80,12 @@ class MOZ_STACK_CLASS JS_PUBLIC_API AutoStableStringChars final {
 
   mozilla::Range<const Latin1Char> latin1Range() const {
     MOZ_ASSERT(state_ == Latin1);
-    return mozilla::Range<const Latin1Char>(latin1Chars_, GetStringLength(s_));
+    return mozilla::Range<const Latin1Char>(latin1Chars_, length());
   }
 
   mozilla::Range<const char16_t> twoByteRange() const {
     MOZ_ASSERT(state_ == TwoByte);
-    return mozilla::Range<const char16_t>(twoByteChars_, GetStringLength(s_));
+    return mozilla::Range<const char16_t>(twoByteChars_, length());
   }
 
   /* If we own the chars, transfer ownership to the caller. */
@@ -98,6 +98,8 @@ class MOZ_STACK_CLASS JS_PUBLIC_API AutoStableStringChars final {
     ownChars_.reset();
     return true;
   }
+
+  size_t length() const { return GetStringLength(s_); }
 
  private:
   AutoStableStringChars(const AutoStableStringChars& other) = delete;

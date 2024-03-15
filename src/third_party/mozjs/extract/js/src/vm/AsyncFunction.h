@@ -10,7 +10,6 @@
 #include "js/Class.h"
 #include "vm/AsyncFunctionResolveKind.h"  // AsyncFunctionResolveKind
 #include "vm/GeneratorObject.h"
-#include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/PromiseObject.h"
 
@@ -313,7 +312,7 @@ class AsyncFunctionGeneratorObject : public AbstractGeneratorObject {
                                               HandleFunction asyncGen);
 
   static AsyncFunctionGeneratorObject* create(JSContext* cx,
-                                              HandleModuleObject module);
+                                              Handle<ModuleObject*> module);
 
   PromiseObject* promise() {
     return &getFixedSlot(PROMISE_SLOT).toObject().as<PromiseObject>();

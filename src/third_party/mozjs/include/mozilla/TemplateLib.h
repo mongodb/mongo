@@ -119,18 +119,6 @@ struct MulOverflowMask<1> {
   static const size_t value = 0;
 };
 
-/**
- * And<bool...> computes the logical 'and' of its argument booleans.
- *
- * Examples:
- *   mozilla::t1::And<true, true>::value is true.
- *   mozilla::t1::And<true, false>::value is false.
- *   mozilla::t1::And<>::value is true.
- */
-
-template <bool... C>
-struct And : std::integral_constant<bool, (C && ...)> {};
-
 }  // namespace tl
 
 }  // namespace mozilla

@@ -16,15 +16,11 @@
 #include "frontend/Parser.h"      // ParserBase
 #include "frontend/ParserAtom.h"  // ParserAtomsTable, TaggedParserAtomIndex
 #include "frontend/SharedContext.h"
-#include "vm/BigIntType.h"
-#include "vm/Printer.h"
-#include "vm/RegExpObject.h"
+#include "js/Printer.h"
 #include "vm/Scope.h"  // GetScopeDataTrailingNames
 
 using namespace js;
 using namespace js::frontend;
-
-using mozilla::IsFinite;
 
 #ifdef DEBUG
 void ListNode::checkConsistency() const {
@@ -55,7 +51,7 @@ void* ParseNodeAllocator::allocNode(size_t size) {
   LifoAlloc::AutoFallibleScope fallibleAllocator(&alloc);
   void* p = alloc.alloc(size);
   if (!p) {
-    ReportOutOfMemory(cx);
+    ReportOutOfMemory(fc);
   }
   return p;
 }
@@ -118,18 +114,24 @@ const size_t ParseNode::sizeTable[] = {
 };
 
 static const char* const parseNodeNames[] = {
-#  define STRINGIFY(name, _type) #  name,
+#  define STRINGIFY(name, _type) #name,
     FOR_EACH_PARSE_NODE_KIND(STRINGIFY)
 #  undef STRINGIFY
 };
 
-void frontend::DumpParseTree(ParserBase* parser, ParseNode* pn,
-                             GenericPrinter& out, int indent) {
+static void DumpParseTree(const ParserAtomsTable* parserAtoms, ParseNode* pn,
+                          GenericPrinter& out, int indent) {
   if (pn == nullptr) {
     out.put("#NULL");
   } else {
-    pn->dump(parser, out, indent);
+    pn->dump(parserAtoms, out, indent);
   }
+}
+
+void frontend::DumpParseTree(ParserBase* parser, ParseNode* pn,
+                             GenericPrinter& out, int indent) {
+  ParserAtomsTable* parserAtoms = parser ? &parser->parserAtoms() : nullptr;
+  ::DumpParseTree(parserAtoms, pn, out, indent);
 }
 
 static void IndentNewLine(GenericPrinter& out, int indent) {
@@ -141,21 +143,22 @@ static void IndentNewLine(GenericPrinter& out, int indent) {
 
 void ParseNode::dump() { dump(nullptr); }
 
-void ParseNode::dump(ParserBase* parser) {
+void ParseNode::dump(const ParserAtomsTable* parserAtoms) {
   js::Fprinter out(stderr);
-  dump(parser, out);
+  dump(parserAtoms, out);
 }
 
-void ParseNode::dump(ParserBase* parser, GenericPrinter& out) {
-  dump(parser, out, 0);
+void ParseNode::dump(const ParserAtomsTable* parserAtoms, GenericPrinter& out) {
+  dump(parserAtoms, out, 0);
   out.putChar('\n');
 }
 
-void ParseNode::dump(ParserBase* parser, GenericPrinter& out, int indent) {
+void ParseNode::dump(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                     int indent) {
   switch (getKind()) {
-#  define DUMP(K, T)                         \
-    case ParseNodeKind::K:                   \
-      as<T>().dumpImpl(parser, out, indent); \
+#  define DUMP(K, T)                              \
+    case ParseNodeKind::K:                        \
+      as<T>().dumpImpl(parserAtoms, out, indent); \
       break;
     FOR_EACH_PARSE_NODE_KIND(DUMP)
 #  undef DUMP
@@ -164,8 +167,8 @@ void ParseNode::dump(ParserBase* parser, GenericPrinter& out, int indent) {
   }
 }
 
-void NullaryNode::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                           int indent) {
+void NullaryNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                           GenericPrinter& out, int indent) {
   switch (getKind()) {
     case ParseNodeKind::TrueExpr:
       out.put("#true");
@@ -185,71 +188,71 @@ void NullaryNode::dumpImpl(ParserBase* parser, GenericPrinter& out,
   }
 }
 
-void NumericLiteral::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                              int indent) {
+void NumericLiteral::dumpImpl(const ParserAtomsTable* parserAtoms,
+                              GenericPrinter& out, int indent) {
   ToCStringBuf cbuf;
-  const char* cstr = NumberToCString(nullptr, &cbuf, value());
-  if (!IsFinite(value())) {
+  const char* cstr = NumberToCString(&cbuf, value());
+  MOZ_ASSERT(cstr);
+  if (!std::isfinite(value())) {
     out.put("#");
   }
-  if (cstr) {
-    out.printf("%s", cstr);
-  } else {
-    out.printf("%g", value());
-  }
+  out.printf("%s", cstr);
 }
 
-void BigIntLiteral::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                             int indent) {
+void BigIntLiteral::dumpImpl(const ParserAtomsTable* parserAtoms,
+                             GenericPrinter& out, int indent) {
   out.printf("(%s)", parseNodeNames[getKindAsIndex()]);
 }
 
-void RegExpLiteral::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                             int indent) {
+void RegExpLiteral::dumpImpl(const ParserAtomsTable* parserAtoms,
+                             GenericPrinter& out, int indent) {
   out.printf("(%s)", parseNodeNames[getKindAsIndex()]);
 }
 
-static void DumpCharsNoNewline(ParserBase* parser, TaggedParserAtomIndex index,
+static void DumpCharsNoNewline(const ParserAtomsTable* parserAtoms,
+                               TaggedParserAtomIndex index,
                                GenericPrinter& out) {
   out.put("\"");
-  if (parser) {
-    parser->parserAtoms().dumpCharsNoQuote(out, index);
+  if (parserAtoms) {
+    parserAtoms->dumpCharsNoQuote(out, index);
   } else {
     DumpTaggedParserAtomIndexNoQuote(out, index, nullptr);
   }
   out.put("\"");
 }
 
-void LoopControlStatement::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                                    int indent) {
+void LoopControlStatement::dumpImpl(const ParserAtomsTable* parserAtoms,
+                                    GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s", name);
   if (label_) {
     out.printf(" ");
-    DumpCharsNoNewline(parser, label_, out);
+    DumpCharsNoNewline(parserAtoms, label_, out);
   }
   out.printf(")");
 }
 
-void UnaryNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
+void UnaryNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                         GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s ", name);
   indent += strlen(name) + 2;
-  DumpParseTree(parser, kid(), out, indent);
+  ::DumpParseTree(parserAtoms, kid(), out, indent);
   out.printf(")");
 }
 
-void BinaryNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
+void BinaryNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                          GenericPrinter& out, int indent) {
   if (isKind(ParseNodeKind::DotExpr)) {
     out.put("(.");
 
-    DumpParseTree(parser, right(), out, indent + 2);
+    ::DumpParseTree(parserAtoms, right(), out, indent + 2);
 
     out.putChar(' ');
     if (as<PropertyAccess>().isSuper()) {
       out.put("super");
     } else {
-      DumpParseTree(parser, left(), out, indent + 2);
+      ::DumpParseTree(parserAtoms, left(), out, indent + 2);
     }
 
     out.printf(")");
@@ -259,62 +262,65 @@ void BinaryNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s ", name);
   indent += strlen(name) + 2;
-  DumpParseTree(parser, left(), out, indent);
+  ::DumpParseTree(parserAtoms, left(), out, indent);
   IndentNewLine(out, indent);
-  DumpParseTree(parser, right(), out, indent);
+  ::DumpParseTree(parserAtoms, right(), out, indent);
   out.printf(")");
 }
 
-void TernaryNode::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                           int indent) {
+void TernaryNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                           GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s ", name);
   indent += strlen(name) + 2;
-  DumpParseTree(parser, kid1(), out, indent);
+  ::DumpParseTree(parserAtoms, kid1(), out, indent);
   IndentNewLine(out, indent);
-  DumpParseTree(parser, kid2(), out, indent);
+  ::DumpParseTree(parserAtoms, kid2(), out, indent);
   IndentNewLine(out, indent);
-  DumpParseTree(parser, kid3(), out, indent);
+  ::DumpParseTree(parserAtoms, kid3(), out, indent);
   out.printf(")");
 }
 
-void FunctionNode::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                            int indent) {
+void FunctionNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                            GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s ", name);
   indent += strlen(name) + 2;
-  DumpParseTree(parser, body(), out, indent);
+  ::DumpParseTree(parserAtoms, body(), out, indent);
   out.printf(")");
 }
 
-void ModuleNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
+void ModuleNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                          GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s ", name);
   indent += strlen(name) + 2;
-  DumpParseTree(parser, body(), out, indent);
+  ::DumpParseTree(parserAtoms, body(), out, indent);
   out.printf(")");
 }
 
-void ListNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
+void ListNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                        GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s [", name);
   if (ParseNode* listHead = head()) {
     indent += strlen(name) + 3;
-    DumpParseTree(parser, listHead, out, indent);
+    ::DumpParseTree(parserAtoms, listHead, out, indent);
     for (ParseNode* item : contentsFrom(listHead->pn_next)) {
       IndentNewLine(out, indent);
-      DumpParseTree(parser, item, out, indent);
+      ::DumpParseTree(parserAtoms, item, out, indent);
     }
   }
   out.printf("])");
 }
 
-void NameNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
+void NameNode::dumpImpl(const ParserAtomsTable* parserAtoms,
+                        GenericPrinter& out, int indent) {
   switch (getKind()) {
     case ParseNodeKind::StringExpr:
     case ParseNodeKind::TemplateStringExpr:
     case ParseNodeKind::ObjectPropertyName:
-      DumpCharsNoNewline(parser, atom_, out);
+      DumpCharsNoNewline(parserAtoms, atom_, out);
       return;
 
     case ParseNodeKind::Name:
@@ -323,11 +329,11 @@ void NameNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
     case ParseNodeKind::PropertyNameExpr:
       if (!atom_) {
         out.put("#<null name>");
-      } else if (parser) {
+      } else if (parserAtoms) {
         if (atom_ == TaggedParserAtomIndex::WellKnown::empty()) {
           out.put("#<zero-length name>");
         } else {
-          parser->parserAtoms().dumpCharsNoQuote(out, atom_);
+          parserAtoms->dumpCharsNoQuote(out, atom_);
         }
       } else {
         DumpTaggedParserAtomIndexNoQuote(out, atom_, nullptr);
@@ -335,7 +341,7 @@ void NameNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
       return;
 
     case ParseNodeKind::LabelStmt: {
-      this->as<LabeledStatement>().dumpImpl(parser, out, indent);
+      this->as<LabeledStatement>().dumpImpl(parserAtoms, out, indent);
       return;
     }
 
@@ -347,20 +353,20 @@ void NameNode::dumpImpl(ParserBase* parser, GenericPrinter& out, int indent) {
   }
 }
 
-void LabeledStatement::dumpImpl(ParserBase* parser, GenericPrinter& out,
-                                int indent) {
+void LabeledStatement::dumpImpl(const ParserAtomsTable* parserAtoms,
+                                GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s ", name);
-  DumpCharsNoNewline(parser, label(), out);
+  DumpCharsNoNewline(parserAtoms, label(), out);
   indent += strlen(name) + 2;
   IndentNewLine(out, indent);
-  DumpParseTree(parser, statement(), out, indent);
+  ::DumpParseTree(parserAtoms, statement(), out, indent);
   out.printf(")");
 }
 
 template <ParseNodeKind Kind, typename ScopeType>
-void BaseScopeNode<Kind, ScopeType>::dumpImpl(ParserBase* parser,
-                                              GenericPrinter& out, int indent) {
+void BaseScopeNode<Kind, ScopeType>::dumpImpl(
+    const ParserAtomsTable* parserAtoms, GenericPrinter& out, int indent) {
   const char* name = parseNodeNames[getKindAsIndex()];
   out.printf("(%s [", name);
   int nameIndent = indent + strlen(name) + 3;
@@ -369,11 +375,11 @@ void BaseScopeNode<Kind, ScopeType>::dumpImpl(ParserBase* parser,
     auto names = GetScopeDataTrailingNames(bindings);
     for (uint32_t i = 0; i < names.size(); i++) {
       auto index = names[i].name();
-      if (parser) {
+      if (parserAtoms) {
         if (index == TaggedParserAtomIndex::WellKnown::empty()) {
           out.put("#<zero-length name>");
         } else {
-          parser->parserAtoms().dumpCharsNoQuote(out, index);
+          parserAtoms->dumpCharsNoQuote(out, index);
         }
       } else {
         DumpTaggedParserAtomIndexNoQuote(out, index, nullptr);
@@ -386,22 +392,22 @@ void BaseScopeNode<Kind, ScopeType>::dumpImpl(ParserBase* parser,
   out.putChar(']');
   indent += 2;
   IndentNewLine(out, indent);
-  DumpParseTree(parser, scopeBody(), out, indent);
+  ::DumpParseTree(parserAtoms, scopeBody(), out, indent);
   out.printf(")");
 }
 #endif
 
 TaggedParserAtomIndex NumericLiteral::toAtom(
-    JSContext* cx, ParserAtomsTable& parserAtoms) const {
-  return NumberToParserAtom(cx, parserAtoms, value());
+    FrontendContext* fc, ParserAtomsTable& parserAtoms) const {
+  return NumberToParserAtom(fc, parserAtoms, value());
 }
 
 RegExpObject* RegExpLiteral::create(
-    JSContext* cx, ParserAtomsTable& parserAtoms,
+    JSContext* cx, FrontendContext* fc, ParserAtomsTable& parserAtoms,
     CompilationAtomCache& atomCache,
     ExtensibleCompilationStencil& stencil) const {
-  return stencil.regExpData[index_].createRegExpAndEnsureAtom(cx, parserAtoms,
-                                                              atomCache);
+  return stencil.regExpData[index_].createRegExpAndEnsureAtom(
+      cx, fc, parserAtoms, atomCache);
 }
 
 bool js::frontend::IsAnonymousFunctionDefinition(ParseNode* pn) {

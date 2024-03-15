@@ -26,7 +26,7 @@
 
 /**
  * @file
- * @brief   Implements command-line argument parsing.
+ * Implements command-line argument parsing.
  */
 
 #ifndef ZYCORE_ARGPARSE_H
@@ -46,50 +46,50 @@ extern "C" {
 /* ============================================================================================== */
 
 /**
- * @brief   Definition of a single argument.
+ * Definition of a single argument.
  */
 typedef struct ZyanArgParseDefinition_
 {
     /**
-     * @brief   The argument name, e.g. `--help`.
+     * The argument name, e.g. `--help`.
      *
      * Must start with either one or two dashes. Single dash arguments must consist of a single
      * character, (e.g. `-n`), double-dash arguments can be of arbitrary length.
      */
     const char* name;
     /**
-     * @brief   Whether the argument is boolean or expects a value.
+     * Whether the argument is boolean or expects a value.
      */
     ZyanBool boolean;
     /**
-     * @brief   Whether this argument is required (error if missing).
+     * Whether this argument is required (error if missing).
      */
     ZyanBool required;
 } ZyanArgParseDefinition;
 
 /**
- * @brief   Configuration for argument parsing.
+ * Configuration for argument parsing.
  */
 typedef struct ZyanArgParseConfig_
 {
     /**
-     * @brief   `argv` argument passed to `main` by LibC.
+     * `argv` argument passed to `main` by LibC.
      */
     const char** argv;
     /**
-     * @brief   `argc` argument passed to `main` by LibC.
+     * `argc` argument passed to `main` by LibC.
      */
     ZyanUSize argc;
     /**
-     * @brief   Minimum # of accepted unnamed / anonymous arguments.
+     * Minimum # of accepted unnamed / anonymous arguments.
      */
     ZyanUSize min_unnamed_args;
     /**
-     * @brief   Maximum # of accepted unnamed / anonymous arguments.
+     * Maximum # of accepted unnamed / anonymous arguments.
      */
     ZyanUSize max_unnamed_args;
     /**
-     * @brief   Argument definition array, or `ZYAN_NULL`.
+     * Argument definition array, or `ZYAN_NULL`.
      *
      * Expects a pointer to an array of `ZyanArgParseDefinition` instances. The array is
      * terminated by setting the `.name` field of the last element to `ZYAN_NULL`. If no named
@@ -99,22 +99,22 @@ typedef struct ZyanArgParseConfig_
 } ZyanArgParseConfig;
 
 /**
- * @brief   Information about a parsed argument.
+ * Information about a parsed argument.
  */
 typedef struct ZyanArgParseArg_
 {
     /**
-     * @brief   Corresponding argument definition, or `ZYAN_NULL` for unnamed args.
+     * Corresponding argument definition, or `ZYAN_NULL` for unnamed args.
      *
      * This pointer is borrowed from the `cfg` pointer passed to `ZyanArgParse`.
      */
     const ZyanArgParseDefinition* def;
     /**
-     * @brief   Whether the argument has a value (is non-boolean).
+     * Whether the argument has a value (is non-boolean).
      */
     ZyanBool has_value;
     /**
-     * @brief   If `has_value == true`, then the argument value.
+     * If `has_value == true`, then the argument value.
      *
      * This is a view into the `argv` string array passed to `ZyanArgParse` via the `cfg` argument.
      */
@@ -128,7 +128,7 @@ typedef struct ZyanArgParseArg_
 #ifndef ZYAN_NO_LIBC
 
 /**
- * @brief  Parse arguments according to a `ZyanArgParseConfig` definition.
+ * Parse arguments according to a `ZyanArgParseConfig` definition.
  *
  * @param  cfg          Argument parser config to use.
  * @param  parsed       Receives the parsed output. Vector of `ZyanArgParseArg`. Ownership is
@@ -146,7 +146,7 @@ ZYCORE_EXPORT ZyanStatus ZyanArgParse(const ZyanArgParseConfig *cfg, ZyanVector*
 #endif
 
 /**
- * @brief  Parse arguments according to a `ZyanArgParseConfig` definition.
+ * Parse arguments according to a `ZyanArgParseConfig` definition.
  *
  * This version allows specification of a custom memory allocator and thus supports no-libc.
  *

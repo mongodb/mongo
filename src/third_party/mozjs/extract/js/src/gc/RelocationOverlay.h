@@ -29,7 +29,7 @@ class RelocationOverlay : public Cell {
   /* The location the cell has been moved to, stored in the cell header. */
   Cell* forwardingAddress() const {
     MOZ_ASSERT(isForwarded());
-    return reinterpret_cast<Cell*>(header_ & ~RESERVED_MASK);
+    return reinterpret_cast<Cell*>(header_.getForwardingAddress());
   }
 
  protected:
@@ -49,9 +49,9 @@ class RelocationOverlay : public Cell {
 
   static RelocationOverlay* forwardCell(Cell* src, Cell* dst);
 
-  RelocationOverlay*& nextRef() {
+  void setNext(RelocationOverlay* next) {
     MOZ_ASSERT(isForwarded());
-    return next_;
+    next_ = next;
   }
 
   RelocationOverlay* next() const {

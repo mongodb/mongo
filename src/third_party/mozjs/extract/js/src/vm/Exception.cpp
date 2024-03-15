@@ -6,7 +6,7 @@
 
 #include "js/Exception.h"
 
-#include "jsapi.h"  // AssertHeapIsIdle
+#include "js/Context.h"  // js::AssertHeapIsIdle
 #include "vm/JSContext.h"
 #include "vm/SavedFrame.h"
 
@@ -52,7 +52,7 @@ void JS::SetPendingExceptionStack(JSContext* cx,
   // compartment while stored stack values are always the unwrapped
   // object anyway.
 
-  RootedSavedFrame nstack(cx);
+  Rooted<SavedFrame*> nstack(cx);
   if (exceptionStack.stack()) {
     nstack = &UncheckedUnwrap(exceptionStack.stack())->as<SavedFrame>();
   }

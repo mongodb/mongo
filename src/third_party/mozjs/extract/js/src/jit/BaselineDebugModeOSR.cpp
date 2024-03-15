@@ -10,17 +10,15 @@
 #include "jit/BaselineIC.h"
 #include "jit/BaselineJIT.h"
 #include "jit/Invalidation.h"
-#include "jit/Ion.h"
-#include "jit/JitcodeMap.h"
+#include "jit/IonScript.h"
 #include "jit/JitFrames.h"
 #include "jit/JitRuntime.h"
 #include "jit/JSJitFrameIter.h"
-#include "jit/PerfSpewer.h"
 
 #include "jit/JitScript-inl.h"
 #include "jit/JSJitFrameIter-inl.h"
-#include "jit/MacroAssembler-inl.h"
-#include "vm/Stack-inl.h"
+#include "vm/JSScript-inl.h"
+#include "vm/Realm-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -418,7 +416,7 @@ static bool RecompileBaselineScriptForDebugMode(
 
   AutoKeepJitScripts keepJitScripts(cx);
   BaselineScript* oldBaselineScript =
-      script->jitScript()->clearBaselineScript(cx->defaultFreeOp(), script);
+      script->jitScript()->clearBaselineScript(cx->gcContext(), script);
 
   MethodStatus status =
       BaselineCompile(cx, script, /* forceDebugMode = */ observing);
@@ -479,7 +477,7 @@ static void UndoRecompileBaselineScriptsForDebugMode(
     BaselineScript* baselineScript = script->baselineScript();
     if (entry.recompiled()) {
       script->jitScript()->setBaselineScript(script, entry.oldBaselineScript);
-      BaselineScript::Destroy(cx->runtime()->defaultFreeOp(), baselineScript);
+      BaselineScript::Destroy(cx->gcContext(), baselineScript);
     }
   }
 }
@@ -545,8 +543,7 @@ bool jit::RecompileOnStackBaselineScriptsForDebugMode(
   for (UniqueScriptOSREntryIter iter(entries); !iter.done(); ++iter) {
     const DebugModeOSREntry& entry = iter.entry();
     if (entry.recompiled()) {
-      BaselineScript::Destroy(cx->runtime()->defaultFreeOp(),
-                              entry.oldBaselineScript);
+      BaselineScript::Destroy(cx->gcContext(), entry.oldBaselineScript);
     }
   }
 

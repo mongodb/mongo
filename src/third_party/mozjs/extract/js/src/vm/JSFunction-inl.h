@@ -11,10 +11,9 @@
 
 #include "gc/Allocator.h"
 #include "gc/GCProbes.h"
-#include "js/CharacterEncoding.h"
-#include "vm/EnvironmentObject.h"
 #include "vm/WellKnownAtom.h"  // js_*_str
 
+#include "gc/ObjectKind-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
 
@@ -29,24 +28,12 @@ inline const char* GetFunctionNameBytes(JSContext* cx, JSFunction* fun,
   return js_anonymous_str;
 }
 
-inline JSFunction* CloneFunctionObject(JSContext* cx, HandleFunction fun,
-                                       HandleObject enclosingEnv,
-                                       HandleObject proto = nullptr) {
-  // These intermediate variables are needed to avoid link errors on some
-  // platforms.  Sigh.
-  gc::AllocKind finalizeKind = gc::AllocKind::FUNCTION;
-  gc::AllocKind extendedFinalizeKind = gc::AllocKind::FUNCTION_EXTENDED;
-  gc::AllocKind kind = fun->isExtended() ? extendedFinalizeKind : finalizeKind;
-
-  MOZ_ASSERT(CanReuseScriptForClone(cx->realm(), fun, enclosingEnv));
-  return CloneFunctionReuseScript(cx, fun, enclosingEnv, kind, proto);
-}
-
 } /* namespace js */
 
-/* static */ inline JS::Result<JSFunction*, JS::OOM> JSFunction::create(
-    JSContext* cx, js::gc::AllocKind kind, js::gc::InitialHeap heap,
-    js::HandleShape shape) {
+/* static */
+inline JSFunction* JSFunction::create(JSContext* cx, js::gc::AllocKind kind,
+                                      js::gc::Heap heap,
+                                      js::Handle<js::SharedShape*> shape) {
   MOZ_ASSERT(kind == js::gc::AllocKind::FUNCTION ||
              kind == js::gc::AllocKind::FUNCTION_EXTENDED);
 
@@ -55,52 +42,100 @@ inline JSFunction* CloneFunctionObject(JSContext* cx, HandleFunction fun,
   const JSClass* clasp = shape->getObjectClass();
   MOZ_ASSERT(clasp->isNativeObject());
   MOZ_ASSERT(clasp->isJSFunction());
+  MOZ_ASSERT_IF(kind == js::gc::AllocKind::FUNCTION,
+                clasp == js::FunctionClassPtr);
+  MOZ_ASSERT_IF(kind == js::gc::AllocKind::FUNCTION_EXTENDED,
+                clasp == js::FunctionExtendedClassPtr);
 
-  static constexpr size_t NumDynamicSlots = 0;
   MOZ_ASSERT(calculateDynamicSlots(shape->numFixedSlots(), shape->slotSpan(),
-                                   clasp) == NumDynamicSlots);
+                                   clasp) == 0);
 
-  JSObject* obj = js::AllocateObject(cx, kind, NumDynamicSlots, heap, clasp);
-  if (!obj) {
-    return cx->alreadyReportedOOM();
+  NativeObject* nobj = cx->newCell<NativeObject>(kind, heap, clasp);
+  if (!nobj) {
+    return nullptr;
   }
 
-  NativeObject* nobj = static_cast<NativeObject*>(obj);
   nobj->initShape(shape);
 
   nobj->initEmptyDynamicSlots();
   nobj->setEmptyElements();
 
-  MOZ_ASSERT(!clasp->hasPrivate());
-  MOZ_ASSERT(shape->slotSpan() == 0);
-
   JSFunction* fun = static_cast<JSFunction*>(nobj);
-  fun->nargs_ = 0;
-
-  // This must be overwritten by some ultimate caller: there's no default
-  // value to which we could sensibly initialize this.
-  MOZ_MAKE_MEM_UNDEFINED(&fun->u, sizeof(u));
-
-  fun->atom_.init(nullptr);
+  fun->initFixedSlots(JSCLASS_RESERVED_SLOTS(clasp));
+  fun->initFlagsAndArgCount();
+  fun->initFixedSlot(NativeJitInfoOrInterpretedScriptSlot,
+                     JS::PrivateValue(nullptr));
 
   if (kind == js::gc::AllocKind::FUNCTION_EXTENDED) {
     fun->setFlags(FunctionFlags::EXTENDED);
-    for (js::GCPtrValue& extendedSlot : fun->toExtended()->extendedSlots) {
-      extendedSlot.init(JS::UndefinedValue());
-    }
-  } else {
-    fun->setFlags(0);
   }
 
   MOZ_ASSERT(!clasp->shouldDelayMetadataBuilder(),
              "Function has no extra data hanging off it, that wouldn't be "
              "allocated at this point, that would require delaying the "
              "building of metadata for it");
-  fun = SetNewObjectMetadata(cx, fun);
+  if (MOZ_UNLIKELY(cx->realm()->hasAllocationMetadataBuilder())) {
+    fun = SetNewObjectMetadata(cx, fun);
+  }
 
   js::gc::gcprobes::CreateObject(fun);
 
   return fun;
+}
+
+/* static */
+inline bool JSFunction::getLength(JSContext* cx, js::HandleFunction fun,
+                                  uint16_t* length) {
+  if (fun->isNativeFun()) {
+    *length = fun->nargs();
+    return true;
+  }
+
+  JSScript* script = getOrCreateScript(cx, fun);
+  if (!script) {
+    return false;
+  }
+
+  *length = script->funLength();
+  return true;
+}
+
+/* static */
+inline bool JSFunction::getUnresolvedLength(JSContext* cx,
+                                            js::HandleFunction fun,
+                                            uint16_t* length) {
+  MOZ_ASSERT(!IsInternalFunctionObject(*fun));
+  MOZ_ASSERT(!fun->hasResolvedLength());
+
+  return JSFunction::getLength(cx, fun, length);
+}
+
+inline JSAtom* JSFunction::infallibleGetUnresolvedName(JSContext* cx) {
+  MOZ_ASSERT(!IsInternalFunctionObject(*this));
+  MOZ_ASSERT(!hasResolvedName());
+
+  if (JSAtom* name = explicitOrInferredName()) {
+    return name;
+  }
+
+  return cx->names().empty;
+}
+
+/* static */ inline bool JSFunction::getAllocKindForThis(
+    JSContext* cx, js::HandleFunction func, js::gc::AllocKind& allocKind) {
+  JSScript* script = getOrCreateScript(cx, func);
+  if (!script) {
+    return false;
+  }
+
+  size_t propertyCountEstimate =
+      script->immutableScriptData()->propertyCountEstimate;
+
+  // Choose the alloc assuming at least the default NewObjectKind slots, but
+  // bigger if our estimate shows we need it.
+  allocKind = js::gc::GetGCObjectKind(std::max(
+      js::gc::GetGCKindSlots(js::NewObjectGCKind()), propertyCountEstimate));
+  return true;
 }
 
 #endif /* vm_JSFunction_inl_h */

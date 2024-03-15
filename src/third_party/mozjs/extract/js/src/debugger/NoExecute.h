@@ -10,8 +10,6 @@
 #include "mozilla/Assertions.h"  // for AssertionConditionType, MOZ_ASSERT
 #include "mozilla/Attributes.h"  // for MOZ_RAII
 
-#include "jsapi.h"
-
 #include "NamespaceImports.h"  // for HandleScript
 #include "js/Promise.h"        // for JS::AutoDebuggerJobQueueInterruption
 

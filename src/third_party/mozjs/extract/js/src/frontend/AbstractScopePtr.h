@@ -7,40 +7,20 @@
 #ifndef frontend_AbstractScopePtr_h
 #define frontend_AbstractScopePtr_h
 
-#include "mozilla/Maybe.h"
-#include "mozilla/Variant.h"
+#include <type_traits>
 
-#include "frontend/TypedIndex.h"
-#include "gc/Barrier.h"
-#include "gc/Rooting.h"
-#include "gc/Tracer.h"
-#include "vm/Scope.h"
+#include "frontend/ScopeIndex.h"
 #include "vm/ScopeKind.h"  // For ScopeKind
 
 namespace js {
 class Scope;
 class GlobalScope;
 class EvalScope;
-struct MemberInitializers;
-class GCMarker;
 
 namespace frontend {
 struct CompilationState;
-struct CompilationGCOutput;
 class ScopeStencil;
 }  // namespace frontend
-
-class ScopeIndex : public frontend::TypedIndex<Scope> {
-  // Delegate constructors;
-  using Base = frontend::TypedIndex<Scope>;
-  using Base::Base;
-
-  static constexpr uint32_t InvalidIndex = UINT32_MAX;
-
- public:
-  static constexpr ScopeIndex invalid() { return ScopeIndex(InvalidIndex); }
-  bool isValid() const { return index != InvalidIndex; }
-};
 
 // An interface class to support Scope queries in the frontend without requiring
 // a GC Allocated scope to necessarily exist.

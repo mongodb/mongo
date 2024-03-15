@@ -23,7 +23,6 @@
 #include "NamespaceImports.h"
 
 #include "js/TypeDecls.h"
-#include "js/UniquePtr.h"
 #include "js/Utility.h"
 #include "js/Value.h"
 #include "vm/BytecodeFormatFlags.h"  // JOF_*
@@ -33,17 +32,8 @@
 #include "vm/ThrowMsgKind.h"   // ThrowMsgKind, ThrowCondition
 
 namespace js {
-class Sprinter;
+class JS_PUBLIC_API Sprinter;
 }  // namespace js
-
-/*
- * JS operation bytecodes.
- */
-enum class JSOp : uint8_t {
-#define ENUMERATE_OPCODE(op, ...) op,
-  FOR_EACH_OPCODE(ENUMERATE_OPCODE)
-#undef ENUMERATE_OPCODE
-};
 
 /* Shorthand for type from format. */
 
@@ -311,13 +301,11 @@ static inline bool IsJumpOpcode(JSOp op) { return JOF_OPTYPE(op) == JOF_JUMP; }
 static inline bool BytecodeFallsThrough(JSOp op) {
   // Note:
   // * JSOp::Yield/JSOp::Await is considered to fall through, like JSOp::Call.
-  // * JSOp::Gosub falls through indirectly, after executing a 'finally'.
   switch (op) {
     case JSOp::Goto:
     case JSOp::Default:
     case JSOp::Return:
     case JSOp::RetRval:
-    case JSOp::Retsub:
     case JSOp::FinalYieldRval:
     case JSOp::Throw:
     case JSOp::ThrowMsg:
@@ -340,8 +328,10 @@ static inline bool BytecodeIsJumpTarget(JSOp op) {
   }
 }
 
-MOZ_ALWAYS_INLINE unsigned StackUses(jsbytecode* pc) {
-  JSOp op = JSOp(*pc);
+// The JSOp argument is superflous, but we are using it to avoid a
+// store forwarding Bug on some Android phones; see Bug 1833315
+MOZ_ALWAYS_INLINE unsigned StackUses(JSOp op, jsbytecode* pc) {
+  MOZ_ASSERT(op == JSOp(*pc));
   int nuses = CodeSpec(op).nuses;
   if (nuses >= 0) {
     return nuses;
@@ -352,20 +342,21 @@ MOZ_ALWAYS_INLINE unsigned StackUses(jsbytecode* pc) {
     case JSOp::PopN:
       return GET_UINT16(pc);
     case JSOp::New:
+    case JSOp::NewContent:
     case JSOp::SuperCall:
       return 2 + GET_ARGC(pc) + 1;
     default:
       /* stack: fun, this, [argc arguments] */
-      MOZ_ASSERT(op == JSOp::Call || op == JSOp::CallIgnoresRv ||
-                 op == JSOp::Eval || op == JSOp::CallIter ||
-                 op == JSOp::StrictEval || op == JSOp::FunCall ||
-                 op == JSOp::FunApply);
+      MOZ_ASSERT(op == JSOp::Call || op == JSOp::CallContent ||
+                 op == JSOp::CallIgnoresRv || op == JSOp::Eval ||
+                 op == JSOp::CallIter || op == JSOp::CallContentIter ||
+                 op == JSOp::StrictEval);
       return 2 + GET_ARGC(pc);
   }
 }
 
-MOZ_ALWAYS_INLINE unsigned StackDefs(jsbytecode* pc) {
-  int ndefs = CodeSpec(JSOp(*pc)).ndefs;
+MOZ_ALWAYS_INLINE unsigned StackDefs(JSOp op) {
+  int ndefs = CodeSpec(op).ndefs;
   MOZ_ASSERT(ndefs >= 0);
   return ndefs;
 }
@@ -487,8 +478,11 @@ inline bool IsGetPropPC(const jsbytecode* pc) { return IsGetPropOp(JSOp(*pc)); }
 inline bool IsHiddenInitOp(JSOp op) {
   return op == JSOp::InitHiddenProp || op == JSOp::InitHiddenElem ||
          op == JSOp::InitHiddenPropGetter || op == JSOp::InitHiddenElemGetter ||
-         op == JSOp::InitHiddenPropSetter || op == JSOp::InitHiddenElemSetter ||
-         op == JSOp::InitLockedElem;
+         op == JSOp::InitHiddenPropSetter || op == JSOp::InitHiddenElemSetter;
+}
+
+inline bool IsLockedInitOp(JSOp op) {
+  return op == JSOp::InitLockedProp || op == JSOp::InitLockedElem;
 }
 
 inline bool IsStrictSetPC(jsbytecode* pc) {
@@ -539,6 +533,10 @@ inline bool IsSpreadOp(JSOp op) { return CodeSpec(op).format & JOF_SPREAD; }
 
 inline bool IsSpreadPC(const jsbytecode* pc) { return IsSpreadOp(JSOp(*pc)); }
 
+inline bool OpUsesEnvironmentChain(JSOp op) {
+  return CodeSpec(op).format & JOF_USES_ENV;
+}
+
 static inline int32_t GetBytecodeInteger(jsbytecode* pc) {
   switch (JSOp(*pc)) {
     case JSOp::Zero:
@@ -578,6 +576,7 @@ inline void GetCheckPrivateFieldOperands(jsbytecode* pc,
              *throwCondition == ThrowCondition::OnlyCheckRhs);
 
   MOZ_ASSERT(*throwKind == ThrowMsgKind::PrivateDoubleInit ||
+             *throwKind == ThrowMsgKind::PrivateBrandDoubleInit ||
              *throwKind == ThrowMsgKind::MissingPrivateOnGet ||
              *throwKind == ThrowMsgKind::MissingPrivateOnSet);
 }

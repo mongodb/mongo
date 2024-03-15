@@ -23,7 +23,7 @@ struct DataType {};
 template <>
 struct DataType<JSObject*> {
   using BarrieredType = HeapPtr<JSObject*>;
-  using HasherType = MovableCellHasher<BarrieredType>;
+  using HasherType = StableCellHasher<BarrieredType>;
   static JSObject* NullValue() { return nullptr; }
 };
 

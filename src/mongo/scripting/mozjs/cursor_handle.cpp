@@ -56,7 +56,8 @@ namespace {
 
 long long* getCursorId(JSObject* thisv) {
     CursorHandleInfo::CursorTracker* tracker =
-        static_cast<CursorHandleInfo::CursorTracker*>(JS::GetPrivate(thisv));
+        JS::GetMaybePtrFromReservedSlot<CursorHandleInfo::CursorTracker>(
+            thisv, CursorHandleInfo::CursorTrackerSlot);
     if (tracker) {
         return &tracker->cursorId;
     }
@@ -70,8 +71,9 @@ long long* getCursorId(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorHandleInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto cursorTracker = static_cast<CursorHandleInfo::CursorTracker*>(JS::GetPrivate(obj));
+void CursorHandleInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto cursorTracker =
+        JS::GetMaybePtrFromReservedSlot<CursorHandleInfo::CursorTracker>(obj, CursorTrackerSlot);
     if (cursorTracker) {
         const long long cursorId = cursorTracker->cursorId;
         if (!skipShellCursorFinalize && cursorId) {
@@ -91,7 +93,7 @@ void CursorHandleInfo::finalize(JSFreeOp* fop, JSObject* obj) {
             }
         }
 
-        getScope(fop)->trackedDelete(cursorTracker);
+        getScope(gcCtx)->trackedDelete(cursorTracker);
     }
 }
 

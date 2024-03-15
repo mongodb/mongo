@@ -42,7 +42,9 @@ namespace mozjs {
  * from C++. Current callers are all via the Mongo object.
  */
 struct SessionInfo : public BaseInfo {
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    enum Slots { SessionHolderSlot, SessionInfoSlotCount };
+
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(end);
@@ -57,7 +59,7 @@ struct SessionInfo : public BaseInfo {
     static const JSFunctionSpec methods[8];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(SessionInfoSlotCount);
     static const InstallType installType = InstallType::Private;
 
     static void make(JSContext* cx,

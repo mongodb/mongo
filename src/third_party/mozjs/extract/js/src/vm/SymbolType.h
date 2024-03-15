@@ -9,29 +9,26 @@
 
 #include <stdio.h>
 
-#include "jsapi.h"
-
 #include "gc/Barrier.h"
 #include "gc/Tracer.h"
 #include "js/AllocPolicy.h"
 #include "js/GCHashTable.h"
-#include "js/HeapAPI.h"
 #include "js/RootingAPI.h"
 #include "js/shadow/Symbol.h"  // JS::shadow::Symbol
 #include "js/Symbol.h"
 #include "js/TypeDecls.h"
-#include "js/Utility.h"
-#include "vm/Printer.h"
 #include "vm/StringType.h"
 
 namespace js {
-class AutoAccessAtomsZone;
-}  // namespace js
+class JS_PUBLIC_API GenericPrinter;
+}
 
 namespace JS {
 
 class Symbol
     : public js::gc::CellWithTenuredGCPointer<js::gc::TenuredCell, JSAtom> {
+  friend class js::gc::CellAllocator;
+
  public:
   // User description of symbol, stored in the cell header.
   JSAtom* description() const { return headerPtr(); }
@@ -43,14 +40,14 @@ class Symbol
   // addresses as hash codes (a security hazard).
   js::HashNumber hash_;
 
-  Symbol(SymbolCode code, js::HashNumber hash, JSAtom* desc)
+  Symbol(SymbolCode code, js::HashNumber hash, Handle<JSAtom*> desc)
       : CellWithTenuredGCPointer(desc), code_(code), hash_(hash) {}
 
   Symbol(const Symbol&) = delete;
   void operator=(const Symbol&) = delete;
 
   static Symbol* newInternal(JSContext* cx, SymbolCode code,
-                             js::HashNumber hash, js::HandleAtom description);
+                             js::HashNumber hash, Handle<JSAtom*> description);
 
   static void staticAsserts() {
     static_assert(uint32_t(SymbolCode::WellKnownAPILimit) ==
@@ -65,6 +62,8 @@ class Symbol
  public:
   static Symbol* new_(JSContext* cx, SymbolCode code,
                       js::HandleString description);
+  static Symbol* newWellKnown(JSContext* cx, SymbolCode code,
+                              Handle<js::PropertyName*> description);
   static Symbol* for_(JSContext* cx, js::HandleString description);
 
   SymbolCode code() const { return code_; }
@@ -80,7 +79,9 @@ class Symbol
   // symbol properties are added, so we can optimize lookups on objects that
   // don't have the BaseShape flag.
   bool isInterestingSymbol() const {
-    return code_ == SymbolCode::toStringTag || code_ == SymbolCode::toPrimitive;
+    return code_ == SymbolCode::toStringTag ||
+           code_ == SymbolCode::toPrimitive ||
+           code_ == SymbolCode::isConcatSpreadable;
   }
 
   // Symbol created for the #PrivateName syntax.
@@ -88,10 +89,8 @@ class Symbol
 
   static const JS::TraceKind TraceKind = JS::TraceKind::Symbol;
 
-  inline void traceChildren(JSTracer* trc) {
-    js::TraceNullableCellHeaderEdge(trc, this, "symbol description");
-  }
-  inline void finalize(JSFreeOp*) {}
+  void traceChildren(JSTracer* trc);
+  void finalize(JS::GCContext* gcx) {}
 
   // Override base class implementation to tell GC about well-known symbols.
   bool isPermanentAndMayBeShared() const { return isWellKnownSymbol(); }
@@ -104,6 +103,8 @@ class Symbol
   void dump();  // Debugger-friendly stderr dump.
   void dump(js::GenericPrinter& out);
 #endif
+
+  static constexpr size_t offsetOfHash() { return offsetof(Symbol, hash_); }
 };
 
 } /* namespace JS */
@@ -137,7 +138,7 @@ struct HashSymbolsByDescription {
  * enumerating the symbol registry, querying its size, etc.
  */
 class SymbolRegistry
-    : public GCHashSet<WeakHeapPtrSymbol, HashSymbolsByDescription,
+    : public GCHashSet<WeakHeapPtr<JS::Symbol*>, HashSymbolsByDescription,
                        SystemAllocPolicy> {
  public:
   SymbolRegistry() = default;

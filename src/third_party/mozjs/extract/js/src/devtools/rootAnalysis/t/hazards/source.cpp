@@ -8,6 +8,20 @@
 
 #define ANNOTATE(property) __attribute__((annotate(property)))
 
+// MarkVariableAsGCSafe is a magic function name used as an
+// explicit annotation.
+
+namespace JS {
+namespace detail {
+template <typename T>
+static void MarkVariableAsGCSafe(T&) {
+  asm("");
+}
+}  // namespace detail
+}  // namespace JS
+
+#define JS_HAZ_VARIABLE_IS_GC_SAFE(var) JS::detail::MarkVariableAsGCSafe(var)
+
 struct Cell {
   int f;
 } ANNOTATE("GC Thing");
@@ -39,6 +53,12 @@ class AutoSuppressGC {
   AutoSuppressGC() {}
 };
 
+class AutoCheckCannotGC {
+ public:
+  AutoCheckCannotGC() {}
+  ~AutoCheckCannotGC() { asm(""); }
+} ANNOTATE("Invalidated by GC");
+
 extern void GC() ANNOTATE("GC Call");
 extern void invisible();
 
@@ -51,6 +71,8 @@ void GC() {
 
 extern void usecell(Cell*);
 
+extern bool flipcoin();
+
 void suppressedFunction() {
   GC();  // Calls GC, but is always called within AutoSuppressGC
 }
@@ -62,6 +84,19 @@ void halfSuppressedFunction() {
 void unsuppressedFunction() {
   GC();  // Calls GC, never within AutoSuppressGC
 }
+
+class IDL_Interface {
+ public:
+  ANNOTATE("Can run script") virtual void canScriptThis() {}
+  virtual void cannotScriptThis() {}
+  ANNOTATE("Can run script") virtual void overridden_canScriptThis() = 0;
+  virtual void overridden_cannotScriptThis() = 0;
+};
+
+class IDL_Subclass : public IDL_Interface {
+  ANNOTATE("Can run script") void overridden_canScriptThis() override {}
+  void overridden_cannotScriptThis() override {}
+};
 
 volatile static int x = 3;
 volatile static int* xp = &x;
@@ -315,6 +350,79 @@ void safevals() {
     GC();
     consume(std::move(unsafe10));
   }
+
+  // annotated to be safe before the GC. (This doesn't make
+  // a lot of sense here; the annotation is for when some
+  // type is known to only contain safe values, eg it is
+  // initialized as empty, or it is a union and we know
+  // that the GC pointer variants are not in use.)
+  {
+    mozilla::UniquePtr<Cell> safe11(&cell);
+    JS_HAZ_VARIABLE_IS_GC_SAFE(safe11);
+    GC();
+  }
+
+  // annotate as safe value after the GC -- since nothing else
+  // has touched the variable, that means it was already safe
+  // during the GC.
+  {
+    mozilla::UniquePtr<Cell> safe12(&cell);
+    GC();
+    JS_HAZ_VARIABLE_IS_GC_SAFE(safe12);
+  }
+
+  // annotate as safe after the GC -- but we've already used it, so it's
+  // too late.
+  {
+    mozilla::UniquePtr<Cell> unsafe13(&cell);
+    GC();
+    use(unsafe13.get());
+    JS_HAZ_VARIABLE_IS_GC_SAFE(unsafe13);
+  }
+
+  // Check JS_HAZ_CAN_RUN_SCRIPT annotation handling.
+  IDL_Subclass sub;
+  IDL_Subclass* subp = &sub;
+  IDL_Interface* base = &sub;
+  {
+    Cell* unsafe14 = &cell;
+    base->canScriptThis();
+    use(unsafe14);
+  }
+  {
+    Cell* unsafe15 = &cell;
+    subp->canScriptThis();
+    use(unsafe15);
+  }
+  {
+    // Almost the same as the last one, except call using the actual object, not
+    // a pointer. The type is known, so there is no danger of the actual type
+    // being a subclass that has overridden the method with an implementation
+    // that calls script.
+    Cell* safe16 = &cell;
+    sub.canScriptThis();
+    use(safe16);
+  }
+  {
+    Cell* safe17 = &cell;
+    base->cannotScriptThis();
+    use(safe17);
+  }
+  {
+    Cell* safe18 = &cell;
+    subp->cannotScriptThis();
+    use(safe18);
+  }
+  {
+    // A use after a GC, but not before. (This does not initialize safe19 by
+    // setting it to a value, because assignment would start its live range, and
+    // this test is to see if a variable with no known live range start requires
+    // a use before the GC or not. It should.)
+    Cell* safe19;
+    GC();
+    extern void initCellPtr(Cell**);
+    initCellPtr(&safe19);
+  }
 }
 
 // Make sure `this` is live at the beginning of a function.
@@ -324,3 +432,135 @@ class Subcell : public Cell {
     return f;  // this->f
   }
 };
+
+template <typename T>
+struct RefPtr {
+  ~RefPtr() { GC(); }
+  bool forget() { return true; }
+  bool use() { return true; }
+  void assign_with_AddRef(T* aRawPtr) { asm(""); }
+};
+
+extern bool flipcoin();
+
+Cell* refptr_test1() {
+  static Cell cell;
+  RefPtr<float> v1;
+  Cell* ref_unsafe1 = &cell;
+  return ref_unsafe1;
+}
+
+Cell* refptr_test2() {
+  static Cell cell;
+  RefPtr<float> v2;
+  Cell* ref_safe2 = &cell;
+  v2.forget();
+  return ref_safe2;
+}
+
+Cell* refptr_test3() {
+  static Cell cell;
+  RefPtr<float> v3;
+  Cell* ref_unsafe3 = &cell;
+  if (x) {
+    v3.forget();
+  }
+  return ref_unsafe3;
+}
+
+Cell* refptr_test4() {
+  static Cell cell;
+  RefPtr<int> r;
+  return &cell;  // hazard in return value
+}
+
+Cell* refptr_test5() {
+  static Cell cell;
+  RefPtr<int> r;
+  return nullptr;  // returning immobile value, so no hazard
+}
+
+float somefloat = 1.2;
+
+Cell* refptr_test6() {
+  static Cell cell;
+  RefPtr<float> v6;
+  Cell* ref_unsafe6 = &cell;
+  // v6 can be used without an intervening forget() before the end of the
+  // function, even though forget() will be called at least once.
+  v6.forget();
+  if (x) {
+    v6.forget();
+    v6.assign_with_AddRef(&somefloat);
+  }
+  return ref_unsafe6;
+}
+
+Cell* refptr_test7() {
+  static Cell cell;
+  RefPtr<float> v7;
+  Cell* ref_unsafe7 = &cell;
+  // Similar to above, but with a loop.
+  while (flipcoin()) {
+    v7.forget();
+    v7.assign_with_AddRef(&somefloat);
+  }
+  return ref_unsafe7;
+}
+
+Cell* refptr_test8() {
+  static Cell cell;
+  RefPtr<float> v8;
+  Cell* ref_unsafe8 = &cell;
+  // If the loop is traversed, forget() will be called. But that doesn't
+  // matter, because even on the last iteration v8.use() will have been called
+  // (and potentially dropped the refcount or whatever.)
+  while (v8.use()) {
+    v8.forget();
+  }
+  return ref_unsafe8;
+}
+
+Cell* refptr_test9() {
+  static Cell cell;
+  RefPtr<float> v9;
+  Cell* ref_safe9 = &cell;
+  // Even when not going through the loop, forget() will be called and so the
+  // dtor will not Release.
+  while (v9.forget()) {
+    v9.assign_with_AddRef(&somefloat);
+  }
+  return ref_safe9;
+}
+
+Cell* refptr_test10() {
+  static Cell cell;
+  RefPtr<float> v10;
+  Cell* ref_unsafe10 = &cell;
+  // The destructor has a backwards path that skips the loop body.
+  v10.assign_with_AddRef(&somefloat);
+  while (flipcoin()) {
+    v10.forget();
+  }
+  return ref_unsafe10;
+}
+
+std::pair<bool, AutoCheckCannotGC> pair_returning_function() {
+  return std::make_pair(true, AutoCheckCannotGC());
+}
+
+void aggr_init_unsafe() {
+  // nogc will be live after the call, so across the GC.
+  auto [ok, nogc] = pair_returning_function();
+  GC();
+}
+
+void aggr_init_safe() {
+  // The analysis should be able to tell that nogc is only live after the call,
+  // not before. (This is to check for a problem where the return value was
+  // getting stored into a different temporary than the local nogc variable,
+  // and so its initialization was never seen and so it was assumed to be live
+  // throughout the function.)
+  GC();
+  auto [ok, nogc] = pair_returning_function();
+}

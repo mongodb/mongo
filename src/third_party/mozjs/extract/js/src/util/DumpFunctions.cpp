@@ -15,16 +15,18 @@
 #include "jsfriendapi.h"  // js::WeakMapTracer
 #include "jstypes.h"      // JS_PUBLIC_API
 
-#include "gc/Allocator.h"   // js::CanGC
-#include "gc/Cell.h"        // js::gc::Cell, js::gc::TenuredCell
-#include "gc/GC.h"          // js::TraceRuntimeWithoutEviction
-#include "gc/Heap.h"        // js::gc::Arena
-#include "gc/Tracer.h"      // js::TraceChildren
-#include "gc/WeakMap.h"     // js::IterateHeapUnbarriered, js::WeakMapBase
-#include "js/GCAPI.h"       // JS::GCReason
-#include "js/GCVector.h"    // JS::RootedVector
-#include "js/HeapAPI.h"     // JS::GCCellPtr, js::gc::IsInsideNursery
-#include "js/Id.h"          // JS::PropertyKey
+#include "gc/Allocator.h"         // js::CanGC
+#include "gc/Cell.h"              // js::gc::Cell, js::gc::TenuredCell
+#include "gc/GC.h"                // js::TraceRuntimeWithoutEviction
+#include "gc/Heap.h"              // js::gc::Arena
+#include "gc/Tracer.h"            // js::TraceChildren
+#include "gc/WeakMap.h"           // js::IterateHeapUnbarriered, js::WeakMapBase
+#include "js/CallAndConstruct.h"  // JS::IsCallable
+#include "js/GCAPI.h"             // JS::GCReason
+#include "js/GCVector.h"          // JS::RootedVector
+#include "js/HeapAPI.h"           // JS::GCCellPtr, js::gc::IsInsideNursery
+#include "js/Id.h"                // JS::PropertyKey
+#include "js/Printer.h"     // js::GenericPrinter, js::QuoteString, js::Sprinter
 #include "js/RootingAPI.h"  // JS::Handle, JS::Rooted
 #include "js/TracingAPI.h"  // JS::CallbackTracer, JS_GetTraceThingInfo
 #include "js/UbiNode.h"     // JS::ubi::Node
@@ -32,16 +34,16 @@
 #include "js/Wrapper.h"     // js::UncheckedUnwrapWithoutExpose
 #include "vm/BigIntType.h"  // JS::BigInt::dump
 #include "vm/FrameIter.h"   // js::AllFramesIter, js::FrameIter
-#include "vm/JSContext.h"   // JSContext
-#include "vm/JSFunction.h"  // JSFunction
-#include "vm/JSObject.h"    // JSObject
-#include "vm/JSScript.h"    // JSScript
-#include "vm/Printer.h"     // js::GenericPrinter, js::QuoteString, js::Sprinter
-#include "vm/Realm.h"       // JS::Realm
-#include "vm/Runtime.h"     // JSRuntime
-#include "vm/Scope.h"       // js::PositionalFormalParameterIter
-#include "vm/Stack.h"       // js::DONT_CHECK_ALIASING
-#include "vm/StringType.h"  // JSAtom, JSString, js::ToString
+#include "vm/Interpreter.h"  // GetFunctionThis
+#include "vm/JSContext.h"    // JSContext
+#include "vm/JSFunction.h"   // JSFunction
+#include "vm/JSObject.h"     // JSObject
+#include "vm/JSScript.h"     // JSScript
+#include "vm/Realm.h"        // JS::Realm
+#include "vm/Runtime.h"      // JSRuntime
+#include "vm/Scope.h"        // js::PositionalFormalParameterIter
+#include "vm/Stack.h"        // js::DONT_CHECK_ALIASING
+#include "vm/StringType.h"   // JSAtom, JSString, js::ToString
 
 #include "vm/JSObject-inl.h"  // js::IsCallable
 #include "vm/Realm-inl.h"     // js::AutoRealm
@@ -270,8 +272,7 @@ static bool FormatFrame(JSContext* cx, const FrameIter& iter, Sprinter& sp,
 
   Rooted<Value> thisVal(cx);
   if (iter.hasUsableAbstractFramePtr() && iter.isFunctionFrame() && fun &&
-      !fun->isArrow() && !fun->isDerivedClassConstructor() &&
-      !(fun->isBoundFunction() && iter.isConstructing())) {
+      !fun->isArrow() && !fun->isDerivedClassConstructor()) {
     if (!GetFunctionThis(cx, iter.abstractFramePtr(), &thisVal)) {
       return false;
     }
@@ -535,7 +536,7 @@ struct DumpHeapTracer final : public JS::CallbackTracer, public WeakMapTracer {
             key.asCell(), kdelegate, value.asCell());
   }
 
-  void onChild(const JS::GCCellPtr& thing) override;
+  void onChild(JS::GCCellPtr thing, const char* name) override;
 };
 
 static char MarkDescriptor(js::gc::Cell* thing) {
@@ -601,13 +602,13 @@ static void DumpHeapVisitCell(JSRuntime* rt, void* data, JS::GCCellPtr cellptr,
   JS::TraceChildren(dtrc, cellptr);
 }
 
-void DumpHeapTracer::onChild(const JS::GCCellPtr& thing) {
+void DumpHeapTracer::onChild(JS::GCCellPtr thing, const char* name) {
   if (js::gc::IsInsideNursery(thing.asCell())) {
     return;
   }
 
   char buffer[1024];
-  context().getEdgeName(buffer, sizeof(buffer));
+  context().getEdgeName(name, buffer, sizeof(buffer));
   fprintf(output, "%s%p %c %s\n", prefix, thing.asCell(),
           MarkDescriptor(thing.asCell()), buffer);
 }
@@ -634,4 +635,23 @@ void js::DumpHeap(JSContext* cx, FILE* fp,
                          DumpHeapVisitArena, DumpHeapVisitCell);
 
   fflush(dtrc.output);
+}
+
+void DumpFmtV(FILE* fp, const char* fmt, va_list args) {
+  js::Fprinter out(fp);
+  out.vprintf(fmt, args);
+}
+
+void js::DumpFmt(FILE* fp, const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  DumpFmtV(fp, fmt, args);
+  va_end(args);
+}
+
+void js::DumpFmt(const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  DumpFmtV(stderr, fmt, args);
+  va_end(args);
 }

@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "util/AllocPolicy.cpp"
+#include "vm/EnvironmentObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/AllocPolicy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/EnvironmentObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/AllocPolicy.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/EnvironmentObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/AllocationLogging.cpp"
+#include "vm/EqualityOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/AllocationLogging.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/EqualityOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/AllocationLogging.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/EqualityOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/CompleteFile.cpp"
+#include "vm/ErrorMessages.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/CompleteFile.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ErrorMessages.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/CompleteFile.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ErrorMessages.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/DumpFunctions.cpp"
+#include "vm/ErrorObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/DumpFunctions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ErrorObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/DumpFunctions.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ErrorObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/NativeStack.cpp"
+#include "vm/ErrorReporting.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/NativeStack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ErrorReporting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/NativeStack.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ErrorReporting.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/Printf.cpp"
+#include "vm/Exception.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/Printf.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Exception.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/Printf.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Exception.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

@@ -15,8 +15,8 @@
 #include "jit/JitAllocPolicy.h"
 #include "jit/JitContext.h"
 #include "jit/TypeData.h"
+#include "vm/EnvironmentObject.h"
 #include "vm/FunctionFlags.h"  // js::FunctionFlags
-#include "vm/Printer.h"
 
 namespace js {
 
@@ -39,9 +39,11 @@ class WarpScriptSnapshot;
   _(WarpBuiltinObject)           \
   _(WarpGetIntrinsic)            \
   _(WarpGetImport)               \
-  _(WarpLambda)                  \
   _(WarpRest)                    \
   _(WarpBindGName)               \
+  _(WarpVarEnvironment)          \
+  _(WarpLexicalEnvironment)      \
+  _(WarpClassBodyEnvironment)    \
   _(WarpBailout)                 \
   _(WarpCacheIR)                 \
   _(WarpInlinedCall)             \
@@ -212,33 +214,6 @@ class WarpGetImport : public WarpOpSnapshot {
   uint32_t numFixedSlots() const { return numFixedSlots_; }
   uint32_t slot() const { return slot_; }
   bool needsLexicalCheck() const { return needsLexicalCheck_; }
-
-  void traceData(JSTracer* trc);
-
-#ifdef JS_JITSPEW
-  void dumpData(GenericPrinter& out) const;
-#endif
-};
-
-// JSFunction info we don't want to read off-thread for JSOp::Lambda and
-// JSOp::LambdaArrow.
-class WarpLambda : public WarpOpSnapshot {
-  WarpGCPtr<BaseScript*> baseScript_;
-  FunctionFlags flags_;
-  uint16_t nargs_;
-
- public:
-  static constexpr Kind ThisKind = Kind::WarpLambda;
-
-  WarpLambda(uint32_t offset, BaseScript* baseScript, FunctionFlags flags,
-             uint16_t nargs)
-      : WarpOpSnapshot(ThisKind, offset),
-        baseScript_(baseScript),
-        flags_(flags),
-        nargs_(nargs) {}
-  BaseScript* baseScript() const { return baseScript_; }
-  FunctionFlags flags() const { return flags_; }
-  uint16_t nargs() const { return nargs_; }
 
   void traceData(JSTracer* trc);
 
@@ -434,6 +409,67 @@ class WarpBindGName : public WarpOpSnapshot {
 #endif
 };
 
+// Block environment for PushVarEnv
+class WarpVarEnvironment : public WarpOpSnapshot {
+  WarpGCPtr<VarEnvironmentObject*> templateObj_;
+
+ public:
+  static constexpr Kind ThisKind = Kind::WarpVarEnvironment;
+
+  WarpVarEnvironment(uint32_t offset, VarEnvironmentObject* templateObj)
+      : WarpOpSnapshot(ThisKind, offset), templateObj_(templateObj) {}
+
+  VarEnvironmentObject* templateObj() const { return templateObj_; }
+
+  void traceData(JSTracer* trc);
+
+#ifdef JS_JITSPEW
+  void dumpData(GenericPrinter& out) const;
+#endif
+};
+
+// Block environment for PushLexicalEnv, FreshenLexicalEnv, RecreateLexicalEnv
+class WarpLexicalEnvironment : public WarpOpSnapshot {
+  WarpGCPtr<BlockLexicalEnvironmentObject*> templateObj_;
+
+ public:
+  static constexpr Kind ThisKind = Kind::WarpLexicalEnvironment;
+
+  WarpLexicalEnvironment(uint32_t offset,
+                         BlockLexicalEnvironmentObject* templateObj)
+      : WarpOpSnapshot(ThisKind, offset), templateObj_(templateObj) {}
+
+  BlockLexicalEnvironmentObject* templateObj() const { return templateObj_; }
+
+  void traceData(JSTracer* trc);
+
+#ifdef JS_JITSPEW
+  void dumpData(GenericPrinter& out) const;
+#endif
+};
+
+// Class body lexical environment for PushClassBodyEnv
+class WarpClassBodyEnvironment : public WarpOpSnapshot {
+  WarpGCPtr<ClassBodyLexicalEnvironmentObject*> templateObj_;
+
+ public:
+  static constexpr Kind ThisKind = Kind::WarpClassBodyEnvironment;
+
+  WarpClassBodyEnvironment(uint32_t offset,
+                           ClassBodyLexicalEnvironmentObject* templateObj)
+      : WarpOpSnapshot(ThisKind, offset), templateObj_(templateObj) {}
+
+  ClassBodyLexicalEnvironmentObject* templateObj() const {
+    return templateObj_;
+  }
+
+  void traceData(JSTracer* trc);
+
+#ifdef JS_JITSPEW
+  void dumpData(GenericPrinter& out) const;
+#endif
+};
+
 struct NoEnvironment {};
 using ConstantObjectEnvironment = WarpGCPtr<JSObject*>;
 struct FunctionEnvironment {
@@ -476,6 +512,7 @@ class WarpScriptSnapshot
 
   // Whether this script is for an arrow function.
   bool isArrowFunction_;
+  bool isMonomorphicInlined_;
 
  public:
   WarpScriptSnapshot(JSScript* script, const WarpEnvironment& env,
@@ -488,6 +525,8 @@ class WarpScriptSnapshot
   ModuleObject* moduleObject() const { return moduleObject_; }
 
   bool isArrowFunction() const { return isArrowFunction_; }
+  bool isMonomorphicInlined() const { return isMonomorphicInlined_; }
+  void markIsMonomorphicInlined() { isMonomorphicInlined_ = true; }
 
   void trace(JSTracer* trc);
 

@@ -14,7 +14,8 @@ using namespace js::jit;
 void MoveEmitterMIPSShared::emit(const MoveResolver& moves) {
   if (moves.numCycles()) {
     // Reserve stack for cycle resolution
-    masm.reserveStack(moves.numCycles() * sizeof(double));
+    static_assert(SpillSlotSize == 8);
+    masm.reserveStack(moves.numCycles() * SpillSlotSize);
     pushedAtCycle_ = masm.framePushed();
   }
 

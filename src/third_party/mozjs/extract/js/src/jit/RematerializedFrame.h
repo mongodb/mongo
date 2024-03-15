@@ -15,7 +15,6 @@
 
 #include "jstypes.h"
 
-#include "gc/Rooting.h"
 #include "jit/JitFrames.h"
 #include "jit/ScriptFromCalleeToken.h"
 #include "js/GCVector.h"
@@ -87,7 +86,6 @@ class RematerializedFrame {
 
   Value returnValue_;
   Value thisArgument_;
-  Value newTarget_;
   Value slots_[1];
 
   RematerializedFrame(JSContext* cx, uint8_t* top, unsigned numActualArgs,
@@ -143,7 +141,7 @@ class RematerializedFrame {
   }
 
   [[nodiscard]] bool initFunctionEnvironmentObjects(JSContext* cx);
-  [[nodiscard]] bool pushVarEnvironment(JSContext* cx, HandleScope scope);
+  [[nodiscard]] bool pushVarEnvironment(JSContext* cx, Handle<Scope*> scope);
 
   bool hasInitialEnvironment() const { return hasInitialEnv_; }
   CallObject& callObj() const;
@@ -207,18 +205,12 @@ class RematerializedFrame {
     return argv()[i];
   }
 
-  Value newTarget() {
-    MOZ_ASSERT(isFunctionFrame());
-    if (callee()->isArrow()) {
-      return callee()->getExtendedSlot(FunctionExtended::ARROW_NEWTARGET_SLOT);
-    }
-    MOZ_ASSERT_IF(!isConstructing(), newTarget_.isUndefined());
-    return newTarget_;
-  }
-
   void setReturnValue(const Value& value) { returnValue_ = value; }
 
-  Value& returnValue() { return returnValue_; }
+  Value& returnValue() {
+    MOZ_ASSERT(!script()->noScriptRval());
+    return returnValue_;
+  }
 
   void trace(JSTracer* trc);
   void dump();

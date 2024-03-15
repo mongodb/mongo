@@ -15,7 +15,6 @@
 #include "js/GCHashTable.h"
 #include "vm/ArgumentsObject.h"
 #include "vm/GlobalObject.h"
-#include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/ProxyObject.h"
 #include "vm/Scope.h"
@@ -27,14 +26,12 @@ class AbstractGeneratorObject;
 class IndirectBindingMap;
 class ModuleObject;
 
-using HandleModuleObject = Handle<ModuleObject*>;
-
 /*
  * Return a shape representing the static scope containing the variable
  * accessed by the ALIASEDVAR op at 'pc'.
  */
-extern Shape* EnvironmentCoordinateToEnvironmentShape(JSScript* script,
-                                                      jsbytecode* pc);
+extern SharedShape* EnvironmentCoordinateToEnvironmentShape(JSScript* script,
+                                                            jsbytecode* pc);
 
 // Return the name being accessed by the given ALIASEDVAR op. This function is
 // relatively slow so it should not be used on hot paths.
@@ -50,7 +47,7 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  * About environments
  * ------------------
  *
- * (See also: ecma262 rev c7952de (19 Aug 2016) 8.1 "Lexical Environments".)
+ * See also: https://tc39.es/ecma262/#sec-environment-records
  *
  * Scoping in ES is specified in terms of "Environment Records". There's a
  * global Environment Record per realm, and a new Environment Record is created
@@ -73,35 +70,59 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *    |
  *    +--NativeObject
  *    |   |
- *    |   +--EnvironmentObject             Engine-internal environment
+ *    |   +--EnvironmentObject          Engine-internal environment
  *    |   |   |
- *    |   |   +--CallObject                    Environment of entire function
+ *    |   |   +--CallObject             Environment of entire function
  *    |   |   |
- *    |   |   +--ModuleEnvironmentObject       Module top-level environment
+ *    |   |   +--VarEnvironmentObject   See VarScope in Scope.h.
+ *    |   |   |
+ *    |   |   +--ModuleEnvironmentObject
+ *    |   |   |                         Module top-level environment
+ *    |   |   |
+ *    |   |   +--WasmInstanceEnvironmentObject
+ *    |   |   |
+ *    |   |   +--WasmFunctionCallObject
  *    |   |   |
  *    |   |   +--LexicalEnvironmentObject
  *    |   |   |   |
- *    |   |   |   +--BlockLexicalEnvironmentObject     Blocks and such: syntactic, non-extensible
+ *    |   |   |   +--ScopedLexicalEnvironmentObject
+ *    |   |   |   |   |                 Non-extensible lexical environment
  *    |   |   |   |   |
- *    |   |   |   |   +--NamedLambdaObject                 Environment for `(function f(){...})`
- *    |   |   |   |                                        containing only a binding for `f`
+ *    |   |   |   |   +--BlockLexicalEnvironmentObject
+ *    |   |   |   |   |   |             Blocks and such: syntactic,
+ *    |   |   |   |   |   |             non-extensible
+ *    |   |   |   |   |   |
+ *    |   |   |   |   |   +--NamedLambdaObject
+ *    |   |   |   |   |                 Environment for `(function f(){...})`
+ *    |   |   |   |   |                 containing only a binding for `f`
+ *    |   |   |   |   |
+ *    |   |   |   |   +--ClassBodyLexicalEnvironmentObject
+ *    |   |   |   |                     Environment for class body, containing
+ *    |   |   |   |                     private names, private brands, and
+ *    |   |   |   |                     static initializers list
+ *    |   |   |   |
  *    |   |   |   +--ExtensibleLexicalEnvironmentObject
  *    |   |   |       |
  *    |   |   |       +--GlobalLexicalEnvironmentObject
- *    |   |   |       |                                Top-level let/const/class in scripts
+ *    |   |   |       |                 Top-level let/const/class in scripts
+ *    |   |   |       |
  *    |   |   |       +--NonSyntacticLexicalEnvironmentObject
- *    |   |   |                                        See "Non-syntactic environments" below
- *    |   |   +--VarEnvironmentObject          See VarScope in Scope.h.
+ *    |   |   |                         See "Non-syntactic environments" below
  *    |   |   |
- *    |   |   +--WithEnvironmentObject         Presents object properties as bindings
+ *    |   |   +--NonSyntacticVariablesObject
+ *    |   |   |                         See "Non-syntactic environments" below
  *    |   |   |
- *    |   |   +--NonSyntacticVariablesObject   See "Non-syntactic environments" below
+ *    |   |   +--WithEnvironmentObject  Presents object properties as bindings
+ *    |   |   |
+ *    |   |   +--RuntimeLexicalErrorObject
+ *    |   |                             Special value represents uninitialized
+ *    |   |                             lexical slots
  *    |   |
- *    |   +--GlobalObject                  The global environment (dynamically presents its
- *    |                                    properties as bindings)
+ *    |   +--GlobalObject               The global environment (dynamically
+ *    |                                 presents its properties as bindings)
  *    +--ProxyObject
  *        |
- *        +--DebugEnvironmentProxy         Environment for debugger eval-in-frame
+ *        +--DebugEnvironmentProxy      Environment for debugger eval-in-frame
  *
  * EnvironmentObjects are technically real JSObjects but only belong on the
  * environment chain (that is, fp->environmentChain() or fun->environment()).
@@ -182,85 +203,200 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *
  *    Does not hold 'var' bindings.
  *
- * The embedding (Gecko) uses non-syntactic envs for various things, some of
- * which are detailed below. All env chain listings below are, from top to
- * bottom, outermost to innermost.
+ * The embedding (Gecko) and debugger uses non-syntactic envs for various
+ * things, all of which are detailed below. All env chain listings below are,
+ * from top to bottom, outermost to innermost.
  *
  * A. Component loading
  *
  * Components may be loaded in a shared global mode where most JSMs share a
  * single global in order to save on memory and avoid CCWs. To support this, a
  * NonSyntacticVariablesObject is used for each JSM to provide a basic form of
- * isolation. They have the following env chain:
+ * isolation. NonSyntacticLexicalEnvironmentObject and
+ * NonSyntacticVariablesObject are allocated for each JSM, and
+ * NonSyntacticLexicalEnvironmentObject holds lexical variables and
+ * NonSyntacticVariablesObject holds qualified variables. JSMs cannot have
+ * unqualified names, but if unqualified names are used by subscript, they
+ * goes to NonSyntacticVariablesObject.
+ * They have the following env chain:
  *
  *   BackstagePass global
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
- *   NonSyntacticVariablesObject
+ *   NonSyntacticVariablesObject (qualified 'var's and unqualified names)
  *       |
- *   NonSyntacticLexicalEnvironmentObject[this=nsvo]
+ *   NonSyntacticLexicalEnvironmentObject[this=nsvo] (lexical vars)
  *
  * B.1 Subscript loading
  *
  * Subscripts may be loaded into a target object and it's associated global.
+ * NonSyntacticLexicalEnvironmentObject holds lexical variables and
+ * WithEnvironmentObject holds qualified variables. Unqualified names goes
+ * to the target object's global.
  * They have the following env chain:
  *
- *   Target object's global
+ *   Target object's global (unqualified names)
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
- *   WithEnvironmentObject wrapping target
+ *   WithEnvironmentObject wrapping target (qualified 'var's)
  *       |
- *   NonSyntacticLexicalEnvironmentObject[this=target]
+ *   NonSyntacticLexicalEnvironmentObject[this=target] (lexical vars)
  *
  * B.2 Subscript loading (Shared-global JSM)
  *
  * The target object of a subscript load may be in a JSM with a shared global,
  * in which case we will also have the NonSyntacticVariablesObject on the
  * chain.
+ * NonSyntacticLexicalEnvironmentObject for target object holds lexical
+ * variables and WithEnvironmentObject holds qualified variables.
+ * Unqualified names goes to NonSyntacticVariablesObject.
  *
  *   Target object's global
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
- *   NonSyntacticVariablesObject
+ *   NonSyntacticVariablesObject (unqualified names)
  *       |
  *   NonSyntacticLexicalEnvironmentObject[this=nsvo]
  *       |
- *   WithEnvironmentObject wrapping target
+ *   WithEnvironmentObject wrapping target (qualified 'var's)
  *       |
- *   NonSyntacticLexicalEnvironmentObject[this=target]
+ *   NonSyntacticLexicalEnvironmentObject[this=target] (lexical vars)
  *
- * C. Frame scripts
+ * C.1. Frame scripts with unique scope
  *
- * XUL frame scripts are loaded in the same global as components, with a
- * NonSyntacticVariablesObject as a "polluting global", and a with environment
- * wrapping a message manager object. This is done exclusively in
+ * XUL frame scripts with unique scope are loaded in the same global as
+ * components, with a NonSyntacticVariablesObject as a "polluting global" for
+ * both qualified 'var' variables and unqualified names, and a with
+ * environment wrapping a message manager object, and
+ * NonSyntacticLexicalEnvironmentObject holding the message manager as `this`,
+ * that holds lexical variables.
+ * These environment objects except for globals are created for each run and
+ * not shared across multiple runs. This is done exclusively in
  * js::ExecuteInScopeChainAndReturnNewScope.
  *
  *   BackstagePass global
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
- *   NonSyntacticVariablesObject
+ *   NonSyntacticVariablesObject (qualified 'var's and unqualified names)
  *       |
  *   WithEnvironmentObject wrapping messageManager
  *       |
- *   NonSyntacticLexicalEnvironmentObject[this=messageManager]
+ *   NonSyntacticLexicalEnvironmentObject[this=messageManager] (lexical vars)
  *
- * D. DOM event handlers
+ * C.2. Frame scripts without unique scope
+ *
+ * XUL frame scripts without unique scope are loaded in the same global as
+ * components, with a with environment wrapping a message manager object for
+ * qualified 'var' variables, and NonSyntacticLexicalEnvironmentObject holding
+ * the message manager as `this`, that holds lexical variables.
+ * The environment chain is associated with the message manager object
+ * and cached for subsequent runs.
+ *
+ *   BackstagePass global (unqualified names)
+ *       |
+ *   GlobalLexicalEnvironmentObject[this=global]
+ *       |
+ *   WithEnvironmentObject wrapping messageManager (qualified names)
+ *       |
+ *   NonSyntacticLexicalEnvironmentObject[this=messageManager] (lexical vars)
+ *
+ * D.1. DOM event handlers without direct eval
  *
  * DOM event handlers are compiled as functions with HTML elements on the
- * environment chain. For a chain of elements e0,e1,...:
+ * environment chain. For a chain of elements e0, e1, ..., eN, where innerrmost
+ * element is the target element, enclosing elements are such as forms, and the
+ * outermost one is the document.
+ * If the DOM event handlers don't have direct eval, the function's scopes are
+ * optimized and frame slots are used for qualified 'var's and lexical vars.
+ * NonSyntacticLexicalEnvironmentObject's `this` value is not used, given
+ * the function's `this` value is used instead:
  *
+ *   global (unqualified names)
+ *       |
+ *   GlobalLexicalEnvironmentObject[this=global]
+ *       |
+ *   WithEnvironmentObject wrapping eN
+ *       |
  *      ...
  *       |
  *   WithEnvironmentObject wrapping e1
  *       |
  *   WithEnvironmentObject wrapping e0
  *       |
- *   NonSyntacticLexicalEnvironmentObject
+ *   NonSyntacticLexicalEnvironmentObject [this=*unused*]
+ *
+ * D.2. DOM event handlers with direct eval
+ *
+ * If DOM event handlers have direct eval, the function's scopes are allocated
+ * as environment object:
+ *
+ *   global (unqualified names)
+ *       |
+ *   GlobalLexicalEnvironmentObject[this=global]
+ *       |
+ *      ...
+ *       |
+ *   WithEnvironmentObject wrapping e1
+ *       |
+ *   WithEnvironmentObject wrapping e0
+ *       |
+ *   NonSyntacticLexicalEnvironmentObject [this=*unused*]
+ *       |
+ *   CallObject (qualified 'var's)
+ *       |
+ *   BlockLexicalEnvironmentObject (lexical vars)
+ *
+ * E.1. Debugger.Frame.prototype.evalWithBindings
+ *
+ * Debugger.Frame.prototype.evalWithBindings uses WithEnvironmentObject for
+ * given bindings, and the frame's enclosing scope
+ *
+ * If the frame is function, it has the following env chain.
+ * lexical variables are optimized and uses frame slots:
+ *
+ *   global (unqualified names)
+ *       |
+ *   [DebugProxy] GlobalLexicalEnvironmentObject[this=global]
+ *       |
+ *   [DebugProxy] CallObject (qualified 'var's)
+ *       |
+ *   WithEnvironmentObject wrapping bindings
+ *
+ * If the script has direct eval, BlockLexicalEnvironmentObject is created for
+ * it:
+ *
+ *   global (unqualified names)
+ *       |
+ *   [DebugProxy] GlobalLexicalEnvironmentObject[this=global]
+ *       |
+ *   [DebugProxy] CallObject (qualified 'var's)
+ *       |
+ *   BlockLexicalEnvironmentObject (lexical)
+ *       |
+ *   WithEnvironmentObject wrapping bindings
+ *
+ * NOTE: Debugger.Frame.prototype.eval uses the frame's enclosing scope only,
+ *       and it doesn't use any dynamic environment, but still uses
+ *       non-syntactic scope to perform `eval` operation.
+ *
+ * E.2. Debugger.Object.prototype.executeInGlobalWithBindings
+ *
+ * Debugger.Object.prototype.executeInGlobalWithBindings uses
+ * WithEnvironmentObject for given bindings, and the object's global scope:
+ *
+ *   global (qualified 'var's and unqualified names)
+ *       |
+ *   GlobalLexicalEnvironmentObject[this=global] (lexical)
+ *       |
+ *   WithEnvironmentObject wrapping bindings
+ *
+ * NOTE: Debugger.Object.prototype.executeInGlobal uses the object's global
+ *       scope only, and it doesn't use any dynamic environment or
+ *       non-syntactic scope.
  *
  */
 // clang-format on
@@ -271,11 +407,7 @@ class EnvironmentObject : public NativeObject {
   // GlobalObject, or a non-syntactic environment object.
   static const uint32_t ENCLOSING_ENV_SLOT = 0;
 
-  inline void setAliasedBinding(JSContext* cx, uint32_t slot, const Value& v);
-
-  void setEnclosingEnvironment(JSObject* enclosing) {
-    setReservedSlot(ENCLOSING_ENV_SLOT, ObjectOrNullValue(enclosing));
-  }
+  inline void setAliasedBinding(uint32_t slot, const Value& v);
 
  public:
   // Since every env chain terminates with a global object, whether
@@ -308,11 +440,9 @@ class EnvironmentObject : public NativeObject {
     return getSlot(bi.location().slot());
   }
 
-  inline void setAliasedBinding(JSContext* cx, EnvironmentCoordinate ec,
-                                const Value& v);
+  inline void setAliasedBinding(EnvironmentCoordinate ec, const Value& v);
 
-  inline void setAliasedBinding(JSContext* cx, const BindingIter& bi,
-                                const Value& v);
+  inline void setAliasedBinding(const BindingIter& bi, const Value& v);
 
   // For JITs.
   static size_t offsetOfEnclosingEnvironment() {
@@ -320,6 +450,8 @@ class EnvironmentObject : public NativeObject {
   }
 
   static uint32_t enclosingEnvironmentSlot() { return ENCLOSING_ENV_SLOT; }
+
+  const char* typeString() const;
 
 #if defined(DEBUG) || defined(JS_JITSPEW)
   void dump();
@@ -331,7 +463,7 @@ class CallObject : public EnvironmentObject {
   static constexpr uint32_t CALLEE_SLOT = 1;
 
   static CallObject* create(JSContext* cx, HandleScript script,
-                            HandleFunction callee, HandleObject enclosing);
+                            HandleObject enclosing, gc::Heap heap);
 
  public:
   static const JSClass class_;
@@ -342,17 +474,14 @@ class CallObject : public EnvironmentObject {
   /* These functions are internal and are exposed only for JITs. */
 
   /*
-   * Construct a bare-bones call object given a shape and a group.
+   * Construct a bare-bones call object given a shape.
    * The call object must be further initialized to be usable.
    */
-  static CallObject* create(JSContext* cx, HandleShape shape);
+  static CallObject* createWithShape(JSContext* cx, Handle<SharedShape*> shape);
 
   static CallObject* createTemplateObject(JSContext* cx, HandleScript script,
-                                          HandleObject enclosing,
-                                          gc::InitialHeap heap);
+                                          HandleObject enclosing);
 
-  static CallObject* create(JSContext* cx, HandleFunction callee,
-                            HandleObject enclosing);
   static CallObject* create(JSContext* cx, AbstractFramePtr frame);
 
   static CallObject* createHollowForDebug(JSContext* cx, HandleFunction callee);
@@ -390,9 +519,13 @@ class CallObject : public EnvironmentObject {
 class VarEnvironmentObject : public EnvironmentObject {
   static constexpr uint32_t SCOPE_SLOT = 1;
 
-  static VarEnvironmentObject* create(JSContext* cx, HandleShape shape,
-                                      HandleObject enclosing,
-                                      gc::InitialHeap heap);
+  static VarEnvironmentObject* createInternal(JSContext* cx,
+                                              Handle<SharedShape*> shape,
+                                              HandleObject enclosing,
+                                              gc::Heap heap);
+
+  static VarEnvironmentObject* create(JSContext* cx, Handle<Scope*> scope,
+                                      HandleObject enclosing, gc::Heap heap);
 
   void initScope(Scope* scope) {
     initReservedSlot(SCOPE_SLOT, PrivateGCThingValue(scope));
@@ -404,10 +537,15 @@ class VarEnvironmentObject : public EnvironmentObject {
   static constexpr uint32_t RESERVED_SLOTS = 2;
   static constexpr ObjectFlags OBJECT_FLAGS = {ObjectFlag::QualifiedVarObj};
 
-  static VarEnvironmentObject* create(JSContext* cx, HandleScope scope,
-                                      AbstractFramePtr frame);
+  static VarEnvironmentObject* createForFrame(JSContext* cx,
+                                              Handle<Scope*> scope,
+                                              AbstractFramePtr frame);
   static VarEnvironmentObject* createHollowForDebug(JSContext* cx,
                                                     Handle<Scope*> scope);
+  static VarEnvironmentObject* createTemplateObject(JSContext* cx,
+                                                    Handle<VarScope*> scope);
+  static VarEnvironmentObject* createWithoutEnclosing(JSContext* cx,
+                                                      Handle<VarScope*> scope);
 
   Scope& scope() const {
     Value v = getReservedSlot(SCOPE_SLOT);
@@ -435,19 +573,24 @@ class ModuleEnvironmentObject : public EnvironmentObject {
                                                ObjectFlag::QualifiedVarObj};
 
   static ModuleEnvironmentObject* create(JSContext* cx,
-                                         HandleModuleObject module);
+                                         Handle<ModuleObject*> module);
   ModuleObject& module() const;
   IndirectBindingMap& importBindings() const;
 
-  bool createImportBinding(JSContext* cx, HandleAtom importName,
-                           HandleModuleObject module, HandleAtom exportName);
+  bool createImportBinding(JSContext* cx, Handle<JSAtom*> importName,
+                           Handle<ModuleObject*> module,
+                           Handle<JSAtom*> exportName);
 
-  bool hasImportBinding(HandlePropertyName name);
+  bool hasImportBinding(Handle<PropertyName*> name);
 
   bool lookupImport(jsid name, ModuleEnvironmentObject** envOut,
                     mozilla::Maybe<PropertyInfo>* propOut);
 
-  void fixEnclosingEnvironmentAfterRealmMerge(GlobalObject& global);
+  // If `env` or any enclosing environment is a ModuleEnvironmentObject,
+  // return that ModuleEnvironmentObject; else null.
+  //
+  // `env` may be a DebugEnvironmentProxy, but not a hollow environment.
+  static ModuleEnvironmentObject* find(JSObject* env);
 
  private:
   static bool lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
@@ -468,11 +611,6 @@ class ModuleEnvironmentObject : public EnvironmentObject {
                            MutableHandleIdVector properties,
                            bool enumerableOnly);
 };
-
-using RootedModuleEnvironmentObject = Rooted<ModuleEnvironmentObject*>;
-using HandleModuleEnvironmentObject = Handle<ModuleEnvironmentObject*>;
-using MutableHandleModuleEnvironmentObject =
-    MutableHandle<ModuleEnvironmentObject*>;
 
 class WasmInstanceEnvironmentObject : public EnvironmentObject {
   // Currently WasmInstanceScopes do not use their scopes in a
@@ -538,10 +676,10 @@ class LexicalEnvironmentObject : public EnvironmentObject {
   static constexpr uint32_t RESERVED_SLOTS = 2;
 
  protected:
-  static LexicalEnvironmentObject* createTemplateObject(JSContext* cx,
-                                                        HandleShape shape,
-                                                        HandleObject enclosing,
-                                                        gc::InitialHeap heap);
+  static LexicalEnvironmentObject* create(JSContext* cx,
+                                          Handle<SharedShape*> shape,
+                                          HandleObject enclosing,
+                                          gc::Heap heap);
 
  public:
   // Is this the global lexical scope?
@@ -578,18 +716,25 @@ class ScopedLexicalEnvironmentObject : public LexicalEnvironmentObject {
 };
 
 class BlockLexicalEnvironmentObject : public ScopedLexicalEnvironmentObject {
- public:
-  static constexpr ObjectFlags OBJECT_FLAGS = {ObjectFlag::NotExtensible};
-
+ protected:
   static BlockLexicalEnvironmentObject* create(JSContext* cx,
                                                Handle<LexicalScope*> scope,
                                                HandleObject enclosing,
-                                               gc::InitialHeap heap);
+                                               gc::Heap heap);
+
+ public:
+  static constexpr ObjectFlags OBJECT_FLAGS = {ObjectFlag::NotExtensible};
 
   static BlockLexicalEnvironmentObject* createForFrame(
       JSContext* cx, Handle<LexicalScope*> scope, AbstractFramePtr frame);
 
   static BlockLexicalEnvironmentObject* createHollowForDebug(
+      JSContext* cx, Handle<LexicalScope*> scope);
+
+  static BlockLexicalEnvironmentObject* createTemplateObject(
+      JSContext* cx, Handle<LexicalScope*> scope);
+
+  static BlockLexicalEnvironmentObject* createWithoutEnclosing(
       JSContext* cx, Handle<LexicalScope*> scope);
 
   // Create a new BlockLexicalEnvironmentObject with the same enclosing env and
@@ -610,30 +755,40 @@ class BlockLexicalEnvironmentObject : public ScopedLexicalEnvironmentObject {
 
 class NamedLambdaObject : public BlockLexicalEnvironmentObject {
   static NamedLambdaObject* create(JSContext* cx, HandleFunction callee,
-                                   HandleFunction replacement,
-                                   HandleObject enclosing,
-                                   gc::InitialHeap heap);
+                                   HandleObject enclosing, gc::Heap heap);
 
  public:
   static NamedLambdaObject* createTemplateObject(JSContext* cx,
-                                                 HandleFunction callee,
-                                                 gc::InitialHeap heap);
+                                                 HandleFunction callee);
+
+  static NamedLambdaObject* createWithoutEnclosing(JSContext* cx,
+                                                   HandleFunction callee);
 
   static NamedLambdaObject* create(JSContext* cx, AbstractFramePtr frame);
 
   // For JITs.
   static size_t lambdaSlot();
+
+  static size_t offsetOfLambdaSlot() {
+    return getFixedSlotOffset(lambdaSlot());
+  }
 };
 
 class ClassBodyLexicalEnvironmentObject
     : public ScopedLexicalEnvironmentObject {
- public:
   static ClassBodyLexicalEnvironmentObject* create(
       JSContext* cx, Handle<ClassBodyScope*> scope, HandleObject enclosing,
-      gc::InitialHeap heap);
+      gc::Heap heap);
 
+ public:
   static ClassBodyLexicalEnvironmentObject* createForFrame(
       JSContext* cx, Handle<ClassBodyScope*> scope, AbstractFramePtr frame);
+
+  static ClassBodyLexicalEnvironmentObject* createTemplateObject(
+      JSContext* cx, Handle<ClassBodyScope*> scope);
+
+  static ClassBodyLexicalEnvironmentObject* createWithoutEnclosing(
+      JSContext* cx, Handle<ClassBodyScope*> scope);
 
   // The ClassBodyScope that created this environment.
   ClassBodyScope& scope() const {
@@ -815,7 +970,7 @@ class MOZ_RAII EnvironmentIter {
 
   // Constructing from a frame. Places the EnvironmentIter on the innermost
   // environment at pc.
-  EnvironmentIter(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc);
+  EnvironmentIter(JSContext* cx, AbstractFramePtr frame, const jsbytecode* pc);
 
   // Constructing from an environment, scope and frame. The frame is given
   // to initialize to proper enclosing environment/scope.
@@ -936,11 +1091,10 @@ class LiveEnvironmentVal {
       : frame_(ei.initialFrame()), scope_(ei.maybeScope()) {}
 
   AbstractFramePtr frame() const { return frame_; }
-  Scope* scope() const { return scope_; }
 
   void updateFrame(AbstractFramePtr frame) { frame_ = frame; }
 
-  bool needsSweep();
+  bool traceWeak(JSTracer* trc);
 };
 
 /****************************************************************************/
@@ -1025,7 +1179,8 @@ class DebugEnvironmentProxy : public ProxyObject {
   EnvironmentObject& environment() const;
   JSObject& enclosingEnvironment() const;
 
-  /* May only be called for proxies to function call objects. */
+  // May only be called for proxies to function call objects or modules
+  // with top-level-await.
   ArrayObject* maybeSnapshot() const;
   void initSnapshot(ArrayObject& snapshot);
 
@@ -1064,7 +1219,7 @@ class DebugEnvironments {
    * The map from live frames which have optimized-away environments to the
    * corresponding debug environments.
    */
-  typedef HashMap<MissingEnvironmentKey, WeakHeapPtrDebugEnvironmentProxy,
+  typedef HashMap<MissingEnvironmentKey, WeakHeapPtr<DebugEnvironmentProxy*>,
                   MissingEnvironmentKey, ZoneAllocPolicy>
       MissingEnvironmentMap;
   MissingEnvironmentMap missingEnvs;
@@ -1078,7 +1233,7 @@ class DebugEnvironments {
    * environments.
    */
   typedef GCHashMap<WeakHeapPtr<JSObject*>, LiveEnvironmentVal,
-                    MovableCellHasher<WeakHeapPtr<JSObject*>>, ZoneAllocPolicy>
+                    StableCellHasher<WeakHeapPtr<JSObject*>>, ZoneAllocPolicy>
       LiveEnvironmentMap;
   LiveEnvironmentMap liveEnvs;
 
@@ -1096,7 +1251,7 @@ class DebugEnvironments {
 
  public:
   void trace(JSTracer* trc);
-  void sweep();
+  void traceWeak(JSTracer* trc);
   void finish();
 #ifdef JS_GC_ZEAL
   void checkHashTablesAfterMovingGC();
@@ -1142,7 +1297,7 @@ class DebugEnvironments {
   static void onPopVar(JSContext* cx, const EnvironmentIter& ei);
   static void onPopLexical(JSContext* cx, const EnvironmentIter& ei);
   static void onPopLexical(JSContext* cx, AbstractFramePtr frame,
-                           jsbytecode* pc);
+                           const jsbytecode* pc);
   static void onPopWith(AbstractFramePtr frame);
   static void onPopModule(JSContext* cx, const EnvironmentIter& ei);
   static void onRealmUnsetIsDebuggee(Realm* realm);
@@ -1303,7 +1458,7 @@ ModuleObject* GetModuleObjectForScript(JSScript* script);
 ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
 
 [[nodiscard]] bool GetThisValueForDebuggerFrameMaybeOptimizedOut(
-    JSContext* cx, AbstractFramePtr frame, jsbytecode* pc,
+    JSContext* cx, AbstractFramePtr frame, const jsbytecode* pc,
     MutableHandleValue res);
 [[nodiscard]] bool GetThisValueForDebuggerSuspendedGeneratorMaybeOptimizedOut(
     JSContext* cx, AbstractGeneratorObject& genObj, JSScript* script,
@@ -1311,12 +1466,12 @@ ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
 
 [[nodiscard]] bool CheckCanDeclareGlobalBinding(JSContext* cx,
                                                 Handle<GlobalObject*> global,
-                                                HandlePropertyName name,
+                                                Handle<PropertyName*> name,
                                                 bool isFunction);
 
 [[nodiscard]] bool CheckLexicalNameConflict(
     JSContext* cx, Handle<ExtensibleLexicalEnvironmentObject*> lexicalEnv,
-    HandleObject varObj, HandlePropertyName name);
+    HandleObject varObj, Handle<PropertyName*> name);
 
 [[nodiscard]] bool CheckGlobalDeclarationConflicts(
     JSContext* cx, HandleScript script,
@@ -1331,19 +1486,19 @@ ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
 [[nodiscard]] bool InitFunctionEnvironmentObjects(JSContext* cx,
                                                   AbstractFramePtr frame);
 
-[[nodiscard]] bool PushVarEnvironmentObject(JSContext* cx, HandleScope scope,
+[[nodiscard]] bool PushVarEnvironmentObject(JSContext* cx, Handle<Scope*> scope,
                                             AbstractFramePtr frame);
 
 [[nodiscard]] bool GetFrameEnvironmentAndScope(JSContext* cx,
                                                AbstractFramePtr frame,
-                                               jsbytecode* pc,
+                                               const jsbytecode* pc,
                                                MutableHandleObject env,
-                                               MutableHandleScope scope);
+                                               MutableHandle<Scope*> scope);
 
 void GetSuspendedGeneratorEnvironmentAndScope(AbstractGeneratorObject& genObj,
                                               JSScript* script,
                                               MutableHandleObject env,
-                                              MutableHandleScope scope);
+                                              MutableHandle<Scope*> scope);
 
 #ifdef DEBUG
 bool AnalyzeEntrainedVariables(JSContext* cx, HandleScript script);
@@ -1351,7 +1506,7 @@ bool AnalyzeEntrainedVariables(JSContext* cx, HandleScript script);
 
 extern JSObject* MaybeOptimizeBindGlobalName(JSContext* cx,
                                              Handle<GlobalObject*> global,
-                                             HandlePropertyName name);
+                                             Handle<PropertyName*> name);
 }  // namespace js
 
 #endif /* vm_EnvironmentObject_h */

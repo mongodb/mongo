@@ -11,22 +11,19 @@
 #ifndef gc_GC_h
 #define gc_GC_h
 
-#include "gc/AllocKind.h"
 #include "gc/GCEnum.h"
 #include "js/GCAPI.h"
 #include "js/HeapAPI.h"
 #include "js/RealmIterators.h"
-#include "js/RealmOptions.h"
 #include "js/TraceKind.h"
 
-class JSExternalString;
-class JSFatInlineString;
 class JSTracer;
 
-namespace js {
+namespace JS {
+class RealmOptions;
+}
 
-class FatInlineAtom;
-class NormalAtom;
+namespace js {
 
 class Nursery;
 
@@ -34,39 +31,76 @@ namespace gc {
 
 class Arena;
 class TenuredChunk;
-struct Cell;
-
-/*
- * Map from C++ type to alloc kind for non-object types. JSObject does not have
- * a 1:1 mapping, so must use Arena::thingSize.
- *
- * The AllocKind is available as MapTypeToFinalizeKind<SomeType>::kind.
- */
-template <typename T>
-struct MapTypeToFinalizeKind {};
-#define EXPAND_MAPTYPETOFINALIZEKIND(allocKind, traceKind, type, sizedType, \
-                                     bgFinal, nursery, compact)             \
-  template <>                                                               \
-  struct MapTypeToFinalizeKind<type> {                                      \
-    static const AllocKind kind = AllocKind::allocKind;                     \
-  };
-FOR_EACH_NONOBJECT_ALLOCKIND(EXPAND_MAPTYPETOFINALIZEKIND)
-#undef EXPAND_MAPTYPETOFINALIZEKIND
 
 } /* namespace gc */
+
+// Define name, key and writability for the GC parameters.
+#define FOR_EACH_GC_PARAM(_)                                                \
+  _("maxBytes", JSGC_MAX_BYTES, true)                                       \
+  _("minNurseryBytes", JSGC_MIN_NURSERY_BYTES, true)                        \
+  _("maxNurseryBytes", JSGC_MAX_NURSERY_BYTES, true)                        \
+  _("gcBytes", JSGC_BYTES, false)                                           \
+  _("nurseryBytes", JSGC_NURSERY_BYTES, false)                              \
+  _("gcNumber", JSGC_NUMBER, false)                                         \
+  _("majorGCNumber", JSGC_MAJOR_GC_NUMBER, false)                           \
+  _("minorGCNumber", JSGC_MINOR_GC_NUMBER, false)                           \
+  _("incrementalGCEnabled", JSGC_INCREMENTAL_GC_ENABLED, true)              \
+  _("perZoneGCEnabled", JSGC_PER_ZONE_GC_ENABLED, true)                     \
+  _("unusedChunks", JSGC_UNUSED_CHUNKS, false)                              \
+  _("totalChunks", JSGC_TOTAL_CHUNKS, false)                                \
+  _("sliceTimeBudgetMS", JSGC_SLICE_TIME_BUDGET_MS, true)                   \
+  _("highFrequencyTimeLimit", JSGC_HIGH_FREQUENCY_TIME_LIMIT, true)         \
+  _("smallHeapSizeMax", JSGC_SMALL_HEAP_SIZE_MAX, true)                     \
+  _("largeHeapSizeMin", JSGC_LARGE_HEAP_SIZE_MIN, true)                     \
+  _("highFrequencySmallHeapGrowth", JSGC_HIGH_FREQUENCY_SMALL_HEAP_GROWTH,  \
+    true)                                                                   \
+  _("highFrequencyLargeHeapGrowth", JSGC_HIGH_FREQUENCY_LARGE_HEAP_GROWTH,  \
+    true)                                                                   \
+  _("lowFrequencyHeapGrowth", JSGC_LOW_FREQUENCY_HEAP_GROWTH, true)         \
+  _("balancedHeapLimitsEnabled", JSGC_BALANCED_HEAP_LIMITS_ENABLED, true)   \
+  _("heapGrowthFactor", JSGC_HEAP_GROWTH_FACTOR, true)                      \
+  _("allocationThreshold", JSGC_ALLOCATION_THRESHOLD, true)                 \
+  _("smallHeapIncrementalLimit", JSGC_SMALL_HEAP_INCREMENTAL_LIMIT, true)   \
+  _("largeHeapIncrementalLimit", JSGC_LARGE_HEAP_INCREMENTAL_LIMIT, true)   \
+  _("minEmptyChunkCount", JSGC_MIN_EMPTY_CHUNK_COUNT, true)                 \
+  _("maxEmptyChunkCount", JSGC_MAX_EMPTY_CHUNK_COUNT, true)                 \
+  _("compactingEnabled", JSGC_COMPACTING_ENABLED, true)                     \
+  _("parallelMarkingEnabled", JSGC_PARALLEL_MARKING_ENABLED, true)          \
+  _("parallelMarkingThresholdKB", JSGC_PARALLEL_MARKING_THRESHOLD_KB, true) \
+  _("minLastDitchGCPeriod", JSGC_MIN_LAST_DITCH_GC_PERIOD, true)            \
+  _("nurseryFreeThresholdForIdleCollection",                                \
+    JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION, true)                  \
+  _("nurseryFreeThresholdForIdleCollectionPercent",                         \
+    JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION_PERCENT, true)          \
+  _("nurseryTimeoutForIdleCollectionMS",                                    \
+    JSGC_NURSERY_TIMEOUT_FOR_IDLE_COLLECTION_MS, true)                      \
+  _("pretenureThreshold", JSGC_PRETENURE_THRESHOLD, true)                   \
+  _("zoneAllocDelayKB", JSGC_ZONE_ALLOC_DELAY_KB, true)                     \
+  _("mallocThresholdBase", JSGC_MALLOC_THRESHOLD_BASE, true)                \
+  _("urgentThreshold", JSGC_URGENT_THRESHOLD_MB, true)                      \
+  _("chunkBytes", JSGC_CHUNK_BYTES, false)                                  \
+  _("helperThreadRatio", JSGC_HELPER_THREAD_RATIO, true)                    \
+  _("maxHelperThreads", JSGC_MAX_HELPER_THREADS, true)                      \
+  _("helperThreadCount", JSGC_HELPER_THREAD_COUNT, false)                   \
+  _("markingThreadCount", JSGC_MARKING_THREAD_COUNT, true)                  \
+  _("systemPageSizeKB", JSGC_SYSTEM_PAGE_SIZE_KB, false)
+
+// Get the key and writability give a GC parameter name.
+extern bool GetGCParameterInfo(const char* name, JSGCParamKey* keyOut,
+                               bool* writableOut);
 
 extern void TraceRuntime(JSTracer* trc);
 
 // Trace roots but don't evict the nursery first; used from DumpHeap.
 extern void TraceRuntimeWithoutEviction(JSTracer* trc);
 
-extern void ReleaseAllJITCode(JSFreeOp* op);
+extern void ReleaseAllJITCode(JS::GCContext* gcx);
 
 extern void PrepareForDebugGC(JSRuntime* rt);
 
 /* Functions for managing cross compartment gray pointers. */
 
-extern void NotifyGCNukeWrapper(JSObject* o);
+extern void NotifyGCNukeWrapper(JSContext* cx, JSObject* wrapper);
 
 extern unsigned NotifyGCPreSwap(JSObject* a, JSObject* b);
 
@@ -129,14 +163,6 @@ void FinishGC(JSContext* cx, JS::GCReason = JS::GCReason::FINISH_GC);
 
 void WaitForBackgroundTasks(JSContext* cx);
 
-/*
- * Merge all contents of source into target. This can only be used if source is
- * the only realm in its zone.
- */
-void MergeRealms(JS::Realm* source, JS::Realm* target);
-
-void CollectSelfHostingZone(JSContext* cx);
-
 enum VerifierType { PreBarrierVerifier };
 
 #ifdef JS_GC_ZEAL
@@ -179,7 +205,8 @@ static inline void MaybeVerifyBarriers(JSContext* cx, bool always = false) {}
  * This works by updating the |JSContext::suppressGC| counter which is checked
  * at the start of GC.
  */
-class MOZ_RAII JS_HAZ_GC_SUPPRESSED AutoSuppressGC {
+class MOZ_RAII JS_HAZ_GC_SUPPRESSED AutoSuppressGC
+    : public JS::AutoRequireNoGC {
   int32_t& suppressGC_;
 
  public:

@@ -31,15 +31,15 @@
 /* Internal constants                                                                             */
 /* ============================================================================================== */
 
-#define ZYAN_BITSET_GROWTH_FACTOR    2.00f
-#define ZYAN_BITSET_SHRINK_THRESHOLD 0.50f
+#define ZYAN_BITSET_GROWTH_FACTOR    2
+#define ZYAN_BITSET_SHRINK_THRESHOLD 2
 
 /* ============================================================================================== */
 /* Internal macros                                                                                */
 /* ============================================================================================== */
 
 /**
- * @brief   Computes the smallest integer value not less than `x`.
+ * Computes the smallest integer value not less than `x`.
  *
  * @param   x   The value.
  *
@@ -49,17 +49,17 @@
     (((x) == ((ZyanU32)(x))) ? (ZyanU32)(x) : ((ZyanU32)(x)) + 1)
 
 /**
- * @brief   Converts bits to bytes.
+ * Converts bits to bytes.
  *
  * @param   x   The value in bits.
  *
  * @return  The amount of bytes needed to fit `x` bits.
  */
 #define ZYAN_BITSET_BITS_TO_BYTES(x) \
-    ZYAN_BITSET_CEIL((x) / 8.0f)
+    ZYAN_BITSET_CEIL((x) / 8)
 
 /**
- * @brief   Returns the offset of the given bit.
+ * Returns the offset of the given bit.
  *
  * @param   index   The bit index.
  *
@@ -77,7 +77,7 @@
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Initializes the given `vector` with `count` "zero"-bytes.
+ * Initializes the given `vector` with `count` "zero"-bytes.
  *
  * @param   vector  A pointer to the `ZyanVector` instance.
  * @param   count   The number of bytes.
@@ -140,7 +140,7 @@ ZyanStatus ZyanBitsetInit(ZyanBitset* bitset, ZyanUSize count)
 #endif // ZYAN_NO_LIBC
 
 ZyanStatus ZyanBitsetInitEx(ZyanBitset* bitset, ZyanUSize count, ZyanAllocator* allocator,
-    float growth_factor, float shrink_threshold)
+    ZyanU8 growth_factor, ZyanU8 shrink_threshold)
 {
     if (!bitset)
     {
@@ -150,7 +150,7 @@ ZyanStatus ZyanBitsetInitEx(ZyanBitset* bitset, ZyanUSize count, ZyanAllocator* 
     const ZyanU32 bytes = ZYAN_BITSET_BITS_TO_BYTES(count);
 
     bitset->size = count;
-    ZYAN_CHECK(ZyanVectorInitEx(&bitset->bits, sizeof(ZyanU8), bytes, ZYAN_NULL, allocator, 
+    ZYAN_CHECK(ZyanVectorInitEx(&bitset->bits, sizeof(ZyanU8), bytes, ZYAN_NULL, allocator,
         growth_factor, shrink_threshold));
     ZYAN_CHECK(ZyanBitsetInitVectorElements(&bitset->bits, bytes));
 
@@ -172,7 +172,7 @@ ZyanStatus ZyanBitsetInitBuffer(ZyanBitset* bitset, ZyanUSize count, void* buffe
     }
 
     bitset->size = count;
-    ZYAN_CHECK(ZyanVectorInitCustomBuffer(&bitset->bits, sizeof(ZyanU8), buffer, capacity, 
+    ZYAN_CHECK(ZyanVectorInitCustomBuffer(&bitset->bits, sizeof(ZyanU8), buffer, capacity,
         ZYAN_NULL));
     ZYAN_CHECK(ZyanBitsetInitVectorElements(&bitset->bits, bytes));
 
@@ -661,7 +661,7 @@ ZyanStatus ZyanBitsetNone(const ZyanBitset* bitset)
 //    }
 //
 //    // TODO:
-//    
+//
 //    return ZYAN_STATUS_SUCCESS;
 //}
 

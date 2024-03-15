@@ -232,11 +232,7 @@ class UniquePtr {
       : mTuple(aOther.release(),
                std::forward<DeleterType>(aOther.get_deleter())) {}
 
-  MOZ_IMPLICIT
-  UniquePtr(decltype(nullptr)) : mTuple(nullptr, DeleterType()) {
-    static_assert(!std::is_pointer_v<D>, "must provide a deleter instance");
-    static_assert(!std::is_reference_v<D>, "must provide a deleter instance");
-  }
+  MOZ_IMPLICIT constexpr UniquePtr(decltype(nullptr)) : UniquePtr() {}
 
   template <typename U, class E>
   MOZ_IMPLICIT UniquePtr(

@@ -15,8 +15,11 @@
 namespace mozilla {
 
 /**
- *  Generate a cryptographically secure random 64-bit unsigned number using the
- *  best facilities available on the current OS.
+ *  Generate cryptographically secure random bytes using the best facilities
+ *  available on the current OS.
+ *
+ *  Return value: true if random bytes were copied into `aBuffer` or false on
+ *  error.
  *
  *  Useful whenever a secure random number is needed and NSS isn't available.
  *  (Perhaps because it hasn't been initialized yet)
@@ -27,6 +30,13 @@ namespace mozilla {
  *    Linux: getrandom() if available, "/dev/urandom" otherwise
  *    Other Unix: "/dev/urandom"
  *
+ */
+[[nodiscard]] MFBT_API bool GenerateRandomBytesFromOS(void* aBuffer,
+                                                      size_t aLength);
+
+/**
+ *  Generate a cryptographically secure random 64-bit unsigned number using the
+ *  best facilities available on the current OS.
  */
 MFBT_API Maybe<uint64_t> RandomUint64();
 

@@ -44,7 +44,7 @@ class MOZ_RAII AutoProfilerLabelData {
   };
 
   // Mutex protecting access to the following static members.
-  static Mutex sAPLMutex;
+  static Mutex sAPLMutex MOZ_UNANNOTATED;
 
   static ProfilerLabelEnter sEnter;
   static ProfilerLabelExit sExit;
@@ -82,7 +82,7 @@ ProfilerLabel ProfilerLabelBegin(const char* aLabelName,
                            : nullptr;
   uint32_t generation = data.GenerationCRef();
 
-  return MakeTuple(entryContext, generation);
+  return std::make_tuple(entryContext, generation);
 }
 
 void ProfilerLabelEnd(const ProfilerLabel& aLabel) {
@@ -91,19 +91,19 @@ void ProfilerLabelEnd(const ProfilerLabel& aLabel) {
   }
 
   const AutoProfilerLabelData data;
-  if (data.ExitCRef() && (Get<1>(aLabel) == data.GenerationCRef())) {
-    data.ExitCRef()(Get<0>(aLabel));
+  if (data.ExitCRef() && (std::get<1>(aLabel) == data.GenerationCRef())) {
+    data.ExitCRef()(std::get<0>(aLabel));
   }
 }
 
 AutoProfilerLabel::AutoProfilerLabel(const char* aLabel,
                                      const char* aDynamicString) {
-  Tie(mEntryContext, mGeneration) =
+  std::tie(mEntryContext, mGeneration) =
       ProfilerLabelBegin(aLabel, aDynamicString, this);
 }
 
 AutoProfilerLabel::~AutoProfilerLabel() {
-  ProfilerLabelEnd(MakeTuple(mEntryContext, mGeneration));
+  ProfilerLabelEnd(std::make_tuple(mEntryContext, mGeneration));
 }
 
 }  // namespace mozilla

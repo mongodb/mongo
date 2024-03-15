@@ -13,7 +13,6 @@
 #include "jit/MIRGraph.h"
 #include "js/Conversions.h"
 #include "vm/Shape.h"
-#include "vm/TraceLogging.h"
 
 #include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
@@ -272,7 +271,7 @@ void CodeGeneratorMIPS64::emitBigIntDiv(LBigIntDiv* ins, Register dividend,
 #endif
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -289,7 +288,7 @@ void CodeGeneratorMIPS64::emitBigIntMod(LBigIntMod* ins, Register dividend,
 #endif
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -302,12 +301,18 @@ void CodeGeneratorMIPS64::emitWasmLoadI64(T* lir) {
     ptrScratch = ToRegister(lir->ptrCopy());
   }
 
+  Register ptrReg = ToRegister(lir->ptr());
+  if (mir->base()->type() == MIRType::Int32) {
+    // See comment in visitWasmLoad re the type of 'base'.
+    masm.move32ZeroExtendToPtr(ptrReg, ptrReg);
+  }
+
   if (IsUnaligned(mir->access())) {
-    masm.wasmUnalignedLoadI64(mir->access(), HeapReg, ToRegister(lir->ptr()),
-                              ptrScratch, ToOutRegister64(lir),
+    masm.wasmUnalignedLoadI64(mir->access(), HeapReg, ptrReg, ptrScratch,
+                              ToOutRegister64(lir),
                               ToRegister(lir->getTemp(1)));
   } else {
-    masm.wasmLoadI64(mir->access(), HeapReg, ToRegister(lir->ptr()), ptrScratch,
+    masm.wasmLoadI64(mir->access(), HeapReg, ptrReg, ptrScratch,
                      ToOutRegister64(lir));
   }
 }
@@ -329,13 +334,19 @@ void CodeGeneratorMIPS64::emitWasmStoreI64(T* lir) {
     ptrScratch = ToRegister(lir->ptrCopy());
   }
 
+  Register ptrReg = ToRegister(lir->ptr());
+  if (mir->base()->type() == MIRType::Int32) {
+    // See comment in visitWasmLoad re the type of 'base'.
+    masm.move32ZeroExtendToPtr(ptrReg, ptrReg);
+  }
+
   if (IsUnaligned(mir->access())) {
     masm.wasmUnalignedStoreI64(mir->access(), ToRegister64(lir->value()),
-                               HeapReg, ToRegister(lir->ptr()), ptrScratch,
+                               HeapReg, ptrReg, ptrScratch,
                                ToRegister(lir->getTemp(1)));
   } else {
     masm.wasmStoreI64(mir->access(), ToRegister64(lir->value()), HeapReg,
-                      ToRegister(lir->ptr()), ptrScratch);
+                      ptrReg, ptrScratch);
   }
 }
 
@@ -423,12 +434,18 @@ void CodeGenerator::visitSignExtendInt64(LSignExtendInt64* lir) {
   }
 }
 
-void CodeGenerator::visitWasmExtendU32Index(LWasmExtendU32Index*) {
-  MOZ_CRASH("Unused - no support on MIPS64 for indices > INT_MAX");
+void CodeGenerator::visitWasmExtendU32Index(LWasmExtendU32Index* lir) {
+  Register input = ToRegister(lir->input());
+  Register output = ToRegister(lir->output());
+  MOZ_ASSERT(input == output);
+  masm.move32To64ZeroExtend(input, Register64(output));
 }
 
-void CodeGenerator::visitWasmWrapU32Index(LWasmWrapU32Index*) {
-  MOZ_CRASH("Unused - no support on MIPS64 for indices > INT_MAX");
+void CodeGenerator::visitWasmWrapU32Index(LWasmWrapU32Index* lir) {
+  Register input = ToRegister(lir->input());
+  Register output = ToRegister(lir->output());
+  MOZ_ASSERT(input == output);
+  masm.move64To32(Register64(input), output);
 }
 
 void CodeGenerator::visitClzI64(LClzI64* lir) {
@@ -447,7 +464,15 @@ void CodeGenerator::visitNotI64(LNotI64* lir) {
   Register64 input = ToRegister64(lir->getInt64Operand(0));
   Register output = ToRegister(lir->output());
 
-  masm.cmp64Set(Assembler::Equal, input.reg, Imm32(0), output);
+  masm.ma_cmp_set(output, input.reg, zero, Assembler::Equal);
+}
+
+void CodeGenerator::visitBitNotI64(LBitNotI64* ins) {
+  const LAllocation* input = ins->getOperand(0);
+  MOZ_ASSERT(!input->isConstant());
+  Register inputReg = ToRegister(input);
+  MOZ_ASSERT(inputReg == ToRegister(ins->output()));
+  masm.ma_not(inputReg, inputReg);
 }
 
 void CodeGenerator::visitWasmTruncateToInt64(LWasmTruncateToInt64* lir) {

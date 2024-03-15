@@ -1,5 +1,5 @@
     /*
-     * Generating switch for the list of 54 entries:
+     * Generating switch for the list of 55 entries:
      * false
      * true
      * null
@@ -43,6 +43,7 @@
      * protected
      * public
      * as
+     * assert
      * async
      * await
      * from
@@ -63,7 +64,7 @@
                 JSRW_GOT_MATCH(16) /* if */
             }
             if (JSRW_AT(0) == 'o') {
-                JSRW_GOT_MATCH(49) /* of */
+                JSRW_GOT_MATCH(50) /* of */
             }
             JSRW_NO_MATCH()
           case 'n':
@@ -102,13 +103,13 @@
           case 't':
             if (JSRW_AT(1) == 'e') {
                 if (JSRW_AT(0) == 'g') {
-                    JSRW_GOT_MATCH(46) /* get */
+                    JSRW_GOT_MATCH(47) /* get */
                 }
                 if (JSRW_AT(0) == 'l') {
-                    JSRW_GOT_MATCH(47) /* let */
+                    JSRW_GOT_MATCH(48) /* let */
                 }
                 if (JSRW_AT(0) == 's') {
-                    JSRW_GOT_MATCH(50) /* set */
+                    JSRW_GOT_MATCH(51) /* set */
                 }
                 JSRW_NO_MATCH()
             }
@@ -148,7 +149,7 @@
             JSRW_NO_MATCH()
           case 'o':
             if (JSRW_AT(0)=='f' && JSRW_AT(1)=='r' && JSRW_AT(3)=='m') {
-                JSRW_GOT_MATCH(45) /* from */
+                JSRW_GOT_MATCH(46) /* from */
             }
             JSRW_NO_MATCH()
           case 's':
@@ -168,7 +169,7 @@
           case 't':
             if (JSRW_AT(0) == 'm') {
                 if (JSRW_AT(3)=='a' && JSRW_AT(1)=='e') {
-                    JSRW_GOT_MATCH(48) /* meta */
+                    JSRW_GOT_MATCH(49) /* meta */
                 }
                 JSRW_NO_MATCH()
             }
@@ -214,7 +215,7 @@
             JSRW_NO_MATCH()
           case 'i':
             if (JSRW_AT(0)=='a' && JSRW_AT(1)=='w' && JSRW_AT(2)=='a' && JSRW_AT(4)=='t') {
-                JSRW_GOT_MATCH(44) /* await */
+                JSRW_GOT_MATCH(45) /* await */
             }
             JSRW_NO_MATCH()
           case 'l':
@@ -226,14 +227,14 @@
             }
             if (JSRW_AT(0) == 'y') {
                 if (JSRW_AT(4)=='d' && JSRW_AT(1)=='i' && JSRW_AT(2)=='e') {
-                    JSRW_GOT_MATCH(53) /* yield */
+                    JSRW_GOT_MATCH(54) /* yield */
                 }
                 JSRW_NO_MATCH()
             }
             JSRW_NO_MATCH()
           case 'n':
             if (JSRW_AT(0)=='a' && JSRW_AT(1)=='s' && JSRW_AT(2)=='y' && JSRW_AT(4)=='c') {
-                JSRW_GOT_MATCH(43) /* async */
+                JSRW_GOT_MATCH(44) /* async */
             }
             JSRW_NO_MATCH()
           case 'o':
@@ -267,45 +268,61 @@
         }
         JSRW_NO_MATCH()
       case 6:
-        switch (JSRW_AT(0)) {
-          case 'd':
-            JSRW_TEST_GUESS(10) /* delete */
+        switch (JSRW_AT(3)) {
           case 'e':
-            JSRW_TEST_GUESS(31) /* export */
-          case 'i':
-            JSRW_TEST_GUESS(30) /* import */
-          case 'p':
-            JSRW_TEST_GUESS(41) /* public */
-          case 'r':
-            JSRW_TEST_GUESS(20) /* return */
-          case 's':
-            if (JSRW_AT(1) == 't') {
-                if (JSRW_AT(5)=='c' && JSRW_AT(4)=='i' && JSRW_AT(2)=='a' && JSRW_AT(3)=='t') {
-                    JSRW_GOT_MATCH(51) /* static */
+            if (JSRW_AT(0) == 'a') {
+                if (JSRW_AT(4)=='r' && JSRW_AT(1)=='s' && JSRW_AT(2)=='s' && JSRW_AT(5)=='t') {
+                    JSRW_GOT_MATCH(43) /* assert */
                 }
                 JSRW_NO_MATCH()
             }
-            if (JSRW_AT(1) == 'w') {
-                if (JSRW_AT(5)=='h' && JSRW_AT(4)=='c' && JSRW_AT(2)=='i' && JSRW_AT(3)=='t') {
-                    JSRW_GOT_MATCH(21) /* switch */
+            if (JSRW_AT(0) == 'd') {
+                if (JSRW_AT(4)=='t' && JSRW_AT(1)=='e' && JSRW_AT(2)=='l' && JSRW_AT(5)=='e') {
+                    JSRW_GOT_MATCH(10) /* delete */
+                }
+                JSRW_NO_MATCH()
+            }
+            if (JSRW_AT(0) == 't') {
+                if (JSRW_AT(4)=='o' && JSRW_AT(1)=='y' && JSRW_AT(2)=='p' && JSRW_AT(5)=='f') {
+                    JSRW_GOT_MATCH(25) /* typeof */
+                }
+                JSRW_NO_MATCH()
+            }
+            JSRW_NO_MATCH()
+          case 'g':
+            JSRW_TEST_GUESS(53) /* target */
+          case 'l':
+            JSRW_TEST_GUESS(41) /* public */
+          case 'o':
+            if (JSRW_AT(1) == 'm') {
+                if (JSRW_AT(0)=='i' && JSRW_AT(4)=='r' && JSRW_AT(2)=='p' && JSRW_AT(5)=='t') {
+                    JSRW_GOT_MATCH(30) /* import */
+                }
+                JSRW_NO_MATCH()
+            }
+            if (JSRW_AT(1) == 'x') {
+                if (JSRW_AT(0)=='e' && JSRW_AT(4)=='r' && JSRW_AT(2)=='p' && JSRW_AT(5)=='t') {
+                    JSRW_GOT_MATCH(31) /* export */
                 }
                 JSRW_NO_MATCH()
             }
             JSRW_NO_MATCH()
           case 't':
-            if (JSRW_AT(5) == 'f') {
-                if (JSRW_AT(4)=='o' && JSRW_AT(1)=='y' && JSRW_AT(2)=='p' && JSRW_AT(3)=='e') {
-                    JSRW_GOT_MATCH(25) /* typeof */
+            if (JSRW_AT(1) == 't') {
+                if (JSRW_AT(0)=='s' && JSRW_AT(4)=='i' && JSRW_AT(2)=='a' && JSRW_AT(5)=='c') {
+                    JSRW_GOT_MATCH(52) /* static */
                 }
                 JSRW_NO_MATCH()
             }
-            if (JSRW_AT(5) == 't') {
-                if (JSRW_AT(4)=='e' && JSRW_AT(1)=='a' && JSRW_AT(2)=='r' && JSRW_AT(3)=='g') {
-                    JSRW_GOT_MATCH(52) /* target */
+            if (JSRW_AT(1) == 'w') {
+                if (JSRW_AT(0)=='s' && JSRW_AT(4)=='c' && JSRW_AT(2)=='i' && JSRW_AT(5)=='h') {
+                    JSRW_GOT_MATCH(21) /* switch */
                 }
                 JSRW_NO_MATCH()
             }
             JSRW_NO_MATCH()
+          case 'u':
+            JSRW_TEST_GUESS(20) /* return */
         }
         JSRW_NO_MATCH()
       case 7:

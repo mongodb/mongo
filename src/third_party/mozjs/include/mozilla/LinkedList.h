@@ -341,6 +341,28 @@ class LinkedListElement {
   }
 
   /*
+   * Transfers the elements [aBegin, aEnd) before the "this" list element.
+   */
+  void transferBeforeUnsafe(LinkedListElement<T>& aBegin,
+                            LinkedListElement<T>& aEnd) {
+    MOZ_RELEASE_ASSERT(!aBegin.mIsSentinel);
+    if (!aBegin.isInList() || !aEnd.isInList()) {
+      return;
+    }
+
+    auto otherPrev = aBegin.mPrev;
+
+    aBegin.mPrev = this->mPrev;
+    this->mPrev->mNext = &aBegin;
+    this->mPrev = aEnd.mPrev;
+    aEnd.mPrev->mNext = this;
+
+    // Patch the gap in the source list
+    otherPrev->mNext = &aEnd;
+    aEnd.mPrev = otherPrev;
+  }
+
+  /*
    * Adjust mNext and mPrev for implementing move constructor and move
    * assignment.
    */
@@ -458,6 +480,50 @@ class LinkedList {
    * Add aElem to the back of the list.
    */
   void insertBack(RawType aElem) { sentinel.setPreviousUnsafe(aElem); }
+
+  /*
+   * Move all elements from another list to the back
+   */
+  void extendBack(LinkedList<T>&& aOther) {
+    MOZ_RELEASE_ASSERT(this != &aOther);
+    if (aOther.isEmpty()) {
+      return;
+    }
+    sentinel.transferBeforeUnsafe(**aOther.begin(), aOther.sentinel);
+  }
+
+  /*
+   * Move elements from another list to the specified position
+   */
+  void splice(size_t aDestinationPos, LinkedList<T>& aListFrom,
+              size_t aSourceStart, size_t aSourceLen) {
+    MOZ_RELEASE_ASSERT(this != &aListFrom);
+    if (aListFrom.isEmpty() || !aSourceLen) {
+      return;
+    }
+
+    const auto safeForward = [](LinkedList<T>& aList,
+                                LinkedListElement<T>& aBegin,
+                                size_t aPos) -> LinkedListElement<T>& {
+      auto* iter = &aBegin;
+      for (size_t i = 0; i < aPos; ++i, (iter = iter->mNext)) {
+        if (iter->mIsSentinel) {
+          break;
+        }
+      }
+      return *iter;
+    };
+
+    auto& sourceBegin =
+        safeForward(aListFrom, *aListFrom.sentinel.mNext, aSourceStart);
+    if (sourceBegin.mIsSentinel) {
+      return;
+    }
+    auto& sourceEnd = safeForward(aListFrom, sourceBegin, aSourceLen);
+    auto& destination = safeForward(*this, *sentinel.mNext, aDestinationPos);
+
+    destination.transferBeforeUnsafe(sourceBegin, sourceEnd);
+  }
 
   /*
    * Get the first element of the list, or nullptr if the list is empty.
@@ -662,6 +728,8 @@ class AutoCleanLinkedList : public LinkedList<T> {
   using ClientType = typename detail::LinkedListElementTraits<T>::ClientType;
 
  public:
+  AutoCleanLinkedList() = default;
+  AutoCleanLinkedList(AutoCleanLinkedList&&) = default;
   ~AutoCleanLinkedList() { clear(); }
 
   AutoCleanLinkedList& operator=(AutoCleanLinkedList&& aOther) = default;

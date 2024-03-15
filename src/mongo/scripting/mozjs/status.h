@@ -46,7 +46,9 @@ namespace mozjs {
  * traces, and instanceOf Error.
  */
 struct MongoStatusInfo : public BaseInfo {
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    enum Slots { StatusSlot, MongoStatusInfoSlotCount };
+
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(code);
@@ -58,7 +60,7 @@ struct MongoStatusInfo : public BaseInfo {
 
     static const char* const className;
     static const char* const inheritFrom;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(MongoStatusInfoSlotCount);
     static const InstallType installType = InstallType::Private;
 
     static Status toStatus(JSContext* cx, JS::HandleObject object);

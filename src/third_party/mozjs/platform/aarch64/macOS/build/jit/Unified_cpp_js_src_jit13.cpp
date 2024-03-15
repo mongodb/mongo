@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/arm64/Lowering-arm64.cpp"
+#include "jit/XrayJitInfo.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/arm64/Lowering-arm64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/XrayJitInfo.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/arm64/Lowering-arm64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/XrayJitInfo.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/arm64/MacroAssembler-arm64.cpp"
+#include "jit/none/Trampoline-none.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/arm64/MacroAssembler-arm64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/none/Trampoline-none.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/arm64/MacroAssembler-arm64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/none/Trampoline-none.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/arm64/MoveEmitter-arm64.cpp"
+#include "jit/shared/Assembler-shared.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/arm64/MoveEmitter-arm64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/shared/Assembler-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/arm64/MoveEmitter-arm64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/shared/Assembler-shared.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/arm64/Trampoline-arm64.cpp"
+#include "jit/shared/AtomicOperations-shared-jit.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/arm64/Trampoline-arm64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/shared/AtomicOperations-shared-jit.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/arm64/Trampoline-arm64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/shared/AtomicOperations-shared-jit.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/arm64/vixl/Assembler-vixl.cpp"
+#include "jit/shared/CodeGenerator-shared.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/arm64/vixl/Assembler-vixl.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/shared/CodeGenerator-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/arm64/vixl/Assembler-vixl.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/shared/CodeGenerator-shared.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/arm64/vixl/Cpu-Features-vixl.cpp"
+#include "jit/shared/Disassembler-shared.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/arm64/vixl/Cpu-Features-vixl.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jit/shared/Disassembler-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/arm64/vixl/Cpu-Features-vixl.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jit/shared/Disassembler-shared.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

@@ -10,6 +10,7 @@
 #define mozilla_Vector_h
 
 #include <new>  // for placement new
+#include <type_traits>
 #include <utility>
 
 #include "mozilla/Alignment.h"
@@ -23,7 +24,6 @@
 #include "mozilla/ReentrancyGuard.h"
 #include "mozilla/Span.h"
 #include "mozilla/TemplateLib.h"
-#include "mozilla/TypeTraits.h"
 
 namespace mozilla {
 
@@ -34,13 +34,109 @@ namespace detail {
 
 /*
  * Check that the given capacity wastes the minimal amount of space if
- * allocated on the heap. This means that aCapacity*sizeof(T) is as close to a
+ * allocated on the heap. This means that aCapacity*EltSize is as close to a
  * power-of-two as possible. growStorageBy() is responsible for ensuring this.
  */
-template <typename T>
+template <size_t EltSize>
 static bool CapacityHasExcessSpace(size_t aCapacity) {
-  size_t size = aCapacity * sizeof(T);
-  return RoundUpPow2(size) - size >= sizeof(T);
+  size_t size = aCapacity * EltSize;
+  return RoundUpPow2(size) - size >= EltSize;
+}
+
+/*
+ * AllocPolicy can optionally provide a `computeGrowth<T>(size_t aOldElts,
+ * size_t aIncr)` method that returns the new number of elements to allocate
+ * when the current capacity is `aOldElts` and `aIncr` more are being
+ * requested. If the AllocPolicy does not have such a method, a fallback
+ * will be used that mostly will just round the new requested capacity up to
+ * the next power of two, which results in doubling capacity for the most part.
+ *
+ * If the new size would overflow some limit, `computeGrowth` returns 0.
+ *
+ * A simpler way would be to make computeGrowth() part of the API for all
+ * AllocPolicy classes, but this turns out to be rather complex because
+ * mozalloc.h defines a very widely-used InfallibleAllocPolicy, and yet it
+ * can only be compiled in limited contexts, eg within `extern "C"` and with
+ * -std=c++11 rather than a later version. That makes the headers that are
+ * necessary for the computation unavailable (eg mfbt/MathAlgorithms.h).
+ */
+
+// Fallback version.
+template <size_t EltSize>
+inline size_t GrowEltsByDoubling(size_t aOldElts, size_t aIncr) {
+  /*
+   * When choosing a new capacity, its size in bytes should is as close to 2**N
+   * bytes as possible.  2**N-sized requests are best because they are unlikely
+   * to be rounded up by the allocator.  Asking for a 2**N number of elements
+   * isn't as good, because if EltSize is not a power-of-two that would
+   * result in a non-2**N request size.
+   */
+
+  if (aIncr == 1) {
+    if (aOldElts == 0) {
+      return 1;
+    }
+
+    /* This case occurs in ~15--20% of the calls to Vector::growStorageBy. */
+
+    /*
+     * Will aOldSize * 4 * sizeof(T) overflow?  This condition limits a
+     * collection to 1GB of memory on a 32-bit system, which is a reasonable
+     * limit.  It also ensures that
+     *
+     *   static_cast<char*>(end()) - static_cast<char*>(begin())
+     *
+     * for a Vector doesn't overflow ptrdiff_t (see bug 510319).
+     */
+    if (MOZ_UNLIKELY(aOldElts &
+                     mozilla::tl::MulOverflowMask<4 * EltSize>::value)) {
+      return 0;
+    }
+
+    /*
+     * If we reach here, the existing capacity will have a size that is already
+     * as close to 2^N as sizeof(T) will allow.  Just double the capacity, and
+     * then there might be space for one more element.
+     */
+    size_t newElts = aOldElts * 2;
+    if (CapacityHasExcessSpace<EltSize>(newElts)) {
+      newElts += 1;
+    }
+    return newElts;
+  }
+
+  /* This case occurs in ~2% of the calls to Vector::growStorageBy. */
+  size_t newMinCap = aOldElts + aIncr;
+
+  /* Did aOldElts + aIncr overflow?  Will newMinCap * EltSize rounded up to the
+   * next power of two overflow PTRDIFF_MAX? */
+  if (MOZ_UNLIKELY(newMinCap < aOldElts ||
+                   newMinCap & tl::MulOverflowMask<4 * EltSize>::value)) {
+    return 0;
+  }
+
+  size_t newMinSize = newMinCap * EltSize;
+  size_t newSize = RoundUpPow2(newMinSize);
+  return newSize / EltSize;
+};
+
+// Fallback version.
+template <typename AP, size_t EltSize>
+static size_t ComputeGrowth(size_t aOldElts, size_t aIncr, int) {
+  return GrowEltsByDoubling<EltSize>(aOldElts, aIncr);
+}
+
+// If the AllocPolicy provides its own computeGrowth<EltSize> implementation,
+// use that.
+template <typename AP, size_t EltSize>
+static size_t ComputeGrowth(
+    size_t aOldElts, size_t aIncr,
+    decltype(std::declval<AP>().template computeGrowth<EltSize>(0, 0),
+             bool()) aOverloadSelector) {
+  size_t newElts = AP::template computeGrowth<EltSize>(aOldElts, aIncr);
+  MOZ_ASSERT(newElts <= PTRDIFF_MAX && newElts * EltSize <= PTRDIFF_MAX,
+             "invalid Vector size (see bug 510319)");
+  return newElts;
 }
 
 /*
@@ -119,7 +215,7 @@ struct VectorImpl {
   [[nodiscard]] static inline bool growTo(Vector<T, N, AP>& aV,
                                           size_t aNewCap) {
     MOZ_ASSERT(!aV.usingInlineStorage());
-    MOZ_ASSERT(!CapacityHasExcessSpace<T>(aNewCap));
+    MOZ_ASSERT(!CapacityHasExcessSpace<sizeof(T)>(aNewCap));
     T* newbuf = aV.template pod_malloc<T>(aNewCap);
     if (MOZ_UNLIKELY(!newbuf)) {
       return false;
@@ -204,7 +300,7 @@ struct VectorImpl<T, N, AP, true> {
   [[nodiscard]] static inline bool growTo(Vector<T, N, AP>& aV,
                                           size_t aNewCap) {
     MOZ_ASSERT(!aV.usingInlineStorage());
-    MOZ_ASSERT(!CapacityHasExcessSpace<T>(aNewCap));
+    MOZ_ASSERT(!CapacityHasExcessSpace<sizeof(T)>(aNewCap));
     T* newbuf =
         aV.template pod_realloc<T>(aV.mBegin, aV.mTail.mCapacity, aNewCap);
     if (MOZ_UNLIKELY(!newbuf)) {
@@ -245,8 +341,8 @@ template <typename T, size_t MinInlineCapacity = 0,
           class AllocPolicy = MallocAllocPolicy>
 class MOZ_NON_PARAM Vector final : private AllocPolicy {
   /* utilities */
-
-  static constexpr bool kElemIsPod = IsPod<T>::value;
+  static constexpr bool kElemIsPod =
+      std::is_trivial_v<T> && std::is_standard_layout_v<T>;
   typedef detail::VectorImpl<T, MinInlineCapacity, AllocPolicy, kElemIsPod>
       Impl;
   friend struct detail::VectorImpl<T, MinInlineCapacity, AllocPolicy,
@@ -443,7 +539,9 @@ class MOZ_NON_PARAM Vector final : private AllocPolicy {
 
   typedef T ElementType;
 
-  explicit Vector(AllocPolicy = AllocPolicy());
+  explicit Vector(AllocPolicy);
+  Vector() : Vector(AllocPolicy()) {}
+
   Vector(Vector&&);            /* Move constructor. */
   Vector& operator=(Vector&&); /* Move assignment. */
   ~Vector();
@@ -925,7 +1023,7 @@ inline bool Vector<T, N, AP>::convertToHeapStorage(size_t aNewCap) {
   MOZ_ASSERT(usingInlineStorage());
 
   /* Allocate buffer. */
-  MOZ_ASSERT(!detail::CapacityHasExcessSpace<T>(aNewCap));
+  MOZ_ASSERT(!detail::CapacityHasExcessSpace<sizeof(T)>(aNewCap));
   T* newBuf = this->template pod_malloc<T>(aNewCap);
   if (MOZ_UNLIKELY(!newBuf)) {
     return false;
@@ -946,78 +1044,27 @@ template <typename T, size_t N, class AP>
 MOZ_NEVER_INLINE bool Vector<T, N, AP>::growStorageBy(size_t aIncr) {
   MOZ_ASSERT(mLength + aIncr > mTail.mCapacity);
 
-  /*
-   * When choosing a new capacity, its size should is as close to 2**N bytes
-   * as possible.  2**N-sized requests are best because they are unlikely to
-   * be rounded up by the allocator.  Asking for a 2**N number of elements
-   * isn't as good, because if sizeof(T) is not a power-of-two that would
-   * result in a non-2**N request size.
-   */
-
   size_t newCap;
 
-  if (aIncr == 1) {
-    if (usingInlineStorage()) {
-      /* This case occurs in ~70--80% of the calls to this function. */
-      size_t newSize =
-          tl::RoundUpPow2<(kInlineCapacity + 1) * sizeof(T)>::value;
-      newCap = newSize / sizeof(T);
-      goto convert;
-    }
-
-    if (mLength == 0) {
-      /* This case occurs in ~0--10% of the calls to this function. */
-      newCap = 1;
-      goto grow;
-    }
-
-    /* This case occurs in ~15--20% of the calls to this function. */
-
-    /*
-     * Will mLength * 4 *sizeof(T) overflow?  This condition limits a vector
-     * to 1GB of memory on a 32-bit system, which is a reasonable limit.  It
-     * also ensures that
-     *
-     *   static_cast<char*>(end()) - static_cast<char*>(begin())
-     *
-     * doesn't overflow ptrdiff_t (see bug 510319).
-     */
-    if (MOZ_UNLIKELY(mLength & tl::MulOverflowMask<4 * sizeof(T)>::value)) {
-      this->reportAllocOverflow();
-      return false;
-    }
-
-    /*
-     * If we reach here, the existing capacity will have a size that is already
-     * as close to 2^N as sizeof(T) will allow.  Just double the capacity, and
-     * then there might be space for one more element.
-     */
-    newCap = mLength * 2;
-    if (detail::CapacityHasExcessSpace<T>(newCap)) {
-      newCap += 1;
-    }
-  } else {
-    /* This case occurs in ~2% of the calls to this function. */
-    size_t newMinCap = mLength + aIncr;
-
-    /* Did mLength + aIncr overflow?  Will newCap * sizeof(T) overflow? */
-    if (MOZ_UNLIKELY(newMinCap < mLength ||
-                     newMinCap & tl::MulOverflowMask<2 * sizeof(T)>::value)) {
-      this->reportAllocOverflow();
-      return false;
-    }
-
-    size_t newMinSize = newMinCap * sizeof(T);
-    size_t newSize = RoundUpPow2(newMinSize);
+  if (aIncr == 1 && usingInlineStorage()) {
+    /* This case occurs in ~70--80% of the calls to this function. */
+    constexpr size_t newSize =
+        tl::RoundUpPow2<(kInlineCapacity + 1) * sizeof(T)>::value;
+    static_assert(newSize / sizeof(T) > 0,
+                  "overflow when exceeding inline Vector storage");
     newCap = newSize / sizeof(T);
+  } else {
+    newCap = detail::ComputeGrowth<AP, sizeof(T)>(mLength, aIncr, true);
+    if (MOZ_UNLIKELY(newCap == 0)) {
+      this->reportAllocOverflow();
+      return false;
+    }
   }
 
   if (usingInlineStorage()) {
-  convert:
     return convertToHeapStorage(newCap);
   }
 
-grow:
   return Impl::growTo(*this, newCap);
 }
 

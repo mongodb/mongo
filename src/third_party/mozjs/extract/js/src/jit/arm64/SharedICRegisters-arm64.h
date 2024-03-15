@@ -14,13 +14,6 @@
 namespace js {
 namespace jit {
 
-// Must be a callee-saved register for preservation around generateEnterJIT().
-static constexpr Register BaselineFrameReg = r23;
-static constexpr ARMRegister BaselineFrameReg64 = {BaselineFrameReg, 64};
-
-// BaselineStackReg is intentionally undefined on ARM64.
-// Refer to the comment next to the definition of RealStackPointer.
-
 // ValueOperands R0, R1, and R2.
 // R0 == JSReturnReg, and R2 uses registers not preserved across calls.
 // R1 value should be preserved across calls.
@@ -36,15 +29,6 @@ static constexpr ValueOperand R2(R2_);
 // calls.
 static constexpr Register ICTailCallReg = r30;
 static constexpr Register ICStubReg = r9;
-
-// ExtractTemps must be callee-save registers:
-// ICSetProp_Native::Compiler::generateStubCode() stores the object
-// in ExtractTemp0, but then calls callTypeUpdateIC(), which clobbers
-// caller-save registers.
-// They should also not be the scratch registers ip0 or ip1,
-// since those get clobbered all the time.
-static constexpr Register ExtractTemp0 = r24;
-static constexpr Register ExtractTemp1 = r25;
 
 // R7 - R9 are generally available for use within stubcode.
 

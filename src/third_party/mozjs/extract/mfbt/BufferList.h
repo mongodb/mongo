@@ -197,6 +197,11 @@ class BufferList : private AllocPolicy {
       return mData;
     }
 
+    bool operator==(const IterImpl& other) const {
+      return mAbsoluteOffset == other.mAbsoluteOffset;
+    }
+    bool operator!=(const IterImpl& other) const { return !(*this == other); }
+
     // Returns true if the memory in the range [Data(), Data() + aBytes) is all
     // part of one contiguous buffer.
     bool HasRoomFor(size_t aBytes) const {
@@ -353,16 +358,6 @@ class BufferList : private AllocPolicy {
   template <typename OtherAllocPolicy>
   BufferList<OtherAllocPolicy> MoveFallible(
       bool* aSuccess, OtherAllocPolicy aAP = OtherAllocPolicy());
-
-  // Return a new BufferList that adopts the byte range starting at Iter so that
-  // range [aIter, aIter + aSize) is transplanted to the returned BufferList.
-  // Contents of the buffer before aIter + aSize is left undefined.
-  // Extract can fail, in which case *aSuccess will be false upon return. The
-  // moved buffers are erased from the original BufferList. In case of extract
-  // fails, the original BufferList is intact.  All other iterators except aIter
-  // are invalidated.
-  // This method requires aIter and aSize to be 8-byte aligned.
-  BufferList Extract(IterImpl& aIter, size_t aSize, bool* aSuccess);
 
   // Return the number of bytes from 'start' to 'end', two iterators within
   // this BufferList.
@@ -548,154 +543,6 @@ BufferList<OtherAllocPolicy> BufferList<AllocPolicy>::MoveFallible(
   result.mSize = mSize;
   mSegments.clear();
   mSize = 0;
-  *aSuccess = true;
-  return result;
-}
-
-template <typename AllocPolicy>
-BufferList<AllocPolicy> BufferList<AllocPolicy>::Extract(IterImpl& aIter,
-                                                         size_t aSize,
-                                                         bool* aSuccess) {
-  MOZ_RELEASE_ASSERT(aSize);
-  MOZ_RELEASE_ASSERT(mOwning);
-  MOZ_ASSERT(aSize % kSegmentAlignment == 0);
-  MOZ_ASSERT(intptr_t(aIter.mData) % kSegmentAlignment == 0);
-
-  auto failure = [this, aSuccess]() {
-    *aSuccess = false;
-    return BufferList(0, 0, mStandardCapacity);
-  };
-
-  // Number of segments we'll need to copy data from to satisfy the request.
-  size_t segmentsNeeded = 0;
-  // If this is None then the last segment is a full segment, otherwise we need
-  // to copy this many bytes.
-  Maybe<size_t> lastSegmentSize;
-  {
-    // Copy of the iterator to walk the BufferList and see how many segments we
-    // need to copy.
-    IterImpl iter = aIter;
-    size_t remaining = aSize;
-    while (!iter.Done() && remaining &&
-           remaining >= iter.RemainingInSegment()) {
-      remaining -= iter.RemainingInSegment();
-      iter.Advance(*this, iter.RemainingInSegment());
-      segmentsNeeded++;
-    }
-
-    if (remaining) {
-      if (iter.Done()) {
-        // We reached the end of the BufferList and there wasn't enough data to
-        // satisfy the request.
-        return failure();
-      }
-      lastSegmentSize.emplace(remaining);
-      // The last block also counts as a segment. This makes the conditionals
-      // on segmentsNeeded work in the rest of the function.
-      segmentsNeeded++;
-    }
-  }
-
-  BufferList result(0, 0, mStandardCapacity);
-  if (!result.mSegments.reserve(segmentsNeeded + lastSegmentSize.isSome())) {
-    return failure();
-  }
-
-  // Copy the first segment, it's special because we can't just steal the
-  // entire Segment struct from this->mSegments.
-  //
-  // As we leave the data before the new `aIter` position as "unspecified", we
-  // leave this data in the existing buffer, despite copying it into the new
-  // buffer.
-  size_t firstSegmentSize = std::min(aSize, aIter.RemainingInSegment());
-  if (!result.WriteBytes(aIter.Data(), firstSegmentSize)) {
-    return failure();
-  }
-  aIter.Advance(*this, firstSegmentSize);
-  segmentsNeeded--;
-
-  // The entirety of the request wasn't in the first segment, now copy the
-  // rest.
-  if (segmentsNeeded) {
-    size_t finalSegmentCapacity = 0;
-    char* finalSegment = nullptr;
-    // Pre-allocate the final segment so that if this fails, we return before
-    // we delete the elements from |this->mSegments|.
-    if (lastSegmentSize.isSome()) {
-      finalSegmentCapacity = std::max(mStandardCapacity, *lastSegmentSize);
-      finalSegment = this->template pod_malloc<char>(finalSegmentCapacity);
-      if (!finalSegment) {
-        return failure();
-      }
-    }
-
-    size_t removedBytes = 0;
-    size_t copyStart = aIter.mSegment;
-    // Copy segments from this over to the result and remove them from our
-    // storage. Not needed if the only segment we need to copy is the last
-    // partial one.
-    size_t segmentsToCopy = segmentsNeeded - lastSegmentSize.isSome();
-    for (size_t i = 0; i < segmentsToCopy; ++i) {
-      result.mSegments.infallibleAppend(Segment(
-          mSegments[aIter.mSegment].mData, mSegments[aIter.mSegment].mSize,
-          mSegments[aIter.mSegment].mCapacity));
-      removedBytes += mSegments[aIter.mSegment].mSize;
-      aIter.Advance(*this, aIter.RemainingInSegment());
-    }
-    // Due to the way IterImpl works, there are two cases here: (1) if we've
-    // consumed the entirety of the BufferList, then the iterator is pointed at
-    // the end of the final segment, (2) otherwise it is pointed at the start
-    // of the next segment. We want to verify that we really consumed all
-    // |segmentsToCopy| segments.
-    MOZ_RELEASE_ASSERT(
-        (aIter.mSegment == copyStart + segmentsToCopy) ||
-        (aIter.Done() && aIter.mSegment == copyStart + segmentsToCopy - 1));
-    mSegments.erase(mSegments.begin() + copyStart,
-                    mSegments.begin() + copyStart + segmentsToCopy);
-
-    // Reset the iter's position for what we just deleted.
-    aIter.mSegment -= segmentsToCopy;
-    aIter.mAbsoluteOffset -= removedBytes;
-    mSize -= removedBytes;
-
-    // If our iterator is already at the end, we just removed the very last
-    // segment of our buffer list and need to shift the iterator back to point
-    // at the end of the previous segment.
-    if (aIter.Done()) {
-      MOZ_ASSERT(lastSegmentSize.isNothing());
-      if (mSegments.empty()) {
-        MOZ_ASSERT(aIter.mSegment == 0);
-        aIter.mData = aIter.mDataEnd = nullptr;
-      } else {
-        MOZ_ASSERT(aIter.mSegment == mSegments.length() - 1);
-        aIter.mData = aIter.mDataEnd = mSegments.back().End();
-      }
-    }
-
-    if (lastSegmentSize.isSome()) {
-      // We called reserve() on result.mSegments so infallibleAppend is safe.
-      result.mSegments.infallibleAppend(
-          Segment(finalSegment, 0, finalSegmentCapacity));
-      bool r = result.WriteBytes(aIter.Data(), *lastSegmentSize);
-      MOZ_RELEASE_ASSERT(r);
-      aIter.Advance(*this, *lastSegmentSize);
-    }
-  }
-
-  result.mSize = aSize;
-
-  AssertConsistentSize();
-  result.AssertConsistentSize();
-
-  // Ensure that the iterator is still valid when Extract returns.
-#ifdef DEBUG
-  if (!mSegments.empty()) {
-    auto& segment = mSegments[aIter.mSegment];
-    MOZ_ASSERT(segment.Start() <= aIter.mData);
-    MOZ_ASSERT(aIter.mDataEnd == segment.End());
-  }
-#endif
-
   *aSuccess = true;
   return result;
 }

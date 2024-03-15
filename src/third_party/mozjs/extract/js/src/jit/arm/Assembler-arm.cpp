@@ -11,6 +11,8 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/Sprintf.h"
 
+#include <type_traits>
+
 #include "gc/Marking.h"
 #include "jit/arm/disasm/Disasm-arm.h"
 #include "jit/arm/MacroAssembler-arm.h"
@@ -1899,14 +1901,14 @@ enum vfp_tags { VfpTag = 0x0C000A00, VfpArith = 0x02000000 };
 BufferOffset Assembler::writeVFPInst(vfp_size sz, uint32_t blob) {
   MOZ_ASSERT((sz & blob) == 0);
   MOZ_ASSERT((VfpTag & blob) == 0);
-  return writeInst(VfpTag | sz | blob);
+  return writeInst(VfpTag | std::underlying_type_t<vfp_size>(sz) | blob);
 }
 
 /* static */
 void Assembler::WriteVFPInstStatic(vfp_size sz, uint32_t blob, uint32_t* dest) {
   MOZ_ASSERT((sz & blob) == 0);
   MOZ_ASSERT((VfpTag & blob) == 0);
-  WriteInstStatic(VfpTag | sz | blob, dest);
+  WriteInstStatic(VfpTag | std::underlying_type_t<vfp_size>(sz) | blob, dest);
 }
 
 // Unityped variants: all registers hold the same (ieee754 single/double)
@@ -2009,13 +2011,17 @@ BufferOffset Assembler::as_vxfer(Register vt1, Register vt2, VFPRegister vm,
   }
 
   if (vt2 == InvalidReg) {
-    return writeVFPInst(
-        sz, WordTransfer | f2c | c | RT(vt1) | maybeRN(vt2) | VN(vm) | idx);
+    return writeVFPInst(sz, WordTransfer |
+                                std::underlying_type_t<FloatToCore_>(f2c) |
+                                std::underlying_type_t<Condition>(c) | RT(vt1) |
+                                maybeRN(vt2) | VN(vm) | idx);
   }
 
   // We are doing a 64 bit transfer.
-  return writeVFPInst(
-      sz, DoubleTransfer | f2c | c | RT(vt1) | maybeRN(vt2) | VM(vm) | idx);
+  return writeVFPInst(sz, DoubleTransfer |
+                              std::underlying_type_t<FloatToCore_>(f2c) |
+                              std::underlying_type_t<Condition>(c) | RT(vt1) |
+                              maybeRN(vt2) | VM(vm) | idx);
 }
 
 enum vcvt_destFloatness { VcvtToInteger = 1 << 18, VcvtToFloat = 0 << 18 };
@@ -2630,13 +2636,6 @@ size_t Assembler::ToggledCallSize(uint8_t* code) {
   iter.next();
   MOZ_ASSERT(iter.cur()->is<InstNOP>() || iter.cur()->is<InstBLXReg>());
   return uintptr_t(iter.cur()) + 4 - uintptr_t(code);
-}
-
-uint8_t* Assembler::BailoutTableStart(uint8_t* code) {
-  // The iterator skips over any automatically-inserted instructions.
-  InstructionIterator iter(reinterpret_cast<Instruction*>(code));
-  MOZ_ASSERT(iter.cur()->is<InstBLImm>());
-  return reinterpret_cast<uint8_t*>(iter.cur());
 }
 
 uint32_t Assembler::NopFill = 0;

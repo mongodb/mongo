@@ -1,55 +1,37 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/Runtime.cpp"
+#include "vm/Watchtower.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Runtime.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Watchtower.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Runtime.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Watchtower.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/SavedStacks.cpp"
+#include "vm/WellKnownAtom.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/SavedStacks.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/WellKnownAtom.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/SavedStacks.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/WellKnownAtom.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Scope.cpp"
+#include "vm/WindowProxy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Scope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/WindowProxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Scope.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/WindowProxy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/SelfHosting.cpp"
+#include "vm/Xdr.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/SelfHosting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Xdr.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/SelfHosting.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "vm/Shape.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Shape.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/Shape.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "vm/ShapeZone.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/ShapeZone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/ShapeZone.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Xdr.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

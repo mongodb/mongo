@@ -397,9 +397,9 @@ static void shaCompress(volatile unsigned* aX, const uint32_t* aBuf) {
   SHA_MIX(15, 12, 7, 1);
   SHA_RND4(A, B, C, D, E, 15);
 
-  XH(0) += A;
-  XH(1) += B;
-  XH(2) += C;
-  XH(3) += D;
-  XH(4) += E;
+  XH(0) = XH(0) + A;
+  XH(1) = XH(1) + B;
+  XH(2) = XH(2) + C;
+  XH(3) = XH(3) + D;
+  XH(4) = XH(4) + E;
 }

@@ -15,7 +15,6 @@
 #include "jstypes.h"
 #include "NamespaceImports.h"
 
-#include "gc/Tracer.h"
 #include "js/GCVector.h"
 #include "js/PropertyDescriptor.h"
 #include "util/EnumFlags.h"
@@ -81,6 +80,10 @@ class PropertyFlags : public EnumFlags<PropertyFlag> {
   bool isDataDescriptor() const { return !isAccessorProperty(); }
 };
 
+inline constexpr PropertyFlags PropertyFlags::defaultDataPropFlags = {
+    PropertyFlag::Configurable, PropertyFlag::Enumerable,
+    PropertyFlag::Writable};
+
 // PropertyInfo contains information (PropertyFlags, slot number) for a
 // property stored in the Shape tree. Property lookups on NativeObjects return a
 // PropertyInfo.
@@ -103,13 +106,13 @@ class PropertyInfoBase {
 
   // Constructor is private, code should prefer Maybe<PropertyInfo>. This
   // constructor is only used for the propInfos array in property maps
-  // (mozilla::Array is a friend class for this reason).
+  // (CompactPropMap and LinkedPropMap are friend classes for this reason).
   PropertyInfoBase() = default;
 
   template <typename U>
   friend class PropertyInfoBase;
-  template <typename U, size_t Len>
-  friend class mozilla::Array;
+  friend class CompactPropMap;
+  friend class LinkedPropMap;
 
  public:
   static constexpr size_t MaxSlotNumber =

@@ -1,7 +1,6 @@
-static const ZydisShortString STR_REGISTER[] =
+static const ZydisShortString STR_REGISTERS[] =
 {
     ZYDIS_MAKE_SHORTSTRING("none"),
-
     // General purpose registers  8-bit
     ZYDIS_MAKE_SHORTSTRING("al"),
     ZYDIS_MAKE_SHORTSTRING("cl"),
@@ -194,6 +193,15 @@ static const ZydisShortString STR_REGISTER[] =
     ZYDIS_MAKE_SHORTSTRING("zmm29"),
     ZYDIS_MAKE_SHORTSTRING("zmm30"),
     ZYDIS_MAKE_SHORTSTRING("zmm31"),
+    // Matrix registers
+    ZYDIS_MAKE_SHORTSTRING("tmm0"),
+    ZYDIS_MAKE_SHORTSTRING("tmm1"),
+    ZYDIS_MAKE_SHORTSTRING("tmm2"),
+    ZYDIS_MAKE_SHORTSTRING("tmm3"),
+    ZYDIS_MAKE_SHORTSTRING("tmm4"),
+    ZYDIS_MAKE_SHORTSTRING("tmm5"),
+    ZYDIS_MAKE_SHORTSTRING("tmm6"),
+    ZYDIS_MAKE_SHORTSTRING("tmm7"),
     // Flags registers
     ZYDIS_MAKE_SHORTSTRING("flags"),
     ZYDIS_MAKE_SHORTSTRING("eflags"),
@@ -276,5 +284,6 @@ static const ZydisShortString STR_REGISTER[] =
     // Uncategorized
     ZYDIS_MAKE_SHORTSTRING("mxcsr"),
     ZYDIS_MAKE_SHORTSTRING("pkru"),
-    ZYDIS_MAKE_SHORTSTRING("xcr0")
+    ZYDIS_MAKE_SHORTSTRING("xcr0"),
+    ZYDIS_MAKE_SHORTSTRING("uif")
 };

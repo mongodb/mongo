@@ -10,7 +10,6 @@
 
 #include "builtin/Boolean-inl.h"
 
-#include "jsapi.h"
 #include "jstypes.h"
 
 #include "jit/InlinableNatives.h"
@@ -18,10 +17,8 @@
 #include "util/StringBuffer.h"
 #include "vm/BigIntType.h"
 #include "vm/GlobalObject.h"
-#include "vm/JSAtom.h"
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
-#include "vm/ProxyObject.h"
 #include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/BooleanObject-inl.h"
@@ -169,6 +166,12 @@ JS_PUBLIC_API bool js::ToBooleanSlow(HandleValue v) {
   if (v.isBigInt()) {
     return !v.toBigInt()->isZero();
   }
+#ifdef ENABLE_RECORD_TUPLE
+  // proposal-record-tuple Section 3.1.1
+  if (v.isExtendedPrimitive()) {
+    return true;
+  }
+#endif
 
   MOZ_ASSERT(v.isObject());
   return !EmulatesUndefined(&v.toObject());

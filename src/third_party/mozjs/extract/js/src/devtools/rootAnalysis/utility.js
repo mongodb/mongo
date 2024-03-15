@@ -8,19 +8,26 @@
 
 loadRelativeToScript('dumpCFG.js');
 
-// Limit inset bits - each call edge may carry a set of 'limit' bits, saying eg
+// Attribute bits - each call edge may carry a set of 'attrs' bits, saying eg
 // that the edge takes place within a scope where GC is suppressed, for
 // example.
-var LIMIT_NONE = 0;
-var LIMIT_CANNOT_GC = 1;
-var LIMIT_ALL = 1;
+var ATTR_GC_SUPPRESSED     = 1 << 0;
+var ATTR_CANSCRIPT_BOUNDED = 1 << 1; // Unimplemented
+var ATTR_DOM_ITERATING     = 1 << 2; // Unimplemented
+var ATTR_NONRELEASING      = 1 << 3; // ~RefPtr of value whose refcount will not go to zero
+var ATTR_REPLACED          = 1 << 4; // Ignore edge, it was replaced by zero or more better edges.
+var ATTR_SYNTHETIC         = 1 << 5; // Call was manufactured in some way.
+
+var ATTR_LAST              = 1 << 5;
+var ATTRS_NONE             = 0;
+var ATTRS_ALL              = (ATTR_LAST << 1) - 1; // All possible bits set
 
 // The traversal algorithms we run will recurse into children if you change any
-// limit bit to zero. Use all bits set to maximally limited, including
+// attrs bit to zero. Use all bits set to maximally attributed, including
 // additional bits that all just mean "unvisited", so that the first time we
-// see a node with this limit, we're guaranteed to turn at least one bit off
+// see a node with this attrs, we're guaranteed to turn at least one bit off
 // and thereby keep going.
-var LIMIT_UNVISITED = 0xffff;
+var ATTRS_UNVISITED = 0xffff;
 
 // gcc appends this to mangled function names for "not in charge"
 // constructors/destructors.
@@ -41,9 +48,9 @@ function assert(x, msg)
         return;
     debugger;
     if (msg)
-        throw "assertion failed: " + msg + "\n" + (Error().stack);
+        throw new Error("assertion failed: " + msg + "\n");
     else
-        throw "assertion failed: " + (Error().stack);
+        throw new Error("assertion failed");
 }
 
 function defined(x) {
@@ -71,64 +78,131 @@ function xprint(x, padding)
     }
 }
 
+// Command-line argument parser.
+//
+// `parameters` is a dict of parameters specs, each of which is a dict with keys:
+//
+//   - name: name of option, prefixed with "--" if it is named (otherwise, it
+//     is interpreted as a positional parameter.)
+//   - dest: key to store the result in, defaulting to the parameter name without
+//     any leading "--"" and with dashes replaced with underscores.
+//   - default: value of option if no value is given. Positional parameters with
+//     a default value are optional. If no default is given, the parameter's name
+//     is not included in the return value.
+//   - type: `bool` if it takes no argument, otherwise an argument is required.
+//     Named arguments default to 'bool', positional arguments to 'string'.
+//   - nargs: the only supported value is `+`, which means to grab all following
+//     arguments, up to the next named option, and store them as a list.
+//
+// The command line is parsed for `--foo=value` and `--bar` arguments.
+//
+// Return value is a dict of parameter values, keyed off of `dest` as determined
+// above. An extra option named "rest" will be set to the list of all remaining
+// arguments passed in.
+//
 function parse_options(parameters, inArgs = scriptArgs) {
     const options = {};
 
-    const optional = {};
+    const named = {};
     const positional = [];
     for (const param of parameters) {
         if (param.name.startsWith("-")) {
-            optional[param.name] = param;
-            param.dest = param.dest || param.name.substring(2).replace("-", "_");
+            named[param.name] = param;
+            if (!param.dest) {
+                if (!param.name.startsWith("--")) {
+                    throw new Error(`parameter '${param.name}' requires param.dest to be set`);
+                }
+                param.dest = param.name.substring(2).replace("-", "_");
+            }
         } else {
+            if (!('default' in param) && positional.length > 0 && ('default' in positional.at(-1))) {
+                throw new Error(`required parameter '${param.name}' follows optional parameter`);
+            }
+            param.positional = true;
             positional.push(param);
             param.dest = param.dest || param.name.replace("-", "_");
         }
 
-        param.type = param.type || 'bool';
-        if ('default' in param)
+        if (!param.type) {
+            if (param.nargs === "+") {
+                param.type = "list";
+            } else if (param.positional) {
+                param.type = "string";
+            } else {
+                param.type = "bool";
+            }
+        }
+
+        if ('default' in param) {
             options[param.dest] = param.default;
+        }
     }
 
     options.rest = [];
     const args = [...inArgs];
+    let grabbing_into = undefined;
     while (args.length > 0) {
+        let arg = args.shift();
         let param;
-        let pos = -1;
-        if (args[0] in optional)
-            param = optional[args[0]];
-        else {
-            pos = args[0].indexOf("=");
-            if (pos != -1) {
-                param = optional[args[0].substring(0, pos)];
-                pos++;
-            }
-        }
-
-        if (!param) {
-            if (positional.length > 0) {
-                param = positional.shift();
-                options[param.dest] = args.shift();
-            } else {
-                options.rest.push(args.shift());
-            }
-            continue;
-        }
-
-        if (param.type != 'bool') {
-            if (pos != -1) {
-                options[param.dest] = args.shift().substring(pos);
-            } else {
-                args.shift();
-                if (args.length == 0)
-                    throw(new Error(`--${param.name} requires an argument`));
-                options[param.dest] = args.shift();
+        if (arg.startsWith("-") && arg in named) {
+            param = named[arg];
+            if (param.type !== 'bool') {
+                if (args.length == 0) {
+                    throw(new Error(`${param.name} requires an argument`));
+                }
+                arg = args.shift();
             }
         } else {
-            if (pos != -1)
-                throw(new Error(`--${param.name} does not take an argument`));
-            options[param.dest] = true;
-            args.shift();
+            const pos = arg.indexOf("=");
+            if (pos != -1) {
+                const name = arg.substring(0, pos);
+                param = named[name];
+                if (!param) {
+                    throw(new Error(`Unknown option '${name}'`));
+                } else if (param.type === 'bool') {
+                    throw(new Error(`--${param.name} does not take an argument`));
+                }
+                arg = arg.substring(pos + 1);
+            }
+        }
+
+        // If this isn't a --named param, and we're not accumulating into a nargs="+" param, then
+        // use the next positional.
+        if (!param && !grabbing_into && positional.length > 0) {
+            param = positional.shift();
+        }
+
+        // If a parameter was identified, then any old accumulator is done and we might start a new one.
+        if (param) {
+            if (param.type === 'list') {
+                grabbing_into = options[param.dest] = options[param.dest] || [];
+            } else {
+                grabbing_into = undefined;
+            }
+        }
+
+        if (grabbing_into) {
+            grabbing_into.push(arg);
+        } else if (param) {
+            if (param.type === 'bool') {
+                options[param.dest] = true;
+            } else {
+                options[param.dest] = arg;
+            }
+        } else {
+            options.rest.push(arg);
+        }
+    }
+
+    for (const param of positional) {
+        if (!('default' in param)) {
+            throw(new Error(`'${param.name}' option is required`));
+        }
+    }
+
+    for (const param of parameters) {
+        if (param.nargs === '+' && options[param.dest].length == 0) {
+            throw(new Error(`at least one value required for option '${param.name}'`));
         }
     }
 
@@ -183,13 +257,8 @@ function collectBodyEdges(body)
 
 function getPredecessors(body)
 {
-    try {
-        if (!('predecessors' in body))
-            collectBodyEdges(body);
-    } catch (e) {
-        debugger;
-        printErr("body is " + body);
-    }
+    if (!('predecessors' in body))
+        collectBodyEdges(body);
     return body.predecessors;
 }
 
@@ -244,15 +313,27 @@ function xdbLibrary()
     return api;
 }
 
-function cLibrary()
-{
-    var libPossibilities = ['libc.so.6', 'libc.so', 'libc.dylib'];
-    var lib;
-    for (const name of libPossibilities) {
+function openLibrary(names) {
+    for (const name of names) {
         try {
-            lib = ctypes.open("libc.so.6");
+            return ctypes.open(name);
         } catch(e) {
         }
+    }
+    return undefined;
+}
+
+function cLibrary()
+{
+    const lib = openLibrary(['libc.so.6', 'libc.so', 'libc.dylib']);
+    if (!lib) {
+        throw new Error("Unable to open libc");
+    }
+
+    if (getBuildConfiguration()["moz-memory"]) {
+        throw new Error("cannot use libc functions with --enable-jemalloc, since they will be routed " +
+                        "through jemalloc, but calling libc.free() directly will bypass it and the " +
+                        "malloc/free will be mismatched");
     }
 
     return {
@@ -270,7 +351,7 @@ function* readFileLines_gen(filename)
     var bufsize = ctypes.size_t(0);
     var fp = libc.fopen(filename, "r");
     if (fp.isNull())
-        throw "Unable to open '" + filename + "'"
+        throw new Error("Unable to open '" + filename + "'");
 
     while (libc.getline(linebuf.address(), bufsize.address(), fp) > 0)
         yield linebuf.readString();
@@ -286,7 +367,56 @@ function addToKeyedList(collection, key, entry)
     return collection[key];
 }
 
+function addToMappedList(map, key, entry)
+{
+    if (!map.has(key))
+        map.set(key, []);
+    map.get(key).push(entry);
+    return map.get(key);
+}
+
 function loadTypeInfo(filename)
 {
     return JSON.parse(os.file.readFile(filename));
+}
+
+// Given the range `first` .. `last`, break it down into `count` batches and
+// return the start of the (1-based) `num` batch.
+function batchStart(num, count, first, last) {
+  const N = (last - first) + 1;
+  return Math.floor((num - 1) / count * N) + first;
+}
+
+// As above, but return the last value in the (1-based) `num` batch.
+function batchLast(num, count, first, last) {
+  const N = (last - first) + 1;
+  return Math.floor(num / count * N) + first - 1;
+}
+
+// Debugging tool. See usage below.
+function PropertyTracer(traced_prop, check) {
+    return {
+        matches(prop, value) {
+            if (prop != traced_prop)
+                return false;
+            if ('value' in check)
+                return value == check.value;
+            return true;
+        },
+
+        // Also called when defining a property.
+        set(obj, prop, value) {
+            if (this.matches(prop, value))
+                debugger;
+            return Reflect.set(...arguments);
+        },
+    };
+}
+
+// Usage: var myobj = traced({}, 'name', {value: 'Bob'})
+//
+// This will execute a `debugger;` statement when myobj['name'] is defined or
+// set to 'Bob'.
+function traced(obj, traced_prop, check) {
+  return new Proxy(obj, PropertyTracer(traced_prop, check));
 }

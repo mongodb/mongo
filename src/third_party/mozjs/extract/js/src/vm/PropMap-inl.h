@@ -9,15 +9,11 @@
 
 #include "vm/PropMap.h"
 
-#include "gc/Allocator.h"
-#include "vm/Interpreter.h"
-#include "vm/JSObject.h"
-#include "vm/TypedArrayObject.h"
+#include "gc/Cell.h"
+#include "gc/Zone.h"
+#include "vm/JSContext.h"
 
-#include "gc/FreeOp-inl.h"
-#include "gc/Marking-inl.h"
-#include "vm/JSAtom-inl.h"
-#include "vm/JSContext-inl.h"
+#include "gc/GCContext-inl.h"
 
 namespace js {
 
@@ -215,7 +211,7 @@ MOZ_ALWAYS_INLINE bool SharedPropMap::shouldConvertToDictionaryForAdd() const {
   return false;
 }
 
-inline void SharedPropMap::sweep(JSFreeOp* fop) {
+inline void SharedPropMap::sweep(JS::GCContext* gcx) {
   // We detach the child from the parent if the parent is reachable.
   //
   // This test depends on PropMap arenas not being freed until after we finish
@@ -228,25 +224,25 @@ inline void SharedPropMap::sweep(JSFreeOp* fop) {
   MOZ_ASSERT_IF(hasPrevious(), asLinked()->previous()->zone() == zone());
 
   SharedPropMapAndIndex parent = treeDataRef().parent;
-  if (!parent.isNone() && parent.map()->isMarkedAny()) {
-    parent.map()->removeChild(fop, this);
+  if (!parent.isNone() && TenuredThingIsMarkedAny(parent.map())) {
+    parent.map()->removeChild(gcx, this);
   }
 }
 
-inline void SharedPropMap::finalize(JSFreeOp* fop) {
+inline void SharedPropMap::finalize(JS::GCContext* gcx) {
   if (canHaveTable() && asLinked()->hasTable()) {
-    asLinked()->purgeTable(fop);
+    asLinked()->purgeTable(gcx);
   }
   if (hasChildrenSet()) {
     SharedChildrenPtr& childrenRef = treeDataRef().children;
-    fop->delete_(this, childrenRef.toChildrenSet(), MemoryUse::PropMapChildren);
+    gcx->delete_(this, childrenRef.toChildrenSet(), MemoryUse::PropMapChildren);
     childrenRef.setNone();
   }
 }
 
-inline void DictionaryPropMap::finalize(JSFreeOp* fop) {
+inline void DictionaryPropMap::finalize(JS::GCContext* gcx) {
   if (asLinked()->hasTable()) {
-    asLinked()->purgeTable(fop);
+    asLinked()->purgeTable(gcx);
   }
 }
 

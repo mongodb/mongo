@@ -9,12 +9,10 @@
 
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/PropertySpec.h"
-#include "util/StringBuffer.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/SymbolType.h"
 
 #include "vm/JSObject-inl.h"
-#include "vm/NativeObject-inl.h"
 
 using namespace js;
 
@@ -52,10 +50,11 @@ const JSFunctionSpec SymbolObject::staticMethods[] = {
 
 static bool SymbolClassFinish(JSContext* cx, HandleObject ctor,
                               HandleObject proto) {
-  HandleNativeObject nativeCtor = ctor.as<NativeObject>();
+  Handle<NativeObject*> nativeCtor = ctor.as<NativeObject>();
 
   // Define the well-known symbol properties, such as Symbol.iterator.
-  ImmutablePropertyNamePtr* names = cx->names().wellKnownSymbolNames();
+  ImmutableTenuredPtr<PropertyName*>* names =
+      cx->names().wellKnownSymbolNames();
   RootedValue value(cx);
   unsigned attrs = JSPROP_READONLY | JSPROP_PERMANENT;
   WellKnownSymbols* wks = cx->runtime()->wellKnownSymbols;

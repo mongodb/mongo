@@ -26,7 +26,7 @@
 
 /**
  * @file
- * @brief   Defines some generic object-related datatypes.
+ * Defines some generic object-related datatypes.
  */
 
 #ifndef ZYCORE_OBJECT_H
@@ -44,21 +44,21 @@ extern "C" {
 /* ============================================================================================== */
 
 /**
- * @brief   Defines the `ZyanMemberProcedure` function prototype.
+ * Defines the `ZyanMemberProcedure` function prototype.
  *
  * @param   object  A pointer to the object.
  */
 typedef void (*ZyanMemberProcedure)(void* object);
 
 /**
- * @brief   Defines the `ZyanConstMemberProcedure` function prototype.
+ * Defines the `ZyanConstMemberProcedure` function prototype.
  *
  * @param   object  A pointer to the object.
  */
 typedef void (*ZyanConstMemberProcedure)(const void* object);
 
 /**
- * @brief   Defines the `ZyanMemberFunction` function prototype.
+ * Defines the `ZyanMemberFunction` function prototype.
  *
  * @param   object  A pointer to the object.
  *
@@ -67,7 +67,7 @@ typedef void (*ZyanConstMemberProcedure)(const void* object);
 typedef ZyanStatus (*ZyanMemberFunction)(void* object);
 
 /**
- * @brief   Defines the `ZyanConstMemberFunction` function prototype.
+ * Defines the `ZyanConstMemberFunction` function prototype.
  *
  * @param   object  A pointer to the object.
  *

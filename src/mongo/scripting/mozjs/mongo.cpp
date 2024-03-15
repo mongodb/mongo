@@ -102,8 +102,8 @@ const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
 namespace {
 
 const std::shared_ptr<DBClientBase>& getConnectionRef(JS::CallArgs& args) {
-    auto ret =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto ret = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        args.thisv().toObjectOrNull(), MongoBase::DBClientSlot);
     uassert(
         ErrorCodes::BadValue, "Trying to get connection for closed Mongo object", *ret != nullptr);
     return *ret;
@@ -126,11 +126,14 @@ void setCursor(MozJSImplScope* scope,
                JS::HandleObject target,
                std::unique_ptr<DBClientCursor> cursor,
                JS::CallArgs& args) {
-    auto client =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto client = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        args.thisv().toObjectOrNull(), MongoBase::DBClientSlot);
 
     // Copy the client shared pointer to up the refcount
-    JS::SetPrivate(target, scope->trackedNew<CursorInfo::CursorHolder>(std::move(cursor), *client));
+    JS::SetReservedSlot(
+        target,
+        CursorInfo::CursorHolderSlot,
+        JS::PrivateValue(scope->trackedNew<CursorInfo::CursorHolder>(std::move(cursor), *client)));
 }
 
 void setCursorHandle(MozJSImplScope* scope,
@@ -138,13 +141,14 @@ void setCursorHandle(MozJSImplScope* scope,
                      NamespaceString ns,
                      long long cursorId,
                      JS::CallArgs& args) {
-    auto client =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto client = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        args.thisv().toObjectOrNull(), MongoBase::DBClientSlot);
 
     // Copy the client shared pointer to up the refcount.
-    JS::SetPrivate(
-        target,
-        scope->trackedNew<CursorHandleInfo::CursorTracker>(std::move(ns), cursorId, *client));
+    JS::SetReservedSlot(target,
+                        CursorHandleInfo::CursorTrackerSlot,
+                        JS::PrivateValue(scope->trackedNew<CursorHandleInfo::CursorTracker>(
+                            std::move(ns), cursorId, *client)));
 }
 
 void setHiddenMongo(JSContext* cx, JS::HandleValue value, JS::CallArgs& args) {
@@ -174,8 +178,10 @@ void setHiddenMongo(JSContext* cx,
         scope->getProto<MongoExternalInfo>().newObject(&newMongo);
 
         auto host = resPtr->getServerAddress();
-        JS::SetPrivate(newMongo,
-                       scope->trackedNew<std::shared_ptr<DBClientBase>>(std::move(resPtr)));
+        JS::SetReservedSlot(
+            newMongo,
+            MongoBase::DBClientSlot,
+            JS::PrivateValue(scope->trackedNew<std::shared_ptr<DBClientBase>>(std::move(resPtr))));
 
         ObjectWrapper from(cx, args.thisv());
         ObjectWrapper to(cx, newMongo);
@@ -206,16 +212,18 @@ EncryptionCallbacks* getEncryptionCallbacks(DBClientBase* conn) {
 
 }  // namespace
 
-void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(obj));
+void MongoBase::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto conn = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        obj, MongoBase::DBClientSlot);
 
     if (conn) {
-        getScope(fop)->trackedDelete(conn);
+        getScope(gcCtx)->trackedDelete(conn);
     }
 }
 
 void MongoBase::trace(JSTracer* trc, JSObject* obj) {
-    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(obj));
+    auto conn = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        obj, MongoBase::DBClientSlot);
     if (!conn) {
         return;
     }
@@ -229,7 +237,8 @@ void MongoBase::Functions::close::call(JSContext* cx, JS::CallArgs args) {
     getConnection(args);
 
     auto thisv = args.thisv().toObjectOrNull();
-    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(thisv));
+    auto conn = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        thisv, MongoBase::DBClientSlot);
 
     conn->reset();
 
@@ -577,7 +586,10 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     conn = runEncryptedDBClientCallback(std::move(conn), args.get(1), thisv, cx);
 
-    JS::SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
+    JS::SetReservedSlot(
+        thisv,
+        MongoBase::DBClientSlot,
+        JS::PrivateValue(scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release())));
 
     o.setBoolean(InternedString::slaveOk, false);
     o.setString(InternedString::host, cs.connectionString().toString());
@@ -586,8 +598,8 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     // Adds a property to the Mongo connection object.
     boost::optional<bool> retryWrites = cs.getRetryWrites();
-    // If retryWrites is not explicitly set in uri, sessions created on this connection default to
-    // the global retryWrites value. This is checked in sessions.js by using the injected
+    // If retryWrites is not explicitly set in uri, sessions created on this connection default
+    // to the global retryWrites value. This is checked in sessions.js by using the injected
     // _shouldRetryWrites() function, which returns true if the --retryWrites flag was passed.
     if (retryWrites) {
         o.setBoolean(InternedString::_retryWrites, retryWrites.value());
@@ -632,8 +644,8 @@ void MongoBase::Functions::getApiParameters::call(JSContext* cx, JS::CallArgs ar
 }
 
 void MongoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args) {
-    auto client =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto client = JS::GetMaybePtrFromReservedSlot<std::shared_ptr<DBClientBase>>(
+        args.thisv().toObjectOrNull(), MongoBase::DBClientSlot);
 
     LogicalSessionIdToClient id;
     id.setId(UUID::gen());

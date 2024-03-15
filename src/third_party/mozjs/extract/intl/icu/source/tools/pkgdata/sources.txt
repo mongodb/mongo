@@ -1,2 +1,0 @@
-pkgdata.cpp
-pkgtypes.c

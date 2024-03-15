@@ -8,6 +8,7 @@
 #define jit_WarpBuilderShared_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/Maybe.h"
 
 #include "jit/MIRGraph.h"
 #include "js/Value.h"
@@ -54,6 +55,7 @@ class MOZ_STACK_CLASS CallInfo {
 
  private:
   ArgFormat argFormat_ = ArgFormat::Standard;
+  mozilla::Maybe<ResumeMode> inliningMode_;
 
  public:
   CallInfo(TempAllocator& alloc, bool constructing, bool ignoresReturnValue,
@@ -136,6 +138,38 @@ class MOZ_STACK_CLASS CallInfo {
     MOZ_ALWAYS_TRUE(args_.reserve(numActuals));
   }
 
+  [[nodiscard]] bool initForApplyArray(MDefinition* callee,
+                                       MDefinition* thisVal,
+                                       uint32_t numActuals) {
+    MOZ_ASSERT(args_.empty());
+    MOZ_ASSERT(!constructing_);
+
+    setCallee(callee);
+    setThis(thisVal);
+
+    return args_.reserve(numActuals);
+  }
+
+  [[nodiscard]] bool initForConstructArray(MDefinition* callee,
+                                           MDefinition* thisVal,
+                                           MDefinition* newTarget,
+                                           uint32_t numActuals) {
+    MOZ_ASSERT(args_.empty());
+    MOZ_ASSERT(constructing_);
+
+    setCallee(callee);
+    setThis(thisVal);
+    setNewTarget(newTarget);
+
+    return args_.reserve(numActuals);
+  }
+
+  void initForCloseIter(MDefinition* iter, MDefinition* callee) {
+    MOZ_ASSERT(args_.empty());
+    setCallee(callee);
+    setThis(iter);
+  }
+
   void popCallStack(MBasicBlock* current) { current->popn(numFormals()); }
 
   [[nodiscard]] bool pushCallStack(MBasicBlock* current) {
@@ -208,6 +242,17 @@ class MOZ_STACK_CLASS CallInfo {
   bool isInlined() const { return inlined_; }
   void markAsInlined() { inlined_ = true; }
 
+  ResumeMode inliningResumeMode() const {
+    MOZ_ASSERT(isInlined());
+    return *inliningMode_;
+  }
+
+  void setInliningResumeMode(ResumeMode mode) {
+    MOZ_ASSERT(isInlined());
+    MOZ_ASSERT(inliningMode_.isNothing());
+    inliningMode_.emplace(mode);
+  }
+
   MDefinition* callee() const {
     MOZ_ASSERT(callee_);
     return callee_;
@@ -227,6 +272,22 @@ class MOZ_STACK_CLASS CallInfo {
     }
   }
 
+  // Prepend `numArgs` arguments. Calls `f(i)` for each new argument.
+  template <typename Fun>
+  [[nodiscard]] bool prependArgs(size_t numArgs, const Fun& f) {
+    size_t numArgsBefore = args_.length();
+    if (!args_.growBy(numArgs)) {
+      return false;
+    }
+    for (size_t i = numArgsBefore; i > 0; i--) {
+      args_[numArgs + i - 1] = args_[i - 1];
+    }
+    for (size_t i = 0; i < numArgs; i++) {
+      args_[i] = f(i);
+    }
+    return true;
+  }
+
   void setImplicitlyUsedUnchecked() {
     auto setFlag = [](MDefinition* def) { def->setImplicitlyUsedUnchecked(); };
     forEachCallOperand(setFlag);
@@ -238,9 +299,8 @@ class MOZ_STACK_CLASS CallInfo {
   MDefinition* arrayArg() const {
     MOZ_ASSERT(argFormat_ == ArgFormat::Array);
     // The array argument for a spread call or FunApply is always the last
-    // argument, unless the spread call is constructing, in which case the
-    // last argument is NewTarget, and the array argument is second-last.
-    return getArg(argc() - 1 - constructing_);
+    // argument.
+    return getArg(argc() - 1);
   }
 };
 
@@ -251,15 +311,15 @@ MCall* MakeCall(TempAllocator& alloc, Undef addUndefined, CallInfo& callInfo,
   MOZ_ASSERT_IF(needsThisCheck, !target);
   MOZ_ASSERT_IF(isDOMCall, target->jitInfo()->type() == JSJitInfo::Method);
 
-  DOMObjectKind objKind = DOMObjectKind::Unknown;
+  mozilla::Maybe<DOMObjectKind> objKind;
   if (isDOMCall) {
-    const JSClass* clasp = callInfo.thisArg()->toGuardToClass()->getClass();
-    MOZ_ASSERT(clasp->isDOMClass());
-    if (clasp->isNativeObject()) {
-      objKind = DOMObjectKind::Native;
+    const Shape* shape = callInfo.thisArg()->toGuardShape()->shape();
+    MOZ_ASSERT(shape->getObjectClass()->isDOMClass());
+    if (shape->isNative()) {
+      objKind.emplace(DOMObjectKind::Native);
     } else {
-      MOZ_ASSERT(clasp->isProxyObject());
-      objKind = DOMObjectKind::Proxy;
+      MOZ_ASSERT(shape->isProxy());
+      objKind.emplace(DOMObjectKind::Proxy);
     }
   }
 
@@ -348,7 +408,8 @@ class WarpBuilderShared {
 
   MCall* makeCall(CallInfo& callInfo, bool needsThisCheck,
                   WrappedFunction* target = nullptr, bool isDOMCall = false);
-  MInstruction* makeSpreadCall(CallInfo& callInfo, bool isSameRealm = false,
+  MInstruction* makeSpreadCall(CallInfo& callInfo, bool needsThisCheck,
+                               bool isSameRealm = false,
                                WrappedFunction* target = nullptr);
 
  public:

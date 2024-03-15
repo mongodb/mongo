@@ -11,15 +11,12 @@
 #include "mozilla/Maybe.h"       // Maybe
 
 #include "frontend/BytecodeControlStructures.h"  // LabelControl
-#include "frontend/BytecodeOffset.h"             // BytecodeOffset
-#include "frontend/JumpList.h"                   // JumpList
-#include "frontend/ParserAtom.h"                 // TaggedParserAtomIndex
-#include "js/TypeDecls.h"                        // JSAtom
 
 namespace js {
 namespace frontend {
 
 struct BytecodeEmitter;
+class TaggedParserAtomIndex;
 
 // Class for emitting labeled statement.
 //

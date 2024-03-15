@@ -14,7 +14,6 @@
 using namespace js;
 using namespace js::frontend;
 
-using mozilla::Maybe;
 using mozilla::Nothing;
 
 DefaultEmitter::DefaultEmitter(BytecodeEmitter* bce) : bce_(bce) {}

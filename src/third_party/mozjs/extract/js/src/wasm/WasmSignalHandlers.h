@@ -31,12 +31,12 @@ using RegisterState = JS::ProfilingFrameIterator::RegisterState;
 // want to do eagerly to ensure a more-deterministic global process state. This
 // is especially relevant for signal handlers since handler ordering depends on
 // installation order: the wasm signal handler must run *before* the other crash
-// handlers (ds/MemoryProtectionExceptionHandler.h and breakpad) and since POSIX
-// signal handlers work LIFO, this function needs to be called at the end of the
-// startup process, after the other two handlers have been installed. Currently,
-// this is achieved by having JSRuntime() call this function. There can be
-// multiple JSRuntimes per process so this function can thus be called multiple
-// times, having no effect after the first call.
+// handlers (breakpad) and since POSIX signal handlers work LIFO, this function
+// needs to be called at the end of the startup process, after the other two
+// handlers have been installed. Currently, this is achieved by having
+// JSRuntime() call this function. There can be multiple JSRuntimes per process
+// so this function can thus be called multiple times, having no effect after
+// the first call.
 void EnsureEagerProcessSignalHandlers();
 
 // Assuming EnsureEagerProcessSignalHandlers() has already been called,

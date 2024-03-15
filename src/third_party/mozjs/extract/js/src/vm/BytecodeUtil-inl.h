@@ -19,7 +19,8 @@ static inline unsigned GetDefCount(jsbytecode* pc) {
    * Add an extra pushed value for Or/And opcodes, so that they are included
    * in the pushed array of stack values for type inference.
    */
-  switch (JSOp(*pc)) {
+  JSOp op = JSOp(*pc);
+  switch (op) {
     case JSOp::Or:
     case JSOp::And:
     case JSOp::Coalesce:
@@ -34,16 +35,17 @@ static inline unsigned GetDefCount(jsbytecode* pc) {
        */
       return pc[1] + 1;
     default:
-      return StackDefs(pc);
+      return StackDefs(op);
   }
 }
 
 static inline unsigned GetUseCount(jsbytecode* pc) {
-  if (JSOp(*pc) == JSOp::Pick || JSOp(*pc) == JSOp::Unpick) {
+  JSOp op = JSOp(*pc);
+  if (op == JSOp::Pick || op == JSOp::Unpick) {
     return pc[1] + 1;
   }
 
-  return StackUses(pc);
+  return StackUses(op, pc);
 }
 
 static inline JSOp ReverseCompareOp(JSOp op) {

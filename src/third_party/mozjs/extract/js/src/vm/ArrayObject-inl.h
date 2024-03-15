@@ -11,73 +11,75 @@
 
 #include "gc/Allocator.h"
 #include "gc/GCProbes.h"
-#include "vm/StringType.h"
 
 #include "vm/JSObject-inl.h"
-#include "vm/ObjectOperations-inl.h"  // js::GetElement
+#include "vm/NativeObject-inl.h"
 
 namespace js {
 
-/* static */ inline ArrayObject* ArrayObject::createArrayInternal(
-    JSContext* cx, gc::AllocKind kind, gc::InitialHeap heap, HandleShape shape,
-    AutoSetNewObjectMetadata&, gc::AllocSite* site) {
-  const JSClass* clasp = shape->getObjectClass();
+/* static */ MOZ_ALWAYS_INLINE ArrayObject* ArrayObject::create(
+    JSContext* cx, gc::AllocKind kind, gc::Heap heap,
+    Handle<SharedShape*> shape, uint32_t length, uint32_t slotSpan,
+    AutoSetNewObjectMetadata& metadata, gc::AllocSite* site) {
+  debugCheckNewObject(shape, kind, heap);
+
+  const JSClass* clasp = &ArrayObject::class_;
   MOZ_ASSERT(shape);
-  MOZ_ASSERT(clasp == &ArrayObject::class_);
+  MOZ_ASSERT(shape->getObjectClass() == clasp);
   MOZ_ASSERT(clasp->isNativeObject());
-  MOZ_ASSERT_IF(clasp->hasFinalize(), heap == gc::TenuredHeap);
+  MOZ_ASSERT(!clasp->hasFinalize());
+
+  // Note: the slot span is passed as argument to allow more constant folding
+  // below for the common case of slotSpan == 0.
+  MOZ_ASSERT(shape->slotSpan() == slotSpan);
 
   // Arrays can use their fixed slots to store elements, so can't have shapes
   // which allow named properties to be stored in the fixed slots.
   MOZ_ASSERT(shape->numFixedSlots() == 0);
 
-  size_t nDynamicSlots = calculateDynamicSlots(0, shape->slotSpan(), clasp);
-  JSObject* obj =
-      js::AllocateObject(cx, kind, nDynamicSlots, heap, clasp, site);
-  if (!obj) {
+  size_t nDynamicSlots = calculateDynamicSlots(0, slotSpan, clasp);
+  ArrayObject* aobj = cx->newCell<ArrayObject>(kind, heap, clasp, site);
+  if (!aobj) {
     return nullptr;
   }
 
-  ArrayObject* aobj = static_cast<ArrayObject*>(obj);
   aobj->initShape(shape);
-  // NOTE: Dynamic slots are created internally by Allocate<JSObject>.
+  aobj->initFixedElements(kind, length);
+
   if (!nDynamicSlots) {
     aobj->initEmptyDynamicSlots();
+  } else if (!aobj->allocateInitialSlots(cx, nDynamicSlots)) {
+    return nullptr;
   }
 
   MOZ_ASSERT(clasp->shouldDelayMetadataBuilder());
-  cx->realm()->setObjectPendingMetadata(cx, aobj);
+  cx->realm()->setObjectPendingMetadata(aobj);
 
+  if (slotSpan > 0) {
+    aobj->initDynamicSlots(slotSpan);
+  }
+
+  gc::gcprobes::CreateObject(aobj);
   return aobj;
 }
 
-/* static */ inline ArrayObject* ArrayObject::finishCreateArray(
-    ArrayObject* obj, HandleShape shape, AutoSetNewObjectMetadata& metadata) {
-  size_t span = shape->slotSpan();
-  if (span) {
-    obj->initializeSlotRange(0, span);
+inline DenseElementResult ArrayObject::addDenseElementNoLengthChange(
+    JSContext* cx, uint32_t index, const Value& val) {
+  MOZ_ASSERT(isExtensible());
+
+  // Only support the `index < length` case so that we don't have to increase
+  // the array's .length value below.
+  if (index >= length() || containsDenseElement(index) || isIndexed()) {
+    return DenseElementResult::Incomplete;
   }
 
-  gc::gcprobes::CreateObject(obj);
-
-  return obj;
-}
-
-/* static */ inline ArrayObject* ArrayObject::createArray(
-    JSContext* cx, gc::AllocKind kind, gc::InitialHeap heap, HandleShape shape,
-    uint32_t length, AutoSetNewObjectMetadata& metadata, gc::AllocSite* site) {
-  ArrayObject* obj = createArrayInternal(cx, kind, heap, shape, metadata, site);
-  if (!obj) {
-    return nullptr;
+  DenseElementResult res = ensureDenseElements(cx, index, 1);
+  if (MOZ_UNLIKELY(res != DenseElementResult::Success)) {
+    return res;
   }
 
-  uint32_t capacity =
-      gc::GetGCKindSlots(kind) - ObjectElements::VALUES_PER_HEADER;
-
-  obj->setFixedElements();
-  new (obj->getElementsHeader()) ObjectElements(capacity, length);
-
-  return finishCreateArray(obj, shape, metadata);
+  initDenseElement(index, val);
+  return DenseElementResult::Success;
 }
 
 }  // namespace js

@@ -10,8 +10,7 @@
 #include "builtin/WeakMapObject.h"
 
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "vm/ProxyObject.h"
-
+#include "js/Wrapper.h"
 #include "gc/WeakMap-inl.h"
 #include "vm/JSObject-inl.h"
 
@@ -37,7 +36,8 @@ static MOZ_ALWAYS_INLINE bool WeakCollectionPutEntryInternal(
       return false;
     }
     map = newMap.release();
-    InitObjectPrivate(obj, map, MemoryUse::WeakMapObject);
+    InitReservedSlot(obj, WeakCollectionObject::DataSlot, map,
+                     MemoryUse::WeakMapObject);
   }
 
   // Preserve wrapped native keys to prevent wrapper optimization.

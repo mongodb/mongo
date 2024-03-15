@@ -13,7 +13,6 @@
 #include "jit/MIRGraph.h"
 #include "js/Conversions.h"
 #include "vm/Shape.h"
-#include "vm/TraceLogging.h"
 
 #include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
@@ -211,7 +210,7 @@ void CodeGeneratorMIPS::emitBigIntDiv(LBigIntDiv* ins, Register dividend,
 #endif
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -228,7 +227,7 @@ void CodeGeneratorMIPS::emitBigIntMod(LBigIntMod* ins, Register dividend,
 #endif
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 

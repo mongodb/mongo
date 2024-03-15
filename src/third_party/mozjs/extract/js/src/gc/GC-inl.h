@@ -13,6 +13,7 @@
 #include "mozilla/Maybe.h"
 
 #include "gc/IteratorUtils.h"
+#include "gc/Marking.h"
 #include "gc/Zone.h"
 #include "vm/Runtime.h"
 
@@ -37,15 +38,17 @@ class ArenaListIter {
     MOZ_ASSERT(!done());
     arena = arena->next;
   }
+
+  operator Arena*() const { return get(); }
+  Arena* operator->() const { return get(); }
 };
 
-class ArenaIter : public ChainedIterator<ArenaListIter, 4> {
+class ArenaIter : public ChainedIterator<ArenaListIter, 3> {
  public:
   ArenaIter(JS::Zone* zone, AllocKind kind)
       : ChainedIterator(zone->arenas.getFirstArena(kind),
-                        zone->arenas.getFirstArenaToSweep(kind),
-                        zone->arenas.getFirstSweptArena(kind),
-                        zone->arenas.getFirstNewArenaInMarkPhase(kind)) {}
+                        zone->arenas.getFirstCollectingArena(kind),
+                        zone->arenas.getFirstSweptArena(kind)) {}
 };
 
 class ArenaCellIter {
@@ -232,17 +235,17 @@ template <typename GCType>
 class ZoneAllCellIter : public ZoneAllCellIter<TenuredCell> {
  public:
   // Non-nursery allocated (equivalent to having an entry in
-  // MapTypeToFinalizeKind). The template declaration here is to discard this
-  // constructor overload if MapTypeToFinalizeKind<GCType>::kind does not
-  // exist. Note that there will be no remaining overloads that will work,
-  // which makes sense given that you haven't specified which of the
-  // AllocKinds to use for GCType.
+  // MapTypeToAllocKind). The template declaration here is to discard this
+  // constructor overload if MapTypeToAllocKind<GCType>::kind does not
+  // exist. Note that there will be no remaining overloads that will work, which
+  // makes sense given that you haven't specified which of the AllocKinds to use
+  // for GCType.
   //
-  // If we later add a nursery allocable GCType with a single AllocKind, we
-  // will want to add an overload of this constructor that does the right
-  // thing (ie, it empties the nursery before iterating.)
+  // If we later add a nursery allocable GCType with a single AllocKind, we will
+  // want to add an overload of this constructor that does the right thing (ie,
+  // it empties the nursery before iterating.)
   explicit ZoneAllCellIter(JS::Zone* zone) : ZoneAllCellIter<TenuredCell>() {
-    init(zone, MapTypeToFinalizeKind<GCType>::kind);
+    init(zone, MapTypeToAllocKind<GCType>::kind);
   }
 
   // Non-nursery allocated, nursery is known to be empty: same behavior as
@@ -327,7 +330,7 @@ class ZoneCellIter : protected ZoneAllCellIter<T> {
   void skipDying() {
     while (!ZoneAllCellIter<T>::done()) {
       T* current = ZoneAllCellIter<T>::get();
-      if (!IsAboutToBeFinalizedUnbarriered(&current)) {
+      if (!IsAboutToBeFinalizedUnbarriered(current)) {
         return;
       }
       ZoneAllCellIter<T>::next();

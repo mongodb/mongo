@@ -22,45 +22,6 @@ class MDefinition;
 class MInstruction;
 class LOsiPoint;
 
-#ifdef ENABLE_WASM_SIMD
-
-// Representation of the result of the shuffle analysis.  See
-// Lowering-shared.cpp for more.
-
-struct Shuffle {
-  enum class Operand {
-    // Both inputs, in the original lhs-rhs order
-    BOTH,
-    // Both inputs, but in rhs-lhs order
-    BOTH_SWAPPED,
-    // Only the lhs input
-    LEFT,
-    // Only the rhs input
-    RIGHT,
-  };
-
-  Operand opd;
-  SimdConstant control;
-  mozilla::Maybe<LWasmPermuteSimd128::Op> permuteOp;  // Single operands
-  mozilla::Maybe<LWasmShuffleSimd128::Op> shuffleOp;  // Double operands
-
-  static Shuffle permute(Operand opd, SimdConstant control,
-                         LWasmPermuteSimd128::Op op) {
-    MOZ_ASSERT(opd == Operand::LEFT || opd == Operand::RIGHT);
-    Shuffle s{opd, control, mozilla::Some(op), mozilla::Nothing()};
-    return s;
-  }
-
-  static Shuffle shuffle(Operand opd, SimdConstant control,
-                         LWasmShuffleSimd128::Op op) {
-    MOZ_ASSERT(opd == Operand::BOTH || opd == Operand::BOTH_SWAPPED);
-    Shuffle s{opd, control, mozilla::Nothing(), mozilla::Some(op)};
-    return s;
-  }
-};
-
-#endif
-
 class LIRGeneratorShared {
  protected:
   MIRGenerator* gen;
@@ -110,13 +71,6 @@ class LIRGeneratorShared {
                                  MInstruction* ins);
   static bool ShouldReorderCommutative(MDefinition* lhs, MDefinition* rhs,
                                        MInstruction* ins);
-
-#ifdef ENABLE_WASM_SIMD
-  static Shuffle AnalyzeShuffle(MWasmShuffleSimd128* ins);
-#  ifdef DEBUG
-  static void ReportShuffleSpecialization(const Shuffle& s);
-#  endif
-#endif
 
   // A backend can decide that an instruction should be emitted at its uses,
   // rather than at its definition. To communicate this, set the
@@ -319,15 +273,9 @@ class LIRGeneratorShared {
   inline LInt64Allocation useInt64FixedAtStart(MDefinition* mir,
                                                Register64 regs);
 
-  LInt64Allocation useInt64RegisterAtStart(MDefinition* mir) {
-    return useInt64Register(mir, /* useAtStart = */ true);
-  }
-  LInt64Allocation useInt64RegisterOrConstantAtStart(MDefinition* mir) {
-    return useInt64RegisterOrConstant(mir, /* useAtStart = */ true);
-  }
-  LInt64Allocation useInt64OrConstantAtStart(MDefinition* mir) {
-    return useInt64OrConstant(mir, /* useAtStart = */ true);
-  }
+  inline LInt64Allocation useInt64RegisterAtStart(MDefinition* mir);
+  inline LInt64Allocation useInt64RegisterOrConstantAtStart(MDefinition* mir);
+  inline LInt64Allocation useInt64OrConstantAtStart(MDefinition* mir);
 
   // Rather than defining a new virtual register, sets |ins| to have the same
   // virtual register as |as|.
@@ -401,14 +349,11 @@ class LIRGeneratorShared {
                        BailoutKind kind = BailoutKind::DuringVMCall);
 
   // Marks this instruction as needing a wasm safepoint.
-  void assignWasmSafepoint(LInstruction* ins, MInstruction* mir);
+  void assignWasmSafepoint(LInstruction* ins);
 
-  void lowerConstantDouble(double d, MInstruction* mir) {
-    define(new (alloc()) LDouble(d), mir);
-  }
-  void lowerConstantFloat32(float f, MInstruction* mir) {
-    define(new (alloc()) LFloat32(f), mir);
-  }
+  inline void lowerConstantDouble(double d, MInstruction* mir);
+  inline void lowerConstantFloat32(float f, MInstruction* mir);
+
   bool canSpecializeWasmCompareAndSelect(MCompare::CompareType compTy,
                                          MIRType insTy);
   void lowerWasmCompareAndSelect(MWasmSelect* ins, MDefinition* lhs,

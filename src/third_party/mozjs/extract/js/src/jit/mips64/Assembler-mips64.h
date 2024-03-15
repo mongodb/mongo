@@ -61,23 +61,24 @@ static constexpr Register ABINonArgReturnVolatileReg = t0;
 // TLS pointer argument register for WebAssembly functions. This must not alias
 // any other register used for passing function arguments or return values.
 // Preserved by WebAssembly functions.
-static constexpr Register WasmTlsReg = s5;
+static constexpr Register InstanceReg = s5;
 
 // Registers used for wasm table calls. These registers must be disjoint
-// from the ABI argument registers, WasmTlsReg and each other.
+// from the ABI argument registers, InstanceReg and each other.
 static constexpr Register WasmTableCallScratchReg0 = ABINonArgReg0;
 static constexpr Register WasmTableCallScratchReg1 = ABINonArgReg1;
 static constexpr Register WasmTableCallSigReg = ABINonArgReg2;
 static constexpr Register WasmTableCallIndexReg = ABINonArgReg3;
 
-// Register used as a scratch along the return path in the fast js -> wasm stub
-// code. This must not overlap ReturnReg, JSReturnOperand, or WasmTlsReg. It
-// must be a volatile register.
-static constexpr Register WasmJitEntryReturnScratch = t1;
+// Registers used for ref calls.
+static constexpr Register WasmCallRefCallScratchReg0 = ABINonArgReg0;
+static constexpr Register WasmCallRefCallScratchReg1 = ABINonArgReg1;
+static constexpr Register WasmCallRefReg = ABINonArgReg3;
 
-// Register used to store a reference to an exception thrown by Wasm to an
-// exception handling block. Should not overlap with WasmTlsReg.
-static constexpr Register WasmExceptionReg = ABINonArgReg0;
+// Register used as a scratch along the return path in the fast js -> wasm stub
+// code. This must not overlap ReturnReg, JSReturnOperand, or InstanceReg.
+// It must be a volatile register.
+static constexpr Register WasmJitEntryReturnScratch = t1;
 
 static constexpr Register InterpreterPCReg = t5;
 
@@ -191,7 +192,6 @@ static const uint32_t WasmTrapInstructionLength = 4;
 // See comments in wasm::GenerateFunctionPrologue.  The difference between these
 // is the size of the largest callable prologue on the platform.
 static constexpr uint32_t WasmCheckedCallEntryOffset = 0u;
-static constexpr uint32_t WasmCheckedTailEntryOffset = 16u;
 
 static constexpr Scale ScalePointer = TimesEight;
 

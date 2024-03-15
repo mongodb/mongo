@@ -8,7 +8,6 @@
 #define mozilla_AwakeTimeStamp_h
 
 #include <stdint.h>
-#include <inttypes.h>
 #include <mozilla/Types.h>
 #include "mozilla/Assertions.h"
 

@@ -7,10 +7,10 @@
 #ifndef vm_AsyncIteration_h
 #define vm_AsyncIteration_h
 
+#include "builtin/Promise.h"  // js::PromiseHandler
 #include "builtin/SelfHostingDefines.h"
 #include "js/Class.h"
 #include "vm/GeneratorObject.h"
-#include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/List.h"
 #include "vm/PromiseObject.h"
@@ -282,29 +282,13 @@
 namespace js {
 
 class AsyncGeneratorObject;
+enum class CompletionKind : uint8_t;
 
 extern const JSClass AsyncGeneratorFunctionClass;
 
-// Resume the async generator when the `await` operand fulfills to `value`.
-[[nodiscard]] bool AsyncGeneratorAwaitedFulfilled(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    HandleValue value);
-
-// Resume the async generator when the `await` operand rejects with `reason`.
-[[nodiscard]] bool AsyncGeneratorAwaitedRejected(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    HandleValue reason);
-
-// Resume the async generator after awaiting on the value passed to
-// AsyncGenerator#return, when the async generator was still executing.
-// Split into two functions depending on whether the awaited value was
-// fulfilled or rejected.
-[[nodiscard]] bool AsyncGeneratorYieldReturnAwaitedFulfilled(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    HandleValue value);
-[[nodiscard]] bool AsyncGeneratorYieldReturnAwaitedRejected(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    HandleValue reason);
+[[nodiscard]] bool AsyncGeneratorPromiseReactionJob(
+    JSContext* cx, PromiseHandler handler,
+    Handle<AsyncGeneratorObject*> generator, HandleValue argument);
 
 bool AsyncGeneratorNext(JSContext* cx, unsigned argc, Value* vp);
 bool AsyncGeneratorReturn(JSContext* cx, unsigned argc, Value* vp);
@@ -479,14 +463,14 @@ class AsyncGeneratorObject : public AbstractGeneratorObject {
   void setCompleted() { setState(State_Completed); }
 
   [[nodiscard]] static bool enqueueRequest(
-      JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
+      JSContext* cx, Handle<AsyncGeneratorObject*> generator,
       Handle<AsyncGeneratorRequest*> request);
 
   static AsyncGeneratorRequest* dequeueRequest(
-      JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj);
+      JSContext* cx, Handle<AsyncGeneratorObject*> generator);
 
   static AsyncGeneratorRequest* peekRequest(
-      Handle<AsyncGeneratorObject*> asyncGenObj);
+      Handle<AsyncGeneratorObject*> generator);
 
   bool isQueueEmpty() const {
     if (isSingleQueue()) {
@@ -499,7 +483,7 @@ class AsyncGeneratorObject : public AbstractGeneratorObject {
   //   * return a cached request object with the slots updated
   //   * create a new request object with the slots set
   static AsyncGeneratorRequest* createRequest(
-      JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
+      JSContext* cx, Handle<AsyncGeneratorObject*> generator,
       CompletionKind completionKind, HandleValue completionValue,
       Handle<PromiseObject*> promise);
 
@@ -561,10 +545,6 @@ class AsyncFromSyncIteratorObject : public NativeObject {
 
   const Value& nextMethod() const { return getFixedSlot(Slot_NextMethod); }
 };
-
-[[nodiscard]] bool AsyncGeneratorResume(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    CompletionKind completionKind, HandleValue argument);
 
 class AsyncIteratorObject : public NativeObject {
  public:

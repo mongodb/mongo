@@ -1,4 +1,22 @@
 #define MOZ_UNIFIED_BUILD
+#include "frontend/FrontendContext.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "frontend/FrontendContext.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "frontend/FrontendContext.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "frontend/FunctionEmitter.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "frontend/FunctionEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "frontend/FunctionEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "frontend/IfEmitter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "frontend/IfEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -33,23 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "frontend/LexicalScopeEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "frontend/NameFunctions.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/NameFunctions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "frontend/NameFunctions.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "frontend/NameOpEmitter.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/NameOpEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "frontend/NameOpEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

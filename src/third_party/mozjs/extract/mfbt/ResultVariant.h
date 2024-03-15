@@ -20,13 +20,14 @@ class ResultImplementation<V, E, PackingStrategy::Variant> {
   mozilla::Variant<V, E> mStorage;
 
  public:
+  static constexpr PackingStrategy Strategy = PackingStrategy::Variant;
+
   ResultImplementation(ResultImplementation&&) = default;
   ResultImplementation(const ResultImplementation&) = delete;
   ResultImplementation& operator=(const ResultImplementation&) = delete;
   ResultImplementation& operator=(ResultImplementation&&) = default;
 
-  explicit ResultImplementation(V&& aValue)
-      : mStorage(std::forward<V>(aValue)) {}
+  explicit ResultImplementation(V&& aValue) : mStorage(std::move(aValue)) {}
   explicit ResultImplementation(const V& aValue) : mStorage(aValue) {}
   template <typename... Args>
   explicit ResultImplementation(std::in_place_t, Args&&... aArgs)
@@ -34,7 +35,7 @@ class ResultImplementation<V, E, PackingStrategy::Variant> {
 
   explicit ResultImplementation(const E& aErrorValue) : mStorage(aErrorValue) {}
   explicit ResultImplementation(E&& aErrorValue)
-      : mStorage(std::forward<E>(aErrorValue)) {}
+      : mStorage(std::move(aErrorValue)) {}
 
   bool isOk() const { return mStorage.template is<V>(); }
 
@@ -46,6 +47,13 @@ class ResultImplementation<V, E, PackingStrategy::Variant> {
 
   E unwrapErr() { return std::move(mStorage.template as<E>()); }
   const E& inspectErr() const { return mStorage.template as<E>(); }
+
+  void updateAfterTracing(V&& aValue) {
+    mStorage.template emplace<V>(std::move(aValue));
+  }
+  void updateErrorAfterTracing(E&& aErrorValue) {
+    mStorage.template emplace<E>(std::move(aErrorValue));
+  }
 };
 
 }  // namespace mozilla::detail

@@ -72,16 +72,14 @@ static_assert(sizeof(AbortReasonOr<bool>) <= sizeof(uintptr_t),
 static_assert(sizeof(AbortReasonOr<uint16_t*>) == sizeof(uintptr_t),
               "Unexpected size of AbortReasonOr<uint16_t*>");
 
-// A JIT context is needed to enter into either an JIT method or an instance
-// of a JIT compiler. It points to a temporary allocator and the active
-// JSContext, either of which may be nullptr, and the active realm, which
-// will not be nullptr.
+// A JIT context is needed for parts of the compiler backend such as the
+// MacroAssembler. It points to the JSContext (nullptr for off-thread
+// compilations or Wasm compilations) and also stores some extra information,
+// most of it only used in debug builds.
+//
+// JIT contexts must not be nested.
 
-class JitContext {
-  JitContext* prev_ = nullptr;
-  CompileRealm* realm_ = nullptr;
-  int assemblerCount_ = 0;
-
+class MOZ_RAII JitContext {
 #ifdef DEBUG
   // Whether this thread is actively Ion compiling (does not include Wasm or
   // WarpOracle).
@@ -92,36 +90,24 @@ class JitContext {
 #endif
 
  public:
-  // Running context when executing on the main thread. Not available during
-  // compilation.
+  // Running context when compiling on the main thread. Not available during
+  // off-thread compilation.
   JSContext* cx = nullptr;
 
-  // Allocator for temporary memory during compilation.
-  TempAllocator* temp = nullptr;
-
-  // Wrappers with information about the current runtime/realm for use
-  // during compilation.
+  // Wrapper with information about the current runtime. nullptr for Wasm
+  // compilations.
   CompileRuntime* runtime = nullptr;
 
   // Constructor for compilations happening on the main thread.
-  JitContext(JSContext* cx, TempAllocator* temp);
+  explicit JitContext(JSContext* cx);
 
   // Constructor for off-thread Ion compilations.
-  JitContext(CompileRuntime* rt, CompileRealm* realm, TempAllocator* temp);
+  explicit JitContext(CompileRuntime* rt);
 
-  // Constructors for Wasm compilation.
-  explicit JitContext(TempAllocator* temp);
+  // Constructor for Wasm compilation.
   JitContext();
 
   ~JitContext();
-
-  int getNextAssemblerId() { return assemblerCount_++; }
-
-  CompileRealm* maybeRealm() const { return realm_; }
-  CompileRealm* realm() const {
-    MOZ_ASSERT(maybeRealm());
-    return maybeRealm();
-  }
 
 #ifdef DEBUG
   bool isCompilingWasm() { return isCompilingWasm_; }
@@ -146,12 +132,9 @@ class JitContext {
 #endif
 };
 
-// Process-wide initialization of JIT data structures.
+// Process-wide initialization and shutdown of JIT data structures.
 [[nodiscard]] bool InitializeJit();
-
-// Call this after changing hardware parameters via command line flags (on
-// platforms that support that).
-void ComputeJitSupportFlags();
+void ShutdownJit();
 
 // Get and set the current JIT context.
 JitContext* GetJitContext();

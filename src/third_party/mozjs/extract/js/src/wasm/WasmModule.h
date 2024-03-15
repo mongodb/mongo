@@ -23,8 +23,14 @@
 #include "js/BuildId.h"
 
 #include "wasm/WasmCode.h"
+#include "wasm/WasmException.h"
 #include "wasm/WasmJS.h"
+#include "wasm/WasmSerialize.h"
 #include "wasm/WasmTable.h"
+
+namespace JS {
+class OptimizedEncodingListener;
+}
 
 namespace js {
 namespace wasm {
@@ -42,10 +48,10 @@ using Tier2Listener = RefPtr<JS::OptimizedEncodingListener>;
 // and complete lack of barriers.
 
 struct ImportValues {
-  JSFunctionVector funcs;
+  JSObjectVector funcs;
   WasmTableObjectVector tables;
   WasmMemoryObject* memory;
-  WasmExceptionObjectVector exceptionObjs;
+  WasmTagObjectVector tagObjs;
   WasmGlobalObjectVector globalObjs;
   ValVector globalValues;
 
@@ -57,7 +63,7 @@ struct ImportValues {
     if (memory) {
       TraceRoot(trc, &memory, "import values memory");
     }
-    exceptionObjs.trace(trc);
+    tagObjs.trace(trc);
     globalObjs.trace(trc);
     globalValues.trace(trc);
   }
@@ -67,16 +73,12 @@ struct ImportValues {
 // operations: instantiation, tiered compilation, serialization. A Module can be
 // instantiated any number of times to produce new Instance objects. A Module
 // can have a single tier-2 task initiated to augment a Module's code with a
-// higher tier. A Module can  have its optimized code serialized at any point
+// higher tier. A Module can have its optimized code serialized at any point
 // where the LinkData is also available, which is primarily (1) at the end of
 // module generation, (2) at the end of tier-2 compilation.
 //
-// Fully linked-and-instantiated code (represented by Code and its owned
-// ModuleSegment) can be shared between instances, provided none of those
-// instances are being debugged. If patchable code is needed then each instance
-// must have its own Code. Module eagerly creates a new Code and gives it to the
-// first instance; it then instantiates new Code objects from a copy of the
-// unlinked code that it keeps around for that purpose.
+// Fully linked-and-instantiated code (represented by SharedCode and its owned
+// ModuleSegment) can be shared between instances.
 
 class Module : public JS::WasmModule {
   const SharedCode code_;
@@ -86,17 +88,8 @@ class Module : public JS::WasmModule {
   const ElemSegmentVector elemSegments_;
   const CustomSectionVector customSections_;
 
-  // These fields are only meaningful when code_->metadata().debugEnabled.
-  // `debugCodeClaimed_` is set to false initially and then to true when
-  // `code_` is already being used for an instance and can't be shared because
-  // it may be patched by the debugger. Subsequent instances must then create
-  // copies by linking the `debugUnlinkedCode_` using `debugLinkData_`.
-  // This could all be removed if debugging didn't need to perform
-  // per-instance code patching.
+  // This field is only meaningful when code_->metadata().debugEnabled.
 
-  mutable Atomic<bool> debugCodeClaimed_;
-  const UniqueConstBytes debugUnlinkedCode_;
-  const UniqueLinkData debugLinkData_;
   const SharedBytes debugBytecode_;
 
   // This field is set during tier-2 compilation and cleared on success or
@@ -120,21 +113,10 @@ class Module : public JS::WasmModule {
   size_t gcMallocBytesExcludingCode_;
 
   bool instantiateFunctions(JSContext* cx,
-                            const JSFunctionVector& funcImports) const;
+                            const JSObjectVector& funcImports) const;
   bool instantiateMemory(JSContext* cx,
-                         MutableHandleWasmMemoryObject memory) const;
-#ifdef ENABLE_WASM_EXCEPTIONS
-  bool instantiateImportedException(JSContext* cx,
-                                    Handle<WasmExceptionObject*> exnObj,
-                                    WasmExceptionObjectVector& exnObjs,
-                                    SharedExceptionTagVector* tags) const;
-  bool instantiateLocalException(JSContext* cx, const EventDesc& ed,
-                                 WasmExceptionObjectVector& exnObjs,
-                                 SharedExceptionTagVector* tags,
-                                 uint32_t exnIndex) const;
-  bool instantiateExceptions(JSContext* cx, WasmExceptionObjectVector& exnObjs,
-                             SharedExceptionTagVector* tags) const;
-#endif
+                         MutableHandle<WasmMemoryObject*> memory) const;
+  bool instantiateTags(JSContext* cx, WasmTagObjectVector& tagObjs) const;
   bool instantiateImportedTable(JSContext* cx, const TableDesc& td,
                                 Handle<WasmTableObject*> table,
                                 WasmTableObjectVector* tableObjs,
@@ -148,10 +130,8 @@ class Module : public JS::WasmModule {
                          SharedTableVector* tables) const;
   bool instantiateGlobals(JSContext* cx, const ValVector& globalImportValues,
                           WasmGlobalObjectVector& globalObjs) const;
-  bool initSegments(JSContext* cx, HandleWasmInstanceObject instance,
-                    HandleWasmMemoryObject memory,
-                    const ValVector& globalImportValues) const;
-  SharedCode getDebugEnabledCode() const;
+  bool initSegments(JSContext* cx, Handle<WasmInstanceObject*> instance,
+                    Handle<WasmMemoryObject*> memory) const;
 
   class Tier2GeneratorTaskImpl;
 
@@ -159,8 +139,6 @@ class Module : public JS::WasmModule {
   Module(const Code& code, ImportVector&& imports, ExportVector&& exports,
          DataSegmentVector&& dataSegments, ElemSegmentVector&& elemSegments,
          CustomSectionVector&& customSections,
-         UniqueConstBytes debugUnlinkedCode = nullptr,
-         UniqueLinkData debugLinkData = nullptr,
          const ShareableBytes* debugBytecode = nullptr,
          bool loggingDeserialized = false)
       : code_(&code),
@@ -169,14 +147,9 @@ class Module : public JS::WasmModule {
         dataSegments_(std::move(dataSegments)),
         elemSegments_(std::move(elemSegments)),
         customSections_(std::move(customSections)),
-        debugCodeClaimed_(false),
-        debugUnlinkedCode_(std::move(debugUnlinkedCode)),
-        debugLinkData_(std::move(debugLinkData)),
         debugBytecode_(debugBytecode),
         loggingDeserialized_(loggingDeserialized),
         testingTier2Active_(false) {
-    MOZ_ASSERT_IF(metadata().debugEnabled,
-                  debugUnlinkedCode_ && debugLinkData_);
     initGCMallocBytesExcludingCode();
   }
   ~Module() override;
@@ -195,7 +168,7 @@ class Module : public JS::WasmModule {
 
   bool instantiate(JSContext* cx, ImportValues& imports,
                    HandleObject instanceProto,
-                   MutableHandleWasmInstanceObject instanceObj) const;
+                   MutableHandle<WasmInstanceObject*> instanceObj) const;
 
   // Tier-2 compilation may be initiated after the Module is constructed at
   // most once. When tier-2 compilation completes, ModuleGenerator calls
@@ -211,12 +184,8 @@ class Module : public JS::WasmModule {
 
   // Code caching support.
 
-  size_t serializedSize(const LinkData& linkData) const;
-  void serialize(const LinkData& linkData, uint8_t* begin, size_t size) const;
-  void serialize(const LinkData& linkData,
-                 JS::OptimizedEncodingListener& listener) const;
-  static RefPtr<Module> deserialize(const uint8_t* begin, size_t size,
-                                    Metadata* maybeMetadata = nullptr);
+  [[nodiscard]] bool serialize(const LinkData& linkData, Bytes* bytes) const;
+  static RefPtr<Module> deserialize(const uint8_t* begin, size_t size);
   bool loggingDeserialized() const { return loggingDeserialized_; }
 
   // JS API and JS::WasmModule implementation:
@@ -239,6 +208,8 @@ class Module : public JS::WasmModule {
   // Generated code analysis support:
 
   bool extractCode(JSContext* cx, Tier tier, MutableHandleValue vp) const;
+
+  WASM_DECLARE_FRIEND_SERIALIZE_ARGS(Module, const wasm::LinkData& linkData);
 };
 
 using MutableModule = RefPtr<Module>;

@@ -6,10 +6,7 @@
 
 #include "vm/StringType-inl.h"
 
-#include "mozilla/ArrayUtils.h"
-#include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/EndianUtils.h"
 #include "mozilla/HashFunctions.h"
 #include "mozilla/Latin1.h"
 #include "mozilla/MathAlgorithms.h"
@@ -25,32 +22,35 @@
 #include <type_traits>  // std::is_same, std::is_unsigned
 
 #include "jsfriendapi.h"
+#include "jsnum.h"
 
 #include "builtin/Boolean.h"
+#ifdef ENABLE_RECORD_TUPLE
+#  include "builtin/RecordObject.h"
+#endif
 #include "frontend/BytecodeCompiler.h"
-#include "frontend/ParserAtom.h"
+#include "gc/AllocKind.h"
 #include "gc/MaybeRooted.h"
 #include "gc/Nursery.h"
 #include "js/CharacterEncoding.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
+#include "js/PropertyAndElement.h"    // JS_DefineElement
 #include "js/StableStringChars.h"
-#include "js/Symbol.h"
 #include "js/UbiNode.h"
-#include "util/StringBuffer.h"
 #include "util/Unicode.h"
 #include "vm/GeckoProfiler.h"
+#include "vm/StaticStrings.h"
 #include "vm/ToSource.h"  // js::ValueToSource
 
 #include "gc/Marking-inl.h"
 #include "vm/GeckoProfiler-inl.h"
-#include "vm/JSContext-inl.h"
-#include "vm/JSObject-inl.h"
-#include "vm/Realm-inl.h"
+#ifdef ENABLE_RECORD_TUPLE
+#  include "vm/RecordType.h"
+#  include "vm/TupleType.h"
+#endif
 
 using namespace js;
 
-using mozilla::ArrayEqual;
-using mozilla::AssertedCast;
 using mozilla::AsWritableChars;
 using mozilla::ConvertLatin1toUtf16;
 using mozilla::IsAsciiDigit;
@@ -132,7 +132,7 @@ JS::ubi::Node::Size JS::ubi::Concrete<JSString>::size(
 
 const char16_t JS::ubi::Concrete<JSString>::concreteTypeName[] = u"JSString";
 
-mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
+mozilla::Maybe<std::tuple<size_t, size_t> > JSString::encodeUTF8Partial(
     const JS::AutoRequireNoGC& nogc, mozilla::Span<char> buffer) const {
   mozilla::Vector<const JSString*, 16, SystemAllocPolicy> stack;
   const JSString* current = this;
@@ -154,7 +154,7 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
     if (MOZ_LIKELY(linear.hasLatin1Chars())) {
       if (MOZ_UNLIKELY(pendingLeadSurrogate)) {
         if (buffer.Length() < 3) {
-          return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+          return mozilla::Some(std::make_tuple(totalRead, totalWritten));
         }
         buffer[0] = '\xEF';
         buffer[1] = '\xBF';
@@ -168,13 +168,13 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
           mozilla::Span(linear.latin1Chars(nogc), linear.length()));
       size_t read;
       size_t written;
-      mozilla::Tie(read, written) =
+      std::tie(read, written) =
           mozilla::ConvertLatin1toUtf8Partial(src, buffer);
       buffer = buffer.From(written);
       totalRead += read;
       totalWritten += written;
       if (read < src.Length()) {
-        return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+        return mozilla::Some(std::make_tuple(totalRead, totalWritten));
       }
     } else {
       auto src = mozilla::Span(linear.twoByteChars(nogc), linear.length());
@@ -186,7 +186,7 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
         if (unicode::IsTrailSurrogate(first)) {
           // Got a surrogate pair
           if (buffer.Length() < 4) {
-            return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+            return mozilla::Some(std::make_tuple(totalRead, totalWritten));
           }
           uint32_t astral = unicode::UTF16Decode(pendingLeadSurrogate, first);
           buffer[0] = char(0b1111'0000 | (astral >> 18));
@@ -200,7 +200,7 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
         } else {
           // unpaired surrogate
           if (buffer.Length() < 3) {
-            return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+            return mozilla::Some(std::make_tuple(totalRead, totalWritten));
           }
           buffer[0] = '\xEF';
           buffer[1] = '\xBF';
@@ -211,25 +211,24 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
         }
         pendingLeadSurrogate = 0;
       }
-      if (src.IsEmpty()) {
-        return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
-      }
-      char16_t last = src[src.Length() - 1];
-      if (unicode::IsLeadSurrogate(last)) {
-        src = src.To(src.Length() - 1);
-        pendingLeadSurrogate = last;
-      } else {
-        MOZ_ASSERT(!pendingLeadSurrogate);
-      }
-      size_t read;
-      size_t written;
-      mozilla::Tie(read, written) =
-          mozilla::ConvertUtf16toUtf8Partial(src, buffer);
-      buffer = buffer.From(written);
-      totalRead += read;
-      totalWritten += written;
-      if (read < src.Length()) {
-        return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+      if (!src.IsEmpty()) {
+        char16_t last = src[src.Length() - 1];
+        if (unicode::IsLeadSurrogate(last)) {
+          src = src.To(src.Length() - 1);
+          pendingLeadSurrogate = last;
+        } else {
+          MOZ_ASSERT(!pendingLeadSurrogate);
+        }
+        size_t read;
+        size_t written;
+        std::tie(read, written) =
+            mozilla::ConvertUtf16toUtf8Partial(src, buffer);
+        buffer = buffer.From(written);
+        totalRead += read;
+        totalWritten += written;
+        if (read < src.Length()) {
+          return mozilla::Some(std::make_tuple(totalRead, totalWritten));
+        }
       }
     }
     if (stack.empty()) {
@@ -239,7 +238,7 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
   }
   if (MOZ_UNLIKELY(pendingLeadSurrogate)) {
     if (buffer.Length() < 3) {
-      return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+      return mozilla::Some(std::make_tuple(totalRead, totalWritten));
     }
     buffer[0] = '\xEF';
     buffer[1] = '\xBF';
@@ -248,10 +247,10 @@ mozilla::Maybe<mozilla::Tuple<size_t, size_t> > JSString::encodeUTF8Partial(
     totalRead += 1;
     totalWritten += 3;
   }
-  return mozilla::Some(mozilla::MakeTuple(totalRead, totalWritten));
+  return mozilla::Some(std::make_tuple(totalRead, totalWritten));
 }
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
 
 template <typename CharT>
 /*static */
@@ -418,7 +417,20 @@ bool JSString::equals(const char* s) {
 
   return StringEqualsAscii(linear, s);
 }
-#endif /* defined(DEBUG) || defined(JS_JITSPEW) */
+#endif /* defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW) */
+
+JSExtensibleString& JSLinearString::makeExtensible(size_t capacity) {
+  MOZ_ASSERT(!isDependent());
+  MOZ_ASSERT(!isInline());
+  MOZ_ASSERT(!isAtom());
+  MOZ_ASSERT(!isExternal());
+  MOZ_ASSERT(capacity >= length());
+  js::RemoveCellMemory(this, allocSize(), js::MemoryUse::StringContents);
+  setLengthAndFlags(length(), flags() | EXTENSIBLE_FLAGS);
+  d.s.u3.capacity = capacity;
+  js::AddCellMemory(this, allocSize(), js::MemoryUse::StringContents);
+  return asExtensible();
+}
 
 template <typename CharT>
 static MOZ_ALWAYS_INLINE bool AllocChars(JSString* str, size_t length,
@@ -540,7 +552,7 @@ bool JSRope::hash(uint32_t* outHash) const {
   return true;
 }
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
 void JSRope::dumpRepresentation(js::GenericPrinter& out, int indent) const {
   dumpRepresentationHeader(out, "JSRope");
   indent += 2;
@@ -632,8 +644,10 @@ static bool CanReuseLeftmostBuffer(JSString* leftmostChild, size_t wholeLength,
 }
 
 JSLinearString* JSRope::flatten(JSContext* maybecx) {
+  MOZ_ASSERT_IF(maybecx, maybecx->isMainThreadContext());
+
   mozilla::Maybe<AutoGeckoProfilerEntry> entry;
-  if (maybecx && !maybecx->isHelperThreadContext()) {
+  if (maybecx) {
     entry.emplace(maybecx, "JSRope::flatten");
   }
 
@@ -787,7 +801,7 @@ first_visit_node : {
     str = &left.asRope();
     goto first_visit_node;
   }
-  if (!(reuseLeftmostBuffer && &left == leftmostChild)) {
+  if (!(reuseLeftmostBuffer && pos == wholeChars)) {
     CopyChars(pos, left.asLinear());
   }
   pos += left.length();
@@ -904,8 +918,7 @@ static JSLinearString* EnsureLinear(
 template <AllowGC allowGC>
 JSString* js::ConcatStrings(
     JSContext* cx, typename MaybeRooted<JSString*, allowGC>::HandleType left,
-    typename MaybeRooted<JSString*, allowGC>::HandleType right,
-    gc::InitialHeap heap) {
+    typename MaybeRooted<JSString*, allowGC>::HandleType right, gc::Heap heap) {
   MOZ_ASSERT_IF(!left->isAtom(), cx->isInsideCurrentZone(left));
   MOZ_ASSERT_IF(!right->isAtom(), cx->isInsideCurrentZone(right));
 
@@ -923,7 +936,7 @@ JSString* js::ConcatStrings(
   if (MOZ_UNLIKELY(wholeLength > JSString::MAX_LENGTH)) {
     // Don't report an exception if GC is not allowed, just return nullptr.
     if (allowGC) {
-      js::ReportAllocationOverflow(cx);
+      js::ReportOversizedAllocation(cx, JSMSG_ALLOC_OVERFLOW);
     }
     return nullptr;
   }
@@ -978,12 +991,11 @@ JSString* js::ConcatStrings(
 }
 
 template JSString* js::ConcatStrings<CanGC>(JSContext* cx, HandleString left,
-                                            HandleString right,
-                                            gc::InitialHeap heap);
+                                            HandleString right, gc::Heap heap);
 
 template JSString* js::ConcatStrings<NoGC>(JSContext* cx, JSString* const& left,
                                            JSString* const& right,
-                                           gc::InitialHeap heap);
+                                           gc::Heap heap);
 
 /**
  * Copy |src[0..length]| to |dest[0..length]| when copying doesn't narrow and
@@ -1004,17 +1016,6 @@ static inline void FillChars(unsigned char* dest, const unsigned char* src,
   PodCopy(dest, src, length);
 }
 
-static inline void FillChars(char16_t* dest, LittleEndianChars src,
-                             size_t length) {
-#if MOZ_LITTLE_ENDIAN()
-  memcpy(dest, src.get(), length * sizeof(char16_t));
-#else
-  for (size_t i = 0; i < length; ++i) {
-    dest[i] = src[i];
-  }
-#endif
-}
-
 /**
  * Copy |src[0..length]| to |dest[0..length]| when copying *does* narrow, but
  * the user guarantees every runtime |src[i]| value can be stored without change
@@ -1026,14 +1027,7 @@ static inline void FillFromCompatible(unsigned char* dest, const char16_t* src,
                             AsWritableChars(Span(dest, length)));
 }
 
-static inline void FillFromCompatible(unsigned char* dest,
-                                      LittleEndianChars src, size_t length) {
-  for (size_t i = 0; i < length; ++i) {
-    dest[i] = AssertedCast<unsigned char>(src[i]);
-  }
-}
-
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
 void JSDependentString::dumpRepresentation(js::GenericPrinter& out,
                                            int indent) const {
   dumpRepresentationHeader(out, "JSDependentString");
@@ -1044,7 +1038,7 @@ void JSDependentString::dumpRepresentation(js::GenericPrinter& out,
 }
 #endif
 
-bool js::EqualChars(JSLinearString* str1, JSLinearString* str2) {
+bool js::EqualChars(const JSLinearString* str1, const JSLinearString* str2) {
   MOZ_ASSERT(str1->length() == str2->length());
 
   size_t len = str1->length();
@@ -1052,7 +1046,7 @@ bool js::EqualChars(JSLinearString* str1, JSLinearString* str2) {
   AutoCheckCannotGC nogc;
   if (str1->hasTwoByteChars()) {
     if (str2->hasTwoByteChars()) {
-      return ArrayEqual(str1->twoByteChars(nogc), str2->twoByteChars(nogc),
+      return EqualChars(str1->twoByteChars(nogc), str2->twoByteChars(nogc),
                         len);
     }
 
@@ -1060,7 +1054,7 @@ bool js::EqualChars(JSLinearString* str1, JSLinearString* str2) {
   }
 
   if (str2->hasLatin1Chars()) {
-    return ArrayEqual(str1->latin1Chars(nogc), str2->latin1Chars(nogc), len);
+    return EqualChars(str1->latin1Chars(nogc), str2->latin1Chars(nogc), len);
   }
 
   return EqualChars(str1->latin1Chars(nogc), str2->twoByteChars(nogc), len);
@@ -1076,7 +1070,7 @@ bool js::HasSubstringAt(JSLinearString* text, JSLinearString* pat,
   if (text->hasLatin1Chars()) {
     const Latin1Char* textChars = text->latin1Chars(nogc) + start;
     if (pat->hasLatin1Chars()) {
-      return ArrayEqual(textChars, pat->latin1Chars(nogc), patLen);
+      return EqualChars(textChars, pat->latin1Chars(nogc), patLen);
     }
 
     return EqualChars(textChars, pat->twoByteChars(nogc), patLen);
@@ -1084,7 +1078,7 @@ bool js::HasSubstringAt(JSLinearString* text, JSLinearString* pat,
 
   const char16_t* textChars = text->twoByteChars(nogc) + start;
   if (pat->hasTwoByteChars()) {
-    return ArrayEqual(textChars, pat->twoByteChars(nogc), patLen);
+    return EqualChars(textChars, pat->twoByteChars(nogc), patLen);
   }
 
   return EqualChars(pat->latin1Chars(nogc), textChars, patLen);
@@ -1116,7 +1110,7 @@ bool js::EqualStrings(JSContext* cx, JSString* str1, JSString* str2,
   return true;
 }
 
-bool js::EqualStrings(JSLinearString* str1, JSLinearString* str2) {
+bool js::EqualStrings(const JSLinearString* str1, const JSLinearString* str2) {
   if (str1 == str2) {
     return true;
   }
@@ -1136,7 +1130,8 @@ int32_t js::CompareChars(const char16_t* s1, size_t len1, JSLinearString* s2) {
              : CompareChars(s1, len1, s2->twoByteChars(nogc), s2->length());
 }
 
-static int32_t CompareStringsImpl(JSLinearString* str1, JSLinearString* str2) {
+static int32_t CompareStringsImpl(const JSLinearString* str1,
+                                  const JSLinearString* str2) {
   size_t len1 = str1->length();
   size_t len2 = str2->length();
 
@@ -1178,8 +1173,15 @@ bool js::CompareStrings(JSContext* cx, JSString* str1, JSString* str2,
   return true;
 }
 
-int32_t js::CompareAtoms(JSAtom* atom1, JSAtom* atom2) {
-  return CompareStringsImpl(atom1, atom2);
+int32_t js::CompareStrings(const JSLinearString* str1,
+                           const JSLinearString* str2) {
+  MOZ_ASSERT(str1);
+  MOZ_ASSERT(str2);
+
+  if (str1 == str2) {
+    return 0;
+  }
+  return CompareStringsImpl(str1, str2);
 }
 
 bool js::StringIsAscii(JSLinearString* str) {
@@ -1207,7 +1209,7 @@ bool js::StringEqualsAscii(JSLinearString* str, const char* asciiBytes,
 
   AutoCheckCannotGC nogc;
   return str->hasLatin1Chars()
-             ? ArrayEqual(latin1, str->latin1Chars(nogc), length)
+             ? EqualChars(latin1, str->latin1Chars(nogc), length)
              : EqualChars(latin1, str->twoByteChars(nogc), length);
 }
 
@@ -1295,97 +1297,6 @@ uint32_t JSAtom::getIndexSlow() const {
                           : AtomCharsToIndex(twoByteChars(nogc), len);
 }
 
-constexpr StaticStrings::SmallCharTable StaticStrings::createSmallCharTable() {
-  SmallCharTable array{};
-  for (size_t i = 0; i < SMALL_CHAR_TABLE_SIZE; i++) {
-    array[i] = toSmallChar(i);
-  }
-  return array;
-}
-
-const StaticStrings::SmallCharTable StaticStrings::toSmallCharTable =
-    createSmallCharTable();
-
-bool StaticStrings::init(JSContext* cx) {
-  AutoAllocInAtomsZone az(cx);
-
-  static_assert(UNIT_STATIC_LIMIT - 1 <= JSString::MAX_LATIN1_CHAR,
-                "Unit strings must fit in Latin1Char.");
-
-  using Latin1Range = mozilla::Range<const Latin1Char>;
-
-  for (uint32_t i = 0; i < UNIT_STATIC_LIMIT; i++) {
-    Latin1Char ch = Latin1Char(i);
-    JSLinearString* s =
-        NewInlineString<NoGC>(cx, Latin1Range(&ch, 1), gc::TenuredHeap);
-    if (!s) {
-      return false;
-    }
-    HashNumber hash = mozilla::HashString(&ch, 1);
-    unitStaticTable[i] = s->morphAtomizedStringIntoPermanentAtom(hash);
-  }
-
-  for (uint32_t i = 0; i < NUM_LENGTH2_ENTRIES; i++) {
-    Latin1Char buffer[] = {firstCharOfLength2(i), secondCharOfLength2(i)};
-    JSLinearString* s =
-        NewInlineString<NoGC>(cx, Latin1Range(buffer, 2), gc::TenuredHeap);
-    if (!s) {
-      return false;
-    }
-    HashNumber hash = mozilla::HashString(buffer, 2);
-    length2StaticTable[i] = s->morphAtomizedStringIntoPermanentAtom(hash);
-  }
-
-  for (uint32_t i = 0; i < INT_STATIC_LIMIT; i++) {
-    if (i < 10) {
-      intStaticTable[i] = unitStaticTable[i + '0'];
-    } else if (i < 100) {
-      auto index =
-          getLength2IndexStatic(char(i / 10) + '0', char(i % 10) + '0');
-      intStaticTable[i] = length2StaticTable[index];
-    } else {
-      Latin1Char buffer[] = {Latin1Char('0' + (i / 100)),
-                             Latin1Char('0' + ((i / 10) % 10)),
-                             Latin1Char('0' + (i % 10))};
-      JSLinearString* s =
-          NewInlineString<NoGC>(cx, Latin1Range(buffer, 3), gc::TenuredHeap);
-      if (!s) {
-        return false;
-      }
-      HashNumber hash = mozilla::HashString(buffer, 3);
-      intStaticTable[i] = s->morphAtomizedStringIntoPermanentAtom(hash);
-    }
-
-    // Static string initialization can not race, so allow even without the
-    // lock.
-    intStaticTable[i]->setIsIndex(i);
-  }
-
-  return true;
-}
-
-inline void TraceStaticString(JSTracer* trc, JSAtom* atom, const char* name) {
-  MOZ_ASSERT(atom->isPermanentAtom());
-  TraceProcessGlobalRoot(trc, atom, name);
-}
-
-void StaticStrings::trace(JSTracer* trc) {
-  /* These strings never change, so barriers are not needed. */
-
-  for (auto& s : unitStaticTable) {
-    TraceStaticString(trc, s, "unit-static-string");
-  }
-
-  for (auto& s : length2StaticTable) {
-    TraceStaticString(trc, s, "length2-static-string");
-  }
-
-  /* This may mark some strings more than once, but so be it. */
-  for (auto& s : intStaticTable) {
-    TraceStaticString(trc, s, "int-static-string");
-  }
-}
-
 static void MarkStringAndBasesNonDeduplicatable(JSLinearString* s) {
   while (true) {
     if (!s->isTenured()) {
@@ -1399,7 +1310,7 @@ static void MarkStringAndBasesNonDeduplicatable(JSLinearString* s) {
 }
 
 bool AutoStableStringChars::init(JSContext* cx, JSString* s) {
-  RootedLinearString linearString(cx, s->ensureLinear(cx));
+  Rooted<JSLinearString*> linearString(cx, s->ensureLinear(cx));
   if (!linearString) {
     return false;
   }
@@ -1428,7 +1339,7 @@ bool AutoStableStringChars::init(JSContext* cx, JSString* s) {
 }
 
 bool AutoStableStringChars::initTwoByte(JSContext* cx, JSString* s) {
-  RootedLinearString linearString(cx, s->ensureLinear(cx));
+  Rooted<JSLinearString*> linearString(cx, s->ensureLinear(cx));
   if (!linearString) {
     return false;
   }
@@ -1454,7 +1365,7 @@ bool AutoStableStringChars::initTwoByte(JSContext* cx, JSString* s) {
   return true;
 }
 
-bool AutoStableStringChars::baseIsInline(HandleLinearString linearString) {
+bool AutoStableStringChars::baseIsInline(Handle<JSLinearString*> linearString) {
   JSString* base = linearString;
   while (base->isDependent()) {
     base = base->asDependent().base();
@@ -1487,7 +1398,7 @@ T* AutoStableStringChars::allocOwnChars(JSContext* cx, size_t count) {
 }
 
 bool AutoStableStringChars::copyAndInflateLatin1Chars(
-    JSContext* cx, HandleLinearString linearString) {
+    JSContext* cx, Handle<JSLinearString*> linearString) {
   char16_t* chars = allocOwnChars<char16_t>(cx, linearString->length());
   if (!chars) {
     return false;
@@ -1501,8 +1412,8 @@ bool AutoStableStringChars::copyAndInflateLatin1Chars(
   return true;
 }
 
-bool AutoStableStringChars::copyLatin1Chars(JSContext* cx,
-                                            HandleLinearString linearString) {
+bool AutoStableStringChars::copyLatin1Chars(
+    JSContext* cx, Handle<JSLinearString*> linearString) {
   size_t length = linearString->length();
   JS::Latin1Char* chars = allocOwnChars<JS::Latin1Char>(cx, length);
   if (!chars) {
@@ -1517,8 +1428,8 @@ bool AutoStableStringChars::copyLatin1Chars(JSContext* cx,
   return true;
 }
 
-bool AutoStableStringChars::copyTwoByteChars(JSContext* cx,
-                                             HandleLinearString linearString) {
+bool AutoStableStringChars::copyTwoByteChars(
+    JSContext* cx, Handle<JSLinearString*> linearString) {
   size_t length = linearString->length();
   char16_t* chars = allocOwnChars<char16_t>(cx, length);
   if (!chars) {
@@ -1533,7 +1444,35 @@ bool AutoStableStringChars::copyTwoByteChars(JSContext* cx,
   return true;
 }
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
+template <>
+bool JS::SourceText<char16_t>::initMaybeBorrowed(
+    JSContext* cx, JS::AutoStableStringChars& linearChars) {
+  MOZ_ASSERT(linearChars.isTwoByte(),
+             "AutoStableStringChars must be initialized with char16_t");
+
+  const char16_t* chars = linearChars.twoByteChars();
+  size_t length = linearChars.length();
+  JS::SourceOwnership ownership = linearChars.maybeGiveOwnershipToCaller()
+                                      ? JS::SourceOwnership::TakeOwnership
+                                      : JS::SourceOwnership::Borrowed;
+  return initImpl(cx, chars, length, ownership);
+}
+
+template <>
+bool JS::SourceText<char16_t>::initMaybeBorrowed(
+    JS::FrontendContext* fc, JS::AutoStableStringChars& linearChars) {
+  MOZ_ASSERT(linearChars.isTwoByte(),
+             "AutoStableStringChars must be initialized with char16_t");
+
+  const char16_t* chars = linearChars.twoByteChars();
+  size_t length = linearChars.length();
+  JS::SourceOwnership ownership = linearChars.maybeGiveOwnershipToCaller()
+                                      ? JS::SourceOwnership::TakeOwnership
+                                      : JS::SourceOwnership::Borrowed;
+  return initImpl(fc, chars, length, ownership);
+}
+
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
 void JSAtom::dump(js::GenericPrinter& out) {
   out.printf("JSAtom* (%p) = ", (void*)this);
   this->JSString::dump(out);
@@ -1553,11 +1492,11 @@ void JSExternalString::dumpRepresentation(js::GenericPrinter& out,
              callbacks());
   dumpRepresentationChars(out, indent);
 }
-#endif /* defined(DEBUG) || defined(JS_JITSPEW) */
+#endif /* defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW) */
 
 JSLinearString* js::NewDependentString(JSContext* cx, JSString* baseArg,
                                        size_t start, size_t length,
-                                       gc::InitialHeap heap) {
+                                       gc::Heap heap) {
   if (length == 0) {
     return cx->emptyString();
   }
@@ -1592,20 +1531,10 @@ static inline bool CanStoreCharsAsLatin1(const char16_t* s, size_t length) {
   return IsUtf16Latin1(Span(s, length));
 }
 
-static bool CanStoreCharsAsLatin1(LittleEndianChars chars, size_t length) {
-  for (size_t i = 0; i < length; i++) {
-    if (chars[i] > JSString::MAX_LATIN1_CHAR) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 template <AllowGC allowGC>
 static MOZ_ALWAYS_INLINE JSInlineString* NewInlineStringDeflated(
     JSContext* cx, const mozilla::Range<const char16_t>& chars,
-    gc::InitialHeap heap = gc::DefaultHeap) {
+    gc::Heap heap = gc::Heap::Default) {
   size_t len = chars.length();
   Latin1Char* storage;
   JSInlineString* str = AllocateInlineString<allowGC>(cx, len, &storage, heap);
@@ -1620,7 +1549,7 @@ static MOZ_ALWAYS_INLINE JSInlineString* NewInlineStringDeflated(
 
 template <AllowGC allowGC>
 static JSLinearString* NewStringDeflated(JSContext* cx, const char16_t* s,
-                                         size_t n, gc::InitialHeap heap) {
+                                         size_t n, gc::Heap heap) {
   if (JSLinearString* str = TryEmptyOrStaticString(cx, s, n)) {
     return str;
   }
@@ -1644,39 +1573,43 @@ static JSLinearString* NewStringDeflated(JSContext* cx, const char16_t* s,
   return JSLinearString::new_<allowGC>(cx, std::move(news), n, heap);
 }
 
-static JSLinearString* NewStringDeflatedFromLittleEndianNoGC(
-    JSContext* cx, LittleEndianChars chars, size_t length,
-    gc::InitialHeap heap) {
-  MOZ_ASSERT(CanStoreCharsAsLatin1(chars, length));
-
-  if (JSInlineString::lengthFits<Latin1Char>(length)) {
-    Latin1Char* storage;
-    JSInlineString* str =
-        AllocateInlineString<NoGC>(cx, length, &storage, heap);
-    if (!str) {
-      return nullptr;
-    }
-
-    FillFromCompatible(storage, chars, length);
-    return str;
+static MOZ_ALWAYS_INLINE JSAtom* NewInlineAtomDeflated(JSContext* cx,
+                                                       const char16_t* chars,
+                                                       size_t length,
+                                                       js::HashNumber hash) {
+  Latin1Char* storage;
+  JSAtom* str = AllocateInlineAtom(cx, length, &storage, hash);
+  if (!str) {
+    return nullptr;
   }
 
-  auto news =
-      cx->make_pod_arena_array<Latin1Char>(js::StringBufferArena, length);
+  MOZ_ASSERT(CanStoreCharsAsLatin1(chars, length));
+  FillFromCompatible(storage, chars, length);
+  return str;
+}
+
+static JSAtom* NewAtomDeflatedValidLength(JSContext* cx, const char16_t* s,
+                                          size_t n, js::HashNumber hash) {
+  if (JSInlineString::lengthFits<Latin1Char>(n)) {
+    return NewInlineAtomDeflated(cx, s, n, hash);
+  }
+
+  auto news = cx->make_pod_arena_array<Latin1Char>(js::StringBufferArena, n);
   if (!news) {
     cx->recoverFromOutOfMemory();
     return nullptr;
   }
 
-  FillFromCompatible(news.get(), chars, length);
+  MOZ_ASSERT(CanStoreCharsAsLatin1(s, n));
+  FillFromCompatible(news.get(), s, n);
 
-  return JSLinearString::new_<NoGC>(cx, std::move(news), length, heap);
+  return JSAtom::newValidLength(cx, std::move(news), n, hash);
 }
 
 template <AllowGC allowGC, typename CharT>
 JSLinearString* js::NewStringDontDeflate(
     JSContext* cx, UniquePtr<CharT[], JS::FreePolicy> chars, size_t length,
-    gc::InitialHeap heap) {
+    gc::Heap heap) {
   if (JSLinearString* str = TryEmptyOrStaticString(cx, chars.get(), length)) {
     return str;
   }
@@ -1692,26 +1625,23 @@ JSLinearString* js::NewStringDontDeflate(
 }
 
 template JSLinearString* js::NewStringDontDeflate<CanGC>(
-    JSContext* cx, UniqueTwoByteChars chars, size_t length,
-    gc::InitialHeap heap);
+    JSContext* cx, UniqueTwoByteChars chars, size_t length, gc::Heap heap);
 
 template JSLinearString* js::NewStringDontDeflate<NoGC>(
-    JSContext* cx, UniqueTwoByteChars chars, size_t length,
-    gc::InitialHeap heap);
+    JSContext* cx, UniqueTwoByteChars chars, size_t length, gc::Heap heap);
 
 template JSLinearString* js::NewStringDontDeflate<CanGC>(
-    JSContext* cx, UniqueLatin1Chars chars, size_t length,
-    gc::InitialHeap heap);
+    JSContext* cx, UniqueLatin1Chars chars, size_t length, gc::Heap heap);
 
 template JSLinearString* js::NewStringDontDeflate<NoGC>(JSContext* cx,
                                                         UniqueLatin1Chars chars,
                                                         size_t length,
-                                                        gc::InitialHeap heap);
+                                                        gc::Heap heap);
 
 template <AllowGC allowGC, typename CharT>
 JSLinearString* js::NewString(JSContext* cx,
                               UniquePtr<CharT[], JS::FreePolicy> chars,
-                              size_t length, gc::InitialHeap heap) {
+                              size_t length, gc::Heap heap) {
   if constexpr (std::is_same_v<CharT, char16_t>) {
     if (CanStoreCharsAsLatin1(chars.get(), length)) {
       // Deflating copies from |chars.get()| and lets |chars| be freed on
@@ -1725,33 +1655,27 @@ JSLinearString* js::NewString(JSContext* cx,
 
 template JSLinearString* js::NewString<CanGC>(JSContext* cx,
                                               UniqueTwoByteChars chars,
-                                              size_t length,
-                                              gc::InitialHeap heap);
+                                              size_t length, gc::Heap heap);
 
 template JSLinearString* js::NewString<NoGC>(JSContext* cx,
                                              UniqueTwoByteChars chars,
-                                             size_t length,
-                                             gc::InitialHeap heap);
+                                             size_t length, gc::Heap heap);
 
 template JSLinearString* js::NewString<CanGC>(JSContext* cx,
                                               UniqueLatin1Chars chars,
-                                              size_t length,
-                                              gc::InitialHeap heap);
+                                              size_t length, gc::Heap heap);
 
 template JSLinearString* js::NewString<NoGC>(JSContext* cx,
                                              UniqueLatin1Chars chars,
-                                             size_t length,
-                                             gc::InitialHeap heap);
+                                             size_t length, gc::Heap heap);
 
 namespace js {
 
 template <AllowGC allowGC, typename CharT>
-JSLinearString* NewStringCopyNDontDeflate(JSContext* cx, const CharT* s,
-                                          size_t n, gc::InitialHeap heap) {
-  if (JSLinearString* str = TryEmptyOrStaticString(cx, s, n)) {
-    return str;
-  }
-
+JSLinearString* NewStringCopyNDontDeflateNonStaticValidLength(JSContext* cx,
+                                                              const CharT* s,
+                                                              size_t n,
+                                                              gc::Heap heap) {
   if (JSInlineString::lengthFits<CharT>(n)) {
     return NewInlineString<allowGC>(cx, mozilla::Range<const CharT>(s, n),
                                     heap);
@@ -1767,57 +1691,51 @@ JSLinearString* NewStringCopyNDontDeflate(JSContext* cx, const CharT* s,
 
   FillChars(news.get(), s, n);
 
-  return JSLinearString::new_<allowGC>(cx, std::move(news), n, heap);
+  return JSLinearString::newValidLength<allowGC>(cx, std::move(news), n, heap);
+}
+
+template JSLinearString* NewStringCopyNDontDeflateNonStaticValidLength<CanGC>(
+    JSContext* cx, const char16_t* s, size_t n, gc::Heap heap);
+
+template JSLinearString* NewStringCopyNDontDeflateNonStaticValidLength<CanGC>(
+    JSContext* cx, const Latin1Char* s, size_t n, gc::Heap heap);
+
+template <AllowGC allowGC, typename CharT>
+JSLinearString* NewStringCopyNDontDeflate(JSContext* cx, const CharT* s,
+                                          size_t n, gc::Heap heap) {
+  if (JSLinearString* str = TryEmptyOrStaticString(cx, s, n)) {
+    return str;
+  }
+
+  if (MOZ_UNLIKELY(!JSLinearString::validateLength(cx, n))) {
+    return nullptr;
+  }
+
+  return NewStringCopyNDontDeflateNonStaticValidLength<allowGC>(cx, s, n, heap);
 }
 
 template JSLinearString* NewStringCopyNDontDeflate<CanGC>(JSContext* cx,
                                                           const char16_t* s,
                                                           size_t n,
-                                                          gc::InitialHeap heap);
+                                                          gc::Heap heap);
 
 template JSLinearString* NewStringCopyNDontDeflate<NoGC>(JSContext* cx,
                                                          const char16_t* s,
                                                          size_t n,
-                                                         gc::InitialHeap heap);
+                                                         gc::Heap heap);
 
 template JSLinearString* NewStringCopyNDontDeflate<CanGC>(JSContext* cx,
                                                           const Latin1Char* s,
                                                           size_t n,
-                                                          gc::InitialHeap heap);
+                                                          gc::Heap heap);
 
 template JSLinearString* NewStringCopyNDontDeflate<NoGC>(JSContext* cx,
                                                          const Latin1Char* s,
                                                          size_t n,
-                                                         gc::InitialHeap heap);
-
-static JSLinearString* NewUndeflatedStringFromLittleEndianNoGC(
-    JSContext* cx, LittleEndianChars chars, size_t length,
-    gc::InitialHeap heap) {
-  if (JSInlineString::lengthFits<char16_t>(length)) {
-    char16_t* storage;
-    JSInlineString* str =
-        AllocateInlineString<NoGC>(cx, length, &storage, heap);
-    if (!str) {
-      return nullptr;
-    }
-
-    FillChars(storage, chars, length);
-    return str;
-  }
-
-  auto news = cx->make_pod_arena_array<char16_t>(js::StringBufferArena, length);
-  if (!news) {
-    cx->recoverFromOutOfMemory();
-    return nullptr;
-  }
-
-  FillChars(news.get(), chars, length);
-
-  return JSLinearString::new_<NoGC>(cx, std::move(news), length, heap);
-}
+                                                         gc::Heap heap);
 
 JSLinearString* NewLatin1StringZ(JSContext* cx, UniqueChars chars,
-                                 gc::InitialHeap heap) {
+                                 gc::Heap heap) {
   size_t length = strlen(chars.get());
   UniqueLatin1Chars latin1(reinterpret_cast<Latin1Char*>(chars.release()));
   return NewString<CanGC>(cx, std::move(latin1), length, heap);
@@ -1825,7 +1743,7 @@ JSLinearString* NewLatin1StringZ(JSContext* cx, UniqueChars chars,
 
 template <AllowGC allowGC, typename CharT>
 JSLinearString* NewStringCopyN(JSContext* cx, const CharT* s, size_t n,
-                               gc::InitialHeap heap) {
+                               gc::Heap heap) {
   if constexpr (std::is_same_v<CharT, char16_t>) {
     if (CanStoreCharsAsLatin1(s, n)) {
       return NewStringDeflated<allowGC>(cx, s, n, heap);
@@ -1836,40 +1754,78 @@ JSLinearString* NewStringCopyN(JSContext* cx, const CharT* s, size_t n,
 }
 
 template JSLinearString* NewStringCopyN<CanGC>(JSContext* cx, const char16_t* s,
-                                               size_t n, gc::InitialHeap heap);
+                                               size_t n, gc::Heap heap);
 
 template JSLinearString* NewStringCopyN<NoGC>(JSContext* cx, const char16_t* s,
-                                              size_t n, gc::InitialHeap heap);
+                                              size_t n, gc::Heap heap);
 
 template JSLinearString* NewStringCopyN<CanGC>(JSContext* cx,
                                                const Latin1Char* s, size_t n,
-                                               gc::InitialHeap heap);
+                                               gc::Heap heap);
 
 template JSLinearString* NewStringCopyN<NoGC>(JSContext* cx,
                                               const Latin1Char* s, size_t n,
-                                              gc::InitialHeap heap);
+                                              gc::Heap heap);
 
-JSLinearString* NewStringFromLittleEndianNoGC(JSContext* cx,
-                                              LittleEndianChars chars,
-                                              size_t length,
-                                              gc::InitialHeap heap) {
-  if (JSLinearString* str = TryEmptyOrStaticString(cx, chars, length)) {
-    return str;
+template <typename CharT>
+JSAtom* NewAtomCopyNDontDeflateValidLength(JSContext* cx, const CharT* s,
+                                           size_t n, js::HashNumber hash) {
+  if constexpr (std::is_same_v<CharT, char16_t>) {
+    MOZ_ASSERT(!CanStoreCharsAsLatin1(s, n));
   }
 
-  if (CanStoreCharsAsLatin1(chars, length)) {
-    return NewStringDeflatedFromLittleEndianNoGC(cx, chars, length, heap);
+  if (JSInlineString::lengthFits<CharT>(n)) {
+    return NewInlineAtom(cx, s, n, hash);
   }
 
-  return NewUndeflatedStringFromLittleEndianNoGC(cx, chars, length, heap);
+  auto news = cx->make_pod_arena_array<CharT>(js::StringBufferArena, n);
+  if (!news) {
+    cx->recoverFromOutOfMemory();
+    return nullptr;
+  }
+
+  FillChars(news.get(), s, n);
+
+  return JSAtom::newValidLength(cx, std::move(news), n, hash);
 }
 
-template <js::AllowGC allowGC>
+template JSAtom* NewAtomCopyNDontDeflateValidLength(JSContext* cx,
+                                                    const char16_t* s, size_t n,
+                                                    js::HashNumber hash);
+
+template JSAtom* NewAtomCopyNDontDeflateValidLength(JSContext* cx,
+                                                    const Latin1Char* s,
+                                                    size_t n,
+                                                    js::HashNumber hash);
+
+template <typename CharT>
+JSAtom* NewAtomCopyNMaybeDeflateValidLength(JSContext* cx, const CharT* s,
+                                            size_t n, js::HashNumber hash) {
+  if constexpr (std::is_same_v<CharT, char16_t>) {
+    if (CanStoreCharsAsLatin1(s, n)) {
+      return NewAtomDeflatedValidLength(cx, s, n, hash);
+    }
+  }
+
+  return NewAtomCopyNDontDeflateValidLength(cx, s, n, hash);
+}
+
+template JSAtom* NewAtomCopyNMaybeDeflateValidLength(JSContext* cx,
+                                                     const char16_t* s,
+                                                     size_t n,
+                                                     js::HashNumber hash);
+
+template JSAtom* NewAtomCopyNMaybeDeflateValidLength(JSContext* cx,
+                                                     const Latin1Char* s,
+                                                     size_t n,
+                                                     js::HashNumber hash);
+
 JSLinearString* NewStringCopyUTF8N(JSContext* cx, const JS::UTF8Chars utf8,
-                                   gc::InitialHeap heap) {
+                                   gc::Heap heap) {
   JS::SmallestEncoding encoding = JS::FindSmallestEncoding(utf8);
   if (encoding == JS::SmallestEncoding::ASCII) {
-    return NewStringCopyN<allowGC>(cx, utf8.begin().get(), utf8.length(), heap);
+    return NewStringCopyN<js::CanGC>(cx, utf8.begin().get(), utf8.length(),
+                                     heap);
   }
 
   size_t length;
@@ -1881,7 +1837,7 @@ JSLinearString* NewStringCopyUTF8N(JSContext* cx, const JS::UTF8Chars utf8,
       return nullptr;
     }
 
-    return NewString<allowGC>(cx, std::move(latin1), length, heap);
+    return NewString<js::CanGC>(cx, std::move(latin1), length, heap);
   }
 
   MOZ_ASSERT(encoding == JS::SmallestEncoding::UTF16);
@@ -1893,12 +1849,8 @@ JSLinearString* NewStringCopyUTF8N(JSContext* cx, const JS::UTF8Chars utf8,
     return nullptr;
   }
 
-  return NewString<allowGC>(cx, std::move(utf16), length, heap);
+  return NewString<js::CanGC>(cx, std::move(utf16), length, heap);
 }
-
-template JSLinearString* NewStringCopyUTF8N<CanGC>(JSContext* cx,
-                                                   const JS::UTF8Chars utf8,
-                                                   gc::InitialHeap heap);
 
 MOZ_ALWAYS_INLINE JSString* ExternalStringCache::lookup(const char16_t* chars,
                                                         size_t len) const {
@@ -1921,7 +1873,7 @@ MOZ_ALWAYS_INLINE JSString* ExternalStringCache::lookup(const char16_t* chars,
     // Compare the chars. Don't do this for long strings as it will be
     // faster to allocate a new external string.
     static const size_t MaxLengthForCharComparison = 100;
-    if (len <= MaxLengthForCharComparison && ArrayEqual(chars, strChars, len)) {
+    if (len <= MaxLengthForCharComparison && EqualChars(chars, strChars, len)) {
       return str;
     }
   }
@@ -1941,8 +1893,7 @@ MOZ_ALWAYS_INLINE void ExternalStringCache::put(JSString* str) {
 
 JSString* NewMaybeExternalString(JSContext* cx, const char16_t* s, size_t n,
                                  const JSExternalStringCallbacks* callbacks,
-                                 bool* allocatedExternal,
-                                 gc::InitialHeap heap) {
+                                 bool* allocatedExternal, gc::Heap heap) {
   if (JSString* str = TryEmptyOrStaticString(cx, s, n)) {
     *allocatedExternal = false;
     return str;
@@ -1973,7 +1924,7 @@ JSString* NewMaybeExternalString(JSContext* cx, const char16_t* s, size_t n,
 
 } /* namespace js */
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
+#if defined(DEBUG) || defined(JS_JITSPEW) || defined(JS_CACHEIR_SPEW)
 void JSExtensibleString::dumpRepresentation(js::GenericPrinter& out,
                                             int indent) const {
   dumpRepresentationHeader(out, "JSExtensibleString");
@@ -2015,11 +1966,11 @@ struct RepresentativeExternalString : public JSExternalStringCallbacks {
 static const RepresentativeExternalString RepresentativeExternalStringCallbacks;
 
 template <typename CheckString, typename CharT>
-static bool FillWithRepresentatives(JSContext* cx, HandleArrayObject array,
+static bool FillWithRepresentatives(JSContext* cx, Handle<ArrayObject*> array,
                                     uint32_t* index, const CharT* chars,
                                     size_t len, size_t fatInlineMaxLength,
-                                    const CheckString& check) {
-  auto AppendString = [&check](JSContext* cx, HandleArrayObject array,
+                                    const CheckString& check, gc::Heap heap) {
+  auto AppendString = [&check](JSContext* cx, Handle<ArrayObject*> array,
                                uint32_t* index, HandleString s) {
     MOZ_ASSERT(check(s));
     (void)check;  // silence clang -Wunused-lambda-capture in opt builds
@@ -2052,50 +2003,50 @@ static bool FillWithRepresentatives(JSContext* cx, HandleArrayObject array,
   MOZ_ASSERT(atom3->isAtom());
   MOZ_ASSERT(atom3->isFatInline());
 
-  // Normal linear string.
-  RootedString linear1(cx, NewStringCopyN<CanGC>(cx, chars, len));
+  // Normal linear string; maybe nursery.
+  RootedString linear1(cx, NewStringCopyN<CanGC>(cx, chars, len, heap));
   if (!linear1 || !AppendString(cx, array, index, linear1)) {
     return false;
   }
   MOZ_ASSERT(linear1->isLinear());
 
-  // Inline string.
-  RootedString linear2(cx, NewStringCopyN<CanGC>(cx, chars, 3));
+  // Inline string; maybe nursery.
+  RootedString linear2(cx, NewStringCopyN<CanGC>(cx, chars, 3, heap));
   if (!linear2 || !AppendString(cx, array, index, linear2)) {
     return false;
   }
   MOZ_ASSERT(linear2->isLinear());
   MOZ_ASSERT(linear2->isInline());
 
-  // Fat inline string.
-  RootedString linear3(cx,
-                       NewStringCopyN<CanGC>(cx, chars, fatInlineMaxLength));
+  // Fat inline string; maybe nursery.
+  RootedString linear3(
+      cx, NewStringCopyN<CanGC>(cx, chars, fatInlineMaxLength, heap));
   if (!linear3 || !AppendString(cx, array, index, linear3)) {
     return false;
   }
   MOZ_ASSERT(linear3->isLinear());
   MOZ_ASSERT(linear3->isFatInline());
 
-  // Rope.
-  RootedString rope(cx, ConcatStrings<CanGC>(cx, atom1, atom3));
+  // Rope; maybe nursery.
+  RootedString rope(cx, ConcatStrings<CanGC>(cx, atom1, atom3, heap));
   if (!rope || !AppendString(cx, array, index, rope)) {
     return false;
   }
   MOZ_ASSERT(rope->isRope());
 
-  // Dependent.
-  RootedString dep(cx, NewDependentString(cx, atom1, 0, len - 2));
+  // Dependent; maybe nursery.
+  RootedString dep(cx, NewDependentString(cx, atom1, 0, len - 2, heap));
   if (!dep || !AppendString(cx, array, index, dep)) {
     return false;
   }
   MOZ_ASSERT(dep->isDependent());
 
-  // Extensible.
-  RootedString temp1(cx, NewStringCopyN<CanGC>(cx, chars, len));
+  // Extensible; maybe nursery.
+  RootedString temp1(cx, NewStringCopyN<CanGC>(cx, chars, len, heap));
   if (!temp1) {
     return false;
   }
-  RootedString extensible(cx, ConcatStrings<CanGC>(cx, temp1, atom3));
+  RootedString extensible(cx, ConcatStrings<CanGC>(cx, temp1, atom3, heap));
   if (!extensible || !extensible->ensureLinear(cx)) {
     return false;
   }
@@ -2146,47 +2097,45 @@ static bool FillWithRepresentatives(JSContext* cx, HandleArrayObject array,
 }
 
 /* static */
-bool JSString::fillWithRepresentatives(JSContext* cx, HandleArrayObject array) {
+bool JSString::fillWithRepresentatives(JSContext* cx,
+                                       Handle<ArrayObject*> array) {
   uint32_t index = 0;
 
   auto CheckTwoByte = [](JSString* str) { return str->hasTwoByteChars(); };
   auto CheckLatin1 = [](JSString* str) { return str->hasLatin1Chars(); };
 
-  // Append TwoByte strings.
   static const char16_t twoByteChars[] =
       u"\u1234abc\0def\u5678ghijklmasdfa\0xyz0123456789";
-  if (!FillWithRepresentatives(
-          cx, array, &index, twoByteChars, std::size(twoByteChars) - 1,
-          JSFatInlineString::MAX_LENGTH_TWO_BYTE, CheckTwoByte)) {
-    return false;
-  }
-
-  // Append Latin1 strings.
   static const Latin1Char latin1Chars[] = "abc\0defghijklmasdfa\0xyz0123456789";
-  if (!FillWithRepresentatives(
-          cx, array, &index, latin1Chars, std::size(latin1Chars) - 1,
-          JSFatInlineString::MAX_LENGTH_LATIN1, CheckLatin1)) {
+
+  // Create strings using both the default heap and forcing the tenured heap. If
+  // nursery strings are available, this is a best effort at creating them in
+  // the default heap case. Since nursery strings may be disabled or a GC may
+  // occur during this process, there may be duplicate representatives in the
+  // final list.
+
+  if (!FillWithRepresentatives(cx, array, &index, twoByteChars,
+                               std::size(twoByteChars) - 1,
+                               JSFatInlineString::MAX_LENGTH_TWO_BYTE,
+                               CheckTwoByte, gc::Heap::Tenured)) {
     return false;
   }
-
-  // Now create forcibly-tenured versions of each of these string types. Note
-  // that this is best-effort; if nursery strings are disabled, or we GC
-  // midway through here, then we may end up with fewer nursery strings than
-  // desired. Also, some types of strings are not nursery-allocatable, so
-  // this will always produce some number of redundant strings.
-  gc::AutoSuppressNurseryCellAlloc suppress(cx);
-
-  // Append TwoByte strings.
-  if (!FillWithRepresentatives(
-          cx, array, &index, twoByteChars, std::size(twoByteChars) - 1,
-          JSFatInlineString::MAX_LENGTH_TWO_BYTE, CheckTwoByte)) {
+  if (!FillWithRepresentatives(cx, array, &index, latin1Chars,
+                               std::size(latin1Chars) - 1,
+                               JSFatInlineString::MAX_LENGTH_LATIN1,
+                               CheckLatin1, gc::Heap::Tenured)) {
     return false;
   }
-
-  // Append Latin1 strings.
-  if (!FillWithRepresentatives(
-          cx, array, &index, latin1Chars, std::size(latin1Chars) - 1,
-          JSFatInlineString::MAX_LENGTH_LATIN1, CheckLatin1)) {
+  if (!FillWithRepresentatives(cx, array, &index, twoByteChars,
+                               std::size(twoByteChars) - 1,
+                               JSFatInlineString::MAX_LENGTH_TWO_BYTE,
+                               CheckTwoByte, gc::Heap::Default)) {
+    return false;
+  }
+  if (!FillWithRepresentatives(cx, array, &index, latin1Chars,
+                               std::size(latin1Chars) - 1,
+                               JSFatInlineString::MAX_LENGTH_LATIN1,
+                               CheckLatin1, gc::Heap::Default)) {
     return false;
   }
 
@@ -2296,7 +2245,22 @@ JSString* js::ToStringSlow(
     }
     RootedBigInt i(cx, v.toBigInt());
     str = BigInt::toString<CanGC>(cx, i, 10);
-  } else {
+  }
+#ifdef ENABLE_RECORD_TUPLE
+  else if (v.isExtendedPrimitive()) {
+    if (!allowGC) {
+      return nullptr;
+    }
+    if (IsTuple(v)) {
+      Rooted<TupleType*> tup(cx, &TupleType::thisTupleValue(v));
+      return TupleToSource(cx, tup);
+    }
+    Rooted<RecordType*> rec(cx);
+    MOZ_ALWAYS_TRUE(RecordObject::maybeUnbox(&v.getObjectPayload(), &rec));
+    return RecordToSource(cx, rec);
+  }
+#endif
+  else {
     MOZ_ASSERT(v.isUndefined());
     str = cx->names().undefined;
   }

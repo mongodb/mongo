@@ -47,7 +47,7 @@ class V8Vector {
     return start_[index];
   }
 
-  inline V8Vector<T> operator+(int offset) {
+  V8Vector<T> operator+(int offset) const {
     MOZ_ASSERT(offset < length_);
     return V8Vector<T>(start_ + offset, length_ - offset);
   }

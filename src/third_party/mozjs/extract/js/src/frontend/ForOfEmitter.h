@@ -7,15 +7,15 @@
 #ifndef frontend_ForOfEmitter_h
 #define frontend_ForOfEmitter_h
 
-#include "mozilla/Attributes.h"
-#include "mozilla/Maybe.h"
+#include "mozilla/Attributes.h"  // MOZ_STACK_CLASS
+#include "mozilla/Maybe.h"       // mozilla::Maybe
 
-#include <stdint.h>
+#include <stdint.h>  // int32_t
 
-#include "frontend/ForOfLoopControl.h"
-#include "frontend/IteratorKind.h"
-#include "frontend/JumpList.h"
-#include "frontend/TDZCheckCache.h"
+#include "frontend/ForOfLoopControl.h"  // ForOfLoopControl
+#include "frontend/IteratorKind.h"      // IteratorKind
+#include "frontend/SelfHostedIter.h"    // SelfHostedIter
+#include "frontend/TDZCheckCache.h"     // TDZCheckCache
 
 namespace js {
 namespace frontend {
@@ -32,11 +32,11 @@ class EmitterScope;
 //     ForOfEmitter forOf(this, headLexicalEmitterScope);
 //     forOf.emitIterated();
 //     emit(iterated);
-//     forOf.emitInitialize(Some(offset_of_for));
+//     forOf.emitInitialize(offset_of_for);
 //     emit(init);
 //     forOf.emitBody();
 //     emit(body);
-//     forOf.emitEnd(Some(offset_of_iterated));
+//     forOf.emitEnd(offset_of_iterated);
 //
 class MOZ_STACK_CLASS ForOfEmitter {
   BytecodeEmitter* bce_;
@@ -46,7 +46,7 @@ class MOZ_STACK_CLASS ForOfEmitter {
   int32_t loopDepth_ = 0;
 #endif
 
-  bool allowSelfHostedIter_;
+  SelfHostedIter selfHostedIter_;
   IteratorKind iterKind_;
 
   mozilla::Maybe<ForOfLoopControl> loopInfo_;
@@ -93,7 +93,7 @@ class MOZ_STACK_CLASS ForOfEmitter {
  public:
   ForOfEmitter(BytecodeEmitter* bce,
                const EmitterScope* headLexicalEmitterScope,
-               bool allowSelfHostedIter, IteratorKind iterKind);
+               SelfHostedIter selfHostedIter, IteratorKind iterKind);
 
   // The offset in the source code for each character below:
   //
@@ -103,12 +103,11 @@ class MOZ_STACK_CLASS ForOfEmitter {
   //   |              iteratedPos
   //   |
   //   forPos
-  //
-  // Can be Nothing() if not available.
   [[nodiscard]] bool emitIterated();
-  [[nodiscard]] bool emitInitialize(const mozilla::Maybe<uint32_t>& forPos);
+  [[nodiscard]] bool emitInitialize(uint32_t forPos,
+                                    bool isIteratorMethodOnStack);
   [[nodiscard]] bool emitBody();
-  [[nodiscard]] bool emitEnd(const mozilla::Maybe<uint32_t>& iteratedPos);
+  [[nodiscard]] bool emitEnd(uint32_t iteratedPos);
 };
 
 } /* namespace frontend */

@@ -49,7 +49,6 @@ enum class State {
   D(CheckHashTablesOnMinorGC, 13)        \
   D(Compact, 14)                         \
   D(CheckHeapAfterGC, 15)                \
-  D(CheckNursery, 16)                    \
   D(YieldBeforeSweepingAtoms, 17)        \
   D(CheckGrayMarking, 18)                \
   D(YieldBeforeSweepingCaches, 19)       \
@@ -103,11 +102,12 @@ enum class GCAbortReason {
   _(PropMapChildren)                       \
   _(PropMapTable)                          \
   _(ModuleBindingMap)                      \
+  _(ModuleCyclicFields)                    \
+  _(ModuleExports)                         \
   _(BaselineScript)                        \
   _(IonScript)                             \
   _(ArgumentsData)                         \
   _(RareArgumentsData)                     \
-  _(RegExpStatics)                         \
   _(RegExpSharedBytecode)                  \
   _(RegExpSharedNamedCaptureData)          \
   _(TypedArrayElements)                    \
@@ -127,9 +127,8 @@ enum class GCAbortReason {
   _(WasmResolveResponseClosure)            \
   _(WasmModule)                            \
   _(WasmTableTable)                        \
-  _(WasmExceptionTag)                      \
-  _(WasmExceptionType)                     \
-  _(WasmRuntimeExceptionTag)               \
+  _(WasmExceptionData)                     \
+  _(WasmTagType)                           \
   _(FileObjectFile)                        \
   _(Debugger)                              \
   _(DebuggerFrameGeneratorInfo)            \
@@ -140,9 +139,11 @@ enum class GCAbortReason {
   _(FinalizationRegistryRecordVector)      \
   _(FinalizationRegistryRegistrations)     \
   _(FinalizationRecordVector)              \
-  _(ZoneAllocPolicy)                       \
+  _(TrackedAllocPolicy)                    \
   _(SharedArrayRawBuffer)                  \
-  _(XDRBufferElements)
+  _(XDRBufferElements)                     \
+  _(GlobalObjectData)                      \
+  _(ProxyExternalValueArray)
 
 #define JS_FOR_EACH_MEMORY_USE(_)  \
   JS_FOR_EACH_PUBLIC_MEMORY_USE(_) \

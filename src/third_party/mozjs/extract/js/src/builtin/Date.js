@@ -34,7 +34,6 @@
 // 3) create the desired formatter and store and return it.
 var dateTimeFormatCache = new_Record();
 
-
 /**
  * Get a cached DateTimeFormat formatter object, created like so:
  *
@@ -44,30 +43,32 @@ var dateTimeFormatCache = new_Record();
  * |format| must be a key from the "formatters" Record described above.
  */
 function GetCachedFormat(format, required, defaults) {
-    assert(format === "dateTimeFormat" ||
-           format === "dateFormat" ||
-           format === "timeFormat",
-           "unexpected format key: please update the comment by " +
-           "dateTimeFormatCache");
+  assert(
+    format === "dateTimeFormat" ||
+      format === "dateFormat" ||
+      format === "timeFormat",
+    "unexpected format key: please update the comment by dateTimeFormatCache"
+  );
 
-    var formatters;
-    if (!intl_IsRuntimeDefaultLocale(dateTimeFormatCache.runtimeDefaultLocale) ||
-        !intl_isDefaultTimeZone(dateTimeFormatCache.icuDefaultTimeZone))
-    {
-        formatters = dateTimeFormatCache.formatters = new_Record();
-        dateTimeFormatCache.runtimeDefaultLocale = intl_RuntimeDefaultLocale();
-        dateTimeFormatCache.icuDefaultTimeZone = intl_defaultTimeZone();
-    } else {
-        formatters = dateTimeFormatCache.formatters;
-    }
+  var formatters;
+  if (
+    !intl_IsRuntimeDefaultLocale(dateTimeFormatCache.runtimeDefaultLocale) ||
+    !intl_isDefaultTimeZone(dateTimeFormatCache.icuDefaultTimeZone)
+  ) {
+    formatters = dateTimeFormatCache.formatters = new_Record();
+    dateTimeFormatCache.runtimeDefaultLocale = intl_RuntimeDefaultLocale();
+    dateTimeFormatCache.icuDefaultTimeZone = intl_defaultTimeZone();
+  } else {
+    formatters = dateTimeFormatCache.formatters;
+  }
 
-    var fmt = formatters[format];
-    if (fmt === undefined) {
-        var options = ToDateTimeOptions(undefined, required, defaults);
-        fmt = formatters[format] = intl_DateTimeFormat(undefined, options);
-    }
+  var fmt = formatters[format];
+  if (fmt === undefined) {
+    var options = ToDateTimeOptions(undefined, required, defaults);
+    fmt = formatters[format] = intl_DateTimeFormat(undefined, options);
+  }
 
-    return fmt;
+  return fmt;
 }
 
 /**
@@ -78,30 +79,30 @@ function GetCachedFormat(format, required, defaults) {
  * Spec: ECMAScript Internationalization API Specification, 13.3.1.
  */
 function Date_toLocaleString() {
-    // Steps 1-2.
-    var x = callFunction(ThisTimeValue, this, DATE_METHOD_LOCALE_STRING);
-    if (Number_isNaN(x))
-        return "Invalid Date";
+  // Steps 1-2.
+  var x = callFunction(ThisTimeValue, this, DATE_METHOD_LOCALE_STRING);
+  if (Number_isNaN(x)) {
+    return "Invalid Date";
+  }
 
-    // Steps 3-4.
-    var locales = arguments.length > 0 ? arguments[0] : undefined;
-    var options = arguments.length > 1 ? arguments[1] : undefined;
+  // Steps 3-4.
+  var locales = ArgumentsLength() ? GetArgument(0) : undefined;
+  var options = ArgumentsLength() > 1 ? GetArgument(1) : undefined;
 
-    // Step 5-6.
-    var dateTimeFormat;
-    if (locales === undefined && options === undefined) {
-        // This cache only optimizes for the old ES5 toLocaleString without
-        // locales and options.
-        dateTimeFormat = GetCachedFormat("dateTimeFormat", "any", "all");
-    } else {
-        options = ToDateTimeOptions(options, "any", "all");
-        dateTimeFormat = intl_DateTimeFormat(locales, options);
-    }
+  // Step 5-6.
+  var dateTimeFormat;
+  if (locales === undefined && options === undefined) {
+    // This cache only optimizes for the old ES5 toLocaleString without
+    // locales and options.
+    dateTimeFormat = GetCachedFormat("dateTimeFormat", "any", "all");
+  } else {
+    options = ToDateTimeOptions(options, "any", "all");
+    dateTimeFormat = intl_DateTimeFormat(locales, options);
+  }
 
-    // Step 7.
-    return intl_FormatDateTime(dateTimeFormat, x, /* formatToParts = */ false);
+  // Step 7.
+  return intl_FormatDateTime(dateTimeFormat, x, /* formatToParts = */ false);
 }
-
 
 /**
  * Format this Date object into a date string, using the locale and formatting
@@ -111,30 +112,30 @@ function Date_toLocaleString() {
  * Spec: ECMAScript Internationalization API Specification, 13.3.2.
  */
 function Date_toLocaleDateString() {
-    // Steps 1-2.
-    var x = callFunction(ThisTimeValue, this, DATE_METHOD_LOCALE_DATE_STRING);
-    if (Number_isNaN(x))
-        return "Invalid Date";
+  // Steps 1-2.
+  var x = callFunction(ThisTimeValue, this, DATE_METHOD_LOCALE_DATE_STRING);
+  if (Number_isNaN(x)) {
+    return "Invalid Date";
+  }
 
-    // Steps 3-4.
-    var locales = arguments.length > 0 ? arguments[0] : undefined;
-    var options = arguments.length > 1 ? arguments[1] : undefined;
+  // Steps 3-4.
+  var locales = ArgumentsLength() ? GetArgument(0) : undefined;
+  var options = ArgumentsLength() > 1 ? GetArgument(1) : undefined;
 
-    // Step 5-6.
-    var dateTimeFormat;
-    if (locales === undefined && options === undefined) {
-        // This cache only optimizes for the old ES5 toLocaleDateString without
-        // locales and options.
-        dateTimeFormat = GetCachedFormat("dateFormat", "date", "date");
-    } else {
-        options = ToDateTimeOptions(options, "date", "date");
-        dateTimeFormat = intl_DateTimeFormat(locales, options);
-    }
+  // Step 5-6.
+  var dateTimeFormat;
+  if (locales === undefined && options === undefined) {
+    // This cache only optimizes for the old ES5 toLocaleDateString without
+    // locales and options.
+    dateTimeFormat = GetCachedFormat("dateFormat", "date", "date");
+  } else {
+    options = ToDateTimeOptions(options, "date", "date");
+    dateTimeFormat = intl_DateTimeFormat(locales, options);
+  }
 
-    // Step 7.
-    return intl_FormatDateTime(dateTimeFormat, x, /* formatToParts = */ false);
+  // Step 7.
+  return intl_FormatDateTime(dateTimeFormat, x, /* formatToParts = */ false);
 }
-
 
 /**
  * Format this Date object into a time string, using the locale and formatting
@@ -144,27 +145,28 @@ function Date_toLocaleDateString() {
  * Spec: ECMAScript Internationalization API Specification, 13.3.3.
  */
 function Date_toLocaleTimeString() {
-    // Steps 1-2.
-    var x = callFunction(ThisTimeValue, this, DATE_METHOD_LOCALE_TIME_STRING);
-    if (Number_isNaN(x))
-        return "Invalid Date";
+  // Steps 1-2.
+  var x = callFunction(ThisTimeValue, this, DATE_METHOD_LOCALE_TIME_STRING);
+  if (Number_isNaN(x)) {
+    return "Invalid Date";
+  }
 
-    // Steps 3-4.
-    var locales = arguments.length > 0 ? arguments[0] : undefined;
-    var options = arguments.length > 1 ? arguments[1] : undefined;
+  // Steps 3-4.
+  var locales = ArgumentsLength() ? GetArgument(0) : undefined;
+  var options = ArgumentsLength() > 1 ? GetArgument(1) : undefined;
 
-    // Step 5-6.
-    var dateTimeFormat;
-    if (locales === undefined && options === undefined) {
-        // This cache only optimizes for the old ES5 toLocaleTimeString without
-        // locales and options.
-        dateTimeFormat = GetCachedFormat("timeFormat", "time", "time");
-    } else {
-        options = ToDateTimeOptions(options, "time", "time");
-        dateTimeFormat = intl_DateTimeFormat(locales, options);
-    }
+  // Step 5-6.
+  var dateTimeFormat;
+  if (locales === undefined && options === undefined) {
+    // This cache only optimizes for the old ES5 toLocaleTimeString without
+    // locales and options.
+    dateTimeFormat = GetCachedFormat("timeFormat", "time", "time");
+  } else {
+    options = ToDateTimeOptions(options, "time", "time");
+    dateTimeFormat = intl_DateTimeFormat(locales, options);
+  }
 
-    // Step 7.
-    return intl_FormatDateTime(dateTimeFormat, x, /* formatToParts = */ false);
+  // Step 7.
+  return intl_FormatDateTime(dateTimeFormat, x, /* formatToParts = */ false);
 }
 #endif  // JS_HAS_INTL_API

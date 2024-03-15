@@ -32,10 +32,14 @@ class ObjectOpResult;
 
 class JS_PUBLIC_API PropertyDescriptor;
 
+namespace Scalar {}
+
 }  // namespace JS
 
 // Do the importing.
 namespace js {
+
+namespace Scalar = JS::Scalar;
 
 using JS::BooleanValue;
 using JS::DoubleValue;
@@ -46,6 +50,9 @@ using JS::NullValue;
 using JS::NumberValue;
 using JS::ObjectOrNullValue;
 using JS::ObjectValue;
+#ifdef ENABLE_RECORD_TUPLE
+using JS::ExtendedPrimitiveValue;
+#endif
 using JS::PrivateGCThingValue;
 using JS::PrivateUint32Value;
 using JS::PrivateValue;
@@ -58,6 +65,7 @@ using JS::Latin1Char;
 using JS::UniqueChars;
 using JS::UniqueLatin1Chars;
 using JS::UniqueTwoByteChars;
+using JS::UniqueWideChars;
 
 using JS::Ok;
 using JS::OOM;
@@ -143,6 +151,11 @@ using JS::Realm;
 using JS::Zone;
 
 using JS::BigInt;
+
+#ifdef ENABLE_RECORD_TUPLE
+using JS::RecordType;
+using JS::TupleType;
+#endif
 
 } /* namespace js */
 

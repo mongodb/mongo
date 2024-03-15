@@ -26,7 +26,7 @@
 
 /**
  * @file
- * @brief   Provides a simple LibC abstraction and fallback routines.
+ * Provides a simple LibC abstraction and fallback routines.
  */
 
 #ifndef ZYCORE_LIBC_H
@@ -58,7 +58,7 @@
 #include <stdarg.h>
 
 /**
- * @brief   Defines the `ZyanVAList` datatype.
+ * Defines the `ZyanVAList` datatype.
  */
 typedef va_list ZyanVAList;
 
@@ -84,7 +84,7 @@ typedef va_list ZyanVAList;
 #define ZYAN_VSNPRINTF  vsnprintf
 
 /**
- * @brief   Defines the `ZyanFile` datatype.
+ * Defines the `ZyanFile` datatype.
  */
 typedef FILE ZyanFile;
 
@@ -153,7 +153,7 @@ typedef FILE ZyanFile;
 #if defined(ZYAN_MSVC) || defined(ZYAN_ICC)
 
 /**
- * @brief   Defines the `ZyanVAList` datatype.
+ * Defines the `ZyanVAList` datatype.
  */
 typedef char* ZyanVAList;
 
@@ -165,7 +165,7 @@ typedef char* ZyanVAList;
 #elif defined(ZYAN_GNUC)
 
 /**
- * @brief   Defines the `ZyanVAList` datatype.
+ * Defines the `ZyanVAList` datatype.
  */
 typedef __builtin_va_list  ZyanVAList;
 

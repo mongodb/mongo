@@ -1,0 +1,8 @@
+{
+    "debug": true,
+    "optimize": true,
+    "configure-args": "--enable-record-tuple",
+    "skip-tests": {
+        "all": ["jittest", "jsapitests", "checks"]
+    }
+}

@@ -70,7 +70,7 @@ static const ZyanStringView STR_SUB = ZYAN_DEFINE_STRING_VIEW("-");
 /* ============================================================================================== */
 
 /**
- * @brief   Writes a terminating '\0' character at the end of the string data.
+ * Writes a terminating '\0' character at the end of the string data.
  */
 #define ZYCORE_STRING_NULLTERMINATE(string) \
       *(char*)((ZyanU8*)(string)->vector.data + (string)->vector.size - 1) = '\0';
@@ -83,7 +83,7 @@ static const ZyanStringView STR_SUB = ZYAN_DEFINE_STRING_VIEW("-");
 /* Decimal                                                                                        */
 /* ---------------------------------------------------------------------------------------------- */
 
-#if defined(ZYAN_X86) || defined(ZYAN_ARM) || defined(ZYAN_EMSCRIPTEN)
+#if defined(ZYAN_X86) || defined(ZYAN_ARM) || defined(ZYAN_EMSCRIPTEN) || defined(ZYAN_WASM) || defined(ZYAN_PPC)
 ZyanStatus ZyanStringAppendDecU32(ZyanString* string, ZyanU32 value, ZyanU8 padding_length)
 {
     if (!string)
@@ -179,7 +179,7 @@ ZyanStatus ZyanStringAppendDecU64(ZyanString* string, ZyanU64 value, ZyanU8 padd
 /* Hexadecimal                                                                                    */
 /* ---------------------------------------------------------------------------------------------- */
 
-#if defined(ZYAN_X86) || defined(ZYAN_ARM) || defined(ZYAN_EMSCRIPTEN)
+#if defined(ZYAN_X86) || defined(ZYAN_ARM) || defined(ZYAN_EMSCRIPTEN) || defined(ZYAN_WASM) || defined(ZYAN_PPC)
 ZyanStatus ZyanStringAppendHexU32(ZyanString* string, ZyanU32 value, ZyanU8 padding_length,
     ZyanBool uppercase)
 {
@@ -423,7 +423,7 @@ ZyanStatus ZyanStringAppendFormat(ZyanString* string, const char* format, ...)
 
 ZyanStatus ZyanStringAppendDecU(ZyanString* string, ZyanU64 value, ZyanU8 padding_length)
 {
-#if defined(ZYAN_X64) || defined(ZYAN_AARCH64)
+#if defined(ZYAN_X64) || defined(ZYAN_AARCH64) || defined(ZYAN_PPC64) || defined(ZYAN_RISCV64)
     return ZyanStringAppendDecU64(string, value, padding_length);
 #else
     // Working with 64-bit values is slow on non 64-bit systems
@@ -445,7 +445,7 @@ ZyanStatus ZyanStringAppendDecS(ZyanString* string, ZyanI64 value, ZyanU8 paddin
         {
             ZYAN_CHECK(ZyanStringAppend(string, prefix));
         }
-        return ZyanStringAppendDecU(string, -value, padding_length);
+        return ZyanStringAppendDecU(string, ZyanAbsI64(value), padding_length);
     }
 
     if (force_sign)
@@ -464,7 +464,7 @@ ZyanStatus ZyanStringAppendDecS(ZyanString* string, ZyanI64 value, ZyanU8 paddin
 ZyanStatus ZyanStringAppendHexU(ZyanString* string, ZyanU64 value, ZyanU8 padding_length,
     ZyanBool uppercase)
 {
-#if defined(ZYAN_X64) || defined(ZYAN_AARCH64)
+#if defined(ZYAN_X64) || defined(ZYAN_AARCH64) || defined(ZYAN_PPC64) || defined(ZYAN_RISCV64)
     return ZyanStringAppendHexU64(string, value, padding_length, uppercase);
 #else
     // Working with 64-bit values is slow on non 64-bit systems
@@ -486,7 +486,7 @@ ZyanStatus ZyanStringAppendHexS(ZyanString* string, ZyanI64 value, ZyanU8 paddin
         {
             ZYAN_CHECK(ZyanStringAppend(string, prefix));
         }
-        return ZyanStringAppendHexU(string, -value, padding_length, uppercase);
+        return ZyanStringAppendHexU(string, ZyanAbsI64(value), padding_length, uppercase);
     }
 
     if (force_sign)

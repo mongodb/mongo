@@ -7,7 +7,6 @@
 #ifndef builtin_intl_IntlObject_h
 #define builtin_intl_IntlObject_h
 
-#include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 
 namespace js {
@@ -20,82 +19,24 @@ extern const JSClass IntlClass;
  * properties:
  *
  *   firstDayOfWeek
- *     an integer in the range 1=Sunday to 7=Saturday indicating the day
- *     considered the first day of the week in calendars, e.g. 1 for en-US,
- *     2 for en-GB, 1 for bn-IN
+ *     an integer in the range 1=Monday to 7=Sunday indicating the day
+ *     considered the first day of the week in calendars, e.g. 7 for en-US,
+ *     1 for en-GB, 7 for bn-IN
  *   minDays
  *     an integer in the range of 1 to 7 indicating the minimum number
  *     of days required in the first week of the year, e.g. 1 for en-US,
  *     4 for de
- *   weekendStart
- *     an integer in the range 1=Sunday to 7=Saturday indicating the day
- *     considered the beginning of a weekend, e.g. 7 for en-US, 7 for en-GB,
- *     1 for bn-IN
- *   weekendEnd
- *     an integer in the range 1=Sunday to 7=Saturday indicating the day
- *     considered the end of a weekend, e.g. 1 for en-US, 1 for en-GB,
- *     1 for bn-IN (note that "weekend" is *not* necessarily two days)
+ *   weekend
+ *     an array with values in the range 1=Monday to 7=Sunday indicating the
+ *     days of the week considered as part of the weekend, e.g. [6, 7] for en-US
+ *     and en-GB, [7] for bn-IN (note that "weekend" is *not* necessarily two
+ *     days)
  *
  * NOTE: "calendar" and "locale" properties are *not* added to the object.
  */
 [[nodiscard]] extern bool intl_GetCalendarInfo(JSContext* cx, unsigned argc,
                                                JS::Value* vp);
 
-/**
- * Returns a plain object with locale information for a single valid locale
- * (callers must perform this validation).  The object will have these
- * properties:
- *
- *   direction
- *     a string with a value "ltr" for left-to-right locale, and "rtl" for
- *     right-to-left locale.
- *   locale
- *     a BCP47 compilant locale string for the resolved locale.
- */
-[[nodiscard]] extern bool intl_GetLocaleInfo(JSContext* cx, unsigned argc,
-                                             JS::Value* vp);
-
-/**
- * Returns an Array with CLDR-based fields display names.
- * The function takes three arguments:
- *
- *   locale
- *     BCP47 compliant locale string
- *   style
- *     A string with values: long or short or narrow
- *   keys
- *     An array or path-like strings that identify keys to be returned
- *     At the moment the following types of keys are supported:
- *
- *       'dates/fields/{year|month|week|day}'
- *       'dates/gregorian/months/{january|...|december}'
- *       'dates/gregorian/weekdays/{sunday|...|saturday}'
- *       'dates/gregorian/dayperiods/{am|pm}'
- *
- * Example:
- *
- * let info = intl_ComputeDisplayNames(
- *   'en-US',
- *   'long',
- *   [
- *     'dates/fields/year',
- *     'dates/gregorian/months/january',
- *     'dates/gregorian/weekdays/monday',
- *     'dates/gregorian/dayperiods/am',
- *   ]
- * );
- *
- * Returned value:
- *
- * [
- *   'year',
- *   'January',
- *   'Monday',
- *   'AM'
- * ]
- */
-[[nodiscard]] extern bool intl_ComputeDisplayNames(JSContext* cx, unsigned argc,
-                                                   JS::Value* vp);
 /**
  * Compares a BCP 47 language tag against the locales in availableLocales and
  * returns the best available match -- or |undefined| if no match was found.
@@ -125,6 +66,16 @@ extern const JSClass IntlClass;
 [[nodiscard]] extern bool intl_supportedLocaleOrFallback(JSContext* cx,
                                                          unsigned argc,
                                                          JS::Value* vp);
+
+/**
+ * Returns the list of supported values for the given key. Throws a RangeError
+ * if the key isn't one of {"calendar", "collation", "currency",
+ * "numberingSystem", "timeZone", "unit"}.
+ *
+ * Usage: list = intl_SupportedValuesOf(key)
+ */
+[[nodiscard]] extern bool intl_SupportedValuesOf(JSContext* cx, unsigned argc,
+                                                 JS::Value* vp);
 
 }  // namespace js
 

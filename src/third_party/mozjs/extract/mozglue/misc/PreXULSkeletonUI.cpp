@@ -315,7 +315,7 @@ static bool ProfileDbHasStartWithLastProfile(IFStream& iniContents) {
   bool inGeneral = false;
   std::string line;
   while (std::getline(iniContents, line)) {
-    int whitespace = 0;
+    size_t whitespace = 0;
     while (line.length() > whitespace &&
            (line[whitespace] == ' ' || line[whitespace] == '\t')) {
       whitespace++;
@@ -756,7 +756,7 @@ Result<Ok, PreXULSkeletonUIError> DrawSkeletonUI(
   int menubarHeightDevPixels =
       menubarShown ? CSSToDevPixels(28, sCSSToDevPixelScaling) : 0;
 
-  // controlled by css variable urlbarMarginInline in urlbar-searchbar.inc.css
+  // defined in urlbar-searchbar.inc.css as --urlbar-margin-inline: 5px
   int urlbarMargin =
       CSSToDevPixels(5, sCSSToDevPixelScaling) + horizontalOffset;
 
@@ -1000,7 +1000,7 @@ Result<Ok, PreXULSkeletonUIError> DrawSkeletonUI(
     }
   }
 
-  for (int i = 1; i < noPlaceholderSpans.length(); i++) {
+  for (size_t i = 1; i < noPlaceholderSpans.length(); i++) {
     int start = noPlaceholderSpans[i - 1].end + placeholderMargin;
     int end = noPlaceholderSpans[i].start - placeholderMargin;
     if (start + 2 * placeholderBorderRadius >= end) {
@@ -1259,8 +1259,6 @@ DWORD WINAPI AnimateSkeletonUI(void* aUnused) {
       return 0;
     }
   }
-
-  return 0;
 }
 
 LRESULT WINAPI PreXULSkeletonUIProc(HWND hWnd, UINT msg, WPARAM wParam,
@@ -1341,7 +1339,7 @@ ThemeColors GetTheme(ThemeMode themeId) {
       theme.tabBarColor = 0x1c1b22;
       // controlled by --toolbar-non-lwt-textcolor in browser.css
       theme.chromeContentDividerColor = 0x0c0c0d;
-      // controlled by css variable --lwt-toolbar-field-background-color
+      // controlled by css variable --toolbar-field-background-color
       theme.urlbarColor = 0x42414d;
       theme.urlbarBorderColor = 0x42414d;
       theme.animationColor = theme.urlbarColor;
@@ -1624,9 +1622,9 @@ static Result<Ok, PreXULSkeletonUIError> ValidateCmdlineArguments(
     const char* flag = NormalizeFlag(argv[i]);
     if (!flag) {
       // If this is not a flag, then we interpret it as a URL, similar to
-      // BrowserContentHandler.jsm. Some command line options take additional
-      // arguments, which may or may not be URLs. We don't need to know this,
-      // because we don't need to parse them out; we just rely on the
+      // BrowserContentHandler.sys.mjs. Some command line options take
+      // additional arguments, which may or may not be URLs. We don't need to
+      // know this, because we don't need to parse them out; we just rely on the
       // assumption that if arg X is actually a parameter for the preceding
       // arg Y, then X must not look like a flag (starting with "--", "-",
       // or "/").
@@ -1666,6 +1664,7 @@ static Result<Ok, PreXULSkeletonUIError> ValidateCmdlineArguments(
 
 static Result<Ok, PreXULSkeletonUIError> ValidateEnvVars() {
   if (EnvHasValue("MOZ_SAFE_MODE_RESTART") ||
+      EnvHasValue("MOZ_APP_SILENT_START") ||
       EnvHasValue("MOZ_RESET_PROFILE_RESTART") || EnvHasValue("MOZ_HEADLESS") ||
       (EnvHasValue("XRE_PROFILE_PATH") &&
        !EnvHasValue("MOZ_SKELETON_UI_RESTARTING"))) {
@@ -1706,7 +1705,7 @@ static Result<Vector<CSSPixelSpan>, PreXULSkeletonUIError> ReadRegCSSPixelSpans(
 
   Vector<CSSPixelSpan> resultVector;
   double* asDoubles = reinterpret_cast<double*>(buffer.get());
-  for (int i = 0; i < dataLen / (2 * sizeof(double)); i++) {
+  for (size_t i = 0; i < dataLen / (2 * sizeof(double)); i++) {
     CSSPixelSpan span = {};
     span.start = *(asDoubles++);
     span.end = *(asDoubles++);
@@ -1830,7 +1829,7 @@ static Result<Ok, PreXULSkeletonUIError> CreateAndStorePreXULSkeletonUIImpl(
   sProcessRuntime = new mscom::ProcessRuntime(
       mscom::ProcessRuntime::ProcessCategory::GeckoBrowserParent);
 
-  const TimeStamp skeletonStart = TimeStamp::NowUnfuzzed();
+  const TimeStamp skeletonStart = TimeStamp::Now();
 
   if (!IsWin10OrLater()) {
     return Err(PreXULSkeletonUIError::Ineligible);
@@ -1861,6 +1860,8 @@ static Result<Ok, PreXULSkeletonUIError> CreateAndStorePreXULSkeletonUIImpl(
         static_cast<uint32_t>(PreXULSkeletonUIProgress::Completed));
   });
 
+  MOZ_TRY(GetSkeletonUILock());
+
   bool explicitProfile = false;
   MOZ_TRY(ValidateCmdlineArguments(argc, argv, &explicitProfile));
   MOZ_TRY(ValidateEnvVars());
@@ -1879,7 +1880,6 @@ static Result<Ok, PreXULSkeletonUIError> CreateAndStorePreXULSkeletonUIImpl(
   sAnimatedRects = new Vector<ColorRect>();
 
   MOZ_TRY(LoadGdi32AndUser32Procedures());
-  MOZ_TRY(GetSkeletonUILock());
 
   if (!explicitProfile) {
     MOZ_TRY(CheckForStartWithLastProfile());

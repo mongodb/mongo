@@ -12,11 +12,12 @@
 #include "mozilla/EnumSet.h"     // mozilla::EnumSet
 #include "mozilla/Maybe.h"       // mozilla::Maybe
 
+#include <stddef.h>  // size_t
 #include <stdint.h>  // uint8_t
 
 #include "jstypes.h"  // JS_PUBLIC_API
 
-#include "js/Class.h"       // JS{Getter,Setter}Op
+#include "js/Id.h"          // jsid
 #include "js/RootingAPI.h"  // JS::Handle, js::{,Mutable}WrappedPtrOperations
 #include "js/Value.h"       // JS::Value
 
@@ -433,6 +434,49 @@ class MutableWrappedPtrOperations<JS::PropertyDescriptor, Wrapper>
 };
 
 }  // namespace js
+
+/**
+ * Get a description of one of obj's own properties. If no such property exists
+ * on obj, return true with desc.object() set to null.
+ *
+ * Implements: ES6 [[GetOwnProperty]] internal method.
+ */
+extern JS_PUBLIC_API bool JS_GetOwnPropertyDescriptorById(
+    JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc);
+
+extern JS_PUBLIC_API bool JS_GetOwnPropertyDescriptor(
+    JSContext* cx, JS::Handle<JSObject*> obj, const char* name,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc);
+
+extern JS_PUBLIC_API bool JS_GetOwnUCPropertyDescriptor(
+    JSContext* cx, JS::Handle<JSObject*> obj, const char16_t* name,
+    size_t namelen,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc);
+
+/**
+ * DEPRECATED
+ *
+ * Like JS_GetOwnPropertyDescriptorById, but also searches the prototype chain
+ * if no own property is found directly on obj. The object on which the
+ * property is found is returned in holder. If the property is not found
+ * on the prototype chain, then desc is Nothing.
+ */
+extern JS_PUBLIC_API bool JS_GetPropertyDescriptorById(
+    JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc,
+    JS::MutableHandle<JSObject*> holder);
+
+extern JS_PUBLIC_API bool JS_GetPropertyDescriptor(
+    JSContext* cx, JS::Handle<JSObject*> obj, const char* name,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc,
+    JS::MutableHandle<JSObject*> holder);
+
+extern JS_PUBLIC_API bool JS_GetUCPropertyDescriptor(
+    JSContext* cx, JS::Handle<JSObject*> obj, const char16_t* name,
+    size_t namelen,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc,
+    JS::MutableHandle<JSObject*> holder);
 
 namespace JS {
 

@@ -63,5 +63,4 @@ class MutexImpl {
 }  // namespace detail
 
 }  // namespace mozilla
-
 #endif  // mozilla_PlatformMutex_h

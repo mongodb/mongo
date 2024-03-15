@@ -9,13 +9,12 @@
 
 #include "jit/JitScript.h"
 
-#include "mozilla/BinarySearch.h"
+#include "mozilla/Assertions.h"
 
+#include "gc/Zone.h"
 #include "jit/JitZone.h"
-#include "vm/BytecodeUtil.h"
+#include "vm/JSContext.h"
 #include "vm/JSScript.h"
-
-#include "vm/JSContext-inl.h"
 
 namespace js {
 namespace jit {

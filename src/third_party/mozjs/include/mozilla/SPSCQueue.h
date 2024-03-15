@@ -103,17 +103,15 @@ class SPSCRingBufferBase {
    */
   explicit SPSCRingBufferBase(int aCapacity)
       : mReadIndex(0),
-        mWriteIndex(0)
+        mWriteIndex(0),
         /* One more element to distinguish from empty and full buffer. */
-        ,
         mCapacity(aCapacity + 1) {
-    MOZ_ASSERT(StorageCapacity() < std::numeric_limits<int>::max() / 2,
-               "buffer too large for the type of index used.");
-    MOZ_ASSERT(mCapacity > 0 && aCapacity != std::numeric_limits<int>::max());
+    MOZ_RELEASE_ASSERT(aCapacity != std::numeric_limits<int>::max());
+    MOZ_RELEASE_ASSERT(mCapacity > 0);
 
     mData = std::make_unique<T[]>(StorageCapacity());
 
-    std::atomic_thread_fence(std::memory_order::memory_order_seq_cst);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
   /**
    * Push `aCount` zero or default constructed elements in the array.
@@ -152,8 +150,8 @@ class SPSCRingBufferBase {
     AssertCorrectThread(mProducerId);
 #endif
 
-    int rdIdx = mReadIndex.load(std::memory_order::memory_order_acquire);
-    int wrIdx = mWriteIndex.load(std::memory_order::memory_order_relaxed);
+    int rdIdx = mReadIndex.load(std::memory_order_acquire);
+    int wrIdx = mWriteIndex.load(std::memory_order_relaxed);
 
     if (IsFull(rdIdx, wrIdx)) {
       return 0;
@@ -178,7 +176,7 @@ class SPSCRingBufferBase {
     }
 
     mWriteIndex.store(IncrementIndex(wrIdx, toWrite),
-                      std::memory_order::memory_order_release);
+                      std::memory_order_release);
 
     return toWrite;
   }
@@ -198,8 +196,8 @@ class SPSCRingBufferBase {
     AssertCorrectThread(mConsumerId);
 #endif
 
-    int wrIdx = mWriteIndex.load(std::memory_order::memory_order_acquire);
-    int rdIdx = mReadIndex.load(std::memory_order::memory_order_relaxed);
+    int wrIdx = mWriteIndex.load(std::memory_order_acquire);
+    int rdIdx = mReadIndex.load(std::memory_order_relaxed);
 
     if (IsEmpty(rdIdx, wrIdx)) {
       return 0;
@@ -217,48 +215,37 @@ class SPSCRingBufferBase {
                                               secondPart);
     }
 
-    mReadIndex.store(IncrementIndex(rdIdx, toRead),
-                     std::memory_order::memory_order_release);
+    mReadIndex.store(IncrementIndex(rdIdx, toRead), std::memory_order_release);
 
     return toRead;
   }
   /**
    * Get the number of available elements for consuming.
    *
-   * Only safely called on the consumer thread. This can be less than the actual
-   * number of elements in the queue, since the mWriteIndex is updated at the
-   * very end of the Enqueue method on the producer thread, but consequently
-   * always returns a number of elements such that a call to Dequeue return this
-   * number of elements.
+   * This can be less than the actual number of elements in the queue, since the
+   * mWriteIndex is updated at the very end of the Enqueue method on the
+   * producer thread, but consequently always returns a number of elements such
+   * that a call to Dequeue return this number of elements.
    *
    * @return The number of available elements for reading.
    */
   int AvailableRead() const {
-#ifdef DEBUG
-    AssertCorrectThread(mConsumerId);
-#endif
-    return AvailableReadInternal(
-        mReadIndex.load(std::memory_order::memory_order_relaxed),
-        mWriteIndex.load(std::memory_order::memory_order_relaxed));
+    return AvailableReadInternal(mReadIndex.load(std::memory_order_relaxed),
+                                 mWriteIndex.load(std::memory_order_relaxed));
   }
   /**
    * Get the number of available elements for writing.
    *
-   * Only safely called on the producer thread. This can be less than than the
-   * actual number of slots that are available, because mReadIndex is update at
-   * the very end of the Deque method. It always returns a number such that a
-   * call to Enqueue with this number will succeed in enqueuing this number of
-   * elements.
+   * This can be less than than the actual number of slots that are available,
+   * because mReadIndex is updated at the very end of the Deque method. It
+   * always returns a number such that a call to Enqueue with this number will
+   * succeed in enqueuing this number of elements.
    *
    * @return The number of empty slots in the buffer, available for writing.
    */
   int AvailableWrite() const {
-#ifdef DEBUG
-    AssertCorrectThread(mProducerId);
-#endif
-    return AvailableWriteInternal(
-        mReadIndex.load(std::memory_order::memory_order_relaxed),
-        mWriteIndex.load(std::memory_order::memory_order_relaxed));
+    return AvailableWriteInternal(mReadIndex.load(std::memory_order_relaxed),
+                                  mWriteIndex.load(std::memory_order_relaxed));
   }
   /**
    * Get the total Capacity, for this ring buffer.
@@ -274,8 +261,19 @@ class SPSCRingBufferBase {
    * asserts are disabled.
    */
   void ResetThreadIds() {
+    ResetProducerThreadId();
+    ResetConsumerThreadId();
+  }
+
+  void ResetConsumerThreadId() {
 #ifdef DEBUG
-    mConsumerId = mProducerId = std::thread::id();
+    mConsumerId = std::thread::id();
+#endif
+  }
+
+  void ResetProducerThreadId() {
+#ifdef DEBUG
+    mProducerId = std::thread::id();
 #endif
   }
 

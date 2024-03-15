@@ -6,16 +6,19 @@
 
 #include "builtin/Reflect.h"
 
-#include "builtin/Array.h"
+#include "jsapi.h"
 
+#include "builtin/Object.h"
 #include "jit/InlinableNatives.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_NOT_EXPECTED_TYPE
 #include "js/PropertySpec.h"
-#include "vm/ArgumentsObject.h"
+#include "vm/GlobalObject.h"
 #include "vm/JSContext.h"
-#include "vm/Stack.h"
+#include "vm/PlainObject.h"
 
-#include "vm/Interpreter-inl.h"
+#include "vm/GeckoProfiler-inl.h"
+#include "vm/JSObject-inl.h"
+#include "vm/ObjectOperations-inl.h"
 
 using namespace js;
 
@@ -94,6 +97,7 @@ bool js::Reflect_isExtensible(JSContext* cx, unsigned argc, Value* vp) {
 // ES2018 draft rev c164be80f7ea91de5526b33d54e5c9321ed03d3f
 // 26.1.10 Reflect.ownKeys ( target )
 bool js::Reflect_ownKeys(JSContext* cx, unsigned argc, Value* vp) {
+  AutoJSMethodProfilerEntry pseudoFrame(cx, "Reflect", "ownKeys");
   CallArgs args = CallArgsFromVp(argc, vp);
 
   // Step 1.
@@ -219,12 +223,8 @@ static const JSPropertySpec reflect_properties[] = {
 /*** Setup ******************************************************************/
 
 static JSObject* CreateReflectObject(JSContext* cx, JSProtoKey key) {
-  Handle<GlobalObject*> global = cx->global();
-  RootedObject proto(cx, GlobalObject::getOrCreateObjectPrototype(cx, global));
-  if (!proto) {
-    return nullptr;
-  }
-  return NewTenuredObjectWithGivenProto<PlainObject>(cx, proto);
+  RootedObject proto(cx, &cx->global()->getObjectPrototype());
+  return NewPlainObjectWithProto(cx, proto, TenuredObject);
 }
 
 static const ClassSpec ReflectClassSpec = {CreateReflectObject, nullptr,

@@ -30,7 +30,7 @@
 //
 //   TN:<compartment name>
 //   for-each <source file> {
-//     SN:<filename>
+//     SF:<filename>
 //     for-each <script> {
 //       FN:<line>,<name>
 //     }
@@ -153,7 +153,7 @@ void LCovSource::writeScript(JSScript* script, const char* scriptName) {
     MOZ_ASSERT(script->code() <= pc && pc < end);
     JSOp op = JSOp(*pc);
     bool jump = IsJumpOpcode(op) || op == JSOp::TableSwitch;
-    bool fallsthrough = BytecodeFallsThrough(op) && op != JSOp::Gosub;
+    bool fallsthrough = BytecodeFallsThrough(op);
 
     // If the current script & pc has a hit-count report, then update the
     // current number of hits.
@@ -593,12 +593,7 @@ bool InitScriptCoverage(JSContext* cx, JSScript* script) {
   MOZ_ASSERT(script->hasBytecode(),
              "Only initialize coverage data for fully initialized scripts.");
 
-  // Don't allocate LCovSource if we on helper thread since we will have our
-  // realm migrated. The 'GCRunime::mergeRealms' code will do this
-  // initialization.
-  if (cx->isHelperThreadContext()) {
-    return true;
-  }
+  MOZ_ASSERT(!cx->isHelperThreadContext());
 
   const char* filename = script->filename();
   if (!filename) {
@@ -639,7 +634,7 @@ bool InitScriptCoverage(JSContext* cx, JSScript* script) {
 
   // Save source in map for when we collect coverage.
   if (!zone->scriptLCovMap->putNew(script,
-                                   mozilla::MakeTuple(source, scriptName))) {
+                                   std::make_tuple(source, scriptName))) {
     ReportOutOfMemory(cx);
     return false;
   }
@@ -660,9 +655,7 @@ bool CollectScriptCoverage(JSScript* script, bool finalizing) {
     return false;
   }
 
-  LCovSource* source;
-  const char* scriptName;
-  mozilla::Tie(source, scriptName) = p->value();
+  auto [source, scriptName] = p->value();
 
   if (script->hasBytecode()) {
     source->writeScript(script, scriptName);

@@ -9,8 +9,8 @@
 #include <algorithm>
 #include <utility>
 
-#include "debugger/DebugAPI.h"
 #include "jit/Bailouts.h"
+#include "jit/JSJitFrameIter.h"
 #include "js/friend/DumpFunctions.h"  // js::DumpValue
 #include "vm/ArgumentsObject.h"
 
@@ -51,9 +51,9 @@ RematerializedFrame::RematerializedFrame(JSContext* cx, uint8_t* top,
   }
 
   CopyValueToRematerializedFrame op(slots_);
-  iter.readFrameArgsAndLocals(cx, op, op, &envChain_, &hasInitialEnv_,
-                              &returnValue_, &argsObj_, &thisArgument_,
-                              &newTarget_, ReadFrame_Actuals, fallback);
+  iter.readFrameArgsAndLocals(
+      cx, op, op, &envChain_, &hasInitialEnv_, &returnValue_, &argsObj_,
+      &thisArgument_, ReadFrameArgsBehavior::ActualsAndFormals, fallback);
 }
 
 /* static */
@@ -131,7 +131,8 @@ bool RematerializedFrame::initFunctionEnvironmentObjects(JSContext* cx) {
   return js::InitFunctionEnvironmentObjects(cx, this);
 }
 
-bool RematerializedFrame::pushVarEnvironment(JSContext* cx, HandleScope scope) {
+bool RematerializedFrame::pushVarEnvironment(JSContext* cx,
+                                             Handle<Scope*> scope) {
   return js::PushVarEnvironmentObject(cx, scope, this);
 }
 
@@ -146,7 +147,6 @@ void RematerializedFrame::trace(JSTracer* trc) {
   }
   TraceRoot(trc, &returnValue_, "remat ion frame return value");
   TraceRoot(trc, &thisArgument_, "remat ion frame this");
-  TraceRoot(trc, &newTarget_, "remat ion frame newTarget");
   TraceRootRange(trc, numArgSlots() + script_->nfixed(), slots_,
                  "remat ion frame stack");
 }

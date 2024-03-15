@@ -15,20 +15,18 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/RangedPtr.h"
 #include "mozilla/Variant.h"
+#include "mozilla/Vector.h"
 
 #include <utility>
 
 #include "jspubtd.h"
 
 #include "js/AllocPolicy.h"
-#include "js/GCAPI.h"
 #include "js/HashTable.h"
 #include "js/RootingAPI.h"
-#include "js/TracingAPI.h"
 #include "js/TypeDecls.h"
 #include "js/UniquePtr.h"
 #include "js/Value.h"
-#include "js/Vector.h"
 
 // [SMDOC] ubi::Node (Heap Analysis framework)
 //
@@ -169,6 +167,8 @@ class BaseScript;
 }  // namespace js
 
 namespace JS {
+
+class JS_PUBLIC_API AutoCheckCannotGC;
 
 using ZoneSet =
     js::HashSet<Zone*, js::DefaultHasher<Zone*>, js::SystemAllocPolicy>;
@@ -741,7 +741,7 @@ class Node {
   // JS::ubi::Node are both essentially tagged references to other sorts of
   // objects, so letting conversions happen automatically is appropriate.
   MOZ_IMPLICIT Node(JS::HandleValue value);
-  explicit Node(const JS::GCCellPtr& thing);
+  explicit Node(JS::GCCellPtr thing);
 
   // copy construction and copy assignment just use memcpy, since we know
   // instances contain nothing but a vtable pointer and a data pointer.
@@ -967,50 +967,51 @@ class PreComputedEdgeRange : public EdgeRange {
 //
 // RootList::init itself causes a minor collection, but once the list of roots
 // has been created, GC must not occur, as the referent ubi::Nodes are not
-// stable across GC. The init calls emplace on |noGC|'s AutoCheckCannotGC, whose
-// lifetime must extend at least as long as the RootList itself.
+// stable across GC. It returns a [[nodiscard]] AutoCheckCannotGC token in order
+// to enforce this. The token's lifetime must extend at least as long as the
+// RootList itself. Note that the RootList does not itself contain a nogc field,
+// which means that it is possible to store it somewhere that it can escape
+// the init()'s nogc scope. Don't do that. (Or you could call some function
+// and pass in the RootList and GC, but that would be caught.)
 //
 // Example usage:
 //
 //    {
-//        mozilla::Maybe<JS::AutoCheckCannotGC> maybeNoGC;
-//        JS::ubi::RootList rootList(cx, maybeNoGC);
-//        if (!rootList.init()) {
+//        JS::ubi::RootList rootList(cx);
+//        auto [ok, nogc] = rootList.init();
+//        if (!ok()) {
 //            return false;
 //        }
-//
-//        // The AutoCheckCannotGC is guaranteed to exist if init returned true.
-//        MOZ_ASSERT(maybeNoGC.isSome());
 //
 //        JS::ubi::Node root(&rootList);
 //
 //        ...
 //    }
 class MOZ_STACK_CLASS JS_PUBLIC_API RootList {
-  Maybe<AutoCheckCannotGC>& noGC;
-
  public:
   JSContext* cx;
   EdgeVector edges;
   bool wantNames;
+  bool inited;
 
-  RootList(JSContext* cx, Maybe<AutoCheckCannotGC>& noGC,
-           bool wantNames = false);
+  explicit RootList(JSContext* cx, bool wantNames = false);
 
   // Find all GC roots.
-  [[nodiscard]] bool init();
+  [[nodiscard]] std::pair<bool, JS::AutoCheckCannotGC> init();
   // Find only GC roots in the provided set of |JS::Compartment|s. Note: it's
   // important to take a CompartmentSet and not a RealmSet: objects in
   // same-compartment realms can reference each other directly, without going
   // through CCWs, so if we used a RealmSet here we would miss edges.
-  [[nodiscard]] bool init(CompartmentSet& debuggees);
+  [[nodiscard]] std::pair<bool, JS::AutoCheckCannotGC> init(
+      CompartmentSet& debuggees);
   // Find only GC roots in the given Debugger object's set of debuggee
   // compartments.
-  [[nodiscard]] bool init(HandleObject debuggees);
+  [[nodiscard]] std::pair<bool, JS::AutoCheckCannotGC> init(
+      HandleObject debuggees);
 
   // Returns true if the RootList has been initialized successfully, false
   // otherwise.
-  bool initialized() { return noGC.isSome(); }
+  bool initialized() { return inited; }
 
   // Explicitly add the given Node as a root in this RootList. If wantNames is
   // true, you must pass an edgeName. The RootList does not take ownership of

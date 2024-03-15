@@ -82,8 +82,12 @@ class SparseBitmap {
 
   Data data;
 
-  static size_t blockStartWord(size_t word) {
+  MOZ_ALWAYS_INLINE static size_t blockStartWord(size_t word) {
     return word & ~(WordsInBlock - 1);
+  }
+
+  MOZ_ALWAYS_INLINE static uintptr_t bitMask(size_t bit) {
+    return uintptr_t(1) << (bit % JS_BITS_PER_WORD);
   }
 
   // Return the number of words in a BitBlock starting at |blockWord| which
@@ -100,6 +104,12 @@ class SparseBitmap {
 
   MOZ_ALWAYS_INLINE BitBlock* getBlock(size_t blockId) const {
     Data::Ptr p = data.lookup(blockId);
+    return p ? p->value() : nullptr;
+  }
+
+  MOZ_ALWAYS_INLINE const BitBlock* readonlyThreadsafeGetBlock(
+      size_t blockId) const {
+    Data::Ptr p = data.readonlyThreadsafeLookup(blockId);
     return p ? p->value() : nullptr;
   }
 
@@ -131,7 +141,7 @@ class SparseBitmap {
     size_t word = bit / JS_BITS_PER_WORD;
     size_t blockWord = blockStartWord(word);
     BitBlock& block = getOrCreateBlock(blockWord / WordsInBlock);
-    block[word - blockWord] |= uintptr_t(1) << (bit % JS_BITS_PER_WORD);
+    block[word - blockWord] |= bitMask(bit);
   }
 
   MOZ_ALWAYS_INLINE bool setBitFallible(size_t bit) {
@@ -141,11 +151,12 @@ class SparseBitmap {
     if (!block) {
       return false;
     }
-    (*block)[word - blockWord] |= uintptr_t(1) << (bit % JS_BITS_PER_WORD);
+    (*block)[word - blockWord] |= bitMask(bit);
     return true;
   }
 
   bool getBit(size_t bit) const;
+  bool readonlyThreadsafeGetBit(size_t bit) const;
 
   void bitwiseAndWith(const DenseBitmap& other);
   void bitwiseOrWith(const SparseBitmap& other);

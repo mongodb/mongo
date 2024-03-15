@@ -94,7 +94,7 @@ class InlineTable : private AllocPolicy {
   [[nodiscard]] bool switchToTable() {
     MOZ_ASSERT(inlNext_ == InlineEntries);
 
-    table_.clear();
+    table_.clearAndCompact();
 
     InlineEntry* end = inlineEnd();
     for (InlineEntry* it = inlineStart(); it != end; ++it) {

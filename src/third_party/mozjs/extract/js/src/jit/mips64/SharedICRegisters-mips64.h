@@ -14,9 +14,6 @@
 namespace js {
 namespace jit {
 
-static constexpr Register BaselineFrameReg = s5;
-static constexpr Register BaselineStackReg = sp;
-
 // ValueOperands R0, R1, and R2.
 // R0 == JSReturnReg, and R2 uses registers not preserved across calls. R1 value
 // should be preserved across calls.
@@ -28,9 +25,6 @@ static constexpr ValueOperand R2(a6);
 // These use registers that are not preserved across calls.
 static constexpr Register ICTailCallReg = ra;
 static constexpr Register ICStubReg = a5;
-
-static constexpr Register ExtractTemp0 = s6;
-static constexpr Register ExtractTemp1 = s7;
 
 // Register used internally by MacroAssemblerMIPS.
 static constexpr Register BaselineSecondScratchReg = SecondScratchReg;

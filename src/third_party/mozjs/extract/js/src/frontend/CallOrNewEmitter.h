@@ -14,11 +14,9 @@
 
 #include "frontend/ElemOpEmitter.h"
 #include "frontend/IfEmitter.h"
-#include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
 #include "frontend/PrivateOpEmitter.h"
 #include "frontend/PropOpEmitter.h"
 #include "frontend/ValueUsage.h"
-#include "js/TypeDecls.h"
 #include "vm/BytecodeUtil.h"
 #include "vm/Opcodes.h"
 
@@ -26,6 +24,7 @@ namespace js {
 namespace frontend {
 
 struct BytecodeEmitter;
+class TaggedParserAtomIndex;
 
 // Class for emitting bytecode for call or new expression.
 //
@@ -39,7 +38,7 @@ struct BytecodeEmitter;
 //     cone.emitThis();
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `callee.prop(arg1, arg2);`
 //     CallOrNewEmitter cone(this, JSOp::Call,
@@ -51,7 +50,7 @@ struct BytecodeEmitter;
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg1);
 //     emit(arg2);
-//     cone.emitEnd(2, Some(offset_of_callee));
+//     cone.emitEnd(2, offset_of_callee);
 //
 //   `callee[key](arg);`
 //     CallOrNewEmitter cone(this, JSOp::Call,
@@ -62,7 +61,7 @@ struct BytecodeEmitter;
 //     cone.emitThis();
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `callee.#method(arg);`
 //     CallOrNewEmitter cone(this, JSOp::Call,
@@ -72,7 +71,7 @@ struct BytecodeEmitter;
 //     ... emit `callee.#method` with `xoe` here...
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `(function() { ... })(arg);`
 //     CallOrNewEmitter cone(this, JSOp::Call,
@@ -83,7 +82,7 @@ struct BytecodeEmitter;
 //     cone.emitThis();
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `super(arg);`
 //     CallOrNewEmitter cone(this, JSOp::Call,
@@ -93,7 +92,7 @@ struct BytecodeEmitter;
 //     cone.emitThis();
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `(some_other_expression)(arg);`
 //     CallOrNewEmitter cone(this, JSOp::Call,
@@ -104,7 +103,7 @@ struct BytecodeEmitter;
 //     cone.emitThis();
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `print(...arg);`
 //     CallOrNewEmitter cone(this, JSOp::SpreadCall,
@@ -117,7 +116,7 @@ struct BytecodeEmitter;
 //     }
 //     cone.emitSpreadArgumentsTest();
 //     emit([...arg]);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 //   `new f(arg);`
 //     CallOrNewEmitter cone(this, JSOp::New,
@@ -127,7 +126,7 @@ struct BytecodeEmitter;
 //     cone.emitThis();
 //     cone.prepareForNonSpreadArguments();
 //     emit(arg);
-//     cone.emitEnd(1, Some(offset_of_callee));
+//     cone.emitEnd(1, offset_of_callee);
 //
 class MOZ_STACK_CLASS CallOrNewEmitter {
  public:
@@ -215,15 +214,30 @@ class MOZ_STACK_CLASS CallOrNewEmitter {
   // +------------------------------->+->| Arguments |-------->| End |
   // |                                ^  +-----------+         +-----+
   // |                                |
-  // |                                | wantSpreadIteration
-  // |                                |
-  // |                                |         +-----------------+
-  // |                                +---------| SpreadIteration |------+
-  // |                                          +-----------------+      |
-  // | [isSpread]                                                        |
-  // |   wantSpreadOperand +-------------------+ emitSpreadArgumentsTest |
-  // +-------------------->| WantSpreadOperand |-------------------------+
-  //                       +-------------------+
+  // |                                +<------------------------------------+
+  // |                                |                                     |
+  // |                                | emitSpreadArgumentsTestEnd          |
+  // |                                |                                     |
+  // |                                |         +-----------------+         |
+  // |                                +---------| SpreadIteration |------+  |
+  // |                                          +-----------------+      |  |
+  // |                                +----------------------------------+  |
+  // |                                |                                     |
+  // |                                | wantSpreadIteration                 |
+  // |                                |                                     |
+  // |                                |         +---------------------+     |
+  // |                                +---------| SpreadArgumentsTest |--+  |
+  // |                                          +---------------------+  |  |
+  // | [isSpread]                                                        |  |
+  // |   wantSpreadOperand +-------------------+ emitSpreadArgumentsTest |  |
+  // +-------------------->| WantSpreadOperand |-------------------------+  |
+  // |                     +-------------------+                            |
+  // |                                                                      |
+  // |                                                                      |
+  // |                                                                      |
+  // | [isSpread]                                                           |
+  // |   prepareForSpreadArguments                                          |
+  // +----------------------------------------------------------------------+
   enum class State {
     // The initial state.
     Start,
@@ -256,6 +270,9 @@ class MOZ_STACK_CLASS CallOrNewEmitter {
     WantSpreadOperand,
 
     // After calling emitSpreadArgumentsTest.
+    SpreadArgumentsTest,
+
+    // After calling wantSpreadIteration.
     SpreadIteration,
 
     // After calling prepareForNonSpreadArguments.
@@ -273,7 +290,7 @@ class MOZ_STACK_CLASS CallOrNewEmitter {
  private:
   [[nodiscard]] bool isCall() const {
     return op_ == JSOp::Call || op_ == JSOp::CallIgnoresRv ||
-           op_ == JSOp::SpreadCall || isEval() || isFunApply() || isFunCall();
+           op_ == JSOp::SpreadCall || isEval();
   }
 
   [[nodiscard]] bool isNew() const {
@@ -288,10 +305,6 @@ class MOZ_STACK_CLASS CallOrNewEmitter {
     return op_ == JSOp::Eval || op_ == JSOp::StrictEval ||
            op_ == JSOp::SpreadEval || op_ == JSOp::StrictSpreadEval;
   }
-
-  [[nodiscard]] bool isFunApply() const { return op_ == JSOp::FunApply; }
-
-  [[nodiscard]] bool isFunCall() const { return op_ == JSOp::FunCall; }
 
   [[nodiscard]] bool isSpread() const { return IsSpreadOp(op_); }
 
@@ -315,15 +328,13 @@ class MOZ_STACK_CLASS CallOrNewEmitter {
 
   [[nodiscard]] bool emitThis();
 
-  // Used by BytecodeEmitter::emitPipeline to reuse CallOrNewEmitter instance
-  // across multiple chained calls.
-  void reset();
-
   [[nodiscard]] bool prepareForNonSpreadArguments();
+  [[nodiscard]] bool prepareForSpreadArguments();
 
   // See the usage in the comment at the top of the class.
   [[nodiscard]] bool wantSpreadOperand();
   [[nodiscard]] bool emitSpreadArgumentsTest();
+  [[nodiscard]] bool emitSpreadArgumentsTestEnd();
   [[nodiscard]] bool wantSpreadIteration();
 
   // Parameters are the offset in the source code for each character below:
@@ -332,10 +343,7 @@ class MOZ_STACK_CLASS CallOrNewEmitter {
   //   ^
   //   |
   //   beginPos
-  //
-  // Can be Nothing() if not available.
-  [[nodiscard]] bool emitEnd(uint32_t argc,
-                             const mozilla::Maybe<uint32_t>& beginPos);
+  [[nodiscard]] bool emitEnd(uint32_t argc, uint32_t beginPos);
 };
 
 } /* namespace frontend */

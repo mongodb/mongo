@@ -110,9 +110,8 @@ class MOZ_NON_PARAM InlineCharBuffer {
     return true;
   }
 
-  JSString* toStringDontDeflate(
-      JSContext* cx, size_t length,
-      js::gc::InitialHeap heap = js::gc::DefaultHeap) {
+  JSString* toStringDontDeflate(JSContext* cx, size_t length,
+                                js::gc::Heap heap = js::gc::Heap::Default) {
     MOZ_ASSERT(length == lastRequestedLength);
 
     if (JSInlineString::lengthFits<CharT>(length)) {
@@ -136,7 +135,7 @@ class MOZ_NON_PARAM InlineCharBuffer {
   }
 
   JSString* toString(JSContext* cx, size_t length,
-                     js::gc::InitialHeap heap = js::gc::DefaultHeap) {
+                     js::gc::Heap heap = js::gc::Heap::Default) {
     MOZ_ASSERT(length == lastRequestedLength);
 
     if (JSInlineString::lengthFits<CharT>(length)) {

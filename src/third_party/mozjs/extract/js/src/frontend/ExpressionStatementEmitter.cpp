@@ -18,14 +18,11 @@ ExpressionStatementEmitter::ExpressionStatementEmitter(BytecodeEmitter* bce,
                                                        ValueUsage valueUsage)
     : bce_(bce), valueUsage_(valueUsage) {}
 
-bool ExpressionStatementEmitter::prepareForExpr(
-    const Maybe<uint32_t>& beginPos) {
+bool ExpressionStatementEmitter::prepareForExpr(uint32_t beginPos) {
   MOZ_ASSERT(state_ == State::Start);
 
-  if (beginPos) {
-    if (!bce_->updateSourceCoordNotes(*beginPos)) {
-      return false;
-    }
+  if (!bce_->updateSourceCoordNotes(beginPos)) {
+    return false;
   }
 
 #ifdef DEBUG

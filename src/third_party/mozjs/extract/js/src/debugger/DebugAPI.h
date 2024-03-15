@@ -21,6 +21,10 @@ class AbstractGeneratorObject;
 class DebugScriptMap;
 class PromiseObject;
 
+namespace gc {
+class AutoSuppressGC;
+}  // namespace gc
+
 /**
  * DebugAPI::onNativeCall allows the debugger to call callbacks just before
  * some native functions are to be executed. It also allows the hooks
@@ -110,14 +114,15 @@ class DebugAPI {
   // The garbage collector calls this after everything has been marked, but
   // before anything has been finalized. We use this to clear Debugger /
   // debuggee edges at a point where the parties concerned are all still
-  // initialized.
-  static void sweepAll(JSFreeOp* fop);
+  // initialized. This does not update edges to moved GC things which is handled
+  // via the other trace methods.
+  static void sweepAll(JS::GCContext* gcx);
 
   // Add sweep group edges due to the presence of any debuggers.
   [[nodiscard]] static bool findSweepGroupEdges(JSRuntime* rt);
 
   // Remove the debugging information associated with a script.
-  static void removeDebugScript(JSFreeOp* fop, JSScript* script);
+  static void removeDebugScript(JS::GCContext* gcx, JSScript* script);
 
   // Delete a Zone's debug script map. Called when a zone is destroyed.
   static void deleteDebugScriptMap(DebugScriptMap* map);
@@ -258,7 +263,7 @@ class DebugAPI {
    */
   [[nodiscard]] static inline bool onLeaveFrame(JSContext* cx,
                                                 AbstractFramePtr frame,
-                                                jsbytecode* pc, bool ok);
+                                                const jsbytecode* pc, bool ok);
 
   // Call any breakpoint handlers for the current scripted location.
   [[nodiscard]] static bool onTrap(JSContext* cx);
@@ -297,6 +302,9 @@ class DebugAPI {
   // Whether any Debugger is observing asm.js execution in a global.
   static bool debuggerObservesAsmJS(GlobalObject* global);
 
+  // Whether any Debugger is observing WebAssembly execution in a global.
+  static bool debuggerObservesWasm(GlobalObject* global);
+
   /*
    * Return true if the given global is being observed by at least one
    * Debugger that is tracking allocations.
@@ -333,10 +341,9 @@ class DebugAPI {
 
   // If necessary, record an object that was just allocated for any observing
   // debuggers.
-  [[nodiscard]] static inline bool onLogAllocationSite(JSContext* cx,
-                                                       JSObject* obj,
-                                                       HandleSavedFrame frame,
-                                                       mozilla::TimeStamp when);
+  [[nodiscard]] static inline bool onLogAllocationSite(
+      JSContext* cx, JSObject* obj, Handle<SavedFrame*> frame,
+      mozilla::TimeStamp when);
 
   // Announce to the debugger that a global object is being collected by the
   // specified major GC.
@@ -349,13 +356,15 @@ class DebugAPI {
   static void slowPathOnNewGlobalObject(JSContext* cx,
                                         Handle<GlobalObject*> global);
   static void slowPathNotifyParticipatesInGC(uint64_t majorGCNumber,
-                                             JS::Realm::DebuggerVector& dbgs);
+                                             JS::Realm::DebuggerVector& dbgs,
+                                             const JS::AutoRequireNoGC& nogc);
   [[nodiscard]] static bool slowPathOnLogAllocationSite(
-      JSContext* cx, HandleObject obj, HandleSavedFrame frame,
-      mozilla::TimeStamp when, JS::Realm::DebuggerVector& dbgs);
+      JSContext* cx, HandleObject obj, Handle<SavedFrame*> frame,
+      mozilla::TimeStamp when, JS::Realm::DebuggerVector& dbgs,
+      const gc::AutoSuppressGC& nogc);
   [[nodiscard]] static bool slowPathOnLeaveFrame(JSContext* cx,
                                                  AbstractFramePtr frame,
-                                                 jsbytecode* pc, bool ok);
+                                                 const jsbytecode* pc, bool ok);
   [[nodiscard]] static bool slowPathOnNewGenerator(
       JSContext* cx, AbstractFramePtr frame,
       Handle<AbstractGeneratorObject*> genObj);

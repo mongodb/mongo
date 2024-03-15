@@ -7,6 +7,8 @@
 #ifndef jit_MoveResolver_h
 #define jit_MoveResolver_h
 
+#include <algorithm>
+
 #include "jit/InlineList.h"
 #include "jit/JitAllocPolicy.h"
 #include "jit/Registers.h"
@@ -22,58 +24,61 @@ class MacroAssembler;
 // guaranteed that Operand looks like this on all ISAs.
 class MoveOperand {
  public:
-  enum Kind {
+  enum class Kind : uint8_t {
     // A register in the "integer", aka "general purpose", class.
-    REG,
+    Reg,
 #ifdef JS_CODEGEN_REGISTER_PAIR
-    // Two consecutive "integer" register (aka "general purpose"). The even
+    // Two consecutive "integer" registers (aka "general purpose"). The even
     // register contains the lower part, the odd register has the high bits
     // of the content.
-    REG_PAIR,
+    RegPair,
 #endif
     // A register in the "float" register class.
-    FLOAT_REG,
+    FloatReg,
     // A memory region.
-    MEMORY,
+    Memory,
     // The address of a memory region.
-    EFFECTIVE_ADDRESS
+    EffectiveAddress
   };
 
  private:
   Kind kind_;
-  uint32_t code_;
+  uint8_t code_;
   int32_t disp_;
+
+  static_assert(std::max(Registers::Total, FloatRegisters::Total) <= UINT8_MAX,
+                "Any register code must fit in code_");
 
  public:
   MoveOperand() = delete;
   explicit MoveOperand(Register reg)
-      : kind_(REG), code_(reg.code()), disp_(0) {}
+      : kind_(Kind::Reg), code_(reg.code()), disp_(0) {}
   explicit MoveOperand(FloatRegister reg)
-      : kind_(FLOAT_REG), code_(reg.code()), disp_(0) {}
-  MoveOperand(Register reg, int32_t disp, Kind kind = MEMORY)
+      : kind_(Kind::FloatReg), code_(reg.code()), disp_(0) {}
+  MoveOperand(Register reg, int32_t disp, Kind kind = Kind::Memory)
       : kind_(kind), code_(reg.code()), disp_(disp) {
     MOZ_ASSERT(isMemoryOrEffectiveAddress());
 
     // With a zero offset, this is a plain reg-to-reg move.
-    if (disp == 0 && kind_ == EFFECTIVE_ADDRESS) {
-      kind_ = REG;
+    if (disp == 0 && kind_ == Kind::EffectiveAddress) {
+      kind_ = Kind::Reg;
     }
   }
-  explicit MoveOperand(const Address& addr, Kind kind = MEMORY)
+  explicit MoveOperand(const Address& addr, Kind kind = Kind::Memory)
       : MoveOperand(AsRegister(addr.base), addr.offset, kind) {}
   MoveOperand(MacroAssembler& masm, const ABIArg& arg);
   MoveOperand(const MoveOperand& other) = default;
-  bool isFloatReg() const { return kind_ == FLOAT_REG; }
-  bool isGeneralReg() const { return kind_ == REG; }
+  bool isFloatReg() const { return kind_ == Kind::FloatReg; }
+  bool isGeneralReg() const { return kind_ == Kind::Reg; }
   bool isGeneralRegPair() const {
 #ifdef JS_CODEGEN_REGISTER_PAIR
-    return kind_ == REG_PAIR;
+    return kind_ == Kind::RegPair;
 #else
     return false;
 #endif
   }
-  bool isMemory() const { return kind_ == MEMORY; }
-  bool isEffectiveAddress() const { return kind_ == EFFECTIVE_ADDRESS; }
+  bool isMemory() const { return kind_ == Kind::Memory; }
+  bool isEffectiveAddress() const { return kind_ == Kind::EffectiveAddress; }
   bool isMemoryOrEffectiveAddress() const {
     return isMemory() || isEffectiveAddress();
   }
@@ -103,7 +108,7 @@ class MoveOperand {
   }
 
   bool aliases(MoveOperand other) const {
-    // These are not handled presently, but MEMORY and EFFECTIVE_ADDRESS
+    // These are not handled presently, but Memory and EffectiveAddress
     // only appear in controlled circumstances in the trampoline code
     // which ensures these cases never come up.
 
@@ -138,7 +143,7 @@ class MoveOperand {
     if (kind_ != other.kind_) {
       return false;
     }
-    if (kind_ == FLOAT_REG) {
+    if (kind_ == Kind::FloatReg) {
       return floatReg().aliases(other.floatReg());
     }
     if (code_ != other.code_) {
@@ -170,13 +175,13 @@ class MoveOp {
  protected:
   MoveOperand from_;
   MoveOperand to_;
-  bool cycleBegin_;
-  bool cycleEnd_;
-  int cycleBeginSlot_;
-  int cycleEndSlot_;
+  int32_t cycleBeginSlot_ = -1;
+  int32_t cycleEndSlot_ = -1;
+  bool cycleBegin_ = false;
+  bool cycleEnd_ = false;
 
  public:
-  enum Type { GENERAL, INT32, FLOAT32, DOUBLE, SIMD128 };
+  enum Type : uint8_t { GENERAL, INT32, FLOAT32, DOUBLE, SIMD128 };
 
  protected:
   Type type_;
@@ -194,10 +199,6 @@ class MoveOp {
   MoveOp(const MoveOperand& from, const MoveOperand& to, Type type)
       : from_(from),
         to_(to),
-        cycleBegin_(false),
-        cycleEnd_(false),
-        cycleBeginSlot_(-1),
-        cycleEndSlot_(-1),
         type_(type),
         endCycleType_(GENERAL)  // initialize to silence UBSan warning
   {}

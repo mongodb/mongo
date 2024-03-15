@@ -6,7 +6,10 @@
 # for GC rooting hazards. See
 # <https://wiki.mozilla.org/Javascript:SpiderMonkey:ExactStackRooting>.
 
-ac_add_options --enable-application=browser
+ac_add_options --enable-project=browser
 ac_add_options --enable-js-shell
+
+# the sixgill wrapper is not compatible with building wasm objects with clang.
+export WASM_SANDBOXED_LIBRARIES=
 
 . $topsrcdir/js/src/devtools/rootAnalysis/mozconfig.common

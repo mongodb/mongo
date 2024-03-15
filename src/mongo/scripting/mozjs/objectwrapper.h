@@ -30,6 +30,7 @@
 #pragma once
 
 #include <js/Object.h>
+#include <js/PropertyAndElement.h>
 #include <js/ValueArray.h>
 
 #include <jsapi.h>

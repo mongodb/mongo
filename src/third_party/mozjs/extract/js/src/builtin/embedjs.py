@@ -36,19 +36,16 @@
 #
 # It uses the C preprocessor to process its inputs.
 
-from __future__ import with_statement
-
 import errno
-import re
-import sys
 import os
-import subprocess
+import re
 import shlex
+import subprocess
+import sys
 
 import buildconfig
 import mozpack.path as mozpath
 from mozfile import which
-from mozbuild.util import ensure_bytes
 
 
 def ToCAsciiArray(lines):
@@ -115,7 +112,7 @@ def embed(
     js_out.write(processed)
     import zlib
 
-    compressed = zlib.compress(ensure_bytes(processed))
+    compressed = zlib.compress(processed.encode("utf-8"))
     data = ToCArray(compressed)
     c_out.write(
         HEADER_TEMPLATE
@@ -144,7 +141,7 @@ def preprocess(cxx, preprocessorOption, source, args=[]):
     outputArg = shlex.split(preprocessorOption + tmpOut)
 
     with open(tmpIn, "wb") as input:
-        input.write(ensure_bytes(source))
+        input.write(source.encode("utf-8"))
     print(" ".join(cxx + outputArg + args + [tmpIn]))
     result = subprocess.Popen(cxx + outputArg + args + [tmpIn]).wait()
     if result != 0:
@@ -162,9 +159,13 @@ def messages(jsmsg):
         match = re.match("MSG_DEF\((JSMSG_(\w+))", line)
         if match:
             defines.append("#define %s %i" % (match.group(1), len(defines)))
-        else:
-            # Make sure that MSG_DEF isn't preceded by whitespace
-            assert not line.strip().startswith("MSG_DEF")
+            continue
+
+        # Make sure that MSG_DEF isn't preceded by whitespace
+        assert not line.strip().startswith("MSG_DEF")
+
+        # This script doesn't support preprocessor
+        assert not line.strip().startswith("#")
     return "\n".join(defines)
 
 

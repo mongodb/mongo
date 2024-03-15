@@ -146,10 +146,6 @@ function treatAsSafeArgument(entry, varName, csuName)
         [/^Gecko_/, null, "nsStyleImageLayers"],
         [/^Gecko_/, null, /FontFamilyList/],
 
-        // RawGeckoBorrowedNode thread-mutable parameters.
-        ["Gecko_SetNodeFlags", "aNode", null],
-        ["Gecko_UnsetNodeFlags", "aNode", null],
-
         // Various Servo binding out parameters. This is a mess and there needs
         // to be a way to indicate which params are out parameters, either using
         // an attribute or a naming convention.

@@ -13,7 +13,6 @@
 #include <stdint.h>
 
 #include "frontend/JumpList.h"
-#include "frontend/SourceNotes.h"
 #include "frontend/TDZCheckCache.h"
 
 namespace js {

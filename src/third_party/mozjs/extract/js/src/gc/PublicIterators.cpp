@@ -4,16 +4,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "mozilla/DebugOnly.h"
-
 #include "gc/GCInternals.h"
 #include "gc/GCLock.h"
-#include "js/HashTable.h"
 #include "vm/Realm.h"
 #include "vm/Runtime.h"
 
 #include "gc/PrivateIterators-inl.h"
-#include "vm/JSContext-inl.h"
 
 using namespace js;
 using namespace js::gc;
@@ -53,10 +49,19 @@ void js::IterateHeapUnbarriered(JSContext* cx, void* data,
   AutoPrepareForTracing prep(cx);
   JS::AutoSuppressGCAnalysis nogc(cx);
 
-  for (ZonesIter zone(cx->runtime(), WithAtoms); !zone.done(); zone.next()) {
+  auto iterateZone = [&](Zone* zone) -> void {
     (*zoneCallback)(cx->runtime(), data, zone, nogc);
     IterateRealmsArenasCellsUnbarriered(cx, zone, data, realmCallback,
                                         arenaCallback, cellCallback, nogc);
+  };
+
+  // Include the shared atoms zone if present.
+  if (Zone* zone = cx->runtime()->gc.maybeSharedAtomsZone()) {
+    iterateZone(zone);
+  }
+
+  for (ZonesIter zone(cx->runtime(), WithAtoms); !zone.done(); zone.next()) {
+    iterateZone(zone);
   }
 }
 

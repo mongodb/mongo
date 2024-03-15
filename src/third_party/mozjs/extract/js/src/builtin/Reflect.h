@@ -7,24 +7,26 @@
 #ifndef builtin_Reflect_h
 #define builtin_Reflect_h
 
-#include "vm/JSObject.h"
+#include "js/Class.h"
+
+struct JSContext;
+
+namespace JS {
+class Value;
+}
 
 namespace js {
 
 extern const JSClass ReflectClass;
 
-}  // namespace js
-
-namespace js {
-
 [[nodiscard]] extern bool Reflect_getPrototypeOf(JSContext* cx, unsigned argc,
-                                                 Value* vp);
+                                                 JS::Value* vp);
 
 [[nodiscard]] extern bool Reflect_isExtensible(JSContext* cx, unsigned argc,
-                                               Value* vp);
+                                               JS::Value* vp);
 
 [[nodiscard]] extern bool Reflect_ownKeys(JSContext* cx, unsigned argc,
-                                          Value* vp);
+                                          JS::Value* vp);
 
 }  // namespace js
 

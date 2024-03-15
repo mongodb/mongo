@@ -23,7 +23,27 @@ class ByteArrayData {
  public:
   uint32_t length;
   uint8_t* data();
+
+  uint8_t get(uint32_t index) {
+    MOZ_ASSERT(index < length);
+    return data()[index];
+  }
+  void set(uint32_t index, uint8_t val) {
+    MOZ_ASSERT(index < length);
+    data()[index] = val;
+  }
+
+  // Used for FixedIntegerArray.
+  template <typename T>
+  T getTyped(uint32_t index);
+  template <typename T>
+  void setTyped(uint32_t index, T value);
+
+ private:
+  template <typename T>
+  T* typedData();
 };
+
 class Isolate;
 class RegExpStack;
 class RegExpStackScope;
@@ -44,6 +64,21 @@ struct InputOutputData {
         inputEnd(inputEnd),
         startIndex(startIndex),
         matches(matches) {}
+
+  // Note: return int32_t instead of size_t to prevent signed => unsigned
+  // conversions in caller functions.
+  static constexpr int32_t offsetOfInputStart() {
+    return int32_t(offsetof(InputOutputData, inputStart));
+  }
+  static constexpr int32_t offsetOfInputEnd() {
+    return int32_t(offsetof(InputOutputData, inputEnd));
+  }
+  static constexpr int32_t offsetOfStartIndex() {
+    return int32_t(offsetof(InputOutputData, startIndex));
+  }
+  static constexpr int32_t offsetOfMatches() {
+    return int32_t(offsetof(InputOutputData, matches));
+  }
 };
 
 }  // namespace internal

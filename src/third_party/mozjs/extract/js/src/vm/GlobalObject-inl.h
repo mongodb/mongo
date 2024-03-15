@@ -15,15 +15,11 @@
 #include "vm/ObjectOperations-inl.h"  // js::SetProperty
 
 /* static */ inline bool js::GlobalObject::setIntrinsicValue(
-    JSContext* cx, Handle<GlobalObject*> global, HandlePropertyName name,
+    JSContext* cx, Handle<GlobalObject*> global, Handle<PropertyName*> name,
     HandleValue value) {
-  MOZ_ASSERT(cx->runtime()->isSelfHostingGlobal(global));
-
-  RootedObject holder(cx, GlobalObject::getIntrinsicsHolder(cx, global));
-  if (!holder) {
-    return false;
-  }
-
+  Rooted<NativeObject*> holder(cx, global->getComputedIntrinsicsHolder());
+  MOZ_ASSERT(holder->lookupPure(name).isNothing(),
+             "SetIntrinsic tried to redefine existing intrinsic");
   return SetProperty(cx, holder, name, value);
 }
 

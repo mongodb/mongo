@@ -62,12 +62,13 @@ class InitExpr {
   // position of the decoder. Upon failure, the decoder contains the failure
   // message or else the failure was an OOM.
   static bool decodeAndValidate(Decoder& d, ModuleEnvironment* env,
-                                ValType expected, InitExpr* expr);
+                                ValType expected,
+                                uint32_t maxInitializedGlobalsIndexPlus1,
+                                InitExpr* expr);
 
   // Evaluate the constant expresssion with the given context. This may only
   // fail due to an OOM, as all InitExpr's are required to have been validated.
-  bool evaluate(JSContext* cx, const ValVector& globalImportValues,
-                HandleWasmInstanceObject instanceObj,
+  bool evaluate(JSContext* cx, Handle<WasmInstanceObject*> instanceObj,
                 MutableHandleVal result) const;
 
   bool isLiteral() const { return kind_ == InitExprKind::Literal; }
@@ -90,7 +91,8 @@ class InitExpr {
   // Allow explicit cloning
   [[nodiscard]] bool clone(const InitExpr& src);
 
-  WASM_DECLARE_SERIALIZABLE(InitExpr)
+  size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
+  WASM_DECLARE_FRIEND_SERIALIZE(InitExpr);
 };
 
 }  // namespace wasm

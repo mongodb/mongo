@@ -141,6 +141,22 @@ js::gc::ArenaList& js::gc::ArenaList::insertListWithCursorAtEnd(
   return *this;
 }
 
+js::gc::Arena* js::gc::ArenaList::takeFirstArena() {
+  check();
+  Arena* arena = head_;
+  if (!arena) {
+    return nullptr;
+  }
+
+  head_ = arena->next;
+  if (cursorp_ == &arena->next) {
+    cursorp_ = &head_;
+  }
+
+  check();
+  return arena;
+}
+
 js::gc::SortedArenaList::SortedArenaList(size_t thingsPerArena) {
   reset(thingsPerArena);
 }
@@ -241,9 +257,9 @@ js::gc::Arena* js::gc::ArenaLists::getFirstArena(AllocKind thingKind) const {
   return arenaList(thingKind).head();
 }
 
-js::gc::Arena* js::gc::ArenaLists::getFirstArenaToSweep(
+js::gc::Arena* js::gc::ArenaLists::getFirstCollectingArena(
     AllocKind thingKind) const {
-  return arenasToSweep(thingKind);
+  return collectingArenaList(thingKind).head();
 }
 
 js::gc::Arena* js::gc::ArenaLists::getFirstSweptArena(
@@ -252,11 +268,6 @@ js::gc::Arena* js::gc::ArenaLists::getFirstSweptArena(
     return nullptr;
   }
   return incrementalSweptArenas.ref().head();
-}
-
-js::gc::Arena* js::gc::ArenaLists::getFirstNewArenaInMarkPhase(
-    AllocKind thingKind) const {
-  return newArenasInMarkPhase(thingKind).head();
 }
 
 js::gc::Arena* js::gc::ArenaLists::getArenaAfterCursor(
@@ -280,16 +291,6 @@ bool js::gc::ArenaLists::arenaListsAreEmpty() const {
   return true;
 }
 
-void js::gc::ArenaLists::unmarkAll() {
-  for (auto i : AllAllocKinds()) {
-    /* The background finalization must have stopped at this point. */
-    MOZ_ASSERT(concurrentUse(i) == ConcurrentUse::None);
-    for (Arena* arena = arenaList(i).head(); arena; arena = arena->next) {
-      arena->unmarkAll();
-    }
-  }
-}
-
 bool js::gc::ArenaLists::doneBackgroundFinalize(AllocKind kind) const {
   return concurrentUse(kind) != ConcurrentUse::BackgroundFinalize;
 }
@@ -308,13 +309,6 @@ MOZ_ALWAYS_INLINE js::gc::TenuredCell* js::gc::ArenaLists::allocateFromFreeList(
 void js::gc::ArenaLists::unmarkPreMarkedFreeCells() {
   for (auto i : AllAllocKinds()) {
     freeLists().unmarkPreMarkedFreeCells(i);
-  }
-}
-
-void js::gc::ArenaLists::mergeNewArenasInMarkPhase() {
-  for (auto i : AllAllocKinds()) {
-    arenaList(i).insertListWithCursorAtEnd(newArenasInMarkPhase(i));
-    newArenasInMarkPhase(i).clear();
   }
 }
 

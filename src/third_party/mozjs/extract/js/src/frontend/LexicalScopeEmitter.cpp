@@ -6,8 +6,6 @@
 
 #include "frontend/LexicalScopeEmitter.h"
 
-#include "frontend/BytecodeEmitter.h"  // BytecodeEmitter
-
 using namespace js;
 using namespace js::frontend;
 

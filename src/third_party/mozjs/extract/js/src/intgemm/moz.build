@@ -1,0 +1,53 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+include("../js-config.mozbuild")
+include("../js-cxxflags.mozbuild")
+
+FINAL_LIBRARY = "js"
+
+with Files("*"):
+    BUG_COMPONENT = ("Core", "JavaScript: WebAssembly")
+
+LOCAL_INCLUDES += [
+    "!..",
+    "..",
+    "/third_party/gemmology",
+    "/third_party/xsimd/include",
+]
+
+if CONFIG["INTEL_ARCHITECTURE"]:
+    DEFINES["USE_SSE2"] = True
+    SOURCES += ["/third_party/gemmology/kernels/GemmologyEngineSSE2.cpp"]
+    SOURCES["/third_party/gemmology/kernels/GemmologyEngineSSE2.cpp"].flags += CONFIG[
+        "SSE2_FLAGS"
+    ]
+    if CONFIG["SSSE3_FLAGS"]:
+        DEFINES["USE_SSSE3"] = True
+        SOURCES += ["/third_party/gemmology/kernels/GemmologyEngineSSSE3.cpp"]
+        SOURCES[
+            "/third_party/gemmology/kernels/GemmologyEngineSSSE3.cpp"
+        ].flags += CONFIG["SSSE3_FLAGS"]
+    if CONFIG["AVX2_FLAGS"]:
+        DEFINES["USE_AVX2"] = True
+        SOURCES += ["/third_party/gemmology/kernels/GemmologyEngineAVX2.cpp"]
+        SOURCES[
+            "/third_party/gemmology/kernels/GemmologyEngineAVX2.cpp"
+        ].flags += CONFIG["AVX2_FLAGS"]
+
+if CONFIG["CPU_ARCH"] == "aarch64":
+    DEFINES["USE_NEON"] = True
+    SOURCES += ["/third_party/gemmology/kernels/GemmologyEngineNeon64.cpp"]
+    SOURCES["/third_party/gemmology/kernels/GemmologyEngineNeon64.cpp"].flags += CONFIG[
+        "NEON_FLAGS"
+    ]
+
+SOURCES += [
+    "IntegerGemmIntrinsic.cpp",
+]
+
+# We allow warnings for third-party code that can be updated from upstream.
+AllowCompilerWarnings()

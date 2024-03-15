@@ -6,10 +6,10 @@
 
 #include "jit/ValueNumbering.h"
 
-#include "jit/AliasAnalysis.h"
 #include "jit/IonAnalysis.h"
 #include "jit/JitSpewer.h"
 #include "jit/MIRGenerator.h"
+#include "jit/MIRGraph.h"
 
 using namespace js;
 using namespace js::jit;
@@ -244,10 +244,11 @@ bool ValueNumberer::handleUseReleased(MDefinition* def,
 }
 
 // Discard |def| and anything in its use-def subtree which is no longer needed.
-bool ValueNumberer::discardDefsRecursively(MDefinition* def) {
+bool ValueNumberer::discardDefsRecursively(MDefinition* def,
+                                           AllowEffectful allowEffectful) {
   MOZ_ASSERT(deadDefs_.empty(), "deadDefs_ not cleared");
 
-  return discardDef(def) && processDeadDefs();
+  return discardDef(def, allowEffectful) && processDeadDefs();
 }
 
 // Assuming |resume| is unreachable, release its operands.
@@ -300,7 +301,8 @@ bool ValueNumberer::releaseOperands(MDefinition* def) {
 }
 
 // Discard |def| and mine its operands for any subsequently dead defs.
-bool ValueNumberer::discardDef(MDefinition* def) {
+bool ValueNumberer::discardDef(MDefinition* def,
+                               AllowEffectful allowEffectful) {
 #ifdef JS_JITSPEW
   JitSpew(JitSpew_GVN, "      Discarding %s %s%u",
           def->block()->isMarked() ? "unreachable" : "dead", def->opName(),
@@ -311,7 +313,10 @@ bool ValueNumberer::discardDef(MDefinition* def) {
   if (def->block()->isMarked()) {
     MOZ_ASSERT(!def->hasUses(), "Discarding def that still has uses");
   } else {
-    MOZ_ASSERT(IsDiscardable(def), "Discarding non-discardable definition");
+    MOZ_ASSERT(allowEffectful == AllowEffectful::Yes
+                   ? IsDiscardableAllowEffectful(def)
+                   : IsDiscardable(def),
+               "Discarding non-discardable definition");
     MOZ_ASSERT(!values_.has(def), "Discarding a definition still in the set");
   }
 #endif
@@ -750,6 +755,16 @@ bool ValueNumberer::visitDefinition(MDefinition* def) {
 
     // If |sim| doesn't belong to a block, insert it next to |def|.
     if (isNewInstruction) {
+      // A new |sim| node mustn't be effectful when |def| wasn't effectful.
+      MOZ_ASSERT((def->isEffectful() && sim->isEffectful()) ||
+                 !sim->isEffectful());
+
+      // If both instructions are effectful, |sim| must have stolen the resume
+      // point of |def| when it's a new instruction.
+      MOZ_ASSERT_IF(def->isEffectful() && sim->isEffectful(),
+                    !def->toInstruction()->resumePoint() &&
+                        sim->toInstruction()->resumePoint());
+
       def->block()->insertAfter(def->toInstruction(), sim->toInstruction());
     }
 
@@ -773,8 +788,11 @@ bool ValueNumberer::visitDefinition(MDefinition* def) {
       sim->setBailoutKind(def->bailoutKind());
     }
 
-    if (DeadIfUnused(def)) {
-      if (!discardDefsRecursively(def)) {
+    // Discard |def| if it's now unused. Similar to guards, we allow to replace
+    // effectful instructions when the node's foldsTo method said |def| can be
+    // replaced.
+    if (DeadIfUnusedAllowEffectful(def)) {
+      if (!discardDefsRecursively(def, AllowEffectful::Yes)) {
         return false;
       }
 
@@ -815,30 +833,33 @@ bool ValueNumberer::visitDefinition(MDefinition* def) {
     if (rep == nullptr) {
       return false;
     }
-    if (rep->updateForReplacement(def)) {
+
+    if (rep->isPhi()) {
+      MOZ_ASSERT(def->isPhi());
+      rep->toPhi()->updateForReplacement(def->toPhi());
+    }
+
 #ifdef JS_JITSPEW
-      JitSpew(JitSpew_GVN, "      Replacing %s%u with %s%u", def->opName(),
-              def->id(), rep->opName(), rep->id());
+    JitSpew(JitSpew_GVN, "      Replacing %s%u with %s%u", def->opName(),
+            def->id(), rep->opName(), rep->id());
 #endif
-      ReplaceAllUsesWith(def, rep);
+    ReplaceAllUsesWith(def, rep);
 
-      // The node's congruentTo said |def| is congruent to |rep|, and it's
-      // dominated by |rep|. If |def| is a guard, it's covered by |rep|,
-      // so we can clear |def|'s guard flag and let it be discarded.
-      def->setNotGuardUnchecked();
+    // The node's congruentTo said |def| is congruent to |rep|, and it's
+    // dominated by |rep|. If |def| is a guard, it's covered by |rep|,
+    // so we can clear |def|'s guard flag and let it be discarded.
+    def->setNotGuardUnchecked();
 
-      if (DeadIfUnused(def)) {
-        // discardDef should not add anything to the deadDefs, as the
-        // redundant operation should have the same input operands.
-        mozilla::DebugOnly<bool> r = discardDef(def);
-        MOZ_ASSERT(
-            r,
-            "discardDef shouldn't have tried to add anything to the worklist, "
-            "so it shouldn't have failed");
-        MOZ_ASSERT(deadDefs_.empty(),
-                   "discardDef shouldn't have added anything to the worklist");
-      }
-      def = rep;
+    if (DeadIfUnused(def)) {
+      // discardDef should not add anything to the deadDefs, as the
+      // redundant operation should have the same input operands.
+      mozilla::DebugOnly<bool> r = discardDef(def);
+      MOZ_ASSERT(
+          r,
+          "discardDef shouldn't have tried to add anything to the worklist, "
+          "so it shouldn't have failed");
+      MOZ_ASSERT(deadDefs_.empty(),
+                 "discardDef shouldn't have added anything to the worklist");
     }
   }
 

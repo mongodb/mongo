@@ -25,7 +25,7 @@ struct BytecodeEmitter;
 //
 //   `do body while (cond);`
 //     DoWhileEmitter doWhile(this);
-//     doWhile.emitBody(Some(offset_of_do), Some(offset_of_body));
+//     doWhile.emitBody(offset_of_do, offset_of_body);
 //     emit(body);
 //     doWhile.emitCond();
 //     emit(cond);
@@ -69,10 +69,7 @@ class MOZ_STACK_CLASS DoWhileEmitter {
   //   |  bodyPos
   //   |
   //   doPos
-  //
-  // Can be Nothing() if not available.
-  [[nodiscard]] bool emitBody(const mozilla::Maybe<uint32_t>& doPos,
-                              const mozilla::Maybe<uint32_t>& bodyPos);
+  [[nodiscard]] bool emitBody(uint32_t doPos, uint32_t bodyPos);
   [[nodiscard]] bool emitCond();
   [[nodiscard]] bool emitEnd();
 };

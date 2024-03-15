@@ -55,8 +55,6 @@ class DeadObjectProxy : public BaseProxyHandler {
   virtual bool nativeCall(JSContext* cx, JS::IsAcceptableThis test,
                           JS::NativeImpl impl,
                           const JS::CallArgs& args) const override;
-  virtual bool hasInstance(JSContext* cx, JS::HandleObject proxy,
-                           JS::MutableHandleValue v, bool* bp) const override;
   virtual bool getBuiltinClass(JSContext* cx, JS::HandleObject proxy,
                                ESClass* cls) const override;
   virtual bool isArray(JSContext* cx, JS::HandleObject proxy,
@@ -93,15 +91,9 @@ class DeadObjectProxy : public BaseProxyHandler {
 
 bool IsDeadProxyObject(const JSObject* obj);
 
-JS::Value DeadProxyTargetValue(ProxyObject* obj);
+JS::Value DeadProxyTargetValue(JSObject* obj);
 
 JSObject* NewDeadProxyObject(JSContext* cx, JSObject* origObj = nullptr);
-
-enum class IsCallableFlag : bool { False, True };
-enum class IsConstructorFlag : bool { False, True };
-
-JSObject* NewDeadProxyObject(JSContext* cx, IsCallableFlag isCallable,
-                             IsConstructorFlag isConstructor);
 
 } /* namespace js */
 

@@ -8,11 +8,14 @@
 
 #include "jsexn.h"
 
+#include "js/CallAndConstruct.h"      // JS::Construct, JS::IsConstructor
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/friend/WindowProxy.h"    // js::IsWindowProxy
 #include "js/Object.h"                // JS::GetBuiltinClass
 #include "js/Proxy.h"
+#include "vm/Compartment.h"
 #include "vm/ErrorObject.h"
+#include "vm/Interpreter.h"
 #include "vm/JSContext.h"
 #include "vm/ProxyObject.h"
 #include "vm/Realm.h"
@@ -64,7 +67,7 @@ bool ForwardingProxyHandler::defineProperty(JSContext* cx, HandleObject proxy,
 
 bool ForwardingProxyHandler::ownPropertyKeys(
     JSContext* cx, HandleObject proxy, MutableHandleIdVector props) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, ENUMERATE);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), ENUMERATE);
   RootedObject target(cx, proxy->as<ProxyObject>().target());
   return GetPropertyKeys(
       cx, target, JSITER_OWNONLY | JSITER_HIDDEN | JSITER_SYMBOLS, props);
@@ -80,7 +83,7 @@ bool ForwardingProxyHandler::delete_(JSContext* cx, HandleObject proxy,
 
 bool ForwardingProxyHandler::enumerate(JSContext* cx, HandleObject proxy,
                                        MutableHandleIdVector props) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, ENUMERATE);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), ENUMERATE);
   MOZ_ASSERT(
       !hasPrototype());  // Should never be called if there's a prototype.
   RootedObject target(cx, proxy->as<ProxyObject>().target());
@@ -154,7 +157,7 @@ bool ForwardingProxyHandler::set(JSContext* cx, HandleObject proxy, HandleId id,
 
 bool ForwardingProxyHandler::call(JSContext* cx, HandleObject proxy,
                                   const CallArgs& args) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, CALL);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), CALL);
   RootedValue target(cx, proxy->as<ProxyObject>().private_());
 
   InvokeArgs iargs(cx);
@@ -167,7 +170,7 @@ bool ForwardingProxyHandler::call(JSContext* cx, HandleObject proxy,
 
 bool ForwardingProxyHandler::construct(JSContext* cx, HandleObject proxy,
                                        const CallArgs& args) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, CALL);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), CALL);
 
   RootedValue target(cx, proxy->as<ProxyObject>().private_());
   if (!IsConstructor(target)) {
@@ -199,7 +202,7 @@ bool ForwardingProxyHandler::hasOwn(JSContext* cx, HandleObject proxy,
 
 bool ForwardingProxyHandler::getOwnEnumerablePropertyKeys(
     JSContext* cx, HandleObject proxy, MutableHandleIdVector props) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, ENUMERATE);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), ENUMERATE);
   RootedObject target(cx, proxy->as<ProxyObject>().target());
   return GetPropertyKeys(cx, target, JSITER_OWNONLY, props);
 }
@@ -217,13 +220,6 @@ bool ForwardingProxyHandler::nativeCall(JSContext* cx, IsAcceptableThis test,
   return CallNativeImpl(cx, impl, args);
 }
 
-bool ForwardingProxyHandler::hasInstance(JSContext* cx, HandleObject proxy,
-                                         MutableHandleValue v, bool* bp) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
-  RootedObject target(cx, proxy->as<ProxyObject>().target());
-  return HasInstance(cx, target, v, bp);
-}
-
 bool ForwardingProxyHandler::getBuiltinClass(JSContext* cx, HandleObject proxy,
                                              ESClass* cls) const {
   RootedObject target(cx, proxy->as<ProxyObject>().target());
@@ -238,7 +234,7 @@ bool ForwardingProxyHandler::isArray(JSContext* cx, HandleObject proxy,
 
 const char* ForwardingProxyHandler::className(JSContext* cx,
                                               HandleObject proxy) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), GET);
   RootedObject target(cx, proxy->as<ProxyObject>().target());
   return GetObjectClassName(cx, target);
 }
@@ -246,7 +242,7 @@ const char* ForwardingProxyHandler::className(JSContext* cx,
 JSString* ForwardingProxyHandler::fun_toString(JSContext* cx,
                                                HandleObject proxy,
                                                bool isToSource) const {
-  assertEnteredPolicy(cx, proxy, JSID_VOID, GET);
+  assertEnteredPolicy(cx, proxy, JS::PropertyKey::Void(), GET);
   RootedObject target(cx, proxy->as<ProxyObject>().target());
   return fun_toStringHelper(cx, target, isToSource);
 }
@@ -447,7 +443,7 @@ ErrorCopier::~ErrorCopier() {
     RootedValue exc(cx);
     if (cx->getPendingException(&exc) && exc.isObject() &&
         exc.toObject().is<ErrorObject>()) {
-      RootedSavedFrame stack(cx, cx->getPendingExceptionStack());
+      Rooted<SavedFrame*> stack(cx, cx->getPendingExceptionStack());
       cx->clearPendingException();
       ar.reset();
       Rooted<ErrorObject*> errObj(cx, &exc.toObject().as<ErrorObject>());

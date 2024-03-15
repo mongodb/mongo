@@ -22,55 +22,63 @@ class JS_PUBLIC_API JSObject;
  * It's OK for these enum values to change as they will be mapped to a fixed
  * member of the mozilla::Telemetry::HistogramID enum by the callback.
  */
-#define MAP_JS_TELEMETRY(_)                 \
-  _(JS_TELEMETRY_GC_REASON)                 \
-  _(JS_TELEMETRY_GC_IS_ZONE_GC)             \
-  _(JS_TELEMETRY_GC_MS)                     \
-  _(JS_TELEMETRY_GC_BUDGET_MS_2)            \
-  _(JS_TELEMETRY_GC_BUDGET_OVERRUN)         \
-  _(JS_TELEMETRY_GC_ANIMATION_MS)           \
-  _(JS_TELEMETRY_GC_MAX_PAUSE_MS_2)         \
-  _(JS_TELEMETRY_GC_PREPARE_MS)             \
-  _(JS_TELEMETRY_GC_MARK_MS)                \
-  _(JS_TELEMETRY_GC_SWEEP_MS)               \
-  _(JS_TELEMETRY_GC_COMPACT_MS)             \
-  _(JS_TELEMETRY_GC_MARK_ROOTS_US)          \
-  _(JS_TELEMETRY_GC_MARK_GRAY_MS_2)         \
-  _(JS_TELEMETRY_GC_MARK_WEAK_MS)           \
-  _(JS_TELEMETRY_GC_SLICE_MS)               \
-  _(JS_TELEMETRY_GC_SLOW_PHASE)             \
-  _(JS_TELEMETRY_GC_SLOW_TASK)              \
-  _(JS_TELEMETRY_GC_MMU_50)                 \
-  _(JS_TELEMETRY_GC_RESET)                  \
-  _(JS_TELEMETRY_GC_RESET_REASON)           \
-  _(JS_TELEMETRY_GC_NON_INCREMENTAL)        \
-  _(JS_TELEMETRY_GC_NON_INCREMENTAL_REASON) \
-  _(JS_TELEMETRY_GC_MINOR_REASON)           \
-  _(JS_TELEMETRY_GC_MINOR_REASON_LONG)      \
-  _(JS_TELEMETRY_GC_MINOR_US)               \
-  _(JS_TELEMETRY_GC_NURSERY_BYTES)          \
-  _(JS_TELEMETRY_GC_PRETENURE_COUNT_2)      \
-  _(JS_TELEMETRY_GC_NURSERY_PROMOTION_RATE) \
-  _(JS_TELEMETRY_GC_TENURED_SURVIVAL_RATE)  \
-  _(JS_TELEMETRY_GC_MARK_RATE_2)            \
-  _(JS_TELEMETRY_GC_TIME_BETWEEN_S)         \
-  _(JS_TELEMETRY_GC_TIME_BETWEEN_SLICES_MS) \
-  _(JS_TELEMETRY_GC_SLICE_COUNT)            \
-  _(JS_TELEMETRY_DESERIALIZE_BYTES)         \
-  _(JS_TELEMETRY_DESERIALIZE_ITEMS)         \
-  _(JS_TELEMETRY_DESERIALIZE_US)            \
-  _(JS_TELEMETRY_GC_EFFECTIVENESS)
+#define FOR_EACH_JS_METRIC(_)                   \
+  _(GC_REASON_2, Enumeration)                   \
+  _(GC_IS_COMPARTMENTAL, Boolean)               \
+  _(GC_ZONE_COUNT, QuantityDistribution)        \
+  _(GC_ZONES_COLLECTED, QuantityDistribution)   \
+  _(GC_MS, TimeDuration_MS)                     \
+  _(GC_BUDGET_MS_2, TimeDuration_MS)            \
+  _(GC_BUDGET_WAS_INCREASED, Boolean)           \
+  _(GC_SLICE_WAS_LONG, Boolean)                 \
+  _(GC_BUDGET_OVERRUN, TimeDuration_US)         \
+  _(GC_ANIMATION_MS, TimeDuration_MS)           \
+  _(GC_MAX_PAUSE_MS_2, TimeDuration_MS)         \
+  _(GC_PREPARE_MS, TimeDuration_MS)             \
+  _(GC_MARK_MS, TimeDuration_MS)                \
+  _(GC_SWEEP_MS, TimeDuration_MS)               \
+  _(GC_COMPACT_MS, TimeDuration_MS)             \
+  _(GC_MARK_ROOTS_US, TimeDuration_US)          \
+  _(GC_MARK_GRAY_MS_2, TimeDuration_MS)         \
+  _(GC_MARK_WEAK_MS, TimeDuration_MS)           \
+  _(GC_SLICE_MS, TimeDuration_MS)               \
+  _(GC_SLOW_PHASE, Enumeration)                 \
+  _(GC_SLOW_TASK, Enumeration)                  \
+  _(GC_MMU_50, Percentage)                      \
+  _(GC_RESET, Boolean)                          \
+  _(GC_RESET_REASON, Enumeration)               \
+  _(GC_NON_INCREMENTAL, Boolean)                \
+  _(GC_NON_INCREMENTAL_REASON, Enumeration)     \
+  _(GC_MINOR_REASON, Enumeration)               \
+  _(GC_MINOR_REASON_LONG, Enumeration)          \
+  _(GC_MINOR_US, TimeDuration_US)               \
+  _(GC_NURSERY_BYTES_2, MemoryDistribution)     \
+  _(GC_PRETENURE_COUNT_2, QuantityDistribution) \
+  _(GC_NURSERY_PROMOTION_RATE, Percentage)      \
+  _(GC_TENURED_SURVIVAL_RATE, Percentage)       \
+  _(GC_MARK_RATE_2, QuantityDistribution)       \
+  _(GC_TIME_BETWEEN_S, TimeDuration_S)          \
+  _(GC_TIME_BETWEEN_SLICES_MS, TimeDuration_MS) \
+  _(GC_SLICE_COUNT, QuantityDistribution)       \
+  _(DESERIALIZE_BYTES, MemoryDistribution)      \
+  _(DESERIALIZE_ITEMS, QuantityDistribution)    \
+  _(DESERIALIZE_US, TimeDuration_US)            \
+  _(GC_EFFECTIVENESS, MemoryDistribution)       \
+  _(GC_PARALLEL_MARK_SPEEDUP, Integer)          \
+  _(GC_PARALLEL_MARK_UTILIZATION, Percentage)   \
+  _(GC_PARALLEL_MARK_INTERRUPTIONS, Integer)    \
+  _(GC_TASK_START_DELAY_US, TimeDuration_US)
 
 // clang-format off
-#define ENUM_DEF(NAME) NAME ,
-enum {
-  MAP_JS_TELEMETRY(ENUM_DEF)
-  JS_TELEMETRY_END
+#define ENUM_DEF(NAME, _) NAME,
+enum class JSMetric {
+  FOR_EACH_JS_METRIC(ENUM_DEF)
+  Count
 };
 #undef ENUM_DEF
 // clang-format on
 
-using JSAccumulateTelemetryDataCallback = void (*)(int, uint32_t, const char*);
+using JSAccumulateTelemetryDataCallback = void (*)(JSMetric, uint32_t);
 
 extern JS_PUBLIC_API void JS_SetAccumulateTelemetryCallback(
     JSContext* cx, JSAccumulateTelemetryDataCallback callback);
@@ -82,7 +90,7 @@ extern JS_PUBLIC_API void JS_SetAccumulateTelemetryCallback(
  * fixed member of the mozilla::UseCounter enum by the callback.
  */
 
-enum class JSUseCounter { ASMJS, WASM, WASM_DUPLICATE_IMPORTS };
+enum class JSUseCounter { ASMJS, WASM };
 
 using JSSetUseCounterCallback = void (*)(JSObject*, JSUseCounter);
 

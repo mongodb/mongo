@@ -21,14 +21,20 @@
 
 #include <type_traits>
 
+#include "js/Utility.h"
 #include "js/WasmFeatures.h"
 
 #include "wasm/WasmBinary.h"
 #include "wasm/WasmCompile.h"
-#include "wasm/WasmTypes.h"
+#include "wasm/WasmCompileArgs.h"
+#include "wasm/WasmModuleTypes.h"
+#include "wasm/WasmProcess.h"
+#include "wasm/WasmTypeDef.h"
 
 namespace js {
 namespace wasm {
+
+using mozilla::Some;
 
 // ModuleEnvironment contains all the state necessary to process or render
 // functions, and all of the state necessary to validate all aspects of the
@@ -50,15 +56,11 @@ struct ModuleEnvironment {
   // validating an asm.js module) and immutable during compilation:
   Maybe<uint32_t> dataCount;
   Maybe<MemoryDesc> memory;
-  TypeContext types;
-  TypeIdDescVector typeIds;
+  MutableTypeContext types;
   FuncDescVector funcs;
-  Uint32Vector funcImportGlobalDataOffsets;
-
+  uint32_t numFuncImports;
   GlobalDescVector globals;
-#ifdef ENABLE_WASM_EXCEPTIONS
-  EventDescVector events;
-#endif
+  TagDescVector tags;
   TableDescVector tables;
   Uint32Vector asmJSSigToTableIndex;
   ImportVector imports;
@@ -66,7 +68,19 @@ struct ModuleEnvironment {
   Maybe<uint32_t> startFuncIndex;
   ElemSegmentVector elemSegments;
   MaybeSectionRange codeSection;
-  bool usesDuplicateImports;
+
+  // The start offset of the FuncImportInstanceData[] section of the instance
+  // data. There is one entry for every imported function.
+  uint32_t funcImportsOffsetStart;
+  // The start offset of the TypeDefInstanceData[] section of the instance
+  // data. There is one entry for every type.
+  uint32_t typeDefsOffsetStart;
+  // The start offset of the TableInstanceData[] section of the instance data.
+  // There is one entry for every table.
+  uint32_t tablesOffsetStart;
+  // The start offset of the tag section of the instance data. There is one
+  // entry for every tag.
+  uint32_t tagsOffsetStart;
 
   // Fields decoded as part of the wasm module tail:
   DataSegmentEnvVector dataSegments;
@@ -80,30 +94,39 @@ struct ModuleEnvironment {
       : kind(kind),
         features(features),
         memory(Nothing()),
-        types(features, TypeDefVector()),
-        usesDuplicateImports(false) {}
+        numFuncImports(0),
+        funcImportsOffsetStart(UINT32_MAX),
+        typeDefsOffsetStart(UINT32_MAX),
+        tablesOffsetStart(UINT32_MAX),
+        tagsOffsetStart(UINT32_MAX) {}
+
+  [[nodiscard]] bool init() {
+    types = js_new<TypeContext>(features);
+    return types;
+  }
 
   size_t numTables() const { return tables.length(); }
-  size_t numTypes() const { return types.length(); }
+  size_t numTypes() const { return types->length(); }
   size_t numFuncs() const { return funcs.length(); }
-  size_t numFuncImports() const { return funcImportGlobalDataOffsets.length(); }
-  size_t numFuncDefs() const {
-    return funcs.length() - funcImportGlobalDataOffsets.length();
+  size_t numFuncDefs() const { return funcs.length() - numFuncImports; }
+
+  bool funcIsImport(uint32_t funcIndex) const {
+    return funcIndex < numFuncImports;
   }
 
 #define WASM_FEATURE(NAME, SHORT_NAME, ...) \
   bool SHORT_NAME##Enabled() const { return features.SHORT_NAME; }
-  JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE)
+  JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE, WASM_FEATURE)
 #undef WASM_FEATURE
   Shareable sharedMemoryEnabled() const { return features.sharedMemory; }
-  bool hugeMemoryEnabled() const { return !isAsmJS() && features.hugeMemory; }
-  bool simdWormholeEnabled() const { return features.simdWormhole; }
+  bool hugeMemoryEnabled() const {
+    return !isAsmJS() && usesMemory() &&
+           IsHugeMemoryEnabled(memory->indexType());
+  }
+  bool simdAvailable() const { return features.simd; }
+  bool intrinsicsEnabled() const { return features.intrinsics; }
 
   bool isAsmJS() const { return kind == ModuleKind::AsmJS; }
-
-  bool funcIsImport(uint32_t funcIndex) const {
-    return funcIndex < funcImportGlobalDataOffsets.length();
-  }
 
   bool usesMemory() const { return memory.isSome(); }
   bool usesSharedMemory() const {
@@ -126,6 +149,35 @@ struct ModuleEnvironment {
     }
 
     funcs[funcIndex].flags = flags;
+  }
+
+  uint32_t offsetOfFuncImportInstanceData(uint32_t funcIndex) const {
+    MOZ_ASSERT(funcIndex < numFuncImports);
+    return funcImportsOffsetStart + funcIndex * sizeof(FuncImportInstanceData);
+  }
+
+  uint32_t offsetOfTypeDefInstanceData(uint32_t typeIndex) const {
+    MOZ_ASSERT(typeIndex < types->length());
+    return typeDefsOffsetStart + typeIndex * sizeof(TypeDefInstanceData);
+  }
+
+  uint32_t offsetOfTypeDef(uint32_t typeIndex) const {
+    return offsetOfTypeDefInstanceData(typeIndex) +
+           offsetof(TypeDefInstanceData, typeDef);
+  }
+  uint32_t offsetOfSuperTypeVector(uint32_t typeIndex) const {
+    return offsetOfTypeDefInstanceData(typeIndex) +
+           offsetof(TypeDefInstanceData, superTypeVector);
+  }
+
+  uint32_t offsetOfTableInstanceData(uint32_t tableIndex) const {
+    MOZ_ASSERT(tableIndex < tables.length());
+    return tablesOffsetStart + tableIndex * sizeof(TableInstanceData);
+  }
+
+  uint32_t offsetOfTagInstanceData(uint32_t tagIndex) const {
+    MOZ_ASSERT(tagIndex < tags.length());
+    return tagsOffsetStart + tagIndex * sizeof(TagInstanceData);
   }
 };
 
@@ -179,6 +231,8 @@ class NothingVector {
   bool resize(size_t length) { return true; }
   Nothing& operator[](size_t) { return unused_; }
   Nothing& back() { return unused_; }
+  size_t length() const { return 0; }
+  bool append(Nothing& nothing) { return true; }
 };
 
 struct ValidatingPolicy {
@@ -195,8 +249,8 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
 // Shared subtyping function across validation.
 
 [[nodiscard]] bool CheckIsSubtypeOf(Decoder& d, const ModuleEnvironment& env,
-                                    size_t opcodeOffset, ValType actual,
-                                    ValType expected, TypeCache* cache);
+                                    size_t opcodeOffset, FieldType subType,
+                                    FieldType superType);
 
 // The local entries are part of function bodies and thus serialized by both
 // wasm and asm.js and decoded as part of both validation and compilation.
@@ -206,7 +260,8 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
 // This performs no validation; the local entries must already have been
 // validated by an earlier pass.
 
-[[nodiscard]] bool DecodeValidatedLocalEntries(Decoder& d,
+[[nodiscard]] bool DecodeValidatedLocalEntries(const TypeContext& types,
+                                               Decoder& d,
                                                ValTypeVector* locals);
 
 // This validates the entries.

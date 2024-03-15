@@ -15,15 +15,15 @@
 
 #include "builtin/SelfHostingDefines.h"
 #include "js/Class.h"  // JSClass, JSClassOps, js::ClassSpec
+#include "js/TypeDecls.h"
 #include "js/Value.h"
-#include "vm/JSObject.h"
-#include "vm/List.h"
 #include "vm/NativeObject.h"
 
 struct JS_PUBLIC_API JSContext;
-class JS_PUBLIC_API JSFreeOp;
 
-struct ULocaleDisplayNames;
+namespace mozilla::intl {
+class DisplayNames;
+}
 
 namespace js {
 struct ClassSpec;
@@ -34,8 +34,7 @@ class DisplayNamesObject : public NativeObject {
   static const JSClass& protoClass_;
 
   static constexpr uint32_t INTERNALS_SLOT = 0;
-  static constexpr uint32_t ULOCALE_DISPLAY_NAMES_SLOT = 1;
-  static constexpr uint32_t DATE_TIME_NAMES_SLOT = 2;
+  static constexpr uint32_t LOCALE_DISPLAY_NAMES_SLOT = 1;
   static constexpr uint32_t SLOT_COUNT = 3;
 
   static_assert(INTERNALS_SLOT == INTL_INTERNALS_OBJECT_SLOT,
@@ -43,37 +42,25 @@ class DisplayNamesObject : public NativeObject {
                 "object slot");
 
   // Estimated memory use for ULocaleDisplayNames (see IcuMemoryUsage).
-  static constexpr size_t EstimatedMemoryUse = 1256;
+  static constexpr size_t EstimatedMemoryUse = 1238;
 
-  ULocaleDisplayNames* getLocaleDisplayNames() const {
-    const auto& slot = getFixedSlot(ULOCALE_DISPLAY_NAMES_SLOT);
+  mozilla::intl::DisplayNames* getDisplayNames() const {
+    const auto& slot = getFixedSlot(LOCALE_DISPLAY_NAMES_SLOT);
     if (slot.isUndefined()) {
       return nullptr;
     }
-    return static_cast<ULocaleDisplayNames*>(slot.toPrivate());
+    return static_cast<mozilla::intl::DisplayNames*>(slot.toPrivate());
   }
 
-  void setLocaleDisplayNames(ULocaleDisplayNames* localeDisplayNames) {
-    setFixedSlot(ULOCALE_DISPLAY_NAMES_SLOT, PrivateValue(localeDisplayNames));
-  }
-
-  ListObject* getDateTimeNames() const {
-    const auto& slot = getFixedSlot(DATE_TIME_NAMES_SLOT);
-    if (slot.isUndefined()) {
-      return nullptr;
-    }
-    return &slot.toObject().as<ListObject>();
-  }
-
-  void setDateTimeNames(ListObject* names) {
-    setFixedSlot(DATE_TIME_NAMES_SLOT, ObjectValue(*names));
+  void setDisplayNames(mozilla::intl::DisplayNames* displayNames) {
+    setFixedSlot(LOCALE_DISPLAY_NAMES_SLOT, PrivateValue(displayNames));
   }
 
  private:
   static const JSClassOps classOps_;
   static const ClassSpec classSpec_;
 
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 /**

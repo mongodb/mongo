@@ -1,4 +1,4 @@
-// Copyright 2014, ARM Limited
+// Copyright 2014, VIXL authors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -311,8 +311,7 @@ void Decoder::DecodeLoadStore(const Instruction* instr) {
           VisitLoadLiteral(instr);
         }
       } else {
-        if ((instr->Mask(0x84C00000) == 0x80C00000) ||
-            (instr->Mask(0x44800000) == 0x44800000) ||
+        if ((instr->Mask(0x44800000) == 0x44800000) ||
             (instr->Mask(0x84800000) == 0x84800000)) {
           VisitUnallocated(instr);
         } else {
@@ -352,7 +351,29 @@ void Decoder::DecodeLoadStore(const Instruction* instr) {
                 VisitLoadStoreRegisterOffset(instr);
               }
             } else {
-              VisitUnallocated(instr);
+              if (instr->Bits(11, 10) == 0x0) {
+                if (instr->Bit(25) == 0) {
+                  if (instr->Bit(26) == 0) {
+                    if ((instr->Bit(15) == 1) &&
+                        ((instr->Bits(14, 12) == 0x1) ||
+                         (instr->Bit(13) == 1) ||
+                         (instr->Bits(14, 12) == 0x5) ||
+                         ((instr->Bits(14, 12) == 0x4) &&
+                          ((instr->Bit(23) == 0) ||
+                           (instr->Bits(23, 22) == 0x3))))) {
+                      VisitUnallocated(instr);
+                    } else {
+                      VisitAtomicMemory(instr);
+                    }
+                  } else {
+                    VisitUnallocated(instr);
+                  }
+                } else {
+                  VisitUnallocated(instr);
+                }
+              } else {
+                VisitUnallocated(instr);
+              }
             }
           }
         }

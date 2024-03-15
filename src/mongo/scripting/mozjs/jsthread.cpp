@@ -35,6 +35,7 @@
 #include <cstdio>
 #include <js/Array.h>
 #include <js/Object.h>
+#include <js/PropertyAndElement.h>
 #include <jsfriendapi.h>
 #include <memory>
 #include <vm/PosixNSPR.h>
@@ -228,18 +229,19 @@ JSThreadConfig* getConfig(JSContext* cx, JS::CallArgs args) {
     if (!getScope(cx)->getProto<JSThreadInfo>().instanceOf(value))
         uasserted(ErrorCodes::BadValue, "_JSThreadConfig is not a JSThread");
 
-    return static_cast<JSThreadConfig*>(JS::GetPrivate(value.toObjectOrNull()));
+    return JS::GetMaybePtrFromReservedSlot<JSThreadConfig>(value.toObjectOrNull(),
+                                                           JSThreadInfo::JSThreadConfigSlot);
 }
 
 }  // namespace
 
-void JSThreadInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto config = static_cast<JSThreadConfig*>(JS::GetPrivate(obj));
+void JSThreadInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto config = JS::GetMaybePtrFromReservedSlot<JSThreadConfig>(obj, JSThreadConfigSlot);
 
     if (!config)
         return;
 
-    getScope(fop)->trackedDelete(config);
+    getScope(gcCtx)->trackedDelete(config);
 }
 
 void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
@@ -248,7 +250,7 @@ void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject obj(cx);
     scope->getProto<JSThreadInfo>().newObject(&obj);
     JSThreadConfig* config = scope->trackedNew<JSThreadConfig>(cx, args);
-    JS::SetPrivate(obj, config);
+    JS::SetReservedSlot(obj, JSThreadConfigSlot, JS::PrivateValue(config));
 
     ObjectWrapper(cx, args.thisv()).setObject(InternedString::_JSThreadConfig, obj);
 

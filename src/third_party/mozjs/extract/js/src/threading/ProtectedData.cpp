@@ -6,7 +6,6 @@
 
 #include "threading/ProtectedData.h"
 
-#include "gc/Zone.h"
 #include "vm/HelperThreads.h"
 #include "vm/JSContext.h"
 
@@ -20,7 +19,8 @@ namespace js {
 template <AllowedHelperThread Helper>
 static inline bool OnHelperThread() {
   if (Helper == AllowedHelperThread::IonCompile ||
-      Helper == AllowedHelperThread::GCTaskOrIonCompile) {
+      Helper == AllowedHelperThread::GCTaskOrIonCompile ||
+      Helper == AllowedHelperThread::ParseTaskOrIonCompile) {
     if (CurrentThreadIsIonCompiling()) {
       return true;
     }
@@ -28,8 +28,14 @@ static inline bool OnHelperThread() {
 
   if (Helper == AllowedHelperThread::GCTask ||
       Helper == AllowedHelperThread::GCTaskOrIonCompile) {
-    JSContext* cx = TlsContext.get();
-    if (cx->defaultFreeOp()->isCollecting()) {
+    if (CurrentThreadIsPerformingGC()) {
+      return true;
+    }
+  }
+
+  if (Helper == AllowedHelperThread::ParseTask ||
+      Helper == AllowedHelperThread::ParseTaskOrIonCompile) {
+    if (CurrentThreadIsParseThread()) {
       return true;
     }
   }
@@ -69,28 +75,9 @@ void CheckMainThread<Helper>::check() const {
 
 template class CheckMainThread<AllowedHelperThread::None>;
 template class CheckMainThread<AllowedHelperThread::GCTask>;
+template class CheckMainThread<AllowedHelperThread::ParseTask>;
 template class CheckMainThread<AllowedHelperThread::IonCompile>;
-
-template <AllowedHelperThread Helper>
-void CheckZone<Helper>::check() const {
-  if (OnHelperThread<Helper>()) {
-    return;
-  }
-
-  if (zone->usedByHelperThread()) {
-    // This may only be accessed by the helper thread using this zone.
-    MOZ_ASSERT(zone->ownedByCurrentHelperThread());
-  } else {
-    // The main thread is permitted access to all zones. These accesses
-    // are threadsafe if the zone is not in use by a helper thread.
-    MOZ_ASSERT(CurrentThreadCanAccessRuntime(TlsContext.get()->runtime()));
-  }
-}
-
-template class CheckZone<AllowedHelperThread::None>;
-template class CheckZone<AllowedHelperThread::GCTask>;
-template class CheckZone<AllowedHelperThread::IonCompile>;
-template class CheckZone<AllowedHelperThread::GCTaskOrIonCompile>;
+template class CheckMainThread<AllowedHelperThread::ParseTaskOrIonCompile>;
 
 template <GlobalLock Lock, AllowedHelperThread Helper>
 void CheckGlobalLock<Lock, Helper>::check() const {
@@ -100,10 +87,9 @@ void CheckGlobalLock<Lock, Helper>::check() const {
 
   switch (Lock) {
     case GlobalLock::GCLock:
-      TlsContext.get()->runtime()->gc.assertCurrentThreadHasLockedGC();
-      break;
-    case GlobalLock::ScriptDataLock:
-      TlsContext.get()->runtime()->assertCurrentThreadHasScriptDataAccess();
+      TlsGCContext.get()
+          ->runtimeFromAnyThread()
+          ->gc.assertCurrentThreadHasLockedGC();
       break;
     case GlobalLock::HelperThreadLock:
       gHelperThreadLock.assertOwnedByCurrentThread();
@@ -112,38 +98,8 @@ void CheckGlobalLock<Lock, Helper>::check() const {
 }
 
 template class CheckGlobalLock<GlobalLock::GCLock, AllowedHelperThread::None>;
-template class CheckGlobalLock<GlobalLock::ScriptDataLock,
-                               AllowedHelperThread::None>;
 template class CheckGlobalLock<GlobalLock::HelperThreadLock,
                                AllowedHelperThread::None>;
-
-template <AllowedHelperThread Helper>
-void CheckArenaListAccess<Helper>::check() const {
-  MOZ_ASSERT(zone);
-
-  if (OnHelperThread<Helper>()) {
-    return;
-  }
-
-  JSRuntime* rt = TlsContext.get()->runtime();
-  if (zone->isAtomsZone()) {
-    // The main thread can access the atoms arenas if it holds all the atoms
-    // table locks.
-    if (rt->currentThreadHasAtomsTableAccess()) {
-      return;
-    }
-
-    // Otherwise we must hold the GC lock if parallel parsing is running.
-    if (rt->isOffThreadParseRunning()) {
-      rt->gc.assertCurrentThreadHasLockedGC();
-    }
-    return;
-  }
-
-  CheckZone<AllowedHelperThread::None>::check();
-}
-
-template class CheckArenaListAccess<AllowedHelperThread::GCTask>;
 
 #endif  // JS_HAS_PROTECTED_DATA_CHECKS
 

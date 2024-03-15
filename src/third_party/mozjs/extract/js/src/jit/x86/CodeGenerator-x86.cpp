@@ -18,7 +18,9 @@
 #include "jit/MIRGraph.h"
 #include "js/Conversions.h"
 #include "vm/Shape.h"
-#include "wasm/WasmTypes.h"
+#include "wasm/WasmBuiltins.h"
+#include "wasm/WasmCodegenTypes.h"
+#include "wasm/WasmInstanceData.h"
 
 #include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
@@ -35,29 +37,6 @@ using mozilla::FloatingPoint;
 CodeGeneratorX86::CodeGeneratorX86(MIRGenerator* gen, LIRGraph* graph,
                                    MacroAssembler* masm)
     : CodeGeneratorX86Shared(gen, graph, masm) {}
-
-static const uint32_t FrameSizes[] = {128, 256, 512, 1024};
-
-FrameSizeClass FrameSizeClass::FromDepth(uint32_t frameDepth) {
-  for (uint32_t i = 0; i < std::size(FrameSizes); i++) {
-    if (frameDepth < FrameSizes[i]) {
-      return FrameSizeClass(i);
-    }
-  }
-
-  return FrameSizeClass::None();
-}
-
-FrameSizeClass FrameSizeClass::ClassLimit() {
-  return FrameSizeClass(std::size(FrameSizes));
-}
-
-uint32_t FrameSizeClass::frameSize() const {
-  MOZ_ASSERT(class_ != NO_FRAME_SIZE_CLASS_ID);
-  MOZ_ASSERT(class_ < std::size(FrameSizes));
-
-  return FrameSizes[class_];
-}
 
 ValueOperand CodeGeneratorX86::ToValue(LInstruction* ins, size_t pos) {
   Register typeReg = ToRegister(ins->getOperand(pos + TYPE_INDEX));
@@ -257,7 +236,7 @@ void CodeGenerator::visitCompareExchangeTypedArrayElement64(
   Register temp2 = edx;
 
   Label fail;
-  masm.newGCBigInt(bigInt, temp2, &fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(bigInt, temp2, initialBigIntHeap(), &fail);
   masm.initializeBigInt64(arrayType, bigInt, replacement);
   masm.mov(bigInt, out);
   restoreSavedRegisters();
@@ -321,7 +300,7 @@ void CodeGenerator::visitAtomicExchangeTypedArrayElement64(
   Register temp = edx;
 
   Label fail;
-  masm.newGCBigInt(out, temp, &fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(out, temp, initialBigIntHeap(), &fail);
   masm.initializeBigInt64(arrayType, out, temp1);
   restoreSavedRegisters();
   masm.jump(ool->rejoin());
@@ -395,7 +374,7 @@ void CodeGenerator::visitAtomicTypedArrayElementBinop64(
   Register temp = edx;
 
   Label fail;
-  masm.newGCBigInt(out, temp, &fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(out, temp, initialBigIntHeap(), &fail);
   masm.initializeBigInt64(arrayType, out, temp1);
   restoreSavedRegisters();
   masm.jump(ool->rejoin());
@@ -452,9 +431,6 @@ void CodeGenerator::visitAtomicTypedArrayElementBinopForEffect64(
   masm.pop(edx);
 }
 
-// See ../CodeGenerator.cpp for more information.
-void CodeGenerator::visitWasmRegisterResult(LWasmRegisterResult* lir) {}
-
 void CodeGenerator::visitWasmUint32ToDouble(LWasmUint32ToDouble* lir) {
   Register input = ToRegister(lir->input());
   Register temp = ToRegister(lir->temp());
@@ -481,9 +457,9 @@ void CodeGenerator::visitWasmUint32ToFloat32(LWasmUint32ToFloat32* lir) {
 }
 
 void CodeGenerator::visitWasmHeapBase(LWasmHeapBase* ins) {
-  masm.loadPtr(
-      Address(ToRegister(ins->tlsPtr()), offsetof(wasm::TlsData, memoryBase)),
-      ToRegister(ins->output()));
+  masm.loadPtr(Address(ToRegister(ins->instance()),
+                       wasm::Instance::offsetOfMemoryBase()),
+               ToRegister(ins->output()));
 }
 
 template <typename T>
@@ -918,9 +894,9 @@ void CodeGeneratorX86::visitOutOfLineTruncate(OutOfLineTruncate* ool) {
   masm.bind(&fail);
   {
     if (gen->compilingWasm()) {
-      masm.Push(WasmTlsReg);
+      masm.Push(InstanceReg);
     }
-    int32_t framePushedAfterTls = masm.framePushed();
+    int32_t framePushedAfterInstance = masm.framePushed();
 
     saveVolatile(output);
 
@@ -928,9 +904,9 @@ void CodeGeneratorX86::visitOutOfLineTruncate(OutOfLineTruncate* ool) {
       masm.setupWasmABICall();
       masm.passABIArg(input, MoveOp::DOUBLE);
 
-      int32_t tlsOffset = masm.framePushed() - framePushedAfterTls;
+      int32_t instanceOffset = masm.framePushed() - framePushedAfterInstance;
       masm.callWithABI(ool->bytecodeOffset(), wasm::SymbolicAddress::ToInt32,
-                       mozilla::Some(tlsOffset));
+                       mozilla::Some(instanceOffset));
     } else {
       using Fn = int32_t (*)(double);
       masm.setupUnalignedABICall(output);
@@ -943,7 +919,7 @@ void CodeGeneratorX86::visitOutOfLineTruncate(OutOfLineTruncate* ool) {
     restoreVolatile(output);
 
     if (gen->compilingWasm()) {
-      masm.Pop(WasmTlsReg);
+      masm.Pop(InstanceReg);
     }
   }
 
@@ -966,7 +942,7 @@ void CodeGeneratorX86::visitOutOfLineTruncateFloat32(
     masm.storeFloat32(input, Operand(esp, 0));
 
     // Check exponent to avoid fp exceptions.
-    masm.branchDoubleNotInInt64Range(Address(esp, 0), output, &failPopFloat);
+    masm.branchFloat32NotInInt64Range(Address(esp, 0), output, &failPopFloat);
 
     // Load float, perform 32-bit truncation.
     masm.truncateFloat32ToInt64(Address(esp, 0), Address(esp, 0), output);
@@ -1019,9 +995,9 @@ void CodeGeneratorX86::visitOutOfLineTruncateFloat32(
   masm.bind(&fail);
   {
     if (gen->compilingWasm()) {
-      masm.Push(WasmTlsReg);
+      masm.Push(InstanceReg);
     }
-    int32_t framePushedAfterTls = masm.framePushed();
+    int32_t framePushedAfterInstance = masm.framePushed();
 
     saveVolatile(output);
 
@@ -1037,9 +1013,9 @@ void CodeGeneratorX86::visitOutOfLineTruncateFloat32(
     masm.passABIArg(input.asDouble(), MoveOp::DOUBLE);
 
     if (gen->compilingWasm()) {
-      int32_t tlsOffset = masm.framePushed() - framePushedAfterTls;
+      int32_t instanceOffset = masm.framePushed() - framePushedAfterInstance;
       masm.callWithABI(ool->bytecodeOffset(), wasm::SymbolicAddress::ToInt32,
-                       mozilla::Some(tlsOffset));
+                       mozilla::Some(instanceOffset));
     } else {
       using Fn = int32_t (*)(double);
       masm.callWithABI<Fn, JS::ToInt32>(MoveOp::GENERAL,
@@ -1052,7 +1028,7 @@ void CodeGeneratorX86::visitOutOfLineTruncateFloat32(
     restoreVolatile(output);
 
     if (gen->compilingWasm()) {
-      masm.Pop(WasmTlsReg);
+      masm.Pop(InstanceReg);
     }
   }
 
@@ -1121,10 +1097,11 @@ void CodeGenerator::visitCompareI64AndBranch(LCompareI64AndBranch* lir) {
 
 void CodeGenerator::visitDivOrModI64(LDivOrModI64* lir) {
   MOZ_ASSERT(gen->compilingWasm());
-  MOZ_ASSERT(ToRegister(lir->getOperand(LDivOrModI64::Tls)) == WasmTlsReg);
+  MOZ_ASSERT(ToRegister(lir->getOperand(LDivOrModI64::Instance)) ==
+             InstanceReg);
 
-  masm.Push(WasmTlsReg);
-  int32_t framePushedAfterTls = masm.framePushed();
+  masm.Push(InstanceReg);
+  int32_t framePushedAfterInstance = masm.framePushed();
 
   Register64 lhs = ToRegister64(lir->getInt64Operand(LDivOrModI64::Lhs));
   Register64 rhs = ToRegister64(lir->getInt64Operand(LDivOrModI64::Rhs));
@@ -1137,8 +1114,9 @@ void CodeGenerator::visitDivOrModI64(LDivOrModI64* lir) {
   // Handle divide by zero.
   if (lir->canBeDivideByZero()) {
     Label nonZero;
-    // We can use WasmTlsReg as temp register because we preserved it before.
-    masm.branchTest64(Assembler::NonZero, rhs, rhs, WasmTlsReg, &nonZero);
+    // We can use InstanceReg as temp register because we preserved it
+    // before.
+    masm.branchTest64(Assembler::NonZero, rhs, rhs, InstanceReg, &nonZero);
     masm.wasmTrap(wasm::Trap::IntegerDivideByZero, lir->bytecodeOffset());
     masm.bind(&nonZero);
   }
@@ -1165,13 +1143,13 @@ void CodeGenerator::visitDivOrModI64(LDivOrModI64* lir) {
   masm.passABIArg(rhs.high);
   masm.passABIArg(rhs.low);
 
-  int32_t tlsOffset = masm.framePushed() - framePushedAfterTls;
+  int32_t instanceOffset = masm.framePushed() - framePushedAfterInstance;
   if (mir->isWasmBuiltinModI64()) {
     masm.callWithABI(lir->bytecodeOffset(), wasm::SymbolicAddress::ModI64,
-                     mozilla::Some(tlsOffset));
+                     mozilla::Some(instanceOffset));
   } else {
     masm.callWithABI(lir->bytecodeOffset(), wasm::SymbolicAddress::DivI64,
-                     mozilla::Some(tlsOffset));
+                     mozilla::Some(instanceOffset));
   }
 
   // output in edx:eax, move to output register.
@@ -1179,15 +1157,16 @@ void CodeGenerator::visitDivOrModI64(LDivOrModI64* lir) {
   MOZ_ASSERT(eax == output.low);
 
   masm.bind(&done);
-  masm.Pop(WasmTlsReg);
+  masm.Pop(InstanceReg);
 }
 
 void CodeGenerator::visitUDivOrModI64(LUDivOrModI64* lir) {
   MOZ_ASSERT(gen->compilingWasm());
-  MOZ_ASSERT(ToRegister(lir->getOperand(LDivOrModI64::Tls)) == WasmTlsReg);
+  MOZ_ASSERT(ToRegister(lir->getOperand(LDivOrModI64::Instance)) ==
+             InstanceReg);
 
-  masm.Push(WasmTlsReg);
-  int32_t framePushedAfterTls = masm.framePushed();
+  masm.Push(InstanceReg);
+  int32_t framePushedAfterInstance = masm.framePushed();
 
   Register64 lhs = ToRegister64(lir->getInt64Operand(LDivOrModI64::Lhs));
   Register64 rhs = ToRegister64(lir->getInt64Operand(LDivOrModI64::Rhs));
@@ -1198,8 +1177,9 @@ void CodeGenerator::visitUDivOrModI64(LUDivOrModI64* lir) {
   // Prevent divide by zero.
   if (lir->canBeDivideByZero()) {
     Label nonZero;
-    // We can use WasmTlsReg as temp register because we preserved it before.
-    masm.branchTest64(Assembler::NonZero, rhs, rhs, WasmTlsReg, &nonZero);
+    // We can use InstanceReg as temp register because we preserved it
+    // before.
+    masm.branchTest64(Assembler::NonZero, rhs, rhs, InstanceReg, &nonZero);
     masm.wasmTrap(wasm::Trap::IntegerDivideByZero, lir->bytecodeOffset());
     masm.bind(&nonZero);
   }
@@ -1211,20 +1191,20 @@ void CodeGenerator::visitUDivOrModI64(LUDivOrModI64* lir) {
   masm.passABIArg(rhs.low);
 
   MDefinition* mir = lir->mir();
-  int32_t tlsOffset = masm.framePushed() - framePushedAfterTls;
+  int32_t instanceOffset = masm.framePushed() - framePushedAfterInstance;
   if (mir->isWasmBuiltinModI64()) {
     masm.callWithABI(lir->bytecodeOffset(), wasm::SymbolicAddress::UModI64,
-                     mozilla::Some(tlsOffset));
+                     mozilla::Some(instanceOffset));
   } else {
     masm.callWithABI(lir->bytecodeOffset(), wasm::SymbolicAddress::UDivI64,
-                     mozilla::Some(tlsOffset));
+                     mozilla::Some(instanceOffset));
   }
 
   // output in edx:eax, move to output register.
   masm.movl(edx, output.high);
   MOZ_ASSERT(eax == output.low);
 
-  masm.Pop(WasmTlsReg);
+  masm.Pop(InstanceReg);
 }
 
 void CodeGeneratorX86::emitBigIntDiv(LBigIntDiv* ins, Register dividend,
@@ -1241,7 +1221,7 @@ void CodeGeneratorX86::emitBigIntDiv(LBigIntDiv* ins, Register dividend,
   masm.idiv(divisor);
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -1262,7 +1242,7 @@ void CodeGeneratorX86::emitBigIntMod(LBigIntMod* ins, Register dividend,
   masm.movl(output, dividend);
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -1281,6 +1261,47 @@ void CodeGenerator::visitWasmSelectI64(LWasmSelectI64* lir) {
   masm.movl(falseExpr.low, out.low);
   masm.movl(falseExpr.high, out.high);
   masm.bind(&done);
+}
+
+// We expect to handle only the case where compare is {U,}Int32 and select is
+// {U,}Int32.  Some values may be stack allocated, and the "true" input is
+// reused for the output.
+void CodeGenerator::visitWasmCompareAndSelect(LWasmCompareAndSelect* ins) {
+  bool cmpIs32bit = ins->compareType() == MCompare::Compare_Int32 ||
+                    ins->compareType() == MCompare::Compare_UInt32;
+  bool selIs32bit = ins->mir()->type() == MIRType::Int32;
+
+  MOZ_RELEASE_ASSERT(
+      cmpIs32bit && selIs32bit,
+      "CodeGenerator::visitWasmCompareAndSelect: unexpected types");
+
+  Register trueExprAndDest = ToRegister(ins->output());
+  MOZ_ASSERT(ToRegister(ins->ifTrueExpr()) == trueExprAndDest,
+             "true expr input is reused for output");
+
+  Assembler::Condition cond = Assembler::InvertCondition(
+      JSOpToCondition(ins->compareType(), ins->jsop()));
+  const LAllocation* rhs = ins->rightExpr();
+  const LAllocation* falseExpr = ins->ifFalseExpr();
+  Register lhs = ToRegister(ins->leftExpr());
+
+  if (rhs->isRegister()) {
+    if (falseExpr->isRegister()) {
+      masm.cmp32Move32(cond, lhs, ToRegister(rhs), ToRegister(falseExpr),
+                       trueExprAndDest);
+    } else {
+      masm.cmp32Load32(cond, lhs, ToRegister(rhs), ToAddress(falseExpr),
+                       trueExprAndDest);
+    }
+  } else {
+    if (falseExpr->isRegister()) {
+      masm.cmp32Move32(cond, lhs, ToAddress(rhs), ToRegister(falseExpr),
+                       trueExprAndDest);
+    } else {
+      masm.cmp32Load32(cond, lhs, ToAddress(rhs), ToAddress(falseExpr),
+                       trueExprAndDest);
+    }
+  }
 }
 
 void CodeGenerator::visitWasmReinterpretFromI64(LWasmReinterpretFromI64* lir) {
@@ -1359,8 +1380,10 @@ void CodeGenerator::visitWasmExtendU32Index(LWasmExtendU32Index*) {
   MOZ_CRASH("64-bit only");
 }
 
-void CodeGenerator::visitWasmWrapU32Index(LWasmWrapU32Index*) {
-  MOZ_CRASH("64-bit only");
+void CodeGenerator::visitWasmWrapU32Index(LWasmWrapU32Index* lir) {
+  // Generates no code on this platform because we just return the low part of
+  // the input register pair.
+  MOZ_ASSERT(ToRegister(lir->input()) == ToRegister(lir->output()));
 }
 
 void CodeGenerator::visitClzI64(LClzI64* lir) {
@@ -1455,6 +1478,14 @@ void CodeGenerator::visitInt64ToFloatingPoint(LInt64ToFloatingPoint* lir) {
   }
 }
 
+void CodeGenerator::visitBitNotI64(LBitNotI64* ins) {
+  const LInt64Allocation input = ins->getInt64Operand(0);
+  Register64 inputR = ToRegister64(input);
+  MOZ_ASSERT(inputR == ToOutRegister64(ins));
+  masm.notl(inputR.high);
+  masm.notl(inputR.low);
+}
+
 void CodeGenerator::visitTestI64AndBranch(LTestI64AndBranch* lir) {
   Register64 input = ToRegister64(lir->getInt64Operand(0));
 
@@ -1462,4 +1493,17 @@ void CodeGenerator::visitTestI64AndBranch(LTestI64AndBranch* lir) {
   jumpToBlock(lir->ifTrue(), Assembler::NonZero);
   masm.testl(input.low, input.low);
   emitBranch(Assembler::NonZero, lir->ifTrue(), lir->ifFalse());
+}
+
+void CodeGenerator::visitBitAndAndBranch(LBitAndAndBranch* baab) {
+  // LBitAndAndBranch only represents single-word ANDs, hence it can't be
+  // 64-bit here.
+  MOZ_ASSERT(!baab->is64());
+  Register regL = ToRegister(baab->left());
+  if (baab->right()->isConstant()) {
+    masm.test32(regL, Imm32(ToInt32(baab->right())));
+  } else {
+    masm.test32(regL, ToRegister(baab->right()));
+  }
+  emitBranch(baab->cond(), baab->ifTrue(), baab->ifFalse());
 }

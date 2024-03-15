@@ -8,7 +8,7 @@
 #define gc_NurseryAwareHashMap_h
 
 #include "gc/Barrier.h"
-#include "gc/Marking.h"
+#include "gc/Tracer.h"
 #include "js/GCHashTable.h"
 #include "js/GCPolicyAPI.h"
 #include "js/HashTable.h"
@@ -16,13 +16,15 @@
 namespace js {
 
 namespace detail {
+
 // This class only handles the incremental case and does not deal with nursery
 // pointers. The only users should be for NurseryAwareHashMap; it is defined
 // externally because we need a GCPolicy for its use in the contained map.
 template <typename T>
 class UnsafeBareWeakHeapPtr : public ReadBarriered<T> {
  public:
-  UnsafeBareWeakHeapPtr() : ReadBarriered<T>(JS::SafelyInitialized<T>()) {}
+  UnsafeBareWeakHeapPtr()
+      : ReadBarriered<T>(JS::SafelyInitialized<T>::create()) {}
   MOZ_IMPLICIT UnsafeBareWeakHeapPtr(const T& v) : ReadBarriered<T>(v) {}
   explicit UnsafeBareWeakHeapPtr(const UnsafeBareWeakHeapPtr& v)
       : ReadBarriered<T>(v) {}
@@ -41,7 +43,7 @@ class UnsafeBareWeakHeapPtr : public ReadBarriered<T> {
 
   const T get() const {
     if (!InternalBarrierMethods<T>::isMarkable(this->value)) {
-      return JS::SafelyInitialized<T>();
+      return JS::SafelyInitialized<T>::create();
     }
     this->read();
     return this->value;
@@ -63,24 +65,22 @@ enum : bool { DuplicatesNotPossible, DuplicatesPossible };
 // hash table treats such edges strongly.
 //
 // Doing this requires some strong constraints on what can be stored in this
-// table and how it can be accessed. At the moment, this table assumes that
-// all values contain a strong reference to the key. It also requires the
-// policy to contain an |isTenured| and |needsSweep| members, which is fairly
-// non-standard. This limits its usefulness to the CrossCompartmentMap at the
-// moment, but might serve as a useful base for other tables in future.
-template <typename Key, typename Value,
-          typename HashPolicy = DefaultHasher<Key>,
-          typename AllocPolicy = TempAllocPolicy,
+// table and how it can be accessed. At the moment, this table assumes that all
+// values contain a strong reference to the key. This limits its usefulness to
+// the CrossCompartmentMap at the moment, but might serve as a useful base for
+// other tables in future.
+template <typename Key, typename Value, typename AllocPolicy = TempAllocPolicy,
           bool AllowDuplicates = DuplicatesNotPossible>
 class NurseryAwareHashMap {
-  using BarrieredValue = detail::UnsafeBareWeakHeapPtr<Value>;
-  using MapType =
-      GCRekeyableHashMap<Key, BarrieredValue, HashPolicy, AllocPolicy>;
+  using MapKey = UnsafeBarePtr<Key>;
+  using MapValue = detail::UnsafeBareWeakHeapPtr<Value>;
+  using HashPolicy = DefaultHasher<MapKey>;
+  using MapType = GCRekeyableHashMap<MapKey, MapValue, HashPolicy, AllocPolicy>;
   MapType map;
 
-  // Keep a list of all keys for which JS::GCPolicy<Key>::isTenured is false.
-  // This lets us avoid a full traveral of the map on each minor GC, keeping
-  // the minor GC times proportional to the nursery heap size.
+  // Keep a list of all keys for which key->isTenured() is false. This lets us
+  // avoid a full traversal of the map on each minor GC, keeping the minor GC
+  // times proportional to the nursery heap size.
   Vector<Key, 0, AllocPolicy> nurseryEntries;
 
  public:
@@ -111,33 +111,19 @@ class NurseryAwareHashMap {
            nurseryEntries.sizeOfIncludingThis(mallocSizeOf);
   }
 
-  [[nodiscard]] bool put(const Key& k, const Value& v) {
-    auto p = map.lookupForAdd(k);
-    if (p) {
-      if (!JS::GCPolicy<Key>::isTenured(k) ||
-          !JS::GCPolicy<Value>::isTenured(v)) {
-        if (!nurseryEntries.append(k)) {
-          return false;
-        }
-      }
-      p->value() = v;
-      return true;
-    }
-
-    bool ok = map.add(p, k, v);
-    if (!ok) {
+  [[nodiscard]] bool put(const Key& key, const Value& value) {
+    if ((!key->isTenured() || !value->isTenured()) &&
+        !nurseryEntries.append(key)) {
       return false;
     }
 
-    if (!JS::GCPolicy<Key>::isTenured(k) ||
-        !JS::GCPolicy<Value>::isTenured(v)) {
-      if (!nurseryEntries.append(k)) {
-        map.remove(k);
-        return false;
-      }
+    auto p = map.lookupForAdd(key);
+    if (p) {
+      p->value() = value;
+      return true;
     }
 
-    return true;
+    return map.add(p, key, value);
   }
 
   void sweepAfterMinorGC(JSTracer* trc) {
@@ -148,25 +134,25 @@ class NurseryAwareHashMap {
       }
 
       // Drop the entry if the value is not marked.
-      if (JS::GCPolicy<BarrieredValue>::needsSweep(&p->value())) {
-        map.remove(key);
+      if (!JS::GCPolicy<MapValue>::traceWeak(trc, &p->value())) {
+        map.remove(p);
         continue;
       }
 
       // Update and relocate the key, if the value is still needed.
       //
-      // Non-string Values will contain a strong reference to Key, as per
-      // its use in the CrossCompartmentWrapperMap, so the key will never
-      // be dying here. Strings do *not* have any sort of pointer from
-      // wrapper to wrappee, as they are just copies. The wrapper map
-      // entry is merely used as a cache to avoid re-copying the string,
-      // and currently that entire cache is flushed on major GC.
-      Key copy(key);
-      bool sweepKey = JS::GCPolicy<Key>::needsSweep(&copy);
-      if (sweepKey) {
-        map.remove(key);
+      // Non-string Values will contain a strong reference to Key, as per its
+      // use in the CrossCompartmentWrapperMap, so the key will never be dying
+      // here. Strings do *not* have any sort of pointer from wrapper to
+      // wrappee, as they are just copies. The wrapper map entry is merely used
+      // as a cache to avoid re-copying the string, and currently that entire
+      // cache is flushed on major GC.
+      MapKey copy(key);
+      if (!JS::GCPolicy<MapKey>::traceWeak(trc, &copy)) {
+        map.remove(p);
         continue;
       }
+
       if (AllowDuplicates) {
         // Drop duplicated keys.
         //
@@ -178,7 +164,7 @@ class NurseryAwareHashMap {
         } else if (map.has(copy)) {
           // Key was forwarded to the same place that another key was already
           // forwarded to.
-          map.remove(key);
+          map.remove(p);
         } else {
           map.rekeyAs(key, copy, copy);
         }
@@ -190,7 +176,7 @@ class NurseryAwareHashMap {
     nurseryEntries.clear();
   }
 
-  void sweep() { map.sweep(); }
+  void traceWeak(JSTracer* trc) { map.traceWeak(trc); }
 
   void clear() {
     map.clear();
@@ -203,16 +189,21 @@ class NurseryAwareHashMap {
 }  // namespace js
 
 namespace JS {
+
 template <typename T>
 struct GCPolicy<js::detail::UnsafeBareWeakHeapPtr<T>> {
   static void trace(JSTracer* trc, js::detail::UnsafeBareWeakHeapPtr<T>* thingp,
                     const char* name) {
     js::TraceEdge(trc, thingp, name);
   }
-  static bool needsSweep(js::detail::UnsafeBareWeakHeapPtr<T>* thingp) {
-    return js::gc::IsAboutToBeFinalized(thingp);
+  static bool traceWeak(JSTracer* trc,
+                        js::detail::UnsafeBareWeakHeapPtr<T>* thingp) {
+    return js::TraceWeakEdge(trc, thingp, "UnsafeBareWeakHeapPtr");
   }
 };
+
 }  // namespace JS
+
+namespace mozilla {}  // namespace mozilla
 
 #endif  // gc_NurseryAwareHashMap_h

@@ -7,8 +7,6 @@
 #ifndef debugger_DebuggerMemory_h
 #define debugger_DebuggerMemory_h
 
-#include "jsapi.h"
-
 #include "js/Class.h"
 #include "js/Value.h"
 #include "vm/JSContext.h"

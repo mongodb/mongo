@@ -20,9 +20,6 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared {
   ValueOperand ToValue(LInstruction* ins, size_t pos);
   ValueOperand ToTempValue(LInstruction* ins, size_t pos);
 
-  void storeUnboxedValue(const LAllocation* value, MIRType valueType,
-                         Operand dest, MIRType slotType);
-
   void emitBigIntDiv(LBigIntDiv* ins, Register dividend, Register divisor,
                      Register output, Label* fail);
   void emitBigIntMod(LBigIntMod* ins, Register dividend, Register divisor,

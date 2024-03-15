@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/PromiseLookup.cpp"
+#include "vm/UbiNode.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/PromiseLookup.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UbiNode.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/PromiseLookup.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UbiNode.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/PropMap.cpp"
+#include "vm/UbiNodeCensus.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/PropMap.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UbiNodeCensus.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/PropMap.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UbiNodeCensus.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/ProxyObject.cpp"
+#include "vm/UbiNodeShortestPaths.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/ProxyObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UbiNodeShortestPaths.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/ProxyObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UbiNodeShortestPaths.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Realm.cpp"
+#include "vm/UsageStatistics.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Realm.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UsageStatistics.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Realm.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UsageStatistics.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/RegExpObject.cpp"
+#include "vm/Value.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/RegExpObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Value.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/RegExpObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Value.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/RegExpStatics.cpp"
+#include "vm/Warnings.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/RegExpStatics.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Warnings.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/RegExpStatics.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Warnings.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

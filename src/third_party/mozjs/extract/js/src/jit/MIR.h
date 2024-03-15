@@ -12,40 +12,43 @@
 #ifndef jit_MIR_h
 #define jit_MIR_h
 
-#include "mozilla/Alignment.h"
 #include "mozilla/Array.h"
+#include "mozilla/HashFunctions.h"
+#ifdef JS_JITSPEW
+#  include "mozilla/Attributes.h"  // MOZ_STACK_CLASS
+#endif
 #include "mozilla/MacroForEach.h"
+#ifdef JS_JITSPEW
+#  include "mozilla/Sprintf.h"
+#  include "mozilla/Vector.h"
+#endif
 
 #include <algorithm>
 #include <initializer_list>
 
 #include "NamespaceImports.h"
 
-#include "gc/Allocator.h"
 #include "jit/AtomicOp.h"
 #include "jit/FixedList.h"
 #include "jit/InlineList.h"
-#include "jit/InlineScriptTree.h"
 #include "jit/JitAllocPolicy.h"
 #include "jit/MacroAssembler.h"
 #include "jit/MIROpsGenerated.h"
+#include "jit/ShuffleAnalysis.h"
 #include "jit/TypeData.h"
 #include "jit/TypePolicy.h"
 #include "js/experimental/JitInfo.h"  // JSJit{Getter,Setter}Op, JSJitInfo
 #include "js/HeapAPI.h"
-#include "js/Id.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 #include "js/Value.h"
 #include "js/Vector.h"
-#include "util/DifferentialTesting.h"
-#include "vm/ArrayObject.h"
-#include "vm/BuiltinObjectKind.h"
+#include "vm/BigIntType.h"
 #include "vm/EnvironmentObject.h"
 #include "vm/FunctionFlags.h"  // js::FunctionFlags
 #include "vm/JSContext.h"
 #include "vm/RegExpObject.h"
-#include "vm/SharedMem.h"
 #include "vm/TypedArrayObject.h"
+#include "wasm/WasmJS.h"  // for WasmInstanceObject
 
 namespace JS {
 struct ExpandoAndGeneration;
@@ -58,7 +61,8 @@ class FuncExport;
 extern uint32_t MIRTypeToABIResultSize(jit::MIRType);
 }  // namespace wasm
 
-class GenericPrinter;
+class JS_PUBLIC_API GenericPrinter;
+class NativeIteratorListHead;
 class StringObject;
 
 enum class UnaryMathFunction : uint8_t;
@@ -66,6 +70,36 @@ enum class UnaryMathFunction : uint8_t;
 bool CurrentThreadIsIonCompiling();
 
 namespace jit {
+
+class CallInfo;
+
+#ifdef JS_JITSPEW
+// Helper for debug printing.  Avoids creating a MIR.h <--> MIRGraph.h cycle.
+// Implementation of this needs to see inside `MBasicBlock`; that is possible
+// in MIR.cpp since it also includes MIRGraph.h, whereas this file does not.
+class MBasicBlock;
+uint32_t GetMBasicBlockId(const MBasicBlock* block);
+
+// Helper class for debug printing.  This class allows `::getExtras` methods
+// to add strings to be printed, on a per-MIR-node basis.  The strings are
+// copied into storage owned by this class when `::add` is called, so the
+// `::getExtras` methods do not need to be concerned about storage management.
+class MOZ_STACK_CLASS ExtrasCollector {
+  mozilla::Vector<UniqueChars, 4> strings_;
+
+ public:
+  // Add `str` to the collection.  A copy, owned by this object, is made.  In
+  // case of OOM the call has no effect.
+  void add(const char* str) {
+    UniqueChars dup = DuplicateString(str);
+    if (dup) {
+      (void)strings_.append(std::move(dup));
+    }
+  }
+  size_t count() const { return strings_.length(); }
+  UniqueChars get(size_t ix) { return std::move(strings_[ix]); }
+};
+#endif
 
 // Forward declarations of MIR types.
 #define FORWARD_DECLARE(op) class M##op;
@@ -81,29 +115,9 @@ class MDefinitionVisitorDefaultNoop {
 #undef VISIT_INS
 };
 
+class BytecodeSite;
 class CompactBufferWriter;
 class Range;
-
-static inline MIRType MIRTypeFromValue(const js::Value& vp) {
-  if (vp.isDouble()) {
-    return MIRType::Double;
-  }
-  if (vp.isMagic()) {
-    switch (vp.whyMagic()) {
-      case JS_OPTIMIZED_OUT:
-        return MIRType::MagicOptimizedOut;
-      case JS_ELEMENTS_HOLE:
-        return MIRType::MagicHole;
-      case JS_IS_CONSTRUCTING:
-        return MIRType::MagicIsConstructing;
-      case JS_UNINITIALIZED_LEXICAL:
-        return MIRType::MagicUninitializedLexical;
-      default:
-        MOZ_ASSERT_UNREACHABLE("Unexpected magic constant");
-    }
-  }
-  return MIRTypeFromValueType(vp.extractNonDoubleType());
-}
 
 #define MIR_FLAG_LIST(_)                                                       \
   _(InWorklist)                                                                \
@@ -343,39 +357,74 @@ class AliasSet {
  public:
   enum Flag {
     None_ = 0,
-    ObjectFields = 1 << 0,    // shape, class, slots, length etc.
-    Element = 1 << 1,         // A Value member of obj->elements or
-                              // a typed object.
-    UnboxedElement = 1 << 2,  // An unboxed scalar or reference member of
-                              // typed object.
-    DynamicSlot = 1 << 3,     // A Value member of obj->slots.
-    FixedSlot = 1 << 4,       // A Value member of obj->fixedSlots().
-    DOMProperty = 1 << 5,     // A DOM property
-    WasmGlobalVar = 1 << 6,   // An asm.js/wasm private global var
-    WasmHeap = 1 << 7,        // An asm.js/wasm heap load
-    WasmHeapMeta = 1 << 8,    // The asm.js/wasm heap base pointer and
-                              // bounds check limit, in Tls.
+    ObjectFields = 1 << 0,      // shape, class, slots, length etc.
+    Element = 1 << 1,           // A Value member of obj->elements or
+                                // a typed object.
+    UnboxedElement = 1 << 2,    // An unboxed scalar or reference member of
+                                // typed object.
+    DynamicSlot = 1 << 3,       // A Value member of obj->slots.
+    FixedSlot = 1 << 4,         // A Value member of obj->fixedSlots().
+    DOMProperty = 1 << 5,       // A DOM property
+    WasmInstanceData = 1 << 6,  // An asm.js/wasm private global var
+    WasmHeap = 1 << 7,          // An asm.js/wasm heap load
+    WasmHeapMeta = 1 << 8,      // The asm.js/wasm heap base pointer and
+                                // bounds check limit, in Instance.
     ArrayBufferViewLengthOrOffset =
         1 << 9,                  // An array buffer view's length or byteOffset
     WasmGlobalCell = 1 << 10,    // A wasm global cell
     WasmTableElement = 1 << 11,  // An element of a wasm table
-    WasmStackResult = 1 << 12,   // A stack result from the current function
+    WasmTableMeta = 1 << 12,     // A wasm table elements pointer and
+                                 // length field, in instance data.
+    WasmStackResult = 1 << 13,   // A stack result from the current function
 
     // JSContext's exception state. This is used on instructions like MThrow
     // or MNewArrayDynamicLength that throw exceptions (other than OOM) but have
     // no other side effect, to ensure that they get their own up-to-date resume
     // point. (This resume point will be used when constructing the Baseline
     // frame during exception bailouts.)
-    ExceptionState = 1 << 13,
+    ExceptionState = 1 << 14,
 
     // Used for instructions that load the privateSlot of DOM proxies and
     // the ExpandoAndGeneration.
-    DOMProxyExpando = 1 << 14,
+    DOMProxyExpando = 1 << 15,
 
-    Last = DOMProxyExpando,
+    // Hash table of a Map or Set object.
+    MapOrSetHashTable = 1 << 16,
+
+    // Internal state of the random number generator
+    RNG = 1 << 17,
+
+    // The pendingException slot on the wasm instance object.
+    WasmPendingException = 1 << 18,
+
+    // The fuzzilliHash slot
+    FuzzilliHash = 1 << 19,
+
+    // The WasmStructObject::inlineData_[..] storage area
+    WasmStructInlineDataArea = 1 << 20,
+
+    // The WasmStructObject::outlineData_ pointer only
+    WasmStructOutlineDataPointer = 1 << 21,
+
+    // The malloc'd block that WasmStructObject::outlineData_ points at
+    WasmStructOutlineDataArea = 1 << 22,
+
+    // The WasmArrayObject::numElements_ field
+    WasmArrayNumElements = 1 << 23,
+
+    // The WasmArrayObject::data_ pointer only
+    WasmArrayDataPointer = 1 << 24,
+
+    // The malloc'd block that WasmArrayObject::data_ points at
+    WasmArrayDataArea = 1 << 25,
+
+    // The generation counter associated with the global object
+    GlobalGenerationCounter = 1 << 26,
+
+    Last = GlobalGenerationCounter,
+
     Any = Last | (Last - 1),
-
-    NumCategories = 15,
+    NumCategories = 27,
 
     // Indicates load or store.
     Store_ = 1 << 31
@@ -515,6 +564,12 @@ class MDefinition : public MNode {
     return data + (hash << 6) + (hash << 16) - hash;
   }
 
+  static HashNumber addU64ToHash(HashNumber hash, uint64_t data) {
+    hash = addU32ToHash(hash, uint32_t(data));
+    hash = addU32ToHash(hash, uint32_t(data >> 32));
+    return hash;
+  }
+
  public:
   explicit MDefinition(Opcode op)
       : MNode(nullptr, Kind::Definition),
@@ -550,6 +605,10 @@ class MDefinition : public MNode {
   void dump() const override;
   void dumpLocation(GenericPrinter& out) const;
   void dumpLocation() const;
+  // Dump any other stuff the node wants to have printed in `extras`.  The
+  // added strings are copied, with the `ExtrasCollector` taking ownership of
+  // the copies.
+  virtual void getExtras(ExtrasCollector* extras) {}
 #endif
 
   // Also for LICM. Test whether this definition is likely to be a call, which
@@ -604,19 +663,18 @@ class MDefinition : public MNode {
 
   virtual HashNumber valueHash() const;
   virtual bool congruentTo(const MDefinition* ins) const { return false; }
+  const MDefinition* skipObjectGuards() const;
   bool congruentIfOperandsEqual(const MDefinition* ins) const;
   virtual MDefinition* foldsTo(TempAllocator& alloc);
   virtual void analyzeEdgeCasesForward();
   virtual void analyzeEdgeCasesBackward();
 
-  // |needTruncation| records the truncation kind of the results, such that it
-  // can be used to truncate the operands of this instruction.  If
-  // |needTruncation| function returns true, then the |truncate| function is
-  // called on the same instruction to mutate the instruction, such as
-  // updating the return type, the range and the specialization of the
-  // instruction.
-  virtual bool needTruncation(TruncateKind kind);
-  virtual void truncate();
+  // |canTruncate| reports if this instruction supports truncation. If
+  // |canTruncate| function returns true, then the |truncate| function is
+  // called on the same instruction to mutate the instruction, such as updating
+  // the return type, the range and the specialization of the instruction.
+  virtual bool canTruncate() const;
+  virtual void truncate(TruncateKind kind);
 
   // Determine what kind of truncate this node prefers for the operand at the
   // given index.
@@ -777,13 +835,6 @@ class MDefinition : public MNode {
   // instruction which are recovered on bailouts.
   void replaceAllLiveUsesWith(MDefinition* dom);
 
-  // Mark this instruction as having replaced all uses of ins, as during GVN,
-  // returning false if the replacement should not be performed. For use when
-  // GVN eliminates instructions which are not equivalent to one another.
-  [[nodiscard]] virtual bool updateForReplacement(MDefinition* ins) {
-    return true;
-  }
-
   void setVirtualRegister(uint32_t vreg) {
     virtualRegister_ = vreg;
     setLoweredUnchecked();
@@ -922,7 +973,7 @@ class CompilerGCPointer {
 
  public:
   explicit CompilerGCPointer(T ptr) : ptr_(ptr) {
-    MOZ_ASSERT(!IsInsideNursery(ptr));
+    MOZ_ASSERT_IF(ptr, !IsInsideNursery(ptr));
     MOZ_ASSERT_IF(!CurrentThreadIsIonCompiling(), TlsContext.get()->suppressGC);
   }
 
@@ -1205,6 +1256,9 @@ class MVariadicT : public T {
   MUse* getUseFor(size_t index) final { return &operands_[index]; }
   const MUse* getUseFor(size_t index) const final { return &operands_[index]; }
 
+  // The MWasmCallBase mixin performs initialization for it's subclasses.
+  friend class MWasmCallBase;
+
  public:
   // Will assert if called before initialization.
   MDefinition* getOperand(size_t index) const final {
@@ -1221,6 +1275,9 @@ class MVariadicT : public T {
   }
 };
 
+// An instruction with a variable number of operands. Note that the
+// MFoo::New constructor for variadic instructions fallibly
+// initializes the operands_ array and must be checked for OOM.
 using MVariadicInstruction = MVariadicT<MInstruction>;
 
 MIR_OPCODE_CLASS_GENERATED
@@ -1247,7 +1304,8 @@ class MLimitedTruncate : public MUnaryInstruction,
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   TruncateKind operandTruncateKind(size_t index) const override;
   TruncateKind truncateKind() const { return truncate_; }
   void setTruncateKind(TruncateKind kind) { truncate_ = kind; }
@@ -1317,22 +1375,9 @@ class MConstant : public MNullaryInstruction {
 
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
-  [[nodiscard]] bool updateForReplacement(MDefinition* def) override {
-    MConstant* c = def->toConstant();
-    // During constant folding, we don't want to replace a float32
-    // value by a double value.
-    if (type() == MIRType::Float32) {
-      return c->type() == MIRType::Float32;
-    }
-    if (type() == MIRType::Double) {
-      return c->type() != MIRType::Float32;
-    }
-    return true;
-  }
-
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
 
   bool canProduceFloat32() const override;
 
@@ -1361,6 +1406,9 @@ class MConstant : public MNullaryInstruction {
   }
   bool isInt32(int32_t i) const {
     return type() == MIRType::Int32 && payload_.i32 == i;
+  }
+  bool isInt64(int64_t i) const {
+    return type() == MIRType::Int64 && payload_.i64 == i;
   }
   const double& toDouble() const {
     MOZ_ASSERT(type() == MIRType::Double);
@@ -1500,6 +1548,30 @@ class MWasmFloatConstant : public MNullaryInstruction {
   const SimdConstant toSimd128() const {
     MOZ_ASSERT(type() == MIRType::Simd128);
     return SimdConstant::CreateX16(u.s128_);
+  }
+#endif
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    switch (type()) {
+      case MIRType::Float32:
+        SprintfLiteral(buf, "f32{%e}", (double)u.f32_);
+        break;
+      case MIRType::Double:
+        SprintfLiteral(buf, "f64{%e}", u.f64_);
+        break;
+#  ifdef ENABLE_WASM_SIMD
+      case MIRType::Simd128:
+        SprintfLiteral(buf, "v128{[1]=%016llx:[0]=%016llx}",
+                       (unsigned long long int)u.bits_[1],
+                       (unsigned long long int)u.bits_[0]);
+        break;
+#  endif
+      default:
+        SprintfLiteral(buf, "!!getExtras: missing case!!");
+        break;
+    }
+    extras->add(buf);
   }
 #endif
 };
@@ -1652,6 +1724,8 @@ class MTableSwitch final : public MControlInstruction,
   }
 
   MDefinition* foldsTo(TempAllocator& alloc) override;
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
 };
 
 template <size_t Arity, size_t Successors>
@@ -1691,10 +1765,29 @@ class MAryControlInstruction : public MControlInstruction {
   }
 };
 
+template <size_t Successors>
+class MVariadicControlInstruction : public MVariadicT<MControlInstruction> {
+  mozilla::Array<MBasicBlock*, Successors> successors_;
+
+ protected:
+  explicit MVariadicControlInstruction(Opcode op)
+      : MVariadicT<MControlInstruction>(op) {}
+  void setSuccessor(size_t index, MBasicBlock* successor) {
+    successors_[index] = successor;
+  }
+
+ public:
+  size_t numSuccessors() const final { return Successors; }
+  MBasicBlock* getSuccessor(size_t i) const final { return successors_[i]; }
+  void replaceSuccessor(size_t i, MBasicBlock* succ) final {
+    successors_[i] = succ;
+  }
+};
+
 // Jump to the start of another basic block.
 class MGoto : public MAryControlInstruction<0, 1>, public NoTypePolicy::Data {
   explicit MGoto(MBasicBlock* target) : MAryControlInstruction(classOpcode) {
-    setSuccessor(0, target);
+    setSuccessor(TargetIndex, target);
   }
 
  public:
@@ -1705,29 +1798,31 @@ class MGoto : public MAryControlInstruction<0, 1>, public NoTypePolicy::Data {
   // Variant that may patch the target later.
   static MGoto* New(TempAllocator& alloc);
 
-  static const size_t TargetIndex = 0;
+  static constexpr size_t TargetIndex = 0;
 
-  MBasicBlock* target() { return getSuccessor(0); }
+  MBasicBlock* target() { return getSuccessor(TargetIndex); }
   AliasSet getAliasSet() const override { return AliasSet::None(); }
-};
 
-static inline BranchDirection NegateBranchDirection(BranchDirection dir) {
-  return (dir == FALSE_BRANCH) ? TRUE_BRANCH : FALSE_BRANCH;
-}
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "Block%u", GetMBasicBlockId(target()));
+    extras->add(buf);
+  }
+#endif
+};
 
 // Tests if the input instruction evaluates to true or false, and jumps to the
 // start of a corresponding basic block.
 class MTest : public MAryControlInstruction<1, 2>, public TestPolicy::Data {
+  // It is allowable to specify `trueBranch` or `falseBranch` as nullptr and
+  // patch it in later.
   MTest(MDefinition* ins, MBasicBlock* trueBranch, MBasicBlock* falseBranch)
       : MAryControlInstruction(classOpcode) {
     initOperand(0, ins);
-    setSuccessor(0, trueBranch);
-    setSuccessor(1, falseBranch);
+    setSuccessor(TrueBranchIndex, trueBranch);
+    setSuccessor(FalseBranchIndex, falseBranch);
   }
-
-  // Variant which may patch the ifTrue branch later.
-  MTest(MDefinition* ins, MBasicBlock* falseBranch)
-      : MTest(ins, nullptr, falseBranch) {}
 
   TypeDataList observedTypes_;
 
@@ -1741,10 +1836,11 @@ class MTest : public MAryControlInstruction<1, 2>, public TestPolicy::Data {
     observedTypes_ = observed;
   }
 
-  static const size_t TrueBranchIndex = 0;
+  static constexpr size_t TrueBranchIndex = 0;
+  static constexpr size_t FalseBranchIndex = 1;
 
-  MBasicBlock* ifTrue() const { return getSuccessor(0); }
-  MBasicBlock* ifFalse() const { return getSuccessor(1); }
+  MBasicBlock* ifTrue() const { return getSuccessor(TrueBranchIndex); }
+  MBasicBlock* ifFalse() const { return getSuccessor(FalseBranchIndex); }
   MBasicBlock* branchSuccessor(BranchDirection dir) const {
     return (dir == TRUE_BRANCH) ? ifTrue() : ifFalse();
   }
@@ -1759,6 +1855,15 @@ class MTest : public MAryControlInstruction<1, 2>, public TestPolicy::Data {
 
 #ifdef DEBUG
   bool isConsistentFloat32Use(MUse* use) const override { return true; }
+#endif
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "true->Block%u false->Block%u",
+                   GetMBasicBlockId(ifTrue()), GetMBasicBlockId(ifFalse()));
+    extras->add(buf);
+  }
 #endif
 };
 
@@ -1783,20 +1888,19 @@ class MNewArray : public MUnaryInstruction, public NoTypePolicy::Data {
   uint32_t length_;
 
   // Heap where the array should be allocated.
-  gc::InitialHeap initialHeap_;
+  gc::Heap initialHeap_;
 
   bool vmCall_;
 
-  MNewArray(uint32_t length, MConstant* templateConst,
-            gc::InitialHeap initialHeap, bool vmCall = false);
+  MNewArray(uint32_t length, MConstant* templateConst, gc::Heap initialHeap,
+            bool vmCall = false);
 
  public:
   INSTRUCTION_HEADER(NewArray)
   TRIVIAL_NEW_WRAPPERS
 
   static MNewArray* NewVM(TempAllocator& alloc, uint32_t length,
-                          MConstant* templateConst,
-                          gc::InitialHeap initialHeap) {
+                          MConstant* templateConst, gc::Heap initialHeap) {
     return new (alloc) MNewArray(length, templateConst, initialHeap, true);
   }
 
@@ -1806,7 +1910,7 @@ class MNewArray : public MUnaryInstruction, public NoTypePolicy::Data {
     return getOperand(0)->toConstant()->toObjectOrNull();
   }
 
-  gc::InitialHeap initialHeap() const { return initialHeap_; }
+  gc::Heap initialHeap() const { return initialHeap_; }
 
   bool isVMCall() const { return vmCall_; }
 
@@ -1828,9 +1932,9 @@ class MNewArray : public MUnaryInstruction, public NoTypePolicy::Data {
 };
 
 class MNewTypedArray : public MUnaryInstruction, public NoTypePolicy::Data {
-  gc::InitialHeap initialHeap_;
+  gc::Heap initialHeap_;
 
-  MNewTypedArray(MConstant* templateConst, gc::InitialHeap initialHeap)
+  MNewTypedArray(MConstant* templateConst, gc::Heap initialHeap)
       : MUnaryInstruction(classOpcode, templateConst),
         initialHeap_(initialHeap) {
     setResultType(MIRType::Object);
@@ -1844,7 +1948,7 @@ class MNewTypedArray : public MUnaryInstruction, public NoTypePolicy::Data {
     return &getOperand(0)->toConstant()->toObject().as<TypedArrayObject>();
   }
 
-  gc::InitialHeap initialHeap() const { return initialHeap_; }
+  gc::Heap initialHeap() const { return initialHeap_; }
 
   virtual AliasSet getAliasSet() const override { return AliasSet::None(); }
 
@@ -1858,17 +1962,21 @@ class MNewObject : public MUnaryInstruction, public NoTypePolicy::Data {
   enum Mode { ObjectLiteral, ObjectCreate };
 
  private:
-  gc::InitialHeap initialHeap_;
+  gc::Heap initialHeap_;
   Mode mode_;
   bool vmCall_;
 
-  MNewObject(MConstant* templateConst, gc::InitialHeap initialHeap, Mode mode,
+  MNewObject(MConstant* templateConst, gc::Heap initialHeap, Mode mode,
              bool vmCall = false)
       : MUnaryInstruction(classOpcode, templateConst),
         initialHeap_(initialHeap),
         mode_(mode),
         vmCall_(vmCall) {
-    MOZ_ASSERT_IF(mode != ObjectLiteral, templateObject());
+    if (mode == ObjectLiteral) {
+      MOZ_ASSERT(!templateObject());
+    } else {
+      MOZ_ASSERT(templateObject());
+    }
     setResultType(MIRType::Object);
 
     // The constant is kept separated in a MConstant, this way we can safely
@@ -1886,7 +1994,7 @@ class MNewObject : public MUnaryInstruction, public NoTypePolicy::Data {
   TRIVIAL_NEW_WRAPPERS
 
   static MNewObject* NewVM(TempAllocator& alloc, MConstant* templateConst,
-                           gc::InitialHeap initialHeap, Mode mode) {
+                           gc::Heap initialHeap, Mode mode) {
     return new (alloc) MNewObject(templateConst, initialHeap, mode, true);
   }
 
@@ -1896,7 +2004,7 @@ class MNewObject : public MUnaryInstruction, public NoTypePolicy::Data {
     return getOperand(0)->toConstant()->toObjectOrNull();
   }
 
-  gc::InitialHeap initialHeap() const { return initialHeap_; }
+  gc::Heap initialHeap() const { return initialHeap_; }
 
   bool isVMCall() const { return vmCall_; }
 
@@ -1914,11 +2022,11 @@ class MNewPlainObject : public MUnaryInstruction, public NoTypePolicy::Data {
   uint32_t numFixedSlots_;
   uint32_t numDynamicSlots_;
   gc::AllocKind allocKind_;
-  gc::InitialHeap initialHeap_;
+  gc::Heap initialHeap_;
 
   MNewPlainObject(MConstant* shapeConst, uint32_t numFixedSlots,
                   uint32_t numDynamicSlots, gc::AllocKind allocKind,
-                  gc::InitialHeap initialHeap)
+                  gc::Heap initialHeap)
       : MUnaryInstruction(classOpcode, shapeConst),
         numFixedSlots_(numFixedSlots),
         numDynamicSlots_(numDynamicSlots),
@@ -1943,20 +2051,22 @@ class MNewPlainObject : public MUnaryInstruction, public NoTypePolicy::Data {
   uint32_t numFixedSlots() const { return numFixedSlots_; }
   uint32_t numDynamicSlots() const { return numDynamicSlots_; }
   gc::AllocKind allocKind() const { return allocKind_; }
-  gc::InitialHeap initialHeap() const { return initialHeap_; }
+  gc::Heap initialHeap() const { return initialHeap_; }
 
   [[nodiscard]] bool writeRecoverData(
       CompactBufferWriter& writer) const override;
   bool canRecoverOnBailout() const override { return true; }
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
 };
 
 class MNewArrayObject : public MUnaryInstruction, public NoTypePolicy::Data {
  private:
   uint32_t length_;
-  gc::InitialHeap initialHeap_;
+  gc::Heap initialHeap_;
 
   MNewArrayObject(TempAllocator& alloc, MConstant* shapeConst, uint32_t length,
-                  gc::InitialHeap initialHeap)
+                  gc::Heap initialHeap)
       : MUnaryInstruction(classOpcode, shapeConst),
         length_(length),
         initialHeap_(initialHeap) {
@@ -1970,7 +2080,7 @@ class MNewArrayObject : public MUnaryInstruction, public NoTypePolicy::Data {
   TRIVIAL_NEW_WRAPPERS
 
   static MNewArrayObject* New(TempAllocator& alloc, MConstant* shapeConst,
-                              uint32_t length, gc::InitialHeap initialHeap) {
+                              uint32_t length, gc::Heap initialHeap) {
     return new (alloc) MNewArrayObject(alloc, shapeConst, length, initialHeap);
   }
 
@@ -1980,7 +2090,7 @@ class MNewArrayObject : public MUnaryInstruction, public NoTypePolicy::Data {
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
   uint32_t length() const { return length_; }
-  gc::InitialHeap initialHeap() const { return initialHeap_; }
+  gc::Heap initialHeap() const { return initialHeap_; }
 
   [[nodiscard]] bool writeRecoverData(
       CompactBufferWriter& writer) const override;
@@ -2050,8 +2160,7 @@ class MObjectState : public MVariadicInstruction,
 
   // As we might do read of uninitialized properties, we have to copy the
   // initial values from the template object.
-  [[nodiscard]] bool initFromTemplateObject(TempAllocator& alloc,
-                                            MDefinition* undefinedVal);
+  void initFromTemplateObject(TempAllocator& alloc, MDefinition* undefinedVal);
 
   size_t numFixedSlots() const { return numFixedSlots_; }
   size_t numSlots() const { return numSlots_; }
@@ -2112,8 +2221,7 @@ class MArrayState : public MVariadicInstruction,
                           MDefinition* initLength);
   static MArrayState* Copy(TempAllocator& alloc, MArrayState* state);
 
-  [[nodiscard]] bool initFromTemplateObject(TempAllocator& alloc,
-                                            MDefinition* undefinedVal);
+  void initFromTemplateObject(TempAllocator& alloc, MDefinition* undefinedVal);
 
   void setInitializedLength(MDefinition* def) { replaceOperand(1, def); }
 
@@ -2172,14 +2280,54 @@ class WrappedFunction : public TempObject {
   JSFunction* rawNativeJSFunction() const { return nativeFun_; }
 };
 
-enum class DOMObjectKind : uint8_t { Proxy, Native, Unknown };
+enum class DOMObjectKind : uint8_t { Proxy, Native };
 
-class MCall : public MVariadicInstruction, public CallPolicy::Data {
- private:
+class MCallBase : public MVariadicInstruction, public CallPolicy::Data {
+ protected:
   // The callee, this, and the actual arguments are all operands of MCall.
   static const size_t CalleeOperandIndex = 0;
   static const size_t NumNonArgumentOperands = 1;
 
+  explicit MCallBase(Opcode op) : MVariadicInstruction(op) {}
+
+ public:
+  void initCallee(MDefinition* func) { initOperand(CalleeOperandIndex, func); }
+  MDefinition* getCallee() const { return getOperand(CalleeOperandIndex); }
+
+  void replaceCallee(MInstruction* newfunc) {
+    replaceOperand(CalleeOperandIndex, newfunc);
+  }
+
+  void addArg(size_t argnum, MDefinition* arg);
+
+  MDefinition* getArg(uint32_t index) const {
+    return getOperand(NumNonArgumentOperands + index);
+  }
+
+  // The number of stack arguments is the max between the number of formal
+  // arguments and the number of actual arguments. The number of stack
+  // argument includes the |undefined| padding added in case of underflow.
+  // Includes |this|.
+  uint32_t numStackArgs() const {
+    return numOperands() - NumNonArgumentOperands;
+  }
+  uint32_t paddedNumStackArgs() const {
+    if (JitStackValueAlignment > 1) {
+      return AlignBytes(numStackArgs(), JitStackValueAlignment);
+    }
+    return numStackArgs();
+  }
+
+  static size_t IndexOfThis() { return NumNonArgumentOperands; }
+  static size_t IndexOfArgument(size_t index) {
+    return NumNonArgumentOperands + index + 1;  // +1 to skip |this|.
+  }
+  static size_t IndexOfStackArg(size_t index) {
+    return NumNonArgumentOperands + index;
+  }
+};
+
+class MCall : public MCallBase {
  protected:
   // Monomorphic cache for MCalls with a single JSFunction target.
   WrappedFunction* target_;
@@ -2199,7 +2347,7 @@ class MCall : public MVariadicInstruction, public CallPolicy::Data {
 
   MCall(WrappedFunction* target, uint32_t numActualArgs, bool construct,
         bool ignoresReturnValue)
-      : MVariadicInstruction(classOpcode),
+      : MCallBase(classOpcode),
         target_(target),
         numActualArgs_(numActualArgs),
         construct_(construct),
@@ -2215,9 +2363,7 @@ class MCall : public MVariadicInstruction, public CallPolicy::Data {
   static MCall* New(TempAllocator& alloc, WrappedFunction* target,
                     size_t maxArgc, size_t numActualArgs, bool construct,
                     bool ignoresReturnValue, bool isDOMCall,
-                    DOMObjectKind objectKind);
-
-  void initCallee(MDefinition* func) { initOperand(CalleeOperandIndex, func); }
+                    mozilla::Maybe<DOMObjectKind> objectKind);
 
   bool needsClassCheck() const { return needsClassCheck_; }
   void disableClassCheck() { needsClassCheck_ = false; }
@@ -2231,39 +2377,12 @@ class MCall : public MVariadicInstruction, public CallPolicy::Data {
     needsThisCheck_ = true;
   }
 
-  MDefinition* getCallee() const { return getOperand(CalleeOperandIndex); }
-  void replaceCallee(MInstruction* newfunc) {
-    replaceOperand(CalleeOperandIndex, newfunc);
-  }
-
-  void addArg(size_t argnum, MDefinition* arg);
-
-  MDefinition* getArg(uint32_t index) const {
-    return getOperand(NumNonArgumentOperands + index);
-  }
-
-  static size_t IndexOfThis() { return NumNonArgumentOperands; }
-  static size_t IndexOfArgument(size_t index) {
-    return NumNonArgumentOperands + index + 1;  // +1 to skip |this|.
-  }
-  static size_t IndexOfStackArg(size_t index) {
-    return NumNonArgumentOperands + index;
-  }
-
   // For monomorphic callsites.
   WrappedFunction* getSingleTarget() const { return target_; }
 
   bool isConstructing() const { return construct_; }
 
   bool ignoresReturnValue() const { return ignoresReturnValue_; }
-
-  // The number of stack arguments is the max between the number of formal
-  // arguments and the number of actual arguments. The number of stack
-  // argument includes the |undefined| padding added in case of underflow.
-  // Includes |this|.
-  uint32_t numStackArgs() const {
-    return numOperands() - NumNonArgumentOperands;
-  }
 
   // Does not include |this|.
   uint32_t numActualArgs() const { return numActualArgs_; }
@@ -2306,7 +2425,7 @@ class MCallDOMNative : public MCall {
   friend MCall* MCall::New(TempAllocator& alloc, WrappedFunction* target,
                            size_t maxArgc, size_t numActualArgs, bool construct,
                            bool ignoresReturnValue, bool isDOMCall,
-                           DOMObjectKind objectKind);
+                           mozilla::Maybe<DOMObjectKind> objectKind);
 
   const JSJitInfo* getJitInfo() const;
 
@@ -2322,18 +2441,58 @@ class MCallDOMNative : public MCall {
   virtual void computeMovable() override;
 };
 
+// Used to invoke a JSClass call/construct hook.
+class MCallClassHook : public MCallBase {
+  const JSNative target_;
+  bool constructing_ : 1;
+  bool ignoresReturnValue_ : 1;
+
+  MCallClassHook(JSNative target, bool constructing)
+      : MCallBase(classOpcode),
+        target_(target),
+        constructing_(constructing),
+        ignoresReturnValue_(false) {
+    setResultType(MIRType::Value);
+  }
+
+ public:
+  INSTRUCTION_HEADER(CallClassHook)
+  static MCallClassHook* New(TempAllocator& alloc, JSNative target,
+                             uint32_t argc, bool constructing);
+
+  JSNative target() const { return target_; }
+  bool isConstructing() const { return constructing_; }
+
+  uint32_t numActualArgs() const {
+    uint32_t thisAndNewTarget = 1 + constructing_;
+    MOZ_ASSERT(numStackArgs() >= thisAndNewTarget);
+    return numStackArgs() - thisAndNewTarget;
+  }
+
+  bool maybeCrossRealm() const { return true; }
+
+  bool ignoresReturnValue() const { return ignoresReturnValue_; }
+  void setIgnoresReturnValue() { ignoresReturnValue_ = true; }
+
+  bool possiblyCalls() const override { return true; }
+};
+
 // fun.apply(self, arguments)
 class MApplyArgs : public MTernaryInstruction,
                    public MixPolicy<ObjectPolicy<0>, UnboxedInt32Policy<1>,
                                     BoxPolicy<2>>::Data {
-  // Monomorphic cache of single target from TI, or nullptr.
+  // Single target from CacheIR, or nullptr
   WrappedFunction* target_;
+  // Number of extra initial formals to skip.
+  uint32_t numExtraFormals_;
   bool maybeCrossRealm_ = true;
   bool ignoresReturnValue_ = false;
 
   MApplyArgs(WrappedFunction* target, MDefinition* fun, MDefinition* argc,
-             MDefinition* self)
-      : MTernaryInstruction(classOpcode, fun, argc, self), target_(target) {
+             MDefinition* self, uint32_t numExtraFormals = 0)
+      : MTernaryInstruction(classOpcode, fun, argc, self),
+        target_(target),
+        numExtraFormals_(numExtraFormals) {
     MOZ_ASSERT(argc->type() == MIRType::Int32);
     setResultType(MIRType::Value);
   }
@@ -2343,8 +2502,9 @@ class MApplyArgs : public MTernaryInstruction,
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, getFunction), (1, getArgc), (2, getThis))
 
-  // For TI-informed monomorphic callsites.
   WrappedFunction* getSingleTarget() const { return target_; }
+
+  uint32_t numExtraFormals() const { return numExtraFormals_; }
 
   bool maybeCrossRealm() const { return maybeCrossRealm_; }
   void setNotCrossRealm() { maybeCrossRealm_ = false; }
@@ -2393,7 +2553,7 @@ class MApplyArgsObj
 // fun.apply(fn, array)
 class MApplyArray : public MTernaryInstruction,
                     public MixPolicy<ObjectPolicy<0>, BoxPolicy<2>>::Data {
-  // Monomorphic cache of single target from TI, or nullptr.
+  // Single target from CacheIR, or nullptr
   WrappedFunction* target_;
   bool maybeCrossRealm_ = true;
   bool ignoresReturnValue_ = false;
@@ -2410,7 +2570,6 @@ class MApplyArray : public MTernaryInstruction,
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, getFunction), (1, getElements), (2, getThis))
 
-  // For TI-informed monomorphic callsites.
   WrappedFunction* getSingleTarget() const { return target_; }
 
   bool maybeCrossRealm() const { return maybeCrossRealm_; }
@@ -2424,13 +2583,53 @@ class MApplyArray : public MTernaryInstruction,
   bool possiblyCalls() const override { return true; }
 };
 
+// |new F(...arguments)| and |super(...arguments)|.
+class MConstructArgs : public MQuaternaryInstruction,
+                       public MixPolicy<ObjectPolicy<0>, UnboxedInt32Policy<1>,
+                                        BoxPolicy<2>, ObjectPolicy<3>>::Data {
+  // Single target from CacheIR, or nullptr
+  WrappedFunction* target_;
+  // Number of extra initial formals to skip.
+  uint32_t numExtraFormals_;
+  bool maybeCrossRealm_ = true;
+
+  MConstructArgs(WrappedFunction* target, MDefinition* fun, MDefinition* argc,
+                 MDefinition* thisValue, MDefinition* newTarget,
+                 uint32_t numExtraFormals = 0)
+      : MQuaternaryInstruction(classOpcode, fun, argc, thisValue, newTarget),
+        target_(target),
+        numExtraFormals_(numExtraFormals) {
+    MOZ_ASSERT(argc->type() == MIRType::Int32);
+    setResultType(MIRType::Value);
+  }
+
+ public:
+  INSTRUCTION_HEADER(ConstructArgs)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, getFunction), (1, getArgc), (2, getThis),
+                 (3, getNewTarget))
+
+  WrappedFunction* getSingleTarget() const { return target_; }
+
+  uint32_t numExtraFormals() const { return numExtraFormals_; }
+
+  bool maybeCrossRealm() const { return maybeCrossRealm_; }
+  void setNotCrossRealm() { maybeCrossRealm_ = false; }
+
+  bool ignoresReturnValue() const { return false; }
+  bool isConstructing() const { return true; }
+
+  bool possiblyCalls() const override { return true; }
+};
+
 // |new F(...args)| and |super(...args)|.
 class MConstructArray
     : public MQuaternaryInstruction,
       public MixPolicy<ObjectPolicy<0>, BoxPolicy<2>, ObjectPolicy<3>>::Data {
-  // Monomorphic cache of single target from TI, or nullptr.
+  // Single target from CacheIR, or nullptr
   WrappedFunction* target_;
   bool maybeCrossRealm_ = true;
+  bool needsThisCheck_ = false;
 
   MConstructArray(WrappedFunction* target, MDefinition* fun,
                   MDefinition* elements, MDefinition* thisValue,
@@ -2448,11 +2647,13 @@ class MConstructArray
   NAMED_OPERANDS((0, getFunction), (1, getElements), (2, getThis),
                  (3, getNewTarget))
 
-  // For TI-informed monomorphic callsites.
   WrappedFunction* getSingleTarget() const { return target_; }
 
   bool maybeCrossRealm() const { return maybeCrossRealm_; }
   void setNotCrossRealm() { maybeCrossRealm_ = false; }
+
+  bool needsThisCheck() const { return needsThisCheck_; }
+  void setNeedsThisCheck() { needsThisCheck_ = true; }
 
   bool ignoresReturnValue() const { return false; }
   bool isConstructing() const { return true; }
@@ -2648,8 +2849,8 @@ class MCompare : public MBinaryInstruction, public ComparePolicy::Data {
 
   void trySpecializeFloat32(TempAllocator& alloc) override;
   bool isFloat32Commutative() const override { return true; }
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
 #ifdef DEBUG
@@ -2664,7 +2865,11 @@ class MCompare : public MBinaryInstruction, public ComparePolicy::Data {
  private:
   [[nodiscard]] bool tryFoldEqualOperands(bool* result);
   [[nodiscard]] bool tryFoldTypeOf(bool* result);
+  [[nodiscard]] MDefinition* tryFoldTypeOf(TempAllocator& alloc);
   [[nodiscard]] MDefinition* tryFoldCharCompare(TempAllocator& alloc);
+  [[nodiscard]] MDefinition* tryFoldStringCompare(TempAllocator& alloc);
+  [[nodiscard]] MDefinition* tryFoldStringSubstring(TempAllocator& alloc);
+  [[nodiscard]] MDefinition* tryFoldStringIndexOf(TempAllocator& alloc);
 
  public:
   bool congruentTo(const MDefinition* ins) const override {
@@ -2674,6 +2879,99 @@ class MCompare : public MBinaryInstruction, public ComparePolicy::Data {
     return compareType() == ins->toCompare()->compareType() &&
            jsop() == ins->toCompare()->jsop();
   }
+
+  [[nodiscard]] bool writeRecoverData(
+      CompactBufferWriter& writer) const override;
+  bool canRecoverOnBailout() const override {
+    switch (compareType_) {
+      case Compare_Undefined:
+      case Compare_Null:
+      case Compare_Int32:
+      case Compare_UInt32:
+      case Compare_Double:
+      case Compare_Float32:
+      case Compare_String:
+      case Compare_Symbol:
+      case Compare_Object:
+      case Compare_BigInt:
+      case Compare_BigInt_Int32:
+      case Compare_BigInt_Double:
+      case Compare_BigInt_String:
+        return true;
+
+      case Compare_Int64:
+      case Compare_UInt64:
+      case Compare_UIntPtr:
+      case Compare_RefOrNull:
+        return false;
+    }
+    MOZ_CRASH("unexpected compare type");
+  }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    const char* ty = nullptr;
+    switch (compareType_) {
+      case Compare_Undefined:
+        ty = "Undefined";
+        break;
+      case Compare_Null:
+        ty = "Null";
+        break;
+      case Compare_Int32:
+        ty = "Int32";
+        break;
+      case Compare_UInt32:
+        ty = "UInt32";
+        break;
+      case Compare_Int64:
+        ty = "Int64";
+        break;
+      case Compare_UInt64:
+        ty = "UInt64";
+        break;
+      case Compare_UIntPtr:
+        ty = "UIntPtr";
+        break;
+      case Compare_Double:
+        ty = "Double";
+        break;
+      case Compare_Float32:
+        ty = "Float32";
+        break;
+      case Compare_String:
+        ty = "String";
+        break;
+      case Compare_Symbol:
+        ty = "Symbol";
+        break;
+      case Compare_Object:
+        ty = "Object";
+        break;
+      case Compare_BigInt:
+        ty = "BigInt";
+        break;
+      case Compare_BigInt_Int32:
+        ty = "BigInt_Int32";
+        break;
+      case Compare_BigInt_Double:
+        ty = "BigInt_Double";
+        break;
+      case Compare_BigInt_String:
+        ty = "BigInt_String";
+        break;
+      case Compare_RefOrNull:
+        ty = "RefOrNull";
+        break;
+      default:
+        ty = "!!unknown!!";
+        break;
+    };
+    char buf[64];
+    SprintfLiteral(buf, "ty=%s jsop=%s", ty, CodeName(jsop()));
+    extras->add(buf);
+  }
+#endif
 };
 
 // Takes a typed value and returns an untyped value.
@@ -2704,6 +3002,7 @@ class MBox : public MUnaryInstruction, public NoTypePolicy::Data {
 static inline Assembler::Condition JSOpToCondition(
     MCompare::CompareType compareType, JSOp op) {
   bool isSigned = (compareType != MCompare::Compare_UInt32 &&
+                   compareType != MCompare::Compare_UInt64 &&
                    compareType != MCompare::Compare_UIntPtr);
   return JSOpToCondition(op, isSigned);
 }
@@ -2827,39 +3126,6 @@ class MAssertShape : public MUnaryInstruction, public NoTypePolicy::Data {
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 };
 
-// Caller-side allocation of |this| for |new|:
-// Given a templateobject, construct |this| for JSOp::New.
-// Not used for JSOp::SuperCall, because Baseline doesn't attach template
-// objects for super calls.
-class MCreateThisWithTemplate : public MUnaryInstruction,
-                                public NoTypePolicy::Data {
-  gc::InitialHeap initialHeap_;
-
-  MCreateThisWithTemplate(MConstant* templateConst, gc::InitialHeap initialHeap)
-      : MUnaryInstruction(classOpcode, templateConst),
-        initialHeap_(initialHeap) {
-    setResultType(MIRType::Object);
-  }
-
- public:
-  INSTRUCTION_HEADER(CreateThisWithTemplate)
-  TRIVIAL_NEW_WRAPPERS
-
-  // Template for |this|, provided by TI.
-  JSObject* templateObject() const {
-    return &getOperand(0)->toConstant()->toObject();
-  }
-
-  gc::InitialHeap initialHeap() const { return initialHeap_; }
-
-  // Although creation of |this| modifies global state, it is safely repeatable.
-  AliasSet getAliasSet() const override { return AliasSet::None(); }
-
-  [[nodiscard]] bool writeRecoverData(
-      CompactBufferWriter& writer) const override;
-  bool canRecoverOnBailout() const override;
-};
-
 // Eager initialization of arguments object.
 class MCreateArgumentsObject : public MUnaryInstruction,
                                public ObjectPolicy<0>::Data {
@@ -2889,7 +3155,10 @@ class MCreateArgumentsObject : public MUnaryInstruction,
 // Eager initialization of arguments object for inlined function
 class MCreateInlinedArgumentsObject : public MVariadicInstruction,
                                       public NoFloatPolicyAfter<0>::Data {
-  MCreateInlinedArgumentsObject() : MVariadicInstruction(classOpcode) {
+  CompilerGCPointer<ArgumentsObject*> templateObj_;
+
+  explicit MCreateInlinedArgumentsObject(ArgumentsObject* templateObj)
+      : MVariadicInstruction(classOpcode), templateObj_(templateObj) {
     setResultType(MIRType::Object);
   }
 
@@ -2900,8 +3169,11 @@ class MCreateInlinedArgumentsObject : public MVariadicInstruction,
   static MCreateInlinedArgumentsObject* New(TempAllocator& alloc,
                                             MDefinition* callObj,
                                             MDefinition* callee,
-                                            MDefinitionVector& args);
+                                            MDefinitionVector& args,
+                                            ArgumentsObject* templateObj);
   NAMED_OPERANDS((0, getCallObject), (1, getCallee))
+
+  ArgumentsObject* templateObject() const { return templateObj_; }
 
   MDefinition* getArg(uint32_t idx) const {
     return getOperand(idx + NumNonArgumentOperands);
@@ -2930,6 +3202,8 @@ class MGetInlinedArgument
   INSTRUCTION_HEADER(GetInlinedArgument)
   static MGetInlinedArgument* New(TempAllocator& alloc, MDefinition* index,
                                   MCreateInlinedArgumentsObject* args);
+  static MGetInlinedArgument* New(TempAllocator& alloc, MDefinition* index,
+                                  const CallInfo& callInfo);
   NAMED_OPERANDS((0, index))
 
   MDefinition* getArg(uint32_t idx) const {
@@ -2943,6 +3217,110 @@ class MGetInlinedArgument
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
   MDefinition* foldsTo(TempAllocator& alloc) override;
+};
+
+class MGetInlinedArgumentHole
+    : public MVariadicInstruction,
+      public MixPolicy<UnboxedInt32Policy<0>, NoFloatPolicyAfter<1>>::Data {
+  MGetInlinedArgumentHole() : MVariadicInstruction(classOpcode) {
+    setGuard();
+    setResultType(MIRType::Value);
+  }
+
+  static const size_t NumNonArgumentOperands = 1;
+
+ public:
+  INSTRUCTION_HEADER(GetInlinedArgumentHole)
+  static MGetInlinedArgumentHole* New(TempAllocator& alloc, MDefinition* index,
+                                      MCreateInlinedArgumentsObject* args);
+  NAMED_OPERANDS((0, index))
+
+  MDefinition* getArg(uint32_t idx) const {
+    return getOperand(idx + NumNonArgumentOperands);
+  }
+  uint32_t numActuals() const { return numOperands() - NumNonArgumentOperands; }
+
+  bool congruentTo(const MDefinition* ins) const override {
+    return congruentIfOperandsEqual(ins);
+  }
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+  MDefinition* foldsTo(TempAllocator& alloc) override;
+};
+
+class MInlineArgumentsSlice
+    : public MVariadicInstruction,
+      public MixPolicy<UnboxedInt32Policy<0>, UnboxedInt32Policy<1>,
+                       NoFloatPolicyAfter<2>>::Data {
+  JSObject* templateObj_;
+  gc::Heap initialHeap_;
+
+  MInlineArgumentsSlice(JSObject* templateObj, gc::Heap initialHeap)
+      : MVariadicInstruction(classOpcode),
+        templateObj_(templateObj),
+        initialHeap_(initialHeap) {
+    setResultType(MIRType::Object);
+  }
+
+  static const size_t NumNonArgumentOperands = 2;
+
+ public:
+  INSTRUCTION_HEADER(InlineArgumentsSlice)
+  static MInlineArgumentsSlice* New(TempAllocator& alloc, MDefinition* begin,
+                                    MDefinition* count,
+                                    MCreateInlinedArgumentsObject* args,
+                                    JSObject* templateObj,
+                                    gc::Heap initialHeap);
+  NAMED_OPERANDS((0, begin), (1, count))
+
+  JSObject* templateObj() const { return templateObj_; }
+  gc::Heap initialHeap() const { return initialHeap_; }
+
+  MDefinition* getArg(uint32_t idx) const {
+    return getOperand(idx + NumNonArgumentOperands);
+  }
+  uint32_t numActuals() const { return numOperands() - NumNonArgumentOperands; }
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+  bool possiblyCalls() const override { return true; }
+};
+
+// Allocates a new BoundFunctionObject and calls
+// BoundFunctionObject::functionBindImpl. This instruction can have arbitrary
+// side-effects because the GetProperty calls for length/name can call into JS.
+class MBindFunction
+    : public MVariadicInstruction,
+      public MixPolicy<ObjectPolicy<0>, NoFloatPolicyAfter<1>>::Data {
+  CompilerGCPointer<JSObject*> templateObj_;
+
+  explicit MBindFunction(JSObject* templateObj)
+      : MVariadicInstruction(classOpcode), templateObj_(templateObj) {
+    setResultType(MIRType::Object);
+  }
+
+  // The target object is operand 0.
+  static const size_t NumNonArgumentOperands = 1;
+
+ public:
+  INSTRUCTION_HEADER(BindFunction)
+  static MBindFunction* New(TempAllocator& alloc, MDefinition* target,
+                            uint32_t argc, JSObject* templateObj);
+  NAMED_OPERANDS((0, target))
+
+  JSObject* templateObject() const { return templateObj_; }
+
+  MDefinition* getArg(uint32_t idx) const {
+    return getOperand(idx + NumNonArgumentOperands);
+  }
+  void initArg(size_t i, MDefinition* arg) {
+    initOperand(NumNonArgumentOperands + i, arg);
+  }
+  uint32_t numStackArgs() const {
+    return numOperands() - NumNonArgumentOperands;
+  }
+
+  bool possiblyCalls() const override { return true; }
 };
 
 class MToFPInstruction : public MUnaryInstruction, public ToDoublePolicy::Data {
@@ -2997,8 +3375,8 @@ class MToDouble : public MToFPInstruction {
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
 #ifdef DEBUG
@@ -3160,7 +3538,7 @@ class MExtendInt32ToInt64 : public MUnaryInstruction,
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 };
 
-// The same as MWasmTruncateToInt64 but with the TLS dependency.
+// The same as MWasmTruncateToInt64 but with the Instance dependency.
 // It used only for arm now because on arm we need to call builtin to truncate
 // to i64.
 class MWasmBuiltinTruncateToInt64 : public MAryInstruction<2>,
@@ -3168,14 +3546,14 @@ class MWasmBuiltinTruncateToInt64 : public MAryInstruction<2>,
   TruncFlags flags_;
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MWasmBuiltinTruncateToInt64(MDefinition* def, MDefinition* tls,
+  MWasmBuiltinTruncateToInt64(MDefinition* def, MDefinition* instance,
                               TruncFlags flags,
                               wasm::BytecodeOffset bytecodeOffset)
       : MAryInstruction(classOpcode),
         flags_(flags),
         bytecodeOffset_(bytecodeOffset) {
     initOperand(0, def);
-    initOperand(1, tls);
+    initOperand(1, instance);
 
     setResultType(MIRType::Int64);
     setGuard();  // neither removable nor movable because of possible
@@ -3184,7 +3562,7 @@ class MWasmBuiltinTruncateToInt64 : public MAryInstruction<2>,
 
  public:
   INSTRUCTION_HEADER(WasmBuiltinTruncateToInt64)
-  NAMED_OPERANDS((0, input), (1, tls));
+  NAMED_OPERANDS((0, input), (1, instance));
   TRIVIAL_NEW_WRAPPERS
 
   bool isUnsigned() const { return flags_ & TRUNC_UNSIGNED; }
@@ -3410,7 +3788,8 @@ class MBuiltinInt64ToFloatingPoint : public MAryInstruction<2>,
   bool isUnsigned_;
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MBuiltinInt64ToFloatingPoint(MDefinition* def, MDefinition* tls, MIRType type,
+  MBuiltinInt64ToFloatingPoint(MDefinition* def, MDefinition* instance,
+                               MIRType type,
                                wasm::BytecodeOffset bytecodeOffset,
                                bool isUnsigned)
       : MAryInstruction(classOpcode),
@@ -3418,14 +3797,14 @@ class MBuiltinInt64ToFloatingPoint : public MAryInstruction<2>,
         bytecodeOffset_(bytecodeOffset) {
     MOZ_ASSERT(IsFloatingPointType(type));
     initOperand(0, def);
-    initOperand(1, tls);
+    initOperand(1, instance);
     setResultType(type);
     setMovable();
   }
 
  public:
   INSTRUCTION_HEADER(BuiltinInt64ToFloatingPoint)
-  NAMED_OPERANDS((0, input), (1, tls));
+  NAMED_OPERANDS((0, input), (1, instance));
   TRIVIAL_NEW_WRAPPERS
 
   bool isUnsigned() const { return isUnsigned_; }
@@ -3504,49 +3883,6 @@ class MToNumberInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
   ALLOW_CLONE(MToNumberInt32)
 };
 
-// Applies ECMA's ToInteger on a primitive (either typed or untyped) and expects
-// the result to be precisely representable as an Int32, otherwise bails.
-//
-// NB: Negative zero doesn't lead to a bailout, but instead will be treated the
-// same as positive zero for this operation.
-//
-// If the input is not primitive at runtime, a bailout occurs. If the input
-// cannot be converted to an int32 without loss (i.e. 2e10 or Infinity) then a
-// bailout occurs.
-class MToIntegerInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
-  explicit MToIntegerInt32(MDefinition* def)
-      : MUnaryInstruction(classOpcode, def) {
-    setResultType(MIRType::Int32);
-    setMovable();
-
-    // Guard unless the conversion is known to be non-effectful & non-throwing.
-    if (!def->definitelyType({MIRType::Undefined, MIRType::Null,
-                              MIRType::Boolean, MIRType::Int32, MIRType::Double,
-                              MIRType::Float32, MIRType::String})) {
-      setGuard();
-    }
-  }
-
- public:
-  INSTRUCTION_HEADER(ToIntegerInt32)
-  TRIVIAL_NEW_WRAPPERS
-
-  MDefinition* foldsTo(TempAllocator& alloc) override;
-
-  bool congruentTo(const MDefinition* ins) const override {
-    return congruentIfOperandsEqual(ins);
-  }
-
-  AliasSet getAliasSet() const override { return AliasSet::None(); }
-  void computeRange(TempAllocator& alloc) override;
-
-#ifdef DEBUG
-  bool isConsistentFloat32Use(MUse* use) const override { return true; }
-#endif
-
-  ALLOW_CLONE(MToIntegerInt32)
-};
-
 // Converts a value or typed input to a truncated int32, for use with bitwise
 // operations. This is an infallible ValueToECMAInt32.
 class MTruncateToInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
@@ -3599,17 +3935,17 @@ class MTruncateToInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
   ALLOW_CLONE(MTruncateToInt32)
 };
 
-// It is like MTruncateToInt32 but with tls dependency.
+// It is like MTruncateToInt32 but with instance dependency.
 class MWasmBuiltinTruncateToInt32 : public MAryInstruction<2>,
                                     public ToInt32Policy::Data {
   wasm::BytecodeOffset bytecodeOffset_;
 
   MWasmBuiltinTruncateToInt32(
-      MDefinition* def, MDefinition* tls,
+      MDefinition* def, MDefinition* instance,
       wasm::BytecodeOffset bytecodeOffset = wasm::BytecodeOffset())
       : MAryInstruction(classOpcode), bytecodeOffset_(bytecodeOffset) {
     initOperand(0, def);
-    initOperand(1, tls);
+    initOperand(1, instance);
     setResultType(MIRType::Int32);
     setMovable();
 
@@ -3621,7 +3957,7 @@ class MWasmBuiltinTruncateToInt32 : public MAryInstruction<2>,
 
  public:
   INSTRUCTION_HEADER(WasmBuiltinTruncateToInt32)
-  NAMED_OPERANDS((0, input), (1, tls))
+  NAMED_OPERANDS((0, input), (1, instance))
   TRIVIAL_NEW_WRAPPERS
 
   bool congruentTo(const MDefinition* ins) const override {
@@ -3812,6 +4148,9 @@ class MToString : public MUnaryInstruction, public ToStringPolicy::Data {
 class MBitNot : public MUnaryInstruction, public BitwisePolicy::Data {
   explicit MBitNot(MDefinition* input) : MUnaryInstruction(classOpcode, input) {
     setResultType(MIRType::Int32);
+    if (input->type() == MIRType::Int64) {
+      setResultType(MIRType::Int64);
+    }
     setMovable();
   }
 
@@ -3837,7 +4176,7 @@ class MBitNot : public MUnaryInstruction, public BitwisePolicy::Data {
 class MTypeOf : public MUnaryInstruction,
                 public BoxExceptPolicy<0, MIRType::Object>::Data {
   explicit MTypeOf(MDefinition* def) : MUnaryInstruction(classOpcode, def) {
-    setResultType(MIRType::String);
+    setResultType(MIRType::Int32);
     setMovable();
   }
   TypeDataList observed_;
@@ -3861,6 +4200,40 @@ class MTypeOf : public MUnaryInstruction,
   [[nodiscard]] bool writeRecoverData(
       CompactBufferWriter& writer) const override;
   bool canRecoverOnBailout() const override { return true; }
+};
+
+class MTypeOfIs : public MUnaryInstruction, public NoTypePolicy::Data {
+  JSOp jsop_;
+  JSType jstype_;
+
+  MTypeOfIs(MDefinition* def, JSOp jsop, JSType jstype)
+      : MUnaryInstruction(classOpcode, def), jsop_(jsop), jstype_(jstype) {
+    MOZ_ASSERT(def->type() == MIRType::Object || def->type() == MIRType::Value);
+
+    setResultType(MIRType::Boolean);
+    setMovable();
+  }
+
+ public:
+  INSTRUCTION_HEADER(TypeOfIs)
+  TRIVIAL_NEW_WRAPPERS
+
+  JSOp jsop() const { return jsop_; }
+  JSType jstype() const { return jstype_; }
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+  bool congruentTo(const MDefinition* ins) const override {
+    if (!congruentIfOperandsEqual(ins)) {
+      return false;
+    }
+    return jsop() == ins->toTypeOfIs()->jsop() &&
+           jstype() == ins->toTypeOfIs()->jstype();
+  }
+
+#ifdef JS_JITSPEW
+  void printOpcode(GenericPrinter& out) const override;
+#endif
 };
 
 class MBinaryBitwiseInstruction : public MBinaryInstruction,
@@ -4257,6 +4630,11 @@ class MMinMaxArray : public MUnaryInstruction, public SingleObjectPolicy::Data {
       : MUnaryInstruction(classOpcode, array), isMax_(isMax) {
     MOZ_ASSERT(type == MIRType::Int32 || type == MIRType::Double);
     setResultType(type);
+
+    // We can't DCE this, even if the result is unused, in case one of the
+    // elements of the array is an object with a `valueOf` function that
+    // must be called.
+    setGuard();
   }
 
  public:
@@ -4652,7 +5030,7 @@ class MMathFunction : public MUnaryInstruction,
 
   [[nodiscard]] bool writeRecoverData(
       CompactBufferWriter& writer) const override;
-  bool canRecoverOnBailout() const override;
+  bool canRecoverOnBailout() const override { return true; }
 
   ALLOW_CLONE(MMathFunction)
 };
@@ -4687,8 +5065,8 @@ class MAdd : public MBinaryArithInstruction {
 
   bool fallible() const;
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
   [[nodiscard]] bool writeRecoverData(
@@ -4724,8 +5102,8 @@ class MSub : public MBinaryArithInstruction {
 
   bool fallible() const;
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
   [[nodiscard]] bool writeRecoverData(
@@ -4810,15 +5188,13 @@ class MMul : public MBinaryArithInstruction {
     canBeNegativeZero_ = negativeZero;
   }
 
-  [[nodiscard]] bool updateForReplacement(MDefinition* ins) override;
-
   bool fallible() const { return canBeNegativeZero_ || canOverflow(); }
 
   bool isFloat32Commutative() const override { return true; }
 
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
   Mode mode() const { return mode_; }
@@ -4928,8 +5304,8 @@ class MDiv : public MBinaryArithInstruction {
 
   void computeRange(TempAllocator& alloc) override;
   bool fallible() const;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   void collectRangeInfoPreTrunc() override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
@@ -4958,7 +5334,8 @@ class MWasmBuiltinDivI64 : public MAryInstruction<3>, public ArithPolicy::Data {
   bool trapOnError_;
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MWasmBuiltinDivI64(MDefinition* left, MDefinition* right, MDefinition* tls)
+  MWasmBuiltinDivI64(MDefinition* left, MDefinition* right,
+                     MDefinition* instance)
       : MAryInstruction(classOpcode),
         canBeNegativeZero_(true),
         canBeNegativeOverflow_(true),
@@ -4968,7 +5345,7 @@ class MWasmBuiltinDivI64 : public MAryInstruction<3>, public ArithPolicy::Data {
         trapOnError_(false) {
     initOperand(0, left);
     initOperand(1, right);
-    initOperand(2, tls);
+    initOperand(2, instance);
 
     setResultType(MIRType::Int64);
     setMovable();
@@ -4977,13 +5354,13 @@ class MWasmBuiltinDivI64 : public MAryInstruction<3>, public ArithPolicy::Data {
  public:
   INSTRUCTION_HEADER(WasmBuiltinDivI64)
 
-  NAMED_OPERANDS((0, lhs), (1, rhs), (2, tls))
+  NAMED_OPERANDS((0, lhs), (1, rhs), (2, instance))
 
   static MWasmBuiltinDivI64* New(
       TempAllocator& alloc, MDefinition* left, MDefinition* right,
-      MDefinition* tls, bool unsignd, bool trapOnError = false,
+      MDefinition* instance, bool unsignd, bool trapOnError = false,
       wasm::BytecodeOffset bytecodeOffset = wasm::BytecodeOffset()) {
-    auto* wasm64Div = new (alloc) MWasmBuiltinDivI64(left, right, tls);
+    auto* wasm64Div = new (alloc) MWasmBuiltinDivI64(left, right, instance);
     wasm64Div->unsigned_ = unsignd;
     wasm64Div->trapOnError_ = trapOnError;
     wasm64Div->bytecodeOffset_ = bytecodeOffset;
@@ -5106,8 +5483,8 @@ class MMod : public MBinaryArithInstruction {
   bool fallible() const;
 
   void computeRange(TempAllocator& alloc) override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
   void collectRangeInfoPreTrunc() override;
   TruncateKind operandTruncateKind(size_t index) const override;
 
@@ -5124,12 +5501,12 @@ class MMod : public MBinaryArithInstruction {
 class MWasmBuiltinModD : public MAryInstruction<3>, public ArithPolicy::Data {
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MWasmBuiltinModD(MDefinition* left, MDefinition* right, MDefinition* tls,
+  MWasmBuiltinModD(MDefinition* left, MDefinition* right, MDefinition* instance,
                    MIRType type)
       : MAryInstruction(classOpcode) {
     initOperand(0, left);
     initOperand(1, right);
-    initOperand(2, tls);
+    initOperand(2, instance);
 
     setResultType(type);
     setMovable();
@@ -5137,14 +5514,14 @@ class MWasmBuiltinModD : public MAryInstruction<3>, public ArithPolicy::Data {
 
  public:
   INSTRUCTION_HEADER(WasmBuiltinModD)
-  NAMED_OPERANDS((0, lhs), (1, rhs), (2, tls))
+  NAMED_OPERANDS((0, lhs), (1, rhs), (2, instance))
 
   static MWasmBuiltinModD* New(
       TempAllocator& alloc, MDefinition* left, MDefinition* right,
-      MDefinition* tls, MIRType type,
+      MDefinition* instance, MIRType type,
       wasm::BytecodeOffset bytecodeOffset = wasm::BytecodeOffset()) {
     auto* wasmBuiltinModD =
-        new (alloc) MWasmBuiltinModD(left, right, tls, type);
+        new (alloc) MWasmBuiltinModD(left, right, instance, type);
     wasmBuiltinModD->bytecodeOffset_ = bytecodeOffset;
     return wasmBuiltinModD;
   }
@@ -5164,7 +5541,8 @@ class MWasmBuiltinModI64 : public MAryInstruction<3>, public ArithPolicy::Data {
   bool trapOnError_;
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MWasmBuiltinModI64(MDefinition* left, MDefinition* right, MDefinition* tls)
+  MWasmBuiltinModI64(MDefinition* left, MDefinition* right,
+                     MDefinition* instance)
       : MAryInstruction(classOpcode),
         unsigned_(false),
         canBeNegativeDividend_(true),
@@ -5172,7 +5550,7 @@ class MWasmBuiltinModI64 : public MAryInstruction<3>, public ArithPolicy::Data {
         trapOnError_(false) {
     initOperand(0, left);
     initOperand(1, right);
-    initOperand(2, tls);
+    initOperand(2, instance);
 
     setResultType(MIRType::Int64);
     setMovable();
@@ -5181,13 +5559,13 @@ class MWasmBuiltinModI64 : public MAryInstruction<3>, public ArithPolicy::Data {
  public:
   INSTRUCTION_HEADER(WasmBuiltinModI64)
 
-  NAMED_OPERANDS((0, lhs), (1, rhs), (2, tls))
+  NAMED_OPERANDS((0, lhs), (1, rhs), (2, instance))
 
   static MWasmBuiltinModI64* New(
       TempAllocator& alloc, MDefinition* left, MDefinition* right,
-      MDefinition* tls, bool unsignd, bool trapOnError = false,
+      MDefinition* instance, bool unsignd, bool trapOnError = false,
       wasm::BytecodeOffset bytecodeOffset = wasm::BytecodeOffset()) {
-    auto* mod = new (alloc) MWasmBuiltinModI64(left, right, tls);
+    auto* mod = new (alloc) MWasmBuiltinModI64(left, right, instance);
     mod->unsigned_ = unsignd;
     mod->trapOnError_ = trapOnError;
     mod->bytecodeOffset_ = bytecodeOffset;
@@ -5718,17 +6096,11 @@ class MPhi final : public MDefinition,
 
   // Assuming this phi is in a loop header with a unique loop entry, return
   // the phi operand along the loop entry.
-  MDefinition* getLoopPredecessorOperand() const {
-    assertLoopPhi();
-    return getOperand(0);
-  }
+  MDefinition* getLoopPredecessorOperand() const;
 
   // Assuming this phi is in a loop header with a unique loop entry, return
   // the phi operand along the loop backedge.
-  MDefinition* getLoopBackedgeOperand() const {
-    assertLoopPhi();
-    return getOperand(1);
-  }
+  MDefinition* getLoopBackedgeOperand() const;
 
   // Whether this phi's type already includes information for def.
   bool typeIncludes(MDefinition* def);
@@ -5767,7 +6139,10 @@ class MPhi final : public MDefinition,
   MDefinition* foldsTernary(TempAllocator& alloc);
 
   bool congruentTo(const MDefinition* ins) const override;
-  bool updateForReplacement(MDefinition* def) override;
+
+  // Mark this phi-node as having replaced all uses of |other|, as during GVN.
+  // For use when GVN eliminates phis which are not equivalent to one another.
+  void updateForReplacement(MPhi* other);
 
   bool isIterator() const { return isIterator_; }
   void setIterator() { isIterator_ = true; }
@@ -5788,8 +6163,8 @@ class MPhi final : public MDefinition,
   void setCanConsumeFloat32(bool can) { canConsumeFloat32_ = can; }
 
   TruncateKind operandTruncateKind(size_t index) const override;
-  bool needTruncation(TruncateKind kind) override;
-  void truncate() override;
+  bool canTruncate() const override;
+  void truncate(TruncateKind kind) override;
 
   PhiUsage getUsageAnalysis() const { return usageAnalysis_; }
   void setUsageAnalysis(PhiUsage pu) {
@@ -5952,9 +6327,9 @@ class MWasmInterruptCheck : public MUnaryInstruction,
                             public NoTypePolicy::Data {
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MWasmInterruptCheck(MDefinition* tlsPointer,
+  MWasmInterruptCheck(MDefinition* instance,
                       wasm::BytecodeOffset bytecodeOffset)
-      : MUnaryInstruction(classOpcode, tlsPointer),
+      : MUnaryInstruction(classOpcode, instance),
         bytecodeOffset_(bytecodeOffset) {
     setGuard();
   }
@@ -5962,7 +6337,7 @@ class MWasmInterruptCheck : public MUnaryInstruction,
  public:
   INSTRUCTION_HEADER(WasmInterruptCheck)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, tlsPtr))
+  NAMED_OPERANDS((0, instance))
 
   AliasSet getAliasSet() const override { return AliasSet::None(); }
   wasm::BytecodeOffset bytecodeOffset() const { return bytecodeOffset_; }
@@ -6109,42 +6484,9 @@ class MStringReplace : public MTernaryInstruction,
   bool possiblyCalls() const override { return true; }
 };
 
-struct LambdaFunctionInfo {
-  // The functions used in lambdas are the canonical original function in
-  // the script, and are immutable except for delazification. Record this
-  // information while still on the main thread to avoid races.
- private:
-  CompilerFunction fun_;
-
- public:
-  js::BaseScript* baseScript;
-  js::FunctionFlags flags;
-  uint16_t nargs;
-
-  LambdaFunctionInfo(JSFunction* fun, BaseScript* baseScript,
-                     FunctionFlags flags, uint16_t nargs)
-      : fun_(fun), baseScript(baseScript), flags(flags), nargs(nargs) {}
-
-  LambdaFunctionInfo(const LambdaFunctionInfo& other)
-      : fun_(static_cast<JSFunction*>(other.fun_)),
-        baseScript(other.baseScript),
-        flags(other.flags),
-        nargs(other.nargs) {}
-
-  // Be careful when calling this off-thread. Don't call any JSFunction*
-  // methods that depend on script/lazyScript - this can race with
-  // delazification on the main thread.
-  JSFunction* funUnsafe() const { return fun_; }
-
- private:
-  void operator=(const LambdaFunctionInfo&) = delete;
-};
-
 class MLambda : public MBinaryInstruction, public SingleObjectPolicy::Data {
-  const LambdaFunctionInfo info_;
-
-  MLambda(MDefinition* envChain, MConstant* cst, const LambdaFunctionInfo& info)
-      : MBinaryInstruction(classOpcode, envChain, cst), info_(info) {
+  MLambda(MDefinition* envChain, MConstant* cst)
+      : MBinaryInstruction(classOpcode, envChain, cst) {
     setResultType(MIRType::Object);
   }
 
@@ -6154,31 +6496,10 @@ class MLambda : public MBinaryInstruction, public SingleObjectPolicy::Data {
   NAMED_OPERANDS((0, environmentChain))
 
   MConstant* functionOperand() const { return getOperand(1)->toConstant(); }
-  const LambdaFunctionInfo& info() const { return info_; }
-  [[nodiscard]] bool writeRecoverData(
-      CompactBufferWriter& writer) const override;
-  bool canRecoverOnBailout() const override { return true; }
-};
-
-class MLambdaArrow
-    : public MTernaryInstruction,
-      public MixPolicy<ObjectPolicy<0>, BoxPolicy<1>, ObjectPolicy<2>>::Data {
-  const LambdaFunctionInfo info_;
-
-  MLambdaArrow(MDefinition* envChain, MDefinition* newTarget, MConstant* cst,
-               const LambdaFunctionInfo& info)
-      : MTernaryInstruction(classOpcode, envChain, newTarget, cst),
-        info_(info) {
-    setResultType(MIRType::Object);
+  JSFunction* templateFunction() const {
+    return &functionOperand()->toObject().as<JSFunction>();
   }
 
- public:
-  INSTRUCTION_HEADER(LambdaArrow)
-  TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, environmentChain), (1, newTargetDef))
-
-  MConstant* functionOperand() const { return getOperand(2)->toConstant(); }
-  const LambdaFunctionInfo& info() const { return info_; }
   [[nodiscard]] bool writeRecoverData(
       CompactBufferWriter& writer) const override;
   bool canRecoverOnBailout() const override { return true; }
@@ -6442,20 +6763,15 @@ class MSpectreMaskIndex
   ALLOW_CLONE(MSpectreMaskIndex)
 };
 
-// Load a value from a dense array's element vector and does a hole check if the
-// array is not known to be packed.
+// Load a value from a dense array's element vector. Bails out if the element is
+// a hole.
 class MLoadElement : public MBinaryInstruction, public NoTypePolicy::Data {
-  bool needsHoleCheck_;
-
-  MLoadElement(MDefinition* elements, MDefinition* index, bool needsHoleCheck)
-      : MBinaryInstruction(classOpcode, elements, index),
-        needsHoleCheck_(needsHoleCheck) {
-    if (needsHoleCheck) {
-      // Uses may be optimized away based on this instruction's result
-      // type. This means it's invalid to DCE this instruction, as we
-      // have to invalidate when we read a hole.
-      setGuard();
-    }
+  MLoadElement(MDefinition* elements, MDefinition* index)
+      : MBinaryInstruction(classOpcode, elements, index) {
+    // Uses may be optimized away based on this instruction's result
+    // type. This means it's invalid to DCE this instruction, as we
+    // have to invalidate when we read a hole.
+    setGuard();
     setResultType(MIRType::Value);
     setMovable();
     MOZ_ASSERT(elements->type() == MIRType::Elements);
@@ -6467,18 +6783,8 @@ class MLoadElement : public MBinaryInstruction, public NoTypePolicy::Data {
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, elements), (1, index))
 
-  bool needsHoleCheck() const { return needsHoleCheck_; }
-  bool fallible() const { return needsHoleCheck(); }
-
   bool congruentTo(const MDefinition* ins) const override {
-    if (!ins->isLoadElement()) {
-      return false;
-    }
-    const MLoadElement* other = ins->toLoadElement();
-    if (needsHoleCheck() != other->needsHoleCheck()) {
-      return false;
-    }
-    return congruentIfOperandsEqual(other);
+    return congruentIfOperandsEqual(ins);
   }
   AliasType mightAlias(const MDefinition* store) const override;
   MDefinition* foldsTo(TempAllocator& alloc) override;
@@ -6501,7 +6807,6 @@ class MLoadElementAndUnbox : public MBinaryInstruction,
     if (mode_ == MUnbox::Fallible) {
       setGuard();
     }
-    setBailoutKind(BailoutKind::UnboxFolding);
   }
 
  public:
@@ -6530,14 +6835,11 @@ class MLoadElementAndUnbox : public MBinaryInstruction,
 // Load a value from the elements vector of a native object. If the index is
 // out-of-bounds, or the indexed slot has a hole, undefined is returned instead.
 class MLoadElementHole : public MTernaryInstruction, public NoTypePolicy::Data {
-  bool needsNegativeIntCheck_;
-  bool needsHoleCheck_;
+  bool needsNegativeIntCheck_ = true;
 
   MLoadElementHole(MDefinition* elements, MDefinition* index,
-                   MDefinition* initLength, bool needsHoleCheck)
-      : MTernaryInstruction(classOpcode, elements, index, initLength),
-        needsNegativeIntCheck_(true),
-        needsHoleCheck_(needsHoleCheck) {
+                   MDefinition* initLength)
+      : MTernaryInstruction(classOpcode, elements, index, initLength) {
     setResultType(MIRType::Value);
     setMovable();
 
@@ -6557,15 +6859,11 @@ class MLoadElementHole : public MTernaryInstruction, public NoTypePolicy::Data {
   NAMED_OPERANDS((0, elements), (1, index), (2, initLength))
 
   bool needsNegativeIntCheck() const { return needsNegativeIntCheck_; }
-  bool needsHoleCheck() const { return needsHoleCheck_; }
   bool congruentTo(const MDefinition* ins) const override {
     if (!ins->isLoadElementHole()) {
       return false;
     }
     const MLoadElementHole* other = ins->toLoadElementHole();
-    if (needsHoleCheck() != other->needsHoleCheck()) {
-      return false;
-    }
     if (needsNegativeIntCheck() != other->needsNegativeIntCheck()) {
       return false;
     }
@@ -6579,33 +6877,17 @@ class MLoadElementHole : public MTernaryInstruction, public NoTypePolicy::Data {
   ALLOW_CLONE(MLoadElementHole)
 };
 
-class MStoreElementCommon {
-  MIRType elementType_;
-  bool needsBarrier_;
-
- protected:
-  MStoreElementCommon() : elementType_(MIRType::Value), needsBarrier_(false) {}
-
- public:
-  MIRType elementType() const { return elementType_; }
-  void setElementType(MIRType elementType) {
-    MOZ_ASSERT(elementType != MIRType::None);
-    elementType_ = elementType;
-  }
-  bool needsBarrier() const { return needsBarrier_; }
-  void setNeedsBarrier() { needsBarrier_ = true; }
-};
-
 // Store a value to a dense array slots vector.
 class MStoreElement : public MTernaryInstruction,
-                      public MStoreElementCommon,
                       public NoFloatPolicy<2>::Data {
   bool needsHoleCheck_;
+  bool needsBarrier_;
 
   MStoreElement(MDefinition* elements, MDefinition* index, MDefinition* value,
-                bool needsHoleCheck)
+                bool needsHoleCheck, bool needsBarrier)
       : MTernaryInstruction(classOpcode, elements, index, value) {
     needsHoleCheck_ = needsHoleCheck;
+    needsBarrier_ = needsBarrier;
     MOZ_ASSERT(elements->type() == MIRType::Elements);
     MOZ_ASSERT(index->type() == MIRType::Int32);
     MOZ_ASSERT(value->type() != MIRType::MagicHole);
@@ -6616,9 +6898,25 @@ class MStoreElement : public MTernaryInstruction,
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, elements), (1, index), (2, value))
 
+  static MStoreElement* NewUnbarriered(TempAllocator& alloc,
+                                       MDefinition* elements,
+                                       MDefinition* index, MDefinition* value,
+                                       bool needsHoleCheck) {
+    return new (alloc)
+        MStoreElement(elements, index, value, needsHoleCheck, false);
+  }
+
+  static MStoreElement* NewBarriered(TempAllocator& alloc,
+                                     MDefinition* elements, MDefinition* index,
+                                     MDefinition* value, bool needsHoleCheck) {
+    return new (alloc)
+        MStoreElement(elements, index, value, needsHoleCheck, true);
+  }
+
   AliasSet getAliasSet() const override {
     return AliasSet::Store(AliasSet::Element);
   }
+  bool needsBarrier() const { return needsBarrier_; }
   bool needsHoleCheck() const { return needsHoleCheck_; }
   bool fallible() const { return needsHoleCheck(); }
 
@@ -6646,13 +6944,12 @@ class MStoreHoleValueElement : public MBinaryInstruction,
   ALLOW_CLONE(MStoreHoleValueElement)
 };
 
-// Like MStoreElement, but supports indexes >= initialized length. The downside
-// is that we cannot hoist the elements vector and bounds check, since this
-// instruction may update the (initialized) length and reallocate the elements
-// vector.
+// Like MStoreElement, but also supports index == initialized length. The
+// downside is that we cannot hoist the elements vector and bounds check, since
+// this instruction may update the (initialized) length and reallocate the
+// elements vector.
 class MStoreElementHole
     : public MQuaternaryInstruction,
-      public MStoreElementCommon,
       public MixPolicy<SingleObjectPolicy, NoFloatPolicy<3>>::Data {
   MStoreElementHole(MDefinition* object, MDefinition* elements,
                     MDefinition* index, MDefinition* value)
@@ -6666,6 +6963,12 @@ class MStoreElementHole
   INSTRUCTION_HEADER(StoreElementHole)
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, object), (1, elements), (2, index), (3, value))
+
+  AliasSet getAliasSet() const override {
+    // StoreElementHole can update the initialized length, the array length
+    // or reallocate obj->elements.
+    return AliasSet::Store(AliasSet::ObjectFields | AliasSet::Element);
+  }
 
   ALLOW_CLONE(MStoreElementHole)
 };
@@ -6896,7 +7199,8 @@ class MLoadTypedArrayElementHole : public MBinaryInstruction,
     return congruentIfOperandsEqual(other);
   }
   AliasSet getAliasSet() const override {
-    return AliasSet::Load(AliasSet::UnboxedElement);
+    return AliasSet::Load(AliasSet::UnboxedElement | AliasSet::ObjectFields |
+                          AliasSet::ArrayBufferViewLengthOrOffset);
   }
   bool canProduceFloat32() const override {
     return arrayType_ == Scalar::Float32;
@@ -7123,6 +7427,10 @@ class MLoadFixedSlot : public MUnaryInstruction,
 
   AliasType mightAlias(const MDefinition* store) const override;
 
+#ifdef JS_JITSPEW
+  void printOpcode(GenericPrinter& out) const override;
+#endif
+
   ALLOW_CLONE(MLoadFixedSlot)
 };
 
@@ -7139,7 +7447,6 @@ class MLoadFixedSlotAndUnbox : public MUnaryInstruction,
     if (mode_ == MUnbox::Fallible) {
       setGuard();
     }
-    setBailoutKind(BailoutKind::UnboxFolding);
   }
 
  public:
@@ -7167,6 +7474,10 @@ class MLoadFixedSlotAndUnbox : public MUnaryInstruction,
 
   AliasType mightAlias(const MDefinition* store) const override;
 
+#ifdef JS_JITSPEW
+  void printOpcode(GenericPrinter& out) const override;
+#endif
+
   ALLOW_CLONE(MLoadFixedSlotAndUnbox);
 };
 
@@ -7183,7 +7494,6 @@ class MLoadDynamicSlotAndUnbox : public MUnaryInstruction,
     if (mode_ == MUnbox::Fallible) {
       setGuard();
     }
-    setBailoutKind(BailoutKind::UnboxFolding);
   }
 
  public:
@@ -7207,6 +7517,10 @@ class MLoadDynamicSlotAndUnbox : public MUnaryInstruction,
   AliasSet getAliasSet() const override {
     return AliasSet::Load(AliasSet::DynamicSlot);
   }
+
+#ifdef JS_JITSPEW
+  void printOpcode(GenericPrinter& out) const override;
+#endif
 
   ALLOW_CLONE(MLoadDynamicSlotAndUnbox);
 };
@@ -7245,6 +7559,10 @@ class MStoreFixedSlot
   void setNeedsBarrier(bool needsBarrier = true) {
     needsBarrier_ = needsBarrier;
   }
+
+#ifdef JS_JITSPEW
+  void printOpcode(GenericPrinter& out) const override;
+#endif
 
   ALLOW_CLONE(MStoreFixedSlot)
 };
@@ -7346,9 +7664,6 @@ class MGuardValue : public MUnaryInstruction, public BoxInputsPolicy::Data {
 
   MGuardValue(MDefinition* val, const Value& expected)
       : MUnaryInstruction(classOpcode, val), expected_(expected) {
-    MOZ_ASSERT(expected.isNullOrUndefined() || expected.isMagic() ||
-               expected.isPrivateGCThing());
-
     setGuard();
     setMovable();
     setResultType(MIRType::Value);
@@ -7432,7 +7747,6 @@ class MGuardObjectIdentity : public MBinaryInstruction,
                        bool bailOnEquality)
       : MBinaryInstruction(classOpcode, obj, expected),
         bailOnEquality_(bailOnEquality) {
-    MOZ_ASSERT(expected->isConstant() || expected->isNurseryObject());
     setGuard();
     setMovable();
     setResultType(MIRType::Object);
@@ -7595,26 +7909,6 @@ class MLoadDynamicSlot : public MUnaryInstruction, public NoTypePolicy::Data {
   ALLOW_CLONE(MLoadDynamicSlot)
 };
 
-// Allocate a new BlockLexicalEnvironmentObject.
-class MNewLexicalEnvironmentObject : public MUnaryInstruction,
-                                     public SingleObjectPolicy::Data {
-  CompilerGCPointer<LexicalScope*> scope_;
-
-  MNewLexicalEnvironmentObject(MDefinition* enclosing, LexicalScope* scope)
-      : MUnaryInstruction(classOpcode, enclosing), scope_(scope) {
-    setResultType(MIRType::Object);
-  }
-
- public:
-  INSTRUCTION_HEADER(NewLexicalEnvironmentObject)
-  TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, enclosing))
-
-  LexicalScope* scope() const { return scope_; }
-  bool possiblyCalls() const override { return true; }
-  AliasSet getAliasSet() const override { return AliasSet::None(); }
-};
-
 class MAddAndStoreSlot
     : public MBinaryInstruction,
       public MixPolicy<SingleObjectPolicy, BoxPolicy<1>>::Data {
@@ -7656,14 +7950,12 @@ class MAddAndStoreSlot
 class MStoreDynamicSlot : public MBinaryInstruction,
                           public NoFloatPolicy<1>::Data {
   uint32_t slot_;
-  MIRType slotType_;
   bool needsBarrier_;
 
   MStoreDynamicSlot(MDefinition* slots, uint32_t slot, MDefinition* value,
                     bool barrier)
       : MBinaryInstruction(classOpcode, slots, value),
         slot_(slot),
-        slotType_(MIRType::Value),
         needsBarrier_(barrier) {
     MOZ_ASSERT(slots->type() == MIRType::Slots);
   }
@@ -7684,13 +7976,7 @@ class MStoreDynamicSlot : public MBinaryInstruction,
   }
 
   uint32_t slot() const { return slot_; }
-  MIRType slotType() const { return slotType_; }
-  void setSlotType(MIRType slotType) {
-    MOZ_ASSERT(slotType != MIRType::None);
-    slotType_ = slotType;
-  }
   bool needsBarrier() const { return needsBarrier_; }
-  void setNeedsBarrier() { needsBarrier_ = true; }
   AliasSet getAliasSet() const override {
     return AliasSet::Store(AliasSet::DynamicSlot);
   }
@@ -7719,17 +8005,17 @@ class MSetPropertyCache : public MTernaryInstruction,
   bool strict() const { return strict_; }
 };
 
-class MCallSetElement : public MTernaryInstruction,
-                        public CallSetElementPolicy::Data {
+class MMegamorphicSetElement : public MTernaryInstruction,
+                               public MegamorphicSetElementPolicy::Data {
   bool strict_;
 
-  MCallSetElement(MDefinition* object, MDefinition* index, MDefinition* value,
-                  bool strict)
+  MMegamorphicSetElement(MDefinition* object, MDefinition* index,
+                         MDefinition* value, bool strict)
       : MTernaryInstruction(classOpcode, object, index, value),
         strict_(strict) {}
 
  public:
-  INSTRUCTION_HEADER(CallSetElement)
+  INSTRUCTION_HEADER(MegamorphicSetElement)
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, object), (1, index), (2, value))
 
@@ -8441,13 +8727,6 @@ class MResumePoint final : public MNode
                            public InlineForwardListNode<MResumePoint>
 #endif
 {
- public:
-  enum Mode {
-    ResumeAt,     // Resume until before the current instruction
-    ResumeAfter,  // Resume after the current instruction
-    Outer         // State before inlining.
-  };
-
  private:
   friend class MBasicBlock;
   friend void AssertBasicGraphCoherency(MIRGraph& graph, bool force);
@@ -8461,14 +8740,19 @@ class MResumePoint final : public MNode
 
   jsbytecode* pc_;
   MInstruction* instruction_;
-  Mode mode_;
+  ResumeMode mode_;
+  bool isDiscarded_ = false;
 
-  MResumePoint(MBasicBlock* block, jsbytecode* pc, Mode mode);
+  MResumePoint(MBasicBlock* block, jsbytecode* pc, ResumeMode mode);
   void inherit(MBasicBlock* state);
 
   // Calling isDefinition or isResumePoint on MResumePoint is unnecessary.
   bool isDefinition() const = delete;
   bool isResumePoint() const = delete;
+
+  void setBlock(MBasicBlock* block) {
+    setBlockAndKind(block, Kind::ResumePoint);
+  }
 
  protected:
   // Initializes operands_ to an empty array of a fixed length.
@@ -8487,7 +8771,7 @@ class MResumePoint final : public MNode
 
  public:
   static MResumePoint* New(TempAllocator& alloc, MBasicBlock* block,
-                           jsbytecode* pc, Mode mode);
+                           jsbytecode* pc, ResumeMode mode);
 
   MBasicBlock* block() const { return resumePointBlock(); }
 
@@ -8532,7 +8816,7 @@ class MResumePoint final : public MNode
     MOZ_ASSERT(instruction_);
     instruction_ = nullptr;
   }
-  Mode mode() const { return mode_; }
+  ResumeMode mode() const { return mode_; }
 
   void releaseUses() {
     for (size_t i = 0, e = numOperands(); i < e; i++) {
@@ -8554,6 +8838,9 @@ class MResumePoint final : public MNode
 
   MStoresToRecoverList::iterator storesBegin() const { return stores_.begin(); }
   MStoresToRecoverList::iterator storesEnd() const { return stores_.end(); }
+
+  void setDiscarded() { isDiscarded_ = true; }
+  bool isDiscarded() const { return isDiscarded_; }
 
 #ifdef JS_JITSPEW
   virtual void dump(GenericPrinter& out) const override;
@@ -8619,6 +8906,7 @@ class MGuardToClass : public MUnaryInstruction,
   MGuardToClass(MDefinition* object, const JSClass* clasp)
       : MUnaryInstruction(classOpcode, object), class_(clasp) {
     MOZ_ASSERT(object->type() == MIRType::Object);
+    MOZ_ASSERT(!clasp->isJSFunction(), "Use MGuardToFunction instead");
     setResultType(MIRType::Object);
     setMovable();
 
@@ -8645,6 +8933,34 @@ class MGuardToClass : public MUnaryInstruction,
       return false;
     }
     if (getClass() != ins->toGuardToClass()->getClass()) {
+      return false;
+    }
+    return congruentIfOperandsEqual(ins);
+  }
+};
+
+class MGuardToFunction : public MUnaryInstruction,
+                         public SingleObjectPolicy::Data {
+  explicit MGuardToFunction(MDefinition* object)
+      : MUnaryInstruction(classOpcode, object) {
+    MOZ_ASSERT(object->type() == MIRType::Object);
+    setResultType(MIRType::Object);
+    setMovable();
+
+    // We will bail out if the class type is incorrect, so we need to ensure we
+    // don't eliminate this instruction
+    setGuard();
+  }
+
+ public:
+  INSTRUCTION_HEADER(GuardToFunction)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, object))
+
+  MDefinition* foldsTo(TempAllocator& alloc) override;
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+  bool congruentTo(const MDefinition* ins) const override {
+    if (!ins->isGuardToFunction()) {
       return false;
     }
     return congruentIfOperandsEqual(ins);
@@ -8886,11 +9202,81 @@ class MObjectStaticProto : public MUnaryInstruction,
   }
   AliasType mightAlias(const MDefinition* def) const override {
     // These instructions never modify the [[Prototype]].
-    if (def->isAddAndStoreSlot() || def->isAllocateAndStoreSlot()) {
+    if (def->isAddAndStoreSlot() || def->isAllocateAndStoreSlot() ||
+        def->isStoreElementHole() || def->isArrayPush()) {
       return AliasType::NoAlias;
     }
     return AliasType::MayAlias;
   }
+};
+
+class MConstantProto : public MUnaryInstruction,
+                       public SingleObjectPolicy::Data {
+  // NOTE: we're not going to actually use the underlying receiver object for
+  // anything. This is just here for giving extra information to MGuardShape
+  // to MGuardShape::mightAlias. Accordingly, we don't take it as an operand,
+  // but instead just keep a pointer to it. This means we need to ensure it's
+  // not discarded before we try to access it. If this is discarded, we
+  // basically just become an MConstant for the object's proto, which is fine.
+  const MDefinition* receiverObject_;
+
+  explicit MConstantProto(MDefinition* protoObject,
+                          const MDefinition* receiverObject)
+      : MUnaryInstruction(classOpcode, protoObject),
+        receiverObject_(receiverObject) {
+    MOZ_ASSERT(protoObject->isConstant());
+    setResultType(MIRType::Object);
+    setMovable();
+  }
+
+  ALLOW_CLONE(MConstantProto)
+
+ public:
+  INSTRUCTION_HEADER(ConstantProto)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, protoObject))
+
+  HashNumber valueHash() const override;
+
+  bool congruentTo(const MDefinition* ins) const override {
+    if (this == ins) {
+      return true;
+    }
+    const MDefinition* receiverObject = getReceiverObject();
+    return congruentIfOperandsEqual(ins) && receiverObject &&
+           receiverObject == ins->toConstantProto()->getReceiverObject();
+  }
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+  const MDefinition* getReceiverObject() const {
+    if (receiverObject_->isDiscarded()) {
+      return nullptr;
+    }
+    return receiverObject_;
+  }
+};
+
+class MObjectToIterator : public MUnaryInstruction,
+                          public ObjectPolicy<0>::Data {
+  NativeIteratorListHead* enumeratorsAddr_;
+  bool wantsIndices_ = false;
+
+  explicit MObjectToIterator(MDefinition* object,
+                             NativeIteratorListHead* enumeratorsAddr)
+      : MUnaryInstruction(classOpcode, object),
+        enumeratorsAddr_(enumeratorsAddr) {
+    setResultType(MIRType::Object);
+  }
+
+ public:
+  NativeIteratorListHead* enumeratorsAddr() const { return enumeratorsAddr_; }
+  INSTRUCTION_HEADER(ObjectToIterator)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, object))
+
+  bool wantsIndices() const { return wantsIndices_; }
+  void setWantsIndices(bool value) { wantsIndices_ = value; }
 };
 
 // Flips the input's sign bit, independently of the rest of the number's
@@ -8907,38 +9293,98 @@ class MWasmNeg : public MUnaryInstruction, public NoTypePolicy::Data {
   TRIVIAL_NEW_WRAPPERS
 };
 
-class MWasmLoadTls : public MUnaryInstruction, public NoTypePolicy::Data {
+// Machine-level bitwise AND/OR/XOR, avoiding all JS-level complexity embodied
+// in MBinaryBitwiseInstruction.
+class MWasmBinaryBitwise : public MBinaryInstruction,
+                           public NoTypePolicy::Data {
+ public:
+  enum class SubOpcode { And, Or, Xor };
+
+ protected:
+  MWasmBinaryBitwise(MDefinition* left, MDefinition* right, MIRType type,
+                     SubOpcode subOpcode)
+      : MBinaryInstruction(classOpcode, left, right), subOpcode_(subOpcode) {
+    MOZ_ASSERT(type == MIRType::Int32 || type == MIRType::Int64);
+    setResultType(type);
+    setMovable();
+    setCommutative();
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmBinaryBitwise)
+  TRIVIAL_NEW_WRAPPERS
+
+  SubOpcode subOpcode() const { return subOpcode_; }
+  MDefinition* foldsTo(TempAllocator& alloc) override;
+
+  bool congruentTo(const MDefinition* ins) const override {
+    return ins->isWasmBinaryBitwise() &&
+           ins->toWasmBinaryBitwise()->subOpcode() == subOpcode() &&
+           binaryCongruentTo(ins);
+  }
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    const char* what = "!!unknown!!";
+    switch (subOpcode()) {
+      case SubOpcode::And:
+        what = "And";
+        break;
+      case SubOpcode::Or:
+        what = "Or";
+        break;
+      case SubOpcode::Xor:
+        what = "Xor";
+        break;
+    }
+    extras->add(what);
+  }
+#endif
+
+ private:
+  SubOpcode subOpcode_;
+
+  ALLOW_CLONE(MWasmBinaryBitwise)
+};
+
+class MWasmLoadInstance : public MUnaryInstruction, public NoTypePolicy::Data {
   uint32_t offset_;
   AliasSet aliases_;
 
-  explicit MWasmLoadTls(MDefinition* tlsPointer, uint32_t offset, MIRType type,
-                        AliasSet aliases)
-      : MUnaryInstruction(classOpcode, tlsPointer),
+  explicit MWasmLoadInstance(MDefinition* instance, uint32_t offset,
+                             MIRType type, AliasSet aliases)
+      : MUnaryInstruction(classOpcode, instance),
         offset_(offset),
         aliases_(aliases) {
-    // Different Tls data have different alias classes and only those classes
-    // are allowed.
-    MOZ_ASSERT(aliases_.flags() ==
-                   AliasSet::Load(AliasSet::WasmHeapMeta).flags() ||
-               aliases_.flags() == AliasSet::None().flags());
+    // Different instance data have different alias classes and only those
+    // classes are allowed.
+    MOZ_ASSERT(
+        aliases_.flags() == AliasSet::Load(AliasSet::WasmHeapMeta).flags() ||
+        aliases_.flags() == AliasSet::Load(AliasSet::WasmTableMeta).flags() ||
+        aliases_.flags() ==
+            AliasSet::Load(AliasSet::WasmPendingException).flags() ||
+        aliases_.flags() == AliasSet::None().flags());
 
     // The only types supported at the moment.
     MOZ_ASSERT(type == MIRType::Pointer || type == MIRType::Int32 ||
-               type == MIRType::Int64);
+               type == MIRType::Int64 || type == MIRType::RefOrNull);
 
     setMovable();
     setResultType(type);
   }
 
  public:
-  INSTRUCTION_HEADER(WasmLoadTls)
+  INSTRUCTION_HEADER(WasmLoadInstance)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, tlsPtr))
+  NAMED_OPERANDS((0, instance))
 
   uint32_t offset() const { return offset_; }
 
   bool congruentTo(const MDefinition* ins) const override {
-    return op() == ins->op() && offset() == ins->toWasmLoadTls()->offset() &&
+    return op() == ins->op() &&
+           offset() == ins->toWasmLoadInstance()->offset() &&
            type() == ins->type();
   }
 
@@ -8949,11 +9395,41 @@ class MWasmLoadTls : public MUnaryInstruction, public NoTypePolicy::Data {
   AliasSet getAliasSet() const override { return aliases_; }
 };
 
+class MWasmStoreInstance : public MBinaryInstruction,
+                           public NoTypePolicy::Data {
+  uint32_t offset_;
+  AliasSet aliases_;
+
+  explicit MWasmStoreInstance(MDefinition* instance, MDefinition* value,
+                              uint32_t offset, MIRType type, AliasSet aliases)
+      : MBinaryInstruction(classOpcode, instance, value),
+        offset_(offset),
+        aliases_(aliases) {
+    // Different instance data have different alias classes and only those
+    // classes are allowed.
+    MOZ_ASSERT(aliases_.flags() ==
+               AliasSet::Store(AliasSet::WasmPendingException).flags());
+
+    // The only types supported at the moment.
+    MOZ_ASSERT(type == MIRType::Pointer || type == MIRType::Int32 ||
+               type == MIRType::Int64 || type == MIRType::RefOrNull);
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmStoreInstance)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, instance), (1, value))
+
+  uint32_t offset() const { return offset_; }
+
+  AliasSet getAliasSet() const override { return aliases_; }
+};
+
 class MWasmHeapBase : public MUnaryInstruction, public NoTypePolicy::Data {
   AliasSet aliases_;
 
-  explicit MWasmHeapBase(MDefinition* tlsPointer, AliasSet aliases)
-      : MUnaryInstruction(classOpcode, tlsPointer), aliases_(aliases) {
+  explicit MWasmHeapBase(MDefinition* instance, AliasSet aliases)
+      : MUnaryInstruction(classOpcode, instance), aliases_(aliases) {
     setMovable();
     setResultType(MIRType::Pointer);
   }
@@ -8961,7 +9437,7 @@ class MWasmHeapBase : public MUnaryInstruction, public NoTypePolicy::Data {
  public:
   INSTRUCTION_HEADER(WasmHeapBase)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, tlsPtr))
+  NAMED_OPERANDS((0, instance))
 
   bool congruentTo(const MDefinition* ins) const override {
     return ins->isWasmHeapBase();
@@ -8970,21 +9446,36 @@ class MWasmHeapBase : public MUnaryInstruction, public NoTypePolicy::Data {
   AliasSet getAliasSet() const override { return aliases_; }
 };
 
-// Bounds check nodes are of type Int32 on 32-bit systems for both wasm and
-// asm.js code, as well as on 64-bit systems for asm.js code and for wasm code
-// that is known to have a bounds check limit that fits into 32 bits.  They are
-// of type Int64 only on 64-bit systems for wasm code with 4GB (or larger)
-// heaps.  There is no way for nodes of both types to be present in the same
-// function.  Should this change, then BCE must be updated to take type into
-// account.
+// For memory32, bounds check nodes are of type Int32 on 32-bit systems for both
+// wasm and asm.js code, as well as on 64-bit systems for asm.js code and for
+// wasm code that is known to have a bounds check limit that fits into 32 bits.
+// They are of type Int64 only on 64-bit systems for wasm code with 4GB heaps.
+// There is no way for nodes of both types to be present in the same function.
+// Should this change, then BCE must be updated to take type into account.
+//
+// For memory64, bounds check nodes are always of type Int64.
 
 class MWasmBoundsCheck : public MBinaryInstruction, public NoTypePolicy::Data {
+ public:
+  enum Target {
+    // Linear memory at index zero, which is the only memory allowed so far.
+    Memory0,
+    // Everything else.  Currently comprises tables, and arrays in the GC
+    // proposal.
+    Unknown
+  };
+
+ private:
   wasm::BytecodeOffset bytecodeOffset_;
+  Target target_;
 
   explicit MWasmBoundsCheck(MDefinition* index, MDefinition* boundsCheckLimit,
-                            wasm::BytecodeOffset bytecodeOffset)
+                            wasm::BytecodeOffset bytecodeOffset, Target target)
       : MBinaryInstruction(classOpcode, index, boundsCheckLimit),
-        bytecodeOffset_(bytecodeOffset) {
+        bytecodeOffset_(bytecodeOffset),
+        target_(target) {
+    MOZ_ASSERT(index->type() == boundsCheckLimit->type());
+
     // Bounds check is effectful: it throws for OOB.
     setGuard();
 
@@ -9000,6 +9491,8 @@ class MWasmBoundsCheck : public MBinaryInstruction, public NoTypePolicy::Data {
 
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
+  bool isMemory() const { return target_ == MWasmBoundsCheck::Memory0; }
+
   bool isRedundant() const { return !isGuard(); }
 
   void setRedundant() { setNotGuard(); }
@@ -9008,16 +9501,18 @@ class MWasmBoundsCheck : public MBinaryInstruction, public NoTypePolicy::Data {
 };
 
 class MWasmAddOffset : public MUnaryInstruction, public NoTypePolicy::Data {
-  uint32_t offset_;
+  uint64_t offset_;
   wasm::BytecodeOffset bytecodeOffset_;
 
-  MWasmAddOffset(MDefinition* base, uint32_t offset,
+  MWasmAddOffset(MDefinition* base, uint64_t offset,
                  wasm::BytecodeOffset bytecodeOffset)
       : MUnaryInstruction(classOpcode, base),
         offset_(offset),
         bytecodeOffset_(bytecodeOffset) {
     setGuard();
-    setResultType(MIRType::Int32);
+    MOZ_ASSERT(base->type() == MIRType::Int32 ||
+               base->type() == MIRType::Int64);
+    setResultType(base->type());
   }
 
  public:
@@ -9029,7 +9524,7 @@ class MWasmAddOffset : public MUnaryInstruction, public NoTypePolicy::Data {
 
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
-  uint32_t offset() const { return offset_; }
+  uint64_t offset() const { return offset_; }
   wasm::BytecodeOffset bytecodeOffset() const { return bytecodeOffset_; }
 };
 
@@ -9103,6 +9598,14 @@ class MWasmLoad
     }
     return AliasSet::Load(AliasSet::WasmHeap);
   }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "(offs=%lld)", (long long int)access().offset64());
+    extras->add(buf);
+  }
+#endif
 };
 
 class MWasmStore : public MVariadicInstruction, public NoTypePolicy::Data {
@@ -9140,6 +9643,14 @@ class MWasmStore : public MVariadicInstruction, public NoTypePolicy::Data {
   AliasSet getAliasSet() const override {
     return AliasSet::Store(AliasSet::WasmHeap);
   }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "(offs=%lld)", (long long int)access().offset64());
+    extras->add(buf);
+  }
+#endif
 };
 
 class MAsmJSMemoryAccess {
@@ -9281,7 +9792,7 @@ class MWasmCompareExchangeHeap : public MVariadicInstruction,
 
  public:
   INSTRUCTION_HEADER(WasmCompareExchangeHeap)
-  NAMED_OPERANDS((0, base), (1, oldValue), (2, newValue), (3, tls),
+  NAMED_OPERANDS((0, base), (1, oldValue), (2, newValue), (3, instance),
                  (4, memoryBase))
 
   static MWasmCompareExchangeHeap* New(TempAllocator& alloc,
@@ -9290,7 +9801,7 @@ class MWasmCompareExchangeHeap : public MVariadicInstruction,
                                        MDefinition* base,
                                        const wasm::MemoryAccessDesc& access,
                                        MDefinition* oldv, MDefinition* newv,
-                                       MDefinition* tls) {
+                                       MDefinition* instance) {
     MWasmCompareExchangeHeap* cas =
         new (alloc) MWasmCompareExchangeHeap(access, bytecodeOffset);
     if (!cas->init(alloc, 4 + !!memoryBase)) {
@@ -9299,7 +9810,7 @@ class MWasmCompareExchangeHeap : public MVariadicInstruction,
     cas->initOperand(0, base);
     cas->initOperand(1, oldv);
     cas->initOperand(2, newv);
-    cas->initOperand(3, tls);
+    cas->initOperand(3, instance);
     if (memoryBase) {
       cas->initOperand(4, memoryBase);
     }
@@ -9330,14 +9841,15 @@ class MWasmAtomicExchangeHeap : public MVariadicInstruction,
 
  public:
   INSTRUCTION_HEADER(WasmAtomicExchangeHeap)
-  NAMED_OPERANDS((0, base), (1, value), (2, tls), (3, memoryBase))
+  NAMED_OPERANDS((0, base), (1, value), (2, instance), (3, memoryBase))
 
   static MWasmAtomicExchangeHeap* New(TempAllocator& alloc,
                                       wasm::BytecodeOffset bytecodeOffset,
                                       MDefinition* memoryBase,
                                       MDefinition* base,
                                       const wasm::MemoryAccessDesc& access,
-                                      MDefinition* value, MDefinition* tls) {
+                                      MDefinition* value,
+                                      MDefinition* instance) {
     MWasmAtomicExchangeHeap* xchg =
         new (alloc) MWasmAtomicExchangeHeap(access, bytecodeOffset);
     if (!xchg->init(alloc, 3 + !!memoryBase)) {
@@ -9346,7 +9858,7 @@ class MWasmAtomicExchangeHeap : public MVariadicInstruction,
 
     xchg->initOperand(0, base);
     xchg->initOperand(1, value);
-    xchg->initOperand(2, tls);
+    xchg->initOperand(2, instance);
     if (memoryBase) {
       xchg->initOperand(3, memoryBase);
     }
@@ -9381,14 +9893,14 @@ class MWasmAtomicBinopHeap : public MVariadicInstruction,
 
  public:
   INSTRUCTION_HEADER(WasmAtomicBinopHeap)
-  NAMED_OPERANDS((0, base), (1, value), (2, tls), (3, memoryBase))
+  NAMED_OPERANDS((0, base), (1, value), (2, instance), (3, memoryBase))
 
   static MWasmAtomicBinopHeap* New(TempAllocator& alloc,
                                    wasm::BytecodeOffset bytecodeOffset,
                                    AtomicOp op, MDefinition* memoryBase,
                                    MDefinition* base,
                                    const wasm::MemoryAccessDesc& access,
-                                   MDefinition* v, MDefinition* tls) {
+                                   MDefinition* v, MDefinition* instance) {
     MWasmAtomicBinopHeap* binop =
         new (alloc) MWasmAtomicBinopHeap(op, access, bytecodeOffset);
     if (!binop->init(alloc, 3 + !!memoryBase)) {
@@ -9397,7 +9909,7 @@ class MWasmAtomicBinopHeap : public MVariadicInstruction,
 
     binop->initOperand(0, base);
     binop->initOperand(1, v);
-    binop->initOperand(2, tls);
+    binop->initOperand(2, instance);
     if (memoryBase) {
       binop->initOperand(3, memoryBase);
     }
@@ -9414,11 +9926,12 @@ class MWasmAtomicBinopHeap : public MVariadicInstruction,
   }
 };
 
-class MWasmLoadGlobalVar : public MUnaryInstruction, public NoTypePolicy::Data {
-  MWasmLoadGlobalVar(MIRType type, unsigned globalDataOffset, bool isConstant,
-                     MDefinition* tlsPtr)
-      : MUnaryInstruction(classOpcode, tlsPtr),
-        globalDataOffset_(globalDataOffset),
+class MWasmLoadInstanceDataField : public MUnaryInstruction,
+                                   public NoTypePolicy::Data {
+  MWasmLoadInstanceDataField(MIRType type, unsigned instanceDataOffset,
+                             bool isConstant, MDefinition* instance)
+      : MUnaryInstruction(classOpcode, instance),
+        instanceDataOffset_(instanceDataOffset),
         isConstant_(isConstant) {
     MOZ_ASSERT(IsNumberType(type) || type == MIRType::Simd128 ||
                type == MIRType::Pointer || type == MIRType::RefOrNull);
@@ -9426,15 +9939,15 @@ class MWasmLoadGlobalVar : public MUnaryInstruction, public NoTypePolicy::Data {
     setMovable();
   }
 
-  unsigned globalDataOffset_;
+  unsigned instanceDataOffset_;
   bool isConstant_;
 
  public:
-  INSTRUCTION_HEADER(WasmLoadGlobalVar)
+  INSTRUCTION_HEADER(WasmLoadInstanceDataField)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, tlsPtr))
+  NAMED_OPERANDS((0, instance))
 
-  unsigned globalDataOffset() const { return globalDataOffset_; }
+  unsigned instanceDataOffset() const { return instanceDataOffset_; }
 
   HashNumber valueHash() const override;
   bool congruentTo(const MDefinition* ins) const override;
@@ -9442,7 +9955,7 @@ class MWasmLoadGlobalVar : public MUnaryInstruction, public NoTypePolicy::Data {
 
   AliasSet getAliasSet() const override {
     return isConstant_ ? AliasSet::None()
-                       : AliasSet::Load(AliasSet::WasmGlobalVar);
+                       : AliasSet::Load(AliasSet::WasmInstanceData);
   }
 
   AliasType mightAlias(const MDefinition* def) const override;
@@ -9472,24 +9985,43 @@ class MWasmLoadGlobalCell : public MUnaryInstruction,
   AliasType mightAlias(const MDefinition* def) const override;
 };
 
-class MWasmStoreGlobalVar : public MBinaryInstruction,
-                            public NoTypePolicy::Data {
-  MWasmStoreGlobalVar(unsigned globalDataOffset, MDefinition* value,
-                      MDefinition* tlsPtr)
-      : MBinaryInstruction(classOpcode, value, tlsPtr),
-        globalDataOffset_(globalDataOffset) {}
-
-  unsigned globalDataOffset_;
+class MWasmLoadTableElement : public MBinaryInstruction,
+                              public NoTypePolicy::Data {
+  MWasmLoadTableElement(MDefinition* elements, MDefinition* index)
+      : MBinaryInstruction(classOpcode, elements, index) {
+    setResultType(MIRType::RefOrNull);
+    setMovable();
+  }
 
  public:
-  INSTRUCTION_HEADER(WasmStoreGlobalVar)
+  INSTRUCTION_HEADER(WasmLoadTableElement)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, value), (1, tlsPtr))
-
-  unsigned globalDataOffset() const { return globalDataOffset_; }
+  NAMED_OPERANDS((0, elements))
+  NAMED_OPERANDS((1, index))
 
   AliasSet getAliasSet() const override {
-    return AliasSet::Store(AliasSet::WasmGlobalVar);
+    return AliasSet::Load(AliasSet::WasmTableElement);
+  }
+};
+
+class MWasmStoreInstanceDataField : public MBinaryInstruction,
+                                    public NoTypePolicy::Data {
+  MWasmStoreInstanceDataField(unsigned instanceDataOffset, MDefinition* value,
+                              MDefinition* instance)
+      : MBinaryInstruction(classOpcode, value, instance),
+        instanceDataOffset_(instanceDataOffset) {}
+
+  unsigned instanceDataOffset_;
+
+ public:
+  INSTRUCTION_HEADER(WasmStoreInstanceDataField)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, value), (1, instance))
+
+  unsigned instanceDataOffset() const { return instanceDataOffset_; }
+
+  AliasSet getAliasSet() const override {
+    return AliasSet::Store(AliasSet::WasmInstanceData);
   }
 };
 
@@ -9532,25 +10064,33 @@ class MWasmStoreStackResult : public MBinaryInstruction,
 // Represents a known-good derived pointer into an object or memory region (in
 // the most general sense) that will not move while the derived pointer is live.
 // The `offset` *must* be a valid offset into the object represented by `base`;
-// hence overflow in the address calculation will never be an issue.
+// hence overflow in the address calculation will never be an issue.  `offset`
+// must be representable as a 31-bit unsigned integer.
+//
+// DO NOT use this with a base value of any JS-heap-resident object type.
+// Such a value would need to be adjusted during GC, yet we have no mechanism
+// to do that.  See bug 1810090.
 
 class MWasmDerivedPointer : public MUnaryInstruction,
                             public NoTypePolicy::Data {
   MWasmDerivedPointer(MDefinition* base, size_t offset)
-      : MUnaryInstruction(classOpcode, base), offset_(offset) {
+      : MUnaryInstruction(classOpcode, base), offset_(uint32_t(offset)) {
     MOZ_ASSERT(offset <= INT32_MAX);
+    // Do not change this to allow `base` to be a GC-heap allocated type.
+    MOZ_ASSERT(base->type() == MIRType::Pointer ||
+               base->type() == TargetWordMIRType());
     setResultType(MIRType::Pointer);
     setMovable();
   }
 
-  size_t offset_;
+  uint32_t offset_;
 
  public:
   INSTRUCTION_HEADER(WasmDerivedPointer)
   TRIVIAL_NEW_WRAPPERS
   NAMED_OPERANDS((0, base))
 
-  size_t offset() const { return offset_; }
+  uint32_t offset() const { return offset_; }
 
   AliasSet getAliasSet() const override { return AliasSet::None(); }
 
@@ -9559,28 +10099,119 @@ class MWasmDerivedPointer : public MUnaryInstruction,
            ins->toWasmDerivedPointer()->offset() == offset();
   }
 
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "(offs=%lld)", (long long int)offset_);
+    extras->add(buf);
+  }
+#endif
+
   ALLOW_CLONE(MWasmDerivedPointer)
 };
 
-class MWasmStoreRef : public MAryInstruction<3>, public NoTypePolicy::Data {
-  AliasSet::Flag aliasSet_;
+// As with MWasmDerivedPointer, DO NOT use this with a base value of any
+// JS-heap-resident object type.
+class MWasmDerivedIndexPointer : public MBinaryInstruction,
+                                 public NoTypePolicy::Data {
+  MWasmDerivedIndexPointer(MDefinition* base, MDefinition* index, Scale scale)
+      : MBinaryInstruction(classOpcode, base, index), scale_(scale) {
+    // Do not change this to allow `base` to be a GC-heap allocated type.
+    MOZ_ASSERT(base->type() == MIRType::Pointer);
+    setResultType(MIRType::Pointer);
+    setMovable();
+  }
 
-  MWasmStoreRef(MDefinition* tls, MDefinition* valueAddr, MDefinition* value,
-                AliasSet::Flag aliasSet)
-      : MAryInstruction<3>(classOpcode), aliasSet_(aliasSet) {
-    MOZ_ASSERT(valueAddr->type() == MIRType::Pointer);
+  Scale scale_;
+
+ public:
+  INSTRUCTION_HEADER(WasmDerivedIndexPointer)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, base))
+  NAMED_OPERANDS((1, index))
+
+  Scale scale() const { return scale_; }
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+  bool congruentTo(const MDefinition* ins) const override {
+    return congruentIfOperandsEqual(ins) &&
+           ins->toWasmDerivedIndexPointer()->scale() == scale();
+  }
+
+  ALLOW_CLONE(MWasmDerivedIndexPointer)
+};
+
+// Whether to perform a pre-write barrier for a wasm store reference.
+enum class WasmPreBarrierKind : uint8_t { None, Normal };
+
+// Stores a reference to an address. This performs a pre-barrier on the address,
+// but not a post-barrier. A post-barrier must be performed separately, if it's
+// required.  The accessed location is `valueBase + valueOffset`.  The latter
+// must be be representable as a 31-bit unsigned integer.
+
+class MWasmStoreRef : public MAryInstruction<3>, public NoTypePolicy::Data {
+  uint32_t offset_;
+  AliasSet::Flag aliasSet_;
+  WasmPreBarrierKind preBarrierKind_;
+
+  MWasmStoreRef(MDefinition* instance, MDefinition* valueBase,
+                size_t valueOffset, MDefinition* value, AliasSet::Flag aliasSet,
+                WasmPreBarrierKind preBarrierKind)
+      : MAryInstruction<3>(classOpcode),
+        offset_(uint32_t(valueOffset)),
+        aliasSet_(aliasSet),
+        preBarrierKind_(preBarrierKind) {
+    MOZ_ASSERT(valueOffset <= INT32_MAX);
+    MOZ_ASSERT(valueBase->type() == MIRType::Pointer ||
+               valueBase->type() == MIRType::StackResults);
     MOZ_ASSERT(value->type() == MIRType::RefOrNull);
-    initOperand(0, tls);
-    initOperand(1, valueAddr);
+    initOperand(0, instance);
+    initOperand(1, valueBase);
     initOperand(2, value);
   }
 
  public:
   INSTRUCTION_HEADER(WasmStoreRef)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, tls), (1, valueAddr), (2, value))
+  NAMED_OPERANDS((0, instance), (1, valueBase), (2, value))
 
+  uint32_t offset() const { return offset_; }
   AliasSet getAliasSet() const override { return AliasSet::Store(aliasSet_); }
+  WasmPreBarrierKind preBarrierKind() const { return preBarrierKind_; }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "(offs=%lld)", (long long int)offset_);
+    extras->add(buf);
+  }
+#endif
+};
+
+// Given a value being written to another object, update the generational store
+// buffer if the value is in the nursery and object is in the tenured heap.
+class MWasmPostWriteBarrier : public MQuaternaryInstruction,
+                              public NoTypePolicy::Data {
+  uint32_t valueOffset_;
+
+  MWasmPostWriteBarrier(MDefinition* instance, MDefinition* object,
+                        MDefinition* valueBase, uint32_t valueOffset,
+                        MDefinition* value)
+      : MQuaternaryInstruction(classOpcode, instance, object, valueBase, value),
+        valueOffset_(valueOffset) {
+    setGuard();
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmPostWriteBarrier)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, instance), (1, object), (2, valueBase), (3, value))
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+  uint32_t valueOffset() const { return valueOffset_; }
+
+  ALLOW_CLONE(MWasmPostWriteBarrier)
 };
 
 class MWasmParameter : public MNullaryInstruction {
@@ -9600,27 +10231,31 @@ class MWasmParameter : public MNullaryInstruction {
 
 class MWasmReturn : public MAryControlInstruction<2, 0>,
                     public NoTypePolicy::Data {
-  MWasmReturn(MDefinition* ins, MDefinition* tls)
+  MWasmReturn(MDefinition* ins, MDefinition* instance)
       : MAryControlInstruction(classOpcode) {
     initOperand(0, ins);
-    initOperand(1, tls);
+    initOperand(1, instance);
   }
 
  public:
   INSTRUCTION_HEADER(WasmReturn)
   TRIVIAL_NEW_WRAPPERS
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
 };
 
 class MWasmReturnVoid : public MAryControlInstruction<1, 0>,
                         public NoTypePolicy::Data {
-  explicit MWasmReturnVoid(MDefinition* tls)
+  explicit MWasmReturnVoid(MDefinition* instance)
       : MAryControlInstruction(classOpcode) {
-    initOperand(0, tls);
+    initOperand(0, instance);
   }
 
  public:
   INSTRUCTION_HEADER(WasmReturnVoid)
   TRIVIAL_NEW_WRAPPERS
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
 };
 
 class MWasmStackArg : public MUnaryInstruction, public NoTypePolicy::Data {
@@ -9789,25 +10424,25 @@ class MWasmStackResult : public MUnaryInstruction, public NoTypePolicy::Data {
   }
 };
 
-class MWasmCall final : public MVariadicInstruction, public NoTypePolicy::Data {
-  wasm::CallSiteDesc desc_;
-  wasm::CalleeDesc callee_;
-  wasm::FailureMode builtinMethodFailureMode_;
-  FixedList<AnyRegister> argRegs_;
-  uint32_t stackArgAreaSizeUnaligned_;
-  ABIArg instanceArg_;
+// Arguments for constructing a catchable wasm call inside of a try block.
+struct MWasmCallTryDesc {
+  bool inTry;
+  uint32_t relativeTryDepth;
+  size_t tryNoteIndex;
+  MBasicBlock* fallthroughBlock;
+  MBasicBlock* prePadBlock;
 
-  MWasmCall(const wasm::CallSiteDesc& desc, const wasm::CalleeDesc& callee,
-            uint32_t stackArgAreaSizeUnaligned)
-      : MVariadicInstruction(classOpcode),
-        desc_(desc),
-        callee_(callee),
-        builtinMethodFailureMode_(wasm::FailureMode::Infallible),
-        stackArgAreaSizeUnaligned_(stackArgAreaSizeUnaligned) {}
+  MWasmCallTryDesc()
+      : inTry(false),
+        relativeTryDepth(0),
+        tryNoteIndex(0),
+        fallthroughBlock(nullptr),
+        prePadBlock(nullptr) {}
+};
 
+// Mixin class for wasm calls that may or may not be catchable.
+class MWasmCallBase {
  public:
-  INSTRUCTION_HEADER(WasmCall)
-
   struct Arg {
     AnyRegister reg;
     MDefinition* def;
@@ -9815,16 +10450,54 @@ class MWasmCall final : public MVariadicInstruction, public NoTypePolicy::Data {
   };
   typedef Vector<Arg, 8, SystemAllocPolicy> Args;
 
-  static MWasmCall* New(TempAllocator& alloc, const wasm::CallSiteDesc& desc,
-                        const wasm::CalleeDesc& callee, const Args& args,
-                        uint32_t stackArgAreaSizeUnaligned,
-                        MDefinition* tableIndex = nullptr);
+ protected:
+  wasm::CallSiteDesc desc_;
+  wasm::CalleeDesc callee_;
+  wasm::FailureMode builtinMethodFailureMode_;
+  FixedList<AnyRegister> argRegs_;
+  uint32_t stackArgAreaSizeUnaligned_;
+  ABIArg instanceArg_;
+  bool inTry_;
+  size_t tryNoteIndex_;
 
-  static MWasmCall* NewBuiltinInstanceMethodCall(
-      TempAllocator& alloc, const wasm::CallSiteDesc& desc,
-      const wasm::SymbolicAddress builtin, wasm::FailureMode failureMode,
-      const ABIArg& instanceArg, const Args& args,
-      uint32_t stackArgAreaSizeUnaligned);
+  MWasmCallBase(const wasm::CallSiteDesc& desc, const wasm::CalleeDesc& callee,
+                uint32_t stackArgAreaSizeUnaligned, bool inTry,
+                size_t tryNoteIndex)
+      : desc_(desc),
+        callee_(callee),
+        builtinMethodFailureMode_(wasm::FailureMode::Infallible),
+        stackArgAreaSizeUnaligned_(stackArgAreaSizeUnaligned),
+        inTry_(inTry),
+        tryNoteIndex_(tryNoteIndex) {}
+
+  template <class MVariadicT>
+  [[nodiscard]] bool initWithArgs(TempAllocator& alloc, MVariadicT* ins,
+                                  const Args& args,
+                                  MDefinition* tableIndexOrRef) {
+    if (!argRegs_.init(alloc, args.length())) {
+      return false;
+    }
+    for (size_t i = 0; i < argRegs_.length(); i++) {
+      argRegs_[i] = args[i].reg;
+    }
+
+    if (!ins->init(alloc, argRegs_.length() + (tableIndexOrRef ? 1 : 0))) {
+      return false;
+    }
+    // FixedList doesn't initialize its elements, so do an unchecked init.
+    for (size_t i = 0; i < argRegs_.length(); i++) {
+      ins->initOperand(i, args[i].def);
+    }
+    if (tableIndexOrRef) {
+      ins->initOperand(argRegs_.length(), tableIndexOrRef);
+    }
+    return true;
+  }
+
+ public:
+  static bool IsWasmCall(MDefinition* def) {
+    return def->isWasmCallCatchable() || def->isWasmCallUncatchable();
+  }
 
   size_t numArgs() const { return argRegs_.length(); }
   AnyRegister registerForArg(size_t index) const {
@@ -9841,9 +10514,99 @@ class MWasmCall final : public MVariadicInstruction, public NoTypePolicy::Data {
     return stackArgAreaSizeUnaligned_;
   }
 
+  const ABIArg& instanceArg() const { return instanceArg_; }
+
+  bool inTry() const { return inTry_; }
+  size_t tryNoteIndex() const { return tryNoteIndex_; }
+};
+
+// A wasm call that is catchable. This instruction is a control instruction,
+// and terminates the block it is on. A normal return will proceed in a the
+// fallthrough block. An exceptional return will unwind into the landing pad
+// block for this call. The landing pad block must begin with an
+// MWasmCallLandingPrePad.
+class MWasmCallCatchable final : public MVariadicControlInstruction<2>,
+                                 public MWasmCallBase,
+                                 public NoTypePolicy::Data {
+  MWasmCallCatchable(const wasm::CallSiteDesc& desc,
+                     const wasm::CalleeDesc& callee,
+                     uint32_t stackArgAreaSizeUnaligned, size_t tryNoteIndex)
+      : MVariadicControlInstruction(classOpcode),
+        MWasmCallBase(desc, callee, stackArgAreaSizeUnaligned, true,
+                      tryNoteIndex) {}
+
+ public:
+  INSTRUCTION_HEADER(WasmCallCatchable)
+
+  static MWasmCallCatchable* New(TempAllocator& alloc,
+                                 const wasm::CallSiteDesc& desc,
+                                 const wasm::CalleeDesc& callee,
+                                 const Args& args,
+                                 uint32_t stackArgAreaSizeUnaligned,
+                                 const MWasmCallTryDesc& tryDesc,
+                                 MDefinition* tableIndexOrRef = nullptr);
+
   bool possiblyCalls() const override { return true; }
 
-  const ABIArg& instanceArg() const { return instanceArg_; }
+  static const size_t FallthroughBranchIndex = 0;
+  static const size_t PrePadBranchIndex = 1;
+};
+
+// A wasm call that is not catchable. This instruction is not a control
+// instruction, and therefore is not a block terminator.
+class MWasmCallUncatchable final : public MVariadicInstruction,
+                                   public MWasmCallBase,
+                                   public NoTypePolicy::Data {
+  MWasmCallUncatchable(const wasm::CallSiteDesc& desc,
+                       const wasm::CalleeDesc& callee,
+                       uint32_t stackArgAreaSizeUnaligned)
+      : MVariadicInstruction(classOpcode),
+        MWasmCallBase(desc, callee, stackArgAreaSizeUnaligned, false, 0) {}
+
+ public:
+  INSTRUCTION_HEADER(WasmCallUncatchable)
+
+  static MWasmCallUncatchable* New(TempAllocator& alloc,
+                                   const wasm::CallSiteDesc& desc,
+                                   const wasm::CalleeDesc& callee,
+                                   const Args& args,
+                                   uint32_t stackArgAreaSizeUnaligned,
+                                   MDefinition* tableIndexOrRef = nullptr);
+
+  static MWasmCallUncatchable* NewBuiltinInstanceMethodCall(
+      TempAllocator& alloc, const wasm::CallSiteDesc& desc,
+      const wasm::SymbolicAddress builtin, wasm::FailureMode failureMode,
+      const ABIArg& instanceArg, const Args& args,
+      uint32_t stackArgAreaSizeUnaligned);
+
+  bool possiblyCalls() const override { return true; }
+};
+
+// A marker instruction for a block which is the landing pad for a catchable
+// wasm call. This instruction does not emit any code, only filling in
+// metadata. This instruction must be the first instruction added to the
+// landing pad block.
+class MWasmCallLandingPrePad : public MNullaryInstruction {
+  // The block of the call that may unwind to this landing pad.
+  MBasicBlock* callBlock_;
+  // The index of the try note to initialize a landing pad for.
+  size_t tryNoteIndex_;
+
+  explicit MWasmCallLandingPrePad(MBasicBlock* callBlock, size_t tryNoteIndex)
+      : MNullaryInstruction(classOpcode),
+        callBlock_(callBlock),
+        tryNoteIndex_(tryNoteIndex) {
+    setGuard();
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmCallLandingPrePad)
+  TRIVIAL_NEW_WRAPPERS
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+  size_t tryNoteIndex() { return tryNoteIndex_; }
+  MBasicBlock* callBlock() { return callBlock_; }
 };
 
 class MWasmSelect : public MTernaryInstruction, public NoTypePolicy::Data {
@@ -9938,20 +10701,23 @@ class MRotate : public MBinaryInstruction, public NoTypePolicy::Data {
 // Wasm SIMD.
 //
 // See comment in WasmIonCompile.cpp for a justification for these nodes.
+
 // (v128, v128, v128) -> v128 effect-free operation.
-class MWasmBitselectSimd128 : public MTernaryInstruction,
-                              public NoTypePolicy::Data {
-  MWasmBitselectSimd128(MDefinition* lhs, MDefinition* rhs,
-                        MDefinition* control)
-      : MTernaryInstruction(classOpcode, lhs, rhs, control) {
+class MWasmTernarySimd128 : public MTernaryInstruction,
+                            public NoTypePolicy::Data {
+  wasm::SimdOp simdOp_;
+
+  MWasmTernarySimd128(MDefinition* v0, MDefinition* v1, MDefinition* v2,
+                      wasm::SimdOp simdOp)
+      : MTernaryInstruction(classOpcode, v0, v1, v2), simdOp_(simdOp) {
     setMovable();
     setResultType(MIRType::Simd128);
   }
 
  public:
-  INSTRUCTION_HEADER(WasmBitselectSimd128)
+  INSTRUCTION_HEADER(WasmTernarySimd128)
   TRIVIAL_NEW_WRAPPERS
-  NAMED_OPERANDS((0, lhs), (1, rhs), (2, control))
+  NAMED_OPERANDS((0, v0), (1, v1), (2, v2))
 
   AliasSet getAliasSet() const override { return AliasSet::None(); }
   bool congruentTo(const MDefinition* ins) const override {
@@ -9960,13 +10726,19 @@ class MWasmBitselectSimd128 : public MTernaryInstruction,
 #ifdef ENABLE_WASM_SIMD
   MDefinition* foldsTo(TempAllocator& alloc) override;
 
-  // If the control mask allows the operation to be specialized as a shuffle
-  // and it is profitable to specialize it on this platform, return true and
-  // the appropriate shuffle mask.
-  bool specializeConstantMaskAsShuffle(int8_t shuffle[16]);
+  // If the control mask of a bitselect allows the operation to be specialized
+  // as a shuffle and it is profitable to specialize it on this platform, return
+  // true and the appropriate shuffle mask.
+  bool specializeBitselectConstantMaskAsShuffle(int8_t shuffle[16]);
+  // Checks if more relaxed version of lane select can be used. It returns true
+  // if a bit mask input expected to be all 0s or 1s for entire 8-bit lanes,
+  // false otherwise.
+  bool canRelaxBitselect();
 #endif
 
-  ALLOW_CLONE(MWasmBitselectSimd128)
+  wasm::SimdOp simdOp() const { return simdOp_; }
+
+  ALLOW_CLONE(MWasmTernarySimd128)
 };
 
 // (v128, v128) -> v128 effect-free operations.
@@ -9995,6 +10767,9 @@ class MWasmBinarySimd128 : public MBinaryInstruction,
   }
 #ifdef ENABLE_WASM_SIMD
   MDefinition* foldsTo(TempAllocator& alloc) override;
+
+  // Checks if pmaddubsw operation is supported.
+  bool canPmaddubsw();
 #endif
 
   wasm::SimdOp simdOp() const { return simdOp_; }
@@ -10145,6 +10920,7 @@ class MWasmLoadLaneSimd128
         laneIndex_(laneIndex),
         memoryBaseIndex_(memoryBaseIndex) {
     MOZ_ASSERT(!access_.isAtomic());
+    setGuard();
     setResultType(MIRType::Simd128);
   }
 
@@ -10205,6 +10981,7 @@ class MWasmStoreLaneSimd128 : public MVariadicInstruction,
         laneIndex_(laneIndex),
         memoryBaseIndex_(memoryBaseIndex) {
     MOZ_ASSERT(!access_.isAtomic());
+    setGuard();
     setResultType(MIRType::Simd128);
   }
 
@@ -10292,12 +11069,464 @@ class MIonToWasmCall final : public MVariadicInstruction,
   void initArg(size_t i, MDefinition* arg) { initOperand(i, arg); }
 
   WasmInstanceObject* instanceObject() const { return instanceObj_; }
+  wasm::Instance* instance() const { return &instanceObj_->instance(); }
   const wasm::FuncExport& funcExport() const { return funcExport_; }
   bool possiblyCalls() const override { return true; }
 #ifdef DEBUG
   bool isConsistentFloat32Use(MUse* use) const override;
 #endif
 };
+
+// For accesses to wasm object fields, we need to be able to describe 8- and
+// 16-bit accesses.  But MIRType can't represent those.  Hence these two
+// supplemental enums, used for reading and writing fields respectively.
+
+// Indicates how to widen an 8- or 16-bit value (when it is read from memory).
+enum class MWideningOp : uint8_t { None, FromU16, FromS16, FromU8, FromS8 };
+
+#ifdef JS_JITSPEW
+static inline const char* StringFromMWideningOp(MWideningOp op) {
+  switch (op) {
+    case MWideningOp::None:
+      return "None";
+    case MWideningOp::FromU16:
+      return "FromU16";
+    case MWideningOp::FromS16:
+      return "FromS16";
+    case MWideningOp::FromU8:
+      return "FromU8";
+    case MWideningOp::FromS8:
+      return "FromS8";
+    default:
+      break;
+  }
+  MOZ_CRASH("Unknown MWideningOp");
+}
+#endif
+
+// Indicates how to narrow a 32-bit value (when it is written to memory).  The
+// operation is a simple truncate.
+enum class MNarrowingOp : uint8_t { None, To16, To8 };
+
+#ifdef JS_JITSPEW
+static inline const char* StringFromMNarrowingOp(MNarrowingOp op) {
+  switch (op) {
+    case MNarrowingOp::None:
+      return "None";
+    case MNarrowingOp::To16:
+      return "To16";
+    case MNarrowingOp::To8:
+      return "To8";
+    default:
+      break;
+  }
+  MOZ_CRASH("Unknown MNarrowingOp");
+}
+#endif
+
+// Provide information about potential trap at the instruction machine code,
+// e.g. null pointer dereference.
+struct TrapSiteInfo {
+  wasm::BytecodeOffset offset;
+  explicit TrapSiteInfo(wasm::BytecodeOffset offset_) : offset(offset_) {}
+};
+
+typedef mozilla::Maybe<TrapSiteInfo> MaybeTrapSiteInfo;
+
+// Load an object field stored at a fixed offset from a base pointer.  This
+// field may be any value type, including references.  No barriers are
+// performed.  The offset must be representable as a 31-bit unsigned integer.
+class MWasmLoadField : public MUnaryInstruction, public NoTypePolicy::Data {
+  uint32_t offset_;
+  MWideningOp wideningOp_;
+  AliasSet aliases_;
+  MaybeTrapSiteInfo maybeTrap_;
+
+  MWasmLoadField(MDefinition* obj, uint32_t offset, MIRType type,
+                 MWideningOp wideningOp, AliasSet aliases,
+                 MaybeTrapSiteInfo maybeTrap = mozilla::Nothing())
+      : MUnaryInstruction(classOpcode, obj),
+        offset_(uint32_t(offset)),
+        wideningOp_(wideningOp),
+        aliases_(aliases),
+        maybeTrap_(maybeTrap) {
+    MOZ_ASSERT(offset <= INT32_MAX);
+    // "if you want to widen the value when it is loaded, the destination type
+    // must be Int32".
+    MOZ_ASSERT_IF(wideningOp != MWideningOp::None, type == MIRType::Int32);
+    MOZ_ASSERT(
+        aliases.flags() ==
+            AliasSet::Load(AliasSet::WasmStructOutlineDataPointer).flags() ||
+        aliases.flags() ==
+            AliasSet::Load(AliasSet::WasmArrayNumElements).flags() ||
+        aliases.flags() ==
+            AliasSet::Load(AliasSet::WasmArrayDataPointer).flags() ||
+        aliases.flags() == AliasSet::Load(AliasSet::Any).flags());
+    setResultType(type);
+    if (maybeTrap_) {
+      setGuard();
+    }
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmLoadField)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, obj))
+
+  uint32_t offset() const { return offset_; }
+  MWideningOp wideningOp() const { return wideningOp_; }
+  AliasSet getAliasSet() const override { return aliases_; }
+  MaybeTrapSiteInfo maybeTrap() const { return maybeTrap_; }
+
+  bool congruentTo(const MDefinition* ins) const override {
+    // In the limited case where this insn is used to read
+    // WasmStructObject::outlineData_ (the field itself, not what it points
+    // at), we allow commoning up to happen.  This is OK because
+    // WasmStructObject::outlineData_ is readonly for the life of the
+    // WasmStructObject.
+    if (!ins->isWasmLoadField()) {
+      return false;
+    }
+    const MWasmLoadField* other = ins->toWasmLoadField();
+    return ins->isWasmLoadField() && congruentIfOperandsEqual(ins) &&
+           offset() == other->offset() && wideningOp() == other->wideningOp() &&
+           getAliasSet().flags() == other->getAliasSet().flags() &&
+           getAliasSet().flags() ==
+               AliasSet::Load(AliasSet::WasmStructOutlineDataPointer).flags();
+  }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[96];
+    SprintfLiteral(buf, "(offs=%lld, wideningOp=%s)", (long long int)offset_,
+                   StringFromMWideningOp(wideningOp_));
+    extras->add(buf);
+  }
+#endif
+};
+
+// Loads a value from a location, denoted as a fixed offset from a base
+// pointer, which (it is assumed) is within a wasm object.  This field may be
+// any value type, including references.  No barriers are performed.
+//
+// This instruction takes a pointer to a second object `ka`, which it is
+// necessary to keep alive.  It is expected that `ka` holds a reference to
+// `obj`, but this is not enforced and no code is generated to access `ka`.
+// This instruction extends the lifetime of `ka` so that it, and hence `obj`,
+// cannot be collected while `obj` is live.  This is necessary if `obj` does
+// not point to a GC-managed object.  `offset` must be representable as a
+// 31-bit unsigned integer.
+class MWasmLoadFieldKA : public MBinaryInstruction, public NoTypePolicy::Data {
+  uint32_t offset_;
+  MWideningOp wideningOp_;
+  AliasSet aliases_;
+  MaybeTrapSiteInfo maybeTrap_;
+
+  MWasmLoadFieldKA(MDefinition* ka, MDefinition* obj, size_t offset,
+                   MIRType type, MWideningOp wideningOp, AliasSet aliases,
+                   MaybeTrapSiteInfo maybeTrap = mozilla::Nothing())
+      : MBinaryInstruction(classOpcode, ka, obj),
+        offset_(uint32_t(offset)),
+        wideningOp_(wideningOp),
+        aliases_(aliases),
+        maybeTrap_(maybeTrap) {
+    MOZ_ASSERT(offset <= INT32_MAX);
+    MOZ_ASSERT_IF(wideningOp != MWideningOp::None, type == MIRType::Int32);
+    MOZ_ASSERT(
+        aliases.flags() ==
+            AliasSet::Load(AliasSet::WasmStructInlineDataArea).flags() ||
+        aliases.flags() ==
+            AliasSet::Load(AliasSet::WasmStructOutlineDataArea).flags() ||
+        aliases.flags() ==
+            AliasSet::Load(AliasSet::WasmArrayDataArea).flags() ||
+        aliases.flags() == AliasSet::Load(AliasSet::Any).flags());
+    setResultType(type);
+    if (maybeTrap_) {
+      setGuard();
+    }
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmLoadFieldKA)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, ka), (1, obj))
+
+  uint32_t offset() const { return offset_; }
+  MWideningOp wideningOp() const { return wideningOp_; }
+  AliasSet getAliasSet() const override { return aliases_; }
+  MaybeTrapSiteInfo maybeTrap() const { return maybeTrap_; }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[96];
+    SprintfLiteral(buf, "(offs=%lld, wideningOp=%s)", (long long int)offset_,
+                   StringFromMWideningOp(wideningOp_));
+    extras->add(buf);
+  }
+#endif
+};
+
+// Stores a non-reference value to anlocation, denoted as a fixed offset from
+// a base pointer, which (it is assumed) is within a wasm object.  This field
+// may be any value type, _excluding_ references.  References _must_ use the
+// 'Ref' variant of this instruction.  The offset must be representable as a
+// 31-bit unsigned integer.
+//
+// This instruction takes a second object `ka` that must be kept alive, as
+// described for MWasmLoadFieldKA above.
+class MWasmStoreFieldKA : public MTernaryInstruction,
+                          public NoTypePolicy::Data {
+  uint32_t offset_;
+  MNarrowingOp narrowingOp_;
+  AliasSet aliases_;
+  MaybeTrapSiteInfo maybeTrap_;
+
+  MWasmStoreFieldKA(MDefinition* ka, MDefinition* obj, size_t offset,
+                    MDefinition* value, MNarrowingOp narrowingOp,
+                    AliasSet aliases,
+                    MaybeTrapSiteInfo maybeTrap = mozilla::Nothing())
+      : MTernaryInstruction(classOpcode, ka, obj, value),
+        offset_(uint32_t(offset)),
+        narrowingOp_(narrowingOp),
+        aliases_(aliases),
+        maybeTrap_(maybeTrap) {
+    MOZ_ASSERT(offset <= INT32_MAX);
+    MOZ_ASSERT(value->type() != MIRType::RefOrNull);
+    // "if you want to narrow the value when it is stored, the source type
+    // must be Int32".
+    MOZ_ASSERT_IF(narrowingOp != MNarrowingOp::None,
+                  value->type() == MIRType::Int32);
+    MOZ_ASSERT(
+        aliases.flags() ==
+            AliasSet::Store(AliasSet::WasmStructInlineDataArea).flags() ||
+        aliases.flags() ==
+            AliasSet::Store(AliasSet::WasmStructOutlineDataArea).flags() ||
+        aliases.flags() ==
+            AliasSet::Store(AliasSet::WasmArrayDataArea).flags() ||
+        aliases.flags() == AliasSet::Store(AliasSet::Any).flags());
+    if (maybeTrap_) {
+      setGuard();
+    }
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmStoreFieldKA)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, ka), (1, obj), (2, value))
+
+  uint32_t offset() const { return offset_; }
+  MNarrowingOp narrowingOp() const { return narrowingOp_; }
+  AliasSet getAliasSet() const override { return aliases_; }
+  MaybeTrapSiteInfo maybeTrap() const { return maybeTrap_; }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[96];
+    SprintfLiteral(buf, "(offs=%lld, narrowingOp=%s)", (long long int)offset_,
+                   StringFromMNarrowingOp(narrowingOp_));
+    extras->add(buf);
+  }
+#endif
+};
+
+// Stores a reference value to a location, denoted as a fixed offset from a
+// base pointer, which (it is assumed) is within a wasm object.  This
+// instruction emits a pre-barrier.  A post barrier _must_ be performed
+// separately.  The offset must be representable as a 31-bit unsigned integer.
+//
+// This instruction takes a second object `ka` that must be kept alive, as
+// described for MWasmLoadFieldKA above.
+class MWasmStoreFieldRefKA : public MAryInstruction<4>,
+                             public NoTypePolicy::Data {
+  uint32_t offset_;
+  AliasSet aliases_;
+  MaybeTrapSiteInfo maybeTrap_;
+  WasmPreBarrierKind preBarrierKind_;
+
+  MWasmStoreFieldRefKA(MDefinition* instance, MDefinition* ka, MDefinition* obj,
+                       size_t offset, MDefinition* value, AliasSet aliases,
+                       MaybeTrapSiteInfo maybeTrap,
+                       WasmPreBarrierKind preBarrierKind)
+      : MAryInstruction<4>(classOpcode),
+        offset_(uint32_t(offset)),
+        aliases_(aliases),
+        maybeTrap_(maybeTrap),
+        preBarrierKind_(preBarrierKind) {
+    MOZ_ASSERT(obj->type() == TargetWordMIRType() ||
+               obj->type() == MIRType::Pointer ||
+               obj->type() == MIRType::RefOrNull);
+    MOZ_ASSERT(offset <= INT32_MAX);
+    MOZ_ASSERT(value->type() == MIRType::RefOrNull);
+    MOZ_ASSERT(
+        aliases.flags() ==
+            AliasSet::Store(AliasSet::WasmStructInlineDataArea).flags() ||
+        aliases.flags() ==
+            AliasSet::Store(AliasSet::WasmStructOutlineDataArea).flags() ||
+        aliases.flags() ==
+            AliasSet::Store(AliasSet::WasmArrayDataArea).flags() ||
+        aliases.flags() == AliasSet::Store(AliasSet::Any).flags());
+    initOperand(0, instance);
+    initOperand(1, ka);
+    initOperand(2, obj);
+    initOperand(3, value);
+    if (maybeTrap_) {
+      setGuard();
+    }
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmStoreFieldRefKA)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, instance), (1, ka), (2, obj), (3, value))
+
+  uint32_t offset() const { return offset_; }
+  AliasSet getAliasSet() const override { return aliases_; }
+  MaybeTrapSiteInfo maybeTrap() const { return maybeTrap_; }
+  WasmPreBarrierKind preBarrierKind() const { return preBarrierKind_; }
+
+#ifdef JS_JITSPEW
+  void getExtras(ExtrasCollector* extras) override {
+    char buf[64];
+    SprintfLiteral(buf, "(offs=%lld)", (long long int)offset_);
+    extras->add(buf);
+  }
+#endif
+};
+
+class MWasmGcObjectIsSubtypeOfAbstract : public MUnaryInstruction,
+                                         public NoTypePolicy::Data {
+  wasm::RefType sourceType_;
+  wasm::RefType destType_;
+
+  MWasmGcObjectIsSubtypeOfAbstract(MDefinition* object,
+                                   wasm::RefType sourceType,
+                                   wasm::RefType destType)
+      : MUnaryInstruction(classOpcode, object),
+        sourceType_(sourceType),
+        destType_(destType) {
+    MOZ_ASSERT(!destType.isTypeRef());
+    setResultType(MIRType::Int32);
+    setMovable();
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmGcObjectIsSubtypeOfAbstract)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, object))
+
+  wasm::RefType sourceType() const { return sourceType_; };
+  wasm::RefType destType() const { return destType_; };
+
+  bool congruentTo(const MDefinition* ins) const override {
+    return congruentIfOperandsEqual(ins) &&
+           sourceType() ==
+               ins->toWasmGcObjectIsSubtypeOfAbstract()->sourceType() &&
+           destType() == ins->toWasmGcObjectIsSubtypeOfAbstract()->destType();
+  }
+
+  HashNumber valueHash() const override {
+    HashNumber hn = MUnaryInstruction::valueHash();
+    hn = addU64ToHash(hn, sourceType().packed().bits());
+    hn = addU64ToHash(hn, destType().packed().bits());
+    return hn;
+  }
+
+  MDefinition* foldsTo(TempAllocator& alloc) override;
+};
+
+// Tests if the WasmGcObject, `object`, is a subtype of `superSuperTypeVector`.
+// The actual super type definition must be known at compile time, so that the
+// subtyping depth of super type depth can be used.
+class MWasmGcObjectIsSubtypeOfConcrete : public MBinaryInstruction,
+                                         public NoTypePolicy::Data {
+  wasm::RefType sourceType_;
+  wasm::RefType destType_;
+
+  MWasmGcObjectIsSubtypeOfConcrete(MDefinition* object,
+                                   MDefinition* superSuperTypeVector,
+                                   wasm::RefType sourceType,
+                                   wasm::RefType destType)
+      : MBinaryInstruction(classOpcode, object, superSuperTypeVector),
+        sourceType_(sourceType),
+        destType_(destType) {
+    MOZ_ASSERT(destType.isTypeRef());
+    setResultType(MIRType::Int32);
+    setMovable();
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmGcObjectIsSubtypeOfConcrete)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, object), (1, superSuperTypeVector))
+
+  wasm::RefType sourceType() const { return sourceType_; };
+  wasm::RefType destType() const { return destType_; };
+
+  bool congruentTo(const MDefinition* ins) const override {
+    return congruentIfOperandsEqual(ins) &&
+           sourceType() ==
+               ins->toWasmGcObjectIsSubtypeOfConcrete()->sourceType() &&
+           destType() == ins->toWasmGcObjectIsSubtypeOfConcrete()->destType();
+  }
+
+  HashNumber valueHash() const override {
+    HashNumber hn = MBinaryInstruction::valueHash();
+    hn = addU64ToHash(hn, sourceType().packed().bits());
+    hn = addU64ToHash(hn, destType().packed().bits());
+    return hn;
+  }
+
+  MDefinition* foldsTo(TempAllocator& alloc) override;
+};
+
+#ifdef FUZZING_JS_FUZZILLI
+class MFuzzilliHash : public MUnaryInstruction, public NoTypePolicy::Data {
+  explicit MFuzzilliHash(MDefinition* obj)
+      : MUnaryInstruction(classOpcode, obj) {
+    setResultType(MIRType::Int32);
+    setMovable();
+  }
+
+ public:
+  INSTRUCTION_HEADER(FuzzilliHash);
+  TRIVIAL_NEW_WRAPPERS
+  ALLOW_CLONE(MFuzzilliHash)
+
+#  ifdef DEBUG
+  bool isConsistentFloat32Use(MUse* use) const override { return true; }
+#  endif
+
+  AliasSet getAliasSet() const override {
+    MDefinition* obj = getOperand(0);
+    if (obj->type() == MIRType::Object || obj->type() == MIRType::Value) {
+      return AliasSet::Load(AliasSet::ObjectFields | AliasSet::FixedSlot |
+                            AliasSet::DynamicSlot | AliasSet::Element |
+                            AliasSet::UnboxedElement);
+    }
+    return AliasSet::None();
+  }
+};
+
+class MFuzzilliHashStore : public MUnaryInstruction, public NoTypePolicy::Data {
+  explicit MFuzzilliHashStore(MDefinition* obj)
+      : MUnaryInstruction(classOpcode, obj) {
+    MOZ_ASSERT(obj->type() == MIRType::Int32);
+
+    setResultType(MIRType::None);
+  }
+
+ public:
+  INSTRUCTION_HEADER(FuzzilliHashStore);
+  TRIVIAL_NEW_WRAPPERS
+  ALLOW_CLONE(MFuzzilliHashStore)
+
+  // this is a store and hence effectful, however no other load can
+  // alias with the store
+  AliasSet getAliasSet() const override {
+    return AliasSet::Store(AliasSet::FuzzilliHash);
+  }
+};
+#endif
 
 #undef INSTRUCTION_HEADER
 
@@ -10371,48 +11600,14 @@ MConstant* MDefinition::maybeConstantValue() {
   return nullptr;
 }
 
-// Helper functions used to decide how to build MIR.
-
-inline MIRType MIRTypeForArrayBufferViewRead(Scalar::Type arrayType,
-                                             bool observedDouble) {
-  switch (arrayType) {
-    case Scalar::Int8:
-    case Scalar::Uint8:
-    case Scalar::Uint8Clamped:
-    case Scalar::Int16:
-    case Scalar::Uint16:
-    case Scalar::Int32:
-      return MIRType::Int32;
-    case Scalar::Uint32:
-      return observedDouble ? MIRType::Double : MIRType::Int32;
-    case Scalar::Float32:
-      return MIRType::Float32;
-    case Scalar::Float64:
-      return MIRType::Double;
-    case Scalar::BigInt64:
-    case Scalar::BigUint64:
-      return MIRType::BigInt;
-    default:
-      break;
-  }
-  MOZ_CRASH("Unknown typed array type");
-}
+#ifdef ENABLE_WASM_SIMD
+MWasmShuffleSimd128* BuildWasmShuffleSimd128(TempAllocator& alloc,
+                                             const int8_t* control,
+                                             MDefinition* lhs,
+                                             MDefinition* rhs);
+#endif  // ENABLE_WASM_SIMD
 
 }  // namespace jit
 }  // namespace js
-
-// Specialize the AlignmentFinder class to make Result<V, E> works with abstract
-// classes such as MDefinition*, and MInstruction*
-namespace mozilla {
-
-template <>
-class AlignmentFinder<js::jit::MDefinition>
-    : public AlignmentFinder<js::jit::MStart> {};
-
-template <>
-class AlignmentFinder<js::jit::MInstruction>
-    : public AlignmentFinder<js::jit::MStart> {};
-
-}  // namespace mozilla
 
 #endif /* jit_MIR_h */

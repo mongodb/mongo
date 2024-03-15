@@ -71,8 +71,6 @@ class ScriptedProxyHandler : public BaseProxyHandler {
   virtual bool nativeCall(JSContext* cx, JS::IsAcceptableThis test,
                           JS::NativeImpl impl,
                           const JS::CallArgs& args) const override;
-  virtual bool hasInstance(JSContext* cx, JS::HandleObject proxy,
-                           JS::MutableHandleValue v, bool* bp) const override;
   virtual bool getBuiltinClass(JSContext* cx, JS::HandleObject proxy,
                                ESClass* cls) const override;
   virtual bool isArray(JSContext* cx, JS::HandleObject proxy,

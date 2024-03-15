@@ -23,7 +23,6 @@ static const uint32_t WasmTrapInstructionLength = 0;
 
 // See comments in wasm::GenerateFunctionPrologue.
 static constexpr uint32_t WasmCheckedCallEntryOffset = 0u;
-static constexpr uint32_t WasmCheckedTailEntryOffset = 1u;
 
 class Registers {
  public:
@@ -69,6 +68,7 @@ class FloatRegisters {
   typedef FPRegisterID Code;
   typedef FPRegisterID Encoding;
   union RegisterContent {
+    float s;
     double d;
   };
 

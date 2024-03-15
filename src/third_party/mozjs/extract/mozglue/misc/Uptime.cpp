@@ -11,7 +11,6 @@
 #endif  // XP_WIN
 
 #include <stdint.h>
-#include <inttypes.h>
 
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Maybe.h"
@@ -76,7 +75,7 @@ Maybe<uint64_t> NowIncludingSuspendMs() {
   return Some(interrupt_time / kHNSperMS);
 }
 
-#elif defined(XP_LINUX)  // including Android
+#elif defined(XP_UNIX)  // including BSDs and Android
 #  include <time.h>
 
 // Number of nanoseconds in a millisecond.
@@ -89,7 +88,11 @@ uint64_t TimespecToMilliseconds(struct timespec aTs) {
 Maybe<uint64_t> NowExcludingSuspendMs() {
   struct timespec ts = {0};
 
+#  ifdef XP_OPENBSD
+  if (clock_gettime(CLOCK_UPTIME, &ts)) {
+#  else
   if (clock_gettime(CLOCK_MONOTONIC, &ts)) {
+#  endif
     return Nothing();
   }
   return Some(TimespecToMilliseconds(ts));

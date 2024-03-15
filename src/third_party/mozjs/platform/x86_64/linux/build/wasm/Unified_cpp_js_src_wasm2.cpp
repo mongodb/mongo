@@ -1,4 +1,22 @@
 #define MOZ_UNIFIED_BUILD
+#include "wasm/WasmGC.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "wasm/WasmGC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "wasm/WasmGC.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "wasm/WasmGcObject.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "wasm/WasmGcObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "wasm/WasmGcObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "wasm/WasmGenerator.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "wasm/WasmGenerator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -26,30 +44,12 @@
 #error "wasm/WasmInstance.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "wasm/WasmIonCompile.cpp"
+#include "wasm/WasmIntrinsic.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmIonCompile.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "wasm/WasmIntrinsic.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "wasm/WasmIonCompile.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "wasm/WasmJS.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmJS.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "wasm/WasmJS.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "wasm/WasmModule.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "wasm/WasmModule.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "wasm/WasmModule.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "wasm/WasmIntrinsic.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

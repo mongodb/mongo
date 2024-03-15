@@ -12,25 +12,13 @@
 namespace js {
 namespace gc {
 
-struct ClearEdgesTracer final : public GenericTracer {
+struct ClearEdgesTracer final : public GenericTracerImpl<ClearEdgesTracer> {
   explicit ClearEdgesTracer(JSRuntime* rt);
-  ClearEdgesTracer();
 
+ private:
   template <typename T>
-  inline T* onEdge(T* thing);
-
-  JSObject* onObjectEdge(JSObject* obj) override;
-  JSString* onStringEdge(JSString* str) override;
-  JS::Symbol* onSymbolEdge(JS::Symbol* sym) override;
-  JS::BigInt* onBigIntEdge(JS::BigInt* bi) override;
-  js::BaseScript* onScriptEdge(js::BaseScript* script) override;
-  js::Shape* onShapeEdge(js::Shape* shape) override;
-  js::BaseShape* onBaseShapeEdge(js::BaseShape* base) override;
-  js::GetterSetter* onGetterSetterEdge(js::GetterSetter* gs) override;
-  js::PropMap* onPropMapEdge(js::PropMap* map) override;
-  js::jit::JitCode* onJitCodeEdge(js::jit::JitCode* code) override;
-  js::Scope* onScopeEdge(js::Scope* scope) override;
-  js::RegExpShared* onRegExpSharedEdge(js::RegExpShared* shared) override;
+  void onEdge(T** thingp, const char* name);
+  friend class GenericTracerImpl<ClearEdgesTracer>;
 };
 
 }  // namespace gc

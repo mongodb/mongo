@@ -52,7 +52,8 @@ void setEncryptedDBClientCallbacks(EncryptedDBClientCallback* encCallback,
  * info type with common code and differentiate with varying constructors.
  */
 struct MongoBase : public BaseInfo {
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    enum Slots { DBClientSlot, MongoBaseSlotCount };
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
     static void trace(JSTracer* trc, JSObject* obj);
 
     struct Functions {
@@ -87,7 +88,7 @@ struct MongoBase : public BaseInfo {
     static const JSFunctionSpec methods[24];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(MongoBaseSlotCount);
 };
 
 /**

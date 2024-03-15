@@ -1,0 +1,10 @@
+[package]
+name = "gluesmith"
+version = "0.1.0"
+authors = ["Christian Holler"]
+license = "MPL-2.0"
+
+[dependencies]
+wasm-smith = "0.12.5"
+arbitrary = { version = "1.0.0", features = ["derive"] }
+libc = "0.2"

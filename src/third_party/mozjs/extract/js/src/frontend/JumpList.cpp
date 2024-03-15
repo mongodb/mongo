@@ -8,8 +8,6 @@
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
 
-#include <stddef.h>  // ptrdiff_t
-
 #include "vm/BytecodeUtil.h"  // GET_JUMP_OFFSET, SET_JUMP_OFFSET, IsJumpOpcode
 
 using namespace js;

@@ -35,6 +35,7 @@
 //
 // - jemalloc specific functions:
 //   - jemalloc_stats
+//   - jemalloc_stats_num_bins
 //   - jemalloc_purge_freed_pages
 //   - jemalloc_free_dirty_pages
 //   - jemalloc_thread_local_arena

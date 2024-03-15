@@ -25,7 +25,7 @@
 #include "jsfriendapi.h"
 #include "jstypes.h"
 
-#include "gc/Rooting.h"
+#include "frontend/FrontendContext.h"  // AutoReportFrontendContext
 #include "js/CharacterEncoding.h"
 #include "js/Class.h"
 #include "js/Conversions.h"
@@ -34,7 +34,9 @@
 #include "js/experimental/TypedData.h"  // JS_IsArrayBufferViewObject
 #include "js/friend/ErrorMessages.h"  // JSErrNum, js::GetErrorMessage, JSMSG_*
 #include "js/Object.h"                // JS::GetBuiltinClass
+#include "js/PropertyAndElement.h"    // JS_GetProperty, JS_HasProperty
 #include "js/SavedFrameAPI.h"
+#include "js/Stack.h"
 #include "js/UniquePtr.h"
 #include "js/Value.h"
 #include "js/Warnings.h"  // JS::{,Set}WarningReporter
@@ -56,6 +58,7 @@
 #include "vm/StringType.h"
 #include "vm/SymbolType.h"
 #include "vm/WellKnownAtom.h"  // js_*_str
+#include "wasm/WasmJS.h"       // WasmExceptionObject
 
 #include "vm/Compartment-inl.h"
 #include "vm/ErrorObject-inl.h"
@@ -264,12 +267,18 @@ JSErrorReport* js::ErrorFromException(JSContext* cx, HandleObject objArg) {
 }
 
 JS_PUBLIC_API JSObject* JS::ExceptionStackOrNull(HandleObject objArg) {
-  ErrorObject* obj = objArg->maybeUnwrapIf<ErrorObject>();
-  if (!obj) {
-    return nullptr;
+  ErrorObject* errorObject = objArg->maybeUnwrapIf<ErrorObject>();
+  if (errorObject) {
+    return errorObject->stack();
   }
 
-  return obj->stack();
+  WasmExceptionObject* wasmObject =
+      objArg->maybeUnwrapIf<WasmExceptionObject>();
+  if (wasmObject) {
+    return wasmObject->stack();
+  }
+
+  return nullptr;
 }
 
 JS_PUBLIC_API JSLinearString* js::GetErrorTypeName(JSContext* cx,
@@ -286,17 +295,9 @@ JS_PUBLIC_API JSLinearString* js::GetErrorTypeName(JSContext* cx,
   return ClassName(key, cx);
 }
 
-void js::ErrorToException(JSContext* cx, JSErrorReport* reportp,
+bool js::ErrorToException(JSContext* cx, JSErrorReport* reportp,
                           JSErrorCallback callback, void* userRef) {
   MOZ_ASSERT(!reportp->isWarning());
-
-  // We cannot throw a proper object inside the self-hosting realm, as we
-  // cannot construct the Error constructor without self-hosted code. Just
-  // print the error to stderr to help debugging.
-  if (cx->realm()->isSelfHostingRealm()) {
-    JS::PrintError(stderr, reportp, true);
-    return;
-  }
 
   // Find the exception index associated with this error.
   JSErrNum errorNumber = static_cast<JSErrNum>(reportp->errorNumber);
@@ -310,7 +311,7 @@ void js::ErrorToException(JSContext* cx, JSErrorReport* reportp,
 
   // Prevent infinite recursion.
   if (cx->generatingError) {
-    return;
+    return false;
   }
 
   cx->generatingError = true;
@@ -319,12 +320,18 @@ void js::ErrorToException(JSContext* cx, JSErrorReport* reportp,
   // Create an exception object.
   RootedString messageStr(cx, reportp->newMessageString(cx));
   if (!messageStr) {
-    return;
+    return false;
   }
 
-  RootedString fileName(cx, JS_NewStringCopyZ(cx, reportp->filename));
-  if (!fileName) {
-    return;
+  Rooted<JSString*> fileName(cx);
+  if (const char* filename = reportp->filename) {
+    fileName =
+        JS_NewStringCopyUTF8N(cx, JS::UTF8Chars(filename, strlen(filename)));
+    if (!fileName) {
+      return false;
+    }
+  } else {
+    fileName = cx->emptyString();
   }
 
   uint32_t sourceId = reportp->sourceId;
@@ -336,28 +343,29 @@ void js::ErrorToException(JSContext* cx, JSErrorReport* reportp,
 
   RootedObject stack(cx);
   if (!CaptureStack(cx, &stack)) {
-    return;
+    return false;
   }
 
   UniquePtr<JSErrorReport> report = CopyErrorReport(cx, reportp);
   if (!report) {
-    return;
+    return false;
   }
 
   ErrorObject* errObject =
       ErrorObject::create(cx, exnType, stack, fileName, sourceId, lineNumber,
                           columnNumber, std::move(report), messageStr, cause);
   if (!errObject) {
-    return;
+    return false;
   }
 
   // Throw it.
   RootedValue errValue(cx, ObjectValue(*errObject));
-  RootedSavedFrame nstack(cx);
+  Rooted<SavedFrame*> nstack(cx);
   if (stack) {
     nstack = &stack->as<SavedFrame>();
   }
   cx->setPendingException(errValue, nstack);
+  return true;
 }
 
 using SniffingBehavior = JS::ErrorReportBuilder::SniffingBehavior;
@@ -398,7 +406,7 @@ static bool IsDuckTypedErrorObject(JSContext* cx, HandleObject exnObject,
 
 static bool GetPropertyNoException(JSContext* cx, HandleObject obj,
                                    SniffingBehavior behavior,
-                                   HandlePropertyName name,
+                                   Handle<PropertyName*> name,
                                    MutableHandleValue vp) {
   // This function has no side-effects so always use it.
   if (GetPropertyPure(cx, obj, NameToId(name), vp.address())) {
@@ -653,7 +661,7 @@ bool JS::ErrorReportBuilder::populateUncaughtExceptionReportUTF8VA(
   ownedReport.errorNumber = JSMSG_UNCAUGHT_EXCEPTION;
 
   bool skippedAsync;
-  RootedSavedFrame frame(
+  Rooted<SavedFrame*> frame(
       cx, UnwrapSavedFrame(cx, cx->realm()->principals(), stack,
                            SavedFrameSelfHosted::Exclude, skippedAsync));
   if (frame) {
@@ -684,7 +692,8 @@ bool JS::ErrorReportBuilder::populateUncaughtExceptionReportUTF8VA(
     }
   }
 
-  if (!ExpandErrorArgumentsVA(cx, GetErrorMessage, nullptr,
+  AutoReportFrontendContext fc(cx);
+  if (!ExpandErrorArgumentsVA(&fc, GetErrorMessage, nullptr,
                               JSMSG_UNCAUGHT_EXCEPTION, ArgumentsAreUTF8,
                               &ownedReport, ap)) {
     return false;
@@ -716,6 +725,11 @@ JSObject* js::CopyErrorObject(JSContext* cx, Handle<ErrorObject*> err) {
   if (!cx->compartment()->wrap(cx, &stack)) {
     return nullptr;
   }
+  if (stack && JS_IsDeadWrapper(stack)) {
+    // ErrorObject::create expects |stack| to be either nullptr or a (possibly
+    // wrapped) SavedFrame instance.
+    stack = nullptr;
+  }
   Rooted<mozilla::Maybe<Value>> cause(cx, mozilla::Nothing());
   if (auto maybeCause = err->getCause()) {
     RootedValue errorCause(cx, maybeCause.value());
@@ -739,6 +753,7 @@ JS_PUBLIC_API bool JS::CreateError(JSContext* cx, JSExnType type,
                                    HandleObject stack, HandleString fileName,
                                    uint32_t lineNumber, uint32_t columnNumber,
                                    JSErrorReport* report, HandleString message,
+                                   Handle<mozilla::Maybe<Value>> cause,
                                    MutableHandleValue rval) {
   cx->check(stack, fileName, message);
   AssertObjectIsSavedFrameOrWrapper(cx, stack);
@@ -750,10 +765,6 @@ JS_PUBLIC_API bool JS::CreateError(JSContext* cx, JSExnType type,
       return false;
     }
   }
-
-  // The public API doesn't (yet) support a |cause| argument, so we default to
-  // |Nothing()| here.
-  auto cause = JS::NothingHandleValue;
 
   JSObject* obj =
       js::ErrorObject::create(cx, type, stack, fileName, 0, lineNumber,
@@ -784,8 +795,8 @@ const char* js::ValueToSourceForError(JSContext* cx, HandleValue val,
   }
 
   JSStringBuilder sb(cx);
-  if (val.isObject()) {
-    RootedObject valObj(cx, val.toObjectOrNull());
+  if (val.hasObjectPayload()) {
+    RootedObject valObj(cx, &val.getObjectPayload());
     ESClass cls;
     if (!JS::GetBuiltinClass(cx, valObj, &cls)) {
       return "<<error determining class of value>>";
@@ -797,6 +808,12 @@ const char* js::ValueToSourceForError(JSContext* cx, HandleValue val,
       s = "the array buffer ";
     } else if (JS_IsArrayBufferViewObject(valObj)) {
       s = "the typed array ";
+#ifdef ENABLE_RECORD_TUPLE
+    } else if (cls == ESClass::Record) {
+      s = "the record ";
+    } else if (cls == ESClass::Tuple) {
+      s = "the tuple ";
+#endif
     } else {
       s = "the object ";
     }
@@ -853,4 +870,12 @@ bool js::GetAggregateError(JSContext* cx, unsigned errorNumber,
   args[0].set(Int32Value(errorNumber));
   return CallSelfHostedFunction(cx, cx->names().GetAggregateError,
                                 NullHandleValue, args, error);
+}
+
+JS_PUBLIC_API mozilla::Maybe<Value> JS::GetExceptionCause(JSObject* exc) {
+  if (!exc->is<ErrorObject>()) {
+    return mozilla::Nothing();
+  }
+  auto& error = exc->as<ErrorObject>();
+  return error.getCause();
 }

@@ -12,37 +12,12 @@
 #include "mozilla/Assertions.h"
 
 #include <cmath>
+#include <algorithm>
 #include <limits.h>
 #include <stdint.h>
 #include <type_traits>
 
 namespace mozilla {
-
-// Greatest Common Divisor
-template <typename IntegerType>
-MOZ_ALWAYS_INLINE IntegerType EuclidGCD(IntegerType aA, IntegerType aB) {
-  // Euclid's algorithm; O(N) in the worst case.  (There are better
-  // ways, but we don't need them for the current use of this algo.)
-  MOZ_ASSERT(aA > IntegerType(0));
-  MOZ_ASSERT(aB > IntegerType(0));
-
-  while (aA != aB) {
-    if (aA > aB) {
-      aA = aA - aB;
-    } else {
-      aB = aB - aA;
-    }
-  }
-
-  return aA;
-}
-
-// Least Common Multiple
-template <typename IntegerType>
-MOZ_ALWAYS_INLINE IntegerType EuclidLCM(IntegerType aA, IntegerType aB) {
-  // Divide first to reduce overflow risk.
-  return (aA / EuclidGCD(aA, aB)) * aB;
-}
 
 namespace detail {
 
@@ -198,14 +173,6 @@ inline uint_fast8_t CountTrailingZeroes64(uint64_t aValue) {
 }
 
 #elif defined(__clang__) || defined(__GNUC__)
-
-#  if defined(__clang__)
-#    if !__has_builtin(__builtin_ctz) || !__has_builtin(__builtin_clz)
-#      error "A clang providing __builtin_c[lt]z is required to build"
-#    endif
-#  else
-// gcc has had __builtin_clz and friends since 3.4: no need to check.
-#  endif
 
 inline uint_fast8_t CountLeadingZeroes32(uint32_t aValue) {
   return static_cast<uint_fast8_t>(__builtin_clz(aValue));
@@ -375,7 +342,7 @@ class FloorLog2<T, 8> {
  * FloorLog2(8..15) is 3; and so on.
  */
 template <typename T>
-inline uint_fast8_t FloorLog2(const T aValue) {
+inline constexpr uint_fast8_t FloorLog2(const T aValue) {
   return detail::FloorLog2<T>::compute(aValue);
 }
 
@@ -451,6 +418,65 @@ inline T Clamp(const T aValue, const T aMin, const T aMax) {
   if (aValue <= aMin) return aMin;
   if (aValue >= aMax) return aMax;
   return aValue;
+}
+
+template <typename T>
+inline uint_fast8_t CountTrailingZeroes(T aValue) {
+  static_assert(sizeof(T) <= 8);
+  static_assert(std::is_integral_v<T>);
+  // This casts to 32-bits
+  if constexpr (sizeof(T) <= 4) {
+    return CountTrailingZeroes32(aValue);
+  }
+  // This doesn't
+  if constexpr (sizeof(T) == 8) {
+    return CountTrailingZeroes64(aValue);
+  }
+}
+
+// Greatest Common Divisor, from
+// https://en.wikipedia.org/wiki/Binary_GCD_algorithm#Implementation
+template <typename T>
+MOZ_ALWAYS_INLINE T GCD(T aA, T aB) {
+  static_assert(std::is_integral_v<T>);
+
+  MOZ_ASSERT(aA >= 0);
+  MOZ_ASSERT(aB >= 0);
+
+  if (aA == 0) {
+    return aB;
+  }
+  if (aB == 0) {
+    return aA;
+  }
+
+  T az = CountTrailingZeroes(aA);
+  T bz = CountTrailingZeroes(aB);
+  T shift = std::min<T>(az, bz);
+  aA >>= az;
+  aB >>= bz;
+
+  while (aA != 0) {
+    if constexpr (!std::is_signed_v<T>) {
+      if (aA < aB) {
+        std::swap(aA, aB);
+      }
+    }
+    T diff = aA - aB;
+    if constexpr (std::is_signed_v<T>) {
+      aB = std::min<T>(aA, aB);
+    }
+    if constexpr (std::is_signed_v<T>) {
+      aA = std::abs(diff);
+    } else {
+      aA = diff;
+    }
+    if (aA) {
+      aA >>= CountTrailingZeroes(aA);
+    }
+  }
+
+  return aB << shift;
 }
 
 } /* namespace mozilla */

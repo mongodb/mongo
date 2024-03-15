@@ -8,7 +8,6 @@
 #define frontend_ParseNode_h
 
 #include "mozilla/Assertions.h"
-#include "mozilla/Span.h"  // mozilla::Span
 
 #include <iterator>
 #include <stddef.h>
@@ -21,11 +20,10 @@
 #include "frontend/ParserAtom.h"          // TaggedParserAtomIndex
 #include "frontend/Stencil.h"             // BigIntStencil
 #include "frontend/Token.h"
-#include "js/RootingAPI.h"
-#include "vm/BytecodeUtil.h"
+#include "js/TypeDecls.h"
+#include "vm/Opcodes.h"
 #include "vm/Scope.h"
 #include "vm/ScopeKind.h"
-#include "vm/StringType.h"
 
 // [SMDOC] ParseNode tree lifetime information
 //
@@ -45,21 +43,17 @@
 
 struct JSContext;
 
-namespace JS {
-class BigInt;
-}
-
 namespace js {
 
-class GenericPrinter;
+class JS_PUBLIC_API GenericPrinter;
 class LifoAlloc;
 class RegExpObject;
 
 namespace frontend {
 
+class ParserAtomsTable;
 class ParserBase;
 class ParseContext;
-class ParserAtomsTable;
 struct ExtensibleCompilationStencil;
 class ParserSharedBase;
 class FullParseHandler;
@@ -112,6 +106,8 @@ class FunctionBox;
   F(NullExpr, NullLiteral)                                       \
   F(RawUndefinedExpr, RawUndefinedLiteral)                       \
   F(ThisExpr, UnaryNode)                                         \
+  IF_RECORD_TUPLE(F(RecordExpr, ListNode))                       \
+  IF_RECORD_TUPLE(F(TupleExpr, ListNode))                        \
   F(Function, FunctionNode)                                      \
   F(Module, ModuleNode)                                          \
   F(IfStmt, TernaryNode)                                         \
@@ -122,11 +118,12 @@ class FunctionBox;
   F(ForStmt, ForNode)                                            \
   F(BreakStmt, BreakStatement)                                   \
   F(ContinueStmt, ContinueStatement)                             \
-  F(VarStmt, ListNode)                                           \
-  F(ConstDecl, ListNode)                                         \
+  F(VarStmt, DeclarationListNode)                                \
+  F(ConstDecl, DeclarationListNode)                              \
   F(WithStmt, BinaryNode)                                        \
   F(ReturnStmt, UnaryNode)                                       \
   F(NewExpr, BinaryNode)                                         \
+  IF_DECORATORS(F(DecoratorList, ListNode))                      \
   /* Delete operations.  These must be sequential. */            \
   F(DeleteNameExpr, UnaryNode)                                   \
   F(DeletePropExpr, UnaryNode)                                   \
@@ -142,11 +139,14 @@ class FunctionBox;
   F(YieldExpr, UnaryNode)                                        \
   F(YieldStarExpr, UnaryNode)                                    \
   F(LexicalScope, LexicalScopeNode)                              \
-  F(LetDecl, ListNode)                                           \
+  F(LetDecl, DeclarationListNode)                                \
   F(ImportDecl, BinaryNode)                                      \
   F(ImportSpecList, ListNode)                                    \
   F(ImportSpec, BinaryNode)                                      \
   F(ImportNamespaceSpec, UnaryNode)                              \
+  F(ImportAssertionList, ListNode)                               \
+  F(ImportAssertion, BinaryNode)                                 \
+  F(ImportModuleRequest, BinaryNode)                             \
   F(ExportStmt, UnaryNode)                                       \
   F(ExportFromStmt, BinaryNode)                                  \
   F(ExportDefaultStmt, BinaryNode)                               \
@@ -157,7 +157,7 @@ class FunctionBox;
   F(ForIn, TernaryNode)                                          \
   F(ForOf, TernaryNode)                                          \
   F(ForHead, TernaryNode)                                        \
-  F(ParamsBody, ListNode)                                        \
+  F(ParamsBody, ParamsBodyNode)                                  \
   F(Spread, UnaryNode)                                           \
   F(MutateProto, UnaryNode)                                      \
   F(ClassDecl, ClassNode)                                        \
@@ -168,13 +168,14 @@ class FunctionBox;
   F(ClassField, ClassField)                                      \
   F(ClassMemberList, ListNode)                                   \
   F(ClassNames, ClassNames)                                      \
-  F(NewTargetExpr, BinaryNode)                                   \
+  F(NewTargetExpr, NewTargetNode)                                \
   F(PosHolder, NullaryNode)                                      \
   F(SuperBase, UnaryNode)                                        \
   F(SuperCallExpr, BinaryNode)                                   \
   F(SetThis, BinaryNode)                                         \
   F(ImportMetaExpr, BinaryNode)                                  \
   F(CallImportExpr, BinaryNode)                                  \
+  F(CallImportSpec, BinaryNode)                                  \
   F(InitExpr, BinaryNode)                                        \
                                                                  \
   /* Unary operators. */                                         \
@@ -276,8 +277,7 @@ inline bool IsTypeofKind(ParseNodeKind kind) {
  * <Definitions>
  * Function (FunctionNode)
  *   funbox: ptr to js::FunctionBox
- *   body: ParamsBody or null for lazily-parsed function, ordinarily;
- *         ParseNodeKind::LexicalScope for implicit function in genexpr
+ *   body: ParamsBody or null for lazily-parsed function
  *   syntaxKind: the syntax of the function
  * ParamsBody (ListNode)
  *   head: list of formal parameters with
@@ -288,9 +288,8 @@ inline bool IsTypeofKind(ParseNodeKind kind) {
  *               expr: Array or Object for BindingPattern without
  *                     Initializer, Assign for BindingPattern with
  *                     Initializer
- *         followed by either:
- *           * StatementList node for function body statements
- *           * ReturnStmt for expression closure
+ *         followed by:
+ *           * LexicalScopeNode
  *   count: number of formal parameters + 1
  * Spread (UnaryNode)
  *   kid: expression being spread
@@ -377,7 +376,7 @@ inline bool IsTypeofKind(ParseNodeKind kind) {
  * WithStmt (BinaryNode)
  *   left: head expr
  *   right: body
- * VarStmt, LetDecl, ConstDecl (ListNode)
+ * VarStmt, LetDecl, ConstDecl (DeclarationListNode)
  *   head: list of N Name or AssignExpr nodes
  *         each name node has either
  *           atom: variable name
@@ -469,6 +468,12 @@ inline bool IsTypeofKind(ParseNodeKind kind) {
  * NewExpr (BinaryNode)
  *   left: ctor expression on the left of the '('
  *   right: Arguments
+ * DecoratorList (ListNode)
+ *   head: list of N nodes, each item is one of:
+ *           * NameNode (DecoratorMemberExpression)
+ *           * CallNode (DecoratorCallExpression)
+ *           * Node (DecoratorParenthesizedExpression)
+ *   count: N > 0
  * DeleteNameExpr, DeletePropExpr, DeleteElemExpr, DeleteExpr (UnaryNode)
  *   kid: expression that's evaluated, then the overall delete evaluates to
  *        true; can't be a kind for a more-specific ParseNodeKind::Delete*
@@ -620,8 +625,11 @@ inline bool IsTypeofKind(ParseNodeKind kind) {
   MACRO(PrivateMemberAccess, PrivateMemberAccessType, asPrivateMemberAccess) \
   MACRO(OptionalPrivateMemberAccess, OptionalPrivateMemberAccessType,        \
         asOptionalPrivateMemberAccess)                                       \
+  MACRO(NewTargetNode, NewTargetNodeType, asNewTargetNode)                   \
   MACRO(SwitchStatement, SwitchStatementType, asSwitchStatement)             \
+  MACRO(DeclarationListNode, DeclarationListNodeType, asDeclarationList)     \
                                                                              \
+  MACRO(ParamsBodyNode, ParamsBodyNodeType, asParamsBody)                    \
   MACRO(FunctionNode, FunctionNodeType, asFunction)                          \
   MACRO(ModuleNode, ModuleNodeType, asModule)                                \
                                                                              \
@@ -810,9 +818,6 @@ class ParseNode {
            isKind(ParseNodeKind::RawUndefinedExpr);
   }
 
-  // True iff this is a for-in/of loop variable declaration (var/let/const).
-  inline bool isForLoopDeclaration() const;
-
   inline bool isConstant();
 
   template <class NodeType>
@@ -836,9 +841,10 @@ class ParseNode {
 #ifdef DEBUG
   // Debugger-friendly stderr printer.
   void dump();
-  void dump(ParserBase* parser);
-  void dump(ParserBase* parser, GenericPrinter& out);
-  void dump(ParserBase* parser, GenericPrinter& out, int indent);
+  void dump(const ParserAtomsTable* parserAtoms);
+  void dump(const ParserAtomsTable* parserAtoms, GenericPrinter& out);
+  void dump(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+            int indent);
 
   // The size of this node, in bytes.
   size_t size() const { return sizeTable[getKindAsIndex()]; }
@@ -875,7 +881,8 @@ class NullaryNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 };
 
@@ -902,7 +909,8 @@ class NameNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   TaggedParserAtomIndex atom() const { return atom_; }
@@ -952,7 +960,8 @@ class UnaryNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   ParseNode* kid() const { return kid_; }
@@ -1030,7 +1039,8 @@ class BinaryNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   ParseNode* left() const { return left_; }
@@ -1048,7 +1058,9 @@ class AssignmentNode : public BinaryNode {
  public:
   AssignmentNode(ParseNodeKind kind, ParseNode* left, ParseNode* right)
       : BinaryNode(kind, TokenPos(left->pn_pos.begin, right->pn_pos.end), left,
-                   right) {}
+                   right) {
+    MOZ_ASSERT(is<AssignmentNode>());
+  }
 
   static bool test(const ParseNode& node) {
     ParseNodeKind kind = node.getKind();
@@ -1136,7 +1148,8 @@ class TernaryNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   ParseNode* kid1() const { return kid1_; }
@@ -1182,8 +1195,12 @@ class ListNode : public ParseNode {
   static constexpr uint32_t emittedTopLevelFunctionDeclarationsBit = Bit(2);
 
  public:
-  ListNode(ParseNodeKind kind, const TokenPos& pos) : ParseNode(kind, pos) {
-    makeEmpty();
+  ListNode(ParseNodeKind kind, const TokenPos& pos)
+      : ParseNode(kind, pos),
+        head_(nullptr),
+        tail_(&head_),
+        count_(0),
+        xflags(0) {
     MOZ_ASSERT(is<ListNode>());
   }
 
@@ -1226,7 +1243,8 @@ class ListNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   ParseNode* head() const { return head_; }
@@ -1239,8 +1257,7 @@ class ListNode : public ParseNode {
 
   void checkConsistency() const
 #ifndef DEBUG
-  {
-  }
+      {}
 #endif
   ;
 
@@ -1274,13 +1291,17 @@ class ListNode : public ParseNode {
 
   void setHasNonConstInitializer() {
     MOZ_ASSERT(isKind(ParseNodeKind::ArrayExpr) ||
-               isKind(ParseNodeKind::ObjectExpr));
+               isKind(ParseNodeKind::ObjectExpr) ||
+               IF_RECORD_TUPLE(isKind(ParseNodeKind::TupleExpr), false) ||
+               IF_RECORD_TUPLE(isKind(ParseNodeKind::RecordExpr), false));
     xflags |= hasNonConstInitializerBit;
   }
 
   void unsetHasNonConstInitializer() {
     MOZ_ASSERT(isKind(ParseNodeKind::ArrayExpr) ||
-               isKind(ParseNodeKind::ObjectExpr));
+               isKind(ParseNodeKind::ObjectExpr) ||
+               IF_RECORD_TUPLE(isKind(ParseNodeKind::TupleExpr), false) ||
+               IF_RECORD_TUPLE(isKind(ParseNodeKind::RecordExpr), false));
     xflags &= ~hasNonConstInitializerBit;
   }
 
@@ -1323,13 +1344,6 @@ class ListNode : public ParseNode {
     tail_ = &node->pn_next;
   }
 
-  void makeEmpty() {
-    head_ = nullptr;
-    tail_ = &head_;
-    count_ = 0;
-    xflags = 0;
-  }
-
   void append(ParseNode* item) {
     MOZ_ASSERT(item->pn_pos.begin >= pn_pos.begin);
     pn_pos.end = item->pn_pos.end;
@@ -1345,11 +1359,6 @@ class ListNode : public ParseNode {
       tail_ = &item->pn_next;
     }
     count_++;
-  }
-
-  void prependAndUpdatePos(ParseNode* item) {
-    prepend(item);
-    pn_pos.begin = item->pn_pos.begin;
   }
 
   // Methods used by FoldConstants.cpp.
@@ -1465,15 +1474,50 @@ class ListNode : public ParseNode {
   }
 };
 
-inline bool ParseNode::isForLoopDeclaration() const {
-  if (isKind(ParseNodeKind::VarStmt) || isKind(ParseNodeKind::LetDecl) ||
-      isKind(ParseNodeKind::ConstDecl)) {
-    MOZ_ASSERT(!as<ListNode>().empty());
-    return true;
+class DeclarationListNode : public ListNode {
+ public:
+  DeclarationListNode(ParseNodeKind kind, const TokenPos& pos)
+      : ListNode(kind, pos) {
+    MOZ_ASSERT(is<DeclarationListNode>());
   }
 
-  return false;
-}
+  static bool test(const ParseNode& node) {
+    bool match = node.isKind(ParseNodeKind::VarStmt) ||
+                 node.isKind(ParseNodeKind::LetDecl) ||
+                 node.isKind(ParseNodeKind::ConstDecl);
+    MOZ_ASSERT_IF(match, node.is<ListNode>());
+    return match;
+  }
+
+  auto* singleBinding() const {
+    MOZ_ASSERT(count() == 1);
+    return head();
+  }
+};
+
+class ParamsBodyNode : public ListNode {
+ public:
+  explicit ParamsBodyNode(const TokenPos& pos)
+      : ListNode(ParseNodeKind::ParamsBody, pos) {
+    MOZ_ASSERT(is<ParamsBodyNode>());
+  }
+
+  static bool test(const ParseNode& node) {
+    bool match = node.isKind(ParseNodeKind::ParamsBody);
+    MOZ_ASSERT_IF(match, node.is<ListNode>());
+    return match;
+  }
+
+  auto parameters() const {
+    MOZ_ASSERT(last()->is<LexicalScopeNode>());
+    return contentsTo(last());
+  }
+
+  auto* body() const {
+    MOZ_ASSERT(last()->is<LexicalScopeNode>());
+    return &last()->as<LexicalScopeNode>();
+  }
+};
 
 class FunctionNode : public ParseNode {
   FunctionBox* funbox_;
@@ -1504,21 +1548,25 @@ class FunctionNode : public ParseNode {
       if (!visitor.visit(body_)) {
         return false;
       }
+      MOZ_ASSERT(body_->is<ParamsBodyNode>());
     }
     return true;
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   FunctionBox* funbox() const { return funbox_; }
 
-  ListNode* body() const { return body_ ? &body_->as<ListNode>() : nullptr; }
+  ParamsBodyNode* body() const {
+    return body_ ? &body_->as<ParamsBodyNode>() : nullptr;
+  }
 
   void setFunbox(FunctionBox* funbox) { funbox_ = funbox; }
 
-  void setBody(ListNode* body) { body_ = body; }
+  void setBody(ParamsBodyNode* body) { body_ = body; }
 
   FunctionSyntaxKind syntaxKind() const { return syntaxKind_; }
 
@@ -1549,7 +1597,8 @@ class ModuleNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   ListNode* body() const { return &body_->as<ListNode>(); }
@@ -1579,19 +1628,16 @@ class NumericLiteral : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   double value() const { return value_; }
 
   DecimalPoint decimalPoint() const { return decimalPoint_; }
 
-  void setValue(double v) { value_ = v; }
-
-  void setDecimalPoint(DecimalPoint d) { decimalPoint_ = d; }
-
   // Return the decimal string representation of this numeric literal.
-  TaggedParserAtomIndex toAtom(JSContext* cx,
+  TaggedParserAtomIndex toAtom(FrontendContext* fc,
                                ParserAtomsTable& parserAtoms) const;
 };
 
@@ -1617,7 +1663,8 @@ class BigIntLiteral : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   BigIntIndex index() { return index_; }
@@ -1650,7 +1697,8 @@ class BaseScopeNode : public ParseNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   ParserData* scopeBindings() const {
@@ -1718,7 +1766,8 @@ class LabeledStatement : public NameNode {
   }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 };
 
@@ -1761,7 +1810,8 @@ class LoopControlStatement : public ParseNode {
   TaggedParserAtomIndex label() const { return label_; }
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   static bool test(const ParseNode& node) {
@@ -1926,12 +1976,14 @@ class RegExpLiteral : public ParseNode {
       : ParseNode(ParseNodeKind::RegExpExpr, pos), index_(dataIndex) {}
 
   // Create a RegExp object of this RegExp literal.
-  RegExpObject* create(JSContext* cx, ParserAtomsTable& parserAtoms,
+  RegExpObject* create(JSContext* cx, FrontendContext* fc,
+                       ParserAtomsTable& parserAtoms,
                        CompilationAtomCache& atomCache,
                        ExtensibleCompilationStencil& stencil) const;
 
 #ifdef DEBUG
-  void dumpImpl(ParserBase* parser, GenericPrinter& out, int indent);
+  void dumpImpl(const ParserAtomsTable* parserAtoms, GenericPrinter& out,
+                int indent);
 #endif
 
   static bool test(const ParseNode& node) {
@@ -2119,6 +2171,24 @@ class OptionalPrivateMemberAccess : public PrivateMemberAccessBase {
   }
 };
 
+class NewTargetNode : public TernaryNode {
+ public:
+  NewTargetNode(NullaryNode* newHolder, NullaryNode* targetHolder,
+                NameNode* newTargetName)
+      : TernaryNode(ParseNodeKind::NewTargetExpr, newHolder, targetHolder,
+                    newTargetName) {}
+
+  static bool test(const ParseNode& node) {
+    bool match = node.isKind(ParseNodeKind::NewTargetExpr);
+    MOZ_ASSERT_IF(match, node.is<TernaryNode>());
+    return match;
+  }
+
+  auto* newHolder() const { return &kid1()->as<NullaryNode>(); }
+  auto* targetHolder() const { return &kid2()->as<NullaryNode>(); }
+  auto* newTargetName() const { return &kid3()->as<NameNode>(); }
+};
+
 /*
  * A CallSiteNode represents the implicit call site object argument in a
  * TaggedTemplate.
@@ -2173,6 +2243,10 @@ class ClassMethod : public BinaryNode {
   AccessorType accessorType_;
   FunctionNode* initializerIfPrivate_;
 
+#ifdef ENABLE_DECORATORS
+  ListNode* decorators_;
+#endif
+
  public:
   /*
    * Method definitions often keep a name and function body that overlap,
@@ -2180,12 +2254,22 @@ class ClassMethod : public BinaryNode {
    */
   ClassMethod(ParseNodeKind kind, ParseNode* name, ParseNode* body,
               AccessorType accessorType, bool isStatic,
-              FunctionNode* initializerIfPrivate)
+              FunctionNode* initializerIfPrivate
+#ifdef ENABLE_DECORATORS
+              ,
+              ListNode* decorators
+#endif
+              )
       : BinaryNode(kind, TokenPos(name->pn_pos.begin, body->pn_pos.end), name,
                    body),
         isStatic_(isStatic),
         accessorType_(accessorType),
-        initializerIfPrivate_(initializerIfPrivate) {
+        initializerIfPrivate_(initializerIfPrivate)
+#ifdef ENABLE_DECORATORS
+        ,
+        decorators_(decorators)
+#endif
+  {
     MOZ_ASSERT(kind == ParseNodeKind::DefaultConstructor ||
                kind == ParseNodeKind::ClassMethod);
   }
@@ -2206,16 +2290,36 @@ class ClassMethod : public BinaryNode {
   AccessorType accessorType() const { return accessorType_; }
 
   FunctionNode* initializerIfPrivate() const { return initializerIfPrivate_; }
+
+#ifdef ENABLE_DECORATORS
+  ListNode* decorators() const { return decorators_; }
+#endif
 };
 
 class ClassField : public BinaryNode {
   bool isStatic_;
+#ifdef ENABLE_DECORATORS
+  bool hasAccessor_;
+  ListNode* decorators_;
+#endif
 
  public:
-  ClassField(ParseNode* name, ParseNode* initializer, bool isStatic)
+  ClassField(ParseNode* name, ParseNode* initializer, bool isStatic
+#ifdef ENABLE_DECORATORS
+             ,
+             ListNode* decorators, bool hasAccessor
+#endif
+             )
       : BinaryNode(ParseNodeKind::ClassField, initializer->pn_pos, name,
                    initializer),
-        isStatic_(isStatic) {}
+        isStatic_(isStatic)
+#ifdef ENABLE_DECORATORS
+        ,
+        hasAccessor_(hasAccessor),
+        decorators_(decorators)
+#endif
+  {
+  }
 
   static bool test(const ParseNode& node) {
     bool match = node.isKind(ParseNodeKind::ClassField);
@@ -2228,6 +2332,11 @@ class ClassField : public BinaryNode {
   FunctionNode* initializer() const { return &right()->as<FunctionNode>(); }
 
   bool isStatic() const { return isStatic_; }
+
+#ifdef ENABLE_DECORATORS
+  ListNode* decorators() const { return decorators_; }
+  bool hasAccessor() const { return hasAccessor_; }
+#endif
 };
 
 // Hold onto the function generated for a class static block like
@@ -2355,11 +2464,23 @@ class ClassNode : public TernaryNode {
     return &innerScope()->scopeBody()->as<ClassBodyScopeNode>();
   }
 
+#ifdef ENABLE_DECORATORS
+  ListNode* decorators_;
+#endif
+
  public:
   ClassNode(ParseNode* names, ParseNode* heritage,
-            LexicalScopeNode* memberBlock, const TokenPos& pos)
-      : TernaryNode(ParseNodeKind::ClassDecl, names, heritage, memberBlock,
-                    pos) {
+            LexicalScopeNode* memberBlock,
+#ifdef ENABLE_DECORATORS
+            ListNode* decorators,
+#endif
+            const TokenPos& pos)
+      : TernaryNode(ParseNodeKind::ClassDecl, names, heritage, memberBlock, pos)
+#ifdef ENABLE_DECORATORS
+        ,
+        decorators_(decorators)
+#endif
+  {
     MOZ_ASSERT(innerScope()->scopeBody()->is<ClassBodyScopeNode>());
     MOZ_ASSERT_IF(names, names->is<ClassNames>());
   }
@@ -2387,6 +2508,9 @@ class ClassNode : public TernaryNode {
     ClassBodyScopeNode* scope = bodyScope();
     return scope->isEmptyScope() ? nullptr : scope;
   }
+#ifdef ENABLE_DECORATORS
+  ListNode* decorators() const { return decorators_; }
+#endif
 };
 
 #ifdef DEBUG
@@ -2396,13 +2520,13 @@ void DumpParseTree(ParserBase* parser, ParseNode* pn, GenericPrinter& out,
 
 class ParseNodeAllocator {
  public:
-  explicit ParseNodeAllocator(JSContext* cx, LifoAlloc& alloc)
-      : cx(cx), alloc(alloc) {}
+  explicit ParseNodeAllocator(FrontendContext* fc, LifoAlloc& alloc)
+      : fc(fc), alloc(alloc) {}
 
   void* allocNode(size_t size);
 
  private:
-  JSContext* cx;
+  FrontendContext* fc;
   LifoAlloc& alloc;
 };
 
@@ -2422,20 +2546,6 @@ inline bool ParseNode::isConstant() {
     default:
       return false;
   }
-}
-
-static inline ParseNode* FunctionFormalParametersList(ParseNode* fn,
-                                                      unsigned* numFormals) {
-  MOZ_ASSERT(fn->isKind(ParseNodeKind::Function));
-  ListNode* argsBody = fn->as<FunctionNode>().body();
-  MOZ_ASSERT(argsBody->isKind(ParseNodeKind::ParamsBody));
-  *numFormals = argsBody->count();
-  if (*numFormals > 0 && argsBody->last()->is<LexicalScopeNode>() &&
-      argsBody->last()->as<LexicalScopeNode>().scopeBody()->isKind(
-          ParseNodeKind::StatementList)) {
-    (*numFormals)--;
-  }
-  return argsBody->head();
 }
 
 bool IsAnonymousFunctionDefinition(ParseNode* pn);

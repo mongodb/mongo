@@ -7,14 +7,21 @@
 #ifndef builtin_TestingUtility_h
 #define builtin_TestingUtility_h
 
-#include "js/CompileOptions.h"  // JS::CompileOptions
-#include "js/RootingAPI.h"      // JS::Handle, JS::MutableHandle
-#include "js/Utility.h"         // JS::UniqueChars
+#include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle
+#include "js/Utility.h"     // JS::UniqueChars
 
 struct JSContext;
 class JSObject;
+class JSString;
+
+namespace JS {
+class JS_PUBLIC_API CompileOptions;
+}
 
 namespace js {
+
+class FrontendContext;
+class ScriptSource;
 
 // Populate `options` fields from `opt` object.
 //
@@ -33,6 +40,24 @@ namespace js {
                                        JS::CompileOptions& options,
                                        JS::Handle<JSObject*> opts,
                                        JS::UniqueChars* fileNameBytes);
+
+[[nodiscard]] bool ParseSourceOptions(
+    JSContext* cx, JS::Handle<JSObject*> opts,
+    JS::MutableHandle<JSString*> displayURL,
+    JS::MutableHandle<JSString*> sourceMapURL);
+
+[[nodiscard]] bool SetSourceOptions(JSContext* cx, FrontendContext* fc,
+                                    ScriptSource* source,
+                                    JS::Handle<JSString*> displayURL,
+                                    JS::Handle<JSString*> sourceMapURL);
+
+JSObject* CreateScriptPrivate(JSContext* cx,
+                              JS::Handle<JSString*> path = nullptr);
+
+[[nodiscard]] bool ParseDebugMetadata(
+    JSContext* cx, JS::Handle<JSObject*> opts,
+    JS::MutableHandle<JS::Value> privateValue,
+    JS::MutableHandle<JSString*> elementAttributeName);
 
 } /* namespace js */
 

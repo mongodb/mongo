@@ -33,7 +33,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-inline void printf_stderr(const char* fmt, ...) MOZ_FORMAT_PRINTF(1, 2) {
+void printf_stderr(const char* fmt, ...) MOZ_FORMAT_PRINTF(1, 2);
+inline void printf_stderr(const char* fmt, ...) {
 #if defined(XP_WIN)
   if (IsDebuggerPresent()) {
     char buf[2048];

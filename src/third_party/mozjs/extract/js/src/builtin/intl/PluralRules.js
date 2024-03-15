@@ -8,82 +8,103 @@
  * Spec: ECMAScript 402 API, PluralRules, 13.3.3.
  */
 var pluralRulesInternalProperties = {
-    localeData: pluralRulesLocaleData,
-    relevantExtensionKeys: [],
+  localeData: pluralRulesLocaleData,
+  relevantExtensionKeys: [],
 };
 
 function pluralRulesLocaleData() {
-    // PluralRules don't support any extension keys.
-    return {};
+  // PluralRules don't support any extension keys.
+  return {};
 }
 
 /**
  * Compute an internal properties object from |lazyPluralRulesData|.
  */
 function resolvePluralRulesInternals(lazyPluralRulesData) {
-    assert(IsObject(lazyPluralRulesData), "lazy data not an object?");
+  assert(IsObject(lazyPluralRulesData), "lazy data not an object?");
 
-    var internalProps = std_Object_create(null);
+  var internalProps = std_Object_create(null);
 
-    var PluralRules = pluralRulesInternalProperties;
+  var PluralRules = pluralRulesInternalProperties;
 
-    // Compute effective locale.
+  // Compute effective locale.
 
-    // Step 10.
-    var localeData = PluralRules.localeData;
+  // Step 10.
+  var localeData = PluralRules.localeData;
 
-    // Step 11.
-    const r = ResolveLocale("PluralRules",
-                            lazyPluralRulesData.requestedLocales,
-                            lazyPluralRulesData.opt,
-                            PluralRules.relevantExtensionKeys,
-                            localeData);
+  // Step 11.
+  const r = ResolveLocale(
+    "PluralRules",
+    lazyPluralRulesData.requestedLocales,
+    lazyPluralRulesData.opt,
+    PluralRules.relevantExtensionKeys,
+    localeData
+  );
 
-    // Step 12.
-    internalProps.locale = r.locale;
+  // Step 12.
+  internalProps.locale = r.locale;
 
-    // Step 8.
-    internalProps.type = lazyPluralRulesData.type;
+  // Step 8.
+  internalProps.type = lazyPluralRulesData.type;
 
-    // Step 9.
-    internalProps.minimumIntegerDigits = lazyPluralRulesData.minimumIntegerDigits;
+  // Step 9.
+  internalProps.minimumIntegerDigits = lazyPluralRulesData.minimumIntegerDigits;
 
-    if ("minimumFractionDigits" in lazyPluralRulesData) {
-        assert("maximumFractionDigits" in lazyPluralRulesData, "min/max frac digits mismatch");
-        internalProps.minimumFractionDigits = lazyPluralRulesData.minimumFractionDigits;
-        internalProps.maximumFractionDigits = lazyPluralRulesData.maximumFractionDigits;
-    }
+  if ("minimumFractionDigits" in lazyPluralRulesData) {
+    assert(
+      "maximumFractionDigits" in lazyPluralRulesData,
+      "min/max frac digits mismatch"
+    );
+    internalProps.minimumFractionDigits =
+      lazyPluralRulesData.minimumFractionDigits;
+    internalProps.maximumFractionDigits =
+      lazyPluralRulesData.maximumFractionDigits;
+  }
 
-    if ("minimumSignificantDigits" in lazyPluralRulesData) {
-        assert("maximumSignificantDigits" in lazyPluralRulesData, "min/max sig digits mismatch");
-        internalProps.minimumSignificantDigits = lazyPluralRulesData.minimumSignificantDigits;
-        internalProps.maximumSignificantDigits = lazyPluralRulesData.maximumSignificantDigits;
-    }
+  if ("minimumSignificantDigits" in lazyPluralRulesData) {
+    assert(
+      "maximumSignificantDigits" in lazyPluralRulesData,
+      "min/max sig digits mismatch"
+    );
+    internalProps.minimumSignificantDigits =
+      lazyPluralRulesData.minimumSignificantDigits;
+    internalProps.maximumSignificantDigits =
+      lazyPluralRulesData.maximumSignificantDigits;
+  }
 
-    // Step 13 (lazily computed on first access).
-    internalProps.pluralCategories = null;
+  // Intl.NumberFormat v3 Proposal
+  internalProps.roundingPriority = lazyPluralRulesData.roundingPriority;
 
-    return internalProps;
+  // Step 13 (lazily computed on first access).
+  internalProps.pluralCategories = null;
+
+  return internalProps;
 }
 
 /**
  * Returns an object containing the PluralRules internal properties of |obj|.
  */
 function getPluralRulesInternals(obj) {
-    assert(IsObject(obj), "getPluralRulesInternals called with non-object");
-    assert(intl_GuardToPluralRules(obj) !== null,
-           "getPluralRulesInternals called with non-PluralRules");
+  assert(IsObject(obj), "getPluralRulesInternals called with non-object");
+  assert(
+    intl_GuardToPluralRules(obj) !== null,
+    "getPluralRulesInternals called with non-PluralRules"
+  );
 
-    var internals = getIntlObjectInternals(obj);
-    assert(internals.type === "PluralRules", "bad type escaped getIntlObjectInternals");
+  var internals = getIntlObjectInternals(obj);
+  assert(
+    internals.type === "PluralRules",
+    "bad type escaped getIntlObjectInternals"
+  );
 
-    var internalProps = maybeInternalProperties(internals);
-    if (internalProps)
-        return internalProps;
-
-    internalProps = resolvePluralRulesInternals(internals.lazyData);
-    setInternalProperties(internals, internalProps);
+  var internalProps = maybeInternalProperties(internals);
+  if (internalProps) {
     return internalProps;
+  }
+
+  internalProps = resolvePluralRulesInternals(internals.lazyData);
+  setInternalProperties(internals, internalProps);
+  return internalProps;
 }
 
 /**
@@ -98,67 +119,84 @@ function getPluralRulesInternals(obj) {
  * Spec: ECMAScript 402 API, PluralRules, 13.1.1.
  */
 function InitializePluralRules(pluralRules, locales, options) {
-    assert(IsObject(pluralRules), "InitializePluralRules called with non-object");
-    assert(intl_GuardToPluralRules(pluralRules) !== null,
-           "InitializePluralRules called with non-PluralRules");
+  assert(IsObject(pluralRules), "InitializePluralRules called with non-object");
+  assert(
+    intl_GuardToPluralRules(pluralRules) !== null,
+    "InitializePluralRules called with non-PluralRules"
+  );
 
-    // Lazy PluralRules data has the following structure:
-    //
-    //   {
-    //     requestedLocales: List of locales,
-    //     type: "cardinal" / "ordinal",
-    //
-    //     opt: // opt object computer in InitializePluralRules
-    //       {
-    //         localeMatcher: "lookup" / "best fit",
-    //       }
-    //
-    //     minimumIntegerDigits: integer ∈ [1, 21],
-    //
-    //     // optional, mutually exclusive with the significant-digits option
-    //     minimumFractionDigits: integer ∈ [0, 20],
-    //     maximumFractionDigits: integer ∈ [0, 20],
-    //
-    //     // optional, mutually exclusive with the fraction-digits option
-    //     minimumSignificantDigits: integer ∈ [1, 21],
-    //     maximumSignificantDigits: integer ∈ [1, 21],
-    //   }
-    //
-    // Note that lazy data is only installed as a final step of initialization,
-    // so every PluralRules lazy data object has *all* these properties, never a
-    // subset of them.
-    const lazyPluralRulesData = std_Object_create(null);
+  // Lazy PluralRules data has the following structure:
+  //
+  //   {
+  //     requestedLocales: List of locales,
+  //     type: "cardinal" / "ordinal",
+  //
+  //     opt: // opt object computer in InitializePluralRules
+  //       {
+  //         localeMatcher: "lookup" / "best fit",
+  //       }
+  //
+  //     minimumIntegerDigits: integer ∈ [1, 21],
+  //
+  //     // optional, mutually exclusive with the significant-digits option
+  //     minimumFractionDigits: integer ∈ [0, 20],
+  //     maximumFractionDigits: integer ∈ [0, 20],
+  //
+  //     // optional, mutually exclusive with the fraction-digits option
+  //     minimumSignificantDigits: integer ∈ [1, 21],
+  //     maximumSignificantDigits: integer ∈ [1, 21],
+  //
+  //     roundingPriority: "auto" / "lessPrecision" / "morePrecision",
+  //   }
+  //
+  // Note that lazy data is only installed as a final step of initialization,
+  // so every PluralRules lazy data object has *all* these properties, never a
+  // subset of them.
+  const lazyPluralRulesData = std_Object_create(null);
 
-    // Step 1.
-    let requestedLocales = CanonicalizeLocaleList(locales);
-    lazyPluralRulesData.requestedLocales = requestedLocales;
+  // Step 1.
+  let requestedLocales = CanonicalizeLocaleList(locales);
+  lazyPluralRulesData.requestedLocales = requestedLocales;
 
-    // Steps 2-3.
-    if (options === undefined)
-        options = std_Object_create(null);
-    else
-        options = ToObject(options);
+  // Steps 2-3.
+  if (options === undefined) {
+    options = std_Object_create(null);
+  } else {
+    options = ToObject(options);
+  }
 
-    // Step 4.
-    let opt = new_Record();
-    lazyPluralRulesData.opt = opt;
+  // Step 4.
+  let opt = new_Record();
+  lazyPluralRulesData.opt = opt;
 
-    // Steps 5-6.
-    let matcher = GetOption(options, "localeMatcher", "string", ["lookup", "best fit"], "best fit");
-    opt.localeMatcher = matcher;
+  // Steps 5-6.
+  let matcher = GetOption(
+    options,
+    "localeMatcher",
+    "string",
+    ["lookup", "best fit"],
+    "best fit"
+  );
+  opt.localeMatcher = matcher;
 
-    // Step 7.
-    const type = GetOption(options, "type", "string", ["cardinal", "ordinal"], "cardinal");
-    lazyPluralRulesData.type = type;
+  // Step 7.
+  const type = GetOption(
+    options,
+    "type",
+    "string",
+    ["cardinal", "ordinal"],
+    "cardinal"
+  );
+  lazyPluralRulesData.type = type;
 
-    // Step 9.
-    SetNumberFormatDigitOptions(lazyPluralRulesData, options, 0, 3, "standard");
+  // Step 9.
+  SetNumberFormatDigitOptions(lazyPluralRulesData, options, 0, 3, "standard");
 
-    // Step 15.
-    //
-    // We've done everything that must be done now: mark the lazy data as fully
-    // computed and install it.
-    initializeIntlObject(pluralRules, "PluralRules", lazyPluralRulesData);
+  // Step 15.
+  //
+  // We've done everything that must be done now: mark the lazy data as fully
+  // computed and install it.
+  initializeIntlObject(pluralRules, "PluralRules", lazyPluralRulesData);
 }
 
 /**
@@ -169,16 +207,16 @@ function InitializePluralRules(pluralRules, locales, options) {
  * Spec: ECMAScript 402 API, PluralRules, 13.3.2.
  */
 function Intl_PluralRules_supportedLocalesOf(locales /*, options*/) {
-    var options = arguments.length > 1 ? arguments[1] : undefined;
+  var options = ArgumentsLength() > 1 ? GetArgument(1) : undefined;
 
-    // Step 1.
-    var availableLocales = "PluralRules";
+  // Step 1.
+  var availableLocales = "PluralRules";
 
-    // Step 2.
-    let requestedLocales = CanonicalizeLocaleList(locales);
+  // Step 2.
+  let requestedLocales = CanonicalizeLocaleList(locales);
 
-    // Step 3.
-    return SupportedLocales(availableLocales, requestedLocales, options);
+  // Step 3.
+  return SupportedLocales(availableLocales, requestedLocales, options);
 }
 
 /**
@@ -189,23 +227,73 @@ function Intl_PluralRules_supportedLocalesOf(locales /*, options*/) {
  * Spec: ECMAScript 402 API, PluralRules, 13.4.3.
  */
 function Intl_PluralRules_select(value) {
-    // Step 1.
-    let pluralRules = this;
+  // Step 1.
+  let pluralRules = this;
 
-    // Steps 2-3.
-    if (!IsObject(pluralRules) || (pluralRules = intl_GuardToPluralRules(pluralRules)) === null) {
-        return callFunction(intl_CallPluralRulesMethodIfWrapped, this, value,
-                            "Intl_PluralRules_select");
-    }
+  // Steps 2-3.
+  if (
+    !IsObject(pluralRules) ||
+    (pluralRules = intl_GuardToPluralRules(pluralRules)) === null
+  ) {
+    return callFunction(
+      intl_CallPluralRulesMethodIfWrapped,
+      this,
+      value,
+      "Intl_PluralRules_select"
+    );
+  }
 
-    // Step 4.
-    let n = ToNumber(value);
+  // Step 4.
+  let n = ToNumber(value);
 
-    // Ensure the PluralRules internals are resolved.
-    getPluralRulesInternals(pluralRules);
+  // Ensure the PluralRules internals are resolved.
+  getPluralRulesInternals(pluralRules);
 
-    // Step 5.
-    return intl_SelectPluralRule(pluralRules, n);
+  // Step 5.
+  return intl_SelectPluralRule(pluralRules, n);
+}
+
+/**
+ * Returns a String value representing the plural category matching the input
+ * number range according to the effective locale and the formatting options
+ * of this PluralRules.
+ */
+function Intl_PluralRules_selectRange(start, end) {
+  // Step 1.
+  var pluralRules = this;
+
+  // Step 2.
+  if (
+    !IsObject(pluralRules) ||
+    (pluralRules = intl_GuardToPluralRules(pluralRules)) === null
+  ) {
+    return callFunction(
+      intl_CallPluralRulesMethodIfWrapped,
+      this,
+      start,
+      end,
+      "Intl_PluralRules_selectRange"
+    );
+  }
+
+  // Step 3.
+  if (start === undefined || end === undefined) {
+    ThrowTypeError(
+      JSMSG_UNDEFINED_NUMBER,
+      start === undefined ? "start" : "end",
+      "PluralRules",
+      "selectRange"
+    );
+  }
+
+  // Step 4.
+  var x = ToNumber(start);
+
+  // Step 5.
+  var y = ToNumber(end);
+
+  // Step 6.
+  return intl_SelectPluralRuleRange(pluralRules, x, y);
 }
 
 /**
@@ -214,60 +302,89 @@ function Intl_PluralRules_select(value) {
  * Spec: ECMAScript 402 API, PluralRules, 13.4.4.
  */
 function Intl_PluralRules_resolvedOptions() {
-    // Step 1.
-    var pluralRules = this;
+  // Step 1.
+  var pluralRules = this;
 
-    // Steps 2-3.
-    if (!IsObject(pluralRules) || (pluralRules = intl_GuardToPluralRules(pluralRules)) === null) {
-        return callFunction(intl_CallPluralRulesMethodIfWrapped, this,
-                            "Intl_PluralRules_resolvedOptions");
-    }
+  // Steps 2-3.
+  if (
+    !IsObject(pluralRules) ||
+    (pluralRules = intl_GuardToPluralRules(pluralRules)) === null
+  ) {
+    return callFunction(
+      intl_CallPluralRulesMethodIfWrapped,
+      this,
+      "Intl_PluralRules_resolvedOptions"
+    );
+  }
 
-    var internals = getPluralRulesInternals(pluralRules);
+  var internals = getPluralRulesInternals(pluralRules);
 
-    // Steps 4-5.
-    var result = {
-        locale: internals.locale,
-        type: internals.type,
-        minimumIntegerDigits: internals.minimumIntegerDigits,
-    };
+  // Steps 4-5.
+  var result = {
+    locale: internals.locale,
+    type: internals.type,
+    minimumIntegerDigits: internals.minimumIntegerDigits,
+  };
 
-    // Min/Max fraction digits are either both present or not present at all.
-    assert(hasOwn("minimumFractionDigits", internals) ===
-           hasOwn("maximumFractionDigits", internals),
-           "minimumFractionDigits is present iff maximumFractionDigits is present");
+  // Min/Max fraction digits are either both present or not present at all.
+  assert(
+    hasOwn("minimumFractionDigits", internals) ===
+      hasOwn("maximumFractionDigits", internals),
+    "minimumFractionDigits is present iff maximumFractionDigits is present"
+  );
 
-    if (hasOwn("minimumFractionDigits", internals)) {
-        DefineDataProperty(result, "minimumFractionDigits", internals.minimumFractionDigits);
-        DefineDataProperty(result, "maximumFractionDigits", internals.maximumFractionDigits);
-    }
+  if (hasOwn("minimumFractionDigits", internals)) {
+    DefineDataProperty(
+      result,
+      "minimumFractionDigits",
+      internals.minimumFractionDigits
+    );
+    DefineDataProperty(
+      result,
+      "maximumFractionDigits",
+      internals.maximumFractionDigits
+    );
+  }
 
-    // Min/Max significant digits are either both present or not present at all.
-    assert(hasOwn("minimumSignificantDigits", internals) ===
-           hasOwn("maximumSignificantDigits", internals),
-           "minimumSignificantDigits is present iff maximumSignificantDigits is present");
+  // Min/Max significant digits are either both present or not present at all.
+  assert(
+    hasOwn("minimumSignificantDigits", internals) ===
+      hasOwn("maximumSignificantDigits", internals),
+    "minimumSignificantDigits is present iff maximumSignificantDigits is present"
+  );
 
-    if (hasOwn("minimumSignificantDigits", internals)) {
-        DefineDataProperty(result, "minimumSignificantDigits",
-                           internals.minimumSignificantDigits);
-        DefineDataProperty(result, "maximumSignificantDigits",
-                           internals.maximumSignificantDigits);
-    }
+  if (hasOwn("minimumSignificantDigits", internals)) {
+    DefineDataProperty(
+      result,
+      "minimumSignificantDigits",
+      internals.minimumSignificantDigits
+    );
+    DefineDataProperty(
+      result,
+      "maximumSignificantDigits",
+      internals.maximumSignificantDigits
+    );
+  }
 
-    // Step 6.
-    var internalsPluralCategories = internals.pluralCategories;
-    if (internalsPluralCategories === null) {
-        internalsPluralCategories = intl_GetPluralCategories(pluralRules);
-        internals.pluralCategories = internalsPluralCategories;
-    }
+  // Step 6.
+  var internalsPluralCategories = internals.pluralCategories;
+  if (internalsPluralCategories === null) {
+    internalsPluralCategories = intl_GetPluralCategories(pluralRules);
+    internals.pluralCategories = internalsPluralCategories;
+  }
 
-    var pluralCategories = [];
-    for (var i = 0; i < internalsPluralCategories.length; i++)
-        DefineDataProperty(pluralCategories, i, internalsPluralCategories[i]);
+  var pluralCategories = [];
+  for (var i = 0; i < internalsPluralCategories.length; i++) {
+    DefineDataProperty(pluralCategories, i, internalsPluralCategories[i]);
+  }
 
-    // Step 7.
-    DefineDataProperty(result, "pluralCategories", pluralCategories);
+  // Step 7.
+  DefineDataProperty(result, "pluralCategories", pluralCategories);
 
-    // Step 8.
-    return result;
+#ifdef NIGHTLY_BUILD
+  DefineDataProperty(result, "roundingPriority", internals.roundingPriority);
+#endif
+
+  // Step 8.
+  return result;
 }

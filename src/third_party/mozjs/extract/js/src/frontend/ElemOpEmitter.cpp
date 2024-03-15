@@ -29,12 +29,6 @@ bool ElemOpEmitter::prepareForObj() {
 bool ElemOpEmitter::prepareForKey() {
   MOZ_ASSERT(state_ == State::Obj);
 
-  if (!isSuper() && isIncDec()) {
-    if (!bce_->emit1(JSOp::CheckObjCoercible)) {
-      //            [stack] OBJ
-      return false;
-    }
-  }
   if (isCall()) {
     if (!bce_->emit1(JSOp::Dup)) {
       //            [stack] # if Super
@@ -209,7 +203,7 @@ bool ElemOpEmitter::emitAssignment() {
   return true;
 }
 
-bool ElemOpEmitter::emitIncDec() {
+bool ElemOpEmitter::emitIncDec(ValueUsage valueUsage) {
   MOZ_ASSERT(state_ == State::Key);
   MOZ_ASSERT(isIncDec());
 
@@ -225,7 +219,7 @@ bool ElemOpEmitter::emitIncDec() {
     //              [stack] ... N
     return false;
   }
-  if (isPostIncDec()) {
+  if (isPostIncDec() && valueUsage == ValueUsage::WantValue) {
     //              [stack] OBJ KEY SUPERBASE? N
     if (!bce_->emit1(JSOp::Dup)) {
       //            [stack] ... N N
@@ -249,7 +243,7 @@ bool ElemOpEmitter::emitIncDec() {
     //              [stack] N? N+1
     return false;
   }
-  if (isPostIncDec()) {
+  if (isPostIncDec() && valueUsage == ValueUsage::WantValue) {
     if (!bce_->emit1(JSOp::Pop)) {
       //            [stack] N
       return false;

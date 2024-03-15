@@ -172,19 +172,10 @@ class ExecutableAllocator {
                            MustFlushICache::No);
   }
 
-  [[nodiscard]] static bool makeExecutableAndFlushICache(
-      FlushICacheSpec flushSpec, void* start, size_t size) {
-    MustFlushICache mustFlushICache;
-    switch (flushSpec) {
-      case FlushICacheSpec::LocalThreadOnly:
-        mustFlushICache = MustFlushICache::LocalThreadOnly;
-        break;
-      case FlushICacheSpec::AllThreads:
-        mustFlushICache = MustFlushICache::AllThreads;
-        break;
-    }
+  [[nodiscard]] static bool makeExecutableAndFlushICache(void* start,
+                                                         size_t size) {
     return ReprotectRegion(start, size, ProtectionSetting::Executable,
-                           mustFlushICache);
+                           MustFlushICache::Yes);
   }
 
   static void poisonCode(JSRuntime* rt, JitPoisonRangeVector& ranges);

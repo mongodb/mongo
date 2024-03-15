@@ -42,6 +42,7 @@ enum class TraceKind {
   // These trace kinds have a publicly exposed, although opaque, C++ type.
   // Note: The order here is determined by our Value packing. Other users
   //       should sort alphabetically, for consistency.
+  // Note: Nursery allocatable kinds go first. See js::gc::NurseryTraceKinds.
   Object = 0x00,
   BigInt = 0x01,
   String = 0x02,

@@ -1,7 +1,7 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
  * vim: set ts=8 sts=2 et sw=2 tw=80:
  *
- * Copyright 2015 Mozilla Foundation
+ * Copyright 2022 Mozilla Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,265 +19,276 @@
 #ifndef wasm_serialize_h
 #define wasm_serialize_h
 
+#include "mozilla/CheckedInt.h"
+#include "mozilla/MacroForEach.h"
 #include "mozilla/Maybe.h"
-#include "mozilla/RefPtr.h"
+#include "mozilla/Result.h"
 
+#include <cstdint>
+#include <cstring>
 #include <type_traits>
-
-#include "js/AllocPolicy.h"
-#include "js/Vector.h"
 
 namespace js {
 namespace wasm {
 
-using mozilla::MallocSizeOf;
+class TypeContext;
 
-// Factor out common serialization, cloning and about:memory size-computation
-// functions for reuse when serializing wasm and asm.js modules.
+// [SMDOC] "Module serialization"
+//
+// A wasm::Module may be serialized to a binary format that allows for quick
+// reloads of a previous compiled wasm binary.
+//
+// The binary format is optimized for encoding/decoding speed, not size. There
+// is no formal specification, and no backwards/forwards compatibility
+// guarantees. The prelude of the encoding contains a 'build ID' which must be
+// used when reading from a cache entry to determine if it is valid.
+//
+// Module serialization and deserialization are performed using templated
+// functions that allow for (imperfect) abstraction over whether we are decoding
+// or encoding the module. It can be viewed as a specialization of the visitor
+// pattern.
+//
+// Each module data structure is visited by a function parameterized by the
+// "mode", which may be either:
+//  1. MODE_SIZE - We are computing the final encoding size, before encoding it
+//  2. MODE_ENCODE - We are actually encoding the module to bytes
+//  3. MODE_DECODE - We are decoding the module from bytes
+//
+// These functions are called "coding" functions, as they are generic to whether
+// we are "encoding" or "decoding". The verb tense "code" is used for the
+// prefix.
+//
+// Each coding function takes the item being visited, along with a "Coder"
+// which contains the state needed for each mode. This is either a buffer span
+// or an accumulated length. The coding function either manipulates the Coder
+// directly or delegates to its field's coding functions.
+//
+// Leaf data types are usually just copied directly to and from memory using a
+// generic "CodePod" function. See the "cacheable POD" documentation in this
+// file for more information.
+//
+// Non-leaf data types need an explicit coding function. This function can
+// usually be completely generic to decoding/encoding, and delegate to the
+// coding functions for each field. Separate decoding/encoding functions may
+// be needed when decoding requires initialization logic, such as constructors.
+// In this case, it is critical that both functions agree on the fields to be
+// coded, and the order they are coded in.
+//
+// Coding functions are defined as free functions in "WasmSerialize.cpp". When
+// they require access to protected state in a type, they may use the
+// WASM_DECLARE_FRIEND_SERIALIZE macro.
 
-static inline uint8_t* WriteBytes(uint8_t* dst, const void* src,
-                                  size_t nbytes) {
-  if (nbytes) {
-    memcpy(dst, src, nbytes);
-  }
-  return dst + nbytes;
-}
+// Signal an out of memory condition
+struct OutOfMemory {};
 
-static inline const uint8_t* ReadBytes(const uint8_t* src, void* dst,
-                                       size_t nbytes) {
-  if (nbytes) {
-    memcpy(dst, src, nbytes);
-  }
-  return src + nbytes;
-}
+// The result of serialization, either OK or OOM
+using CoderResult = mozilla::Result<mozilla::Ok, OutOfMemory>;
 
-static inline const uint8_t* ReadBytesChecked(const uint8_t* src,
-                                              size_t* remain, void* dst,
-                                              size_t nbytes) {
-  if (*remain < nbytes) {
-    return nullptr;
-  }
-  memcpy(dst, src, nbytes);
-  *remain -= nbytes;
-  return src + nbytes;
-}
-
-template <class T>
-static inline uint8_t* WriteScalar(uint8_t* dst, T t) {
-  memcpy(dst, &t, sizeof(t));
-  return dst + sizeof(t);
-}
-
-template <class T>
-static inline const uint8_t* ReadScalar(const uint8_t* src, T* dst) {
-  memcpy(dst, src, sizeof(*dst));
-  return src + sizeof(*dst);
-}
-
-template <class T>
-static inline const uint8_t* ReadScalarChecked(const uint8_t* src,
-                                               size_t* remain, T* dst) {
-  if (*remain < sizeof(*dst)) {
-    return nullptr;
-  }
-  memcpy(dst, src, sizeof(*dst));
-  *remain -= sizeof(*dst);
-  return src + sizeof(*dst);
-}
-
-template <class T, size_t N>
-static inline size_t SerializedVectorSize(
-    const mozilla::Vector<T, N, SystemAllocPolicy>& vec) {
-  size_t size = sizeof(uint32_t);
-  for (size_t i = 0; i < vec.length(); i++) {
-    size += vec[i].serializedSize();
-  }
-  return size;
-}
-
-template <class T, size_t N>
-static inline uint8_t* SerializeVector(
-    uint8_t* cursor, const mozilla::Vector<T, N, SystemAllocPolicy>& vec) {
-  cursor = WriteScalar<uint32_t>(cursor, vec.length());
-  for (size_t i = 0; i < vec.length(); i++) {
-    cursor = vec[i].serialize(cursor);
-  }
-  return cursor;
-}
-
-template <class T, size_t N>
-static inline const uint8_t* DeserializeVector(
-    const uint8_t* cursor, mozilla::Vector<T, N, SystemAllocPolicy>* vec) {
-  uint32_t length;
-  cursor = ReadScalar<uint32_t>(cursor, &length);
-  if (!vec->resize(length)) {
-    return nullptr;
-  }
-  for (size_t i = 0; i < vec->length(); i++) {
-    if (!(cursor = (*vec)[i].deserialize(cursor))) {
-      return nullptr;
-    }
-  }
-  return cursor;
-}
-
-template <class T, size_t N>
-static inline size_t SizeOfVectorExcludingThis(
-    const mozilla::Vector<T, N, SystemAllocPolicy>& vec,
-    MallocSizeOf mallocSizeOf) {
-  size_t size = vec.sizeOfExcludingThis(mallocSizeOf);
-  for (const T& t : vec) {
-    size += t.sizeOfExcludingThis(mallocSizeOf);
-  }
-  return size;
-}
-
-template <class T>
-static inline size_t SerializedMaybeSize(const mozilla::Maybe<T>& maybe) {
-  if (!maybe) {
-    return sizeof(uint8_t);
-  }
-  return sizeof(uint8_t) + maybe->serializedSize();
-}
-
-template <class T>
-static inline uint8_t* SerializeMaybe(uint8_t* cursor,
-                                      const mozilla::Maybe<T>& maybe) {
-  cursor = WriteScalar<uint8_t>(cursor, maybe ? 1 : 0);
-  if (maybe) {
-    cursor = maybe->serialize(cursor);
-  }
-  return cursor;
-}
-
-template <class T>
-static inline const uint8_t* DeserializeMaybe(const uint8_t* cursor,
-                                              mozilla::Maybe<T>* maybe) {
-  uint8_t isSome;
-  cursor = ReadScalar<uint8_t>(cursor, &isSome);
-  if (!cursor) {
-    return nullptr;
-  }
-
-  if (isSome == 1) {
-    maybe->emplace();
-    cursor = (*maybe)->deserialize(cursor);
-  } else {
-    *maybe = mozilla::Nothing();
-  }
-  return cursor;
-}
-
-template <class T>
-static inline size_t SizeOfMaybeExcludingThis(const mozilla::Maybe<T>& maybe,
-                                              MallocSizeOf mallocSizeOf) {
-  return maybe ? maybe->sizeOfExcludingThis(mallocSizeOf) : 0;
-}
-
-template <class T, size_t N>
-static inline size_t SerializedPodVectorSize(
-    const mozilla::Vector<T, N, SystemAllocPolicy>& vec) {
-  return sizeof(uint32_t) + vec.length() * sizeof(T);
-}
-
-template <class T, size_t N>
-static inline uint8_t* SerializePodVector(
-    uint8_t* cursor, const mozilla::Vector<T, N, SystemAllocPolicy>& vec) {
-  // This binary format must not change without taking into consideration the
-  // constraints in Assumptions::serialize.
-
-  cursor = WriteScalar<uint32_t>(cursor, vec.length());
-  cursor = WriteBytes(cursor, vec.begin(), vec.length() * sizeof(T));
-  return cursor;
-}
-
-template <class T, size_t N>
-static inline const uint8_t* DeserializePodVector(
-    const uint8_t* cursor, mozilla::Vector<T, N, SystemAllocPolicy>* vec) {
-  uint32_t length;
-  cursor = ReadScalar<uint32_t>(cursor, &length);
-  if (!vec->initLengthUninitialized(length)) {
-    return nullptr;
-  }
-  cursor = ReadBytes(cursor, vec->begin(), length * sizeof(T));
-  return cursor;
-}
-
-template <class T, size_t N>
-static inline const uint8_t* DeserializePodVectorChecked(
-    const uint8_t* cursor, size_t* remain,
-    mozilla::Vector<T, N, SystemAllocPolicy>* vec) {
-  uint32_t length;
-  cursor = ReadScalarChecked<uint32_t>(cursor, remain, &length);
-  if (!cursor || !vec->initLengthUninitialized(length)) {
-    return nullptr;
-  }
-  cursor = ReadBytesChecked(cursor, remain, vec->begin(), length * sizeof(T));
-  return cursor;
-}
-
-// To call Vector::shrinkStorageToFit , a type must specialize mozilla::IsPod
-// which is pretty verbose to do within js::wasm, so factor that process out
-// into a macro.
-
-#define WASM_DECLARE_POD_VECTOR(Type, VectorName)   \
-  }                                                 \
-  }                                                 \
-  namespace mozilla {                               \
-  template <>                                       \
-  struct IsPod<js::wasm::Type> : std::true_type {}; \
-  }                                                 \
-  namespace js {                                    \
-  namespace wasm {                                  \
-  typedef Vector<Type, 0, SystemAllocPolicy> VectorName;
-
-// A wasm Module and everything it contains must support serialization and
-// deserialization. Some data can be simply copied as raw bytes and,
-// as a convention, is stored in an inline CacheablePod struct. Everything else
-// should implement the below methods which are called recusively by the
-// containing Module.
-
-#define WASM_DECLARE_SERIALIZABLE(Type)              \
-  size_t serializedSize() const;                     \
-  uint8_t* serialize(uint8_t* cursor) const;         \
-  const uint8_t* deserialize(const uint8_t* cursor); \
-  size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
-
-template <class T>
-struct SerializableRefPtr : RefPtr<T> {
-  using RefPtr<T>::operator=;
-
-  SerializableRefPtr() = default;
-
-  template <class U>
-  MOZ_IMPLICIT SerializableRefPtr(U&& u) : RefPtr<T>(std::forward<U>(u)) {}
-
-  WASM_DECLARE_SERIALIZABLE(SerializableRefPtr)
+// CoderMode parameterizes the coding functions
+enum CoderMode {
+  // We are computing the final size of the encoded buffer. This is a discrete
+  // pass that runs before encoding.
+  MODE_SIZE,
+  // We are encoding the module to bytes.
+  MODE_ENCODE,
+  // We are decoding the module from bytes.
+  MODE_DECODE,
 };
 
-template <class T>
-inline size_t SerializableRefPtr<T>::serializedSize() const {
-  return (*this)->serializedSize();
-}
+// Coding functions take a different argument depending on which CoderMode
+// they are invoked with:
+//   * MODE_SIZE - const T*
+//   * MODE_ENCODE - const T*
+//   * MODE_DECODE - T*
+//
+// The CoderArg<mode, T> type alias is used to acquire the proper type for
+// coding function arguments.
+template <CoderMode mode, typename V>
+struct CoderArgT;
+
+template <typename V>
+struct CoderArgT<MODE_SIZE, V> {
+  using T = const V*;
+};
+
+template <typename V>
+struct CoderArgT<MODE_DECODE, V> {
+  using T = V*;
+};
+
+template <typename V>
+struct CoderArgT<MODE_ENCODE, V> {
+  using T = const V*;
+};
+
+template <CoderMode mode, typename T>
+using CoderArg = typename CoderArgT<mode, T>::T;
+
+// Coder is the state provided to all coding functions during module traversal.
+template <CoderMode mode>
+struct Coder;
+
+// A Coder<MODE_SIZE> computes the total encoded size of a module
+template <>
+struct Coder<MODE_SIZE> {
+  explicit Coder(const TypeContext* types) : types_(types), size_(0) {}
+
+  // The types of the module that we're going to encode. This is required in
+  // order to encode the original index of types that we encounter.
+  const TypeContext* types_;
+
+  // The current size of buffer required to serialize this module.
+  mozilla::CheckedInt<size_t> size_;
+
+  // This function shares a signature with MODE_ENCODE to allow functions to be
+  // generic across MODE_SIZE/MODE_ENCODE, even though the src pointer is not
+  // needed for MODE_SIZE.
+  CoderResult writeBytes(const void* unusedSrc, size_t length);
+};
+
+// A Coder<MODE_ENCODE> holds the buffer being written to
+template <>
+struct Coder<MODE_ENCODE> {
+  Coder(const TypeContext* types, uint8_t* start, size_t length)
+      : types_(types), buffer_(start), end_(start + length) {}
+
+  // The types of the module that we're encoding. This is required in
+  // order to encode the original index of types that we encounter.
+  const TypeContext* types_;
+
+  // The current position in the buffer we're writing to.
+  uint8_t* buffer_;
+  // The end position in the buffer we're writing to.
+  const uint8_t* end_;
+
+  CoderResult writeBytes(const void* src, size_t length);
+};
+
+// A Coder<MODE_DECODE> holds the buffer being read from
+template <>
+struct Coder<MODE_DECODE> {
+  Coder(const uint8_t* start, size_t length)
+      : types_(nullptr), buffer_(start), end_(start + length) {}
+
+  // The types of the module that we're decoding. This is null until the types
+  // of this module are decoded.
+  const TypeContext* types_;
+
+  // The current position in the buffer we're reading from.
+  const uint8_t* buffer_;
+  // The end position in the buffer we're reading from.
+  const uint8_t* end_;
+
+  CoderResult readBytes(void* dest, size_t length);
+};
+
+// Macros to help types declare friendship with a coding function
+
+#define WASM_DECLARE_FRIEND_SERIALIZE(TYPE) \
+  template <CoderMode mode>                 \
+  friend CoderResult Code##TYPE(Coder<mode>&, CoderArg<mode, TYPE>);
+
+#define WASM_DECLARE_FRIEND_SERIALIZE_ARGS(TYPE, ...) \
+  template <CoderMode mode>                               \
+  friend CoderResult Code##TYPE(Coder<mode>&, CoderArg<mode, TYPE>, __VA_ARGS__);
+
+// [SMDOC] "Cacheable POD"
+//
+// Module serialization relies on copying simple structs to and from the
+// cache format. We need a way to ensure that we only do this on types that are
+// "safe". We call this "cacheable POD". Note: this is not the same thing as
+// "POD" as that may contain pointers, which are not cacheable.
+//
+// We define cacheable POD (C-POD) recursively upon types:
+//   1. any integer type is C-POD
+//   2. any floating point type is C-POD
+//   3. any enum type is C-POD
+//   4. any mozilla::Maybe<T> with T: C-POD is C-POD
+//   5. any T[N] with T: C-POD is C-POD
+//   6. any union where all fields are C-POD is C-POD
+//   7. any struct with the following conditions must is C-POD
+//      * every field's type must be C-POD
+//      * the parent type, if it exists, must also be C-POD
+//      * there must be no virtual methods
+//
+// There are no combination of C++ type traits at this time that can
+// automatically meet these criteria, so we are rolling our own system.
+//
+// We define a "IsCacheablePod" type trait, with builtin rules for cases (1-5).
+// The complex cases (6-7) are handled using manual declaration and checking
+// macros that must be used upon structs and unions that are considered
+// cacheable POD.
+//
+// See the following macros for details:
+//   - WASM_DECLARE_CACHEABLE_POD
+//   - WASM_CHECK_CACHEABLE_POD[_WITH_PARENT]
+
+// The IsCacheablePod type trait primary template. Contains the rules for
+// (cases 1-3).
+template <typename T>
+struct IsCacheablePod
+    : public std::conditional_t<std::is_arithmetic_v<T> || std::is_enum_v<T>,
+                                std::true_type, std::false_type> {};
+
+// Partial specialization for (case 4).
+template <typename T>
+struct IsCacheablePod<mozilla::Maybe<T>>
+    : public std::conditional_t<IsCacheablePod<T>::value, std::true_type,
+                                std::false_type> {};
+
+// Partial specialization for (case 5).
+template <typename T, size_t N>
+struct IsCacheablePod<T[N]>
+    : public std::conditional_t<IsCacheablePod<T>::value, std::true_type,
+                                std::false_type> {};
 
 template <class T>
-inline uint8_t* SerializableRefPtr<T>::serialize(uint8_t* cursor) const {
-  return (*this)->serialize(cursor);
-}
+inline constexpr bool is_cacheable_pod = IsCacheablePod<T>::value;
 
-template <class T>
-inline const uint8_t* SerializableRefPtr<T>::deserialize(
-    const uint8_t* cursor) {
-  auto* t = js_new<std::remove_const_t<T>>();
-  *this = t;
-  return t->deserialize(cursor);
-}
+// Checks if derrived class will not use the structure alignment for its
+// next field. It used when pod is a base class.
+#define WASM_CHECK_CACHEABLE_POD_PADDING(Type)                \
+  class __CHECK_PADING_##Type : public Type {                 \
+   public:                                                    \
+    char c;                                                   \
+  };                                                          \
+  static_assert(sizeof(__CHECK_PADING_##Type) > sizeof(Type), \
+                #Type " will overlap with next field if inherited");
 
-template <class T>
-inline size_t SerializableRefPtr<T>::sizeOfExcludingThis(
-    mozilla::MallocSizeOf mallocSizeOf) const {
-  return (*this)->sizeOfExcludingThis(mallocSizeOf);
-}
+// Declare the type 'Type' to be cacheable POD. The definition of the type must
+// contain a WASM_CHECK_CACHEABLE_POD[_WITH_PARENT] to ensure all fields of the
+// type are cacheable POD.
+#define WASM_DECLARE_CACHEABLE_POD(Type)                                      \
+  static_assert(!std::is_polymorphic_v<Type>,                                 \
+                #Type "must not have virtual methods");                       \
+  } /* namespace wasm */                                                      \
+  } /* namespace js */                                                        \
+  template <>                                                                 \
+  struct js::wasm::IsCacheablePod<js::wasm::Type> : public std::true_type {}; \
+  namespace js {                                                              \
+  namespace wasm {
+
+// Helper: check each field's type to be cacheable POD
+#define WASM_CHECK_CACHEABLE_POD_FIELD_(Field)                    \
+  static_assert(js::wasm::IsCacheablePod<decltype(Field)>::value, \
+                #Field " must be cacheable pod");
+
+// Check every field in a type definition to ensure they are cacheable POD.
+#define WASM_CHECK_CACHEABLE_POD(...) \
+  MOZ_FOR_EACH(WASM_CHECK_CACHEABLE_POD_FIELD_, (), (__VA_ARGS__))
+
+// Check every field in a type definition to ensure they are cacheable POD, and
+// check that the parent class is also cacheable POD.
+#define WASM_CHECK_CACHEABLE_POD_WITH_PARENT(Parent, ...) \
+  static_assert(js::wasm::IsCacheablePod<Parent>::value,        \
+                #Parent " must be cacheable pod");              \
+  MOZ_FOR_EACH(WASM_CHECK_CACHEABLE_POD_FIELD_, (), (__VA_ARGS__))
+
+// Allow fields that are not cacheable POD but are believed to be safe for
+// serialization due to some justification.
+#define WASM_ALLOW_NON_CACHEABLE_POD_FIELD(Field, Reason)          \
+  static_assert(!js::wasm::IsCacheablePod<decltype(Field)>::value, \
+                #Field " is not cacheable due to " Reason);
 
 }  // namespace wasm
 }  // namespace js

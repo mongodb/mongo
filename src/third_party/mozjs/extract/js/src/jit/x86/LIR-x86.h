@@ -95,14 +95,14 @@ class LDivOrModI64
 
   static const size_t Lhs = 0;
   static const size_t Rhs = INT64_PIECES;
-  static const size_t Tls = 2 * INT64_PIECES;
+  static const size_t Instance = 2 * INT64_PIECES;
 
   LDivOrModI64(const LInt64Allocation& lhs, const LInt64Allocation& rhs,
-               const LAllocation& tls)
+               const LAllocation& instance)
       : LCallInstructionHelper(classOpcode) {
     setInt64Operand(Lhs, lhs);
     setInt64Operand(Rhs, rhs);
-    setOperand(Tls, tls);
+    setOperand(Instance, instance);
   }
 
   MDefinition* mir() const {
@@ -137,14 +137,14 @@ class LUDivOrModI64
 
   static const size_t Lhs = 0;
   static const size_t Rhs = INT64_PIECES;
-  static const size_t Tls = 2 * INT64_PIECES;
+  static const size_t Instance = 2 * INT64_PIECES;
 
   LUDivOrModI64(const LInt64Allocation& lhs, const LInt64Allocation& rhs,
-                const LAllocation& tls)
+                const LAllocation& instance)
       : LCallInstructionHelper(classOpcode) {
     setInt64Operand(Lhs, lhs);
     setInt64Operand(Rhs, rhs);
-    setOperand(Tls, tls);
+    setOperand(Instance, instance);
   }
 
   MDefinition* mir() const {

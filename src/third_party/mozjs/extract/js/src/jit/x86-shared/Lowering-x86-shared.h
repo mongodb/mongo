@@ -66,6 +66,7 @@ class LIRGeneratorX86Shared : public LIRGeneratorShared {
                                          bool useI386ByteRegisters);
 
 #ifdef ENABLE_WASM_SIMD
+  bool isThreeOpAllowed() { return Assembler::HasAVX(); }
   bool canFoldReduceSimd128AndBranch(wasm::SimdOp op);
   bool canEmitWasmReduceSimd128AtUses(MWasmReduceSimd128* ins);
 #endif

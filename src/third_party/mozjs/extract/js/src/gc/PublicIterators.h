@@ -11,8 +11,6 @@
 #ifndef gc_PublicIterators_h
 #define gc_PublicIterators_h
 
-#include "mozilla/Maybe.h"
-
 #include "jstypes.h"
 #include "gc/GCRuntime.h"
 #include "gc/IteratorUtils.h"
@@ -20,46 +18,36 @@
 #include "vm/Compartment.h"
 #include "vm/Runtime.h"
 
-struct JSRuntime;
-
 namespace JS {
 class JS_PUBLIC_API Realm;
 }
 
 namespace js {
 
-// Accessing the atoms zone can be dangerous because helper threads may be
-// accessing it concurrently to the main thread, so it's better to skip the
-// atoms zone when iterating over zones. If you need to iterate over the atoms
-// zone, consider using AutoLockAllAtoms.
 enum ZoneSelector { WithAtoms, SkipAtoms };
 
-// Iterate over all zones in the runtime apart from the atoms zone and those
-// which may be in use by parse threads.
-class NonAtomZonesIter {
+// Iterate over all zones in the runtime. May or may not include the atoms zone.
+class ZonesIter {
   gc::AutoEnterIteration iterMarker;
   JS::Zone** it;
-  JS::Zone** end;
+  JS::Zone** const end;
 
  public:
-  explicit NonAtomZonesIter(gc::GCRuntime* gc)
+  ZonesIter(gc::GCRuntime* gc, ZoneSelector selector)
       : iterMarker(gc), it(gc->zones().begin()), end(gc->zones().end()) {
-    skipHelperThreadZones();
+    if (selector == SkipAtoms) {
+      MOZ_ASSERT(get()->isAtomsZone());
+      next();
+    }
   }
-  explicit NonAtomZonesIter(JSRuntime* rt) : NonAtomZonesIter(&rt->gc) {}
+  ZonesIter(JSRuntime* rt, ZoneSelector selector)
+      : ZonesIter(&rt->gc, selector) {}
 
   bool done() const { return it == end; }
 
   void next() {
     MOZ_ASSERT(!done());
     it++;
-    skipHelperThreadZones();
-  }
-
-  void skipHelperThreadZones() {
-    while (!done() && get()->usedByHelperThread()) {
-      it++;
-    }
   }
 
   JS::Zone* get() const {
@@ -71,38 +59,11 @@ class NonAtomZonesIter {
   JS::Zone* operator->() const { return get(); }
 };
 
-// Iterate over all zones in the runtime, except those which may be in use by
-// parse threads.  May or may not include the atoms zone.
-class ZonesIter {
-  JS::Zone* atomsZone;
-  NonAtomZonesIter otherZones;
-
+// Iterate over all zones in the runtime apart from the atoms zone.
+class NonAtomZonesIter : public ZonesIter {
  public:
-  ZonesIter(gc::GCRuntime* gc, ZoneSelector selector)
-      : atomsZone(selector == WithAtoms ? gc->atomsZone.ref() : nullptr),
-        otherZones(gc) {}
-  ZonesIter(JSRuntime* rt, ZoneSelector selector)
-      : ZonesIter(&rt->gc, selector) {}
-
-  bool done() const { return !atomsZone && otherZones.done(); }
-
-  JS::Zone* get() const {
-    MOZ_ASSERT(!done());
-    return atomsZone ? atomsZone : otherZones.get();
-  }
-
-  void next() {
-    MOZ_ASSERT(!done());
-    if (atomsZone) {
-      atomsZone = nullptr;
-      return;
-    }
-
-    otherZones.next();
-  }
-
-  operator JS::Zone*() const { return get(); }
-  JS::Zone* operator->() const { return get(); }
+  explicit NonAtomZonesIter(gc::GCRuntime* gc) : ZonesIter(gc, SkipAtoms) {}
+  explicit NonAtomZonesIter(JSRuntime* rt) : NonAtomZonesIter(&rt->gc) {}
 };
 
 // Iterate over all zones in the runtime, except those which may be in use by

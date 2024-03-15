@@ -13,7 +13,6 @@
 #include <stdint.h>  // uint32_t
 
 #include "frontend/BytecodeControlStructures.h"  // LoopControl
-#include "frontend/BytecodeOffset.h"             // BytecodeOffset
 #include "frontend/TDZCheckCache.h"              // TDZCheckCache
 
 namespace js {
@@ -32,20 +31,20 @@ class EmitterScope;
 //     emit(init); // without pushing value
 //     cfor.emitCond(Some(offset_of_cond));
 //     emit(cond);
-//     cfor.emitBody(CForEmitter::Cond::Present, Some(offset_of_body));
+//     cfor.emitBody(CForEmitter::Cond::Present);
 //     emit(body);
 //     cfor.emitUpdate(CForEmitter::Update::Present, Some(offset_of_update)));
 //     emit(update);
-//     cfor.emitEnd(Some(offset_of_for));
+//     cfor.emitEnd(offset_of_for);
 //
 //   `for (;;) body`
 //     CForEmitter cfor(this, nullptr);
 //     cfor.emitInit(Nothing());
 //     cfor.emitCond(Nothing());
-//     cfor.emitBody(CForEmitter::Cond::Missing, Some(offset_of_body));
+//     cfor.emitBody(CForEmitter::Cond::Missing);
 //     emit(body);
 //     cfor.emitUpdate(CForEmitter::Update::Missing, Nothing());
-//     cfor.emitEnd(Some(offset_of_for));
+//     cfor.emitEnd(offset_of_for);
 //
 class MOZ_STACK_CLASS CForEmitter {
   // Basic structure of the bytecode (not complete).
@@ -167,7 +166,7 @@ class MOZ_STACK_CLASS CForEmitter {
   [[nodiscard]] bool emitBody(Cond cond);
   [[nodiscard]] bool emitUpdate(Update update,
                                 const mozilla::Maybe<uint32_t>& updatePos);
-  [[nodiscard]] bool emitEnd(const mozilla::Maybe<uint32_t>& forPos);
+  [[nodiscard]] bool emitEnd(uint32_t forPos);
 };
 
 } /* namespace frontend */

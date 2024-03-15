@@ -60,7 +60,9 @@ const char* const CursorInfo::className = "Cursor";
 namespace {
 
 DBClientCursor* getCursor(JSObject* thisv) {
-    return static_cast<CursorInfo::CursorHolder*>(JS::GetPrivate(thisv))->cursor.get();
+    auto cursorHolder = JS::GetMaybePtrFromReservedSlot<CursorInfo::CursorHolder>(
+        thisv, CursorInfo::CursorHolderSlot);
+    return cursorHolder ? cursorHolder->cursor.get() : nullptr;
 }
 
 DBClientCursor* getCursor(JS::CallArgs& args) {
@@ -69,11 +71,11 @@ DBClientCursor* getCursor(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto cursor = static_cast<CursorInfo::CursorHolder*>(JS::GetPrivate(obj));
+void CursorInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto cursor = JS::GetMaybePtrFromReservedSlot<CursorInfo::CursorHolder>(obj, CursorHolderSlot);
 
     if (cursor) {
-        getScope(fop)->trackedDelete(cursor);
+        getScope(gcCtx)->trackedDelete(cursor);
     }
 }
 

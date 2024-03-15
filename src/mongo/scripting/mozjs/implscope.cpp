@@ -35,6 +35,7 @@
 #include <iostream>
 #include <memory>
 
+#include <js/CallAndConstruct.h>
 #include <js/CharacterEncoding.h>
 #include <js/CompilationAndEvaluation.h>
 #include <js/ContextOptions.h>
@@ -43,6 +44,7 @@
 #include <js/Object.h>
 #include <js/Promise.h>
 #include <js/SourceText.h>
+#include <js/Stack.h>
 #include <js/TypeDecls.h>
 #include <js/friend/ErrorMessages.h>
 #include <jsapi.h>
@@ -124,9 +126,6 @@ bool closeToMaxMemory() {
     return mongo::sm::get_total_bytes() > (kInterruptGCThreshold * mongo::sm::get_max_bytes());
 }
 }  // namespace
-
-thread_local MozJSImplScope::ASANHandles* currentASANHandles = nullptr;
-
 
 void MozJSImplScope::EnvironmentPreparer::invoke(JS::HandleObject global, Closure& closure) {
     invariant(JS_IsGlobalObject(global));
@@ -280,30 +279,19 @@ void MozJSImplScope::_gcCallback(JSContext* rt,
 
 #if __has_feature(address_sanitizer)
 
-MozJSImplScope::ASANHandles::ASANHandles() {
-    currentASANHandles = this;
-}
-
-MozJSImplScope::ASANHandles::~ASANHandles() {
-    invariant(currentASANHandles == this);
-    currentASANHandles = nullptr;
-}
-
 void MozJSImplScope::ASANHandles::addPointer(void* ptr) {
+    stdx::lock_guard<Latch> lk(_mutex);
     bool inserted;
     std::tie(std::ignore, inserted) = _handles.insert(ptr);
     invariant(inserted);
 }
 
 void MozJSImplScope::ASANHandles::removePointer(void* ptr) {
+    stdx::lock_guard<Latch> lk(_mutex);
     invariant(_handles.erase(ptr));
 }
 
 #else
-
-MozJSImplScope::ASANHandles::ASANHandles() {}
-
-MozJSImplScope::ASANHandles::~ASANHandles() {}
 
 void MozJSImplScope::ASANHandles::addPointer(void* ptr) {}
 
@@ -358,7 +346,6 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
                 .setAsmJS(true)
                 .setThrowOnAsmJSValidationFailure(true)
                 .setWasmBaseline(true)
-                .setWasmCranelift(false)
                 .setWasmIon(true)
                 .setAsyncStack(false);
         } else {
@@ -376,7 +363,6 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
                 .setThrowOnAsmJSValidationFailure(false)
                 .setWasmBaseline(false)
                 .setDisableIon()
-                .setWasmCranelift(false)
                 .setWasmIon(false)
                 .setAsyncStack(false);
         }
@@ -967,7 +953,7 @@ bool MozJSImplScope::exec(StringData code,
                 success = JS_ExecuteScript(_context, script, &out);
             } else {
                 JS::RootedObject module(_context, modulePtr);
-                success = JS::ModuleInstantiate(_context, module);
+                success = JS::ModuleLink(_context, module);
                 if (success) {
                     success = JS::ModuleEvaluate(_context, module, &out);
                     if (success) {
@@ -1112,8 +1098,10 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
         if (JS_GetPendingException(_context, &excn)) {
             if (excn.isObject()) {
                 str::stream ss;
-                // exceptions originating from c++ don't get the "uncaught exception: " prefix
-                if (!JS::GetPrivate(excn.toObjectOrNull())) {
+                // Exceptions originating from C++ should not get the "uncaught exception: " prefix.
+                // These exceptions thrown from mongo are represented as MongoStatusInfo, so we
+                // exclude MongoStatusInfo from having the prefix.
+                if (!getProto<MongoStatusInfo>().instanceOf(excn)) {
                     ss << "uncaught exception: ";
                 }
                 JSStringWrapper jsstr;
@@ -1185,10 +1173,6 @@ void MozJSImplScope::setCompileOptions(JS::CompileOptions* co) {}
 
 MozJSImplScope* MozJSImplScope::getThreadScope() {
     return currentJSScope;
-}
-
-auto MozJSImplScope::ASANHandles::getThreadASANHandles() -> ASANHandles* {
-    return currentASANHandles;
 }
 
 void MozJSImplScope::setOOM() {

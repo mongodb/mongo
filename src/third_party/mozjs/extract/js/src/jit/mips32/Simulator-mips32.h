@@ -493,7 +493,7 @@ class SimulatorProcess {
   // This lock creates a critical section around 'redirection_' and
   // 'icache_', which are referenced both by the execution engine
   // and by the off-thread compiler (see Redirection::Get in the cpp file).
-  Mutex cacheLock_;
+  Mutex cacheLock_ MOZ_UNANNOTATED;
 
   Redirection* redirection_;
   ICacheMap icache_;

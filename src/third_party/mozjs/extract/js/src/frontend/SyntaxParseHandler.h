@@ -12,13 +12,14 @@
 
 #include <string.h>
 
+#include "jstypes.h"
+
+#include "frontend/CompilationStencil.h"  // CompilationState
 #include "frontend/FunctionSyntaxKind.h"  // FunctionSyntaxKind
 #include "frontend/NameAnalysisTypes.h"   // PrivateNameKind
 #include "frontend/ParseNode.h"
 #include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
 #include "frontend/TokenStream.h"
-#include "js/GCAnnotations.h"
-#include "vm/JSContext.h"
 
 namespace js {
 
@@ -172,8 +173,9 @@ class SyntaxParseHandler {
   }
 
  public:
-  SyntaxParseHandler(JSContext* cx, LifoAlloc& alloc,
-                     BaseScript* lazyOuterFunction) {}
+  SyntaxParseHandler(FrontendContext* fc, CompilationState& compilationState) {
+    MOZ_ASSERT(!compilationState.input.isDelazifying());
+  }
 
   static NullNode null() { return NodeFailure; }
 
@@ -316,11 +318,21 @@ class SyntaxParseHandler {
   ListNodeType newObjectLiteral(uint32_t begin) {
     return NodeUnparenthesizedObject;
   }
+
+#ifdef ENABLE_RECORD_TUPLE
+  ListNodeType newRecordLiteral(uint32_t begin) { return NodeGeneric; }
+
+  ListNodeType newTupleLiteral(uint32_t begin) { return NodeGeneric; }
+#endif
+
   ListNodeType newClassMemberList(uint32_t begin) { return NodeGeneric; }
   ClassNamesType newClassNames(Node outer, Node inner, const TokenPos& pos) {
     return NodeGeneric;
   }
   ClassNodeType newClass(Node name, Node heritage, Node methodBlock,
+#ifdef ENABLE_DECORATORS
+                         ListNodeType decorators,
+#endif
                          const TokenPos& pos) {
     return NodeGeneric;
   }
@@ -333,8 +345,9 @@ class SyntaxParseHandler {
     return NodeLexicalDeclaration;
   }
 
-  BinaryNodeType newNewTarget(NullaryNodeType newHolder,
-                              NullaryNodeType targetHolder) {
+  NewTargetNodeType newNewTarget(NullaryNodeType newHolder,
+                                 NullaryNodeType targetHolder,
+                                 NameNodeType newTargetName) {
     return NodeGeneric;
   }
   NullaryNodeType newPosHolder(const TokenPos& pos) { return NodeGeneric; }
@@ -373,12 +386,23 @@ class SyntaxParseHandler {
   }
   [[nodiscard]] Node newClassMethodDefinition(
       Node key, FunctionNodeType funNode, AccessorType atype, bool isStatic,
-      mozilla::Maybe<FunctionNodeType> initializerIfPrivate) {
+      mozilla::Maybe<FunctionNodeType> initializerIfPrivate
+#ifdef ENABLE_DECORATORS
+      ,
+      ListNodeType decorators
+#endif
+  ) {
     return NodeGeneric;
   }
   [[nodiscard]] Node newClassFieldDefinition(Node name,
                                              FunctionNodeType initializer,
-                                             bool isStatic) {
+                                             bool isStatic
+#ifdef ENABLE_DECORATORS
+                                             ,
+                                             ListNodeType decorators,
+                                             bool hasAccessor
+#endif
+  ) {
     return NodeGeneric;
   }
 
@@ -416,7 +440,14 @@ class SyntaxParseHandler {
     return NodeEmptyStatement;
   }
 
-  BinaryNodeType newImportDeclaration(Node importSpecSet, Node moduleSpec,
+  BinaryNodeType newImportAssertion(Node keyNode, Node valueNode) {
+    return NodeGeneric;
+  }
+  BinaryNodeType newModuleRequest(Node moduleSpec, Node importAssertionList,
+                                  const TokenPos& pos) {
+    return NodeGeneric;
+  }
+  BinaryNodeType newImportDeclaration(Node importSpecSet, Node moduleRequest,
                                       const TokenPos& pos) {
     return NodeGeneric;
   }
@@ -430,7 +461,7 @@ class SyntaxParseHandler {
     return NodeGeneric;
   }
   BinaryNodeType newExportFromDeclaration(uint32_t begin, Node exportSpecSet,
-                                          Node moduleSpec) {
+                                          Node moduleRequest) {
     return NodeGeneric;
   }
   BinaryNodeType newExportDefaultDeclaration(Node kid, Node maybeBinding,
@@ -451,6 +482,9 @@ class SyntaxParseHandler {
     return NodeGeneric;
   }
   BinaryNodeType newCallImport(NullaryNodeType importHolder, Node singleArg) {
+    return NodeGeneric;
+  }
+  BinaryNodeType newCallImportSpec(Node specifierArg, Node optionalArg) {
     return NodeGeneric;
   }
 
@@ -560,6 +594,8 @@ class SyntaxParseHandler {
 
   void checkAndSetIsDirectRHSAnonFunction(Node pn) {}
 
+  ParamsBodyNodeType newParamsBody(const TokenPos& pos) { return NodeGeneric; }
+
   FunctionNodeType newFunction(FunctionSyntaxKind syntaxKind,
                                const TokenPos& pos) {
     switch (syntaxKind) {
@@ -576,7 +612,7 @@ class SyntaxParseHandler {
   }
 
   void setFunctionFormalParametersAndBody(FunctionNodeType funNode,
-                                          ListNodeType paramsBody) {}
+                                          ParamsBodyNodeType paramsBody) {}
   void setFunctionBody(FunctionNodeType funNode, LexicalScopeNodeType body) {}
   void setFunctionBox(FunctionNodeType funNode, FunctionBox* funbox) {}
   void addFunctionFormalParameter(FunctionNodeType funNode, Node argpn) {}
@@ -620,6 +656,7 @@ class SyntaxParseHandler {
     MOZ_ASSERT(kind != ParseNodeKind::VarStmt);
     MOZ_ASSERT(kind != ParseNodeKind::LetDecl);
     MOZ_ASSERT(kind != ParseNodeKind::ConstDecl);
+    MOZ_ASSERT(kind != ParseNodeKind::ParamsBody);
     return NodeGeneric;
   }
 
@@ -627,7 +664,8 @@ class SyntaxParseHandler {
     return newList(kind, TokenPos());
   }
 
-  ListNodeType newDeclarationList(ParseNodeKind kind, const TokenPos& pos) {
+  DeclarationListNodeType newDeclarationList(ParseNodeKind kind,
+                                             const TokenPos& pos) {
     if (kind == ParseNodeKind::VarStmt) {
       return NodeVarDeclaration;
     }
@@ -635,13 +673,6 @@ class SyntaxParseHandler {
                kind == ParseNodeKind::ConstDecl);
     return NodeLexicalDeclaration;
   }
-
-  bool isDeclarationList(Node node) {
-    return node == NodeVarDeclaration || node == NodeLexicalDeclaration;
-  }
-
-  // This method should only be called from parsers using FullParseHandler.
-  Node singleBindingFromDeclaration(ListNodeType decl) = delete;
 
   ListNodeType newCommaExpressionList(Node kid) { return NodeGeneric; }
 
@@ -661,6 +692,8 @@ class SyntaxParseHandler {
     return kind == ParseNodeKind::AssignExpr ? NodeUnparenthesizedAssignment
                                              : NodeGeneric;
   }
+
+  AssignmentNodeType newInitExpr(Node lhs, Node rhs) { return NodeGeneric; }
 
   bool isUnparenthesizedAssignment(Node node) {
     return node == NodeUnparenthesizedAssignment;
@@ -748,9 +781,9 @@ class SyntaxParseHandler {
     return TaggedParserAtomIndex::null();
   }
 
-  bool canSkipLazyInnerFunctions() { return false; }
-  bool canSkipLazyClosedOverBindings() { return false; }
-  JSAtom* nextLazyClosedOverBinding() {
+  bool reuseLazyInnerFunctions() { return false; }
+  bool reuseClosedOverBindings() { return false; }
+  TaggedParserAtomIndex nextLazyClosedOverBinding() {
     MOZ_CRASH(
         "SyntaxParseHandler::canSkipLazyClosedOverBindings must return false");
   }

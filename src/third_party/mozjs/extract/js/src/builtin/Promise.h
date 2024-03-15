@@ -7,24 +7,75 @@
 #ifndef builtin_Promise_h
 #define builtin_Promise_h
 
-#include "js/Promise.h"
-
-#include "jsapi.h"    // js::CompletionKind
 #include "jstypes.h"  // JS_PUBLIC_API
 
-#include "js/CallArgs.h"    // JS::CallArgs
 #include "js/RootingAPI.h"  // JS::{,Mutable}Handle
 #include "js/TypeDecls.h"   // JS::HandleObjectVector
-#include "js/Value.h"       // JS::Value
 
 struct JS_PUBLIC_API JSContext;
 class JS_PUBLIC_API JSObject;
+
+namespace JS {
+class CallArgs;
+class Value;
+}  // namespace JS
 
 namespace js {
 
 class AsyncFunctionGeneratorObject;
 class AsyncGeneratorObject;
 class PromiseObject;
+class SavedFrame;
+
+enum class CompletionKind : uint8_t;
+
+enum class PromiseHandler : uint32_t {
+  Identity = 0,
+  Thrower,
+
+  // ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+  //
+  // Await in async function
+  // https://tc39.es/ecma262/#await
+  //
+  // Step 3. fulfilledClosure Abstract Closure.
+  // Step 5. rejectedClosure Abstract Closure.
+  AsyncFunctionAwaitedFulfilled,
+  AsyncFunctionAwaitedRejected,
+
+  // Await in async generator
+  // https://tc39.es/ecma262/#await
+  //
+  // Step 3. fulfilledClosure Abstract Closure.
+  // Step 5. rejectedClosure Abstract Closure.
+  AsyncGeneratorAwaitedFulfilled,
+  AsyncGeneratorAwaitedRejected,
+
+  // AsyncGeneratorAwaitReturn ( generator )
+  // https://tc39.es/ecma262/#sec-asyncgeneratorawaitreturn
+  //
+  // Step 7. fulfilledClosure Abstract Closure.
+  // Step 9. rejectedClosure Abstract Closure.
+  AsyncGeneratorAwaitReturnFulfilled,
+  AsyncGeneratorAwaitReturnRejected,
+
+  // AsyncGeneratorUnwrapYieldResumption
+  // https://tc39.es/ecma262/#sec-asyncgeneratorunwrapyieldresumption
+  //
+  // Steps 3-5 for awaited.[[Type]] handling.
+  AsyncGeneratorYieldReturnAwaitedFulfilled,
+  AsyncGeneratorYieldReturnAwaitedRejected,
+
+  // AsyncFromSyncIteratorContinuation ( result, promiseCapability )
+  // https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation
+  //
+  // Steps 7. unwrap Abstract Closure.
+  AsyncFromSyncIteratorValueUnwrapDone,
+  AsyncFromSyncIteratorValueUnwrapNotDone,
+
+  // One past the maximum allowed PromiseHandler value.
+  Limit
+};
 
 // Promise.prototype.then.
 extern bool Promise_then(JSContext* cx, unsigned argc, JS::Value* vp);
@@ -140,24 +191,6 @@ enum class UnhandledRejectionBehavior { Ignore, Report };
 [[nodiscard]] bool ExtractAwaitValue(JSContext* cx, JS::Handle<JS::Value> val,
                                      JS::MutableHandle<JS::Value> resolved);
 
-[[nodiscard]] bool AsyncGeneratorAwait(
-    JSContext* cx, JS::Handle<AsyncGeneratorObject*> asyncGenObj,
-    JS::Handle<JS::Value> value);
-
-[[nodiscard]] bool AsyncGeneratorResolve(
-    JSContext* cx, JS::Handle<AsyncGeneratorObject*> asyncGenObj,
-    JS::Handle<JS::Value> value, bool done);
-
-[[nodiscard]] bool AsyncGeneratorReject(
-    JSContext* cx, JS::Handle<AsyncGeneratorObject*> asyncGenObj,
-    JS::Handle<JS::Value> exception);
-
-[[nodiscard]] bool AsyncGeneratorEnqueue(JSContext* cx,
-                                         JS::Handle<JS::Value> asyncGenVal,
-                                         CompletionKind completionKind,
-                                         JS::Handle<JS::Value> completionValue,
-                                         JS::MutableHandle<JS::Value> result);
-
 bool AsyncFromSyncIteratorMethod(JSContext* cx, JS::CallArgs& args,
                                  CompletionKind completionKind);
 
@@ -208,6 +241,26 @@ struct PromiseReactionRecordBuilder {
   [[nodiscard]] virtual bool asyncGenerator(
       JSContext* cx, JS::Handle<AsyncGeneratorObject*> unwrappedGenerator) = 0;
 };
+
+[[nodiscard]] PromiseObject* CreatePromiseObjectForAsyncGenerator(
+    JSContext* cx);
+
+[[nodiscard]] bool ResolvePromiseInternal(JSContext* cx,
+                                          JS::Handle<JSObject*> promise,
+                                          JS::Handle<JS::Value> resolutionVal);
+[[nodiscard]] bool RejectPromiseInternal(
+    JSContext* cx, JS::Handle<PromiseObject*> promise,
+    JS::Handle<JS::Value> reason,
+    JS::Handle<SavedFrame*> unwrappedRejectionStack = nullptr);
+
+[[nodiscard]] bool InternalAsyncGeneratorAwait(
+    JSContext* cx, JS::Handle<AsyncGeneratorObject*> generator,
+    JS::Handle<JS::Value> value, PromiseHandler onFulfilled,
+    PromiseHandler onRejected);
+
+bool IsPromiseWithDefaultResolvingFunction(PromiseObject* promise);
+void SetAlreadyResolvedPromiseWithDefaultResolvingFunction(
+    PromiseObject* promise);
 
 }  // namespace js
 

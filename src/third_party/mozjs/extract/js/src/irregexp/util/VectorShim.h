@@ -38,6 +38,10 @@ void DeleteArray(T* array) {
   js_free(array);
 }
 
+}  // namespace internal
+
+namespace base {
+
 //////////////////////////////////////////////////
 
 // A non-resizable vector containing a pointer and a length.
@@ -55,7 +59,7 @@ class Vector {
   }
 
   static Vector<T> New(size_t length) {
-    return Vector<T>(NewArray<T>(length), length);
+    return Vector<T>(v8::internal::NewArray<T>(length), length);
   }
 
   // Returns a vector using the same backing storage as this one,
@@ -102,7 +106,7 @@ class Vector {
 
   // Returns a clone of this vector with a new backing store.
   Vector<T> Clone() const {
-    T* result = NewArray<T>(length_);
+    T* result = v8::internal::NewArray<T>(length_);
     for (size_t i = 0; i < length_; i++) result[i] = start_[i];
     return Vector<T>(result, length_);
   }
@@ -120,7 +124,7 @@ class Vector {
     length_ = 0;
   }
 
-  Vector<T> operator+(size_t offset) {
+  Vector<T> operator+(size_t offset) const {
     MOZ_ASSERT(offset <= length_);
     return Vector<T>(start_ + offset, length_ - offset);
   }
@@ -165,19 +169,28 @@ inline Vector<const char> CStrVector(const char* data) {
   return Vector<const char>(data, strlen(data));
 }
 
-}  // namespace internal
+// Construct a Vector from a start pointer and a size.
+template <typename T>
+inline constexpr Vector<T> VectorOf(T* start, size_t size) {
+  return {start, size};
+}
 
-namespace base {
+class DefaultAllocator {
+ public:
+  using Policy = js::SystemAllocPolicy;
+  Policy policy() const { return js::SystemAllocPolicy(); }
+};
 
 // SmallVector uses inline storage first, and reallocates when full.
 // It is basically equivalent to js::Vector, and is implemented
 // as a thin wrapper.
 // V8's implementation:
-// https://github.com/v8/v8/blob/master/src/base/small-vector.h
-template <typename T, size_t kSize>
+// https://github.com/v8/v8/blob/main/src/base/small-vector.h
+template <typename T, size_t kSize, typename Allocator = DefaultAllocator>
 class SmallVector {
  public:
-  SmallVector() = default;
+  explicit SmallVector(const Allocator& allocator = DefaultAllocator())
+      : inner_(allocator.policy()) {}
   SmallVector(size_t size) { resize_no_init(size); }
 
   inline bool empty() const { return inner_.empty(); }
@@ -193,9 +206,12 @@ class SmallVector {
   inline size_t size() const { return inner_.length(); }
   inline const T& at(size_t index) const { return inner_[index]; }
   T* data() { return inner_.begin(); }
+  T* begin() { return inner_.begin(); }
 
   T& operator[](size_t index) { return inner_[index]; }
   const T& operator[](size_t index) const { return inner_[index]; }
+
+  inline void clear() { inner_.clear(); }
 
   void resize_no_init(size_t new_size) {
     js::AutoEnterOOMUnsafeRegion oomUnsafe;
@@ -205,7 +221,7 @@ class SmallVector {
   }
 
  private:
-  js::Vector<T, kSize, js::SystemAllocPolicy> inner_;
+  js::Vector<T, kSize, typename Allocator::Policy> inner_;
 };
 
 }  // namespace base

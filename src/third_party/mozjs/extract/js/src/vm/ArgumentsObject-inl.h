@@ -12,12 +12,11 @@
 #include "vm/EnvironmentObject.h"
 
 #include "vm/EnvironmentObject-inl.h"
-#include "vm/JSScript-inl.h"
 
 namespace js {
 
 inline const Value& ArgumentsObject::element(uint32_t i) const {
-  MOZ_ASSERT(!isElementDeleted(i));
+  MOZ_ASSERT(isElement(i));
   const Value& v = data()->args[i];
   if (IsMagicScopeSlotValue(v)) {
     CallObject& callobj =
@@ -28,21 +27,15 @@ inline const Value& ArgumentsObject::element(uint32_t i) const {
 }
 
 inline void ArgumentsObject::setElement(uint32_t i, const Value& v) {
-  MOZ_ASSERT(!isElementDeleted(i));
-  GCPtrValue& lhs = data()->args[i];
+  MOZ_ASSERT(isElement(i));
+  GCPtr<Value>& lhs = data()->args[i];
   if (IsMagicScopeSlotValue(lhs)) {
-    uint32_t slot = SlotFromMagicScopeSlotValue(lhs);
     CallObject& callobj =
         getFixedSlot(MAYBE_CALL_SLOT).toObject().as<CallObject>();
-    for (ShapePropertyIter<NoGC> iter(callobj.shape()); !iter.done(); iter++) {
-      if (iter->slot() == slot) {
-        callobj.setAliasedFormalFromArguments(lhs, v);
-        return;
-      }
-    }
-    MOZ_CRASH("Bad Arguments::setElement");
+    callobj.setAliasedFormalFromArguments(lhs, v);
+  } else {
+    lhs = v;
   }
-  lhs = v;
 }
 
 inline bool ArgumentsObject::maybeGetElements(uint32_t start, uint32_t count,
@@ -50,7 +43,7 @@ inline bool ArgumentsObject::maybeGetElements(uint32_t start, uint32_t count,
   MOZ_ASSERT(start + count >= start);
 
   uint32_t length = initialLength();
-  if (start > length || start + count > length || isAnyElementDeleted()) {
+  if (start > length || start + count > length || hasOverriddenElement()) {
     return false;
   }
 

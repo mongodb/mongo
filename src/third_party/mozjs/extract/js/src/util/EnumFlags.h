@@ -62,6 +62,10 @@ class EnumFlags {
     }
   }
 
+  constexpr bool hasAnyFlag(const EnumFlags& other) const {
+    return (flags_ & other.flags_) != 0;
+  }
+
   constexpr bool isEmpty() const { return flags_ == 0; }
 
   constexpr FieldType toRaw() const { return flags_; }

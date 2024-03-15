@@ -51,7 +51,7 @@ case "$_Path" in
         _CONFIG_OPTS="--host=x86_64-openbsd"
     ;;
     "platform/x86_64/windows")
-        _CONFIG_OPTS="--host=x86_64-windows"
+        _CONFIG_OPTS="--host=x86_64-windows-msvc"
     ;;
     "platform/aarch64/macOS")
         _xcode_setup "macosx" "arm64" "macos-version-min=10.9"
@@ -102,6 +102,7 @@ CXXFLAGS="$CXXFLAGS -D__STDC_FORMAT_MACROS"\
 CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
 ../configure \
     --disable-jemalloc \
+    --disable-jit \
     --with-system-zlib \
     --without-intl-api \
     --enable-optimize \
@@ -125,6 +126,10 @@ mkdir -p $_Path/include/jit
 cp $_BuiltPathPrefix/jit/*.cpp $_Path/build/jit
 cp $_BuiltPathPrefix/jit/*.h $_Path/include/jit
 
+mkdir -p $_Path/build/util
+mkdir -p $_Path/include/util
+
+cp $_BuiltPathPrefix/util/*.cpp $_Path/build/util
 
 mkdir -p $_Path/build/gc
 mkdir -p $_Path/include/gc
@@ -163,4 +168,4 @@ find "$_Path/build" -name '*.cpp' |
             -e 's|#include ".*/js/src/|#include "|' \
             -e 's|#error ".*/js/src/|#error "|' \
             "$unified_file"
-  done
+done

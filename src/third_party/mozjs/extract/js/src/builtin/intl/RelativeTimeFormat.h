@@ -7,16 +7,18 @@
 #ifndef builtin_intl_RelativeTimeFormat_h
 #define builtin_intl_RelativeTimeFormat_h
 
+#include "mozilla/intl/NumberPart.h"
+
 #include <stdint.h>
 
 #include "builtin/SelfHostingDefines.h"
 #include "gc/Barrier.h"
 #include "js/Class.h"
 #include "vm/NativeObject.h"
-#include "vm/Runtime.h"
 
-struct UFormattedValue;
-struct URelativeDateTimeFormatter;
+namespace mozilla::intl {
+class RelativeTimeFormat;
+}
 
 namespace js {
 
@@ -34,17 +36,17 @@ class RelativeTimeFormatObject : public NativeObject {
                 "object slot");
 
   // Estimated memory use for URelativeDateTimeFormatter (see IcuMemoryUsage).
-  static constexpr size_t EstimatedMemoryUse = 278;
+  static constexpr size_t EstimatedMemoryUse = 8188;
 
-  URelativeDateTimeFormatter* getRelativeDateTimeFormatter() const {
+  mozilla::intl::RelativeTimeFormat* getRelativeTimeFormatter() const {
     const auto& slot = getFixedSlot(URELATIVE_TIME_FORMAT_SLOT);
     if (slot.isUndefined()) {
       return nullptr;
     }
-    return static_cast<URelativeDateTimeFormatter*>(slot.toPrivate());
+    return static_cast<mozilla::intl::RelativeTimeFormat*>(slot.toPrivate());
   }
 
-  void setRelativeDateTimeFormatter(URelativeDateTimeFormatter* rtf) {
+  void setRelativeTimeFormatter(mozilla::intl::RelativeTimeFormat* rtf) {
     setFixedSlot(URELATIVE_TIME_FORMAT_SLOT, PrivateValue(rtf));
   }
 
@@ -52,7 +54,7 @@ class RelativeTimeFormatObject : public NativeObject {
   static const JSClassOps classOps_;
   static const ClassSpec classSpec_;
 
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 /**
@@ -72,11 +74,12 @@ class RelativeTimeFormatObject : public NativeObject {
 
 namespace intl {
 
-using FieldType = js::ImmutablePropertyNamePtr JSAtomState::*;
+using FieldType = js::ImmutableTenuredPtr<PropertyName*> JSAtomState::*;
 
 [[nodiscard]] bool FormattedRelativeTimeToParts(
-    JSContext* cx, const UFormattedValue* formattedValue, double timeValue,
-    FieldType relativeTimeUnit, MutableHandleValue result);
+    JSContext* cx, HandleString str,
+    const mozilla::intl::NumberPartVector& parts, FieldType relativeTimeUnit,
+    MutableHandleValue result);
 
 }  // namespace intl
 }  // namespace js

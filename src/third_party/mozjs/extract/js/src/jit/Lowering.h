@@ -23,6 +23,12 @@
 #  include "jit/mips32/Lowering-mips32.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/Lowering-mips64.h"
+#elif defined(JS_CODEGEN_LOONG64)
+#  include "jit/loong64/Lowering-loong64.h"
+#elif defined(JS_CODEGEN_RISCV64)
+#  include "jit/riscv64/Lowering-riscv64.h"
+#elif defined(JS_CODEGEN_WASM32)
+#  include "jit/wasm32/Lowering-wasm32.h"
 #elif defined(JS_CODEGEN_NONE)
 #  include "jit/none/Lowering-none.h"
 #else
@@ -55,12 +61,13 @@ class LIRGenerator final : public LIRGeneratorSpecific {
   LBoxAllocation useBoxAtStart(MDefinition* mir,
                                LUse::Policy policy = LUse::REGISTER);
 
-  void lowerBitOp(JSOp op, MBinaryBitwiseInstruction* ins);
+  void lowerBitOp(JSOp op, MBinaryInstruction* ins);
   void lowerShiftOp(JSOp op, MShiftInstruction* ins);
   LInstructionHelper<1, 1, 0>* allocateAbs(MAbs* ins, LAllocation input);
-  void definePhis();
+  bool definePhis();
 
-  [[nodiscard]] bool lowerCallArguments(MCall* call);
+  template <typename T>
+  [[nodiscard]] bool lowerCallArguments(T* call);
 
   friend class LIRGeneratorShared;
   void visitInstructionDispatch(MInstruction* ins);
@@ -73,6 +80,9 @@ class LIRGenerator final : public LIRGeneratorSpecific {
 #define MIR_OP(op) void visit##op(M##op* ins);
   MIR_OPCODE_LIST(MIR_OP)
 #undef MIR_OP
+
+  template <class MWasmCallT>
+  void visitWasmCall(MWasmCallT ins);
 };
 
 }  // namespace jit

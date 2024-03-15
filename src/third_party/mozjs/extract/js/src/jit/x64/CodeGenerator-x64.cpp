@@ -6,15 +6,12 @@
 
 #include "jit/x64/CodeGenerator-x64.h"
 
-#include "mozilla/MathAlgorithms.h"
-
 #include "jit/CodeGenerator.h"
 #include "jit/MIR.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 
 #include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
-#include "vm/JSScript-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -40,16 +37,6 @@ Operand CodeGeneratorX64::ToOperand64(const LInt64Allocation& a64) {
     return Operand(a.toGeneralReg()->reg());
   }
   return Operand(ToAddress(a));
-}
-
-FrameSizeClass FrameSizeClass::FromDepth(uint32_t frameDepth) {
-  return FrameSizeClass::None();
-}
-
-FrameSizeClass FrameSizeClass::ClassLimit() { return FrameSizeClass(0); }
-
-uint32_t FrameSizeClass::frameSize() const {
-  MOZ_CRASH("x64 does not use frame size classes");
 }
 
 void CodeGenerator::visitValue(LValue* value) {
@@ -183,6 +170,24 @@ void CodeGenerator::visitCompareI64AndBranch(LCompareI64AndBranch* lir) {
              lir->ifFalse());
 }
 
+void CodeGenerator::visitBitAndAndBranch(LBitAndAndBranch* baab) {
+  Register regL = ToRegister(baab->left());
+  if (baab->is64()) {
+    if (baab->right()->isConstant()) {
+      masm.test64(regL, Imm64(ToInt64(baab->right())));
+    } else {
+      masm.test64(regL, ToRegister(baab->right()));
+    }
+  } else {
+    if (baab->right()->isConstant()) {
+      masm.test32(regL, Imm32(ToInt32(baab->right())));
+    } else {
+      masm.test32(regL, ToRegister(baab->right()));
+    }
+  }
+  emitBranch(baab->cond(), baab->ifTrue(), baab->ifFalse());
+}
+
 void CodeGenerator::visitDivOrModI64(LDivOrModI64* lir) {
   Register lhs = ToRegister(lir->lhs());
   Register rhs = ToRegister(lir->rhs());
@@ -275,7 +280,7 @@ void CodeGeneratorX64::emitBigIntDiv(LBigIntDiv* ins, Register dividend,
   masm.idivq(divisor);
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -296,7 +301,7 @@ void CodeGeneratorX64::emitBigIntMod(LBigIntMod* ins, Register dividend,
   masm.movq(output, dividend);
 
   // Create and return the result.
-  masm.newGCBigInt(output, divisor, fail, bigIntsCanBeInNursery());
+  masm.newGCBigInt(output, divisor, initialBigIntHeap(), fail);
   masm.initializeBigInt(output, dividend);
 }
 
@@ -310,6 +315,8 @@ void CodeGenerator::visitAtomicLoad64(LAtomicLoad64* lir) {
 
   Scalar::Type storageType = mir->storageType();
 
+  // NOTE: the generated code must match the assembly code in gen_load in
+  // GenerateAtomicOperations.py
   auto sync = Synchronization::Load();
 
   masm.memoryBarrierBefore(sync);
@@ -336,6 +343,8 @@ void CodeGenerator::visitAtomicStore64(LAtomicStore64* lir) {
 
   masm.loadBigInt64(value, temp1);
 
+  // NOTE: the generated code must match the assembly code in gen_store in
+  // GenerateAtomicOperations.py
   auto sync = Synchronization::Store();
 
   masm.memoryBarrierBefore(sync);
@@ -468,16 +477,6 @@ void CodeGenerator::visitAtomicTypedArrayElementBinopForEffect64(
   }
 }
 
-void CodeGenerator::visitWasmRegisterResult(LWasmRegisterResult* lir) {
-  if (JitOptions.spectreIndexMasking) {
-    if (MWasmRegisterResult* mir = lir->mir()) {
-      if (mir->type() == MIRType::Int32) {
-        masm.movl(ToRegister(lir->output()), ToRegister(lir->output()));
-      }
-    }
-  }
-}
-
 void CodeGenerator::visitWasmSelectI64(LWasmSelectI64* lir) {
   MOZ_ASSERT(lir->mir()->type() == MIRType::Int64);
 
@@ -491,6 +490,93 @@ void CodeGenerator::visitWasmSelectI64(LWasmSelectI64* lir) {
 
   masm.test32(cond, cond);
   masm.cmovzq(falseExpr, out.reg);
+}
+
+// We expect to handle only the cases: compare is {U,}Int{32,64}, and select
+// is {U,}Int{32,64}, independently.  Some values may be stack allocated, and
+// the "true" input is reused for the output.
+void CodeGenerator::visitWasmCompareAndSelect(LWasmCompareAndSelect* ins) {
+  bool cmpIs32bit = ins->compareType() == MCompare::Compare_Int32 ||
+                    ins->compareType() == MCompare::Compare_UInt32;
+  bool cmpIs64bit = ins->compareType() == MCompare::Compare_Int64 ||
+                    ins->compareType() == MCompare::Compare_UInt64;
+  bool selIs32bit = ins->mir()->type() == MIRType::Int32;
+  bool selIs64bit = ins->mir()->type() == MIRType::Int64;
+
+  // Throw out unhandled cases
+  MOZ_RELEASE_ASSERT(
+      cmpIs32bit != cmpIs64bit && selIs32bit != selIs64bit,
+      "CodeGenerator::visitWasmCompareAndSelect: unexpected types");
+
+  using C = Assembler::Condition;
+  using R = Register;
+  using A = const Address&;
+
+  // Identify macroassembler methods to generate instructions, based on the
+  // type of the comparison and the select.  This avoids having to duplicate
+  // the code-generation tree below 4 times.  These assignments to
+  // `cmpMove_CRRRR` et al are unambiguous as a result of the combination of
+  // the template parameters and the 5 argument types ((C, R, R, R, R) etc).
+  void (MacroAssembler::*cmpMove_CRRRR)(C, R, R, R, R) = nullptr;
+  void (MacroAssembler::*cmpMove_CRARR)(C, R, A, R, R) = nullptr;
+  void (MacroAssembler::*cmpLoad_CRRAR)(C, R, R, A, R) = nullptr;
+  void (MacroAssembler::*cmpLoad_CRAAR)(C, R, A, A, R) = nullptr;
+
+  if (cmpIs32bit) {
+    if (selIs32bit) {
+      cmpMove_CRRRR = &MacroAssemblerX64::cmpMove<32, 32>;
+      cmpMove_CRARR = &MacroAssemblerX64::cmpMove<32, 32>;
+      cmpLoad_CRRAR = &MacroAssemblerX64::cmpLoad<32, 32>;
+      cmpLoad_CRAAR = &MacroAssemblerX64::cmpLoad<32, 32>;
+    } else {
+      cmpMove_CRRRR = &MacroAssemblerX64::cmpMove<32, 64>;
+      cmpMove_CRARR = &MacroAssemblerX64::cmpMove<32, 64>;
+      cmpLoad_CRRAR = &MacroAssemblerX64::cmpLoad<32, 64>;
+      cmpLoad_CRAAR = &MacroAssemblerX64::cmpLoad<32, 64>;
+    }
+  } else {
+    if (selIs32bit) {
+      cmpMove_CRRRR = &MacroAssemblerX64::cmpMove<64, 32>;
+      cmpMove_CRARR = &MacroAssemblerX64::cmpMove<64, 32>;
+      cmpLoad_CRRAR = &MacroAssemblerX64::cmpLoad<64, 32>;
+      cmpLoad_CRAAR = &MacroAssemblerX64::cmpLoad<64, 32>;
+    } else {
+      cmpMove_CRRRR = &MacroAssemblerX64::cmpMove<64, 64>;
+      cmpMove_CRARR = &MacroAssemblerX64::cmpMove<64, 64>;
+      cmpLoad_CRRAR = &MacroAssemblerX64::cmpLoad<64, 64>;
+      cmpLoad_CRAAR = &MacroAssemblerX64::cmpLoad<64, 64>;
+    }
+  }
+
+  Register trueExprAndDest = ToRegister(ins->output());
+  MOZ_ASSERT(ToRegister(ins->ifTrueExpr()) == trueExprAndDest,
+             "true expr input is reused for output");
+
+  Assembler::Condition cond = Assembler::InvertCondition(
+      JSOpToCondition(ins->compareType(), ins->jsop()));
+  const LAllocation* rhs = ins->rightExpr();
+  const LAllocation* falseExpr = ins->ifFalseExpr();
+  Register lhs = ToRegister(ins->leftExpr());
+
+  // We generate one of four cmp+cmov pairings, depending on whether one of
+  // the cmp args and one of the cmov args is in memory or a register.
+  if (rhs->isRegister()) {
+    if (falseExpr->isRegister()) {
+      (masm.*cmpMove_CRRRR)(cond, lhs, ToRegister(rhs), ToRegister(falseExpr),
+                            trueExprAndDest);
+    } else {
+      (masm.*cmpLoad_CRRAR)(cond, lhs, ToRegister(rhs), ToAddress(falseExpr),
+                            trueExprAndDest);
+    }
+  } else {
+    if (falseExpr->isRegister()) {
+      (masm.*cmpMove_CRARR)(cond, lhs, ToAddress(rhs), ToRegister(falseExpr),
+                            trueExprAndDest);
+    } else {
+      (masm.*cmpLoad_CRAAR)(cond, lhs, ToAddress(rhs), ToAddress(falseExpr),
+                            trueExprAndDest);
+    }
+  }
 }
 
 void CodeGenerator::visitWasmReinterpretFromI64(LWasmReinterpretFromI64* lir) {
@@ -556,7 +642,7 @@ void CodeGeneratorX64::wasmStore(const wasm::MemoryAccessDesc& access,
 }
 
 void CodeGenerator::visitWasmHeapBase(LWasmHeapBase* ins) {
-  MOZ_ASSERT(ins->tlsPtr()->isBogus());
+  MOZ_ASSERT(ins->instance()->isBogus());
   masm.movePtr(HeapReg, ToRegister(ins->output()));
 }
 
@@ -567,6 +653,8 @@ void CodeGeneratorX64::emitWasmLoad(T* ins) {
   uint32_t offset = mir->access().offset();
   MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
+  // ptr is a GPR and is either a 32-bit value zero-extended to 64-bit, or a
+  // true 64-bit value.
   const LAllocation* ptr = ins->ptr();
   Operand srcAddr = ptr->isBogus()
                         ? Operand(HeapReg, offset)
@@ -774,7 +862,7 @@ void CodeGenerator::visitWasmExtendU32Index(LWasmExtendU32Index* lir) {
   // canonical form.
   Register output = ToRegister(lir->output());
   MOZ_ASSERT(ToRegister(lir->input()) == output);
-  masm.assertCanonicalInt32(output);
+  masm.debugAssertCanonicalInt32(output);
 }
 
 void CodeGenerator::visitWasmWrapU32Index(LWasmWrapU32Index* lir) {
@@ -782,7 +870,7 @@ void CodeGenerator::visitWasmWrapU32Index(LWasmWrapU32Index* lir) {
   // canonical form.
   Register output = ToRegister(lir->output());
   MOZ_ASSERT(ToRegister(lir->input()) == output);
-  masm.assertCanonicalInt32(output);
+  masm.debugAssertCanonicalInt32(output);
 }
 
 void CodeGenerator::visitSignExtendInt64(LSignExtendInt64* ins) {
@@ -879,6 +967,14 @@ void CodeGenerator::visitCtzI64(LCtzI64* lir) {
   Register64 input = ToRegister64(lir->getInt64Operand(0));
   Register64 output = ToOutRegister64(lir);
   masm.ctz64(input, output.reg);
+}
+
+void CodeGenerator::visitBitNotI64(LBitNotI64* ins) {
+  const LAllocation* input = ins->getOperand(0);
+  MOZ_ASSERT(!input->isConstant());
+  Register inputR = ToRegister(input);
+  MOZ_ASSERT(inputR == ToRegister(ins->output()));
+  masm.notq(inputR);
 }
 
 void CodeGenerator::visitTestI64AndBranch(LTestI64AndBranch* lir) {

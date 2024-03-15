@@ -9,6 +9,7 @@
 
 #include "jit/TemplateObject.h"
 
+#include "vm/EnvironmentObject.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/RegExpObject.h"
 
@@ -41,6 +42,10 @@ inline bool TemplateObject::isRegExpObject() const {
 
 inline bool TemplateObject::isCallObject() const {
   return obj_->is<CallObject>();
+}
+
+inline bool TemplateObject::isBlockLexicalEnvironmentObject() const {
+  return obj_->is<BlockLexicalEnvironmentObject>();
 }
 
 inline bool TemplateObject::isPlainObject() const {
@@ -76,7 +81,7 @@ inline uint32_t TemplateNativeObject::numFixedSlots() const {
 }
 
 inline uint32_t TemplateNativeObject::slotSpan() const {
-  return asNativeObject().shape()->slotSpan();
+  return asNativeObject().sharedShape()->slotSpan();
 }
 
 inline Value TemplateNativeObject::getSlot(uint32_t i) const {
@@ -109,18 +114,10 @@ inline bool TemplateNativeObject::hasDynamicElements() const {
   return asNativeObject().hasDynamicElements();
 }
 
-inline bool TemplateNativeObject::hasPrivate() const {
-  return asNativeObject().hasPrivate();
-}
-
 inline gc::Cell* TemplateNativeObject::regExpShared() const {
   RegExpObject* regexp = &obj_->as<RegExpObject>();
   MOZ_ASSERT(regexp->hasShared());
   return regexp->getShared();
-}
-
-inline void* TemplateNativeObject::getPrivate() const {
-  return asNativeObject().getPrivate();
 }
 
 }  // namespace jit

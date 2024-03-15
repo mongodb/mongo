@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if !JS_HAS_INTL_API || MOZ_SYSTEM_ICU
+#if !JS_HAS_INTL_API
 /*
  * Broken down form of 64 bit time value.
  */
@@ -51,7 +51,7 @@ extern void PRMJ_NowShutdown();
 inline void PRMJ_NowShutdown() {}
 #endif
 
-#if !JS_HAS_INTL_API || MOZ_SYSTEM_ICU
+#if !JS_HAS_INTL_API
 /* Format a time value into a buffer. Same semantics as strftime() */
 extern size_t PRMJ_FormatTime(char* buf, size_t buflen, const char* fmt,
                               const PRMJTime* tm, int timeZoneYear,
@@ -155,10 +155,6 @@ static __inline__ uint64_t ReadTimestampCounter(void) {
 
 namespace js {
 
-static inline mozilla::TimeStamp ReallyNow() {
-  return mozilla::TimeStamp::NowUnfuzzed();
-}
-
 class MOZ_RAII AutoIncrementalTimer {
   mozilla::TimeStamp startTime;
   mozilla::TimeDuration& output;
@@ -169,10 +165,10 @@ class MOZ_RAII AutoIncrementalTimer {
 
   explicit AutoIncrementalTimer(mozilla::TimeDuration& output_)
       : output(output_) {
-    startTime = ReallyNow();
+    startTime = mozilla::TimeStamp::Now();
   }
 
-  ~AutoIncrementalTimer() { output += ReallyNow() - startTime; }
+  ~AutoIncrementalTimer() { output += mozilla::TimeStamp::Now() - startTime; }
 };
 
 }  // namespace js

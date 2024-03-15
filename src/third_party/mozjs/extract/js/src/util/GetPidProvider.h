@@ -10,8 +10,6 @@
 #ifdef XP_WIN
 #  include <process.h>
 #  define getpid _getpid
-#elif defined(__wasi__)
-#  define getpid() 1
 #else
 #  include <unistd.h>
 #endif

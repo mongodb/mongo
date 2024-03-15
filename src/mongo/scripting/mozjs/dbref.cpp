@@ -69,8 +69,8 @@ void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(out);
 }
 
-void DBRefInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    BSONInfo::finalize(fop, obj);
+void DBRefInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    BSONInfo::finalize(gcCtx, obj);
 }
 
 void DBRefInfo::enumerate(JSContext* cx,
@@ -109,8 +109,12 @@ void DBRefInfo::make(
     auto scope = getScope(cx);
 
     scope->getProto<DBRefInfo>().newObject(obj);
-    JS::SetPrivate(obj, JS::GetPrivate(local));
-    JS::SetPrivate(local, nullptr);
+
+    JS::SetReservedSlot(
+        obj,
+        BSONHolderSlot,
+        JS::PrivateValue(JS::GetMaybePtrFromReservedSlot<void>(local, BSONInfo::BSONHolderSlot)));
+    JS::SetReservedSlot(local, BSONInfo::BSONHolderSlot, JS::UndefinedValue());
 }
 
 }  // namespace mozjs

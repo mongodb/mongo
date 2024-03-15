@@ -44,8 +44,13 @@ enum RegisterID : uint8_t {
 
 enum HRegisterID { ah = rsp, ch = rbp, dh = rsi, bh = rdi };
 
-enum XMMRegisterID {
-  xmm0,
+enum XMMRegisterID
+// GCC < 8.0 has a bug with bitfields of enums with an underlying type.
+#if defined(__clang__) || __GNUC__ > 7
+    : uint8_t
+#endif
+{
+  xmm0 = 0,
   xmm1,
   xmm2,
   xmm3,
@@ -273,6 +278,8 @@ enum ConditionCmp {
   ConditionCmp_NLT = 0x5,
   ConditionCmp_NLE = 0x6,
   ConditionCmp_ORD = 0x7,
+  ConditionCmp_AVX_Enabled = 0x8,
+  ConditionCmp_GE = 0xD,
 };
 
 // Rounding modes for ROUNDSS / ROUNDSD.

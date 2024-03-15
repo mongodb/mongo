@@ -17,10 +17,10 @@ using mozilla::Some;
 
 TDZCheckCache::TDZCheckCache(BytecodeEmitter* bce)
     : Nestable<TDZCheckCache>(&bce->innermostTDZCheckCache),
-      cache_(bce->cx->frontendCollectionPool()) {}
+      cache_(bce->fc->nameCollectionPool()) {}
 
 bool TDZCheckCache::ensureCache(BytecodeEmitter* bce) {
-  return cache_ || cache_.acquire(bce->cx);
+  return cache_ || cache_.acquire(bce->fc);
 }
 
 Maybe<MaybeCheckTDZ> TDZCheckCache::needsTDZCheck(BytecodeEmitter* bce,
@@ -45,7 +45,7 @@ Maybe<MaybeCheckTDZ> TDZCheckCache::needsTDZCheck(BytecodeEmitter* bce,
   }
 
   if (!cache_->add(p, name, rv)) {
-    ReportOutOfMemory(bce->cx);
+    ReportOutOfMemory(bce->fc);
     return Nothing();
   }
 
@@ -67,7 +67,7 @@ bool TDZCheckCache::noteTDZCheck(BytecodeEmitter* bce,
     p->value() = check;
   } else {
     if (!cache_->add(p, name, check)) {
-      ReportOutOfMemory(bce->cx);
+      ReportOutOfMemory(bce->fc);
       return false;
     }
   }

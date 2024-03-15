@@ -27,6 +27,7 @@
 #endif
 
 #include "js/CharacterEncoding.h"
+#include "js/PropertyAndElement.h"  // JS_DefineFunctions
 #include "js/PropertySpec.h"
 #include "js/Utility.h"
 #include "util/Text.h"

@@ -72,7 +72,7 @@ class Tainted {
 // ====================================================================
 // ====================================================================
 /*
- * This section contains non-user-facing C++ gobblygook to support
+ * This section contains obscure, non-user-facing C++ to support
  * variable-argument macros.
  */
 #define MOZ_TAINT_GLUE(a, b) a b

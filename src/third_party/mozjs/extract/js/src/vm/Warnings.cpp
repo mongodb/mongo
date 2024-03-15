@@ -9,9 +9,9 @@
 
 #include <stdarg.h>  // va_{list,start,end}
 
-#include "jsapi.h"    // js::AssertHeapIsIdle
 #include "jstypes.h"  // JS_PUBLIC_API
 
+#include "js/Context.h"               // js::AssertHeapIsIdle
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage
 #include "vm/ErrorReporting.h"        // IsWarning
 #include "vm/JSContext.h"  // js::ArgumentsAre{ASCII,Latin1,UTF8}, js::ReportError{Number}VA

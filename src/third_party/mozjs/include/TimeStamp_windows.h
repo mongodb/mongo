@@ -38,38 +38,31 @@ class TimeStampValue {
   friend bool IsCanonicalTimeStamp(TimeStampValue);
   friend struct IPC::ParamTraits<mozilla::TimeStampValue>;
   friend class TimeStamp;
-  friend class Fuzzyfox;
 
   // Both QPC and GTC are kept in [mt] units.
   uint64_t mGTC;
   uint64_t mQPC;
 
-  bool mUsedCanonicalNow;
   bool mIsNull;
   bool mHasQPC;
 
-  MFBT_API TimeStampValue(uint64_t aGTC, uint64_t aQPC, bool aHasQPC,
-                          bool aUsedCanonicalNow);
+  MFBT_API TimeStampValue(uint64_t aGTC, uint64_t aQPC, bool aHasQPC);
 
   MFBT_API uint64_t CheckQPC(const TimeStampValue& aOther) const;
 
-  constexpr MOZ_IMPLICIT TimeStampValue()
-      : mGTC(0),
-        mQPC(0),
-        mUsedCanonicalNow(false),
-        mIsNull(true),
-        mHasQPC(false) {}
+  // This struct is used to allow doing TimeStampValue a = 0 and similar
+  struct _SomethingVeryRandomHere;
+  constexpr MOZ_IMPLICIT TimeStampValue(_SomethingVeryRandomHere* aNullValue)
+      : mGTC(0), mQPC(0), mIsNull(true), mHasQPC(false) {}
 
  public:
   MFBT_API uint64_t operator-(const TimeStampValue& aOther) const;
 
   TimeStampValue operator+(const int64_t aOther) const {
-    return TimeStampValue(mGTC + aOther, mQPC + aOther, mHasQPC,
-                          mUsedCanonicalNow);
+    return TimeStampValue(mGTC + aOther, mQPC + aOther, mHasQPC);
   }
   TimeStampValue operator-(const int64_t aOther) const {
-    return TimeStampValue(mGTC - aOther, mQPC - aOther, mHasQPC,
-                          mUsedCanonicalNow);
+    return TimeStampValue(mGTC - aOther, mQPC - aOther, mHasQPC);
   }
   MFBT_API TimeStampValue& operator+=(const int64_t aOther);
   MFBT_API TimeStampValue& operator-=(const int64_t aOther);
@@ -92,9 +85,14 @@ class TimeStampValue {
   bool operator!=(const TimeStampValue& aOther) const {
     return int64_t(*this - aOther) != 0;
   }
-  bool UsedCanonicalNow() const { return mUsedCanonicalNow; }
-  void SetCanonicalNow() { mUsedCanonicalNow = true; }
   bool IsNull() const { return mIsNull; }
+
+#if defined(DEBUG)
+  uint64_t GTC() const { return mGTC; }
+  uint64_t QPC() const { return mQPC; }
+
+  bool HasQPC() const { return mHasQPC; }
+#endif
 };
 
 }  // namespace mozilla

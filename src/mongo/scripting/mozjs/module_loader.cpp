@@ -34,8 +34,10 @@
 #include "mongo/scripting/mozjs/module_loader.h"
 #include "mongo/util/file.h"
 
+#include <js/GlobalObject.h>
 #include <js/JSON.h>
 #include <js/Modules.h>
+#include <js/PropertyAndElement.h>
 #include <js/SourceText.h>
 #include <js/StableStringChars.h>
 
@@ -138,7 +140,7 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
             return false;
         }
 
-        if (!JS::ModuleInstantiate(cx, module)) {
+        if (!JS::ModuleLink(cx, module)) {
             return false;
         }
 
