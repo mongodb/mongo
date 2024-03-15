@@ -69,12 +69,13 @@ export function runCommandCompareResponsesBase(
     } catch (err) {
         err0 = err;
     }
-    let resObj1, err1;
-    try {
-        resObj1 = func.apply(conn1, makeFuncArgs(commandObj));
-    } catch (err) {
-        err1 = err;
-    }
+    // TODO (SERVER-87846): Add concurrency_replication suites with replica set endpoint enabled.
+    // let resObj1, err1;
+    // try {
+    //     resObj1 = func.apply(conn1, makeFuncArgs(commandObj));
+    // } catch (err) {
+    //     err1 = err;
+    // }
 
     if (err0) {
         throw err0;
