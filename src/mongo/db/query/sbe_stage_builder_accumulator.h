@@ -136,10 +136,7 @@ public:
      * method generates the "block" versions of the accumulate expressions for this Op.
      */
     boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggs(
-        StageBuilderState& state,
-        InputsPtr inputs,
-        SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot) const;
+        StageBuilderState& state, InputsPtr inputs, SbSlot bitmapInternalSlot) const;
 
     /**
      * Given a map of input expressions ('argExprs'), these methods generate the initialize

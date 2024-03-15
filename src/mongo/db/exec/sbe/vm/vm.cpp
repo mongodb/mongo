@@ -172,6 +172,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // getArraySize
 
     -1,  // aggSum
+    -1,  // aggCount
     -1,  // aggMin
     -1,  // aggMax
     -1,  // aggFirst
@@ -809,6 +810,10 @@ void CodeFragment::appendSetField() {
 
 void CodeFragment::appendSum() {
     appendSimpleInstruction(Instruction::aggSum);
+}
+
+void CodeFragment::appendCount() {
+    appendSimpleInstruction(Instruction::aggCount);
 }
 
 void CodeFragment::appendMin() {
@@ -1745,10 +1750,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags 
                                                                 value::Value accValue,
                                                                 value::TypeTags fieldTag,
                                                                 value::Value fieldValue) {
-    // Skip aggregation step if we don't have the input.
-    if (fieldTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
+    value::ValueGuard guard{accTag, accValue};
+
+    // Skip aggregation step if the input is Nothing or non-numeric.
+    if (!value::isNumber(fieldTag)) {
+        guard.reset();
+        return {true, accTag, accValue};
     }
 
     // Initialize the accumulator.
@@ -1757,7 +1764,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags 
         accValue = value::bitcastFrom<int32_t>(0);
     }
 
-    return genericAdd(accTag, accValue, fieldTag, fieldValue);
+    auto resultTuple = genericAdd(accTag, accValue, fieldTag, fieldValue);
+
+    guard.reset();
+    return resultTuple;
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggCount(value::TypeTags accTag,
+                                                                  value::Value accValue) {
+    value::ValueGuard guard{accTag, accValue};
+    int64_t n = accTag == value::TypeTags::NumberInt64 ? value::bitcastTo<int64_t>(accValue) : 0;
+    return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(n + 1)};
 }
 
 void resetDoubleDoubleSumState(value::Array* state) {
@@ -9525,6 +9542,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockAggMax(arity);
         case Builtin::valueBlockAggCount:
             return builtinValueBlockAggCount(arity);
+        case Builtin::valueBlockAggSum:
+            return builtinValueBlockAggSum(arity);
         case Builtin::valueBlockDateDiff:
             return builtinValueBlockDateDiff(arity);
         case Builtin::valueBlockDateTrunc:
@@ -9535,8 +9554,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockTrunc(arity);
         case Builtin::valueBlockRound:
             return builtinValueBlockRound(arity);
-        case Builtin::valueBlockAggSum:
-            return builtinValueBlockAggSum(arity);
         case Builtin::valueBlockAdd:
             return builtinValueBlockAdd(arity);
         case Builtin::valueBlockSub:
@@ -10041,6 +10058,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockAggMax";
         case Builtin::valueBlockAggCount:
             return "valueBlockAggCount";
+        case Builtin::valueBlockAggSum:
+            return "valueBlockAggSum";
         case Builtin::valueBlockDateDiff:
             return "valueBlockDateDiff";
         case Builtin::valueBlockDateTrunc:
@@ -10051,8 +10070,6 @@ std::string builtinToString(Builtin b) {
             return "valueBlockTrunc";
         case Builtin::valueBlockRound:
             return "valueBlockRound";
-        case Builtin::valueBlockAggSum:
-            return "valueBlockAggSum";
         case Builtin::valueBlockAdd:
             return "valueBlockAdd";
         case Builtin::valueBlockSub:
@@ -10878,14 +10895,19 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
 
-                auto [accOwned, accTag, accVal] = getFromStack(0);
+                auto [accTag, accVal] = moveOwnedFromStack(0);
 
                 auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
 
                 topStack(owned, tag, val);
-                if (accOwned) {
-                    value::releaseValue(accTag, accVal);
-                }
+                break;
+            }
+            case Instruction::aggCount: {
+                auto [accTag, accVal] = moveOwnedFromStack(0);
+
+                auto [owned, tag, val] = aggCount(accTag, accVal);
+
+                topStack(owned, tag, val);
                 break;
             }
             case Instruction::aggMin: {

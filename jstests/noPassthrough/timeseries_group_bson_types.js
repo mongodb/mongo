@@ -125,10 +125,14 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
     }
 
     assert.eq(scalarResults.length, bpResults.length);
+
     // Sort the data so we can compare by iterating through both results pairwise.
     const cmpFn = function(doc1, doc2) {
-        return tojson(doc1) < tojson(doc2);
+        const doc1Json = tojson(doc1);
+        const doc2Json = tojson(doc2);
+        return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
     };
+
     scalarResults.sort(cmpFn);
     bpResults.sort(cmpFn);
     for (let i = 0; i < scalarResults.length; i++) {
@@ -156,9 +160,6 @@ function runTestCases(allowDiskUse, forceSpilling) {
     let testcases = blockProcessingTestCases(
         timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, false);
     // Filter out tests with known accepted differences between SBE and Classic.
-    testcases = testcases.filter(function(test) {
-        return test.name !== 'MinOfMetaSortKey_GroupByX';
-    });
     for (const test of testcases) {
         compareScalarAndBlockProcessing(test, allowDiskUse);
     }

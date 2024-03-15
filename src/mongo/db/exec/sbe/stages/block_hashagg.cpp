@@ -155,13 +155,13 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotVector groupSlotIds,
                                      value::SlotId blockBitsetInSlotId,
                                      value::SlotVector blockDataInSlotIds,
-                                     value::SlotId rowAccSlotId,
-                                     value::SlotId accumulatorBitsetSlotId,
                                      value::SlotVector accumulatorDataSlotIds,
+                                     value::SlotId accumulatorBitsetSlotId,
                                      BlockAndRowAggs aggs,
+                                     bool allowDiskUse,
+                                     SlotExprPairVector mergingExprs,
                                      PlanYieldPolicy* yieldPolicy,
                                      PlanNodeId planNodeId,
-                                     bool allowDiskUse,
                                      bool participateInTrialRunTracking,
                                      bool forceIncreasedSpilling)
     : HashAggBaseStage("block_group"_sd,
@@ -176,15 +176,23 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
       _blockDataInSlotIds(std::move(blockDataInSlotIds)),
       _accumulatorBitsetSlotId(accumulatorBitsetSlotId),
       _accumulatorDataSlotIds(std::move(accumulatorDataSlotIds)),
-      _rowAccSlotId(rowAccSlotId),
-      _blockRowAggs(std::move(aggs)) {
-    invariant(_blockDataInSlotIds.size() == _accumulatorDataSlotIds.size());
+      _blockRowAggs(std::move(aggs)),
+      _mergingExprs(std::move(mergingExprs)) {
+    tassert(8780600,
+            "Expected 'blockDataInSlotIds' and 'accumulatorDataSlotIds' to have the same size",
+            _blockDataInSlotIds.size() == _accumulatorDataSlotIds.size());
 
     _children.emplace_back(std::move(input));
     _outIdBlocks.resize(_groupSlots.size());
     _outAggBlocks.resize(_blockRowAggs.size());
     _blockDataInAccessors.resize(_blockDataInSlotIds.size());
     _accumulatorDataAccessors.resize(_accumulatorDataSlotIds.size());
+
+    if (_allowDiskUse) {
+        tassert(8780601,
+                "Disk use enabled for HashAggStage but incorrect number of merging expresssions",
+                _blockRowAggs.size() == _mergingExprs.size());
+    }
 }
 
 BlockHashAggStage::~BlockHashAggStage() {
@@ -196,21 +204,28 @@ BlockHashAggStage::~BlockHashAggStage() {
 std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
     BlockAndRowAggs blockRowAggs;
     for (const auto& [slot, aggs] : _blockRowAggs) {
-        blockRowAggs.emplace(slot,
-                             BlockRowAccumulators{aggs.blockAgg->clone(), aggs.rowAgg->clone()});
+        blockRowAggs.emplace_back(
+            slot, BlockRowAccumulators{aggs.blockAgg->clone(), aggs.rowAgg->clone()});
+    }
+
+    SlotExprPairVector mergingExprs;
+    mergingExprs.reserve(_mergingExprs.size());
+
+    for (auto&& [k, v] : _mergingExprs) {
+        mergingExprs.push_back({k, v->clone()});
     }
 
     return std::make_unique<BlockHashAggStage>(_children[0]->clone(),
                                                _groupSlots,
                                                _blockBitsetInSlotId,
                                                _blockDataInSlotIds,
-                                               _rowAccSlotId,
-                                               _accumulatorBitsetSlotId,
                                                _accumulatorDataSlotIds,
+                                               _accumulatorBitsetSlotId,
                                                std::move(blockRowAggs),
+                                               _allowDiskUse,
+                                               std::move(mergingExprs),
                                                _yieldPolicy,
                                                _commonStats.nodeId,
-                                               _allowDiskUse,
                                                _participateInTrialRunTracking,
                                                _forceIncreasedSpilling);
 }
@@ -236,10 +251,15 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
     throwIfDupSlot(_blockBitsetInSlotId);
 
     _outAccessorsMap.reserve(_groupSlots.size() + _blockRowAggs.size());
-
     _outIdBlockAccessors.resize(_groupSlots.size());
-    size_t i = 0;
-    for (auto& slot : _groupSlots) {
+    _outAggBlockAccessors.resize(_blockRowAggs.size());
+
+    if (_allowDiskUse) {
+        _spilledAccessors.resize(_blockRowAggs.size());
+    }
+
+    for (size_t i = 0; i < _groupSlots.size(); ++i) {
+        auto& slot = _groupSlots[i];
         throwIfDupSlot(slot);
 
         _idInAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
@@ -248,21 +268,17 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
         _idHtAccessors.emplace_back(std::make_unique<HashKeyAccessor>(_htIt, i));
 
         _outAccessorsMap[slot] = &_outIdBlockAccessors[i];
-
-        ++i;
     }
 
-    _outAggBlockAccessors.resize(_blockRowAggs.size());
     // Change the agg slot accessors to point to the blocks.
-    i = 0;
-    for (auto& outBlock : _outAggBlocks) {
+    for (size_t i = 0; i < _outAggBlocks.size(); ++i) {
+        auto& outBlock = _outAggBlocks[i];
         _outAggBlockAccessors[i].reset(
             false, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(&outBlock));
-        ++i;
     }
 
-    i = 0;
-    for (auto& [slot, aggs] : _blockRowAggs) {
+    for (size_t i = 0; i < _blockRowAggs.size(); ++i) {
+        auto& [slot, _] = _blockRowAggs[i];
         throwIfDupSlot(slot);
 
         _rowAggHtAccessors.emplace_back(std::make_unique<HashAggAccessor>(_htIt, i));
@@ -272,16 +288,41 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
                 _rowAggHtAccessors.back().get(), _rowAggRSAccessors.back().get()}));
         _outAccessorsMap[slot] = &_outAggBlockAccessors[i];
 
+        if (_allowDiskUse) {
+            value::SlotId spillSlot = _mergingExprs[i].first;
+            throwIfDupSlot(spillSlot);
+
+            _spilledAccessorMap[spillSlot] = &_spilledAccessors[i];
+        }
+    }
+
+    // Initialize '_accumulatorDataAccessorMap'.
+    for (size_t i = 0; i < _accumulatorDataSlotIds.size(); ++i) {
+        auto slot = _accumulatorDataSlotIds[i];
+        throwIfDupSlot(slot);
+
+        _accumulatorDataAccessorMap[slot] = &_accumulatorDataAccessors[i];
+    }
+
+    // Compile 'blockAggs', 'rowAggs', and 'mergingExprs'.
+    for (size_t i = 0; i < _blockRowAggs.size(); ++i) {
+        auto& [_, aggs] = _blockRowAggs[i];
+
         ctx.root = this;
         ctx.aggExpression = true;
-        ctx.accumulator = _rowAggAccessors.back().get();
-        _aggCodes.emplace_back(aggs.rowAgg->compile(ctx));
-        ctx.aggExpression = false;
+        ctx.accumulator = _rowAggAccessors[i].get();
 
-        // Also compile the block level agg.
         _blockLevelAggCodes.emplace_back(aggs.blockAgg->compile(ctx));
-        ++i;
+        _aggCodes.emplace_back(aggs.rowAgg->compile(ctx));
+
+        if (_allowDiskUse) {
+            std::unique_ptr<EExpression>& mergingExpr = _mergingExprs[i].second;
+            _mergingExprCodes.emplace_back(mergingExpr->compile(ctx));
+        }
+
+        ctx.aggExpression = false;
     }
+
     _compiled = true;
 }
 
@@ -291,24 +332,27 @@ value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::Slot
         return &_blockBitsetOutAccessor;
     }
 
-    if (_compiled && _outAccessorsMap.count(slot)) {
-        return _outAccessorsMap[slot];
+    if (_compiled) {
+        if (_outAccessorsMap.count(slot)) {
+            return _outAccessorsMap[slot];
+        }
     } else {
-        if (_rowAccSlotId == slot) {
-            return &_rowAccAccessor;
-        } else if (_accumulatorBitsetSlotId == slot) {
+        if (_accumulatorBitsetSlotId == slot) {
             return &_accumulatorBitsetAccessor;
         }
-        for (size_t i = 0; i < _accumulatorDataSlotIds.size(); i++) {
-            if (_accumulatorDataSlotIds[i] == slot) {
-                return &_accumulatorDataAccessors[i];
-            }
+        if (auto it = _accumulatorDataAccessorMap.find(slot);
+            it != _accumulatorDataAccessorMap.end()) {
+            return it->second;
         }
-        return _children[0]->getAccessor(ctx, slot);
+        if (auto it = _spilledAccessorMap.find(slot); it != _spilledAccessorMap.end()) {
+            return it->second;
+        }
     }
+
+    return _children[0]->getAccessor(ctx, slot);
 }
 
-void BlockHashAggStage::executeAccumulatorCode(value::MaterializedRow key) {
+void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::MaterializedRow& key) {
     // If all bits are false, there's no work to do. We don't want to make an erroneous
     // entry in our hash map.
     if (allFalse(_accumulatorBitsetAccessor.getViewOfValue())) {
@@ -318,23 +362,72 @@ void BlockHashAggStage::executeAccumulatorCode(value::MaterializedRow key) {
     _htIt = _ht->find(key);
     if (_htIt == _ht->end()) {
         // New key we haven't seen before.
-        key.makeOwned();
-        auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
+        value::MaterializedRow ownedKey = key;
+        ownedKey.makeOwned();
+
+        auto [it, _] = _ht->emplace(std::move(ownedKey), value::MaterializedRow{0});
         // Initialize accumulators.
         it->second.resize(_rowAggAccessors.size());
         _htIt = it;
     }
 
-    // Now run the block level accumulators followed by the row level accumulators.
-    size_t i = 0;
-    for (auto& blockAccum : _blockLevelAggCodes) {
-        auto [owned, tag, val] = _bytecode.run(blockAccum.get());
+    // Run the block level accumulators.
+    for (size_t i = 0; i < _blockLevelAggCodes.size(); ++i) {
+        auto [owned, tag, val] = _bytecode.run(_blockLevelAggCodes[i].get());
+        _rowAggHtAccessors[i]->reset(owned, tag, val);
+    }
+}
 
-        // Now run the row level accumulator.
-        _rowAccAccessor.reset(owned, tag, val);
-        auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[i].get());
-        _rowAggHtAccessors[i]->reset(rowOwned, rowTag, rowVal);
-        ++i;
+void BlockHashAggStage::executeRowLevelAccumulatorCode(
+    const value::DeblockedTagVals& extractedBitmap,
+    const std::vector<value::DeblockedTagVals>& extractedGbInputs,
+    const std::vector<value::DeblockedTagVals>& extractedData) {
+    const size_t blockSize = extractedBitmap.count();
+
+    boost::optional<value::MaterializedRow> key;
+
+    for (size_t blockIndex = 0; blockIndex < blockSize; ++blockIndex) {
+        auto [bitTag, bitVal] = extractedBitmap[blockIndex];
+        invariant(bitTag == value::TypeTags::Boolean);
+
+        if (!value::bitcastTo<bool>(bitVal)) {
+            continue;
+        }
+
+        if (!key) {
+            key.emplace(extractedGbInputs.size());
+        }
+
+        for (size_t i = 0; i < extractedGbInputs.size(); ++i) {
+            auto [idTag, idVal] = extractedGbInputs[i][blockIndex];
+            key->reset(i, false, idTag, idVal);
+        }
+
+        // Set '_htIt' to point to the entry for 'key' in '_ht'.
+        _htIt = _ht->find(*key);
+
+        if (_htIt == _ht->end()) {
+            // New key we haven't seen before.
+            key->makeOwned();
+            auto [it, _] = _ht->emplace(std::move(*key), value::MaterializedRow{0});
+            key = boost::none;
+
+            // Initialize accumulators.
+            it->second.resize(_rowAggAccessors.size());
+            _htIt = it;
+        }
+
+        // Set '_accumulatorDataAccessors' to the input values for the current 'blockIndex'.
+        for (size_t i = 0; i < extractedData.size(); ++i) {
+            auto [tag, val] = extractedData[i][blockIndex];
+            _accumulatorDataAccessors[i].reset(tag, val);
+        }
+
+        // Run each row level accumulator.
+        for (size_t i = 0; i < _aggCodes.size(); ++i) {
+            auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[i].get());
+            _rowAggHtAccessors[i]->reset(rowOwned, rowTag, rowVal);
+        }
     }
 }
 
@@ -342,6 +435,12 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
     invariant(_blockBitsetInAccessor);
     auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
     invariant(bitmapInTag == value::TypeTags::valueBlock);
+
+    // Set '_accumulatorDataAccessors' to the input value blocks.
+    for (size_t i = 0; i < _blockDataInAccessors.size(); ++i) {
+        auto [tag, val] = _blockDataInAccessors[i]->getViewOfValue();
+        _accumulatorDataAccessors[i].reset(tag, val);
+    }
 
     // Process the accumulators for each partition rather than one element at a time.
     for (size_t partition = 0; partition < tokenizedKeys.keys.size(); ++partition) {
@@ -368,12 +467,7 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
             _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
         }
 
-        for (size_t i = 0; i < _blockDataInAccessors.size(); i++) {
-            auto [dataTag, dataVal] = _blockDataInAccessors[i]->getViewOfValue();
-            _accumulatorDataAccessors[i].reset(false, dataTag, dataVal);
-        }
-
-        executeAccumulatorCode(tokenizedKeys.keys[partition]);
+        executeBlockLevelAccumulatorCode(tokenizedKeys.keys[partition]);
     }
 }
 
@@ -394,63 +488,20 @@ void BlockHashAggStage::runAccumulatorsElementWise(size_t blockSize) {
         extractedGbInputs.push_back(value::bitcastTo<value::ValueBlock*>(gbInputVal)->extract());
     }
 
-
-    const size_t numDataInputs = _accumulatorDataSlotIds.size();
+    const size_t numDataInputs = _blockDataInSlotIds.size();
 
     // Extract each data block into this array for when we process them element-wise.
-    std::vector<value::DeblockedTagVals> extractedDataIn;
-    extractedDataIn.resize(numDataInputs);
+    std::vector<value::DeblockedTagVals> extractedData;
+    extractedData.resize(numDataInputs);
     for (size_t i = 0; i < numDataInputs; i++) {
         auto [dataTag, dataVal] = _blockDataInAccessors[i]->getViewOfValue();
         invariant(dataTag == value::TypeTags::valueBlock);
-        extractedDataIn[i] = value::bitcastTo<value::ValueBlock*>(dataVal)->extract();
+        extractedData[i] = value::bitcastTo<value::ValueBlock*>(dataVal)->extract();
     }
 
-    // Create bitmap and blocks to hold in accessors. We update these blocks as we loop through
-    // the data in the blocks. For the bitmap, we can avoid the overhead of running the
-    // accumulators by checking the input bit first. We can hold a singular `true` in the
-    // accumulator bitmap slot since we know it'll be true.
-    value::BoolBlock singletonBitmap(std::vector<bool>{true});
-    _accumulatorBitsetAccessor.reset(false,
-                                     value::TypeTags::valueBlock,
-                                     value::bitcastFrom<value::ValueBlock*>(&singletonBitmap));
-
-    std::vector<SingletonViewBlock> singletonDataBlocks;
-    singletonDataBlocks.resize(numDataInputs);
-    for (size_t i = 0; i < numDataInputs; i++) {
-        _accumulatorDataAccessors[i].reset(
-            false,
-            value::TypeTags::valueBlock,
-            value::bitcastFrom<value::ValueBlock*>(&singletonDataBlocks[i]));
-    }
-
-    for (size_t blockIndex = 0; blockIndex < blockSize; ++blockIndex) {
-        value::MaterializedRow key{extractedGbInputs.size()};
-        for (size_t i = 0; i < extractedGbInputs.size(); ++i) {
-            auto [idTag, idVal] = extractedGbInputs[i][blockIndex];
-            key.reset(i, false, idTag, idVal);
-        }
-
-        auto [bitTag, bitVal] = extractedBitmap[blockIndex];
-        invariant(bitTag == value::TypeTags::Boolean);
-
-        if (!value::bitcastTo<bool>(bitVal)) {
-            continue;
-        }
-
-        // Update our accessors (via the blocks) with the current value.
-        for (size_t i = 0; i < numDataInputs; i++) {
-            singletonDataBlocks[i].setTagVal(extractedDataIn[i][blockIndex]);
-        }
-
-        // Run the accumulators to update the hash map.
-        executeAccumulatorCode(std::move(key));
-    }
+    executeRowLevelAccumulatorCode(extractedBitmap, extractedGbInputs, extractedData);
 
     _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
-    for (size_t i = 0; i < numDataInputs; i++) {
-        _accumulatorDataAccessors[i].reset(false, value::TypeTags::Nothing, 0);
-    }
 }
 
 boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tokenizeTokenInfos(
@@ -628,10 +679,12 @@ boost::optional<value::MaterializedRow> BlockHashAggStage::getNextSpilledHelper(
     // Take a spilled row and merge it with the current accumulated value.
     auto processRow = [&](const value::MaterializedRow& spilledAggRow) {
         invariant(spilledAggRow.size() == _outAggBlocks.size());
+
         for (size_t idx = 0; idx < _aggCodes.size(); ++idx) {
             auto [spilledTag, spilledVal] = spilledAggRow.getViewOfValue(idx);
-            _rowAccAccessor.reset(false, spilledTag, spilledVal);
-            auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[idx].get());
+            _spilledAccessors[idx].reset(spilledTag, spilledVal);
+
+            auto [rowOwned, rowTag, rowVal] = _bytecode.run(_mergingExprCodes[idx].get());
             _rowAggRSAccessors[idx]->reset(rowOwned, rowTag, rowVal);
         }
     };
@@ -781,21 +834,31 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
     if (includeDebugInfo) {
         DebugPrinter printer;
         BSONObjBuilder bob;
+
         bob.append("groupBySlots", _groupSlots.begin(), _groupSlots.end());
-        bob.append("rowAccSlotId", _rowAccSlotId);
 
         {
             BSONObjBuilder blockExprBob(bob.subobjStart("blockExpressions"));
-            for (auto&& [slot, expr] : _blockRowAggs) {
+            for (auto&& [slot, aggs] : _blockRowAggs) {
                 blockExprBob.append(str::stream() << slot,
-                                    printer.print(expr.blockAgg->debugPrint()));
+                                    printer.print(aggs.blockAgg->debugPrint()));
             }
         }
 
         {
             BSONObjBuilder rowExprBob(bob.subobjStart("rowExpressions"));
-            for (auto&& [slot, expr] : _blockRowAggs) {
-                rowExprBob.append(str::stream() << slot, printer.print(expr.rowAgg->debugPrint()));
+            for (auto&& [slot, aggs] : _blockRowAggs) {
+                rowExprBob.append(str::stream() << slot, printer.print(aggs.rowAgg->debugPrint()));
+            }
+        }
+
+        bob.append(
+            "accumulatorDataSlots", _accumulatorDataSlotIds.begin(), _accumulatorDataSlotIds.end());
+
+        if (!_mergingExprs.empty()) {
+            BSONObjBuilder nestedBuilder{bob.subobjStart("mergingExprs")};
+            for (auto&& [slot, expr] : _mergingExprs) {
+                nestedBuilder.append(str::stream() << slot, printer.print(expr->debugPrint()));
             }
         }
 
@@ -851,23 +914,19 @@ std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
     for (bool blockExprPrint : {true, false}) {
         ret.emplace_back(DebugPrinter::Block("[`"));
         bool first = true;
-        for (auto&& [slot, expr] : _blockRowAggs) {
+        for (auto&& [slot, aggs] : _blockRowAggs) {
             if (!first) {
                 ret.emplace_back(DebugPrinter::Block("`,"));
             }
 
             DebugPrinter::addIdentifier(ret, slot);
             ret.emplace_back("=");
-            const auto& aggExpr = blockExprPrint ? expr.blockAgg : expr.rowAgg;
+            const auto& aggExpr = blockExprPrint ? aggs.blockAgg : aggs.rowAgg;
             DebugPrinter::addBlocks(ret, aggExpr->debugPrint());
             first = false;
         }
         ret.emplace_back("`]");
     }
-
-    ret.emplace_back(DebugPrinter::Block("[`"));
-    DebugPrinter::addIdentifier(ret, _rowAccSlotId);
-    ret.emplace_back(DebugPrinter::Block("`]"));
 
     {
         bool first = true;
@@ -883,6 +942,28 @@ std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint() const {
         ret.emplace_back(DebugPrinter::Block("`]"));
     }
 
+    if (!_mergingExprs.empty()) {
+        ret.emplace_back("spillSlots[`");
+        for (size_t idx = 0; idx < _mergingExprs.size(); ++idx) {
+            if (idx) {
+                ret.emplace_back("`,");
+            }
+
+            DebugPrinter::addIdentifier(ret, _mergingExprs[idx].first);
+        }
+        ret.emplace_back("`]");
+
+        ret.emplace_back("mergingExprs[`");
+        for (size_t idx = 0; idx < _mergingExprs.size(); ++idx) {
+            if (idx) {
+                ret.emplace_back("`,");
+            }
+
+            DebugPrinter::addBlocks(ret, _mergingExprs[idx].second->debugPrint());
+        }
+        ret.emplace_back("`]");
+    }
+
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
@@ -894,6 +975,7 @@ size_t BlockHashAggStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_children);
     size += size_estimator::estimate(_blockRowAggs);
     size += size_estimator::estimate(_outAccessorsMap);
+    size += size_estimator::estimate(_mergingExprs);
     return size;
 }
 

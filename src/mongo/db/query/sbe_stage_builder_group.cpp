@@ -431,8 +431,7 @@ boost::optional<SbAggExprVector> generateAccumAggs(StageBuilderState& state,
                                                    Accum::InputsPtr accExprs,
                                                    boost::optional<SbSlot> initRootSlot,
                                                    bool genBlockAggs,
-                                                   boost::optional<SbSlot> bitmapInternalSlot,
-                                                   boost::optional<SbSlot> accInternalSlot) {
+                                                   boost::optional<SbSlot> bitmapInternalSlot) {
     SbExprBuilder b(state);
 
     auto accOp = Accum::Op{accStmt};
@@ -455,10 +454,9 @@ boost::optional<SbAggExprVector> generateAccumAggs(StageBuilderState& state,
         // Handle the case where we want to generate aggs _and_ blockAggs.
         tassert(
             8448600, "Expected 'bitmapInternalSlot' to be defined", bitmapInternalSlot.has_value());
-        tassert(8448601, "Expected 'accInternalSlot' to be defined", accInternalSlot.has_value());
 
-        boost::optional<std::vector<Accum::BlockAggAndRowAgg>> aggs = accOp.buildAccumBlockAggs(
-            state, std::move(accExprs), *bitmapInternalSlot, *accInternalSlot);
+        boost::optional<std::vector<Accum::BlockAggAndRowAgg>> aggs =
+            accOp.buildAccumBlockAggs(state, std::move(accExprs), *bitmapInternalSlot);
 
         // If 'genBlockAggs' is true and we weren't able to generate block aggs for 'accStmt',
         // then we return boost::none to indicate failure.
@@ -521,8 +519,7 @@ boost::optional<std::vector<SbAggExprVector>> generateAllAccumAggs(
     std::vector<Accum::InputsPtr> accExprsVec,
     boost::optional<SbSlot> initRootSlot,
     bool genBlockAggs,
-    boost::optional<SbSlot> bitmapInternalSlot,
-    boost::optional<SbSlot> accInternalSlot) {
+    boost::optional<SbSlot> bitmapInternalSlot) {
     // Loop over 'groupNode.accumulators' and populate 'sbAggExprs'.
     boost::optional<std::vector<SbAggExprVector>> sbAggExprs;
     sbAggExprs.emplace();
@@ -535,8 +532,7 @@ boost::optional<std::vector<SbAggExprVector>> generateAllAccumAggs(
                                                                  std::move(accExprsVec[i]),
                                                                  initRootSlot,
                                                                  genBlockAggs,
-                                                                 bitmapInternalSlot,
-                                                                 accInternalSlot);
+                                                                 bitmapInternalSlot);
 
         // If we weren't able to generate block aggs for 'accStmt', then we return boost::none
         // to indicate failure. This should only happen when 'genBlockAggs' is true.
@@ -757,9 +753,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     std::vector<SbExprSbSlotVector> mergingExprs,
     bool useBlockHashAgg,
     std::vector<SbExpr::Vector> blockAccExprs,
-    std::vector<SbSlotVector> blockAccInternalArgSlots,
     boost::optional<SbSlot> bitmapInternalSlot,
-    boost::optional<SbSlot> accInternalSlot,
+    const std::vector<SbSlotVector>& accumulatorDataSlots,
     PlanYieldPolicy* yieldPolicy,
     PlanNodeId nodeId) {
     constexpr auto kBlockSelectivityBitmap = PlanStageSlots::kBlockSelectivityBitmap;
@@ -773,8 +768,9 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     for (auto& expr : groupByExprs) {
         projects.emplace_back(std::move(expr), boost::none);
     }
-    for (auto& vec : blockAccExprs) {
-        for (auto& expr : vec) {
+
+    for (auto& exprsVec : blockAccExprs) {
+        for (auto& expr : exprsVec) {
             projects.emplace_back(std::move(expr), boost::none);
         }
     }
@@ -784,17 +780,28 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     stage = std::move(outStage);
 
     SbSlotVector groupBySlots;
-    SbSlotVector blockAccArgSlots;
+    SbSlotVector flattenedBlockAccArgSlots;
+    SbSlotVector flattenedAccumulatorDataSlots;
+
+    groupBySlots.reserve(numGroupByExprs);
+    flattenedBlockAccArgSlots.reserve(outSlots.size() - numGroupByExprs);
 
     for (size_t i = 0; i < numGroupByExprs; ++i) {
         groupBySlots.emplace_back(outSlots[i]);
     }
+
     for (size_t i = numGroupByExprs; i < outSlots.size(); ++i) {
-        blockAccArgSlots.emplace_back(outSlots[i]);
+        flattenedBlockAccArgSlots.emplace_back(outSlots[i]);
+    }
+
+    for (const auto& slotsVec : accumulatorDataSlots) {
+        flattenedAccumulatorDataSlots.insert(
+            flattenedAccumulatorDataSlots.end(), slotsVec.begin(), slotsVec.end());
     }
 
     individualSlots.insert(individualSlots.end(), groupBySlots.begin(), groupBySlots.end());
-    individualSlots.insert(individualSlots.end(), blockAccArgSlots.begin(), blockAccArgSlots.end());
+    individualSlots.insert(
+        individualSlots.end(), flattenedBlockAccArgSlots.begin(), flattenedBlockAccArgSlots.end());
 
     // Builds a group stage with accumulator expressions and group-by slot(s).
     auto [hashAggStage, groupByOutSlots, aggSlots] = [&] {
@@ -812,25 +819,17 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
             tassert(8448603,
                     "Expected 'bitmapInternalSlot' to be defined",
                     bitmapInternalSlot.has_value());
-            tassert(
-                8448604, "Expected 'accInternalSlot' to be defined", accInternalSlot.has_value());
-
-            SbSlotVector flattenedBlockAccInternalArgSlots;
-            for (auto& vec : blockAccInternalArgSlots) {
-                std::move(
-                    vec.begin(), vec.end(), std::back_inserter(flattenedBlockAccInternalArgSlots));
-            }
 
             return b.makeBlockHashAgg(std::move(stage),
                                       buildVariableTypes(childOutputs, individualSlots),
                                       groupBySlots,
                                       std::move(flattenedSbAggExprs),
                                       childOutputs.get(kBlockSelectivityBitmap),
-                                      blockAccArgSlots,
-                                      std::move(flattenedBlockAccInternalArgSlots),
+                                      flattenedBlockAccArgSlots,
                                       *bitmapInternalSlot,
-                                      *accInternalSlot,
+                                      flattenedAccumulatorDataSlots,
                                       allowDiskUse,
+                                      std::move(flattenedMergingExprs),
                                       yieldPolicy);
         } else {
             return b.makeHashAgg(std::move(stage),
@@ -1172,9 +1171,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     boost::optional<std::vector<Accum::InputsPtr>> accExprsVec;
     boost::optional<std::vector<SbAggExprVector>> sbAggExprs;
     std::vector<SbExpr::Vector> blockAccExprs;
-    std::vector<SbSlotVector> blockAccInternalArgSlots;
+    std::vector<SbSlotVector> accumulatorDataSlots;
     boost::optional<SbSlot> bitmapInternalSlot;
-    boost::optional<SbSlot> accInternalSlot;
 
     if (tryToUseBlockHashAgg) {
         // If 'tryToUseBlockHashAgg' is true, then generate block arg expressions for all of the
@@ -1186,19 +1184,18 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
         // generating block agg expressions for all the accumulators.
         if (accumBlockExprsVec) {
             // Unpack 'accumBlockExprsVec' and populate 'accExprsVec', 'blockAccExprs', and
-            // 'blockAccInternalArgSlots'.
+            // 'accumulatorDataSlots'.
             accExprsVec.emplace();
 
             for (auto& accumBlockExprs : *accumBlockExprsVec) {
                 accExprsVec->emplace_back(std::move(accumBlockExprs.inputs));
                 blockAccExprs.emplace_back(std::move(accumBlockExprs.exprs));
-                blockAccInternalArgSlots.emplace_back(std::move(accumBlockExprs.slots));
+                accumulatorDataSlots.emplace_back(std::move(accumBlockExprs.slots));
             }
 
             // When calling generateAllAccumAggs() with genBlockAggs=true, we have to pass in two
             // additional "internal" slots.
             bitmapInternalSlot.emplace(SbSlot{_state.slotId()});
-            accInternalSlot.emplace(SbSlot{_state.slotId()});
 
             // Generate the SbAggExprs for all the accumulators from 'groupNode'.
             sbAggExprs = generateAllAccumAggs(_state,
@@ -1207,8 +1204,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                               std::move(*accExprsVec),
                                               slotIdForInitRoot,
                                               true /* genBlockAggs */,
-                                              bitmapInternalSlot,
-                                              accInternalSlot);
+                                              bitmapInternalSlot);
         }
     }
 
@@ -1231,9 +1227,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     // pipeline here.
     if (!useBlockHashAgg) {
         blockAccExprs.clear();
-        blockAccInternalArgSlots.clear();
+        accumulatorDataSlots.clear();
         bitmapInternalSlot = boost::none;
-        accInternalSlot = boost::none;
 
         if (childOutputs.hasBlockOutput()) {
             SbExprOptSbSlotVector projects;
@@ -1272,8 +1267,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                           std::move(*accExprsVec),
                                           slotIdForInitRoot,
                                           false /* genBlockAggs */,
-                                          boost::none /* bitmapInternalSlot */,
-                                          boost::none /* accInternalSlot */);
+                                          boost::none /* bitmapInternalSlot */);
     }
 
     tassert(8751301, "Expected accumulator aggs to be defined", sbAggExprs.has_value());
@@ -1325,9 +1319,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                               std::move(mergingExprs),
                               useBlockHashAgg,
                               std::move(blockAccExprs),
-                              std::move(blockAccInternalArgSlots),
                               bitmapInternalSlot,
-                              accInternalSlot,
+                              accumulatorDataSlots,
                               _yieldPolicy,
                               nodeId);
     stage = std::move(outStage);

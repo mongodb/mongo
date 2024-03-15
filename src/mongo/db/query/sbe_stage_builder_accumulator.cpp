@@ -186,7 +186,7 @@ using BuildAccumAggsFnType = BuildFnType<SbExpr::Vector, T>;
 
 template <typename T>
 using BuildAccumBlockAggsFnType =
-    BuildFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, T, SbSlot, SbSlot>;
+    BuildFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, T, SbSlot>;
 
 template <typename T>
 using BuildInitFnType = BuildFnType<SbExpr::Vector, T>;
@@ -203,7 +203,7 @@ using BuildAccumBlockExprsNoInputsFn =
     BuildNoInputsFnType<boost::optional<Accum::AccumBlockExprs>, const PlanStageSlots&>;
 using BuildAccumAggsNoInputsFn = BuildNoInputsFnType<std::vector<BlockAggAndRowAgg>>;
 using BuildAccumBlockAggsNoInputsFn =
-    BuildNoInputsFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, SbSlot, SbSlot>;
+    BuildNoInputsFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, SbSlot>;
 using BuildInitNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
 using BuildFinalizeNoInputsFn = BuildNoInputsFnType<SbExpr, const SbSlotVector&>;
 using BuildCombineAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector, const SbSlotVector&>;
@@ -336,15 +336,17 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMin(
     const Op& acc,
     std::unique_ptr<AccumSingleInput> inputs,
     StageBuilderState& state,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot) {
+    SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
+
+    auto blockAgg =
+        b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+
+    auto rowAgg = b.makeFunction("min"_sd, std::move(inputs->inputExpr));
+
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
-
-    pairs->emplace_back(BlockAggAndRowAgg{
-        b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, std::move(inputs->inputExpr)),
-        b.makeFunction("min"_sd, accInternalSlot)});
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
 
     return pairs;
 }
@@ -401,15 +403,17 @@ boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMax(
     const Op& acc,
     std::unique_ptr<AccumSingleInput> inputs,
     StageBuilderState& state,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot) {
+    SbSlot bitmapInternalSlot) {
     SbExprBuilder b(state);
+
+    auto blockAgg =
+        b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+
+    auto rowAgg = b.makeFunction("max"_sd, std::move(inputs->inputExpr));
+
     boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
     pairs.emplace();
-
-    pairs->emplace_back(BlockAggAndRowAgg{
-        b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, std::move(inputs->inputExpr)),
-        b.makeFunction("max"_sd, accInternalSlot)});
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
 
     return pairs;
 }
@@ -1435,14 +1439,14 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
     SbExpr expr = vectorizeExpr(state, outputs, std::move(inputs->inputExpr));
 
     if (expr) {
-        // If vectorization succeeded, allocate an internal slot and update 'inputs->inputExpr' to
-        // refer to the slot. Then put 'inputs', the vectorized expression, and the internal slot
-        // into an AccumBlockExprs struct and return it.
-        auto internalSlot = SbSlot{state.slotId()};
-        inputs->inputExpr = SbExpr{internalSlot};
-
+        // If vectorization succeeded, allocate a slot and update 'inputs->inputExpr' to refer to
+        // the slot. Then put 'inputs', the vectorized expression, and the internal slot into an
+        // AccumBlockExprs struct and return it.
         boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
         accumBlockExprs.emplace();
+
+        SbSlot internalSlot = SbSlot{state.slotId()};
+        inputs->inputExpr = SbExpr{internalSlot};
 
         accumBlockExprs->inputs = std::move(inputs);
         accumBlockExprs->exprs.emplace_back(std::move(expr));
@@ -1723,10 +1727,7 @@ SbExpr::Vector Op::buildAccumAggs(StageBuilderState& state, InputsPtr inputs) co
 }
 
 boost::optional<std::vector<BlockAggAndRowAgg>> Op::buildAccumBlockAggs(
-    StageBuilderState& state,
-    InputsPtr inputs,
-    SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot) const {
+    StageBuilderState& state, InputsPtr inputs, SbSlot bitmapInternalSlot) const {
     uassert(8751304,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
@@ -1736,8 +1737,7 @@ boost::optional<std::vector<BlockAggAndRowAgg>> Op::buildAccumBlockAggs(
         return boost::none;
     }
 
-    return _opInfo->buildAccumBlockAggs(
-        *this, std::move(inputs), state, bitmapInternalSlot, accInternalSlot);
+    return _opInfo->buildAccumBlockAggs(*this, std::move(inputs), state, bitmapInternalSlot);
 }
 
 SbExpr::Vector Op::buildInitialize(StageBuilderState& state, InputsPtr inputs) const {

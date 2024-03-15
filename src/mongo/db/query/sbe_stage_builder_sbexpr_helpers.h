@@ -334,10 +334,10 @@ public:
         SbAggExprVector sbAggExprs,
         SbSlot selectivityBitmapSlot,
         const SbSlotVector& blockAccArgSlots,
-        const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot,
+        const SbSlotVector& accumulatorDataSlots,
         bool allowDiskUse,
+        SbExprSbSlotVector mergingExprs,
         PlanYieldPolicy* yieldPolicy) {
         return makeBlockHashAgg(std::move(stage),
                                 nullptr,
@@ -345,10 +345,10 @@ public:
                                 std::move(sbAggExprs),
                                 selectivityBitmapSlot,
                                 blockAccArgSlots,
-                                blockAccInternalArgSlots,
                                 bitmapInternalSlot,
-                                accInternalSlot,
+                                accumulatorDataSlots,
                                 allowDiskUse,
+                                std::move(mergingExprs),
                                 yieldPolicy);
     }
 
@@ -359,10 +359,10 @@ public:
         SbAggExprVector sbAggExprs,
         SbSlot selectivityBitmapSlot,
         const SbSlotVector& blockAccArgSlots,
-        const SbSlotVector& blockAccInternalArgSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot,
+        const SbSlotVector& accumulatorDataSlots,
         bool allowDiskUse,
+        SbExprSbSlotVector mergingExprs,
         PlanYieldPolicy* yieldPolicy) {
         return makeBlockHashAgg(std::move(stage),
                                 &varTypes,
@@ -370,10 +370,10 @@ public:
                                 std::move(sbAggExprs),
                                 selectivityBitmapSlot,
                                 blockAccArgSlots,
-                                blockAccInternalArgSlots,
                                 bitmapInternalSlot,
-                                accInternalSlot,
+                                accumulatorDataSlots,
                                 allowDiskUse,
+                                std::move(mergingExprs),
                                 yieldPolicy);
     }
 
@@ -383,11 +383,11 @@ public:
         const SbSlotVector& groupBySlots,
         SbAggExprVector sbAggExprs,
         SbSlot selectivityBitmapSlot,
-        const SbSlotVector& blockAccArgSlots,
-        const SbSlotVector& blockAccInternalArgSlots,
+        const SbSlotVector& blockAccArgSbSlots,
         SbSlot bitmapInternalSlot,
-        SbSlot accInternalSlot,
+        const SbSlotVector& accumulatorDataSbSlots,
         bool allowDiskUse,
+        SbExprSbSlotVector mergingExprs,
         PlanYieldPolicy* yieldPolicy);
 
     PlanNodeId _nodeId;

@@ -604,19 +604,19 @@ export function blockProcessingTestCases(
             usesBlockProcessing: false
         },
         {
-            name: "Min_GroupByMetaSortKey",
+            name: "Min_GroupByMetaIndexKey",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {$meta: 'sortKey'}, a: {$min: '$y'}}},
+                {$group: {_id: {$meta: 'indexKey'}, a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
             usesBlockProcessing: false
         },
         {
-            name: "MinOfMetaSortKey_GroupByX",
+            name: "MinOfMetaIndexKey_GroupByX",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$min: {$meta: 'sortKey'}}}},
+                {$group: {_id: '$x', a: {$min: {$meta: 'indexKey'}}}},
                 {$project: {_id: 0, a: 1}}
             ],
             usesBlockProcessing: false

@@ -245,7 +245,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
 }
 
 template <bool less>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockAggMinMaxImpl(
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
     value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock) {
     // Finding the true minimum of the timefield has some computational overhead so can avoid this
     // work if we aren't trying to find a minimum.
@@ -293,27 +293,85 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockAggMinMaxImpl
     return {true, retTag, retVal};
 }
 
+template <bool less>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockAggMinMaxImpl(
+    value::TypeTags accTag,
+    value::Value accVal,
+    value::TypeTags inputTag,
+    value::Value inputVal,
+    value::TypeTags bitsetTag,
+    value::Value bitsetVal) {
+    // The caller transferred ownership of 'acc' to us, so set up a guard.
+    value::ValueGuard guard{accTag, accVal};
+
+    tassert(8625702,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    tassert(8625703,
+            "Expected bitset argument to be of valueBlock type",
+            bitsetTag == value::TypeTags::valueBlock);
+    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+
+    auto [resultOwned, resultTag, resultVal] =
+        valueBlockMinMaxImpl<less>(valueBlockIn, bitsetBlock);
+
+    value::ValueGuard resultGuard{resultOwned, resultTag, resultVal};
+
+    // If 'result' is not Nothing, check if we should return 'result'.
+    if (resultTag != value::TypeTags::Nothing) {
+        bool returnResult = false;
+
+        if (accTag == value::TypeTags::Nothing) {
+            // If 'acc' is Nothing, then we should return 'result'.
+            returnResult = true;
+        } else {
+            // If 'acc' is not Nothing, compare 'result' with 'acc'.
+            auto [tag, val] = value::compare3way(resultTag, resultVal, accTag, accVal);
+
+            if (tag == value::TypeTags::NumberInt32) {
+                // If 'result' is less than or equal to 'acc' (is 'less' is true) or if 'result'
+                // is greater than or equal to 'acc' (is 'less' is false), then we should return
+                // 'result'.
+                int32_t cmp = value::bitcastTo<int32_t>(val);
+                returnResult = less ? cmp <= 0 : cmp >= 0;
+            }
+        }
+
+        if (returnResult) {
+            // If the result is not owned, make it owned.
+            if (!resultOwned) {
+                std::tie(resultTag, resultVal) = value::copyValue(resultTag, resultVal);
+            }
+            // Return result as the updated accumulator state.
+            resultGuard.reset();
+            return {true, resultTag, resultVal};
+        }
+    }
+
+    // Return the current accumulator state unmodified.
+    guard.reset();
+    return {true, accTag, accVal};
+}
+
 /*
  * Given a ValueBlock and bitset as input, returns a tag, value pair that contains the minimum value
  * in the block based on compareValue. Values whose corresponding bit is set to false get ignored.
  * This function will return a non-Nothing value if the block contains any non-Nothing values.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMin(ArityType arity) {
-    invariant(arity == 2);
+    invariant(arity == 3);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    tassert(8625702,
-            "Expected input argument to be of valueBlock type",
-            inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+    auto [_, inputTag, inputVal] = getFromStack(2);
+    auto [__, bitsetTag, bitsetVal] = getFromStack(1);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    tassert(8625703,
-            "Expected bitset argument to be of valueBlock type",
-            bitsetTag == value::TypeTags::valueBlock);
-    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+    // Move the incoming accumulator state from the stack. We now own and have exclusive access
+    // to the accumulator state and can make in-place modifications if desired.
+    auto [accTag, accVal] = moveOwnedFromStack(0);
 
-    return valueBlockAggMinMaxImpl<true /* less */>(valueBlockIn, bitsetBlock);
+    return valueBlockAggMinMaxImpl<true /* less */>(
+        accTag, accVal, inputTag, inputVal, bitsetTag, bitsetVal);
 }
 
 /*
@@ -322,21 +380,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMin
  * This function will return a non-Nothing value if the block contains any non-Nothing values.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMax(ArityType arity) {
-    invariant(arity == 2);
+    invariant(arity == 3);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    tassert(8625704,
-            "Expected input argument to be of valueBlock type",
-            inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+    auto [_, inputTag, inputVal] = getFromStack(2);
+    auto [__, bitsetTag, bitsetVal] = getFromStack(1);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    tassert(8625705,
-            "Expected bitset argument to be of valueBlock type",
-            bitsetTag == value::TypeTags::valueBlock);
-    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+    // Move the incoming accumulator state from the stack. We now own and have exclusive access
+    // to the accumulator state and can make in-place modifications if desired.
+    auto [accTag, accVal] = moveOwnedFromStack(0);
 
-    return valueBlockAggMinMaxImpl<false /* less */>(valueBlockIn, bitsetBlock);
+    return valueBlockAggMinMaxImpl<false /* less */>(
+        accTag, accVal, inputTag, inputVal, bitsetTag, bitsetVal);
 }
 
 /*
@@ -345,25 +399,33 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMax
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCount(
     ArityType arity) {
     // TODO SERVER-83450 add monoblock fast path.
-    invariant(arity == 1);
+    invariant(arity == 2);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    // Move the incoming accumulator state from the stack. We now own and have exclusive access
+    // to the accumulator state and can make in-place modifications if desired.
+    auto [accTag, accVal] = moveOwnedFromStack(0);
+    value::ValueGuard guard{accTag, accVal};
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(1);
     tassert(8625706,
             "Expected bitset argument to be of valueBlock type",
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
-    auto bitset = bitsetBlock->extract();
+    value::DeblockedTagVals bitset = bitsetBlock->extract();
 
     tassert(8151800, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
 
-    size_t count = 0;
+    int64_t n = accTag == value::TypeTags::NumberInt64 ? value::bitcastTo<int64_t>(accVal) : 0;
+
+    int64_t count = 0;
     for (size_t i = 0; i < bitset.count(); ++i) {
         if (value::bitcastTo<bool>(bitset[i].second)) {
-            count++;
+            ++count;
         }
     }
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(count)};
+
+    return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(n + count)};
 }
 
 /*
@@ -374,45 +436,79 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCou
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum(ArityType arity) {
     // TODO SERVER-83450 add monoblock fast path.
-    invariant(arity == 2);
+    invariant(arity == 3);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    // Move the incoming accumulator state from the stack. We now own and have exclusive access
+    // to the accumulator state and can make in-place modifications if desired.
+    auto [accTag, accVal] = moveOwnedFromStack(0);
+    value::ValueGuard guard{accTag, accVal};
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(2);
     tassert(8625707,
             "Expected input argument to be of valueBlock type",
             inputTag == value::TypeTags::valueBlock);
     auto* inputBlock = value::bitcastTo<value::ValueBlock*>(inputVal);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(1);
     tassert(8625708,
             "Expected bitset argument to be of valueBlock type",
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
-    auto block = inputBlock->extract();
-    auto bitset = bitsetBlock->extract();
+    value::DeblockedTagVals block = inputBlock->extract();
+    value::DeblockedTagVals bitset = bitsetBlock->extract();
 
     tassert(
         8151801, "Expected block and bitset to be the same size", block.count() == bitset.count());
     tassert(8151802, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
 
-    value::TypeTags resultTag = value::TypeTags::Nothing;
-    value::Value resultVal = 0;
+    value::TypeTags blockResTag = value::TypeTags::Nothing;
+    value::Value blockResVal = 0;
     for (size_t i = 0; i < bitset.count(); ++i) {
-        // If we find a non-Nothing value and our current result is nothing, set the result to be
-        // this value.
-        if (value::bitcastTo<bool>(bitset[i].second) && resultTag == value::TypeTags::Nothing &&
-            block.tags()[i] != value::TypeTags::Nothing) {
-            // We do not own the value in the block, so make a copy.
-            auto [copyTag, copyVal] = value::copyValue(block.tags()[i], block.vals()[i]);
-            resultTag = copyTag, resultVal = copyVal;
-        } else if (value::bitcastTo<bool>(bitset[i].second) &&
-                   block[i].first != value::TypeTags::Nothing) {
-            auto [sumOwned, sumTag, sumVal] =
-                genericAdd(resultTag, resultVal, block[i].first, block[i].second);
-            value::releaseValue(resultTag, resultVal);
-            resultTag = sumTag, resultVal = sumVal;
+        if (value::bitcastTo<bool>(bitset[i].second) && value::isNumber(block.tags()[i])) {
+            // If 'blockRes' is Nothing, set 'blockRes' equal to 'block[i]'. Otherwise, compute the
+            // sum of 'blockRes' and 'block[i]' and store the result back into 'blockRes'.
+            if (blockResTag == value::TypeTags::Nothing) {
+                std::tie(blockResTag, blockResVal) =
+                    value::copyValue(block.tags()[i], block.vals()[i]);
+            } else {
+                value::ValueGuard curBlockResGuard{blockResTag, blockResVal};
+
+                auto [sumOwned, sumTag, sumVal] =
+                    genericAdd(blockResTag, blockResVal, block.tags()[i], block.vals()[i]);
+
+                if (!sumOwned) {
+                    std::tie(sumTag, sumVal) = value::copyValue(sumTag, sumVal);
+                }
+
+                std::tie(blockResTag, blockResVal) = std::pair(sumTag, sumVal);
+            }
         }
     }
+
+    if (blockResTag == value::TypeTags::Nothing) {
+        // Return the accumulator state unmodified.
+        guard.reset();
+        return {true, accTag, accVal};
+    }
+
+    value::ValueGuard blockResGuard{blockResTag, blockResVal};
+
+    if (accTag == value::TypeTags::Nothing) {
+        // Return 'blockRes' as the updated accumulator state.
+        blockResGuard.reset();
+        return {true, blockResTag, blockResVal};
+    }
+
+    // Compute the result of adding the accumulator state with 'blockRes'.
+    auto [resultOwned, resultTag, resultVal] = genericAdd(accTag, accVal, blockResTag, blockResVal);
+
+    // If 'result' is not owned, make it owned.
+    if (!resultOwned) {
+        std::tie(resultTag, resultVal) = value::copyValue(resultTag, resultVal);
+    }
+
+    // Return 'result' as the updated accumulator state.
     return {true, resultTag, resultVal};
 }
 

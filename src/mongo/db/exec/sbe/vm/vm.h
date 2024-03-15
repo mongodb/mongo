@@ -165,6 +165,7 @@ struct Instruction {
         getArraySize,  // number of elements
 
         aggSum,
+        aggCount,
         aggMin,
         aggMax,
         aggFirst,
@@ -377,6 +378,8 @@ struct Instruction {
                 return "getArraySize";
             case aggSum:
                 return "aggSum";
+            case aggCount:
+                return "aggCount";
             case aggMin:
                 return "aggMin";
             case aggMax:
@@ -721,12 +724,12 @@ enum class Builtin : uint16_t {
     valueBlockAggMin,
     valueBlockAggMax,
     valueBlockAggCount,
+    valueBlockAggSum,
     valueBlockDateDiff,
     valueBlockDateTrunc,
     valueBlockDateAdd,
     valueBlockTrunc,
     valueBlockRound,
-    valueBlockAggSum,
     valueBlockAdd,
     valueBlockSub,
     valueBlockMult,
@@ -1106,6 +1109,7 @@ public:
     void appendValueBlockApplyLambda();
 
     void appendSum();
+    void appendCount();
     void appendMin();
     void appendMax();
     void appendFirst();
@@ -1394,6 +1398,9 @@ private:
                                                           value::Value accValue,
                                                           value::TypeTags fieldTag,
                                                           value::Value fieldValue);
+
+    FastTuple<bool, value::TypeTags, value::Value> aggCount(value::TypeTags accTag,
+                                                            value::Value accValue);
 
     void aggDoubleDoubleSumImpl(value::Array* accumulator,
                                 value::TypeTags rhsTag,
@@ -1982,8 +1989,16 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmptyBlock(ArityType arity);
     template <bool less>
-    FastTuple<bool, value::TypeTags, value::Value> valueBlockAggMinMaxImpl(
+    FastTuple<bool, value::TypeTags, value::Value> valueBlockMinMaxImpl(
         value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock);
+    template <bool less>
+    FastTuple<bool, value::TypeTags, value::Value> valueBlockAggMinMaxImpl(
+        value::TypeTags accTag,
+        value::Value accVal,
+        value::TypeTags inputTag,
+        value::Value inputVal,
+        value::TypeTags bitsetTag,
+        value::Value bitsetVal);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggCount(ArityType arity);

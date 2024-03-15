@@ -59,20 +59,21 @@ public:
         std::unique_ptr<EExpression> rowAgg;
     };
 
-    // Map of slot to corresponding accumulators of the form {blockAgg, rowAgg}.
-    typedef value::SlotMap<BlockRowAccumulators> BlockAndRowAggs;
+    // List of pairs, where the first part of the pair is a slot and second part of the pair
+    // is a struct of the form {blockAgg, rowAgg} containing the corresponding accumulators.
+    using BlockAndRowAggs = std::vector<std::pair<value::SlotId, BlockRowAccumulators>>;
 
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotVector groupSlotIds,
                       value::SlotId blockBitsetInSlotId,
                       value::SlotVector blockDataInSlotIds,
-                      value::SlotId rowAccSlotId,
-                      value::SlotId accumulatorBitsetSlotId,
                       value::SlotVector accumulatorDataSlotIds,
+                      value::SlotId accumulatorBitsetSlotId,
                       BlockAndRowAggs aggs,
+                      bool allowDiskUse,
+                      SlotExprPairVector mergingExprs,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId planNodeId,
-                      bool allowDiskUse,
                       bool participateInTrialRunTracking = true,
                       bool forceIncreasedSpilling = false);
 
@@ -109,7 +110,12 @@ private:
      * Given the groupby key, looks up the entry in our hash table and runs the block and row
      * accumulators. Assumes that our input slots to these accumulators are already setup.
      */
-    void executeAccumulatorCode(value::MaterializedRow key);
+    void executeBlockLevelAccumulatorCode(const value::MaterializedRow& key);
+
+    void executeRowLevelAccumulatorCode(
+        const value::DeblockedTagVals& extractedBitmap,
+        const std::vector<value::DeblockedTagVals>& extractedGbInputs,
+        const std::vector<value::DeblockedTagVals>& extractedData);
 
     struct TokenizedKeys {
         std::vector<value::MaterializedRow> keys;
@@ -170,14 +176,10 @@ private:
     const value::SlotId _accumulatorBitsetSlotId;
     value::OwnedValueAccessor _accumulatorBitsetAccessor;
 
-    // Slots that the accumulators read to process their data. We must set these values before
-    // running the accumulators.
+    // Used as the input for row-level accumulators.
     const value::SlotVector _accumulatorDataSlotIds;
-    std::vector<value::OwnedValueAccessor> _accumulatorDataAccessors;
-
-    // Used for accumulation after block-level accumulators are run.
-    const value::SlotId _rowAccSlotId;
-    value::OwnedValueAccessor _rowAccAccessor;
+    std::vector<value::ViewOfValueAccessor> _accumulatorDataAccessors;
+    value::SlotAccessorMap _accumulatorDataAccessorMap;
 
     /*
      * A map from SlotId to a pair of {blockAccumulator, rowAccumulator}. This SlotId is the
@@ -185,6 +187,8 @@ private:
      * writes to.
      */
     BlockAndRowAggs _blockRowAggs;
+
+    SlotExprPairVector _mergingExprs;
 
     HashAggStats _specificStats;
 
@@ -200,6 +204,10 @@ private:
     std::vector<std::unique_ptr<vm::CodeFragment>> _blockLevelAggCodes;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
+    // Bytecode for the merging expressions, executed if partial aggregates are spilled to a record
+    // store and need to be subsequently combined.
+    std::vector<std::unique_ptr<vm::CodeFragment>> _mergingExprCodes;
+
     std::vector<std::unique_ptr<HashAggAccessor>> _rowAggHtAccessors;
     std::vector<std::unique_ptr<value::OwnedValueAccessor>> _rowAggRSAccessors;
     std::vector<std::unique_ptr<value::SwitchAccessor>> _rowAggAccessors;
@@ -211,6 +219,12 @@ private:
     bool _compiled = false;
 
     bool _done = false;
+
+    // Partial aggregates that have been spilled and restored are passed into the bytecode in
+    // '_mergingExprCodes' via '_spilledAccessors' so that they can be merged to compute the
+    // final aggregate value.
+    std::vector<value::ViewOfValueAccessor> _spilledAccessors;
+    value::SlotAccessorMap _spilledAccessorMap;
 
     // Place to stash the next keys and values during the streaming phase. The record store cursor
     // doesn't offer a "peek" API, so we need to hold onto the next row between getNext() calls when

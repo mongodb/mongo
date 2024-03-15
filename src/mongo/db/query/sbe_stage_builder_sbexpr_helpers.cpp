@@ -404,10 +404,10 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(SbStage stage,
     for (auto& [expr, optSlot] : projects) {
         expr.optimize(_state, varTypes);
 
-        if (!optSlot && expr.isSlotExpr()) {
-            // If 'optSlot' is not set and 'expr' is an SbSlot, then we don't need to
-            // project anything and instead we can just store 'expr.toSlot()' directly
-            // into 'outSlots'.
+        if (expr.isSlotExpr() && (!optSlot || expr.toSlot().getId() == optSlot->getId())) {
+            // If 'expr' is an SbSlot -AND- if 'optSlot' is equal to either 'expr.toSlot()' or
+            // boost::none, then we don't need to project anything and instead we can just store
+            // 'expr.toSlot()' directly into 'outSlots'.
             outSlots.emplace_back(expr.toSlot());
         } else {
             // Otherwise, allocate a slot if needed, add a project to 'slotExprPairs' for this
@@ -500,10 +500,10 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     SbAggExprVector sbAggExprs,
     SbSlot selectivityBitmapSlot,
     const SbSlotVector& blockAccArgSbSlots,
-    const SbSlotVector& blockAccInternalArgSbSlots,
     SbSlot bitmapInternalSlot,
-    SbSlot accInternalSlot,
+    const SbSlotVector& accumulatorDataSbSlots,
     bool allowDiskUse,
+    SbExprSbSlotVector mergingExprs,
     PlanYieldPolicy* yieldPolicy) {
     using BlockAggExprPair = sbe::BlockHashAggStage::BlockRowAccumulators;
 
@@ -513,7 +513,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
     const auto selectivityBitmapSlotId = selectivityBitmapSlot.getId();
 
-    sbe::BlockHashAggStage::BlockAndRowAggs aggExprsMap;
+    sbe::BlockHashAggStage::BlockAndRowAggs blockRowAggs;
     SbSlotVector aggSlots;
 
     for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
@@ -524,35 +524,42 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
         auto exprPair = BlockAggExprPair{sbAggExpr.blockAgg.extractExpr(_state, varTypes),
                                          sbAggExpr.agg.extractExpr(_state, varTypes)};
-        aggExprsMap.emplace(sbSlot.getId(), std::move(exprPair));
+        blockRowAggs.emplace_back(sbSlot.getId(), std::move(exprPair));
     }
 
     sbe::value::SlotVector groupBySlots;
     groupBySlots.push_back(groupBySlot.getId());
 
     sbe::value::SlotVector blockAccArgSlots;
-    sbe::value::SlotVector blockAccInternalArgSlots;
-
     for (const auto& sbSlot : blockAccArgSbSlots) {
         blockAccArgSlots.push_back(sbSlot.getId());
     }
-    for (const auto& sbSlot : blockAccInternalArgSbSlots) {
-        blockAccInternalArgSlots.push_back(sbSlot.getId());
+
+    sbe::value::SlotVector accumulatorDataSlots;
+    for (const auto& sbSlot : accumulatorDataSbSlots) {
+        accumulatorDataSlots.push_back(sbSlot.getId());
+    }
+
+    sbe::SlotExprPairVector mergingExprsVec;
+    for (auto& [sbExpr, sbSlot] : mergingExprs) {
+        mergingExprsVec.emplace_back(
+            std::pair(sbSlot.getId(), sbExpr.extractExpr(_state, varTypes)));
     }
 
     const bool forceIncreasedSpilling = allowDiskUse &&
         (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
+
     stage = sbe::makeS<sbe::BlockHashAggStage>(std::move(stage),
                                                groupBySlots,
                                                selectivityBitmapSlotId,
                                                std::move(blockAccArgSlots),
-                                               accInternalSlot.getId(),
+                                               std::move(accumulatorDataSlots),
                                                bitmapInternalSlot.getId(),
-                                               std::move(blockAccInternalArgSlots),
-                                               std::move(aggExprsMap),
+                                               std::move(blockRowAggs),
+                                               allowDiskUse,
+                                               std::move(mergingExprsVec),
                                                yieldPolicy,
                                                _nodeId,
-                                               allowDiskUse,
                                                true /* participateInTrialRunTracking */,
                                                forceIncreasedSpilling);
 

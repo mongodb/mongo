@@ -194,8 +194,8 @@ TimeseriesTest.run((insert) => {
             MaxMinusMinWithId_GroupByMeta_NoFilter: [{_id: "foo", a: 88}],
             Avg_GroupByX: [{a: 55}, {a: 57.5}],
             Min_GroupByXAndY: [{a: 2}, {a: 4}, {a: 7}, {a: 9}],
-            Min_GroupByMetaSortKey: [{a: 11}],
-            MinOfMetaSortKey_GroupByX: [{a: null}, {a: null}],
+            Min_GroupByMetaIndexKey: [{a: 11}],
+            MinOfMetaIndexKey_GroupByX: [{a: null}, {a: null}],
             GroupWithProjectedOutFieldInAccumulator: [{_id: null, minY: 11}],
             GroupWithProjectedOutFieldInGb: [
                 {_id: 11, a: 456},

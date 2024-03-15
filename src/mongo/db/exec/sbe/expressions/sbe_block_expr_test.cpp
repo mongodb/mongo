@@ -724,6 +724,9 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyBlockTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, BlockCountTest) {
+    sbe::value::OwnedValueAccessor aggAccessor;
+    bindAccessor(&aggAccessor);
+
     auto testCount = [&](std::vector<bool> bitsetData, size_t count) {
         value::ViewOfValueAccessor bitsetAccessor;
         auto bitsetSlot = bindAccessor(&bitsetAccessor);
@@ -734,7 +737,7 @@ TEST_F(SBEBlockExpressionTest, BlockCountTest) {
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>("valueBlockAggCount",
                                                        sbe::makeEs(makeE<EVariable>(bitsetSlot)));
-        auto compiledCountExpr = compileExpression(*compiledExpr);
+        auto compiledCountExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
         auto [runTag, runVal] = runCompiledExpression(compiledCountExpr.get());
 
@@ -753,6 +756,9 @@ TEST_F(SBEBlockExpressionTest, BlockCountTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, BlockSumTest) {
+    sbe::value::OwnedValueAccessor aggAccessor;
+    bindAccessor(&aggAccessor);
+
     auto testSum = [&](std::vector<std::pair<value::TypeTags, value::Value>> blockData,
                        std::vector<bool> bitsetData,
                        std::pair<value::TypeTags, value::Value> expectedResult) {
@@ -778,7 +784,8 @@ TEST_F(SBEBlockExpressionTest, BlockSumTest) {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             "valueBlockAggSum",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
-        auto compiledCountExpr = compileExpression(*compiledExpr);
+
+        auto compiledCountExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
         auto [runTag, runVal] = runCompiledExpression(compiledCountExpr.get());
         value::ValueGuard guard(runTag, runVal);
@@ -841,6 +848,9 @@ TEST_F(SBEBlockExpressionTest, BlockSumTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
+    sbe::value::OwnedValueAccessor aggAccessor;
+    bindAccessor(&aggAccessor);
+
     value::ViewOfValueAccessor blockAccessor;
     value::ViewOfValueAccessor bitsetAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
@@ -864,7 +874,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             "valueBlockAggMin",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
-        auto compiledMinExpr = compileExpression(*compiledExpr);
+        auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
         auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
         value::ValueGuard guard(runTag, runVal);
@@ -878,10 +888,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
     }
 
     {
+        aggAccessor.reset(false, value::TypeTags::Nothing, 0);
+
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             "valueBlockAggMax",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
-        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
         auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
         value::ValueGuard guard(runTag, runVal);
@@ -896,6 +909,9 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
 }
 
 TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
+    sbe::value::OwnedValueAccessor aggAccessor;
+    bindAccessor(&aggAccessor);
+
     value::ViewOfValueAccessor blockAccessor;
     value::ViewOfValueAccessor bitsetAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
@@ -921,7 +937,8 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             "valueBlockAggMin",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
-        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
         auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
         value::ValueGuard guard(runTag, runVal);
@@ -935,10 +952,13 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
     }
 
     {
+        aggAccessor.reset(false, value::TypeTags::Nothing, 0);
+
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             "valueBlockAggMax",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
-        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
         auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
         value::ValueGuard guard(runTag, runVal);

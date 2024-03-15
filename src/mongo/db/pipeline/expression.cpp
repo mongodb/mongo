@@ -3248,7 +3248,11 @@ ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaTyp
         case MetaType::kSearchSequenceToken:
             break;
         default:
+            // If the query contains $meta fields that are not currently supported by SBE, then
+            // we can't run any part of pipeline in SBE and we have to run the entire pipeline
+            // under the classic engine.
             expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+            expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
     }
 }
 

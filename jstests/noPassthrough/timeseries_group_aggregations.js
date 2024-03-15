@@ -67,7 +67,9 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
 
     // Sort order is not guaranteed, so let's sort by the object itself before comparing.
     const cmpFn = function(doc1, doc2) {
-        return tojson(doc1) < tojson(doc2);
+        const doc1Json = tojson(doc1);
+        const doc2Json = tojson(doc2);
+        return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
     };
     classicResults.sort(cmpFn);
     bpResults.sort(cmpFn);
