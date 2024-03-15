@@ -32,6 +32,7 @@
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <iterator>
+#include <memory>
 #include <variant>
 #include <vector>
 
@@ -47,20 +48,27 @@
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
 
@@ -98,30 +106,21 @@ void assertQueryShapeConfigurationsEquals(
 
 }  // namespace
 
-static auto const kSerializationContext =
-    SerializationContext{SerializationContext::Source::Command,
-                         SerializationContext::CallerType::Request,
-                         SerializationContext::Prefix::ExcludePrefix};
-
 class QuerySettingsManagerTest : public ServiceContextTest {
 public:
     static constexpr StringData kCollName = "exampleCol"_sd;
     static constexpr StringData kDbName = "foo"_sd;
 
     static std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
-        OperationContext* opCtx, TenantId tenantId) {
-        OID tenantOid = OID::parse(tenantId.toString()).getValue();
-        NamespaceSpec ns;
-        ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
-        ns.setColl(kCollName);
-
+        OperationContext* opCtx, boost::optional<TenantId> tenantId) {
         QuerySettings settings;
         settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-        settings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a_1")})}});
+        settings.setIndexHints({{IndexHintSpec({IndexHint("a_1")})}});
         QueryInstance queryA = BSON("find" << kCollName << "$db" << kDbName << "filter"
-                                           << BSON("a" << 2) << "$tenant" << tenantOid);
-        QueryInstance queryB = BSON("find" << kCollName << "$db" << kDbName << "filter"
-                                           << BSON("a" << BSONNULL) << "$tenant" << tenantOid);
+                                           << BSON("a" << 2) << "$tenant" << TenantId{OID::gen()});
+        QueryInstance queryB =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL)
+                        << "$tenant" << TenantId{OID::gen()});
         return {makeQueryShapeConfiguration(settings, queryA, opCtx, tenantId),
                 makeQueryShapeConfiguration(settings, queryB, opCtx, tenantId)};
     }

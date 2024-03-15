@@ -349,14 +349,20 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
                        mongo::query_settings::IndexHintSpec>& indexHintSpecs,
     std::vector<IndexEntry>& indexes) {
     // Retrieving the allowed indexes for the given collection.
-    auto getHintNamespace = [](const auto& hint) {
-        return NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
+    auto hintToNs = [&collection](const auto& hint) -> boost::optional<NamespaceString> {
+        if (!hint.getNs()) {
+            return boost::none;
+        }
+        return NamespaceStringUtil::deserialize(collection->ns().tenantId(),
+                                                hint.getNs()->getDb(),
+                                                hint.getNs()->getColl(),
+                                                SerializationContext::stateDefault());
     };
     auto allowedIndexes = visit(
         OverloadedVisitor{
             [&](const std::vector<mongo::query_settings::IndexHintSpec>& hints) {
-                auto isHintForCollection = [&](const auto& hint) {
-                    return getHintNamespace(hint) == collection->ns();
+                auto isHintForCollection = [&](const mongo::query_settings::IndexHintSpec& hint) {
+                    return *hintToNs(hint) == collection->ns();
                 };
 
                 if (auto hintIt = std::find_if(hints.begin(), hints.end(), isHintForCollection);
@@ -366,9 +372,11 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
                 return std::vector<mongo::IndexHint>();
             },
             [&](const mongo::query_settings::IndexHintSpec& hint) {
-                if (getHintNamespace(hint) == collection->ns()) {
+                auto hintNs = hintToNs(hint);
+                if (!hintNs || *hintNs == collection->ns()) {
                     return hint.getAllowedIndexes();
                 }
+
                 return std::vector<mongo::IndexHint>();
             },
         },
