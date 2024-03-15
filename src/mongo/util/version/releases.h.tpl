@@ -43,6 +43,7 @@
 ##
 #from bisect import bisect_left, bisect_right
 #import itertools
+#import logging
 #import re
 #import yaml
 #from packaging.version import Version
@@ -67,7 +68,24 @@
   #set global lower_bound_override = Version(mvc_lower_bound_override)
 #end if
 
-#set global latest = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
+#set global parsed_mongo_version = Version(re.match(r'^[0-9]+\.[0-9]+', $mongo_version).group(0))
+<%
+fcvs = self.getVar('fcvs')
+parsed_mongo_version = self.getVar('parsed_mongo_version')
+
+# Test if the last 'real' entry in the fcvs list is equal to the passed in mongo version. We always
+# include 100.0 in the fcvs list as a dummy final value for testing purposes, so we compare the
+# mongo version to the second to last element.
+last_fcv_in_fcvs_list = fcvs[-2]
+if (last_fcv_in_fcvs_list < parsed_mongo_version):
+    # If the mongo version is ahead of the last entry in the fcvs list, set latest to the last entry and log a warning.
+    logging.warning(f'Mongo version {self.dotted(parsed_mongo_version)} is ahead of the last FCV in fcvs list {self.dotted(last_fcv_in_fcvs_list)}. Please update the fcvs list to include the mongo version.')
+    latest = last_fcv_in_fcvs_list
+else:
+    latest = parsed_mongo_version
+%>
+#set global latest = $latest
+
 ## Highest release less than latest.
 #set global last_continuous = $fcvs[bisect_left($fcvs, $latest) - 1]
 ## Highest LTS release less than latest.
@@ -96,9 +114,6 @@ lower_bound_override = self.getVar('lower_bound_override')
 lts_cutoff = last_lts
 if lower_bound_override is not None:
     lts_cutoff = lower_bound_override
-
-# The 'latest' version must be one of the versions listed in releases.yml.
-assert(latest in fcvs)
 
 # The transition when used as a cpp variable.
 down = 'DowngradingFrom'
