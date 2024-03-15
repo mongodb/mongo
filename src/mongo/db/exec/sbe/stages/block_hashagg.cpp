@@ -183,10 +183,16 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
             _blockDataInSlotIds.size() == _accumulatorDataSlotIds.size());
 
     _children.emplace_back(std::move(input));
+
     _outIdBlocks.resize(_groupSlots.size());
     _outAggBlocks.resize(_blockRowAggs.size());
     _blockDataInAccessors.resize(_blockDataInSlotIds.size());
     _accumulatorDataAccessors.resize(_accumulatorDataSlotIds.size());
+    _gbBlocks.resize(_groupSlots.size());
+    _dataBlocks.resize(_blockDataInSlotIds.size());
+    _deblockedTokens.resize(_groupSlots.size());
+
+    _tokenInfos.reserve(_groupSlots.size());
 
     if (_allowDiskUse) {
         tassert(8780601,
@@ -380,13 +386,12 @@ void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::Materializ
 
 void BlockHashAggStage::executeRowLevelAccumulatorCode(
     const value::DeblockedTagVals& extractedBitmap,
-    const std::vector<value::DeblockedTagVals>& extractedGbInputs,
+    const std::vector<value::DeblockedTagVals>& extractedGbs,
     const std::vector<value::DeblockedTagVals>& extractedData) {
-    const size_t blockSize = extractedBitmap.count();
 
     boost::optional<value::MaterializedRow> key;
 
-    for (size_t blockIndex = 0; blockIndex < blockSize; ++blockIndex) {
+    for (size_t blockIndex = 0; blockIndex < _currentBlockSize; ++blockIndex) {
         auto [bitTag, bitVal] = extractedBitmap[blockIndex];
         invariant(bitTag == value::TypeTags::Boolean);
 
@@ -395,11 +400,11 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
         }
 
         if (!key) {
-            key.emplace(extractedGbInputs.size());
+            key.emplace(extractedGbs.size());
         }
 
-        for (size_t i = 0; i < extractedGbInputs.size(); ++i) {
-            auto [idTag, idVal] = extractedGbInputs[i][blockIndex];
+        for (size_t i = 0; i < extractedGbs.size(); ++i) {
+            auto [idTag, idVal] = extractedGbs[i][blockIndex];
             key->reset(i, false, idTag, idVal);
         }
 
@@ -437,9 +442,9 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
     invariant(bitmapInTag == value::TypeTags::valueBlock);
 
     // Set '_accumulatorDataAccessors' to the input value blocks.
-    for (size_t i = 0; i < _blockDataInAccessors.size(); ++i) {
-        auto [tag, val] = _blockDataInAccessors[i]->getViewOfValue();
-        _accumulatorDataAccessors[i].reset(tag, val);
+    for (size_t i = 0; i < _dataBlocks.size(); ++i) {
+        _accumulatorDataAccessors[i].reset(value::TypeTags::valueBlock,
+                                           value::bitcastFrom<value::ValueBlock*>(_dataBlocks[i]));
     }
 
     // Process the accumulators for each partition rather than one element at a time.
@@ -453,9 +458,7 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
         if (tokenizedKeys.keys.size() > 1) {
             // Combine the partition bitmap and input bitmap using bitAnd().
             auto partitionBitset = computeBitmapForPartition(tokenizedKeys.idxs, partition);
-
-            auto accBitset =
-                bitAnd(partitionBitset.get(), value::bitcastTo<value::ValueBlock*>(bitmapInVal));
+            auto accBitset = bitAnd(partitionBitset.get(), _bitmapBlock);
 
             _accumulatorBitsetAccessor.reset(
                 true,
@@ -464,42 +467,35 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
         } else {
             // The partition bitmap would be all 1s if we computed it, so we can just use
             // the input bitmap in this case.
-            _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
+            _accumulatorBitsetAccessor.reset(false,
+                                             value::TypeTags::valueBlock,
+                                             value::bitcastFrom<value::ValueBlock*>(_bitmapBlock));
         }
 
         executeBlockLevelAccumulatorCode(tokenizedKeys.keys[partition]);
     }
 }
 
-void BlockHashAggStage::runAccumulatorsElementWise(size_t blockSize) {
-    invariant(_blockBitsetInAccessor);
-    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
-    invariant(bitmapInTag == value::TypeTags::valueBlock);
+void BlockHashAggStage::runAccumulatorsElementWise() {
+    // Extract the bitmap.
+    value::DeblockedTagVals extractedBitmap = _bitmapBlock->extract();
 
-    value::DeblockedTagVals extractedBitmap =
-        value::bitcastTo<value::ValueBlock*>(bitmapInVal)->extract();
-    invariant(extractedBitmap.count() == blockSize);
-
-    std::vector<value::DeblockedTagVals> extractedGbInputs;
-    extractedGbInputs.reserve(_idInAccessors.size());
-    for (auto& p : _idInAccessors) {
-        auto [gbInputTag, gbInputVal] = p->getViewOfValue();
-        invariant(gbInputTag == value::TypeTags::valueBlock);
-        extractedGbInputs.push_back(value::bitcastTo<value::ValueBlock*>(gbInputVal)->extract());
+    // Extract the group bys.
+    std::vector<value::DeblockedTagVals> extractedGbs;
+    extractedGbs.resize(_gbBlocks.size());
+    for (size_t i = 0; i < _gbBlocks.size(); ++i) {
+        extractedGbs[i] = _gbBlocks[i]->extract();
     }
-
-    const size_t numDataInputs = _blockDataInSlotIds.size();
 
     // Extract each data block into this array for when we process them element-wise.
     std::vector<value::DeblockedTagVals> extractedData;
-    extractedData.resize(numDataInputs);
-    for (size_t i = 0; i < numDataInputs; i++) {
-        auto [dataTag, dataVal] = _blockDataInAccessors[i]->getViewOfValue();
-        invariant(dataTag == value::TypeTags::valueBlock);
-        extractedData[i] = value::bitcastTo<value::ValueBlock*>(dataVal)->extract();
+    extractedData.resize(_dataBlocks.size());
+    for (size_t i = 0; i < _dataBlocks.size(); i++) {
+        extractedData[i] = _dataBlocks[i]->extract();
     }
 
-    executeRowLevelAccumulatorCode(extractedBitmap, extractedGbInputs, extractedData);
+    // Call executeRowLevelAccumulatorCode() to run the row accumulators.
+    executeRowLevelAccumulatorCode(extractedBitmap, extractedGbs, extractedData);
 
     _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
 }
@@ -555,6 +551,25 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tokenizeTok
     return BlockHashAggStage::TokenizedKeys{std::move(keys), std::move(idxs)};
 }
 
+boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenizeGbs() {
+    // Populate '_tokenInfos' and '_deblockedTokens'.
+    _tokenInfos.clear();
+
+    for (size_t i = 0; i < _gbBlocks.size(); ++i) {
+        _tokenInfos.push_back(_gbBlocks[i]->tokenize());
+
+        tassert(8608600,
+                "All input blocks must be the same size",
+                _tokenInfos[i].idxs.size() == _currentBlockSize);
+
+        _deblockedTokens[i] = _tokenInfos[i].tokens->extract();
+    }
+
+    // Combine the TokenizedBlocks for each input key, combine them into compound keys, tokenize
+    // these compound keys, and then return the result.
+    return tokenizeTokenInfos(_tokenInfos, _deblockedTokens);
+}
+
 void BlockHashAggStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
     _children[0]->open(reOpen);
@@ -573,47 +588,42 @@ void BlockHashAggStage::open(bool reOpen) {
         _done = false;
     }
 
+    invariant(_blockBitsetInAccessor);
+
     MemoryCheckData memoryCheckData;
 
     while (PlanState::ADVANCED == _children[0]->getNext()) {
-        std::vector<value::TokenizedBlock> tokenInfos;
-        tokenInfos.reserve(_idInAccessors.size());
-        std::vector<value::DeblockedTagVals> deblockedTokens(_idInAccessors.size());
-        size_t i = 0;
-        for (auto& id : _idInAccessors) {
-            auto [gbInputTag, gbInputVal] = id->getViewOfValue();
-            if (i == 0) {
-                if (gbInputTag != value::TypeTags::valueBlock) {
-                    // Scalar key inputs cannot be a part of a compound key.
-                    invariant(_idInAccessors.size() == 1);
-                    auto [gbInputCopyTag, gbInputCopyVal] =
-                        value::copyValue(gbInputTag, gbInputVal);
-                    tokenInfos.push_back(
-                        {std::make_unique<value::HeterogeneousBlock>(std::vector{gbInputCopyTag},
-                                                                     std::vector{gbInputCopyVal}),
-                         {0} /* idxs */});
-                    deblockedTokens[0] = tokenInfos[0].tokens->extract();
-                    break;
-                }
-            }
-            invariant(gbInputTag == value::TypeTags::valueBlock);
-            tokenInfos.push_back(value::getValueBlock(gbInputVal)->tokenize());
-            tassert(8608600,
-                    "All input blocks must be the same size",
-                    i == 0 || tokenInfos[i].idxs.size() == tokenInfos[i - 1].idxs.size());
-            deblockedTokens[i] = tokenInfos[i].tokens->extract();
-            ++i;
+        // Update '_bitmapBlock' and '_currentBlockSize'.
+        auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
+        invariant(bitmapInTag == value::TypeTags::valueBlock);
+
+        _bitmapBlock = value::bitcastTo<value::ValueBlock*>(bitmapInVal);
+        _currentBlockSize = _bitmapBlock->count();
+
+        // Update '_gbBlocks' and '_dataBlocks'.
+        for (size_t i = 0; i < _idInAccessors.size(); ++i) {
+            auto [tag, val] = _idInAccessors[i]->getViewOfValue();
+            _gbBlocks[i] = tag == value::TypeTags::valueBlock ? value::getValueBlock(val)
+                                                              : makeMonoBlock(tag, val);
         }
 
-        // Combine the TokenizedBlocks for each input key, combine them into compound keys, and
-        // then tokenize these compound keys.
-        auto tokenizedKeys = tokenizeTokenInfos(tokenInfos, deblockedTokens);
+        for (size_t i = 0; i < _blockDataInAccessors.size(); i++) {
+            auto [tag, val] = _blockDataInAccessors[i]->getViewOfValue();
+            _dataBlocks[i] = tag == value::TypeTags::valueBlock ? value::getValueBlock(val)
+                                                                : makeMonoBlock(tag, val);
+        }
+
+        // Try to generate tokenized group-by keys.
+        auto tokenizedKeys = tryTokenizeGbs();
 
         if (tokenizedKeys) {
+            // If we generated tokenized group-by keys successfully, call runAccumulatorsTokenized()
+            // to run the block-level accumulators.
             runAccumulatorsTokenized(*tokenizedKeys);
         } else {
-            auto blockSize = !tokenInfos.empty() ? tokenInfos[0].idxs.size() : 0;
-            runAccumulatorsElementWise(blockSize);
+            // If tryTokenizeGbs() returned boost::none, call runAccumulatorsElementWise() to
+            // deblock everything and run the row-level accumulators.
+            runAccumulatorsElementWise();
         }
 
         if (!_ht->empty()) {
@@ -629,6 +639,11 @@ void BlockHashAggStage::open(bool reOpen) {
         }
 
         trackResult();
+
+        // We no longer need any of the TokenizedBlocks or MonoBlocks that we created during this
+        // iteration, so we can discard them now.
+        _tokenInfos.clear();
+        _monoBlocks.clear();
     }
 
     // If we spilled at any point while consuming the input, then do one final spill to write
@@ -883,6 +898,11 @@ void BlockHashAggStage::close() {
     _recordStore.reset();
     _stashedNextRow = boost::none;
 
+    _currentBlockSize = 0;
+    _bitmapBlock = nullptr;
+    _tokenInfos.clear();
+    _monoBlocks.clear();
+
     _children[0]->close();
 }
 
@@ -979,6 +999,18 @@ void BlockHashAggStage::populateBitmapSlot(size_t n) {
             std::make_unique<value::MonoBlock>(
                 n, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
                 .release()));
+}
+
+value::ValueBlock* BlockHashAggStage::makeMonoBlock(value::TypeTags tag, value::Value val) {
+    // Add another element to the end of the '_monoBlocks' deque and get a reference to it
+    // ('monoBlockOpt'), emplace a MonoBlock with the specified value into 'monoBlockOpt',
+    // and then return a pointer to the MonoBlock.
+    _monoBlocks.emplace_back();
+    boost::optional<value::MonoBlock>& monoBlockOpt = _monoBlocks.back();
+
+    monoBlockOpt.emplace(_currentBlockSize, tag, val);
+
+    return &*monoBlockOpt;
 }
 }  // namespace sbe
 }  // namespace mongo

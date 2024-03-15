@@ -1413,19 +1413,6 @@ SbExpr buildFinalizeLinearFill(const Op& acc,
     return b.makeFunction("aggLinearFillFinalize", std::move(inputVar), std::move(sortBy));
 }
 
-// Helper function for vectorizing an expression.
-SbExpr vectorizeExpr(StageBuilderState& state, const PlanStageSlots& outputs, SbExpr exprIn) {
-    // Call buildVectorizedExpr() and then check if it produced a vectorized expression.
-    SbExpr expr = buildVectorizedExpr(state, std::move(exprIn), outputs, false);
-    boost::optional<TypeSignature> typeSig = expr.getTypeSignature();
-    bool isVectorized = expr && typeSig && TypeSignature::kBlockType.isSubset(*typeSig);
-    // If 'expr' is a vectorized expression return it, otherwise return a null SbExpr.
-    if (isVectorized) {
-        return expr;
-    }
-    return SbExpr{};
-}
-
 boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
     const Op& acc,
     std::unique_ptr<AccumSingleInput> inputsIn,
@@ -1435,8 +1422,8 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
     // result type of buildAccumExprs() is not AccumSingleInput.
     auto inputs = castInputsTo<AccumSingleInput>(acc.buildAccumExprs(state, std::move(inputsIn)));
 
-    // Try to vectorize 'inputs->inputExpr'.
-    SbExpr expr = vectorizeExpr(state, outputs, std::move(inputs->inputExpr));
+    // Try to vectorize 'inputs->inputExpr' and return the result.
+    auto expr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
 
     if (expr) {
         // If vectorization succeeded, allocate a slot and update 'inputs->inputExpr' to refer to

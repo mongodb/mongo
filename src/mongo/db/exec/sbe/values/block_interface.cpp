@@ -206,9 +206,14 @@ TokenizedBlock ValueBlock::tokenize() {
 }
 
 TokenizedBlock MonoBlock::tokenize() {
-    auto [tag, val] = value::copyValue(_tag, _val);
-    std::vector<TypeTags> tokenTags{tag};
-    std::vector<Value> tokenVals{val};
+    std::vector<TypeTags> tokenTags;
+    std::vector<Value> tokenVals;
+
+    if (_count > 0) {
+        auto [tag, val] = value::copyValue(_tag, _val);
+        tokenTags.emplace_back(tag);
+        tokenVals.emplace_back(val);
+    }
 
     return {std::make_unique<HeterogeneousBlock>(std::move(tokenTags), std::move(tokenVals)),
             std::vector<size_t>(_count, 0)};

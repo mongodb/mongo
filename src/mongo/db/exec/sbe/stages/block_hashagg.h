@@ -133,6 +133,9 @@ private:
     boost::optional<TokenizedKeys> tokenizeTokenInfos(
         const std::vector<value::TokenizedBlock>& tokenInfos,
         const std::vector<value::DeblockedTagVals>& deblockedTokens);
+
+    boost::optional<BlockHashAggStage::TokenizedKeys> tryTokenizeGbs();
+
     /*
      * Finds the unique values in our input key blocks and processes them in together. For example
      * if half of the keys are 1 and the other half are 2, we can avoid many hash table lookups and
@@ -145,7 +148,7 @@ private:
      * Runs the accumulators on each element of the inputs, one at a time. This is best if the
      * number of unique keys is high so the partitioning approach would be quadratic.
      */
-    void runAccumulatorsElementWise(size_t blockSize);
+    void runAccumulatorsElementWise();
 
     // Returns the next accumulator key or boost::none if we've run out of spilled keys.
     boost::optional<value::MaterializedRow> getNextSpilledHelper();
@@ -155,6 +158,8 @@ private:
      * Populates the bitmap out-slot with a block of 'nElements' true values.
      */
     void populateBitmapSlot(size_t nElements);
+
+    value::ValueBlock* makeMonoBlock(value::TypeTags tag, value::Value val);
 
     // Groupby key slots.
     const value::SlotVector _groupSlots;
@@ -214,6 +219,14 @@ private:
 
     // Hash table where we'll map groupby key to the accumulators.
     std::vector<std::unique_ptr<HashKeyAccessor>> _idHtAccessors;
+
+    size_t _currentBlockSize = 0;
+    value::ValueBlock* _bitmapBlock = nullptr;
+    std::vector<value::ValueBlock*> _gbBlocks;
+    std::vector<value::ValueBlock*> _dataBlocks;
+    std::vector<value::TokenizedBlock> _tokenInfos;
+    std::vector<value::DeblockedTagVals> _deblockedTokens;
+    std::deque<boost::optional<value::MonoBlock>> _monoBlocks;
 
     vm::ByteCode _bytecode;
     bool _compiled = false;

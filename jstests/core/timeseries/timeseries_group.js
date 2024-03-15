@@ -26,55 +26,74 @@ import {checkSbeStatus, kSbeDisabled, kSbeFullyEnabled} from "jstests/libs/sbe_u
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
-    let coll = db.timeseries_group;
+    let coll = db.timeseries_group_ts;
+    let collNotTs = db.timeseries_group_not_ts;
 
     const timeFieldName = 'time';
     const metaFieldName = 'measurement';
 
     coll.drop();
+    collNotTs.drop();
+
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     }));
 
-    insert(coll, {
-        _id: 0,
-        [timeFieldName]: new Date(datePrefix + 100),
-        [metaFieldName]: "foo",
-        x: 123,
-        y: 73,
-        z: 7,
-    });
-    insert(coll, {
-        _id: 1,
-        [timeFieldName]: new Date(datePrefix + 200),
-        [metaFieldName]: "foo",
-        x: 123,
-        y: 42,
-        z: 9,
-    });
-    insert(coll, {
-        _id: 2,
-        [timeFieldName]: new Date(datePrefix + 300),
-        [metaFieldName]: "foo",
-        x: 456,
-        y: 11,
-        z: 4,
-    });
-    insert(coll, {
-        _id: 3,
-        [timeFieldName]: new Date(datePrefix + 400),
-        [metaFieldName]: "foo",
-        x: 456,
-        y: 99,
-        z: 2,
-    });
-    insert(coll, {
-        _id: 4,
-        [timeFieldName]: new Date(datePrefix + 500),
-        [metaFieldName]: "foo",
+    assert.commandWorked(db.createCollection(collNotTs.getName()));
 
-        // All fields missing.
-    });
+    // Populate 'coll' and 'collNotTs' with the same set of documents.
+    const Inf = Infinity;
+    const str = "a somewhat long string";
+    const metaVals = ["foo", "bar", "baz"];
+    const xVals = [null, undefined, 42, -12.345, NaN, "789", "antidisestablishmentarianism"];
+    const yVals = [0, 73.73, -Inf, "blah", str, undefined, null];
+    const zVals = [0, 1, 2, 8, 23.9, 67, 247.8, -23, -456.7, -8e9, undefined];
+    const wVals = [0, 1, -2, 4, 7, -8.8, 9, 46, -99, 1e40, Inf, -Inf, NaN, str, [], {}, undefined];
+
+    let nextId = 0;
+    let nextDateOffset = 0;
+    let zIdx = 0;
+    let wIdx = 1;
+
+    for (let i = 0; i < 10; ++i) {
+        const documents = [];
+
+        for (let meta of metaVals) {
+            for (let x of xVals) {
+                for (let y of yVals) {
+                    let id = nextId;
+                    let t = new Date(datePrefix + nextDateOffset);
+                    let z = zVals[zIdx];
+                    let w = wVals[wIdx];
+
+                    let doc = {_id: id, [timeFieldName]: t, [metaFieldName]: meta};
+
+                    if (x !== undefined) {
+                        doc.x = x;
+                    }
+                    if (y !== undefined) {
+                        doc.y = y;
+                    }
+                    if (z !== undefined) {
+                        doc.z = z;
+                    }
+                    if (w !== undefined) {
+                        doc.w = w;
+                    }
+
+                    documents.push(doc);
+
+                    nextId = nextId + 1;
+                    nextDateOffset = (nextDateOffset + 5) % 199;
+                    zIdx = (zIdx + 2) % zVals.length;
+                    wIdx = (wIdx + 3) % wVals.length;
+                }
+            }
+        }
+
+        insert(coll, documents);
+        insert(collNotTs, documents);
+    }
 
     // Block based $group is guarded behind (SbeFull || SbeBlockHashAgg) && TimeSeriesInSbe.
     const sbeStatus = checkSbeStatus(db);
@@ -92,7 +111,7 @@ TimeseriesTest.run((insert) => {
             setParameter: 1,
             internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceIncreasedSpilling
         }));
-        const dateUpperBound = new Date(datePrefix + 500);
+        const dateUpperBound = new Date(datePrefix + 200);
         const dateLowerBound = new Date(datePrefix);
 
         function compareResultEntries(lhs, rhs) {
@@ -111,123 +130,24 @@ TimeseriesTest.run((insert) => {
                                                    dateLowerBound,
                                                    featureFlagsAllowBlockHashAgg);
 
-        const expectedResults = {
-            GroupByNull: [{_id: null}],
-            Min_GroupByNull: [{a: 11}],
-            Min_GroupByNullAllPass: [{a: 11}],
-            MinWithId_GroupByNull: [{_id: null, a: 11}],
-            Max_GroupByNull: [{a: 99}],
-            Max_GroupByNullAllPass: [{a: 99}],
-            MaxWithId_GroupByNull: [{_id: null, a: 99}],
-            MaxMinusMin_GroupByNull: [{a: 88}],
-            MaxMinusMin_GroupByNullAllPass: [{a: 88}],
-            MaxMinusMinWithId_GroupByNull: [{_id: null, a: 88}],
-            MinAndMaxWithId_GroupByNull: [{_id: null, a: 11, b: 99}],
-            Min_GroupByX: [{a: 11}, {a: 42}],
-            MinWithId_GroupByX: [{_id: 123, a: 42}, {_id: 456, a: 11}],
-            Max_GroupByX: [{a: 73}, {a: 99}],
-            MaxWithId_GroupByX: [{_id: 123, a: 73}, {_id: 456, a: 99}],
-            MaxMinusMin_GroupByX: [{a: 31}, {a: 88}],
-            MaxMinusMinWithId_GroupByX: [{_id: 123, a: 31}, {_id: 456, a: 88}],
-            MinAndMaxWithId_GroupByX: [{_id: 123, a: 42, b: 73}, {_id: 456, a: 11, b: 99}],
-            MaxMinusMinWithId_GroupByDateTrunc: [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
-            MinWithId_GroupByDateAdd: [
-                {_id: ISODate("1970-01-20T10:55:12.640Z"), a: 73},
-                {_id: ISODate("1970-01-20T10:55:12.740Z"), a: 42},
-                {_id: ISODate("1970-01-20T10:55:12.840Z"), a: 11},
-                {_id: ISODate("1970-01-20T10:55:12.940Z"), a: 99}
-            ],
-            MinWithId_GroupByDateAddAndDateDiff: [
-                {_id: ISODate("2024-01-01T00:00:00.100Z"), a: 73},
-                {_id: ISODate("2024-01-01T00:00:00.200Z"), a: 42},
-                {_id: ISODate("2024-01-01T00:00:00.300Z"), a: 11},
-                {_id: ISODate("2024-01-01T00:00:00.400Z"), a: 99}
-            ],
-            MinWithId_GroupByDateSubtract: [
-                {_id: ISODate("1970-01-20T10:55:12.440Z"), a: 73},
-                {_id: ISODate("1970-01-20T10:55:12.540Z"), a: 42},
-                {_id: ISODate("1970-01-20T10:55:12.640Z"), a: 11},
-                {_id: ISODate("1970-01-20T10:55:12.740Z"), a: 99}
-            ],
-            MinWithId_GroupByDateSubtractAndDateDiff: [
-                {_id: ISODate("2023-12-31T23:59:59.600Z"), a: 99},
-                {_id: ISODate("2023-12-31T23:59:59.700Z"), a: 11},
-                {_id: ISODate("2023-12-31T23:59:59.800Z"), a: 42},
-                {_id: ISODate("2023-12-31T23:59:59.900Z"), a: 73}
-            ],
-            MaxAndMinOfDateDiffWithId_GroupByNull: [{a: 100, b: 500, c: -500, d: -100}],
-            MaxAndMinOfDateAddDateSubtractDateTruncWithId_GroupByNull: [{
-                a: ISODate("1970-01-20T10:55:12.640Z"),
-                b: ISODate("1970-01-20T10:55:12.840Z"),
-                "c": ISODate("1970-01-20T10:55:12Z")
-            }],
-            MaxMinusMinWithId_GroupByDateTruncAndDateAdd:
-                [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
-            MaxMinusMinWithId_GroupByDateTruncAndDateSubtract:
-                [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
-            MinWithId_GroupByDateDiffAndDateAdd:
-                [{_id: 200, a: 73}, {_id: 300, a: 42}, {_id: 400, a: 11}, {_id: 500, a: 99}],
-            MinOfDateAddWithId_GroupByNull_MissingAmount: [{a: null}],
-            MaxPlusMinWithId_GroupByDateDiff: [
-                {_id: 100, a: 146},
-                {_id: 200, a: 84},
-                {_id: 300, a: 22},
-                {_id: 400, a: 198},
-                {_id: 500, a: null}
-            ],
-            MaxPlusMinWithId_GroupByFilteredComputedDateDiff: [{_id: 300, a: 22}],
-            Min_GroupByX_NoFilter: [{a: 11}, {a: 42}, {a: null}],
-            MinWithId_GroupByX_NoFilter:
-                [{_id: 123, a: 42}, {_id: 456, a: 11}, {_id: null, a: null}],
-            Max_GroupByX_NoFilter: [{a: 73}, {a: 99}, {a: null}],
-            MaxWithId_GroupByX_NoFilter:
-                [{_id: 123, a: 73}, {_id: 456, a: 99}, {_id: null, a: null}],
-            MaxMinusMin_GroupByX_NoFilter: [{a: 31}, {a: 88}, {a: null}],
-            MaxMinusMinWithId_GroupByX_NoFilter:
-                [{_id: 123, a: 31}, {_id: 456, a: 88}, {_id: null, a: null}],
-            MinAndMaxWithId_GroupByX_NoFilter:
-                [{_id: 123, a: 42, b: 73}, {_id: 456, a: 11, b: 99}, {_id: null, a: null, b: null}],
-            MaxMinusMinWithId_GroupByDateTrunc_NoFilter:
-                [{_id: ISODate("1970-01-20T10:55:00Z"), a: 88}],
-            MaxMinusMinWithId_GroupByDateTruncAndDateDiff_NoFilter: [
-                {_id: {date: ISODate("1970-01-20T10:55:12.400Z"), delta: 100}, a: 0},
-                {_id: {date: ISODate("1970-01-20T10:55:12.600Z"), delta: 200}, a: 0},
-                {_id: {date: ISODate("1970-01-20T10:55:12.600Z"), delta: 300}, a: 0},
-                {_id: {date: ISODate("1970-01-20T10:55:12.800Z"), delta: 400}, a: 0},
-                {_id: {date: ISODate("1970-01-20T10:55:12.800Z"), delta: 500}, a: null}
-            ],
-            MaxMinusMinWithId_GroupByDateTruncAndMeta_NoFilter:
-                [{_id: {date: ISODate("1970-01-20T10:55:00Z"), symbol: "foo"}, a: 88}],
-            MaxMinusMinWithId_GroupByMeta_NoFilter: [{_id: "foo", a: 88}],
-            Avg_GroupByX: [{a: 55}, {a: 57.5}],
-            Min_GroupByXAndY: [{a: 2}, {a: 4}, {a: 7}, {a: 9}],
-            Min_GroupByMetaIndexKey: [{a: 11}],
-            MinOfMetaIndexKey_GroupByX: [{a: null}, {a: null}],
-            GroupWithProjectedOutFieldInAccumulator: [{_id: null, minY: 11}],
-            GroupWithProjectedOutFieldInGb: [
-                {_id: 11, a: 456},
-                {_id: 42, a: 123},
-                {_id: 73, a: 123},
-                {_id: 99, a: 456},
-                {_id: null, a: null}
-            ],
-            GroupWithMixOfProjectedOutField: []
-        };
-
         for (let testcase of testcases) {
             const name = testcase.name + " (allowDiskUse=" + allowDiskUseStr + ")";
             const pipeline = testcase.pipeline;
-            const expectedResult = expectedResults[testcase.name];
             const expectedErrorCode = testcase.expectedErrorCode;
             const usesBlockProcessing = testcase.usesBlockProcessing;
 
-            if (expectedResult) {
-                // Issue the aggregate() query and collect the results (together with their
-                // JSON representations).
+            if (expectedErrorCode) {
+                assertErrorCode(coll, pipeline, expectedErrorCode);
+            } else {
+                // Issue the aggregate() query and collect the results.
                 const results = coll.aggregate(pipeline, options).toArray();
+
+                // Issue the same query to collNotTs.
+                const expectedResult = collNotTs.aggregate(pipeline, options).toArray();
 
                 // Sort the results.
                 results.sort(compareResultEntries);
+                expectedResult.sort(compareResultEntries);
 
                 const errMsgFn = () => "Test case '" + name + "':\nExpected " +
                     tojson(expectedResult) + "\n  !=\nActual " + tojson(results);
@@ -241,8 +161,6 @@ TimeseriesTest.run((insert) => {
                 for (let i = 0; i < expectedResult.length; ++i) {
                     assert.docEq(expectedResult[i], results[i], errMsgFn);
                 }
-            } else if (expectedErrorCode) {
-                assertErrorCode(coll, pipeline, expectedErrorCode);
             }
 
             // Check that explain indicates block processing is being used. This is a best effort

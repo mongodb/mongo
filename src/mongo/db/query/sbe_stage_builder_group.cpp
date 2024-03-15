@@ -1165,9 +1165,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     // to generate the block agg expressions. If all of that is successful, then we will set the
     // 'useBlockHashAgg' flag to true and we will use BlockHashAggStage. Otherwise, we use the
     // normal HashAggStage.
-
     const bool tryToUseBlockHashAgg = featureFlagsAllowBlockHashAgg &&
-        childOutputs.hasBlockOutput() && idIsSingleKey && !hasVariableGroupInit && !collatorSlot &&
+        childOutputs.hasBlockOutput() && !hasVariableGroupInit && !collatorSlot &&
         canBuildBlockExprsAndBlockAggs();
 
     bool useBlockHashAgg = false;
@@ -1312,7 +1311,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     }
 
     // Build the HashAggStage or the BlockHashAggStage.
-    auto [outStage, groupBySlots, groupOutSlots] =
+    auto [outStage, groupByOutSlots, aggOutSlots] =
         buildGroupAggregation(_state,
                               childOutputs,
                               std::move(individualSlots),
@@ -1333,14 +1332,14 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     PlanStageSlots outputs;
 
     // After the HashAgg/BlockHashAgg stage, the only slots that are "active" are the group-by slots
-    // ('groupBySlots') and the output slots for the accumulators from groupNode ('groupOutSlots').
-    individualSlots = groupBySlots;
-    individualSlots.insert(individualSlots.end(), groupOutSlots.begin(), groupOutSlots.end());
+    // ('groupByOutSlots') and the output slots for the accumulators from groupNode ('aggOutSlots').
+    individualSlots = groupByOutSlots;
+    individualSlots.insert(individualSlots.end(), aggOutSlots.begin(), aggOutSlots.end());
 
     if (useBlockHashAgg) {
         tassert(8448606,
                 "Expected at least one group by slot or agg out slot",
-                !groupBySlots.empty() || !groupOutSlots.empty());
+                !groupByOutSlots.empty() || !aggOutSlots.empty());
 
         // This stage re-maps the selectivity bitset slot.
         outputs.set(PlanStageSlots::kBlockSelectivityBitmap,
@@ -1349,25 +1348,25 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
 
     // For now we unconditionally end the block processing pipeline here.
     if (outputs.hasBlockOutput()) {
-        auto hashAggOutSlots = groupBySlots;
-        hashAggOutSlots.insert(hashAggOutSlots.end(), groupOutSlots.begin(), groupOutSlots.end());
+        auto hashAggOutSlots = groupByOutSlots;
+        hashAggOutSlots.insert(hashAggOutSlots.end(), aggOutSlots.begin(), aggOutSlots.end());
 
         auto [outStage, blockToRowOutSlots] =
             buildBlockToRow(std::move(stage), _state, outputs, std::move(hashAggOutSlots));
         stage = std::move(outStage);
 
-        for (size_t i = 0; i < groupBySlots.size(); ++i) {
-            groupBySlots[i] = blockToRowOutSlots[i];
+        for (size_t i = 0; i < groupByOutSlots.size(); ++i) {
+            groupByOutSlots[i] = blockToRowOutSlots[i];
         }
-        for (size_t i = 0; i < groupOutSlots.size(); ++i) {
-            size_t blockToRowOutSlotsIdx = groupBySlots.size() + i;
-            groupOutSlots[i] = blockToRowOutSlots[blockToRowOutSlotsIdx];
+        for (size_t i = 0; i < aggOutSlots.size(); ++i) {
+            size_t blockToRowOutSlotsIdx = groupByOutSlots.size() + i;
+            aggOutSlots[i] = blockToRowOutSlots[blockToRowOutSlotsIdx];
         }
 
-        // buildBlockToRow() just made a bunch of changes to 'groupBySlots' and 'groupOutSlots',
+        // buildBlockToRow() just made a bunch of changes to 'groupByOutSlots' and 'aggOutSlots',
         // so we need to re-generate 'individualSlots'.
-        individualSlots = groupBySlots;
-        individualSlots.insert(individualSlots.end(), groupOutSlots.begin(), groupOutSlots.end());
+        individualSlots = groupByOutSlots;
+        individualSlots.insert(individualSlots.end(), aggOutSlots.begin(), aggOutSlots.end());
     }
 
     // Builds the final stage(s) over the collected accumulators.
@@ -1375,8 +1374,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                    std::move(stage),
                                    std::move(outputs),
                                    individualSlots,
-                                   std::move(groupBySlots),
-                                   std::move(groupOutSlots),
+                                   std::move(groupByOutSlots),
+                                   std::move(aggOutSlots),
                                    *groupNode,
                                    idIsSingleKey,
                                    std::move(idConstantValue));

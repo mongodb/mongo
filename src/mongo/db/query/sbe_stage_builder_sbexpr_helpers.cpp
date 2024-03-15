@@ -460,10 +460,10 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     }
 
     sbe::AggExprVector aggExprsVec;
-    SbSlotVector aggSlots;
+    SbSlotVector aggOutSlots;
     for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
-        aggSlots.emplace_back(sbSlot);
+        aggOutSlots.emplace_back(sbSlot);
 
         auto exprPair = sbe::AggExprPair{sbAggExpr.init.extractExpr(_state, varTypes),
                                          sbAggExpr.agg.extractExpr(_state, varTypes)};
@@ -490,7 +490,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                                           true /* participateInTrialRunTracking */,
                                           forceIncreasedSpilling);
 
-    return {std::move(stage), std::move(groupByOutSlots), std::move(aggSlots)};
+    return {std::move(stage), std::move(groupByOutSlots), std::move(aggOutSlots)};
 }
 
 std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
@@ -507,20 +507,18 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     PlanYieldPolicy* yieldPolicy) {
     using BlockAggExprPair = sbe::BlockHashAggStage::BlockRowAccumulators;
 
-    tassert(8448607, "Expected exactly one group by slot to be provided", gbs.size() == 1);
-
-    SbSlot groupBySlot = gbs[0];
+    tassert(8448607, "Expected at least one group by slot to be provided", gbs.size() > 0);
 
     const auto selectivityBitmapSlotId = selectivityBitmapSlot.getId();
 
     sbe::BlockHashAggStage::BlockAndRowAggs blockRowAggs;
-    SbSlotVector aggSlots;
+    SbSlotVector aggOutSlots;
 
     for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
         sbSlot.setTypeSignature(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType));
 
-        aggSlots.emplace_back(sbSlot);
+        aggOutSlots.emplace_back(sbSlot);
 
         auto exprPair = BlockAggExprPair{sbAggExpr.blockAgg.extractExpr(_state, varTypes),
                                          sbAggExpr.agg.extractExpr(_state, varTypes)};
@@ -528,7 +526,9 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     }
 
     sbe::value::SlotVector groupBySlots;
-    groupBySlots.push_back(groupBySlot.getId());
+    for (size_t i = 0; i < gbs.size(); ++i) {
+        groupBySlots.push_back(gbs[i].getId());
+    }
 
     sbe::value::SlotVector blockAccArgSlots;
     for (const auto& sbSlot : blockAccArgSbSlots) {
@@ -550,7 +550,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
         (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
 
     stage = sbe::makeS<sbe::BlockHashAggStage>(std::move(stage),
-                                               groupBySlots,
+                                               std::move(groupBySlots),
                                                selectivityBitmapSlotId,
                                                std::move(blockAccArgSlots),
                                                std::move(accumulatorDataSlots),
@@ -563,18 +563,18 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
                                                true /* participateInTrialRunTracking */,
                                                forceIncreasedSpilling);
 
-    // For BlockHashAggStage, the group by "out" slot is the same as the incoming group by slot,
-    // except that the "out" slot will always be a block even if the incoming group by slot was
-    // scalar.
-    const auto groupByOutSlotType = TypeSignature::kBlockType.include(
-        groupBySlot.getTypeSignature().value_or(TypeSignature::kAnyScalarType));
-
-    auto groupByOutSlot = groupBySlot;
-    groupByOutSlot.setTypeSignature(groupByOutSlotType);
-
+    // For BlockHashAggStage, the group by "out" slots are the same as the incoming group by slots,
+    // except that each "out" slot will always be a block even if the corresponding incoming group
+    // by slot was scalar.
     SbSlotVector groupByOutSlots;
-    groupByOutSlots.emplace_back(groupByOutSlot);
+    for (size_t i = 0; i < gbs.size(); ++i) {
+        auto slotId = gbs[i].getId();
+        auto inputSig = gbs[i].getTypeSignature().value_or(TypeSignature::kAnyScalarType);
+        auto outputSig = TypeSignature::kBlockType.include(inputSig);
 
-    return {std::move(stage), std::move(groupByOutSlots), std::move(aggSlots)};
+        groupByOutSlots.push_back(SbSlot(slotId, outputSig));
+    }
+
+    return {std::move(stage), std::move(groupByOutSlots), std::move(aggOutSlots)};
 }
 }  // namespace mongo::stage_builder
