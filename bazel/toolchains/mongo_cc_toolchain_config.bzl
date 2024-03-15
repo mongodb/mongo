@@ -467,6 +467,85 @@ def _impl(ctx):
         ],
     )
 
+    enable_debug_info_feature = feature(
+        name = "enable_debug_info",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                # This needs to only be set in the cpp compile actions to avoid generating debug info when
+                # building assembly files since the assembler doesn't support gdwarf64.
+                actions = all_cpp_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-g2",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    dwarf4_feature = feature(
+        name = "dwarf-4",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                # This needs to only be set in the cpp compile actions to avoid generating debug info when
+                # building assembly files since the assembler doesn't support gdwarf64.
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-gdwarf-4"])],
+            ),
+        ],
+    )
+
+    dwarf5_feature = feature(
+        name = "dwarf-5",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                # This needs to only be set in the cpp compile actions to avoid generating debug info when
+                # building assembly files since the assembler doesn't support gdwarf64.
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-gdwarf-5"])],
+            ),
+        ],
+    )
+
+    dwarf32_feature = feature(
+        name = "dwarf32",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                # This needs to only be set in the cpp compile actions to avoid generating debug info when
+                # building assembly files since the assembler doesn't support gdwarf64.
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-gdwarf32"])],
+            ),
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = ["-gdwarf32"])],
+            ),
+        ],
+    )
+
+    dwarf64_feature = feature(
+        name = "dwarf64",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                # This needs to only be set in the cpp compile actions to avoid generating debug info when
+                # building assembly files since the assembler doesn't support gdwarf64.
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-gdwarf64"])],
+            ),
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = ["-gdwarf64"])],
+            ),
+        ],
+    )
+
     features = [
         bin_dirs_feature,
         default_compile_flags_feature,
@@ -491,6 +570,11 @@ def _impl(ctx):
         includes_feature,
         dependency_file_feature,
         verbose_feature,
+        enable_debug_info_feature,
+        dwarf4_feature,
+        dwarf5_feature,
+        dwarf32_feature,
+        dwarf64_feature,
     ]
 
     return [

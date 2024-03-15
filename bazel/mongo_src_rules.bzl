@@ -185,7 +185,37 @@ WINDOWS_WARNINGS_AS_ERRORS_COPTS = select({
     "//conditions:default": [],
 })
 
-WINDOWS_COPTS = WINDOWS_GENERAL_COPTS + WINDOWS_OPT_COPTS + WINDOWS_MULTITHREAD_RUNTIME_COPTS + WINDOWS_RUNTIME_ERROR_CHECK_COPTS + WINDOWS_SUPRESSED_WARNINGS_COPTS + WINDOWS_WARNINGS_AS_ERRORS_COPTS
+MSVC_OPT_COPTS = select({
+    "//bazel/config:msvc_opt": [
+        # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
+        "/Gw",
+        "/Gy",
+
+        # https://devblogs.microsoft.com/cppblog/linker-enhancements-in-visual-studio-2013-update-2-ctp2/
+        "/Zc:inline",
+    ],
+    "//conditions:default": [],
+})
+
+WINDOWS_COPTS = WINDOWS_GENERAL_COPTS + WINDOWS_OPT_COPTS + WINDOWS_MULTITHREAD_RUNTIME_COPTS + WINDOWS_RUNTIME_ERROR_CHECK_COPTS + \
+                WINDOWS_SUPRESSED_WARNINGS_COPTS + WINDOWS_WARNINGS_AS_ERRORS_COPTS + MSVC_OPT_COPTS
+
+WINDOWS_DEFAULT_LINKFLAGS = select({
+    "@platforms//os:windows": [
+        # /DEBUG will tell the linker to create a .pdb file
+        # which WinDbg and Visual Studio will use to resolve
+        # symbols if you want to debug a release-mode image.
+        # Note that this means we can't do parallel links in the build.
+        #
+        # Please also note that this has nothing to do with _DEBUG or optimization.
+
+        # If the user set a /DEBUG flag explicitly, don't add
+        # another. Otherwise use the standard /DEBUG flag, since we always
+        # want PDBs.
+        "/DEBUG",
+    ],
+    "//conditions:default": [],
+})
 
 # Windows non optimized builds will cause the PDB to blow up in size,
 # this allows a larger PDB. The flag is undocumented at the time of writing
@@ -216,7 +246,16 @@ WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG = select({
     "//conditions:default": [],
 })
 
-WINDOWS_LINKFLAGS = WINDOWS_PDB_PAGE_SIZE_LINKOPT + WINDOWS_INCREMENTAL_LINKOPT + WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG
+MSVC_OPT_LINKFLAGS = select({
+    "//bazel/config:msvc_opt": [
+        # https://devblogs.microsoft.com/cppblog/introducing-gw-compiler-switch/
+        "/OPT:REF",
+    ],
+    "//conditions:default": [],
+})
+
+WINDOWS_LINKFLAGS = WINDOWS_DEFAULT_LINKFLAGS + WINDOWS_PDB_PAGE_SIZE_LINKOPT + WINDOWS_INCREMENTAL_LINKOPT + \
+                    WINDOWS_LARGE_ADDRESS_AWARE_LINKFLAG + MSVC_OPT_LINKFLAGS
 
 WINDOWS_DEFINES = select({
     "@platforms//os:windows": [
@@ -426,6 +465,16 @@ CLANG_WARNINGS_COPTS = select({
     "//conditions:default": [],
 })
 
+CLANG_FNO_LIMIT_DEBUG_INFO = select({
+    "//bazel/config:compiler_type_clang": [
+        # We add this flag to make clang emit debug info for c++ stl types so that our pretty
+        # printers will work with newer clang's which omit this debug info. This does increase
+        # the overall debug info size.
+        "-fno-limit-debug-info",
+    ],
+    "//conditions:default": [],
+})
+
 MACOS_WARNINGS_COPTS = select({
     "@platforms//os:macos": [
         # As of XCode 9, this flag must be present (it is not enabled
@@ -442,9 +491,6 @@ GCC_OR_CLANG_GENERAL_COPTS = select({
         # The table is exact at each instruction boundary, so it can be used for stack unwinding
         # from asynchronous events (such as debugger or garbage collector).
         "-fasynchronous-unwind-tables",
-
-        # Include default level of debugging information.
-        "-g2",
 
         # For debug builds with tcmalloc, we need the frame pointer so it can
         # record the stack of allocations.
@@ -480,12 +526,12 @@ RDYNAMIC_LINKFLAG = select({
 })
 
 # These are added to both copts and linker flags.
-DWARF_VERSION_FLAGS = select({
+DWARF_VERSION_FEATURES = select({
     "//bazel/config:dwarf_version_4_linux": [
-        "-gdwarf-4",
+        "dwarf-4",
     ],
     "//bazel/config:dwarf_version_5_linux": [
-        "-gdwarf-5",
+        "dwarf-5",
     ],
     "//conditions:default": [],
 })
@@ -817,6 +863,67 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
     ("//bazel/config:detect_odr_violations_disabled"): [],
 }, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
 
+# These are added as both copts and linker flags.
+GDWARF_FEATURES = select({
+    # SCons implementation originally used a compiler check to verify that -gdwarf64 was supported.
+    # If this creates incompatibility issues, we may need to fallback to -gdwarf32 in certain cases.
+    "//bazel/config:linux_gcc": ["dwarf64"],
+    "//bazel/config:linux_clang": ["dwarf32"],
+    "//conditions:default": [],
+})
+
+DEBUG_TYPES_SECTION_FLAGS = select({
+    "//bazel/config:linux_clang_linkstatic": [
+        "-fdebug-types-section",
+    ],
+    "//conditions:default": [],
+})
+
+GCC_OR_CLANG_LINKFLAGS = select({
+    "//bazel/config:gcc_or_clang": [
+        # Explicitly enable GNU build id's if the linker supports it.
+        "-Wl,--build-id",
+
+        # Explicitly use the new gnu hash section if the linker offers it.
+        "-Wl,--hash-style=gnu",
+
+        # Disallow an executable stack. Also, issue a warning if any files are found that would
+        # cause the stack to become executable if the noexecstack flag was not in play, so that we
+        # can find them and fix them. We do this here after we check for ld.gold because the
+        # --warn-execstack is currently only offered with gold.
+        "-Wl,-z,noexecstack",
+        "-Wl,--warn-execstack",
+
+        # If possible with the current linker, mark relocations as read-only.
+        "-Wl,-z,relro",
+    ],
+    "//conditions:default": [],
+})
+
+COMPRESS_DEBUG_COPTS = select({
+    # Disable debug compression in both the assembler and linker
+    # by default.
+    "//bazel/config:linux_gcc": [
+        "-Wa,--nocompress-debug-sections",
+    ],
+    "//conditions:default": [],
+})
+
+COMPRESS_DEBUG_LINKFLAGS = select({
+    # Disable debug compression in both the assembler and linker
+    # by default.
+    "@platforms//os:linux": [
+        "-Wl,--compress-debug-sections=none",
+    ],
+    "//conditions:default": [],
+})
+
+# Avoid deduping symbols on OS X debug builds, as it takes a long time.
+DEDUPE_SYMBOL_LINKFLAGS = select({
+    "//bazel/config:macos_opt_off": ["-Wl,-no_deduplicate"],
+    "//conditions:default": [],
+})
+
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES + \
                        THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES + \
                        WINDOWS_DEFINES + TCMALLOC_DEFINES + LINUX_DEFINES + GCC_OPT_DEFINES + BOOST_DEFINES + \
@@ -825,14 +932,19 @@ MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINE
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \
                      THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + LINUX_OPT_COPTS + \
-                     GCC_OR_CLANG_WARNINGS_COPTS + DWARF_VERSION_FLAGS + GCC_OR_CLANG_GENERAL_COPTS + \
-                     FLOATING_POINT_COPTS + MACOS_WARNINGS_COPTS + CLANG_WARNINGS_COPTS
+                     GCC_OR_CLANG_WARNINGS_COPTS + GCC_OR_CLANG_GENERAL_COPTS + \
+                     FLOATING_POINT_COPTS + MACOS_WARNINGS_COPTS + CLANG_WARNINGS_COPTS + \
+                     CLANG_FNO_LIMIT_DEBUG_INFO + COMPRESS_DEBUG_COPTS + DEBUG_TYPES_SECTION_FLAGS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + \
                          UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS + \
                          LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS + WINDOWS_LINKFLAGS + \
-                         DWARF_VERSION_FLAGS + BIND_AT_LOAD_LINKFLAGS + RDYNAMIC_LINKFLAG + LINUX_PTHREAD_LINKFLAG + \
-                         EXTRA_GLOBAL_LIBS_LINKFLAGS + ANY_SANITIZER_AVAILABLE_LINKFLAGS + ANY_SANITIZER_GCC_LINKFLAGS
+                         BIND_AT_LOAD_LINKFLAGS + RDYNAMIC_LINKFLAG + LINUX_PTHREAD_LINKFLAG + \
+                         EXTRA_GLOBAL_LIBS_LINKFLAGS + ANY_SANITIZER_AVAILABLE_LINKFLAGS + ANY_SANITIZER_GCC_LINKFLAGS + \
+                         GCC_OR_CLANG_LINKFLAGS + COMPRESS_DEBUG_LINKFLAGS + DEDUPE_SYMBOL_LINKFLAGS + \
+                         DEBUG_TYPES_SECTION_FLAGS
+
+MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES
 
 def force_includes_copt(package_name, name):
     if package_name.startswith("src/mongo"):
@@ -995,7 +1107,7 @@ def mongo_cc_library(
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
         includes = includes,
-        features = ["supports_pic", "pic"],
+        features = MONGO_GLOBAL_FEATURES + ["supports_pic", "pic"],
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
@@ -1016,7 +1128,7 @@ def mongo_cc_library(
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         includes = includes,
-        features = select({
+        features = MONGO_GLOBAL_FEATURES + select({
             "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
             "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
             "//conditions:default": ["pie"],
@@ -1125,7 +1237,7 @@ def mongo_cc_binary(
         linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
         includes = includes,
-        features = ["pie"],
+        features = MONGO_GLOBAL_FEATURES + ["pie"],
         dynamic_deps = select({
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],

@@ -78,9 +78,58 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "linux_gcc_or_clang",
+    match_all = [
+        "@platforms//os:linux",
+        ":gcc_or_clang",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linux_gcc",
+    match_all = [
+        "@platforms//os:linux",
+        ":compiler_type_gcc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linux_clang",
+    match_all = [
+        "@platforms//os:linux",
+        ":compiler_type_clang",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linux_clang_linkstatic",
+    match_all = [
+        "@platforms//os:linux",
+        ":compiler_type_clang",
+        ":linkstatic_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "macos_gcc_or_clang",
+    match_all = [
+        "@platforms//os:macos",
+        ":gcc_or_clang",
+    ],
+)
+
+selects.config_setting_group(
     name = "gcc_opt",
     match_all = [
         ":compiler_type_gcc",
+        ":opt_any",
+    ],
+)
+
+selects.config_setting_group(
+    name = "msvc_opt",
+    match_all = [
+        ":compiler_type_msvc",
         ":opt_any",
     ],
 )
@@ -262,6 +311,14 @@ selects.config_setting_group(
         ":opt_on",
         ":opt_size",
         ":opt_debug",
+    ],
+)
+
+selects.config_setting_group(
+    name = "macos_opt_off",
+    match_all = [
+        "@platforms//os:macos",
+        ":opt_off",
     ],
 )
 

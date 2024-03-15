@@ -15,6 +15,30 @@ constraint_value(
     constraint_setting = ":tcmalloc_kernel_version",
 )
 
+constraint_setting(name = "distro")
+
+[
+    constraint_value(
+        name = distro_or_os,
+        constraint_setting = ":distro",
+    )
+    for distro_or_os in [
+        "linux",
+        "ubuntu18",
+        "ubuntu20",
+        "ubuntu22",
+        "amazon_linux_2",
+        "amazon_linux_2023",
+        "debian10",
+        "debian12",
+        "rhel7",
+        "rhel8",
+        "rhel9",
+        "suse12",
+        "suse15",
+    ]
+]
+
 [
     platform(
         name = distro_or_os + "_" + arch + "_" + compiler,
@@ -22,6 +46,7 @@ constraint_value(
             "@platforms//os:linux",
             "@platforms//cpu:arm64" if arch == "arm64" else "@platforms//cpu:x86_64",
             "@bazel_tools//tools/cpp:" + compiler,
+            ":" + distro_or_os,
             ":kernel_version_4_4_or_greater",  # remote execution platforms assume a given kernel version
         ],
         exec_properties = {
