@@ -45,9 +45,6 @@ parameters:
 
 ## Patch Aliases
 patch_aliases:
-- alias: aggfuzzer
-  variant: '^(linux-64)$'
-  task: '^(aggregation_multiversion_fuzzer.*)$'
 - alias: embedded
   variant: '.*'
   task: 'embedded_.*'

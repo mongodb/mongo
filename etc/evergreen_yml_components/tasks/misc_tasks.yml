@@ -508,8 +508,6 @@ tasks:
     vars:
       target: >-
         //:format -- --mode check
-  teardown_task:
-  - func: "attach bazel invocation"
 
 - name: lint_clang_format
   tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
