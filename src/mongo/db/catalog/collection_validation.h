@@ -100,7 +100,6 @@ enum class RepairMode {
  * Additional validation options that can run in any mode.
  */
 struct AdditionalOptions {
-    bool warnOnSchemaValidation = false;  // only warn on schema validation failure
     ValidationVersion validationVersion = currentValidationVersion;
 };
 

@@ -188,6 +188,23 @@ protected:
         dumpOnErrorGuard.dismiss();
     }
 
+    void ensureValidateWarned() {
+        ValidateResults results = runValidate();
+
+        ScopeGuard dumpOnErrorGuard([&] {
+            StorageDebugUtil::printValidateResults(results);
+            StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
+        });
+
+        ASSERT_TRUE(results.valid) << "Validation failed when it should've worked.";
+        ASSERT_TRUE(results.errors.empty())
+            << "Validation reported errors when it should not have.";
+        ASSERT_FALSE(results.warnings.empty())
+            << "Validation did not report a warning when it should have.";
+
+        dumpOnErrorGuard.dismiss();
+    }
+
     void ensureValidateFailed() {
         ValidateResults results = runValidate();
 
@@ -968,7 +985,7 @@ public:
 
         ASSERT_OK(status);
         releaseDb();
-        ensureValidateFailed();
+        ensureValidateWarned();
     }
 };
 

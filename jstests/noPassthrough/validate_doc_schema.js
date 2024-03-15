@@ -4,10 +4,6 @@
 (function() {
 "use strict";
 
-// Disable the testing proctor. When the testing proctor is enabled, 'validate' will only warn about
-// non-compliant documents, even when the validation action is 'error'.
-TestData.testingDiagnosticsEnabled = false;
-
 const conn = MongoRunner.runMongod();
 
 const dbName = "test";
@@ -28,18 +24,12 @@ function testSchemaValidation(validationAction) {
     jsTestLog(res);
 
     // Even though there are two documents violating the collection schema rules, the message about
-    // non-compliant documents should only be shown once.
-    if (validationAction == "warn") {
-        assert(res.valid);
-        assert.eq(res.warnings.length, 1);
-        assert.eq(res.errors.length, 0);
-        assert.eq(res.nNonCompliantDocuments, 2);
-    } else if (validationAction == "error") {
-        assert(!res.valid);
-        assert.eq(res.warnings.length, 0);
-        assert.eq(res.errors.length, 1);
-        assert.eq(res.nNonCompliantDocuments, 2);
-    }
+    // non-compliant documents should only be shown once. Regardless of the validation level, it
+    // should be reported as a warning.
+    assert(res.valid);
+    assert.eq(res.errors.length, 0);
+    assert.eq(res.warnings.length, 1);
+    assert.eq(res.nNonCompliantDocuments, 2);
 
     checkLog.containsJson(conn, 5363500, {recordId: "2"});
     checkLog.containsJson(conn, 5363500, {recordId: "3"});

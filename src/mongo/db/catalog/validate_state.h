@@ -192,10 +192,6 @@ public:
         return _logDiagnostics;
     }
 
-    bool warnOnSchemaValidation() const {
-        return _warnOnSchemaValidation;
-    }
-
     ValidationVersion validationVersion() const {
         return _validationVersion;
     }
@@ -245,7 +241,6 @@ private:
     bool _collectionSchemaViolated = false;
     bool _timeseriesDataInconsistency = false;
     bool _BSONDataNonConformant = false;
-    bool _warnOnSchemaValidation = false;
     ValidationVersion _validationVersion = currentValidationVersion;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;

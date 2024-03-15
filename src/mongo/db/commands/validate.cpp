@@ -387,7 +387,6 @@ public:
         }
 
         CollectionValidation::AdditionalOptions additionalOptions;
-        additionalOptions.warnOnSchemaValidation = cmdObj["warnOnSchemaValidation"].trueValue();
         additionalOptions.validationVersion = getTestCommandsEnabled()
             ? (ValidationVersion)bsonTestValidationVersion
             : currentValidationVersion;
