@@ -2200,7 +2200,11 @@ void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> res
             response->addPassive(std::move(hostView));
         }
     }
-
+    LOGV2_FOR_HEARTBEATS(8697302,
+                         5,
+                         "Add hosts to hello response",
+                         "horizon"_attr = horizonString,
+                         "hosts"_attr = response->getHosts());
     response->setReplSetVersion(_rsConfig.getConfigVersion());
     // Depending on whether or not the client sent a hello/isMaster request, we set the
     // "isWritablePrimary"/"ismaster" field to false if we are not primary. If we're stepping down,

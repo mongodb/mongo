@@ -28,6 +28,9 @@
  */
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/db/repl/topology_version_observer.h"
 
@@ -115,6 +118,10 @@ std::shared_ptr<const HelloResponse> TopologyVersionObserver::getCached() noexce
     // Acquires the lock to avoid potential races with `_workerThreadBody()`.
     // Atomics cannot be used here as `shared_ptr` cannot be atomically updated.
     stdx::lock_guard<Mutex> lk(_mutex);
+    if (_cache) {
+        LOGV2_FOR_HEARTBEATS(
+            8697301, 5, "TopologyVersionObserver get cached", "cache"_attr = *_cache);
+    }
     return _cache;
 }
 
@@ -141,6 +148,8 @@ void TopologyVersionObserver::_cacheHelloResponse(
         if (auto response = std::move(future).get(opCtx); response->isConfigSet()) {
             stdx::lock_guard lk(_mutex);
             _cache = response;
+            LOGV2_FOR_HEARTBEATS(
+                8697300, 5, "Cached a hello response", "response"_attr = *response);
 
             // Reset the cacheGuard because we got a good value.
             cacheGuard.dismiss();

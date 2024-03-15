@@ -28,6 +28,9 @@
  */
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -37,6 +40,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
+#include "mongo/logv2/log.h"
 
 using namespace std::literals::string_literals;
 
@@ -85,7 +89,11 @@ AllMappings computeReverseMappings(SplitHorizon::ForwardMapping forwardMapping) 
         uasserted(ErrorCodes::BadValue, "Duplicate horizon member found \""s + *duplicate + "\".");
     }
 
-
+    LOGV2_FOR_HEARTBEATS(8697304,
+                         5,
+                         "Compute horizon mapping",
+                         "forward"_attr = forwardMapping,
+                         "reverse"_attr = reverseHostMapping);
     return {std::move(forwardMapping), std::move(reverseHostMapping)};
 }
 
@@ -186,6 +194,11 @@ StringData SplitHorizon::determineHorizon(const SplitHorizon::Parameters& horizo
         const auto sniName = *horizonParameters.sniName;
         const auto found = _reverseHostMapping.find(sniName);
         if (found != end(_reverseHostMapping)) {
+            LOGV2_FOR_HEARTBEATS(8697303,
+                                 5,
+                                 "Determine horizon",
+                                 "sni"_attr = sniName,
+                                 "horizon"_attr = found->second);
             return found->second;
         }
     }

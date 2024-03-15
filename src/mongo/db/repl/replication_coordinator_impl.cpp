@@ -32,6 +32,9 @@
 #define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(                             \
         ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/platform/basic.h"
 
@@ -559,6 +562,12 @@ void ReplicationCoordinatorImpl::_createHorizonTopologyChangePromiseMapping(With
     // to change after a replica set reconfig.
     _horizonToTopologyChangePromiseMap.clear();
     for (auto const& [horizon, hostAndPort] : horizonMappings) {
+        LOGV2_FOR_HEARTBEATS(8697308,
+                             5,
+                             "Add horizonToTopologyChangePromiseMap",
+                             "selfIndex"_attr = _selfIndex,
+                             "horizon"_attr = horizon,
+                             "host"_attr = hostAndPort);
         _horizonToTopologyChangePromiseMap.emplace(
             horizon, std::make_shared<SharedPromise<std::shared_ptr<const HelloResponse>>>());
     }
@@ -2213,6 +2222,7 @@ std::shared_ptr<HelloResponse> ReplicationCoordinatorImpl::_makeHelloResponse(
         response->setIsWritablePrimary(false);
         response->setIsSecondary(false);
     }
+    LOGV2_FOR_HEARTBEATS(8697307, 5, "Make hello response", "response"_attr = *response);
     return response;
 }
 
@@ -4212,6 +4222,11 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
         } else {
             StringData horizonString = iter->first;
             auto response = _makeHelloResponse(horizonString, lock, hasValidConfig);
+            LOGV2_FOR_HEARTBEATS(8697306,
+                                 5,
+                                 "Fulfill Topology change",
+                                 "horizon"_attr = horizonString,
+                                 "response"_attr = *response);
             // Fulfill the promise and replace with a new one for future waiters.
             iter->second->emplaceValue(response);
             iter->second = std::make_shared<SharedPromise<std::shared_ptr<const HelloResponse>>>();
@@ -4232,6 +4247,12 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
             } else {
                 const auto horizon = sni.empty() ? SplitHorizon::kDefaultHorizon : iter->second;
                 const auto response = _makeHelloResponse(horizon, lock, hasValidConfig);
+                LOGV2_FOR_HEARTBEATS(8697305,
+                                     5,
+                                     "Fulfill topology change on joining",
+                                     "sni"_attr = sni,
+                                     "horizon"_attr = horizon,
+                                     "response"_attr = *response);
                 promise->emplaceValue(response);
             }
         }
