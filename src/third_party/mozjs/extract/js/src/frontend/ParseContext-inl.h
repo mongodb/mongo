@@ -9,10 +9,7 @@
 
 #include "frontend/ParseContext.h"
 
-#include "mozilla/ResultVariant.h"
-
 #include "frontend/Parser.h"
-#include "vm/JSContext.h"
 
 namespace js {
 namespace frontend {
@@ -44,24 +41,24 @@ inline ParseContext::Scope::BindingIter ParseContext::Scope::bindings(
 
 inline ParseContext::Scope::Scope(ParserBase* parser)
     : Nestable<Scope>(&parser->pc_->innermostScope_),
-      declared_(parser->cx_->frontendCollectionPool()),
-      possibleAnnexBFunctionBoxes_(parser->cx_->frontendCollectionPool()),
+      declared_(parser->fc_->nameCollectionPool()),
+      possibleAnnexBFunctionBoxes_(parser->fc_->nameCollectionPool()),
       id_(parser->usedNames_.nextScopeId()) {}
 
-inline ParseContext::Scope::Scope(JSContext* cx, ParseContext* pc,
+inline ParseContext::Scope::Scope(FrontendContext* fc, ParseContext* pc,
                                   UsedNameTracker& usedNames)
     : Nestable<Scope>(&pc->innermostScope_),
-      declared_(cx->frontendCollectionPool()),
-      possibleAnnexBFunctionBoxes_(cx->frontendCollectionPool()),
+      declared_(fc->nameCollectionPool()),
+      possibleAnnexBFunctionBoxes_(fc->nameCollectionPool()),
       id_(usedNames.nextScopeId()) {}
 
 inline ParseContext::VarScope::VarScope(ParserBase* parser) : Scope(parser) {
   useAsVarScope(parser->pc_);
 }
 
-inline ParseContext::VarScope::VarScope(JSContext* cx, ParseContext* pc,
+inline ParseContext::VarScope::VarScope(FrontendContext* fc, ParseContext* pc,
                                         UsedNameTracker& usedNames)
-    : Scope(cx, pc, usedNames) {
+    : Scope(fc, pc, usedNames) {
   useAsVarScope(pc);
 }
 

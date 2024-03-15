@@ -1,2 +1,0 @@
-gensprep.c
-store.c

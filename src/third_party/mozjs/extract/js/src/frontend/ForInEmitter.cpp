@@ -8,15 +8,12 @@
 
 #include "frontend/BytecodeEmitter.h"
 #include "frontend/EmitterScope.h"
-#include "frontend/SourceNotes.h"
 #include "vm/Opcodes.h"
-#include "vm/Scope.h"
 #include "vm/StencilEnums.h"  // TryNoteKind
 
 using namespace js;
 using namespace js::frontend;
 
-using mozilla::Maybe;
 using mozilla::Nothing;
 
 ForInEmitter::ForInEmitter(BytecodeEmitter* bce,
@@ -76,7 +73,8 @@ bool ForInEmitter::emitInitialize() {
                ScopeKind::Lexical);
 
     if (headLexicalEmitterScope_->hasEnvironment()) {
-      if (!bce_->emit1(JSOp::RecreateLexicalEnv)) {
+      if (!bce_->emitInternedScopeOp(headLexicalEmitterScope_->index(),
+                                     JSOp::RecreateLexicalEnv)) {
         //          [stack] ITER ITERVAL
         return false;
       }
@@ -111,14 +109,12 @@ bool ForInEmitter::emitBody() {
   return true;
 }
 
-bool ForInEmitter::emitEnd(const Maybe<uint32_t>& forPos) {
+bool ForInEmitter::emitEnd(uint32_t forPos) {
   MOZ_ASSERT(state_ == State::Body);
 
-  if (forPos) {
-    // Make sure this code is attributed to the "for".
-    if (!bce_->updateSourceCoordNotes(*forPos)) {
-      return false;
-    }
+  // Make sure this code is attributed to the "for".
+  if (!bce_->updateSourceCoordNotes(forPos)) {
+    return false;
   }
 
   if (!loopInfo_->emitContinueTarget(bce_)) {

@@ -58,13 +58,6 @@ class char16ptr_t {
   constexpr operator const void*() const { return mPtr; }
   constexpr explicit operator bool() const { return mPtr != nullptr; }
 
-  /* Explicit cast operators to allow things like (char16_t*)str. */
-  constexpr explicit operator char16_t*() const {
-    return const_cast<char16_t*>(mPtr);
-  }
-  explicit operator wchar_t*() const {
-    return const_cast<wchar_t*>(static_cast<const wchar_t*>(*this));
-  }
   explicit operator int() const { return reinterpret_cast<intptr_t>(mPtr); }
   explicit operator unsigned int() const {
     return reinterpret_cast<uintptr_t>(mPtr);

@@ -33,8 +33,11 @@ using mozilla::MallocSizeOf;
 // about:memory stats.
 
 template <class T>
+using SeenSet = HashSet<const T*, DefaultHasher<const T*>, SystemAllocPolicy>;
+
+template <class T>
 struct ShareableBase : AtomicRefCounted<T> {
-  using SeenSet = HashSet<const T*, DefaultHasher<const T*>, SystemAllocPolicy>;
+  using SeenSet = wasm::SeenSet<T>;
 
   size_t sizeOfIncludingThisIfNotSeen(MallocSizeOf mallocSizeOf,
                                       SeenSet* seen) const {

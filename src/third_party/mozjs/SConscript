@@ -7,6 +7,7 @@ Import([
 
 env = env.Clone()
 env.InjectThirdParty(libraries=['zlib'])
+env.InjectThirdParty(libraries=['icu'])
 
 env['CCFLAGS_WERROR'] = []
 
@@ -50,6 +51,17 @@ env.Append(FORCEINCLUDES=['js-confdefs.h'], )
 if env.TargetOSIs('windows'):
     env.Append(
         CCFLAGS=[
+            # The default MSVC preprocessor elides commas in some cases as a convenience, but this
+            # behavior breaks compilation of jspubtd.h. Enabling the newer preprocessor fixes the
+            # # problem.
+            '/Zc:preprocessor',
+
+            # Compiling with /Zc:preprocessor causes warnings for some non-standard behavior in
+            # # Windows system header files. We ignore these warnings so that they don't cause the
+            # build to fail.
+            '/wd5104',
+            '/wd5105',
+
             # 'declaration' : no matching operator delete found; memory will not be freed if
             # initialization throws an exception
             '/wd4291',
@@ -125,13 +137,19 @@ sources = [
     "extract/mozglue/misc/AwakeTimeStamp.cpp",
     "extract/mozglue/misc/MmapFaultHandler.cpp",
     "extract/mozglue/misc/Printf.cpp",
+    "extract/mozglue/misc/SIMD.cpp",
     "extract/mozglue/misc/StackWalk.cpp",
     "extract/mozglue/misc/TimeStamp.cpp",
     "extract/mozglue/misc/Uptime.cpp",
+    "extract/js/src/irregexp/imported/regexp-ast.cc",
     "extract/js/src/irregexp/imported/regexp-compiler.cc",
     "extract/js/src/irregexp/RegExpNativeMacroAssembler.cpp",
     "extract/js/src/wasm/WasmCode-platform.cpp",
 ]
+
+if env['TARGET_ARCH'] == 'x86_64' and not env.TargetOSIs('windows'):
+    env.Append(CCFLAGS=['-mavx2'])
+    sources.extend(["extract/mozglue/misc/SIMD_avx2.cpp", "extract/mozglue/misc/SSE.cpp"])
 
 if env.TargetOSIs('windows'):
     sources.extend([
@@ -149,33 +167,47 @@ else:
 sources.append([
     "extract/modules/fdlibm/{}".format(f) for f in [
         'e_acos.cpp',
+        'e_acosf.cpp',
         'e_acosh.cpp',
         'e_asin.cpp',
+        'e_asinf.cpp',
         'e_atan2.cpp',
         'e_atanh.cpp',
         'e_cosh.cpp',
         'e_exp.cpp',
+        'e_expf.cpp',
         'e_hypot.cpp',
         'e_log.cpp',
         'e_log10.cpp',
         'e_log2.cpp',
+        'e_logf.cpp',
         'e_pow.cpp',
-        'e_rem_pio2.cpp',
+        'e_powf.cpp',
         'e_sinh.cpp',
+        'e_sqrtf.cpp',
         'k_cos.cpp',
+        'k_cosf.cpp',
         'k_exp.cpp',
+        'k_expf.cpp',
         'k_rem_pio2.cpp',
         'k_sin.cpp',
+        'k_sinf.cpp',
         'k_tan.cpp',
+        'k_tanf.cpp',
         's_asinh.cpp',
         's_atan.cpp',
+        's_atanf.cpp',
         's_cbrt.cpp',
         's_ceil.cpp',
         's_ceilf.cpp',
-        's_copysign.cpp',
+        # 's_copysign.cpp', # Unused file.
         's_cos.cpp',
+        's_cosf.cpp',
+        's_exp2.cpp',
+        's_exp2f.cpp',
         's_expm1.cpp',
         's_fabs.cpp',
+        's_fabsf.cpp',
         's_floor.cpp',
         's_floorf.cpp',
         's_log1p.cpp',
@@ -184,7 +216,9 @@ sources.append([
         's_rintf.cpp',
         's_scalbn.cpp',
         's_sin.cpp',
+        's_sinf.cpp',
         's_tan.cpp',
+        's_tanf.cpp',
         's_tanh.cpp',
         's_trunc.cpp',
         's_truncf.cpp',
@@ -204,6 +238,7 @@ sourceFilePatterns = [
     "/build/*.cpp",
     "/build/jit/*.cpp",
     "/build/gc/*.cpp",
+    "/build/util/*.cpp",
     "/build/wasm/*.cpp",
     "/build/irregexp/*.cpp",
     "/build/debugger/*.cpp",

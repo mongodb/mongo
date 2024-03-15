@@ -16,20 +16,16 @@
 #include "jspubtd.h"
 #include "NamespaceImports.h"
 
-#include "gc/Barrier.h"
 #include "js/Class.h"
 #include "js/ErrorReport.h"
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 #include "js/UniquePtr.h"
 #include "js/Value.h"
-#include "vm/FunctionFlags.h"  // js::FunctionFlags
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"
-#include "vm/Shape.h"
 
 namespace js {
-class ArrayObject;
 
 class ErrorObject : public NativeObject {
   static JSObject* createProto(JSContext* cx, JSProtoKey key);
@@ -90,7 +86,8 @@ class ErrorObject : public NativeObject {
    * *not* include .message, which must be added separately if needed; see
    * ErrorObject::init.)
    */
-  static Shape* assignInitialShape(JSContext* cx, Handle<ErrorObject*> obj);
+  static SharedShape* assignInitialShape(JSContext* cx,
+                                         Handle<ErrorObject*> obj);
 
   JSExnType type() const {
     MOZ_ASSERT(isErrorClass(getClass()));
@@ -114,8 +111,8 @@ class ErrorObject : public NativeObject {
   inline JSObject* stack() const;
 
   JSString* getMessage() const {
-    const HeapSlot& slot = getReservedSlotRef(MESSAGE_SLOT);
-    return slot.isString() ? slot.toString() : nullptr;
+    Value val = getReservedSlot(MESSAGE_SLOT);
+    return val.isString() ? val.toString() : nullptr;
   }
 
   mozilla::Maybe<Value> getCause() const {
@@ -124,6 +121,17 @@ class ErrorObject : public NativeObject {
       return mozilla::Nothing();
     }
     return mozilla::Some(value);
+  }
+
+  void setStackSlot(const Value& stack) {
+    MOZ_ASSERT(stack.isObjectOrNull());
+    setReservedSlot(STACK_SLOT, stack);
+  }
+
+  void setCauseSlot(const Value& cause) {
+    MOZ_ASSERT(!cause.isMagic());
+    MOZ_ASSERT(getCause().isSome());
+    setReservedSlot(CAUSE_SLOT, cause);
   }
 
   // Getter and setter for the Error.prototype.stack accessor.

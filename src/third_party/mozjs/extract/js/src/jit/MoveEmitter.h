@@ -17,6 +17,12 @@
 #  include "jit/mips32/MoveEmitter-mips32.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/MoveEmitter-mips64.h"
+#elif defined(JS_CODEGEN_LOONG64)
+#  include "jit/loong64/MoveEmitter-loong64.h"
+#elif defined(JS_CODEGEN_RISCV64)
+#  include "jit/riscv64/MoveEmitter-riscv64.h"
+#elif defined(JS_CODEGEN_WASM32)
+#  include "jit/wasm32/MoveEmitter-wasm32.h"
 #elif defined(JS_CODEGEN_NONE)
 #  include "jit/none/MoveEmitter-none.h"
 #else

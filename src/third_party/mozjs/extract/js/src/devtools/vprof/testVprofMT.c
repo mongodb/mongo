@@ -21,8 +21,8 @@ static void cProbe(void* vprofID) {
 }
 
 //__declspec (thread) boolean cv;
-//#define if(c) cv = (c); _vprof (cv); if (cv)
-//#define if(c) cv = (c); _vprof (cv, cProbe); if (cv)
+// #define if(c) cv = (c); _vprof (cv); if (cv)
+// #define if(c) cv = (c); _vprof (cv, cProbe); if (cv)
 
 #define THREADS 1
 #define COUNT 100000

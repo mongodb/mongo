@@ -15,6 +15,7 @@ if CONFIG['JS_CODEGEN_X64'] or CONFIG['JS_CODEGEN_X86']:
     SOURCES += [
         'Zycore/Allocator.c',
         'Zycore/API/Memory.c',
+        'Zycore/API/Process.c',
         'Zycore/ArgParse.c',
         'Zycore/Bitset.c',
         'Zycore/Format.c',
@@ -24,6 +25,9 @@ if CONFIG['JS_CODEGEN_X64'] or CONFIG['JS_CODEGEN_X86']:
         'Zycore/ZycoreString.c',
         'Zydis/Decoder.c',
         'Zydis/DecoderData.c',
+        'Zydis/Disassembler.c',
+        'Zydis/Encoder.c',
+        'Zydis/EncoderData.c',
         'Zydis/Formatter.c',
         'Zydis/FormatterATT.c',
         'Zydis/FormatterBase.c',
@@ -32,9 +36,18 @@ if CONFIG['JS_CODEGEN_X64'] or CONFIG['JS_CODEGEN_X86']:
         'Zydis/MetaInfo.c',
         'Zydis/Mnemonic.c',
         'Zydis/Register.c',
+        'Zydis/Segment.c',
         'Zydis/SharedData.c',
         'Zydis/Utils.c',
         'Zydis/Zydis.c',
         'Zydis/ZydisString.c',
         'ZydisAPI.cpp',
     ]
+
+    # Suppress warnings in third-party code.
+    SOURCES['Zydis/SharedData.c'].flags += ['-Wno-sign-compare']
+
+    # clang -Wtautological-constant-in-range-compare implicitly enables
+    # -Wtautological-value-range-compare, but we need to disable it for Zydis.
+    if "-Wtautological-constant-in-range-compare" in CONFIG["WARNINGS_CFLAGS"]:
+        CFLAGS += ["-Wno-tautological-value-range-compare"]

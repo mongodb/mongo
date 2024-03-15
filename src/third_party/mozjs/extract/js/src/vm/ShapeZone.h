@@ -10,6 +10,7 @@
 #include "mozilla/MemoryReporting.h"
 
 #include "gc/Barrier.h"
+#include "gc/Policy.h"
 #include "js/GCHashTable.h"
 #include "vm/PropertyKey.h"
 #include "vm/PropMap.h"
@@ -30,7 +31,7 @@ struct BaseShapeHasher {
   };
 
   static HashNumber hash(const Lookup& lookup) {
-    HashNumber hash = MovableCellHasher<TaggedProto>::hash(lookup.proto);
+    HashNumber hash = StableCellHasher<TaggedProto>::hash(lookup.proto);
     return mozilla::AddToHash(hash, lookup.clasp, lookup.realm);
   }
   static bool match(const WeakHeapPtr<BaseShape*>& key, const Lookup& lookup) {
@@ -65,43 +66,60 @@ using InitialPropMapSet =
     JS::WeakCache<JS::GCHashSet<WeakHeapPtr<SharedPropMap*>,
                                 InitialPropMapHasher, SystemAllocPolicy>>;
 
+// Helper class to hash information relevant for all shapes.
+struct ShapeBaseHasher {
+  struct Lookup {
+    const JSClass* clasp;
+    JS::Realm* realm;
+    TaggedProto proto;
+    ObjectFlags objectFlags;
+
+    Lookup(const JSClass* clasp, JS::Realm* realm, const TaggedProto& proto,
+           ObjectFlags objectFlags)
+        : clasp(clasp), realm(realm), proto(proto), objectFlags(objectFlags) {}
+  };
+
+  static HashNumber hash(const Lookup& lookup) {
+    HashNumber hash = StableCellHasher<TaggedProto>::hash(lookup.proto);
+    return mozilla::AddToHash(hash, lookup.clasp, lookup.realm,
+                              lookup.objectFlags.toRaw());
+  }
+  static bool match(const Shape* shape, const Lookup& lookup) {
+    return lookup.clasp == shape->getObjectClass() &&
+           lookup.realm == shape->realm() && lookup.proto == shape->proto() &&
+           lookup.objectFlags == shape->objectFlags();
+  }
+};
+
 // Hash policy for the per-zone initialShapes set storing initial shapes for
 // objects in the zone.
 //
 // These are empty shapes, except for certain classes (e.g. String, RegExp)
 // which may add certain baked-in properties. See insertInitialShape.
 struct InitialShapeHasher {
-  struct Lookup {
-    const JSClass* clasp;
-    JS::Realm* realm;
-    TaggedProto proto;
+  struct Lookup : public ShapeBaseHasher::Lookup {
     uint32_t nfixed;
-    ObjectFlags objectFlags;
 
     Lookup(const JSClass* clasp, JS::Realm* realm, const TaggedProto& proto,
            uint32_t nfixed, ObjectFlags objectFlags)
-        : clasp(clasp),
-          realm(realm),
-          proto(proto),
-          nfixed(nfixed),
-          objectFlags(objectFlags) {}
+        : ShapeBaseHasher::Lookup(clasp, realm, proto, objectFlags),
+          nfixed(nfixed) {}
   };
 
   static HashNumber hash(const Lookup& lookup) {
-    HashNumber hash = MovableCellHasher<TaggedProto>::hash(lookup.proto);
-    return mozilla::AddToHash(hash, lookup.clasp, lookup.realm, lookup.nfixed,
-                              lookup.objectFlags.toRaw());
+    HashNumber hash = ShapeBaseHasher::hash(lookup);
+    return mozilla::AddToHash(hash, lookup.nfixed);
   }
-  static bool match(const WeakHeapPtr<Shape*>& key, const Lookup& lookup) {
-    const Shape* shape = key.unbarrieredGet();
-    return lookup.clasp == shape->getObjectClass() &&
-           lookup.realm == shape->realm() && lookup.proto == shape->proto() &&
-           lookup.nfixed == shape->numFixedSlots() &&
-           lookup.objectFlags == shape->objectFlags();
+  static bool match(const WeakHeapPtr<SharedShape*>& key,
+                    const Lookup& lookup) {
+    const SharedShape* shape = key.unbarrieredGet();
+    return ShapeBaseHasher::match(shape, lookup) &&
+           lookup.nfixed == shape->numFixedSlots();
   }
 };
-using InitialShapeSet = JS::WeakCache<
-    JS::GCHashSet<WeakHeapPtr<Shape*>, InitialShapeHasher, SystemAllocPolicy>>;
+using InitialShapeSet =
+    JS::WeakCache<JS::GCHashSet<WeakHeapPtr<SharedShape*>, InitialShapeHasher,
+                                SystemAllocPolicy>>;
 
 // Hash policy for the per-zone propMapShapes set storing shared shapes with
 // shared property maps.
@@ -126,20 +144,64 @@ struct PropMapShapeHasher {
     return mozilla::HashGeneric(lookup.base, lookup.map, lookup.mapLength,
                                 lookup.nfixed, lookup.objectFlags.toRaw());
   }
-  static bool match(const WeakHeapPtr<Shape*>& key, const Lookup& lookup) {
-    const Shape* shape = key.unbarrieredGet();
+  static bool match(const WeakHeapPtr<SharedShape*>& key,
+                    const Lookup& lookup) {
+    const SharedShape* shape = key.unbarrieredGet();
     return lookup.base == shape->base() &&
            lookup.nfixed == shape->numFixedSlots() &&
            lookup.map == shape->propMap() &&
            lookup.mapLength == shape->propMapLength() &&
            lookup.objectFlags == shape->objectFlags();
   }
-  static void rekey(WeakHeapPtr<Shape*>& k, const WeakHeapPtr<Shape*>& newKey) {
+  static void rekey(WeakHeapPtr<SharedShape*>& k,
+                    const WeakHeapPtr<SharedShape*>& newKey) {
     k = newKey;
   }
 };
-using PropMapShapeSet = JS::WeakCache<
-    JS::GCHashSet<WeakHeapPtr<Shape*>, PropMapShapeHasher, SystemAllocPolicy>>;
+using PropMapShapeSet =
+    JS::WeakCache<JS::GCHashSet<WeakHeapPtr<SharedShape*>, PropMapShapeHasher,
+                                SystemAllocPolicy>>;
+
+// Hash policy for the per-zone proxyShapes set storing shapes for proxy objects
+// in the zone.
+struct ProxyShapeHasher : public ShapeBaseHasher {
+  static bool match(const WeakHeapPtr<ProxyShape*>& key, const Lookup& lookup) {
+    const ProxyShape* shape = key.unbarrieredGet();
+    return ShapeBaseHasher::match(shape, lookup);
+  }
+};
+using ProxyShapeSet =
+    JS::WeakCache<JS::GCHashSet<WeakHeapPtr<ProxyShape*>, ProxyShapeHasher,
+                                SystemAllocPolicy>>;
+
+// Hash policy for the per-zone wasmGCShapes set storing shapes for Wasm GC
+// objects in the zone.
+struct WasmGCShapeHasher : public ShapeBaseHasher {
+  struct Lookup : public ShapeBaseHasher::Lookup {
+    const wasm::RecGroup* recGroup;
+
+    Lookup(const JSClass* clasp, JS::Realm* realm, const TaggedProto& proto,
+           const wasm::RecGroup* recGroup, ObjectFlags objectFlags)
+        : ShapeBaseHasher::Lookup(clasp, realm, proto, objectFlags),
+          recGroup(recGroup) {}
+  };
+
+  static HashNumber hash(const Lookup& lookup) {
+    HashNumber hash = ShapeBaseHasher::hash(lookup);
+    hash = mozilla::AddToHash(hash, lookup.recGroup);
+    return hash;
+  }
+
+  static bool match(const WeakHeapPtr<WasmGCShape*>& key,
+                    const Lookup& lookup) {
+    const WasmGCShape* shape = key.unbarrieredGet();
+    return ShapeBaseHasher::match(shape, lookup) &&
+           shape->recGroup() == lookup.recGroup;
+  }
+};
+using WasmGCShapeSet =
+    JS::WeakCache<JS::GCHashSet<WeakHeapPtr<WasmGCShape*>, WasmGCShapeHasher,
+                                SystemAllocPolicy>>;
 
 struct ShapeZone {
   // Set of all base shapes in the Zone.
@@ -155,13 +217,18 @@ struct ShapeZone {
   // Set of SharedPropMapShapes in the Zone.
   PropMapShapeSet propMapShapes;
 
+  // Set of ProxyShapes in the Zone.
+  ProxyShapeSet proxyShapes;
+
+  // Set of WasmGCShapes in the Zone.
+  WasmGCShapeSet wasmGCShapes;
+
   using ShapeWithCacheVector = js::Vector<js::Shape*, 0, js::SystemAllocPolicy>;
   ShapeWithCacheVector shapesWithCache;
 
   explicit ShapeZone(Zone* zone);
 
-  void clearTables(JSFreeOp* fop);
-  void purgeShapeCaches(JSFreeOp* fop);
+  void purgeShapeCaches(JS::GCContext* gcx);
 
   void addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf,
                               size_t* initialPropMapTable, size_t* shapeTables);

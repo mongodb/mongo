@@ -73,20 +73,20 @@ const JSFunctionSpec NumberLongInfo::methods[6] = {
 
 const char* const NumberLongInfo::className = "NumberLong";
 
-void NumberLongInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto numLong = static_cast<int64_t*>(JS::GetPrivate(obj));
+void NumberLongInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(obj, Int64Slot);
 
     if (numLong)
-        getScope(fop)->trackedDelete(numLong);
+        getScope(gcCtx)->trackedDelete(numLong);
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
-    auto numLong = static_cast<int64_t*>(JS::GetPrivate(thisv.toObjectOrNull()));
+    auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(thisv.toObjectOrNull(), Int64Slot);
     return numLong ? *numLong : 0;
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
-    auto numLong = static_cast<int64_t*>(JS::GetPrivate(thisv));
+    auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(thisv, Int64Slot);
     return numLong ? *numLong : 0;
 }
 
@@ -217,8 +217,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
 
         numLong = (top << 32) + bot;
     }
-
-    JS::SetPrivate(thisv, scope->trackedNew<int64_t>(numLong));
+    JS::SetReservedSlot(thisv, Int64Slot, JS::PrivateValue(scope->trackedNew<int64_t>(numLong)));
 
     args.rval().setObjectOrNull(thisv);
 }

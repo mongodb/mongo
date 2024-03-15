@@ -18,7 +18,7 @@
 using namespace js;
 
 const StructuredSpewer::NameArray StructuredSpewer::names_ = {
-#  define STRUCTURED_CHANNEL(name) #  name,
+#  define STRUCTURED_CHANNEL(name) #name,
     STRUCTURED_CHANNEL_LIST(STRUCTURED_CHANNEL)
 #  undef STRUCTURED_CHANNEL
 };

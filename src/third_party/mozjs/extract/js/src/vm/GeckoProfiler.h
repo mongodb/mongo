@@ -7,7 +7,6 @@
 #ifndef vm_GeckoProfiler_h
 #define vm_GeckoProfiler_h
 
-#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
 
@@ -105,6 +104,8 @@
  * accessed from a signal handler when the JIT code is executing.
  */
 
+class JS_PUBLIC_API ProfilingStack;
+
 namespace js {
 
 class BaseScript;
@@ -179,11 +180,17 @@ class MOZ_RAII GeckoProfilerEntryMarker {
 
 /*
  * RAII class to automatically add Gecko Profiler profiling stack frames.
+ * It retrieves the ProfilingStack from the JSContext and does nothing if the
+ * profiler is inactive.
  *
  * NB: The `label` string must be statically allocated.
  */
-class MOZ_NONHEAP_CLASS AutoGeckoProfilerEntry {
+class MOZ_RAII AutoGeckoProfilerEntry {
  public:
+  explicit MOZ_ALWAYS_INLINE AutoGeckoProfilerEntry(
+      JSContext* cx, const char* label, const char* dynamicString,
+      JS::ProfilingCategoryPair categoryPair = JS::ProfilingCategoryPair::JS,
+      uint32_t flags = 0);
   explicit MOZ_ALWAYS_INLINE AutoGeckoProfilerEntry(
       JSContext* cx, const char* label,
       JS::ProfilingCategoryPair categoryPair = JS::ProfilingCategoryPair::JS,
@@ -191,10 +198,41 @@ class MOZ_NONHEAP_CLASS AutoGeckoProfilerEntry {
   MOZ_ALWAYS_INLINE ~AutoGeckoProfilerEntry();
 
  private:
-  GeckoProfilerThread* profiler_;
+  ProfilingStack* profilingStack_;
 #ifdef DEBUG
+  GeckoProfilerThread* profiler_;
   uint32_t spBefore_;
 #endif
+};
+
+/*
+ * Use this RAII class to add Gecko Profiler label frames for methods of the
+ * JavaScript builtin API.
+ * These frames will be exposed to JavaScript developers (ie they won't be
+ * filtered out when using the "JavaScript" filtering option in the Firefox
+ * Profiler UI).
+ * Technical note: the label and dynamicString values will be joined with a dot
+ * separator if dynamicString is present.
+ */
+class MOZ_RAII AutoJSMethodProfilerEntry : public AutoGeckoProfilerEntry {
+ public:
+  explicit MOZ_ALWAYS_INLINE AutoJSMethodProfilerEntry(
+      JSContext* cx, const char* label, const char* dynamicString = nullptr);
+};
+
+/*
+ * Use this RAII class to add Gecko Profiler label frames for constructors of
+ * the JavaScript builtin API.
+ * These frames will be exposed to JavaScript developers (ie they won't be
+ * filtered out when using the "JavaScript" filtering option in the Firefox
+ * Profiler UI).
+ * Technical note: the word "constructor" will be appended to the label (with a
+ * space separator).
+ */
+class MOZ_RAII AutoJSConstructorProfilerEntry : public AutoGeckoProfilerEntry {
+ public:
+  explicit MOZ_ALWAYS_INLINE AutoJSConstructorProfilerEntry(JSContext* cx,
+                                                            const char* label);
 };
 
 /*

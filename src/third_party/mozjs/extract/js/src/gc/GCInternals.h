@@ -14,7 +14,11 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/TimeStamp.h"
 
+#include "gc/Cell.h"
 #include "gc/GC.h"
+#include "gc/GCContext.h"
+#include "vm/GeckoProfiler.h"
+#include "vm/HelperThreads.h"
 #include "vm/JSContext.h"
 
 namespace js {
@@ -71,30 +75,6 @@ class MOZ_RAII AutoEmptyNursery : public AutoAssertEmptyNursery {
   explicit AutoEmptyNursery(JSContext* cx);
 };
 
-class MOZ_RAII AutoCheckCanAccessAtomsDuringGC {
-#ifdef DEBUG
-  JSRuntime* runtime;
-
- public:
-  explicit AutoCheckCanAccessAtomsDuringGC(JSRuntime* rt) : runtime(rt) {
-    // Ensure we're only used from within the GC.
-    MOZ_ASSERT(JS::RuntimeHeapIsMajorCollecting());
-
-    // Ensure there is no off-thread parsing running.
-    MOZ_ASSERT(!rt->hasHelperThreadZones());
-
-    // Set up a check to assert if we try to start an off-thread parse.
-    runtime->setOffThreadParsingBlocked(true);
-  }
-  ~AutoCheckCanAccessAtomsDuringGC() {
-    runtime->setOffThreadParsingBlocked(false);
-  }
-#else
- public:
-  explicit AutoCheckCanAccessAtomsDuringGC(JSRuntime* rt) {}
-#endif
-};
-
 // Abstract base class for exclusive heap access for tracing or GC.
 class MOZ_RAII AutoHeapSession {
  public:
@@ -116,14 +96,6 @@ class MOZ_RAII AutoGCSession : public AutoHeapSession {
  public:
   explicit AutoGCSession(GCRuntime* gc, JS::HeapState state)
       : AutoHeapSession(gc, state) {}
-
-  AutoCheckCanAccessAtomsDuringGC& checkAtomsAccess() {
-    return maybeCheckAtomsAccess.ref();
-  }
-
-  // During a GC we can check that it's not possible for anything else to be
-  // using the atoms zone.
-  mozilla::Maybe<AutoCheckCanAccessAtomsDuringGC> maybeCheckAtomsAccess;
 };
 
 class MOZ_RAII AutoMajorGCProfilerEntry : public AutoGeckoProfilerEntry {
@@ -131,12 +103,10 @@ class MOZ_RAII AutoMajorGCProfilerEntry : public AutoGeckoProfilerEntry {
   explicit AutoMajorGCProfilerEntry(GCRuntime* gc);
 };
 
-class MOZ_RAII AutoTraceSession : public AutoLockAllAtoms,
-                                  public AutoHeapSession {
+class MOZ_RAII AutoTraceSession : public AutoHeapSession {
  public:
   explicit AutoTraceSession(JSRuntime* rt)
-      : AutoLockAllAtoms(rt),
-        AutoHeapSession(&rt->gc, JS::HeapState::Tracing) {}
+      : AutoHeapSession(&rt->gc, JS::HeapState::Tracing) {}
 };
 
 struct MOZ_RAII AutoFinishGC {
@@ -179,6 +149,44 @@ class AutoDisableBarriers {
 
  private:
   GCRuntime* gc;
+};
+
+// Set compartments' maybeAlive flags if anything is marked while this class is
+// live. This is used while marking roots.
+class AutoUpdateLiveCompartments {
+  GCRuntime* gc;
+
+ public:
+  explicit AutoUpdateLiveCompartments(GCRuntime* gc);
+  ~AutoUpdateLiveCompartments();
+};
+
+class MOZ_RAII AutoRunParallelTask : public GCParallelTask {
+  // This class takes a pointer to a member function of GCRuntime.
+  using TaskFunc = JS_MEMBER_FN_PTR_TYPE(GCRuntime, void);
+
+  TaskFunc func_;
+  AutoLockHelperThreadState& lock_;
+
+ public:
+  AutoRunParallelTask(GCRuntime* gc, TaskFunc func, gcstats::PhaseKind phase,
+                      GCUse use, AutoLockHelperThreadState& lock)
+      : GCParallelTask(gc, phase, use), func_(func), lock_(lock) {
+    gc->startTask(*this, lock_);
+  }
+
+  ~AutoRunParallelTask() { gc->joinTask(*this, lock_); }
+
+  void run(AutoLockHelperThreadState& lock) override {
+    AutoUnlockHelperThreadState unlock(lock);
+
+    // The hazard analysis can't tell what the call to func_ will do but it's
+    // not allowed to GC.
+    JS::AutoSuppressGCAnalysis nogc;
+
+    // Call pointer to member function on |gc|.
+    JS_CALL_MEMBER_FN_PTR(gc, func_);
+  }
 };
 
 GCAbortReason IsIncrementalGCUnsafe(JSRuntime* rt);
@@ -225,72 +233,103 @@ struct MOZ_RAII AutoStopVerifyingBarriers {
 };
 #endif /* JS_GC_ZEAL */
 
+class MOZ_RAII AutoPoisonFreedJitCode {
+  JS::GCContext* const gcx;
+
+ public:
+  explicit AutoPoisonFreedJitCode(JS::GCContext* gcx) : gcx(gcx) {}
+  ~AutoPoisonFreedJitCode() { gcx->poisonJitCode(); }
+};
+
+// Set/restore the GCContext GC use flag for the current thread.
+
+class MOZ_RAII AutoSetThreadGCUse {
+ public:
+  AutoSetThreadGCUse(JS::GCContext* gcx, GCUse use)
+      : gcx(gcx), prevUse(gcx->gcUse_) {
+    gcx->gcUse_ = use;
+  }
+  explicit AutoSetThreadGCUse(GCUse use)
+      : AutoSetThreadGCUse(TlsGCContext.get(), use) {}
+
+  ~AutoSetThreadGCUse() { gcx->gcUse_ = prevUse; }
+
+ protected:
+  JS::GCContext* gcx;
+  GCUse prevUse;
+};
+
+template <GCUse Use>
+class AutoSetThreadGCUseT : public AutoSetThreadGCUse {
+ public:
+  explicit AutoSetThreadGCUseT(JS::GCContext* gcx)
+      : AutoSetThreadGCUse(gcx, Use) {}
+  AutoSetThreadGCUseT() : AutoSetThreadGCUseT(TlsGCContext.get()) {}
+};
+
+using AutoSetThreadIsPerformingGC = AutoSetThreadGCUseT<GCUse::Unspecified>;
+using AutoSetThreadIsMarking = AutoSetThreadGCUseT<GCUse::Marking>;
+using AutoSetThreadIsFinalizing = AutoSetThreadGCUseT<GCUse::Finalizing>;
+
+class AutoSetThreadIsSweeping : public AutoSetThreadGCUseT<GCUse::Sweeping> {
+ public:
+  explicit AutoSetThreadIsSweeping(JS::GCContext* gcx,
+                                   JS::Zone* sweepZone = nullptr)
+      : AutoSetThreadGCUseT(gcx) {
+#ifdef DEBUG
+    prevZone = gcx->gcSweepZone_;
+    gcx->gcSweepZone_ = sweepZone;
+#endif
+  }
+  explicit AutoSetThreadIsSweeping(JS::Zone* sweepZone = nullptr)
+      : AutoSetThreadIsSweeping(TlsGCContext.get(), sweepZone) {}
+
+  ~AutoSetThreadIsSweeping() {
+#ifdef DEBUG
+    MOZ_ASSERT_IF(prevUse == GCUse::None, !prevZone);
+    gcx->gcSweepZone_ = prevZone;
+#endif
+  }
+
+ private:
+#ifdef DEBUG
+  JS::Zone* prevZone;
+#endif
+};
+
 #ifdef JSGC_HASH_TABLE_CHECKS
 void CheckHashTablesAfterMovingGC(JSRuntime* rt);
 void CheckHeapAfterGC(JSRuntime* rt);
 #endif
 
-struct MovingTracer final : public GenericTracer {
-  explicit MovingTracer(JSRuntime* rt)
-      : GenericTracer(rt, JS::TracerKind::Moving,
-                      JS::WeakMapTraceAction::TraceKeysAndValues) {}
-
-  JSObject* onObjectEdge(JSObject* obj) override;
-  Shape* onShapeEdge(Shape* shape) override;
-  JSString* onStringEdge(JSString* string) override;
-  js::BaseScript* onScriptEdge(js::BaseScript* script) override;
-  BaseShape* onBaseShapeEdge(BaseShape* base) override;
-  GetterSetter* onGetterSetterEdge(GetterSetter* gs) override;
-  PropMap* onPropMapEdge(PropMap* map) override;
-  Scope* onScopeEdge(Scope* scope) override;
-  RegExpShared* onRegExpSharedEdge(RegExpShared* shared) override;
-  BigInt* onBigIntEdge(BigInt* bi) override;
-  JS::Symbol* onSymbolEdge(JS::Symbol* sym) override;
-  jit::JitCode* onJitCodeEdge(jit::JitCode* jit) override;
+struct MovingTracer final : public GenericTracerImpl<MovingTracer> {
+  explicit MovingTracer(JSRuntime* rt);
 
  private:
   template <typename T>
-  T* onEdge(T* thingp);
+  void onEdge(T** thingp, const char* name);
+  friend class GenericTracerImpl<MovingTracer>;
 };
 
-struct SweepingTracer final : public GenericTracer {
-  explicit SweepingTracer(JSRuntime* rt)
-      : GenericTracer(rt, JS::TracerKind::Sweeping,
-                      JS::WeakMapTraceAction::TraceKeysAndValues) {}
-
-  JSObject* onObjectEdge(JSObject* obj) override;
-  Shape* onShapeEdge(Shape* shape) override;
-  JSString* onStringEdge(JSString* string) override;
-  js::BaseScript* onScriptEdge(js::BaseScript* script) override;
-  BaseShape* onBaseShapeEdge(BaseShape* base) override;
-  GetterSetter* onGetterSetterEdge(js::GetterSetter* gs) override;
-  PropMap* onPropMapEdge(PropMap* map) override;
-  jit::JitCode* onJitCodeEdge(jit::JitCode* jit) override;
-  Scope* onScopeEdge(Scope* scope) override;
-  RegExpShared* onRegExpSharedEdge(RegExpShared* shared) override;
-  BigInt* onBigIntEdge(BigInt* bi) override;
-  JS::Symbol* onSymbolEdge(JS::Symbol* sym) override;
+struct MinorSweepingTracer final
+    : public GenericTracerImpl<MinorSweepingTracer> {
+  explicit MinorSweepingTracer(JSRuntime* rt);
 
  private:
   template <typename T>
-  T* onEdge(T* thingp);
+  void onEdge(T** thingp, const char* name);
+  friend class GenericTracerImpl<MinorSweepingTracer>;
 };
 
-extern void DelayCrossCompartmentGrayMarking(JSObject* src);
+extern void DelayCrossCompartmentGrayMarking(GCMarker* maybeMarker,
+                                             JSObject* src);
 
 inline bool IsOOMReason(JS::GCReason reason) {
   return reason == JS::GCReason::LAST_DITCH ||
          reason == JS::GCReason::MEM_PRESSURE;
 }
 
-// TODO: Bug 1650075. Adding XPCONNECT_SHUTDOWN seems to cause crash.
-inline bool IsShutdownReason(JS::GCReason reason) {
-  return reason == JS::GCReason::WORKER_SHUTDOWN ||
-         reason == JS::GCReason::SHUTDOWN_CC ||
-         reason == JS::GCReason::DESTROY_RUNTIME;
-}
-
-TenuredCell* AllocateCellInGC(JS::Zone* zone, AllocKind thingKind);
+void* AllocateCellInGC(JS::Zone* zone, AllocKind thingKind);
 
 void ReadProfileEnv(const char* envName, const char* helpText, bool* enableOut,
                     bool* workersOut, mozilla::TimeDuration* thresholdOut);

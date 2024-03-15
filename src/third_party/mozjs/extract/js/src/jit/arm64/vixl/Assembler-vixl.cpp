@@ -1,4 +1,4 @@
-// Copyright 2015, ARM Limited
+// Copyright 2015, VIXL authors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -1399,6 +1399,67 @@ void Assembler::ldr(const CPURegister& rt, int imm19) {
   Emit(op | ImmLLiteral(imm19) | Rt(rt));
 }
 
+// clang-format off
+#define COMPARE_AND_SWAP_W_X_LIST(V) \
+  V(cas,   CAS)                      \
+  V(casa,  CASA)                     \
+  V(casl,  CASL)                     \
+  V(casal, CASAL)
+// clang-format on
+
+#define DEFINE_ASM_FUNC(FN, OP)                                  \
+  void Assembler::FN(const Register& rs, const Register& rt,     \
+                     const MemOperand& src) {                    \
+    VIXL_ASSERT(src.IsImmediateOffset() && (src.offset() == 0)); \
+    LoadStoreExclusive op = rt.Is64Bits() ? OP##_x : OP##_w;     \
+    Emit(op | Rs(rs) | Rt(rt) | Rt2_mask | RnSP(src.base()));    \
+  }
+COMPARE_AND_SWAP_W_X_LIST(DEFINE_ASM_FUNC)
+#undef DEFINE_ASM_FUNC
+
+// clang-format off
+#define COMPARE_AND_SWAP_W_LIST(V) \
+  V(casb,   CASB)                  \
+  V(casab,  CASAB)                 \
+  V(caslb,  CASLB)                 \
+  V(casalb, CASALB)                \
+  V(cash,   CASH)                  \
+  V(casah,  CASAH)                 \
+  V(caslh,  CASLH)                 \
+  V(casalh, CASALH)
+// clang-format on
+
+#define DEFINE_ASM_FUNC(FN, OP)                                  \
+  void Assembler::FN(const Register& rs, const Register& rt,     \
+                     const MemOperand& src) {                    \
+    VIXL_ASSERT(src.IsImmediateOffset() && (src.offset() == 0)); \
+    Emit(OP | Rs(rs) | Rt(rt) | Rt2_mask | RnSP(src.base()));    \
+  }
+COMPARE_AND_SWAP_W_LIST(DEFINE_ASM_FUNC)
+#undef DEFINE_ASM_FUNC
+
+// clang-format off
+#define COMPARE_AND_SWAP_PAIR_LIST(V) \
+  V(casp,   CASP)                     \
+  V(caspa,  CASPA)                    \
+  V(caspl,  CASPL)                    \
+  V(caspal, CASPAL)
+// clang-format on
+
+#define DEFINE_ASM_FUNC(FN, OP)                                  \
+  void Assembler::FN(const Register& rs, const Register& rs1,    \
+                     const Register& rt, const Register& rt1,    \
+                     const MemOperand& src) {                    \
+    USE(rs1, rt1);                                               \
+    VIXL_ASSERT(src.IsImmediateOffset() && (src.offset() == 0)); \
+    VIXL_ASSERT(AreEven(rs, rt));                                \
+    VIXL_ASSERT(AreConsecutive(rs, rs1));                        \
+    VIXL_ASSERT(AreConsecutive(rt, rt1));                        \
+    LoadStoreExclusive op = rt.Is64Bits() ? OP##_x : OP##_w;     \
+    Emit(op | Rs(rs) | Rt(rt) | Rt2_mask | RnSP(src.base()));    \
+  }
+COMPARE_AND_SWAP_PAIR_LIST(DEFINE_ASM_FUNC)
+#undef DEFINE_ASM_FUNC
 
 void Assembler::prfm(PrefetchOperation op, int imm19) {
   Emit(PRFM_lit | ImmPrefetchOperation(op) | ImmLLiteral(imm19));
@@ -1585,6 +1646,72 @@ void Assembler::ldar(const Register& rt,
   Emit(op | Rs_mask | Rt(rt) | Rt2_mask | RnSP(src.base()));
 }
 
+// These macros generate all the variations of the atomic memory operations,
+// e.g. ldadd, ldadda, ldaddb, staddl, etc.
+// For a full list of the methods with comments, see the assembler header file.
+
+// clang-format off
+#define ATOMIC_MEMORY_SIMPLE_OPERATION_LIST(V, DEF) \
+  V(DEF, add,  LDADD)                               \
+  V(DEF, clr,  LDCLR)                               \
+  V(DEF, eor,  LDEOR)                               \
+  V(DEF, set,  LDSET)                               \
+  V(DEF, smax, LDSMAX)                              \
+  V(DEF, smin, LDSMIN)                              \
+  V(DEF, umax, LDUMAX)                              \
+  V(DEF, umin, LDUMIN)
+
+#define ATOMIC_MEMORY_STORE_MODES(V, NAME, OP) \
+  V(NAME,     OP##_x,   OP##_w)                \
+  V(NAME##l,  OP##L_x,  OP##L_w)               \
+  V(NAME##b,  OP##B,    OP##B)                 \
+  V(NAME##lb, OP##LB,   OP##LB)                \
+  V(NAME##h,  OP##H,    OP##H)                 \
+  V(NAME##lh, OP##LH,   OP##LH)
+
+#define ATOMIC_MEMORY_LOAD_MODES(V, NAME, OP) \
+  ATOMIC_MEMORY_STORE_MODES(V, NAME, OP)      \
+  V(NAME##a,   OP##A_x,  OP##A_w)             \
+  V(NAME##al,  OP##AL_x, OP##AL_w)            \
+  V(NAME##ab,  OP##AB,   OP##AB)              \
+  V(NAME##alb, OP##ALB,  OP##ALB)             \
+  V(NAME##ah,  OP##AH,   OP##AH)              \
+  V(NAME##alh, OP##ALH,  OP##ALH)
+// clang-format on
+
+#define DEFINE_ASM_LOAD_FUNC(FN, OP_X, OP_W)                     \
+  void Assembler::ld##FN(const Register& rs, const Register& rt, \
+                         const MemOperand& src) {                \
+    VIXL_ASSERT(CPUHas(CPUFeatures::kAtomics));                  \
+    VIXL_ASSERT(src.IsImmediateOffset() && (src.offset() == 0)); \
+    AtomicMemoryOp op = rt.Is64Bits() ? OP_X : OP_W;             \
+    Emit(op | Rs(rs) | Rt(rt) | RnSP(src.base()));               \
+  }
+#define DEFINE_ASM_STORE_FUNC(FN, OP_X, OP_W)                         \
+  void Assembler::st##FN(const Register& rs, const MemOperand& src) { \
+    VIXL_ASSERT(CPUHas(CPUFeatures::kAtomics));                       \
+    ld##FN(rs, AppropriateZeroRegFor(rs), src);                       \
+  }
+
+ATOMIC_MEMORY_SIMPLE_OPERATION_LIST(ATOMIC_MEMORY_LOAD_MODES,
+                                    DEFINE_ASM_LOAD_FUNC)
+ATOMIC_MEMORY_SIMPLE_OPERATION_LIST(ATOMIC_MEMORY_STORE_MODES,
+                                    DEFINE_ASM_STORE_FUNC)
+
+#define DEFINE_ASM_SWP_FUNC(FN, OP_X, OP_W)                      \
+  void Assembler::FN(const Register& rs, const Register& rt,     \
+                     const MemOperand& src) {                    \
+    VIXL_ASSERT(CPUHas(CPUFeatures::kAtomics));                  \
+    VIXL_ASSERT(src.IsImmediateOffset() && (src.offset() == 0)); \
+    AtomicMemoryOp op = rt.Is64Bits() ? OP_X : OP_W;             \
+    Emit(op | Rs(rs) | Rt(rt) | RnSP(src.base()));               \
+  }
+
+ATOMIC_MEMORY_LOAD_MODES(DEFINE_ASM_SWP_FUNC, swp, SWP)
+
+#undef DEFINE_ASM_LOAD_FUNC
+#undef DEFINE_ASM_STORE_FUNC
+#undef DEFINE_ASM_SWP_FUNC
 
 void Assembler::prfm(PrefetchOperation op, const MemOperand& address,
                      LoadStoreScalingOption option) {
@@ -2283,7 +2410,7 @@ void Assembler::fmov(const VRegister& vd, float imm) {
     VIXL_ASSERT(vd.Is1S());
     Emit(FMOV_s_imm | Rd(vd) | ImmFP32(imm));
   } else {
-    VIXL_ASSERT(vd.Is2S() | vd.Is4S());
+    VIXL_ASSERT(vd.Is2S() || vd.Is4S());
     Instr op = NEONModifiedImmediate_MOVI;
     Instr q = vd.Is4S() ?  NEON_Q : 0;
     uint32_t encoded_imm = FP32ToImm8(imm);
@@ -5118,6 +5245,52 @@ bool AreSameSizeAndType(const CPURegister& reg1, const CPURegister& reg2,
   return match;
 }
 
+bool AreEven(const CPURegister& reg1,
+             const CPURegister& reg2,
+             const CPURegister& reg3,
+             const CPURegister& reg4,
+             const CPURegister& reg5,
+             const CPURegister& reg6,
+             const CPURegister& reg7,
+             const CPURegister& reg8) {
+  VIXL_ASSERT(reg1.IsValid());
+  bool even = (reg1.code() % 2) == 0;
+  even &= !reg2.IsValid() || ((reg2.code() % 2) == 0);
+  even &= !reg3.IsValid() || ((reg3.code() % 2) == 0);
+  even &= !reg4.IsValid() || ((reg4.code() % 2) == 0);
+  even &= !reg5.IsValid() || ((reg5.code() % 2) == 0);
+  even &= !reg6.IsValid() || ((reg6.code() % 2) == 0);
+  even &= !reg7.IsValid() || ((reg7.code() % 2) == 0);
+  even &= !reg8.IsValid() || ((reg8.code() % 2) == 0);
+  return even;
+}
+
+bool AreConsecutive(const CPURegister& reg1,
+                    const CPURegister& reg2,
+                    const CPURegister& reg3,
+                    const CPURegister& reg4) {
+  VIXL_ASSERT(reg1.IsValid());
+
+  if (!reg2.IsValid()) {
+    return true;
+  } else if (reg2.code() != ((reg1.code() + 1) % kNumberOfRegisters)) {
+    return false;
+  }
+
+  if (!reg3.IsValid()) {
+    return true;
+  } else if (reg3.code() != ((reg2.code() + 1) % kNumberOfRegisters)) {
+    return false;
+  }
+
+  if (!reg4.IsValid()) {
+    return true;
+  } else if (reg4.code() != ((reg3.code() + 1) % kNumberOfRegisters)) {
+    return false;
+  }
+
+  return true;
+}
 
 bool AreSameFormat(const VRegister& reg1, const VRegister& reg2,
                    const VRegister& reg3, const VRegister& reg4) {

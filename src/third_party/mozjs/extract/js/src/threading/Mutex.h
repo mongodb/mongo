@@ -65,6 +65,7 @@ class Mutex {
   explicit Mutex(const MutexId& id) : id_(id) { MOZ_ASSERT(id_.order != 0); }
 
   void lock();
+  bool tryLock();
   void unlock();
   void assertOwnedByCurrentThread() const;
 #else
@@ -73,6 +74,7 @@ class Mutex {
   explicit Mutex(const MutexId& id) {}
 
   void lock() { impl_.lock(); }
+  bool tryLock() { return impl_.tryLock(); }
   void unlock() { impl_.unlock(); }
   void assertOwnedByCurrentThread() const {};
 #endif

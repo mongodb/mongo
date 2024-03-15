@@ -10,27 +10,12 @@
 #include <utility>  // for ::std::pair
 
 #include "jit/AliasAnalysis.h"
-#include "jit/BaselineJIT.h"
 #include "jit/CompileInfo.h"
-#include "jit/InlineScriptTree.h"
-#include "jit/Ion.h"
-#include "jit/IonOptimizationLevels.h"
-#include "jit/LIR.h"
-#include "jit/Lowering.h"
+#include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
-#include "jit/WarpBuilder.h"
-#include "jit/WarpOracle.h"
 #include "util/CheckedArithmetic.h"
-#include "vm/PlainObject.h"  // js::PlainObject
-#include "vm/RegExpObject.h"
-#include "vm/SelfHosting.h"
 
-#include "jit/InlineScriptTree-inl.h"
-#include "jit/JitScript-inl.h"
-#include "jit/shared/Lowering-shared-inl.h"
 #include "vm/BytecodeUtil-inl.h"
-#include "vm/JSObject-inl.h"
-#include "vm/JSScript-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -565,31 +550,6 @@ bool jit::IsUint32Type(const MDefinition* def) {
          def->getOperand(1)->toConstant()->toInt32() == 0;
 }
 
-// Return whether a block simply computes the specified constant value.
-static bool BlockComputesConstant(MBasicBlock* block, MDefinition* value,
-                                  bool* constBool) {
-  // Look for values with no uses. This is used to eliminate constant
-  // computing blocks in condition statements, and the phi which used to
-  // consume the constant has already been removed.
-  if (value->hasUses()) {
-    return false;
-  }
-
-  if (!value->isConstant() || value->block() != block) {
-    return false;
-  }
-  if (!block->phisEmpty()) {
-    return false;
-  }
-  for (MInstructionIterator iter = block->begin(); iter != block->end();
-       ++iter) {
-    if (*iter != value || !iter->isGoto()) {
-      return false;
-    }
-  }
-  return value->toConstant()->valueToBoolean(constBool);
-}
-
 // Determine whether phiBlock/testBlock simply compute a phi and perform a
 // test on it.
 static bool BlockIsSingleTest(MBasicBlock* phiBlock, MBasicBlock* testBlock,
@@ -605,22 +565,53 @@ static bool BlockIsSingleTest(MBasicBlock* phiBlock, MBasicBlock* testBlock,
     }
   }
 
-  MInstruction* ins = *testBlock->begin();
-  if (!ins->isTest()) {
+  auto iter = testBlock->rbegin();
+  if (!iter->isTest()) {
     return false;
   }
-  MTest* test = ins->toTest();
-  if (!test->input()->isPhi()) {
+  MTest* test = iter->toTest();
+
+  // Unwrap boolean conversion performed through the '!!' idiom.
+  MInstruction* testOrNot = test;
+  bool hasOddNumberOfNots = false;
+  while (++iter != testBlock->rend()) {
+    if (iter->isNot()) {
+      // The MNot must only be used by |testOrNot|.
+      auto* notIns = iter->toNot();
+      if (testOrNot->getOperand(0) != notIns) {
+        return false;
+      }
+      if (!notIns->hasOneUse()) {
+        return false;
+      }
+
+      testOrNot = notIns;
+      hasOddNumberOfNots = !hasOddNumberOfNots;
+    } else {
+      // Fail if there are any other instructions than MNot.
+      return false;
+    }
+  }
+
+  // There's an odd number of MNot, so this can't be the '!!' idiom.
+  if (hasOddNumberOfNots) {
     return false;
   }
-  MPhi* phi = test->input()->toPhi();
+
+  MOZ_ASSERT(testOrNot->isTest() || testOrNot->isNot());
+
+  MDefinition* testInput = testOrNot->getOperand(0);
+  if (!testInput->isPhi()) {
+    return false;
+  }
+  MPhi* phi = testInput->toPhi();
   if (phi->block() != phiBlock) {
     return false;
   }
 
   for (MUseIterator iter = phi->usesBegin(); iter != phi->usesEnd(); ++iter) {
     MUse* use = *iter;
-    if (use->consumer() == test) {
+    if (use->consumer() == testOrNot) {
       continue;
     }
     if (use->consumer()->isResumePoint()) {
@@ -647,6 +638,27 @@ static bool BlockIsSingleTest(MBasicBlock* phiBlock, MBasicBlock* testBlock,
   *ptest = test;
 
   return true;
+}
+
+// Determine if value is directly or indirectly the test input.
+static bool IsTestInputMaybeToBool(MTest* test, MDefinition* value) {
+  auto* input = test->input();
+  bool hasEvenNumberOfNots = true;
+  while (true) {
+    // Only accept if there's an even number of MNot.
+    if (input == value && hasEvenNumberOfNots) {
+      return true;
+    }
+
+    // Unwrap boolean conversion performed through the '!!' idiom.
+    if (input->isNot()) {
+      input = input->toNot()->input();
+      hasEvenNumberOfNots = !hasEvenNumberOfNots;
+      continue;
+    }
+
+    return false;
+  }
 }
 
 // Change block so that it ends in a goto to the specific target block.
@@ -716,14 +728,53 @@ static bool BlockIsSingleTest(MBasicBlock* phiBlock, MBasicBlock* testBlock,
   return true;
 }
 
-static bool MaybeFoldConditionBlock(MIRGraph& graph,
-                                    MBasicBlock* initialBlock) {
+/*
+ * Look for a diamond pattern:
+ *
+ *        initialBlock
+ *          /     \
+ *  trueBranch  falseBranch
+ *          \     /
+ *          phiBlock
+ *             |
+ *         testBlock
+ */
+static bool IsDiamondPattern(MBasicBlock* initialBlock) {
+  MInstruction* ins = initialBlock->lastIns();
+  if (!ins->isTest()) {
+    return false;
+  }
+  MTest* initialTest = ins->toTest();
+
+  MBasicBlock* trueBranch = initialTest->ifTrue();
+  if (trueBranch->numPredecessors() != 1 || trueBranch->numSuccessors() != 1) {
+    return false;
+  }
+
+  MBasicBlock* falseBranch = initialTest->ifFalse();
+  if (falseBranch->numPredecessors() != 1 ||
+      falseBranch->numSuccessors() != 1) {
+    return false;
+  }
+
+  MBasicBlock* phiBlock = trueBranch->getSuccessor(0);
+  if (phiBlock != falseBranch->getSuccessor(0)) {
+    return false;
+  }
+  if (phiBlock->numPredecessors() != 2) {
+    return false;
+  }
+  return true;
+}
+
+static bool MaybeFoldDiamondConditionBlock(MIRGraph& graph,
+                                           MBasicBlock* initialBlock) {
+  MOZ_ASSERT(IsDiamondPattern(initialBlock));
+
   // Optimize the MIR graph to improve the code generated for conditional
   // operations. A test like 'if (a ? b : c)' normally requires four blocks,
   // with a phi for the intermediate value. This can be improved to use three
-  // blocks with no phi value, and if either b or c is constant,
-  // e.g. 'if (a ? b : 0)', then the block associated with that constant
-  // can be eliminated.
+  // blocks with no phi value.
 
   /*
    * Look for a diamond pattern:
@@ -742,31 +793,384 @@ static bool MaybeFoldConditionBlock(MIRGraph& graph,
    * will use different blocks if the (?:) op is in an inlined function.
    */
 
+  MTest* initialTest = initialBlock->lastIns()->toTest();
+
+  MBasicBlock* trueBranch = initialTest->ifTrue();
+  MBasicBlock* falseBranch = initialTest->ifFalse();
+  if (initialBlock->isLoopBackedge() || trueBranch->isLoopBackedge() ||
+      falseBranch->isLoopBackedge()) {
+    return true;
+  }
+
+  MBasicBlock* phiBlock = trueBranch->getSuccessor(0);
+  MBasicBlock* testBlock = phiBlock;
+  if (testBlock->numSuccessors() == 1) {
+    if (testBlock->isLoopBackedge()) {
+      return true;
+    }
+    testBlock = testBlock->getSuccessor(0);
+    if (testBlock->numPredecessors() != 1) {
+      return true;
+    }
+  }
+
+  MPhi* phi;
+  MTest* finalTest;
+  if (!BlockIsSingleTest(phiBlock, testBlock, &phi, &finalTest)) {
+    return true;
+  }
+
+  MOZ_ASSERT(phi->numOperands() == 2);
+
+  // Make sure the test block does not have any outgoing loop backedges.
+  if (!SplitCriticalEdgesForBlock(graph, testBlock)) {
+    return false;
+  }
+
+  MDefinition* trueResult =
+      phi->getOperand(phiBlock->indexForPredecessor(trueBranch));
+  MDefinition* falseResult =
+      phi->getOperand(phiBlock->indexForPredecessor(falseBranch));
+
+  // OK, we found the desired pattern, now transform the graph.
+
+  // Remove the phi from phiBlock.
+  phiBlock->discardPhi(*phiBlock->phisBegin());
+
+  // Change the end of the block to a test that jumps directly to successors of
+  // testBlock, rather than to testBlock itself.
+
+  if (IsTestInputMaybeToBool(initialTest, trueResult)) {
+    if (!UpdateGotoSuccessor(graph.alloc(), trueBranch, finalTest->ifTrue(),
+                             testBlock)) {
+      return false;
+    }
+  } else {
+    if (!UpdateTestSuccessors(graph.alloc(), trueBranch, trueResult,
+                              finalTest->ifTrue(), finalTest->ifFalse(),
+                              testBlock)) {
+      return false;
+    }
+  }
+
+  if (IsTestInputMaybeToBool(initialTest, falseResult)) {
+    if (!UpdateGotoSuccessor(graph.alloc(), falseBranch, finalTest->ifFalse(),
+                             testBlock)) {
+      return false;
+    }
+  } else {
+    if (!UpdateTestSuccessors(graph.alloc(), falseBranch, falseResult,
+                              finalTest->ifTrue(), finalTest->ifFalse(),
+                              testBlock)) {
+      return false;
+    }
+  }
+
+  // Remove phiBlock, if different from testBlock.
+  if (phiBlock != testBlock) {
+    testBlock->removePredecessor(phiBlock);
+    graph.removeBlock(phiBlock);
+  }
+
+  // Remove testBlock itself.
+  finalTest->ifTrue()->removePredecessor(testBlock);
+  finalTest->ifFalse()->removePredecessor(testBlock);
+  graph.removeBlock(testBlock);
+
+  return true;
+}
+
+/*
+ * Look for a triangle pattern:
+ *
+ *        initialBlock
+ *          /     \
+ *  trueBranch     |
+ *          \     /
+ *     phiBlock+falseBranch
+ *             |
+ *         testBlock
+ *
+ * Or:
+ *
+ *        initialBlock
+ *          /     \
+ *         |    falseBranch
+ *          \     /
+ *     phiBlock+trueBranch
+ *             |
+ *         testBlock
+ */
+static bool IsTrianglePattern(MBasicBlock* initialBlock) {
   MInstruction* ins = initialBlock->lastIns();
   if (!ins->isTest()) {
-    return true;
+    return false;
   }
   MTest* initialTest = ins->toTest();
 
   MBasicBlock* trueBranch = initialTest->ifTrue();
-  if (trueBranch->numPredecessors() != 1 || trueBranch->numSuccessors() != 1) {
-    return true;
-  }
   MBasicBlock* falseBranch = initialTest->ifFalse();
-  if (falseBranch->numPredecessors() != 1 ||
-      falseBranch->numSuccessors() != 1) {
-    return true;
-  }
-  MBasicBlock* phiBlock = trueBranch->getSuccessor(0);
-  if (phiBlock != falseBranch->getSuccessor(0)) {
-    return true;
-  }
-  if (phiBlock->numPredecessors() != 2) {
+
+  if (trueBranch->numSuccessors() == 1 &&
+      trueBranch->getSuccessor(0) == falseBranch) {
+    if (trueBranch->numPredecessors() != 1) {
+      return false;
+    }
+    if (falseBranch->numPredecessors() != 2) {
+      return false;
+    }
     return true;
   }
 
+  if (falseBranch->numSuccessors() == 1 &&
+      falseBranch->getSuccessor(0) == trueBranch) {
+    if (trueBranch->numPredecessors() != 2) {
+      return false;
+    }
+    if (falseBranch->numPredecessors() != 1) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+static bool MaybeFoldTriangleConditionBlock(MIRGraph& graph,
+                                            MBasicBlock* initialBlock) {
+  MOZ_ASSERT(IsTrianglePattern(initialBlock));
+
+  // Optimize the MIR graph to improve the code generated for boolean
+  // operations. A test like 'if (a && b)' normally requires three blocks, with
+  // a phi for the intermediate value. This can be improved to use no phi value.
+
+  /*
+   * Look for a triangle pattern:
+   *
+   *        initialBlock
+   *          /     \
+   *  trueBranch     |
+   *          \     /
+   *     phiBlock+falseBranch
+   *             |
+   *         testBlock
+   *
+   * Or:
+   *
+   *        initialBlock
+   *          /     \
+   *         |    falseBranch
+   *          \     /
+   *     phiBlock+trueBranch
+   *             |
+   *         testBlock
+   *
+   * Where phiBlock contains a single phi combining values pushed onto the stack
+   * by trueBranch and falseBranch, and testBlock contains a test on that phi.
+   * phiBlock and testBlock may be the same block; generated code will use
+   * different blocks if the (&&) op is in an inlined function.
+   */
+
+  MTest* initialTest = initialBlock->lastIns()->toTest();
+
+  MBasicBlock* trueBranch = initialTest->ifTrue();
+  MBasicBlock* falseBranch = initialTest->ifFalse();
   if (initialBlock->isLoopBackedge() || trueBranch->isLoopBackedge() ||
       falseBranch->isLoopBackedge()) {
+    return true;
+  }
+
+  MBasicBlock* phiBlock;
+  if (trueBranch->numSuccessors() == 1 &&
+      trueBranch->getSuccessor(0) == falseBranch) {
+    phiBlock = falseBranch;
+  } else {
+    MOZ_ASSERT(falseBranch->getSuccessor(0) == trueBranch);
+    phiBlock = trueBranch;
+  }
+
+  MBasicBlock* testBlock = phiBlock;
+  if (testBlock->numSuccessors() == 1) {
+    MOZ_ASSERT(!testBlock->isLoopBackedge());
+
+    testBlock = testBlock->getSuccessor(0);
+    if (testBlock->numPredecessors() != 1) {
+      return true;
+    }
+  }
+
+  MPhi* phi;
+  MTest* finalTest;
+  if (!BlockIsSingleTest(phiBlock, testBlock, &phi, &finalTest)) {
+    return true;
+  }
+
+  MOZ_ASSERT(phi->numOperands() == 2);
+
+  // If the phi-operand doesn't match the initial input, we can't fold the test.
+  auto* phiInputForInitialBlock =
+      phi->getOperand(phiBlock->indexForPredecessor(initialBlock));
+  if (!IsTestInputMaybeToBool(initialTest, phiInputForInitialBlock)) {
+    return true;
+  }
+
+  // Make sure the test block does not have any outgoing loop backedges.
+  if (!SplitCriticalEdgesForBlock(graph, testBlock)) {
+    return false;
+  }
+
+  MDefinition* trueResult;
+  MDefinition* falseResult;
+  if (phiBlock == trueBranch) {
+    trueResult = phi->getOperand(phiBlock->indexForPredecessor(initialBlock));
+    falseResult = phi->getOperand(phiBlock->indexForPredecessor(falseBranch));
+  } else {
+    trueResult = phi->getOperand(phiBlock->indexForPredecessor(trueBranch));
+    falseResult = phi->getOperand(phiBlock->indexForPredecessor(initialBlock));
+  }
+
+  // OK, we found the desired pattern, now transform the graph.
+
+  // Remove the phi from phiBlock.
+  phiBlock->discardPhi(*phiBlock->phisBegin());
+
+  // Change the end of the block to a test that jumps directly to successors of
+  // testBlock, rather than to testBlock itself.
+
+  if (phiBlock == trueBranch) {
+    if (!UpdateTestSuccessors(graph.alloc(), initialBlock, initialTest->input(),
+                              finalTest->ifTrue(), initialTest->ifFalse(),
+                              testBlock)) {
+      return false;
+    }
+  } else if (IsTestInputMaybeToBool(initialTest, trueResult)) {
+    if (!UpdateGotoSuccessor(graph.alloc(), trueBranch, finalTest->ifTrue(),
+                             testBlock)) {
+      return false;
+    }
+  } else {
+    if (!UpdateTestSuccessors(graph.alloc(), trueBranch, trueResult,
+                              finalTest->ifTrue(), finalTest->ifFalse(),
+                              testBlock)) {
+      return false;
+    }
+  }
+
+  if (phiBlock == falseBranch) {
+    if (!UpdateTestSuccessors(graph.alloc(), initialBlock, initialTest->input(),
+                              initialTest->ifTrue(), finalTest->ifFalse(),
+                              testBlock)) {
+      return false;
+    }
+  } else if (IsTestInputMaybeToBool(initialTest, falseResult)) {
+    if (!UpdateGotoSuccessor(graph.alloc(), falseBranch, finalTest->ifFalse(),
+                             testBlock)) {
+      return false;
+    }
+  } else {
+    if (!UpdateTestSuccessors(graph.alloc(), falseBranch, falseResult,
+                              finalTest->ifTrue(), finalTest->ifFalse(),
+                              testBlock)) {
+      return false;
+    }
+  }
+
+  // Remove phiBlock, if different from testBlock.
+  if (phiBlock != testBlock) {
+    testBlock->removePredecessor(phiBlock);
+    graph.removeBlock(phiBlock);
+  }
+
+  // Remove testBlock itself.
+  finalTest->ifTrue()->removePredecessor(testBlock);
+  finalTest->ifFalse()->removePredecessor(testBlock);
+  graph.removeBlock(testBlock);
+
+  return true;
+}
+
+static bool MaybeFoldConditionBlock(MIRGraph& graph,
+                                    MBasicBlock* initialBlock) {
+  if (IsDiamondPattern(initialBlock)) {
+    return MaybeFoldDiamondConditionBlock(graph, initialBlock);
+  }
+  if (IsTrianglePattern(initialBlock)) {
+    return MaybeFoldTriangleConditionBlock(graph, initialBlock);
+  }
+  return true;
+}
+
+static bool MaybeFoldTestBlock(MIRGraph& graph, MBasicBlock* initialBlock) {
+  // Handle test expressions on more than two inputs. For example
+  // |if ((x > 10) && (y > 20) && (z > 30)) { ... }|, which results in the below
+  // pattern.
+  //
+  // Look for the pattern:
+  //                       ┌─────────────────┐
+  //                    1  │ 1 compare       │
+  //                 ┌─────┤ 2 test compare1 │
+  //                 │     └──────┬──────────┘
+  //                 │            │0
+  //         ┌───────▼─────────┐  │
+  //         │ 3 compare       │  │
+  //         │ 4 test compare3 │  └──────────┐
+  //         └──┬──────────┬───┘             │
+  //           1│          │0                │
+  // ┌──────────▼──────┐   │                 │
+  // │ 5 compare       │   └─────────┐       │
+  // │ 6 goto          │             │       │
+  // └───────┬─────────┘             │       │
+  //         │                       │       │
+  //         │    ┌──────────────────▼───────▼───────┐
+  //         └───►│ 9 phi compare1 compare3 compare5 │
+  //              │10 goto                           │
+  //              └────────────────┬─────────────────┘
+  //                               │
+  //                      ┌────────▼────────┐
+  //                      │11 test phi9     │
+  //                      └─────┬─────┬─────┘
+  //                           1│     │0
+  //         ┌────────────┐     │     │      ┌─────────────┐
+  //         │ TrueBranch │◄────┘     └─────►│ FalseBranch │
+  //         └────────────┘                  └─────────────┘
+  //
+  // And transform it to:
+  //
+  //                      ┌─────────────────┐
+  //                   1  │ 1 compare       │
+  //                  ┌───┤ 2 test compare1 │
+  //                  │   └──────────┬──────┘
+  //                  │              │0
+  //          ┌───────▼─────────┐    │
+  //          │ 3 compare       │    │
+  //          │ 4 test compare3 │    │
+  //          └──┬─────────┬────┘    │
+  //            1│         │0        │
+  //  ┌──────────▼──────┐  │         │
+  //  │ 5 compare       │  └──────┐  │
+  //  │ 6 test compare5 │         │  │
+  //  └────┬────────┬───┘         │  │
+  //      1│        │0            │  │
+  // ┌─────▼──────┐ │         ┌───▼──▼──────┐
+  // │ TrueBranch │ └─────────► FalseBranch │
+  // └────────────┘           └─────────────┘
+
+  auto* ins = initialBlock->lastIns();
+  if (!ins->isTest()) {
+    return true;
+  }
+  auto* initialTest = ins->toTest();
+
+  MBasicBlock* trueBranch = initialTest->ifTrue();
+  MBasicBlock* falseBranch = initialTest->ifFalse();
+
+  // MaybeFoldConditionBlock handles the case for two operands.
+  MBasicBlock* phiBlock;
+  if (trueBranch->numPredecessors() > 2) {
+    phiBlock = trueBranch;
+  } else if (falseBranch->numPredecessors() > 2) {
+    phiBlock = falseBranch;
+  } else {
     return true;
   }
 
@@ -781,74 +1185,93 @@ static bool MaybeFoldConditionBlock(MIRGraph& graph,
     }
   }
 
-  // Make sure the test block does not have any outgoing loop backedges.
-  if (!SplitCriticalEdgesForBlock(graph, testBlock)) {
-    return false;
-  }
+  MOZ_ASSERT(!phiBlock->isLoopBackedge());
 
-  MPhi* phi;
-  MTest* finalTest;
+  MPhi* phi = nullptr;
+  MTest* finalTest = nullptr;
   if (!BlockIsSingleTest(phiBlock, testBlock, &phi, &finalTest)) {
     return true;
   }
 
-  MDefinition* trueResult =
-      phi->getOperand(phiBlock->indexForPredecessor(trueBranch));
-  MDefinition* falseResult =
-      phi->getOperand(phiBlock->indexForPredecessor(falseBranch));
+  MOZ_ASSERT(phiBlock->numPredecessors() == phi->numOperands());
+
+  // If the phi-operand doesn't match the initial input, we can't fold the test.
+  auto* phiInputForInitialBlock =
+      phi->getOperand(phiBlock->indexForPredecessor(initialBlock));
+  if (!IsTestInputMaybeToBool(initialTest, phiInputForInitialBlock)) {
+    return true;
+  }
+
+  MBasicBlock* newTestBlock = nullptr;
+  MDefinition* newTestInput = nullptr;
+
+  // The block of each phi operand must either end with a test instruction on
+  // that phi operand or it's the sole block which ends with a goto instruction.
+  for (size_t i = 0; i < phiBlock->numPredecessors(); i++) {
+    auto* pred = phiBlock->getPredecessor(i);
+    auto* operand = phi->getOperand(i);
+
+    // Each predecessor must end with either a test or goto instruction.
+    auto* lastIns = pred->lastIns();
+    if (lastIns->isGoto() && !newTestBlock) {
+      newTestBlock = pred;
+      newTestInput = operand;
+    } else if (lastIns->isTest()) {
+      if (!IsTestInputMaybeToBool(lastIns->toTest(), operand)) {
+        return true;
+      }
+    } else {
+      return true;
+    }
+
+    MOZ_ASSERT(!pred->isLoopBackedge());
+  }
+
+  // Ensure we found the single goto block.
+  if (!newTestBlock) {
+    return true;
+  }
+
+  // Make sure the test block does not have any outgoing loop backedges.
+  if (!SplitCriticalEdgesForBlock(graph, testBlock)) {
+    return false;
+  }
 
   // OK, we found the desired pattern, now transform the graph.
 
   // Remove the phi from phiBlock.
   phiBlock->discardPhi(*phiBlock->phisBegin());
 
-  // If either trueBranch or falseBranch just computes a constant for the
-  // test, determine the block that branch will end up jumping to and eliminate
-  // the branch. Otherwise, change the end of the block to a test that jumps
-  // directly to successors of testBlock, rather than to testBlock itself.
-
-  MBasicBlock* trueTarget = trueBranch;
-  bool constBool;
-  if (BlockComputesConstant(trueBranch, trueResult, &constBool)) {
-    trueTarget = constBool ? finalTest->ifTrue() : finalTest->ifFalse();
-    phiBlock->removePredecessor(trueBranch);
-    graph.removeBlock(trueBranch);
-  } else if (initialTest->input() == trueResult) {
-    if (!UpdateGotoSuccessor(graph.alloc(), trueBranch, finalTest->ifTrue(),
-                             testBlock)) {
-      return false;
-    }
-  } else {
-    if (!UpdateTestSuccessors(graph.alloc(), trueBranch, trueResult,
-                              finalTest->ifTrue(), finalTest->ifFalse(),
-                              testBlock)) {
-      return false;
-    }
-  }
-
-  MBasicBlock* falseTarget = falseBranch;
-  if (BlockComputesConstant(falseBranch, falseResult, &constBool)) {
-    falseTarget = constBool ? finalTest->ifTrue() : finalTest->ifFalse();
-    phiBlock->removePredecessor(falseBranch);
-    graph.removeBlock(falseBranch);
-  } else if (initialTest->input() == falseResult) {
-    if (!UpdateGotoSuccessor(graph.alloc(), falseBranch, finalTest->ifFalse(),
-                             testBlock)) {
-      return false;
-    }
-  } else {
-    if (!UpdateTestSuccessors(graph.alloc(), falseBranch, falseResult,
-                              finalTest->ifTrue(), finalTest->ifFalse(),
-                              testBlock)) {
-      return false;
-    }
-  }
-
-  // Short circuit the initial test to skip any constant branch eliminated
-  // above.
-  if (!UpdateTestSuccessors(graph.alloc(), initialBlock, initialTest->input(),
-                            trueTarget, falseTarget, testBlock)) {
+  // Create the new test instruction.
+  if (!UpdateTestSuccessors(graph.alloc(), newTestBlock, newTestInput,
+                            finalTest->ifTrue(), finalTest->ifFalse(),
+                            testBlock)) {
     return false;
+  }
+
+  // Update all test instructions to point to the final target.
+  while (phiBlock->numPredecessors()) {
+    mozilla::DebugOnly<size_t> oldNumPred = phiBlock->numPredecessors();
+
+    auto* pred = phiBlock->getPredecessor(0);
+    auto* test = pred->lastIns()->toTest();
+    if (test->ifTrue() == phiBlock) {
+      if (!UpdateTestSuccessors(graph.alloc(), pred, test->input(),
+                                finalTest->ifTrue(), test->ifFalse(),
+                                testBlock)) {
+        return false;
+      }
+    } else {
+      MOZ_ASSERT(test->ifFalse() == phiBlock);
+      if (!UpdateTestSuccessors(graph.alloc(), pred, test->input(),
+                                test->ifTrue(), finalTest->ifFalse(),
+                                testBlock)) {
+        return false;
+      }
+    }
+
+    // Ensure we've made progress.
+    MOZ_ASSERT(phiBlock->numPredecessors() + 1 == oldNumPred);
   }
 
   // Remove phiBlock, if different from testBlock.
@@ -866,9 +1289,12 @@ static bool MaybeFoldConditionBlock(MIRGraph& graph,
 }
 
 bool jit::FoldTests(MIRGraph& graph) {
-  for (MBasicBlockIterator block(graph.begin()); block != graph.end();
+  for (PostorderIterator block(graph.poBegin()); block != graph.poEnd();
        block++) {
     if (!MaybeFoldConditionBlock(graph, *block)) {
+      return false;
+    }
+    if (!MaybeFoldTestBlock(graph, *block)) {
       return false;
     }
   }
@@ -920,7 +1346,15 @@ static void EliminateTriviallyDeadResumePointOperands(MIRGraph& graph,
                                                       MResumePoint* rp) {
   // If we will pop the top of the stack immediately after resuming,
   // then don't preserve the top value in the resume point.
-  if (rp->mode() != MResumePoint::ResumeAt || JSOp(*rp->pc()) != JSOp::Pop) {
+  if (rp->mode() != ResumeMode::ResumeAt) {
+    return;
+  }
+
+  jsbytecode* pc = rp->pc();
+  if (JSOp(*pc) == JSOp::JumpTarget) {
+    pc += JSOpLength_JumpTarget;
+  }
+  if (JSOp(*pc) != JSOp::Pop) {
     return;
   }
 
@@ -934,6 +1368,27 @@ static void EliminateTriviallyDeadResumePointOperands(MIRGraph& graph,
 
   MConstant* constant = rp->block()->optimizedOutConstant(graph.alloc());
   rp->replaceOperand(top, constant);
+}
+
+// Operands to a resume point which are dead at the point of the resume can be
+// replaced with a magic value. This pass only replaces resume points which are
+// trivially dead.
+//
+// This is intended to ensure that extra resume points within a basic block
+// will not artificially extend the lifetimes of any SSA values. This could
+// otherwise occur if the new resume point captured a value which is created
+// between the old and new resume point and is dead at the new resume point.
+bool jit::EliminateTriviallyDeadResumePointOperands(MIRGenerator* mir,
+                                                    MIRGraph& graph) {
+  for (auto* block : graph) {
+    if (MResumePoint* rp = block->entryResumePoint()) {
+      if (!graph.alloc().ensureBallast()) {
+        return false;
+      }
+      ::EliminateTriviallyDeadResumePointOperands(graph, rp);
+    }
+  }
+  return true;
 }
 
 // Operands to a resume point which are dead at the point of the resume can be
@@ -964,7 +1419,7 @@ bool jit::EliminateDeadResumePointOperands(MIRGenerator* mir, MIRGraph& graph) {
       if (!graph.alloc().ensureBallast()) {
         return false;
       }
-      EliminateTriviallyDeadResumePointOperands(graph, rp);
+      ::EliminateTriviallyDeadResumePointOperands(graph, rp);
     }
 
     // The logic below can get confused on infinite loops.
@@ -978,7 +1433,7 @@ bool jit::EliminateDeadResumePointOperands(MIRGenerator* mir, MIRGraph& graph) {
         if (!graph.alloc().ensureBallast()) {
           return false;
         }
-        EliminateTriviallyDeadResumePointOperands(graph, rp);
+        ::EliminateTriviallyDeadResumePointOperands(graph, rp);
       }
 
       // No benefit to replacing constant operands with other constants.
@@ -1111,10 +1566,48 @@ bool js::jit::DeadIfUnused(const MDefinition* def) {
   return true;
 }
 
+// Similar to DeadIfUnused(), but additionally allows effectful instructions.
+bool js::jit::DeadIfUnusedAllowEffectful(const MDefinition* def) {
+  // Never eliminate guard instructions.
+  if (def->isGuard()) {
+    return false;
+  }
+
+  // Required to be preserved, as the type guard related to this instruction
+  // is part of the semantics of a transformation.
+  if (def->isGuardRangeBailouts()) {
+    return false;
+  }
+
+  // Control instructions have no uses, but also shouldn't be optimized out
+  if (def->isControlInstruction()) {
+    return false;
+  }
+
+  // Used when lowering to generate the corresponding snapshots and aggregate
+  // the list of recover instructions to be repeated.
+  if (def->isInstruction() && def->toInstruction()->resumePoint()) {
+    // All effectful instructions must have a resume point attached. We're
+    // allowing effectful instructions here, so we have to ignore any resume
+    // points if we want to consider effectful instructions as dead.
+    if (!def->isEffectful()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // Test whether |def| may be safely discarded, due to being dead or due to being
 // located in a basic block which has itself been marked for discarding.
 bool js::jit::IsDiscardable(const MDefinition* def) {
   return !def->hasUses() && (DeadIfUnused(def) || def->block()->isMarked());
+}
+
+// Similar to IsDiscardable(), but additionally allows effectful instructions.
+bool js::jit::IsDiscardableAllowEffectful(const MDefinition* def) {
+  return !def->hasUses() &&
+         (DeadIfUnusedAllowEffectful(def) || def->block()->isMarked());
 }
 
 // Instructions are useless if they are unused and have no side effects.
@@ -1546,8 +2039,13 @@ bool TypeAnalyzer::propagateSpecialization(MPhi* phi) {
     if (use->type() == MIRType::None) {
       // We tried to specialize this phi, but were unable to guess its
       // type. Now that we know the type of one of its operands, we can
-      // specialize it.
-      if (!respecialize(use, phi->type())) {
+      // specialize it. If it can't be specialized as float32, specialize
+      // as double.
+      MIRType type = phi->type();
+      if (type == MIRType::Float32 && !use->canProduceFloat32()) {
+        type = MIRType::Double;
+      }
+      if (!respecialize(use, type)) {
         return false;
       }
       continue;
@@ -2128,6 +2626,13 @@ bool TypeAnalyzer::tryEmitFloatOperations() {
     return true;
   }
 
+  // WarpBuilder skips over code that can't be reached except through
+  // a catch block. Locals and arguments may be observable in such
+  // code after bailing out, so we can't rely on seeing all uses.
+  if (graph.hasTryBlock()) {
+    return true;
+  }
+
   if (!markPhiConsumers()) {
     return false;
   }
@@ -2199,7 +2704,7 @@ void jit::RenumberBlocks(MIRGraph& graph) {
   }
 }
 
-// A utility for code which deletes blocks. Renumber the remaining blocks,
+// A utility for code which adds/deletes blocks. Renumber the remaining blocks,
 // recompute dominators, and optionally recompute AliasAnalysis dependencies.
 bool jit::AccountForCFGChanges(MIRGenerator* mir, MIRGraph& graph,
                                bool updateAliasAnalysis,
@@ -2219,9 +2724,6 @@ bool jit::AccountForCFGChanges(MIRGenerator* mir, MIRGraph& graph,
 
   // If needed, update alias analysis dependencies.
   if (updateAliasAnalysis) {
-    TraceLoggerThread* logger = TraceLoggerForCurrentThread();
-    AutoTraceLog log(logger, TraceLogger_AliasAnalysis);
-
     if (!AliasAnalysis(mir, graph).analyze()) {
       return false;
     }
@@ -3342,8 +3844,6 @@ bool jit::EliminateRedundantChecks(MIRGraph& graph) {
     }
   }
 
-  MDefinitionVector eliminateList(graph.alloc());
-
   // Starting from each self-dominating block, traverse the CFG in pre-order.
   while (!worklist.empty()) {
     MBasicBlock* block = worklist.popCopy();
@@ -3360,15 +3860,15 @@ bool jit::EliminateRedundantChecks(MIRGraph& graph) {
       if (!def->isBoundsCheck()) {
         continue;
       }
+      auto* boundsCheck = def->toBoundsCheck();
 
       bool eliminated = false;
-      if (!TryEliminateBoundsCheck(checks, index, def->toBoundsCheck(),
-                                   &eliminated)) {
+      if (!TryEliminateBoundsCheck(checks, index, boundsCheck, &eliminated)) {
         return false;
       }
 
       if (eliminated) {
-        block->discardDef(def);
+        block->discard(boundsCheck);
       }
     }
     index++;
@@ -3376,9 +3876,236 @@ bool jit::EliminateRedundantChecks(MIRGraph& graph) {
 
   MOZ_ASSERT(index == graph.numBlocks());
 
-  for (size_t i = 0; i < eliminateList.length(); i++) {
-    MDefinition* def = eliminateList[i];
-    def->block()->discardDef(def);
+  return true;
+}
+
+static bool ShapeGuardIsRedundant(MGuardShape* guard,
+                                  const MDefinition* storeObject,
+                                  const Shape* storeShape) {
+  const MDefinition* guardObject = guard->object()->skipObjectGuards();
+  if (guardObject != storeObject) {
+    JitSpew(JitSpew_RedundantShapeGuards, "SKIP: different objects (%d vs %d)",
+            guardObject->id(), storeObject->id());
+    return false;
+  }
+
+  const Shape* guardShape = guard->shape();
+  if (guardShape != storeShape) {
+    JitSpew(JitSpew_RedundantShapeGuards, "SKIP: different shapes");
+    return false;
+  }
+
+  return true;
+}
+
+// Eliminate shape guards which are redundant given other instructions.
+//
+// A shape guard is redundant if we can prove that the object being
+// guarded already has the correct shape. The conditions for doing so
+// are as follows:
+//
+// 1. We can see the most recent change to the shape of this object.
+//    (This can be an AddAndStoreSlot, an AllocateAndStoreSlot, or the
+//    creation of the object itself.
+// 2. That mutation dominates the shape guard.
+// 3. The shape that was assigned at that point matches the shape
+//    we expect.
+//
+// If all of these conditions hold, then we can remove the shape guard.
+// In debug, we replace it with an AssertShape to help verify correctness.
+bool jit::EliminateRedundantShapeGuards(MIRGraph& graph) {
+  JitSpew(JitSpew_RedundantShapeGuards, "Begin");
+
+  for (ReversePostorderIterator block = graph.rpoBegin();
+       block != graph.rpoEnd(); block++) {
+    for (MInstructionIterator insIter(block->begin());
+         insIter != block->end();) {
+      MInstruction* ins = *insIter;
+      insIter++;
+
+      // Skip instructions that aren't shape guards.
+      if (!ins->isGuardShape()) {
+        continue;
+      }
+      MGuardShape* guard = ins->toGuardShape();
+      MDefinition* lastStore = guard->dependency();
+
+      JitSpew(JitSpew_RedundantShapeGuards, "Visit shape guard %d",
+              guard->id());
+      JitSpewIndent spewIndent(JitSpew_RedundantShapeGuards);
+
+      if (lastStore->isDiscarded() || lastStore->block()->isDead() ||
+          !lastStore->block()->dominates(guard->block())) {
+        JitSpew(JitSpew_RedundantShapeGuards,
+                "SKIP: ins %d does not dominate block %d", lastStore->id(),
+                guard->block()->id());
+        continue;
+      }
+
+      if (lastStore->isAddAndStoreSlot()) {
+        auto* add = lastStore->toAddAndStoreSlot();
+        auto* addObject = add->object()->skipObjectGuards();
+        if (!ShapeGuardIsRedundant(guard, addObject, add->shape())) {
+          continue;
+        }
+      } else if (lastStore->isAllocateAndStoreSlot()) {
+        auto* allocate = lastStore->toAllocateAndStoreSlot();
+        auto* allocateObject = allocate->object()->skipObjectGuards();
+        if (!ShapeGuardIsRedundant(guard, allocateObject, allocate->shape())) {
+          continue;
+        }
+      } else if (lastStore->isStart()) {
+        // The guard doesn't depend on any other instruction that is modifying
+        // the object operand, so we check the object operand directly.
+        auto* obj = guard->object()->skipObjectGuards();
+
+        const Shape* initialShape = nullptr;
+        if (obj->isNewObject()) {
+          auto* templateObject = obj->toNewObject()->templateObject();
+          if (!templateObject) {
+            JitSpew(JitSpew_RedundantShapeGuards, "SKIP: no template");
+            continue;
+          }
+          initialShape = templateObject->shape();
+        } else if (obj->isNewPlainObject()) {
+          initialShape = obj->toNewPlainObject()->shape();
+        } else {
+          JitSpew(JitSpew_RedundantShapeGuards,
+                  "SKIP: not NewObject or NewPlainObject (%d)", obj->id());
+          continue;
+        }
+        if (initialShape != guard->shape()) {
+          JitSpew(JitSpew_RedundantShapeGuards, "SKIP: shapes don't match");
+          continue;
+        }
+      } else {
+        JitSpew(JitSpew_RedundantShapeGuards,
+                "SKIP: Last store not supported (%d)", lastStore->id());
+        continue;
+      }
+
+#ifdef DEBUG
+      if (!graph.alloc().ensureBallast()) {
+        return false;
+      }
+      auto* assert = MAssertShape::New(graph.alloc(), guard->object(),
+                                       const_cast<Shape*>(guard->shape()));
+      guard->block()->insertBefore(guard, assert);
+#endif
+
+      JitSpew(JitSpew_RedundantShapeGuards, "SUCCESS: Removing shape guard %d",
+              guard->id());
+      guard->replaceAllUsesWith(guard->input());
+      guard->block()->discard(guard);
+    }
+  }
+
+  return true;
+}
+
+static bool TryEliminateGCBarriersForAllocation(TempAllocator& alloc,
+                                                MInstruction* allocation) {
+  MOZ_ASSERT(allocation->type() == MIRType::Object);
+
+  JitSpew(JitSpew_RedundantGCBarriers, "Analyzing allocation %s",
+          allocation->opName());
+
+  MBasicBlock* block = allocation->block();
+  MInstructionIterator insIter(block->begin(allocation));
+
+  // Skip `allocation`.
+  MOZ_ASSERT(*insIter == allocation);
+  insIter++;
+
+  // Try to optimize the other instructions in the block.
+  while (insIter != block->end()) {
+    MInstruction* ins = *insIter;
+    insIter++;
+    switch (ins->op()) {
+      case MDefinition::Opcode::Constant:
+      case MDefinition::Opcode::Box:
+      case MDefinition::Opcode::Unbox:
+      case MDefinition::Opcode::AssertCanElidePostWriteBarrier:
+        // These instructions can't trigger GC or affect this analysis in other
+        // ways.
+        break;
+      case MDefinition::Opcode::StoreFixedSlot: {
+        auto* store = ins->toStoreFixedSlot();
+        if (store->object() != allocation) {
+          JitSpew(JitSpew_RedundantGCBarriers,
+                  "Stopped at StoreFixedSlot for other object");
+          return true;
+        }
+        store->setNeedsBarrier(false);
+        JitSpew(JitSpew_RedundantGCBarriers, "Elided StoreFixedSlot barrier");
+        break;
+      }
+      case MDefinition::Opcode::PostWriteBarrier: {
+        auto* barrier = ins->toPostWriteBarrier();
+        if (barrier->object() != allocation) {
+          JitSpew(JitSpew_RedundantGCBarriers,
+                  "Stopped at PostWriteBarrier for other object");
+          return true;
+        }
+#ifdef DEBUG
+        if (!alloc.ensureBallast()) {
+          return false;
+        }
+        MDefinition* value = barrier->value();
+        if (value->type() != MIRType::Value) {
+          value = MBox::New(alloc, value);
+          block->insertBefore(barrier, value->toInstruction());
+        }
+        auto* assert =
+            MAssertCanElidePostWriteBarrier::New(alloc, allocation, value);
+        block->insertBefore(barrier, assert);
+#endif
+        block->discard(barrier);
+        JitSpew(JitSpew_RedundantGCBarriers, "Elided PostWriteBarrier");
+        break;
+      }
+      default:
+        JitSpew(JitSpew_RedundantGCBarriers,
+                "Stopped at unsupported instruction %s", ins->opName());
+        return true;
+    }
+  }
+
+  return true;
+}
+
+bool jit::EliminateRedundantGCBarriers(MIRGraph& graph) {
+  // Peephole optimization for the following pattern:
+  //
+  //   0: MNewCallObject
+  //   1: MStoreFixedSlot(0, ...)
+  //   2: MStoreFixedSlot(0, ...)
+  //   3: MPostWriteBarrier(0, ...)
+  //
+  // If the instructions immediately following the allocation instruction can't
+  // trigger GC and we are storing to the new object's slots, we can elide the
+  // pre-barrier.
+  //
+  // We also eliminate the post barrier and (in debug builds) replace it with an
+  // assertion.
+  //
+  // See also the similar optimizations in WarpBuilder::buildCallObject.
+
+  JitSpew(JitSpew_RedundantGCBarriers, "Begin");
+
+  for (ReversePostorderIterator block = graph.rpoBegin();
+       block != graph.rpoEnd(); block++) {
+    for (MInstructionIterator insIter(block->begin());
+         insIter != block->end();) {
+      MInstruction* ins = *insIter;
+      insIter++;
+
+      if (ins->isNewCallObject()) {
+        if (!TryEliminateGCBarriersForAllocation(graph.alloc(), ins)) {
+          return false;
+        }
+      }
+    }
   }
 
   return true;
@@ -3389,6 +4116,11 @@ static bool NeedsKeepAlive(MInstruction* slotsOrElements, MInstruction* use) {
              slotsOrElements->type() == MIRType::Slots);
 
   if (slotsOrElements->block() != use->block()) {
+    return true;
+  }
+
+  // Allocating a BigInt can GC, so we have to keep the object alive.
+  if (use->type() == MIRType::BigInt) {
     return true;
   }
 
@@ -3420,6 +4152,8 @@ static bool NeedsKeepAlive(MInstruction* slotsOrElements, MInstruction* use) {
       case MDefinition::Opcode::BoundsCheck:
       case MDefinition::Opcode::GuardElementNotHole:
       case MDefinition::Opcode::SpectreMaskIndex:
+      case MDefinition::Opcode::DebugEnterGCUnsafeRegion:
+      case MDefinition::Opcode::DebugLeaveGCUnsafeRegion:
         iter++;
         break;
       default:
@@ -3485,6 +4219,26 @@ bool jit::AddKeepAliveInstructions(MIRGraph& graph) {
         }
 
         if (!NeedsKeepAlive(ins, use)) {
+#ifdef DEBUG
+          // These two instructions don't start a GC unsafe region, because they
+          // overwrite their elements register at the very start. This ensures
+          // there's no invalidated elements value kept on the stack.
+          if (use->isApplyArray() || use->isConstructArray()) {
+            continue;
+          }
+
+          if (!graph.alloc().ensureBallast()) {
+            return false;
+          }
+
+          // Enter a GC unsafe region while the elements/slots are on the stack.
+          auto* enter = MDebugEnterGCUnsafeRegion::New(graph.alloc());
+          use->block()->insertAfter(ins, enter);
+
+          // Leave the region after the use.
+          auto* leave = MDebugLeaveGCUnsafeRegion::New(graph.alloc());
+          use->block()->insertAfter(use, leave);
+#endif
           continue;
         }
 
@@ -3830,10 +4584,19 @@ bool jit::FoldLoadsWithUnbox(MIRGenerator* mir, MIRGraph& graph) {
       MInstruction* load = ins;
 
       // Ensure there's a single def-use (ignoring resume points) and it's an
-      // unbox.
+      // unbox. Unwrap MLexicalCheck because it's redundant if we have a
+      // fallible unbox (checked below).
       MDefinition* defUse = load->maybeSingleDefUse();
       if (!defUse) {
         continue;
+      }
+      MLexicalCheck* lexicalCheck = nullptr;
+      if (defUse->isLexicalCheck()) {
+        lexicalCheck = defUse->toLexicalCheck();
+        defUse = lexicalCheck->maybeSingleDefUse();
+        if (!defUse) {
+          continue;
+        }
       }
       if (!defUse->isUnbox()) {
         continue;
@@ -3846,14 +4609,14 @@ bool jit::FoldLoadsWithUnbox(MIRGenerator* mir, MIRGraph& graph) {
       if (unbox->block() != *block) {
         continue;
       }
+      MOZ_ASSERT_IF(lexicalCheck, lexicalCheck->block() == *block);
 
       MOZ_ASSERT(!IsMagicType(unbox->type()));
 
-      // If this is a LoadElement that needs a hole check, we only support
-      // folding it with a fallible unbox so that we can eliminate the hole
-      // check.
-      if (load->isLoadElement() && load->toLoadElement()->needsHoleCheck() &&
-          !unbox->fallible()) {
+      // If this is a LoadElement or if we have a lexical check between the load
+      // and unbox, we only support folding the load with a fallible unbox so
+      // that we can eliminate the MagicValue check.
+      if ((load->isLoadElement() || lexicalCheck) && !unbox->fallible()) {
         continue;
       }
 
@@ -3881,7 +4644,7 @@ bool jit::FoldLoadsWithUnbox(MIRGenerator* mir, MIRGraph& graph) {
         }
         case MDefinition::Opcode::LoadElement: {
           auto* loadIns = load->toLoadElement();
-          MOZ_ASSERT_IF(loadIns->needsHoleCheck(), unbox->fallible());
+          MOZ_ASSERT(unbox->fallible());
           replacement = MLoadElementAndUnbox::New(
               graph.alloc(), loadIns->elements(), loadIns->index(), mode, type);
           break;
@@ -3889,15 +4652,25 @@ bool jit::FoldLoadsWithUnbox(MIRGenerator* mir, MIRGraph& graph) {
         default:
           MOZ_CRASH("Unexpected instruction");
       }
+      replacement->setBailoutKind(BailoutKind::UnboxFolding);
 
       block->insertBefore(load, replacement);
       unbox->replaceAllUsesWith(replacement);
+      if (lexicalCheck) {
+        lexicalCheck->replaceAllUsesWith(replacement);
+      }
       load->replaceAllUsesWith(replacement);
 
+      if (lexicalCheck && *insIter == lexicalCheck) {
+        insIter++;
+      }
       if (*insIter == unbox) {
         insIter++;
       }
       block->discard(unbox);
+      if (lexicalCheck) {
+        block->discard(lexicalCheck);
+      }
       block->discard(load);
     }
   }
@@ -3985,51 +4758,169 @@ bool jit::MakeLoopsContiguous(MIRGraph& graph) {
   return true;
 }
 
+static MDefinition* SkipUnbox(MDefinition* ins) {
+  if (ins->isUnbox()) {
+    return ins->toUnbox()->input();
+  }
+  return ins;
+}
+
+bool jit::OptimizeIteratorIndices(MIRGenerator* mir, MIRGraph& graph) {
+  bool changed = false;
+
+  for (ReversePostorderIterator blockIter = graph.rpoBegin();
+       blockIter != graph.rpoEnd();) {
+    MBasicBlock* block = *blockIter++;
+    for (MInstructionIterator insIter(block->begin());
+         insIter != block->end();) {
+      MInstruction* ins = *insIter;
+      insIter++;
+      if (!graph.alloc().ensureBallast()) {
+        return false;
+      }
+
+      MDefinition* receiver = nullptr;
+      MDefinition* idVal = nullptr;
+      MDefinition* setValue = nullptr;
+      if (ins->isMegamorphicHasProp() &&
+          ins->toMegamorphicHasProp()->hasOwn()) {
+        receiver = ins->toMegamorphicHasProp()->object();
+        idVal = ins->toMegamorphicHasProp()->idVal();
+      } else if (ins->isHasOwnCache()) {
+        receiver = ins->toHasOwnCache()->value();
+        idVal = ins->toHasOwnCache()->idval();
+      } else if (ins->isMegamorphicLoadSlotByValue()) {
+        receiver = ins->toMegamorphicLoadSlotByValue()->object();
+        idVal = ins->toMegamorphicLoadSlotByValue()->idVal();
+      } else if (ins->isGetPropertyCache()) {
+        receiver = ins->toGetPropertyCache()->value();
+        idVal = ins->toGetPropertyCache()->idval();
+      } else if (ins->isMegamorphicSetElement()) {
+        receiver = ins->toMegamorphicSetElement()->object();
+        idVal = ins->toMegamorphicSetElement()->index();
+        setValue = ins->toMegamorphicSetElement()->value();
+      } else if (ins->isSetPropertyCache()) {
+        receiver = ins->toSetPropertyCache()->object();
+        idVal = ins->toSetPropertyCache()->idval();
+        setValue = ins->toSetPropertyCache()->value();
+      }
+
+      if (!receiver) {
+        continue;
+      }
+
+      // Given the following structure (that occurs inside for-in loops):
+      //   obj: some object
+      //   iter: ObjectToIterator <obj>
+      //   iterNext: IteratorMore <iter>
+      //   access: HasProp/GetElem <obj> <iterNext>
+      // If the iterator object has an indices array, we can speed up the
+      // property access:
+      // 1. If the property access is a HasProp looking for own properties,
+      //    then the result will always be true if the iterator has indices,
+      //    because we only populate the indices array for objects with no
+      //    enumerable properties on the prototype.
+      // 2. If the property access is a GetProp, then we can use the contents
+      //    of the indices array to find the correct property faster than
+      //    the megamorphic cache.
+      if (!idVal->isIteratorMore()) {
+        continue;
+      }
+      auto* iterNext = idVal->toIteratorMore();
+
+      if (!iterNext->iterator()->isObjectToIterator()) {
+        continue;
+      }
+
+      MObjectToIterator* iter = iterNext->iterator()->toObjectToIterator();
+      if (SkipUnbox(iter->object()) != SkipUnbox(receiver)) {
+        continue;
+      }
+
+      MInstruction* indicesCheck =
+          MIteratorHasIndices::New(graph.alloc(), iter->object(), iter);
+      MInstruction* replacement;
+      if (ins->isHasOwnCache() || ins->isMegamorphicHasProp()) {
+        MOZ_ASSERT(!setValue);
+        replacement = MConstant::New(graph.alloc(), BooleanValue(true));
+      } else if (ins->isMegamorphicLoadSlotByValue() ||
+                 ins->isGetPropertyCache()) {
+        MOZ_ASSERT(!setValue);
+        replacement =
+            MLoadSlotByIteratorIndex::New(graph.alloc(), receiver, iter);
+      } else {
+        MOZ_ASSERT(ins->isMegamorphicSetElement() || ins->isSetPropertyCache());
+        MOZ_ASSERT(setValue);
+        replacement = MStoreSlotByIteratorIndex::New(graph.alloc(), receiver,
+                                                     iter, setValue);
+      }
+
+      if (!block->wrapInstructionInFastpath(ins, replacement, indicesCheck)) {
+        return false;
+      }
+
+      iter->setWantsIndices(true);
+      changed = true;
+
+      // Advance to join block.
+      blockIter = graph.rpoBegin(block->getSuccessor(0)->getSuccessor(0));
+      break;
+    }
+  }
+  if (changed && !AccountForCFGChanges(mir, graph,
+                                       /*updateAliasAnalysis=*/false)) {
+    return false;
+  }
+
+  return true;
+}
+
+void jit::DumpMIRDefinition(GenericPrinter& out, MDefinition* def) {
 #ifdef JS_JITSPEW
-static void DumpDefinition(GenericPrinter& out, MDefinition* def,
-                           size_t depth) {
-  out.printf("%u:", def->id());
+  out.printf("%u = %s.", def->id(), StringFromMIRType(def->type()));
   if (def->isConstant()) {
     def->printOpcode(out);
   } else {
     MDefinition::PrintOpcodeName(out, def->op());
   }
 
-  if (depth == 0) {
-    return;
+  // Get any extra bits of text that the MIR node wants to show us.  Both the
+  // vector and the strings added to it belong to this function, so both will
+  // be automatically freed at exit.
+  ExtrasCollector extras;
+  def->getExtras(&extras);
+  for (size_t i = 0; i < extras.count(); i++) {
+    out.printf(" %s", extras.get(i).get());
   }
 
   for (size_t i = 0; i < def->numOperands(); i++) {
-    out.printf(" (");
-    DumpDefinition(out, def->getOperand(i), depth - 1);
-    out.printf(")");
+    out.printf(" %u", def->getOperand(i)->id());
   }
-}
 #endif
+}
 
-void jit::DumpMIRExpressions(MIRGraph& graph, const CompileInfo& info,
-                             const char* phase) {
+void jit::DumpMIRExpressions(GenericPrinter& out, MIRGraph& graph,
+                             const CompileInfo& info, const char* phase) {
 #ifdef JS_JITSPEW
   if (!JitSpewEnabled(JitSpew_MIRExpressions)) {
     return;
   }
 
-  Fprinter& out = JitSpewPrinter();
   out.printf("===== %s =====\n", phase);
 
-  size_t depth = 2;
-  bool isFirstBlock = true;
   for (ReversePostorderIterator block(graph.rpoBegin());
        block != graph.rpoEnd(); block++) {
-    if (isFirstBlock) {
-      isFirstBlock = false;
-    } else {
-      out.printf("  --\n");
+    out.printf("  Block%u:\n", block->id());
+    for (MPhiIterator iter(block->phisBegin()), end(block->phisEnd());
+         iter != end; iter++) {
+      out.printf("    ");
+      jit::DumpMIRDefinition(out, *iter);
+      out.printf("\n");
     }
     for (MInstructionIterator iter(block->begin()), end(block->end());
          iter != end; iter++) {
-      out.printf("  ");
-      DumpDefinition(out, *iter, depth);
+      out.printf("    ");
+      DumpMIRDefinition(out, *iter);
       out.printf("\n");
     }
   }

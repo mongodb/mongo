@@ -17,7 +17,8 @@
 /* static */ inline js::Debugger* js::Debugger::fromJSObject(
     const JSObject* obj) {
   MOZ_ASSERT(obj->is<DebuggerInstanceObject>());
-  return (Debugger*)obj->as<NativeObject>().getPrivate();
+  auto* dbg = &obj->as<DebuggerInstanceObject>();
+  return dbg->maybePtrFromReservedSlot<Debugger>(JSSLOT_DEBUG_DEBUGGER);
 }
 
 inline bool js::Debugger::isHookCallAllowed(JSContext* cx) const {

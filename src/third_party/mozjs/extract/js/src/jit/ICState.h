@@ -18,6 +18,7 @@ enum class TrialInliningState : uint8_t {
   Initial = 0,
   Candidate,
   Inlined,
+  MonomorphicInlined,
   Failure,
 };
 
@@ -38,11 +39,16 @@ class ICState {
   uint8_t mode_ : 2;
 
   // The TrialInliningState for a Baseline IC.
-  uint8_t trialInliningState_ : 2;
+  uint8_t trialInliningState_ : 3;
 
   // Whether WarpOracle created a snapshot based on stubs attached to this
   // Baseline IC.
   bool usedByTranspiler_ : 1;
+
+  // Whether stubs attached to this IC have been folded together into
+  // a single stub. Used as a hint when attaching additional stubs to
+  // try folding them too.
+  bool hasFoldedStub_ : 1;
 
   // Number of optimized stubs currently attached to this IC.
   uint8_t numOptimizedStubs_;
@@ -92,9 +98,7 @@ class ICState {
     return true;
   }
 
-  // If this returns true, we transitioned to a new mode and the caller
-  // should discard all stubs.
-  [[nodiscard]] MOZ_ALWAYS_INLINE bool maybeTransition() {
+  [[nodiscard]] MOZ_ALWAYS_INLINE bool shouldTransition() {
     // Note: we cannot assert that numOptimizedStubs_ <= MaxOptimizedStubs
     // because old-style baseline ICs may attach more stubs than
     // MaxOptimizedStubs allows.
@@ -105,7 +109,16 @@ class ICState {
         numFailures_ < maxFailures()) {
       return false;
     }
-    if (numFailures_ == maxFailures() || mode() == Mode::Megamorphic) {
+    return true;
+  }
+
+  // If this returns true, we transitioned to a new mode and the caller
+  // should discard all stubs.
+  [[nodiscard]] MOZ_ALWAYS_INLINE bool maybeTransition() {
+    if (!shouldTransition()) {
+      return false;
+    }
+    if (numFailures_ >= maxFailures() || mode() == Mode::Megamorphic) {
       transition(Mode::Generic);
       return true;
     }
@@ -123,6 +136,7 @@ class ICState {
 #endif
     trialInliningState_ = uint32_t(TrialInliningState::Initial);
     usedByTranspiler_ = false;
+    hasFoldedStub_ = false;
     numOptimizedStubs_ = 0;
     numFailures_ = 0;
   }
@@ -135,7 +149,7 @@ class ICState {
     numOptimizedStubs_++;
     // As a heuristic, reduce the failure count after each successful attach
     // to delay hitting Generic mode. Reset to 1 instead of 0 so that
-    // BaselineInspector can distinguish no-failures from rare-failures.
+    // code which inspects state can distinguish no-failures from rare-failures.
     numFailures_ = std::min(numFailures_, static_cast<uint8_t>(1));
   }
   void trackNotAttached() {
@@ -155,6 +169,10 @@ class ICState {
   void setUsedByTranspiler() { usedByTranspiler_ = true; }
   bool usedByTranspiler() const { return usedByTranspiler_; }
 
+  void clearHasFoldedStub() { hasFoldedStub_ = false; }
+  void setHasFoldedStub() { hasFoldedStub_ = true; }
+  bool hasFoldedStub() const { return hasFoldedStub_; }
+
   TrialInliningState trialInliningState() const {
     return TrialInliningState(trialInliningState_);
   }
@@ -163,7 +181,8 @@ class ICState {
     // Moving to the Failure state is always valid. The other states should
     // happen in this order:
     //
-    //   Initial -> Candidate -> Inlined
+    //   Initial -> Candidate --> Inlined
+    //                        \-> MonomorphicInlined
     //
     // This ensures we perform trial inlining at most once per IC site.
     if (state != TrialInliningState::Failure) {
@@ -173,9 +192,11 @@ class ICState {
           break;
         case TrialInliningState::Candidate:
           MOZ_ASSERT(state == TrialInliningState::Candidate ||
-                     state == TrialInliningState::Inlined);
+                     state == TrialInliningState::Inlined ||
+                     state == TrialInliningState::MonomorphicInlined);
           break;
         case TrialInliningState::Inlined:
+        case TrialInliningState::MonomorphicInlined:
         case TrialInliningState::Failure:
           MOZ_CRASH("Inlined and Failure can only change to Failure");
           break;

@@ -16,34 +16,264 @@
  * limitations under the License.
  */
 
+/* [SMDOC] The WASM ABIs
+ *
+ * Wasm-internal ABI.
+ *
+ * The *Wasm-internal ABI* is the ABI a wasm function assumes when it is
+ * entered, and the one it assumes when it is making a call to what it believes
+ * is another wasm function.
+ *
+ * We pass the first function arguments in registers (GPR and FPU both) and the
+ * rest on the stack, generally according to platform ABI conventions (which can
+ * be hairy).  On x86-32 there are no register arguments.
+ *
+ * We have no callee-saves registers in the wasm-internal ABI, regardless of the
+ * platform ABI conventions, though see below about InstanceReg or HeapReg.
+ *
+ * We return the last return value in the first return register, according to
+ * platform ABI conventions.  If there is more than one return value, an area is
+ * allocated in the caller's frame to receive the other return values, and the
+ * address of this area is passed to the callee as the last argument.  Return
+ * values except the last are stored in ascending order within this area.  Also
+ * see below about alignment of this area and the values in it.
+ *
+ * When a function is entered, there are two incoming register values in
+ * addition to the function's declared parameters: InstanceReg must have the
+ * correct instance pointer, and HeapReg the correct memoryBase, for the
+ * function.  (On x86-32 there is no HeapReg.)  From the instance we can get to
+ * the JSContext, the instance, the MemoryBase, and many other things.  The
+ * instance maps one-to-one with an instance.
+ *
+ * HeapReg and InstanceReg are not parameters in the usual sense, nor are they
+ * callee-saves registers.  Instead they constitute global register state, the
+ * purpose of which is to bias the call ABI in favor of intra-instance calls,
+ * the predominant case where the caller and the callee have the same
+ * InstanceReg and HeapReg values.
+ *
+ * With this global register state, literally no work needs to take place to
+ * save and restore the instance and MemoryBase values across intra-instance
+ * call boundaries.
+ *
+ * For inter-instance calls, in contrast, there must be an instance switch at
+ * the call boundary: Before the call, the callee's instance must be loaded
+ * (from a closure or from the import table), and from the instance we load the
+ * callee's MemoryBase, the realm, and the JSContext.  The caller's and callee's
+ * instance values must be stored into the frame (to aid unwinding), the
+ * callee's realm must be stored into the JSContext, and the callee's instance
+ * and MemoryBase values must be moved to appropriate registers.  After the
+ * call, the caller's instance must be loaded, and from it the caller's
+ * MemoryBase and realm, and the JSContext.  The realm must be stored into the
+ * JSContext and the caller's instance and MemoryBase values must be moved to
+ * appropriate registers.
+ *
+ * Direct calls to functions within the same module are always intra-instance,
+ * while direct calls to imported functions are always inter-instance.  Indirect
+ * calls -- call_indirect in the MVP, future call_ref and call_funcref -- may or
+ * may not be intra-instance.
+ *
+ * call_indirect, and future call_funcref, also pass a signature value in a
+ * register (even on x86-32), this is a small integer or a pointer value
+ * denoting the caller's expected function signature.  The callee must compare
+ * it to the value or pointer that denotes its actual signature, and trap on
+ * mismatch.
+ *
+ * This is what the stack looks like during a call, after the callee has
+ * completed the prologue:
+ *
+ *     |                                   |
+ *     +-----------------------------------+ <-+
+ *     |               ...                 |   |
+ *     |      Caller's private frame       |   |
+ *     +-----------------------------------+   |
+ *     |   Multi-value return (optional)   |   |
+ *     |               ...                 |   |
+ *     +-----------------------------------+   |
+ *     |       Stack args (optional)       |   |
+ *     |               ...                 |   |
+ *     +-----------------------------------+ -+|
+ *     |          Caller instance slot     |   \
+ *     |          Callee instance slot     |   | \
+ *     +-----------------------------------+   |  \
+ *     |       Shadowstack area (Win64)    |   |  wasm::FrameWithInstances
+ *     |            (32 bytes)             |   |  /
+ *     +-----------------------------------+   | /  <= SP "Before call"
+ *     |          Return address           |   //   <= SP "After call"
+ *     |             Saved FP          ----|--+/
+ *     +-----------------------------------+ -+ <=  FP (a wasm::Frame*)
+ *     |  DebugFrame, Locals, spills, etc  |
+ *     |   (i.e., callee's private frame)  |
+ *     |             ....                  |
+ *     +-----------------------------------+    <=  SP
+ *
+ * The FrameWithInstances is a struct with four fields: the saved FP, the return
+ * address, and the two instance slots; the shadow stack area is there only on
+ * Win64 and is unused by wasm but is part of the native ABI, with which the
+ * wasm ABI is mostly compatible.  The slots for caller and callee instance are
+ * only populated by the instance switching code in inter-instance calls so that
+ * stack unwinding can keep track of the correct instance value for each frame,
+ * the instance not being obtainable from anywhere else.  Nothing in the frame
+ * itself indicates directly whether the instance slots are valid - for that,
+ * the return address must be used to look up a CallSite structure that carries
+ * that information.
+ *
+ * The stack area above the return address is owned by the caller, which may
+ * deallocate the area on return or choose to reuse it for subsequent calls.
+ * (The baseline compiler allocates and frees the stack args area and the
+ * multi-value result area per call.  Ion reuses the areas and allocates them as
+ * part of the overall activation frame when the procedure is entered; indeed,
+ * the multi-value return area can be anywhere within the caller's private
+ * frame, not necessarily directly above the stack args.)
+ *
+ * If the stack args area contain references, it is up to the callee's stack map
+ * to name the locations where those references exist, and the caller's stack
+ * map must not (redundantly) name those locations.  (The callee's ownership of
+ * this area will be crucial for making tail calls work, as the types of the
+ * locations can change if the callee makes a tail call.)  If pointer values are
+ * spilled by anyone into the Shadowstack area they will not be traced.
+ *
+ * References in the multi-return area are covered by the caller's map, as these
+ * slots outlive the call.
+ *
+ * The address "Before call", ie the part of the FrameWithInstances above the
+ * Frame, must be aligned to WasmStackAlignment, and everything follows from
+ * that, with padding inserted for alignment as required for stack arguments. In
+ * turn WasmStackAlignment is at least as large as the largest parameter type.
+ *
+ * The address of the multiple-results area is currently 8-byte aligned by Ion
+ * and its alignment in baseline is uncertain, see bug 1747787.  Result values
+ * are stored packed within the area in fields whose size is given by
+ * ResultStackSize(ValType), this breaks alignment too.  This all seems
+ * underdeveloped.
+ *
+ * In the wasm-internal ABI, the ARM64 PseudoStackPointer (PSP) is garbage on
+ * entry but must be synced with the real SP at the point the function returns.
+ *
+ *
+ * The Wasm Builtin ABIs.
+ *
+ * Also see `[SMDOC] Process-wide builtin thunk set` in WasmBuiltins.cpp.
+ *
+ * The *Wasm-builtin ABIs* comprise the ABIs used when wasm makes calls directly
+ * to the C++ runtime (but not to the JS interpreter), including instance
+ * methods, helpers for operations such as 64-bit division on 32-bit systems,
+ * allocation and writer barriers, conversions to/from JS values, special
+ * fast-path JS imports, and trap handling.
+ *
+ * The callee of a builtin call will always assume the C/C++ ABI.  Therefore
+ * every volatile (caller-saves) register that wasm uses must be saved across
+ * the call, the stack must be aligned as for a C/C++-ABI call before the call,
+ * and any ABI registers the callee expect to have specific values must be set
+ * up (eg the frame pointer, if the C/C++ ABI assumes it is set).
+ *
+ * Most builtin calls are straightforward: the wasm caller knows that it is
+ * performing a call, and so it saves live registers, moves arguments into ABI
+ * locations, etc, before calling.  Abstractions in the masm make sure to pass
+ * the instance pointer to an instance "method" call and to restore the
+ * InstanceReg and HeapReg after the call.  In these straightforward cases,
+ * calling the builtin additionally amounts to:
+ *
+ *  - exiting the wasm activation
+ *  - adjusting parameter values to account for platform weirdness (FP arguments
+ *    are handled differently in the C/C++ ABIs on ARM and x86-32 than in the
+ *    Wasm ABI)
+ *  - copying stack arguments into place for the C/C++ ABIs
+ *  - making the call
+ *  - adjusting the return values on return
+ *  - re-entering the wasm activation and returning to the wasm caller
+ *
+ * The steps above are performed by the *builtin thunk* for the builtin and the
+ * builtin itself is said to be *thunked*.  Going via the thunk is simple and,
+ * except for always having to copy stack arguments on x86-32 and the extra call
+ * in the thunk, close to as fast as we can make it without heroics.  Except for
+ * the arithmetic helpers on 32-bit systems, most builtins are rarely used, are
+ * asm.js-specific, or are expensive anyway, and the overhead of the extra call
+ * doesn't matter.
+ *
+ * A few builtins for special purposes are *unthunked* and fall into two
+ * classes: they would normally be thunked but are used in circumstances where
+ * the VM is in an unusual state; or they do their work within the activation.
+ *
+ * In the former class, we find the debug trap handler, which must preserve all
+ * live registers because it is called in contexts where live registers have not
+ * been saved; argument coercion functions, which are called while a call frame
+ * is being built for a JS->Wasm or Wasm->JS call; and other routines that have
+ * special needs for constructing the call.  These all exit the activation, but
+ * handle the exit specially.
+ *
+ * In the latter class, we find two functions that abandon the VM state and
+ * unwind the activation, HandleThrow and HandleTrap; and some debug print
+ * functions that do not affect the VM state at all.
+ *
+ * To summarize, when wasm calls a builtin thunk the stack will end up looking
+ * like this from within the C++ code:
+ *
+ *      |                         |
+ *      +-------------------------+
+ *      |        Wasm frame       |
+ *      +-------------------------+
+ *      |    Thunk frame (exit)   |
+ *      +-------------------------+
+ *      |   Builtin frame (C++)   |
+ *      +-------------------------+  <= SP
+ *
+ * There is an assumption in the profiler (in initFromExitFP) that an exit has
+ * left precisely one frame on the stack for the thunk itself.  There may be
+ * additional assumptions elsewhere, not yet found.
+ *
+ * Very occasionally, Wasm will call C++ without going through the builtin
+ * thunks, and this can be a source of problems.  The one case I know about
+ * right now is that the JS pre-barrier filtering code is called directly from
+ * Wasm, see bug 1464157.
+ *
+ *
+ * Wasm stub ABIs.
+ *
+ * Also see `[SMDOC] Exported wasm functions and the jit-entry stubs` in
+ * WasmJS.cpp.
+ *
+ * The "stub ABIs" are not properly speaking ABIs themselves, but ABI
+ * converters.  An "entry" stub calls in to wasm and an "exit" stub calls out
+ * from wasm.  The entry stubs must convert from whatever data formats the
+ * caller has to wasm formats (and in the future must provide some kind of type
+ * checking for pointer types); the exit stubs convert from wasm formats to the
+ * callee's expected format.
+ *
+ * There are different entry paths from the JS interpreter (using the C++ ABI
+ * and data formats) and from jitted JS code (using the JIT ABI and data
+ * formats); indeed there is a "normal" JitEntry path ("JitEntry") that will
+ * perform argument and return value conversion, and the "fast" JitEntry path
+ * ("DirectCallFromJit") that is only used when it is known that the JIT will
+ * only pass and receive wasm-compatible data and no conversion is needed.
+ *
+ * Similarly, there are different exit paths to the interpreter (using the C++
+ * ABI and data formats) and to JS JIT code (using the JIT ABI and data
+ * formats).  Also, builtin calls described above are themselves a type of exit,
+ * and builtin thunks are properly a type of exit stub.
+ *
+ * Data conversions are difficult because the VM is in an intermediate state
+ * when they happen, we want them to be fast when possible, and some conversions
+ * can re-enter both JS code and wasm code.
+ */
+
 #ifndef wasm_frame_h
 #define wasm_frame_h
 
+#include "mozilla/Assertions.h"
+
+#include <stddef.h>
 #include <stdint.h>
 #include <type_traits>
 
-#include "NamespaceImports.h"
-
-#include "wasm/WasmConstants.h"
-#include "wasm/WasmValue.h"
+#include "jit/Registers.h"  // For js::jit::ShadowStackSpace
 
 namespace js {
 namespace wasm {
 
-struct TlsData;
+class Instance;
 
-// Bit set as the lowest bit of a frame pointer, used in two different mutually
-// exclusive situations:
-// - either it's a low bit tag in a FramePointer value read from the
-// Frame::callerFP of an inner wasm frame. This indicates the previous call
-// frame has been set up by a JIT caller that directly called into a wasm
-// function's body. This is only stored in Frame::callerFP for a wasm frame
-// called from JIT code, and thus it can not appear in a JitActivation's
-// exitFP.
-// - or it's the low big tag set when exiting wasm code in JitActivation's
-// exitFP.
-
-constexpr uintptr_t ExitOrJitEntryFPTag = 0x1;
+// Bit tag set when exiting wasm code in JitActivation's exitFP.
+constexpr uintptr_t ExitFPTag = 0x1;
 
 // wasm::Frame represents the bytes pushed by the call instruction and the
 // fixed prologue generated by wasm::GenerateCallablePrologue.
@@ -86,36 +316,29 @@ class Frame {
 
   uint8_t* rawCaller() const { return callerFP_; }
 
-  Frame* wasmCaller() const {
-    MOZ_ASSERT(!callerIsExitOrJitEntryFP());
-    return reinterpret_cast<Frame*>(callerFP_);
-  }
+  Frame* wasmCaller() const { return reinterpret_cast<Frame*>(callerFP_); }
 
-  bool callerIsExitOrJitEntryFP() const {
-    return isExitOrJitEntryFP(callerFP_);
-  }
-
-  uint8_t* jitEntryCaller() const { return toJitEntryCaller(callerFP_); }
+  uint8_t* jitEntryCaller() const { return callerFP_; }
 
   static const Frame* fromUntaggedWasmExitFP(const void* savedFP) {
-    MOZ_ASSERT(!isExitOrJitEntryFP(savedFP));
+    MOZ_ASSERT(!isExitFP(savedFP));
     return reinterpret_cast<const Frame*>(savedFP);
   }
 
-  static bool isExitOrJitEntryFP(const void* fp) {
-    return reinterpret_cast<uintptr_t>(fp) & ExitOrJitEntryFPTag;
+  static bool isExitFP(const void* fp) {
+    return reinterpret_cast<uintptr_t>(fp) & ExitFPTag;
   }
 
-  static uint8_t* toJitEntryCaller(const void* fp) {
-    MOZ_ASSERT(isExitOrJitEntryFP(fp));
+  static uint8_t* untagExitFP(const void* fp) {
+    MOZ_ASSERT(isExitFP(fp));
     return reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(fp) &
-                                      ~ExitOrJitEntryFPTag);
+                                      ~ExitFPTag);
   }
 
-  static uint8_t* addExitOrJitEntryFPTag(const Frame* fp) {
-    MOZ_ASSERT(!isExitOrJitEntryFP(fp));
+  static uint8_t* addExitFPTag(const Frame* fp) {
+    MOZ_ASSERT(!isExitFP(fp));
     return reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(fp) |
-                                      ExitOrJitEntryFPTag);
+                                      ExitFPTag);
   }
 };
 
@@ -123,218 +346,62 @@ static_assert(!std::is_polymorphic_v<Frame>, "Frame doesn't need a vtable.");
 static_assert(sizeof(Frame) == 2 * sizeof(void*),
               "Frame is a two pointer structure");
 
-class FrameWithTls : public Frame {
-  TlsData* calleeTls_;
-  TlsData* callerTls_;
+// Note that sizeof(FrameWithInstances) does not account for ShadowStackSpace.
+// Use FrameWithInstances::sizeOf() if you are not incorporating
+// ShadowStackSpace through other means (eg the ABIArgIter).
+
+class FrameWithInstances : public Frame {
+  // `ShadowStackSpace` bytes will be allocated here on Win64, at higher
+  // addresses than Frame and at lower addresses than the instance fields.
+
+  // The instance area MUST be two pointers exactly.
+  Instance* calleeInstance_;
+  Instance* callerInstance_;
 
  public:
-  TlsData* calleeTls() { return calleeTls_; }
-  TlsData* callerTls() { return callerTls_; }
+  Instance* calleeInstance() { return calleeInstance_; }
+  Instance* callerInstance() { return callerInstance_; }
 
-  constexpr static uint32_t sizeWithoutFrame() {
-    return sizeof(wasm::FrameWithTls) - sizeof(wasm::Frame);
+  constexpr static uint32_t sizeOf() {
+    return sizeof(wasm::FrameWithInstances) + js::jit::ShadowStackSpace;
   }
 
-  constexpr static uint32_t calleeTLSOffset() {
-    return offsetof(FrameWithTls, calleeTls_) - sizeof(wasm::Frame);
+  constexpr static uint32_t sizeOfInstanceFields() {
+    return sizeof(wasm::FrameWithInstances) - sizeof(wasm::Frame);
   }
 
-  constexpr static uint32_t callerTLSOffset() {
-    return offsetof(FrameWithTls, callerTls_) - sizeof(wasm::Frame);
+  constexpr static uint32_t calleeInstanceOffset() {
+    return offsetof(FrameWithInstances, calleeInstance_) +
+           js::jit::ShadowStackSpace;
+  }
+
+  constexpr static uint32_t calleeInstanceOffsetWithoutFrame() {
+    return calleeInstanceOffset() - sizeof(wasm::Frame);
+  }
+
+  constexpr static uint32_t callerInstanceOffset() {
+    return offsetof(FrameWithInstances, callerInstance_) +
+           js::jit::ShadowStackSpace;
+  }
+
+  constexpr static uint32_t callerInstanceOffsetWithoutFrame() {
+    return callerInstanceOffset() - sizeof(wasm::Frame);
   }
 };
 
-static_assert(FrameWithTls::calleeTLSOffset() == 0u,
-              "Callee tls stored right above the return address.");
-static_assert(FrameWithTls::callerTLSOffset() == sizeof(void*),
-              "Caller tls stored right above the callee tls.");
+static_assert(FrameWithInstances::calleeInstanceOffsetWithoutFrame() ==
+                  js::jit::ShadowStackSpace,
+              "Callee instance stored right above the return address.");
+static_assert(FrameWithInstances::callerInstanceOffsetWithoutFrame() ==
+                  js::jit::ShadowStackSpace + sizeof(void*),
+              "Caller instance stored right above the callee instance.");
 
-static_assert(FrameWithTls::sizeWithoutFrame() == 2 * sizeof(void*),
+static_assert(FrameWithInstances::sizeOfInstanceFields() == 2 * sizeof(void*),
               "There are only two additional slots");
 
 #if defined(JS_CODEGEN_ARM64)
 static_assert(sizeof(Frame) % 16 == 0, "frame is aligned");
 #endif
-
-// A DebugFrame is a Frame with additional fields that are added after the
-// normal function prologue by the baseline compiler. If a Module is compiled
-// with debugging enabled, then all its code creates DebugFrames on the stack
-// instead of just Frames. These extra fields are used by the Debugger API.
-
-class DebugFrame {
-  // The register results field.  Initialized only during the baseline
-  // compiler's return sequence to allow the debugger to inspect and
-  // modify the return values of a frame being debugged.
-  union SpilledRegisterResult {
-   private:
-    int32_t i32_;
-    int64_t i64_;
-    intptr_t ref_;
-    AnyRef anyref_;
-    float f32_;
-    double f64_;
-#ifdef ENABLE_WASM_SIMD
-    V128 v128_;
-#endif
-#ifdef DEBUG
-    // Should we add a new value representation, this will remind us to update
-    // SpilledRegisterResult.
-    static inline void assertAllValueTypesHandled(ValType type) {
-      switch (type.kind()) {
-        case ValType::I32:
-        case ValType::I64:
-        case ValType::F32:
-        case ValType::F64:
-        case ValType::V128:
-        case ValType::Rtt:
-          return;
-        case ValType::Ref:
-          switch (type.refTypeKind()) {
-            case RefType::Func:
-            case RefType::Extern:
-            case RefType::Eq:
-            case RefType::TypeIndex:
-              return;
-          }
-      }
-    }
-#endif
-  };
-  SpilledRegisterResult registerResults_[MaxRegisterResults];
-
-  // The returnValue() method returns a HandleValue pointing to this field.
-  js::Value cachedReturnJSValue_;
-
-  // If the function returns multiple results, this field is initialized
-  // to a pointer to the stack results.
-  void* stackResultsPointer_;
-
-  // The function index of this frame. Technically, this could be derived
-  // given a PC into this frame (which could lookup the CodeRange which has
-  // the function index), but this isn't always readily available.
-  uint32_t funcIndex_;
-
-  // Flags whose meaning are described below.
-  union Flags {
-    uint32_t allFlags;
-    struct {
-      uint32_t observing : 1;
-      uint32_t isDebuggee : 1;
-      uint32_t prevUpToDate : 1;
-      uint32_t hasCachedSavedFrame : 1;
-      uint32_t hasCachedReturnJSValue : 1;
-      uint32_t hasSpilledRefRegisterResult : MaxRegisterResults;
-    };
-  } flags_{};
-
-  // Avoid -Wunused-private-field warnings.
- protected:
-#if defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_ARM) || \
-    defined(JS_CODEGEN_X86) || defined(__wasi__)
-  // See alignmentStaticAsserts().  For MIPS32, ARM32 and X86 DebugFrame is only
-  // 4-byte aligned, so we add another word to get up to 8-byte
-  // alignment.
-  uint32_t padding_;
-#endif
-#if defined(ENABLE_WASM_SIMD) && defined(JS_CODEGEN_ARM64)
-  uint64_t padding_;
-#endif
-
- private:
-  // The Frame goes at the end since the stack grows down.
-  Frame frame_;
-
- public:
-  static DebugFrame* from(Frame* fp);
-  Frame& frame() { return frame_; }
-  uint32_t funcIndex() const { return funcIndex_; }
-  Instance* instance() const;
-  GlobalObject* global() const;
-  bool hasGlobal(const GlobalObject* global) const;
-  JSObject* environmentChain() const;
-  bool getLocal(uint32_t localIndex, MutableHandleValue vp);
-
-  // The return value must be written from the unboxed representation in the
-  // results union into cachedReturnJSValue_ by updateReturnJSValue() before
-  // returnValue() can return a Handle to it.
-
-  bool hasCachedReturnJSValue() const { return flags_.hasCachedReturnJSValue; }
-  [[nodiscard]] bool updateReturnJSValue(JSContext* cx);
-  HandleValue returnValue() const;
-  void clearReturnJSValue();
-
-  // Once the debugger observes a frame, it must be notified via
-  // onLeaveFrame() before the frame is popped. Calling observe() ensures the
-  // leave frame traps are enabled. Both methods are idempotent so the caller
-  // doesn't have to worry about calling them more than once.
-
-  void observe(JSContext* cx);
-  void leave(JSContext* cx);
-
-  // The 'isDebugge' bit is initialized to false and set by the WebAssembly
-  // runtime right before a frame is exposed to the debugger, as required by
-  // the Debugger API. The bit is then used for Debugger-internal purposes
-  // afterwards.
-
-  bool isDebuggee() const { return flags_.isDebuggee; }
-  void setIsDebuggee() { flags_.isDebuggee = true; }
-  void unsetIsDebuggee() { flags_.isDebuggee = false; }
-
-  // These are opaque boolean flags used by the debugger to implement
-  // AbstractFramePtr. They are initialized to false and not otherwise read or
-  // written by wasm code or runtime.
-
-  bool prevUpToDate() const { return flags_.prevUpToDate; }
-  void setPrevUpToDate() { flags_.prevUpToDate = true; }
-  void unsetPrevUpToDate() { flags_.prevUpToDate = false; }
-
-  bool hasCachedSavedFrame() const { return flags_.hasCachedSavedFrame; }
-  void setHasCachedSavedFrame() { flags_.hasCachedSavedFrame = true; }
-  void clearHasCachedSavedFrame() { flags_.hasCachedSavedFrame = false; }
-
-  bool hasSpilledRegisterRefResult(size_t n) const {
-    uint32_t mask = hasSpilledRegisterRefResultBitMask(n);
-    return (flags_.allFlags & mask) != 0;
-  }
-
-  // DebugFrame is accessed directly by JIT code.
-
-  static constexpr size_t offsetOfRegisterResults() {
-    return offsetof(DebugFrame, registerResults_);
-  }
-  static constexpr size_t offsetOfRegisterResult(size_t n) {
-    MOZ_ASSERT(n < MaxRegisterResults);
-    return offsetOfRegisterResults() + n * sizeof(SpilledRegisterResult);
-  }
-  static constexpr size_t offsetOfCachedReturnJSValue() {
-    return offsetof(DebugFrame, cachedReturnJSValue_);
-  }
-  static constexpr size_t offsetOfStackResultsPointer() {
-    return offsetof(DebugFrame, stackResultsPointer_);
-  }
-  static constexpr size_t offsetOfFlags() {
-    return offsetof(DebugFrame, flags_);
-  }
-  static constexpr uint32_t hasSpilledRegisterRefResultBitMask(size_t n) {
-    MOZ_ASSERT(n < MaxRegisterResults);
-    union Flags flags{0};
-    flags.hasSpilledRefRegisterResult = 1 << n;
-    MOZ_ASSERT(flags.allFlags != 0);
-    return flags.allFlags;
-  }
-  static constexpr size_t offsetOfFuncIndex() {
-    return offsetof(DebugFrame, funcIndex_);
-  }
-  static constexpr size_t offsetOfFrame() {
-    return offsetof(DebugFrame, frame_);
-  }
-
-  // DebugFrames are aligned to 8-byte aligned, allowing them to be placed in
-  // an AbstractFramePtr.
-
-  static const unsigned Alignment = 8;
-  static void alignmentStaticAsserts();
-};
 
 }  // namespace wasm
 }  // namespace js

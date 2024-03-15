@@ -214,15 +214,6 @@ class InstructionDataMap {
   LNode* const& operator[](uint32_t ins) const { return insData_[ins]; }
 };
 
-inline void TakeJitRegisters(bool isProfiling, AllocatableRegisterSet* set) {
-#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64) || \
-    defined(JS_CODEGEN_ARM64)
-  if (isProfiling) {
-    set->take(AnyRegister(FramePointer));
-  }
-#endif
-}
-
 // Common superclass for register allocators.
 class RegisterAllocator {
   void operator=(const RegisterAllocator&) = delete;
@@ -244,10 +235,9 @@ class RegisterAllocator {
 
   RegisterAllocator(MIRGenerator* mir, LIRGenerator* lir, LIRGraph& graph)
       : mir(mir), lir(lir), graph(graph), allRegisters_(RegisterSet::All()) {
+    MOZ_ASSERT(!allRegisters_.has(FramePointer));
     if (mir->compilingWasm()) {
       takeWasmRegisters(allRegisters_);
-    } else {
-      TakeJitRegisters(mir->instrumentedProfiling(), &allRegisters_);
     }
   }
 
@@ -293,33 +283,21 @@ class RegisterAllocator {
   LMoveGroup* getFixReuseMoveGroup(LInstruction* ins);
   LMoveGroup* getMoveGroupAfter(LInstruction* ins);
 
-  CodePosition minimalDefEnd(LNode* ins) {
-    // Compute the shortest interval that captures vregs defined by ins.
-    // Watch for instructions that are followed by an OSI point.
-    // If moves are introduced between the instruction and the OSI point then
-    // safepoint information for the instruction may be incorrect.
-    while (true) {
-      LNode* next = insData[ins->id() + 1];
-      if (!next->isOsiPoint()) {
-        break;
-      }
-      ins = next;
-    }
+  // Atomic group helper.  See comments in BacktrackingAllocator.cpp.
+  CodePosition minimalDefEnd(LNode* ins) const;
 
-    return outputOf(ins);
-  }
-
-  void dumpInstructions();
+  void dumpInstructions(const char* who);
 
  public:
   template <typename TakeableSet>
   static void takeWasmRegisters(TakeableSet& regs) {
-#if defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_ARM) ||      \
-    defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) || \
-    defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_ARM) ||        \
+    defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) ||   \
+    defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_LOONG64) || \
+    defined(JS_CODEGEN_RISCV64)
     regs.take(HeapReg);
 #endif
-    regs.take(FramePointer);
+    MOZ_ASSERT(!regs.has(FramePointer));
   }
 };
 

@@ -77,7 +77,7 @@
 
 namespace js {
 
-class Sprinter;
+class JS_PUBLIC_API Sprinter;
 
 namespace jit {
 

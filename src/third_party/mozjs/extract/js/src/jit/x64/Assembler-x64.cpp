@@ -6,7 +6,7 @@
 
 #include "jit/x64/Assembler-x64.h"
 
-#include "gc/Marking.h"
+#include "gc/Tracer.h"
 #include "util/Memory.h"
 
 using namespace js;
@@ -140,6 +140,8 @@ void Assembler::finish() {
     return;
   }
 
+  AutoCreatedBy acb(*this, "Assembler::finish");
+
   if (!extendedJumps_.length()) {
     // Since we may be folowed by non-executable data, eagerly insert an
     // undefined instruction byte to prevent processors from decoding
@@ -157,6 +159,7 @@ void Assembler::finish() {
 #ifdef DEBUG
     size_t oldSize = masm.size();
 #endif
+    MOZ_ASSERT(hasCreator());
     masm.jmp_rip(2);
     MOZ_ASSERT_IF(!masm.oom(), masm.size() - oldSize == 6);
     // Following an indirect branch with ud2 hints to the hardware that

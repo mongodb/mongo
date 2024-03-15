@@ -26,11 +26,6 @@ struct BaselineStubFrame {
   uintptr_t descriptor;
 };
 
-// Size of values pushed by EmitBaselineEnterStubFrame.
-static const uint32_t STUB_FRAME_SIZE = sizeof(BaselineStubFrame);
-static const uint32_t STUB_FRAME_SAVED_STUB_OFFSET =
-    offsetof(BaselineStubFrame, savedStub);
-
 inline void EmitRestoreTailCallReg(MacroAssembler& masm) {
   // No-op on MIPS because ra register is always holding the return address.
 }
@@ -52,34 +47,21 @@ inline void EmitCallIC(MacroAssembler& masm, CodeOffset* callOffset) {
 
 inline void EmitReturnFromIC(MacroAssembler& masm) { masm.branch(ra); }
 
-inline void EmitBaselineLeaveStubFrame(MacroAssembler& masm,
-                                       bool calledIntoIon = false) {
-  // Ion frames do not save and restore the frame pointer. If we called
-  // into Ion, we have to restore the stack pointer from the frame descriptor.
-  // If we performed a VM call, the descriptor has been popped already so
-  // in that case we use the frame pointer.
-  if (calledIntoIon) {
-    masm.pop(ScratchRegister);
-    masm.rshiftPtr(Imm32(FRAMESIZE_SHIFT), ScratchRegister);
-    masm.addPtr(ScratchRegister, BaselineStackReg);
-  } else {
-    masm.movePtr(BaselineFrameReg, BaselineStackReg);
-  }
-
-  masm.loadPtr(Address(StackPointer, offsetof(BaselineStubFrame, savedFrame)),
-               BaselineFrameReg);
-  masm.loadPtr(Address(StackPointer, offsetof(BaselineStubFrame, savedStub)),
-               ICStubReg);
+inline void EmitBaselineLeaveStubFrame(MacroAssembler& masm) {
+  masm.loadPtr(
+      Address(FramePointer, BaselineStubFrameLayout::ICStubOffsetFromFP),
+      ICStubReg);
+  masm.movePtr(FramePointer, StackPointer);
+  masm.Pop(FramePointer);
 
   // Load the return address.
-  masm.loadPtr(
-      Address(StackPointer, offsetof(BaselineStubFrame, returnAddress)),
-      ICTailCallReg);
+  masm.Pop(ICTailCallReg);
 
   // Discard the frame descriptor.
-  masm.loadPtr(Address(StackPointer, offsetof(BaselineStubFrame, descriptor)),
-               ScratchRegister);
-  masm.addPtr(Imm32(STUB_FRAME_SIZE), StackPointer);
+  {
+    SecondScratchRegisterScope scratch2(masm);
+    masm.Pop(scratch2);
+  }
 }
 
 template <typename AddrType>

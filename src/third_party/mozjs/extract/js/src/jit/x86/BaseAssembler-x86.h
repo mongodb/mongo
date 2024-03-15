@@ -155,8 +155,8 @@ class BaseAssemblerX86 : public BaseAssembler {
                   dst);
   }
 
-  void vhaddpd_rr(XMMRegisterID src, XMMRegisterID dst) {
-    twoByteOpSimdFlags("vhaddpd", VEX_PD, OP2_HADDPD, src, dst);
+  void vhaddpd_rr(XMMRegisterID src1, XMMRegisterID src0, XMMRegisterID dst) {
+    twoByteOpSimd("vhaddpd", VEX_PD, OP2_HADDPD, src1, src0, dst);
   }
 
   void vsubpd_rr(XMMRegisterID src1, XMMRegisterID src0, XMMRegisterID dst) {

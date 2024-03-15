@@ -31,15 +31,15 @@ namespace mozilla {
 // overloads.
 
 /** Returns true iff |aChar| is ASCII, i.e. in the range [0, 0x80). */
-constexpr bool IsAscii(unsigned char aChar) { return aChar < 0x80; }
+inline constexpr bool IsAscii(unsigned char aChar) { return aChar < 0x80; }
 
 /** Returns true iff |aChar| is ASCII, i.e. in the range [0, 0x80). */
-constexpr bool IsAscii(signed char aChar) {
+inline constexpr bool IsAscii(signed char aChar) {
   return IsAscii(static_cast<unsigned char>(aChar));
 }
 
 /** Returns true iff |aChar| is ASCII, i.e. in the range [0, 0x80). */
-constexpr bool IsAscii(char aChar) {
+inline constexpr bool IsAscii(char aChar) {
   return IsAscii(static_cast<unsigned char>(aChar));
 }
 
@@ -53,10 +53,10 @@ constexpr bool IsAscii(char8_t aChar) {
 #endif
 
 /** Returns true iff |aChar| is ASCII, i.e. in the range [0, 0x80). */
-constexpr bool IsAscii(char16_t aChar) { return aChar < 0x80; }
+inline constexpr bool IsAscii(char16_t aChar) { return aChar < 0x80; }
 
 /** Returns true iff |aChar| is ASCII, i.e. in the range [0, 0x80). */
-constexpr bool IsAscii(char32_t aChar) { return aChar < 0x80; }
+inline constexpr bool IsAscii(char32_t aChar) { return aChar < 0x80; }
 
 /**
  * Returns |true| iff |aString| contains only ASCII characters, that is,
@@ -176,10 +176,7 @@ inline void ConvertAsciitoUtf16(mozilla::Span<const char> aSource,
   MOZ_ASSERT(IsAscii(aSource));
   ConvertLatin1toUtf16(aSource, aDest);
 }
-
-#else  // The code below is implemented based on the equivalent specification in
-       // `encoding_rs`.
-
+#else 
 /**
  * Returns the index of the first non-ASCII byte or
  * the length of the string if there are none.

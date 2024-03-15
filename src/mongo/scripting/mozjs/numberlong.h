@@ -57,8 +57,10 @@ namespace mozjs {
  * floating point approximation.
  */
 struct NumberLongInfo : public BaseInfo {
+    enum Slots { Int64Slot, NumberLongInfoSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toNumber);
@@ -75,7 +77,7 @@ struct NumberLongInfo : public BaseInfo {
     static const JSFunctionSpec methods[6];
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NumberLongInfoSlotCount);
 
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 

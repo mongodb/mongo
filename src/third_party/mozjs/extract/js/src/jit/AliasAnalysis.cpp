@@ -6,15 +6,12 @@
 
 #include "jit/AliasAnalysis.h"
 
-#include <stdio.h>
-
-#include "jit/Ion.h"
 #include "jit/JitSpewer.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
 
-#include "vm/Printer.h"
+#include "js/Printer.h"
 
 using namespace js;
 using namespace js::jit;
@@ -190,8 +187,7 @@ bool AliasAnalysis::analyze() {
       def->setId(newId++);
     }
 
-    for (MInstructionIterator def(block->begin()),
-         end(block->begin(block->lastIns()));
+    for (MInstructionIterator def(block->begin()), end(block->end());
          def != end; ++def) {
       def->setId(newId++);
 
@@ -254,10 +250,6 @@ bool AliasAnalysis::analyze() {
         }
       }
     }
-
-    // Renumber the last instruction, as the analysis depends on this and the
-    // order.
-    block->lastIns()->setId(newId++);
 
     if (block->isLoopBackedge()) {
       MOZ_ASSERT(loop_->loopHeader() == block->loopHeaderOfBackedge());

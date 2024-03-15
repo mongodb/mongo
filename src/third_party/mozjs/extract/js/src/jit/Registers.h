@@ -20,6 +20,12 @@
 #  include "jit/mips32/Architecture-mips32.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/Architecture-mips64.h"
+#elif defined(JS_CODEGEN_LOONG64)
+#  include "jit/loong64/Architecture-loong64.h"
+#elif defined(JS_CODEGEN_RISCV64)
+#  include "jit/riscv64/Architecture-riscv64.h"
+#elif defined(JS_CODEGEN_WASM32)
+#  include "jit/wasm32/Architecture-wasm32.h"
 #elif defined(JS_CODEGEN_NONE)
 #  include "jit/none/Architecture-none.h"
 #else
@@ -90,6 +96,13 @@ struct Register {
   static uint32_t SetSize(SetType x) { return Codes::SetSize(x); }
   static uint32_t FirstBit(SetType x) { return Codes::FirstBit(x); }
   static uint32_t LastBit(SetType x) { return Codes::LastBit(x); }
+
+  // Returns the offset of |reg| on the stack, assuming all registers in |set|
+  // were pushed in order (e.g. by |PushRegsInMask|). This is computed by
+  // clearing the lower bits (registers that were pushed later).
+  static size_t OffsetOfPushedRegister(SetType set, Register reg) {
+    return sizeof(Codes::RegisterContent) * Codes::SetSize(set >> reg.code());
+  }
 };
 
 // Architectures where the stack pointer is not a plain register with a standard
@@ -202,7 +215,7 @@ class RegisterDump {
  public:
   typedef mozilla::Array<Registers::RegisterContent, Registers::Total> GPRArray;
   typedef mozilla::Array<FloatRegisters::RegisterContent,
-                         FloatRegisters::TotalPhys>
+                         std::max<uint32_t>(FloatRegisters::TotalPhys, 1)>
       FPUArray;
 
  protected:  // Silence Clang warning.
@@ -218,58 +231,33 @@ class RegisterDump {
   }
 };
 
-// Information needed to recover machine register state. This records the
-// location of spilled register and not the content of the spilled
-// registers. Thus we can safely assume that this structure is unchanged, even
-// if the GC pointers mapped by this structure are relocated.
-class MachineState {
-  mozilla::Array<Registers::RegisterContent*, Registers::Total> regs_;
-  mozilla::Array<FloatRegisters::RegisterContent*, FloatRegisters::Total>
-      fpregs_;
+// Class for mapping each register to an offset.
+class RegisterOffsets {
+  mozilla::Array<uint32_t, Registers::Total> offsets_;
+
+  // Sentinel value representing an uninitialized offset.
+  static constexpr uint32_t InvalidOffset = UINT32_MAX;
 
  public:
-  MachineState() {
-#ifndef JS_CODEGEN_NONE
-    for (uintptr_t i = 0; i < Registers::Total; i++) {
-      regs_[i] = reinterpret_cast<Registers::RegisterContent*>(i + 0x100);
+  RegisterOffsets() {
+    for (size_t i = 0; i < Registers::Total; i++) {
+      offsets_[i] = InvalidOffset;
     }
-    for (uintptr_t i = 0; i < FloatRegisters::Total; i++) {
-      fpregs_[i] =
-          reinterpret_cast<FloatRegisters::RegisterContent*>(i + 0x200);
-    }
-#endif
   }
 
-  static MachineState FromBailout(RegisterDump::GPRArray& regs,
-                                  RegisterDump::FPUArray& fpregs);
+  RegisterOffsets(const RegisterOffsets&) = delete;
+  void operator=(const RegisterOffsets&) = delete;
 
-  void setRegisterLocation(Register reg, uintptr_t* up) {
-    regs_[reg.code()] = (Registers::RegisterContent*)up;
+  bool hasOffset(Register reg) const {
+    return offsets_[reg.code()] != InvalidOffset;
   }
-  void setRegisterLocation(FloatRegister reg, float* fp) {
-    MOZ_ASSERT(reg.isSingle());
-    fpregs_[reg.code()] = (FloatRegisters::RegisterContent*)fp;
+  uint32_t getOffset(Register reg) const {
+    MOZ_ASSERT(hasOffset(reg));
+    return offsets_[reg.code()];
   }
-  void setRegisterLocation(FloatRegister reg, double* dp) {
-    fpregs_[reg.code()] = (FloatRegisters::RegisterContent*)dp;
-  }
-  void setRegisterLocation(FloatRegister reg,
-                           FloatRegisters::RegisterContent* rp) {
-    fpregs_[reg.code()] = rp;
-  }
-
-  bool has(Register reg) const { return regs_[reg.code()] != nullptr; }
-  bool has(FloatRegister reg) const { return fpregs_[reg.code()] != nullptr; }
-  uintptr_t read(Register reg) const { return regs_[reg.code()]->r; }
-  double read(FloatRegister reg) const { return fpregs_[reg.code()]->d; }
-  void write(Register reg, uintptr_t value) const {
-    regs_[reg.code()]->r = value;
-  }
-  const Registers::RegisterContent* address(Register reg) const {
-    return regs_[reg.code()];
-  }
-  const FloatRegisters::RegisterContent* address(FloatRegister reg) const {
-    return fpregs_[reg.code()];
+  void setOffset(Register reg, size_t offset) {
+    MOZ_ASSERT(offset < InvalidOffset);
+    offsets_[reg.code()] = uint32_t(offset);
   }
 };
 

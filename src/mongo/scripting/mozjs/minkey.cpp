@@ -49,9 +49,10 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec MinKeyInfo::methods[3] = {
+const JSFunctionSpec MinKeyInfo::methods[4] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MinKeyInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MinKeyInfo),
+    MONGO_ATTACH_JS_FUNCTION_SYM_WITH_FLAGS(hasInstance, hasInstance),
     JS_FS_END,
 };
 
@@ -89,12 +90,6 @@ void MinKeyInfo::call(JSContext* cx, JS::CallArgs args) {
     args.rval().set(val);
 }
 
-void MinKeyInfo::hasInstance(JSContext* cx,
-                             JS::HandleObject obj,
-                             JS::MutableHandleValue vp,
-                             bool* bp) {
-    *bp = getScope(cx)->getProto<MinKeyInfo>().instanceOf(vp);
-}
 
 void MinKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$minKey\" : 1 }");
@@ -102,6 +97,14 @@ void MinKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
 
 void MinKeyInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSON(BSON("$minKey" << 1), nullptr, false);
+}
+
+void MinKeyInfo::Functions::hasInstance::call(JSContext* cx, JS::CallArgs args) {
+    uassert(ErrorCodes::BadValue, "hasInstance needs 1 argument", args.length() == 1);
+    uassert(ErrorCodes::BadValue, "argument must be an object", args.get(0).isObject());
+
+    auto scope = getScope(cx);
+    args.rval().setBoolean(scope->getProto<MinKeyInfo>().instanceOf(args.get(0)));
 }
 
 void MinKeyInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

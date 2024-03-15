@@ -45,6 +45,33 @@ static bool IsLastUse(MDefinition* ins, MDefinition* input,
   return true;
 }
 
+static void MoveConstantsToStart(MBasicBlock* block,
+                                 MInstruction* insertionPoint) {
+  // Move constants with a single use in the current block to the start of the
+  // block. Constants won't be reordered by ReorderInstructions, as they have no
+  // inputs. Moving them up as high as possible can allow their use to be moved
+  // up further, though, and has no cost if the constant is emitted at its use.
+
+  MInstructionIterator iter(block->begin(insertionPoint));
+  while (iter != block->end()) {
+    MInstruction* ins = *iter;
+    iter++;
+
+    if (!ins->isConstant() || !ins->hasOneUse() ||
+        ins->usesBegin()->consumer()->block() != block ||
+        IsFloatingPointType(ins->type())) {
+      continue;
+    }
+
+    MOZ_ASSERT(ins->isMovable());
+    MOZ_ASSERT(insertionPoint != ins);
+
+    // Note: we don't need to use MoveBefore here because MoveConstantsToStart
+    // is called right before we renumber all instructions in this block.
+    block->moveBefore(insertionPoint, ins);
+  }
+}
+
 bool jit::ReorderInstructions(MIRGraph& graph) {
   // Renumber all instructions in the graph as we go.
   size_t nextId = 0;
@@ -54,6 +81,19 @@ bool jit::ReorderInstructions(MIRGraph& graph) {
 
   for (ReversePostorderIterator block(graph.rpoBegin());
        block != graph.rpoEnd(); block++) {
+    // Don't reorder instructions within entry blocks, which have special
+    // requirements.
+    bool isEntryBlock =
+        *block == graph.entryBlock() || *block == graph.osrBlock();
+
+    MInstruction* insertionPoint = nullptr;
+    if (!isEntryBlock) {
+      // Move constants to the start of the block before renumbering all
+      // instructions.
+      insertionPoint = block->safeInsertTop();
+      MoveConstantsToStart(*block, insertionPoint);
+    }
+
     // Renumber all definitions inside the basic blocks.
     for (MPhiIterator iter(block->phisBegin()); iter != block->phisEnd();
          iter++) {
@@ -65,9 +105,7 @@ bool jit::ReorderInstructions(MIRGraph& graph) {
       iter->setId(nextId++);
     }
 
-    // Don't reorder instructions within entry blocks, which have special
-    // requirements.
-    if (*block == graph.entryBlock() || *block == graph.osrBlock()) {
+    if (isEntryBlock) {
       continue;
     }
 
@@ -79,35 +117,15 @@ bool jit::ReorderInstructions(MIRGraph& graph) {
 
     MBasicBlock* innerLoop = loopHeaders.empty() ? nullptr : loopHeaders.back();
 
-    MInstruction* top = block->safeInsertTop();
-    MInstructionReverseIterator rtop = ++block->rbegin(top);
-    for (MInstructionIterator iter(block->begin(top)); iter != block->end();) {
+    MInstructionReverseIterator rtop = ++block->rbegin(insertionPoint);
+    for (MInstructionIterator iter(block->begin(insertionPoint));
+         iter != block->end();) {
       MInstruction* ins = *iter;
 
       // Filter out some instructions which are never reordered.
       if (ins->isEffectful() || !ins->isMovable() || ins->resumePoint() ||
           ins == block->lastIns()) {
         iter++;
-        continue;
-      }
-
-      // Move constants with a single use in the current block to the
-      // start of the block. Constants won't be reordered by the logic
-      // below, as they have no inputs. Moving them up as high as
-      // possible can allow their use to be moved up further, though,
-      // and has no cost if the constant is emitted at its use.
-      if (ins->isConstant() && ins->hasOneUse() &&
-          ins->usesBegin()->consumer()->block() == *block &&
-          !IsFloatingPointType(ins->type())) {
-        iter++;
-        MInstructionIterator targetIter = block->begin();
-        while (targetIter->isConstant() || targetIter->isInterruptCheck()) {
-          if (*targetIter == ins) {
-            break;
-          }
-          targetIter++;
-        }
-        MoveBefore(*block, *targetIter, ins);
         continue;
       }
 
@@ -193,7 +211,8 @@ bool jit::ReorderInstructions(MIRGraph& graph) {
             postCallTarget = target;
           }
         } else if (postCallTarget) {
-          MOZ_ASSERT(prev->isWasmCall() || prev->isIonToWasmCall());
+          MOZ_ASSERT(MWasmCallBase::IsWasmCall(prev) ||
+                     prev->isIonToWasmCall());
           postCallTarget = nullptr;
         }
 

@@ -25,21 +25,13 @@
 
 class JS_PUBLIC_API JSObject;
 
-// The Debugger.Script.prototype object also has a class of
-// DebuggerScript::class_ so we differentiate instances from the prototype
-// based on the presence of an owner debugger.
-inline bool js::DebuggerScript::isInstance() const {
-  return !getReservedSlot(OWNER_SLOT).isUndefined();
-}
-
 inline js::Debugger* js::DebuggerScript::owner() const {
-  MOZ_ASSERT(isInstance());
   JSObject* dbgobj = &getReservedSlot(OWNER_SLOT).toObject();
   return Debugger::fromJSObject(dbgobj);
 }
 
 js::gc::Cell* js::DebuggerScript::getReferentCell() const {
-  return static_cast<gc::Cell*>(getPrivate());
+  return maybePtrFromReservedSlot<gc::Cell>(SCRIPT_SLOT);
 }
 
 js::DebuggerScriptReferent js::DebuggerScript::getReferent() const {

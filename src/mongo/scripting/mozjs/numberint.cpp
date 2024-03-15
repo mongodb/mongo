@@ -58,21 +58,21 @@ const JSFunctionSpec NumberIntInfo::methods[5] = {
 
 const char* const NumberIntInfo::className = "NumberInt";
 
-void NumberIntInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto x = static_cast<int*>(JS::GetPrivate(obj));
+void NumberIntInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto x = JS::GetMaybePtrFromReservedSlot<int>(obj, IntSlot);
 
     if (x)
-        getScope(fop)->trackedDelete(x);
+        getScope(gcCtx)->trackedDelete(x);
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleValue thisv) {
-    auto x = static_cast<int*>(JS::GetPrivate(thisv.toObjectOrNull()));
+    auto x = JS::GetMaybePtrFromReservedSlot<int>(thisv.toObjectOrNull(), IntSlot);
 
     return x ? *x : 0;
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleObject thisv) {
-    auto x = static_cast<int*>(JS::GetPrivate(thisv));
+    auto x = JS::GetMaybePtrFromReservedSlot<int>(thisv, IntSlot);
 
     return x ? *x : 0;
 }
@@ -118,8 +118,7 @@ void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
     } else {
         uasserted(ErrorCodes::BadValue, "NumberInt takes 0 or 1 arguments");
     }
-
-    JS::SetPrivate(thisv, scope->trackedNew<int>(x));
+    JS::SetReservedSlot(thisv, IntSlot, JS::PrivateValue(scope->trackedNew<int>(x)));
 
     args.rval().setObjectOrNull(thisv);
 }

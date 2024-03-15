@@ -9,7 +9,6 @@
 
 #include "js/Class.h"
 #include "js/RootingAPI.h"
-#include "vm/BigIntType.h"
 #include "vm/NativeObject.h"
 
 namespace js {

@@ -13,7 +13,6 @@
       //        [stack] VAL1 VAL2 VAL3
 """
 
-from __future__ import print_function
 import re
 import sys
 

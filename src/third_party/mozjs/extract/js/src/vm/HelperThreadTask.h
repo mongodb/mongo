@@ -7,12 +7,16 @@
 #ifndef vm_HelperThreadTask_h
 #define vm_HelperThreadTask_h
 
+#include "mozilla/TimeStamp.h"
+
 #include "js/Utility.h"
 
 namespace js {
 
 class AutoLockHelperThreadState;
 struct ParseTask;
+struct DelazifyTask;
+struct FreeDelazifyTask;
 class SourceCompressionTask;
 
 namespace jit {
@@ -39,6 +43,16 @@ struct MapTypeToThreadType<wasm::Tier2GeneratorTask> {
 template <>
 struct MapTypeToThreadType<ParseTask> {
   static const ThreadType threadType = THREAD_TYPE_PARSE;
+};
+
+template <>
+struct MapTypeToThreadType<DelazifyTask> {
+  static const ThreadType threadType = THREAD_TYPE_DELAZIFY;
+};
+
+template <>
+struct MapTypeToThreadType<FreeDelazifyTask> {
+  static const ThreadType threadType = THREAD_TYPE_DELAZIFY_FREE;
 };
 
 template <>

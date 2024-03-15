@@ -7,11 +7,8 @@
 #ifndef vm_Monitor_h
 #define vm_Monitor_h
 
-#include "mozilla/DebugOnly.h"
-
-#include <stddef.h>
-
-#include "js/Utility.h"
+#include "threading/ConditionVariable.h"
+#include "threading/Mutex.h"
 
 namespace js {
 
@@ -25,7 +22,7 @@ class Monitor {
   friend class AutoLockMonitor;
   friend class AutoUnlockMonitor;
 
-  Mutex lock_;
+  Mutex lock_ MOZ_UNANNOTATED;
   ConditionVariable condVar_;
 
  public:

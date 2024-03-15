@@ -58,7 +58,6 @@
  */
 
 #include <cmath>
-
 #include <float.h>
 #include "math_private.h"
 

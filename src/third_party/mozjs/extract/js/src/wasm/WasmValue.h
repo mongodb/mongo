@@ -22,7 +22,8 @@
 #include "js/Class.h"  // JSClassOps, ClassSpec
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"  // NativeObject
-#include "wasm/WasmValType.h"
+#include "wasm/WasmSerialize.h"
+#include "wasm/WasmTypeDef.h"
 
 namespace js {
 namespace wasm {
@@ -30,16 +31,20 @@ namespace wasm {
 // A V128 value.
 
 struct V128 {
-  uint8_t bytes[16];  // Little-endian
+  uint8_t bytes[16] = {};  // Little-endian
 
-  V128() { memset(bytes, 0, sizeof(bytes)); }
+  WASM_CHECK_CACHEABLE_POD(bytes);
+
+  V128() = default;
+
+  explicit V128(uint8_t splatValue) {
+    memset(bytes, int(splatValue), sizeof(bytes));
+  }
 
   template <typename T>
-  T extractLane(unsigned lane) const {
-    T result;
+  void extractLane(unsigned lane, T* result) const {
     MOZ_ASSERT(lane < 16 / sizeof(T));
-    memcpy(&result, bytes + sizeof(T) * lane, sizeof(T));
-    return result;
+    memcpy(result, bytes + sizeof(T) * lane, sizeof(T));
   }
 
   template <typename T>
@@ -59,6 +64,8 @@ struct V128 {
 
   bool operator!=(const V128& rhs) const { return !(*this == rhs); }
 };
+
+WASM_DECLARE_CACHEABLE_POD(V128);
 
 static_assert(sizeof(V128) == 16, "Invariant");
 
@@ -210,7 +217,8 @@ class WasmValueBox : public NativeObject {
 // need to, but it probably could.
 
 class FuncRef {
-  JSFunction* value_;
+  // mutable so that tracing may access a JSFunction* from a `const FuncRef`
+  mutable JSFunction* value_;
 
   explicit FuncRef() : value_((JSFunction*)-1) {}
   explicit FuncRef(JSFunction* p) : value_(p) {
@@ -234,7 +242,9 @@ class FuncRef {
 
   JSFunction* asJSFunction() { return value_; }
 
-  bool isNull() { return value_ == nullptr; }
+  bool isNull() const { return value_ == nullptr; }
+
+  void trace(JSTracer* trc) const;
 };
 
 using RootedFuncRef = Rooted<FuncRef>;
@@ -255,14 +265,21 @@ Value UnboxFuncRef(FuncRef val);
 class LitVal {
  public:
   union Cell {
-    int32_t i32_;
-    int64_t i64_;
+    uint32_t i32_;
+    uint64_t i64_;
     float f32_;
     double f64_;
     wasm::V128 v128_;
     wasm::AnyRef ref_;
+
     Cell() : v128_() {}
     ~Cell() = default;
+
+    WASM_CHECK_CACHEABLE_POD(i32_, i64_, f32_, f64_, v128_);
+    WASM_ALLOW_NON_CACHEABLE_POD_FIELD(
+        ref_,
+        "The pointer value in ref_ is guaranteed to always be null in a "
+        "LitVal.");
   };
 
  protected:
@@ -273,7 +290,6 @@ class LitVal {
   LitVal() : type_(ValType()), cell_{} {}
 
   explicit LitVal(ValType type) : type_(type) {
-    MOZ_ASSERT(type.isDefaultable());
     switch (type.kind()) {
       case ValType::Kind::I32: {
         cell_.i32_ = 0;
@@ -299,9 +315,6 @@ class LitVal {
         cell_.ref_ = AnyRef::null();
         break;
       }
-      case ValType::Kind::Rtt: {
-        MOZ_CRASH("not defaultable");
-      }
     }
   }
 
@@ -314,7 +327,7 @@ class LitVal {
   explicit LitVal(V128 v128) : type_(ValType::V128) { cell_.v128_ = v128; }
 
   explicit LitVal(ValType type, AnyRef any) : type_(type) {
-    MOZ_ASSERT(type.isReference());
+    MOZ_ASSERT(type.isRefRepr());
     MOZ_ASSERT(any.isNull(),
                "use Val for non-nullptr ref types to get tracing");
     cell_.ref_ = any;
@@ -343,14 +356,18 @@ class LitVal {
     return cell_.f64_;
   }
   AnyRef ref() const {
-    MOZ_ASSERT(type_.isReference());
+    MOZ_ASSERT(type_.isRefRepr());
     return cell_.ref_;
   }
   const V128& v128() const {
     MOZ_ASSERT(type_ == ValType::V128);
     return cell_.v128_;
   }
+
+  WASM_DECLARE_FRIEND_SERIALIZE(LitVal);
 };
+
+WASM_DECLARE_CACHEABLE_POD(LitVal::Cell);
 
 // A Val is a LitVal that can contain (non-null) pointers to GC things. All Vals
 // must be used with the rooting APIs as they may contain JS objects.
@@ -366,11 +383,11 @@ class MOZ_NON_PARAM Val : public LitVal {
   explicit Val(double f64) : LitVal(f64) {}
   explicit Val(V128 v128) : LitVal(v128) {}
   explicit Val(ValType type, AnyRef val) : LitVal(type, AnyRef::null()) {
-    MOZ_ASSERT(type.isReference());
+    MOZ_ASSERT(type.isRefRepr());
     cell_.ref_ = val;
   }
   explicit Val(ValType type, FuncRef val) : LitVal(type, AnyRef::null()) {
-    MOZ_ASSERT(type.isFuncRef());
+    MOZ_ASSERT(type.refType().isFuncHierarchy());
     cell_.ref_ = val.asAnyRef();
   }
 
@@ -392,7 +409,6 @@ class MOZ_NON_PARAM Val : public LitVal {
         return cell_.f64_ == rhs.cell_.f64_;
       case ValType::V128:
         return cell_.v128_ == rhs.cell_.v128_;
-      case ValType::Rtt:
       case ValType::Ref:
         return cell_.ref_ == rhs.cell_.ref_;
     }
@@ -402,7 +418,7 @@ class MOZ_NON_PARAM Val : public LitVal {
   bool operator!=(const Val& rhs) const { return !(*this == rhs); }
 
   bool isJSObject() const {
-    return type_.isValid() && type_.isReference() && !cell_.ref_.isNull();
+    return type_.isValid() && type_.isRefRepr() && !cell_.ref_.isNull();
   }
 
   JSObject* asJSObject() const {
@@ -414,8 +430,20 @@ class MOZ_NON_PARAM Val : public LitVal {
     return cell_.ref_.asJSObjectAddress();
   }
 
+  // Read from `loc` which is a rooted location and needs no barriers.
   void readFromRootedLocation(const void* loc);
+
+  // Initialize from `loc` which is a rooted location and needs no barriers.
+  void initFromRootedLocation(ValType type, const void* loc);
+  void initFromHeapLocation(ValType type, const void* loc);
+
+  // Write to `loc` which is a rooted location and needs no barriers.
   void writeToRootedLocation(void* loc, bool mustWrite64) const;
+
+  // Read from `loc` which is in the heap.
+  void readFromHeapLocation(const void* loc);
+  // Write to `loc` which is in the heap and must be barriered.
+  void writeToHeapLocation(void* loc) const;
 
   // See the comment for `ToWebAssemblyValue` below.
   static bool fromJSValue(JSContext* cx, ValType targetType, HandleValue val,
@@ -436,6 +464,11 @@ using RootedValVector = Rooted<ValVector>;
 using HandleValVector = Handle<ValVector>;
 using MutableHandleValVector = MutableHandle<ValVector>;
 
+template <int N>
+using ValVectorN = GCVector<Val, N, SystemAllocPolicy>;
+template <int N>
+using RootedValVectorN = Rooted<ValVectorN<N>>;
+
 // Check a value against the given reference type.  If the targetType
 // is RefType::Extern then the test always passes, but the value may be boxed.
 // If the test passes then the value is stored either in fnval (for
@@ -453,9 +486,39 @@ using MutableHandleValVector = MutableHandle<ValVector>;
 [[nodiscard]] extern bool CheckFuncRefValue(JSContext* cx, HandleValue v,
                                             MutableHandleFunction fun);
 
+// The same as above for when the target type is 'anyref'.
+[[nodiscard]] extern bool CheckAnyRefValue(JSContext* cx, HandleValue v,
+                                           MutableHandleAnyRef vp);
+
+// The same as above for when the target type is 'nullexternref'.
+[[nodiscard]] extern bool CheckNullExternRefValue(JSContext* cx, HandleValue v,
+                                                  MutableHandleAnyRef vp);
+
+// The same as above for when the target type is 'nullfuncref'.
+[[nodiscard]] extern bool CheckNullFuncRefValue(JSContext* cx, HandleValue v,
+                                                MutableHandleFunction fun);
+
+// The same as above for when the target type is 'nullref'.
+[[nodiscard]] extern bool CheckNullRefValue(JSContext* cx, HandleValue v,
+                                            MutableHandleAnyRef vp);
+
 // The same as above for when the target type is 'eqref'.
 [[nodiscard]] extern bool CheckEqRefValue(JSContext* cx, HandleValue v,
                                           MutableHandleAnyRef vp);
+
+// The same as above for when the target type is 'structref'.
+[[nodiscard]] extern bool CheckStructRefValue(JSContext* cx, HandleValue v,
+                                              MutableHandleAnyRef vp);
+
+// The same as above for when the target type is 'arrayref'.
+[[nodiscard]] extern bool CheckArrayRefValue(JSContext* cx, HandleValue v,
+                                             MutableHandleAnyRef vp);
+
+// The same as above for when the target type is '(ref T)'.
+[[nodiscard]] extern bool CheckTypeRefValue(JSContext* cx,
+                                            const TypeDef* typeDef,
+                                            HandleValue v,
+                                            MutableHandleAnyRef vp);
 class NoDebug;
 class DebugCodegenVal;
 
@@ -500,10 +563,13 @@ extern bool ToJSValue(JSContext* cx, const void* src, FieldType type,
                       MutableHandleValue dst,
                       CoercionLevel level = CoercionLevel::Spec);
 template <typename Debug = NoDebug>
+extern bool ToJSValueMayGC(FieldType type);
+template <typename Debug = NoDebug>
 extern bool ToJSValue(JSContext* cx, const void* src, ValType type,
                       MutableHandleValue dst,
                       CoercionLevel level = CoercionLevel::Spec);
-
+template <typename Debug = NoDebug>
+extern bool ToJSValueMayGC(ValType type);
 }  // namespace wasm
 
 template <>
@@ -538,6 +604,43 @@ struct InternalBarrierMethods<wasm::Val> {
 #ifdef DEBUG
   static void assertThingIsNotGray(const wasm::Val& v) {
     if (v.isJSObject()) {
+      JS::AssertObjectIsNotGray(v.asJSObject());
+    }
+  }
+#endif
+};
+
+template <>
+struct InternalBarrierMethods<wasm::AnyRef> {
+  STATIC_ASSERT_ANYREF_IS_JSOBJECT;
+
+  static bool isMarkable(const wasm::AnyRef v) { return !v.isNull(); }
+
+  static void preBarrier(const wasm::AnyRef v) {
+    if (!v.isNull()) {
+      gc::PreWriteBarrier(v.asJSObject());
+    }
+  }
+
+  static MOZ_ALWAYS_INLINE void postBarrier(wasm::AnyRef* vp,
+                                            const wasm::AnyRef prev,
+                                            const wasm::AnyRef next) {
+    JSObject* prevObj = !prev.isNull() ? prev.asJSObject() : nullptr;
+    JSObject* nextObj = !next.isNull() ? next.asJSObject() : nullptr;
+    if (nextObj) {
+      JSObject::postWriteBarrier(vp->asJSObjectAddress(), prevObj, nextObj);
+    }
+  }
+
+  static void readBarrier(const wasm::AnyRef v) {
+    if (!v.isNull()) {
+      gc::ReadBarrier(v.asJSObject());
+    }
+  }
+
+#ifdef DEBUG
+  static void assertThingIsNotGray(const wasm::AnyRef v) {
+    if (!v.isNull()) {
       JS::AssertObjectIsNotGray(v.asJSObject());
     }
   }

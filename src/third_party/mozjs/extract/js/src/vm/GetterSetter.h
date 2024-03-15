@@ -7,7 +7,7 @@
 #ifndef vm_GetterSetter_h
 #define vm_GetterSetter_h
 
-#include "gc/Barrier.h"  // js::GCPtrObject
+#include "gc/Barrier.h"  // js::GCPtr<JSObject*>
 #include "gc/Cell.h"     // js::gc::TenuredCellWithGCPointer
 
 #include "js/TypeDecls.h"  // JS::HandleObject
@@ -55,11 +55,13 @@ namespace js {
 // accessors on the prototype chain until the first time an accessor property is
 // mutated or deleted.
 class GetterSetter : public gc::TenuredCellWithGCPointer<JSObject> {
+  friend class gc::CellAllocator;
+
  public:
   // Getter object, stored in the cell header.
   JSObject* getter() const { return headerPtr(); }
 
-  GCPtrObject setter_;
+  GCPtr<JSObject*> setter_;
 
 #ifndef JS_64BIT
   // Ensure size >= MinCellSize on 32-bit platforms.
@@ -67,7 +69,7 @@ class GetterSetter : public gc::TenuredCellWithGCPointer<JSObject> {
 #endif
 
  private:
-  GetterSetter(JSObject* getter, JSObject* setter);
+  GetterSetter(HandleObject getter, HandleObject setter);
 
  public:
   static GetterSetter* create(JSContext* cx, HandleObject getter,
@@ -79,7 +81,7 @@ class GetterSetter : public gc::TenuredCellWithGCPointer<JSObject> {
 
   void traceChildren(JSTracer* trc);
 
-  void finalize(JSFreeOp* fop) {
+  void finalize(JS::GCContext* gcx) {
     // Nothing to do.
   }
 };

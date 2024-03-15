@@ -9,15 +9,11 @@
 
 #include "vm/Shape.h"
 
-#include "gc/Allocator.h"
-#include "vm/Interpreter.h"
 #include "vm/JSObject.h"
-#include "vm/TypedArrayObject.h"
+#include "vm/PropertyResult.h"
 
-#include "gc/FreeOp-inl.h"
+#include "gc/GCContext-inl.h"
 #include "gc/Marking-inl.h"
-#include "vm/JSAtom-inl.h"
-#include "vm/JSContext-inl.h"
 #include "vm/PropMap-inl.h"
 
 namespace js {
@@ -36,10 +32,10 @@ template <class ObjectSubclass>
 
   // Ensure the initial shape isn't collected under assignInitialShape, to
   // simplify insertInitialShape.
-  RootedShape emptyShape(cx, obj->shape());
+  Rooted<Shape*> emptyShape(cx, obj->shape());
 
   // If no initial shape was assigned, do so.
-  RootedShape shape(cx, ObjectSubclass::assignInitialShape(cx, obj));
+  Rooted<SharedShape*> shape(cx, ObjectSubclass::assignInitialShape(cx, obj));
   if (!shape) {
     return false;
   }
@@ -51,28 +47,42 @@ template <class ObjectSubclass>
   return true;
 }
 
-MOZ_ALWAYS_INLINE PropMap* Shape::lookup(JSContext* cx, PropertyKey key,
-                                         uint32_t* index) {
+MOZ_ALWAYS_INLINE PropMap* NativeShape::lookup(JSContext* cx, PropertyKey key,
+                                               uint32_t* index) {
   uint32_t len = propMapLength();
   return len > 0 ? propMap_->lookup(cx, len, key, index) : nullptr;
 }
 
-MOZ_ALWAYS_INLINE PropMap* Shape::lookupPure(PropertyKey key, uint32_t* index) {
+MOZ_ALWAYS_INLINE PropMap* NativeShape::lookupPure(PropertyKey key,
+                                                   uint32_t* index) {
   uint32_t len = propMapLength();
   return len > 0 ? propMap_->lookupPure(len, key, index) : nullptr;
 }
 
-inline void Shape::purgeCache(JSFreeOp* fop) {
+inline void Shape::purgeCache(JS::GCContext* gcx) {
   if (cache_.isShapeSetForAdd()) {
-    fop->delete_(this, cache_.toShapeSetForAdd(), MemoryUse::ShapeSetForAdd);
+    gcx->delete_(this, cache_.toShapeSetForAdd(), MemoryUse::ShapeSetForAdd);
   }
   cache_.setNone();
 }
 
-inline void Shape::finalize(JSFreeOp* fop) {
+inline void Shape::finalize(JS::GCContext* gcx) {
   if (!cache_.isNone()) {
-    purgeCache(fop);
+    purgeCache(gcx);
   }
+  if (isWasmGC()) {
+    asWasmGC().finalize(gcx);
+  }
+}
+
+inline void WasmGCShape::init() { recGroup_->AddRef(); }
+
+inline void WasmGCShape::finalize(JS::GCContext* gcx) { recGroup_->Release(); }
+
+inline SharedPropMap* SharedShape::propMapMaybeForwarded() const {
+  MOZ_ASSERT(isShared());
+  PropMap* propMap = propMap_;
+  return propMap ? MaybeForwarded(propMap)->asShared() : nullptr;
 }
 
 static inline JS::PropertyAttributes GetPropertyAttributes(

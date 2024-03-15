@@ -30,25 +30,13 @@ namespace jit {
 
 class JitCode;
 
-struct IcStubCodeMapGCPolicy {
-  static bool traceWeak(JSTracer* trc, uint32_t*, WeakHeapPtrJitCode* value) {
-    return TraceWeakEdge(trc, value, "traceWeak");
-  }
-};
-
 class JitRealm {
   friend class JitActivation;
-
-  // Map ICStub keys to ICStub shared code objects.
-  using ICStubCodeMap =
-      GCHashMap<uint32_t, WeakHeapPtrJitCode, DefaultHasher<uint32_t>,
-                ZoneAllocPolicy, IcStubCodeMapGCPolicy>;
-  ICStubCodeMap* stubCodes_;
 
   // The JitRealm stores stubs to concatenate strings inline and perform RegExp
   // calls inline. These bake in zone and realm specific pointers and can't be
   // stored in JitRuntime. They also are dependent on the value of
-  // 'stringsCanBeInNursery' and must be flushed when its value changes.
+  // 'initialStringHeap' and must be flushed when its value changes.
   //
   // These are weak pointers, but they can by accessed during off-thread Ion
   // compilation and therefore can't use the usual read barrier. Instead, we
@@ -59,19 +47,21 @@ class JitRealm {
     StringConcat = 0,
     RegExpMatcher,
     RegExpSearcher,
-    RegExpTester,
+    RegExpExecMatch,
+    RegExpExecTest,
     Count
   };
 
-  mozilla::EnumeratedArray<StubIndex, StubIndex::Count, WeakHeapPtrJitCode>
+  mozilla::EnumeratedArray<StubIndex, StubIndex::Count, WeakHeapPtr<JitCode*>>
       stubs_;
 
-  bool stringsCanBeInNursery;
+  gc::Heap initialStringHeap;
 
   JitCode* generateStringConcatStub(JSContext* cx);
   JitCode* generateRegExpMatcherStub(JSContext* cx);
   JitCode* generateRegExpSearcherStub(JSContext* cx);
-  JitCode* generateRegExpTesterStub(JSContext* cx);
+  JitCode* generateRegExpExecMatchStub(JSContext* cx);
+  JitCode* generateRegExpExecTestStub(JSContext* cx);
 
   JitCode* getStubNoBarrier(StubIndex stub,
                             uint32_t* requiredBarriersOut) const {
@@ -81,27 +71,9 @@ class JitRealm {
   }
 
  public:
-  JitCode* getStubCode(uint32_t key) {
-    ICStubCodeMap::Ptr p = stubCodes_->lookup(key);
-    if (p) {
-      return p->value();
-    }
-    return nullptr;
-  }
-  [[nodiscard]] bool putStubCode(JSContext* cx, uint32_t key,
-                                 Handle<JitCode*> stubCode) {
-    MOZ_ASSERT(stubCode);
-    if (!stubCodes_->putNew(key, stubCode.get())) {
-      ReportOutOfMemory(cx);
-      return false;
-    }
-    return true;
-  }
-
   JitRealm();
-  ~JitRealm();
 
-  [[nodiscard]] bool initialize(JSContext* cx, bool zoneHasNurseryStrings);
+  void initialize(bool zoneHasNurseryStrings);
 
   // Initialize code stubs only used by Ion, not Baseline.
   [[nodiscard]] bool ensureIonStubsExist(JSContext* cx) {
@@ -115,13 +87,13 @@ class JitRealm {
   void traceWeak(JSTracer* trc, JS::Realm* realm);
 
   void discardStubs() {
-    for (WeakHeapPtrJitCode& stubRef : stubs_) {
+    for (WeakHeapPtr<JitCode*>& stubRef : stubs_) {
       stubRef = nullptr;
     }
   }
 
   bool hasStubs() const {
-    for (const WeakHeapPtrJitCode& stubRef : stubs_) {
+    for (const WeakHeapPtr<JitCode*>& stubRef : stubs_) {
       if (stubRef) {
         return true;
       }
@@ -131,8 +103,9 @@ class JitRealm {
 
   void setStringsCanBeInNursery(bool allow) {
     MOZ_ASSERT(!hasStubs());
-    stringsCanBeInNursery = allow;
+    initialStringHeap = allow ? gc::Heap::Default : gc::Heap::Tenured;
   }
+  gc::Heap getInitialStringHeap() const { return initialStringHeap; }
 
   JitCode* stringConcatStubNoBarrier(uint32_t* requiredBarriersOut) const {
     return getStubNoBarrier(StringConcat, requiredBarriersOut);
@@ -142,9 +115,9 @@ class JitRealm {
     return getStubNoBarrier(RegExpMatcher, requiredBarriersOut);
   }
 
-  [[nodiscard]] bool ensureRegExpMatcherStubExists(JSContext* cx) {
-    if (stubs_[RegExpMatcher]) {
-      return true;
+  [[nodiscard]] JitCode* ensureRegExpMatcherStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpMatcher]) {
+      return code;
     }
     stubs_[RegExpMatcher] = generateRegExpMatcherStub(cx);
     return stubs_[RegExpMatcher];
@@ -154,24 +127,36 @@ class JitRealm {
     return getStubNoBarrier(RegExpSearcher, requiredBarriersOut);
   }
 
-  [[nodiscard]] bool ensureRegExpSearcherStubExists(JSContext* cx) {
-    if (stubs_[RegExpSearcher]) {
-      return true;
+  [[nodiscard]] JitCode* ensureRegExpSearcherStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpSearcher]) {
+      return code;
     }
     stubs_[RegExpSearcher] = generateRegExpSearcherStub(cx);
     return stubs_[RegExpSearcher];
   }
 
-  JitCode* regExpTesterStubNoBarrier(uint32_t* requiredBarriersOut) const {
-    return getStubNoBarrier(RegExpTester, requiredBarriersOut);
+  JitCode* regExpExecMatchStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(RegExpExecMatch, requiredBarriersOut);
   }
 
-  [[nodiscard]] bool ensureRegExpTesterStubExists(JSContext* cx) {
-    if (stubs_[RegExpTester]) {
-      return true;
+  [[nodiscard]] JitCode* ensureRegExpExecMatchStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpExecMatch]) {
+      return code;
     }
-    stubs_[RegExpTester] = generateRegExpTesterStub(cx);
-    return stubs_[RegExpTester];
+    stubs_[RegExpExecMatch] = generateRegExpExecMatchStub(cx);
+    return stubs_[RegExpExecMatch];
+  }
+
+  JitCode* regExpExecTestStubNoBarrier(uint32_t* requiredBarriersOut) const {
+    return getStubNoBarrier(RegExpExecTest, requiredBarriersOut);
+  }
+
+  [[nodiscard]] JitCode* ensureRegExpExecTestStubExists(JSContext* cx) {
+    if (JitCode* code = stubs_[RegExpExecTest]) {
+      return code;
+    }
+    stubs_[RegExpExecTest] = generateRegExpExecTestStub(cx);
+    return stubs_[RegExpExecTest];
   }
 
   // Perform the necessary read barriers on stubs described by the bitmasks
@@ -183,6 +168,19 @@ class JitRealm {
   void performStubReadBarriers(uint32_t stubsToBarrier) const;
 
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
+
+  static constexpr size_t offsetOfRegExpMatcherStub() {
+    return offsetof(JitRealm, stubs_) + RegExpMatcher * sizeof(uintptr_t);
+  }
+  static constexpr size_t offsetOfRegExpSearcherStub() {
+    return offsetof(JitRealm, stubs_) + RegExpSearcher * sizeof(uintptr_t);
+  }
+  static constexpr size_t offsetOfRegExpExecMatchStub() {
+    return offsetof(JitRealm, stubs_) + RegExpExecMatch * sizeof(uintptr_t);
+  }
+  static constexpr size_t offsetOfRegExpExecTestStub() {
+    return offsetof(JitRealm, stubs_) + RegExpExecTest * sizeof(uintptr_t);
+  }
 };
 
 }  // namespace jit

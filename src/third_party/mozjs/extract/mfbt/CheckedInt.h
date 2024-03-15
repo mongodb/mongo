@@ -349,7 +349,7 @@ struct IsMulValidImpl<T, false, false> {
 };
 
 template <typename T>
-inline bool IsMulValid(T aX, T aY) {
+constexpr bool IsMulValid(T aX, T aY) {
 #if MOZ_HAS_BUILTIN_OP_OVERFLOW
   T dummy;
   return !__builtin_mul_overflow(aX, aY, &dummy);
@@ -780,12 +780,12 @@ MOZ_CHECKEDINT_CONVENIENCE_BINARY_OPERATORS(%, %=)
 #undef MOZ_CHECKEDINT_CONVENIENCE_BINARY_OPERATORS
 
 template <typename T, typename U>
-inline bool operator==(const CheckedInt<T>& aLhs, U aRhs) {
+constexpr bool operator==(const CheckedInt<T>& aLhs, U aRhs) {
   return aLhs == castToCheckedInt<T>(aRhs);
 }
 
 template <typename T, typename U>
-inline bool operator==(U aLhs, const CheckedInt<T>& aRhs) {
+constexpr bool operator==(U aLhs, const CheckedInt<T>& aRhs) {
   return castToCheckedInt<T>(aLhs) == aRhs;
 }
 

@@ -9,6 +9,7 @@
 
 #include "mozilla/Array.h"
 #include "js/TypeDecls.h"
+#include "vm/Runtime.h"
 
 // Defines a fixed-size hash table solely for the purpose of caching
 // jit::GetPcScript(). One cache is attached to each JSRuntime; it functions as

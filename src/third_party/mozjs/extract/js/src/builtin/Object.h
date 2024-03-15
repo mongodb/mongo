@@ -7,10 +7,11 @@
 #ifndef builtin_Object_h
 #define builtin_Object_h
 
-#include "jsapi.h"
+#include "vm/JSObject.h"
 
-#include "js/Value.h"
-#include "vm/NativeObject.h"
+namespace JS {
+class Value;
+}
 
 namespace js {
 

@@ -16,11 +16,8 @@ namespace jit {
 
 // r15 = program-counter
 // r14 = link-register
-
 // r13 = stack-pointer
 // r11 = frame-pointer
-static constexpr Register BaselineFrameReg = r11;
-static constexpr Register BaselineStackReg = sp;
 
 // ValueOperands R0, R1, and R2.
 // R0 == JSReturnReg, and R2 uses registers not preserved across calls. R1 value
@@ -33,9 +30,6 @@ static constexpr ValueOperand R2(r1, r0);
 // These use registers that are not preserved across calls.
 static constexpr Register ICTailCallReg = r14;
 static constexpr Register ICStubReg = r9;
-
-static constexpr Register ExtractTemp0 = InvalidReg;
-static constexpr Register ExtractTemp1 = InvalidReg;
 
 // Register used internally by MacroAssemblerARM.
 static constexpr Register BaselineSecondScratchReg = r6;

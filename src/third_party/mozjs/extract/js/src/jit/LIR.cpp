@@ -19,6 +19,12 @@
 using namespace js;
 using namespace js::jit;
 
+const char* const js::jit::LIROpNames[] = {
+#define OPNAME(op, ...) #op,
+    LIR_OPCODE_LIST(OPNAME)
+#undef OPNAME
+};
+
 LIRGraph::LIRGraph(MIRGraph* mir)
     : blocks_(),
       constantPool_(mir->alloc()),
@@ -27,7 +33,7 @@ LIRGraph::LIRGraph(MIRGraph* mir)
       nonCallSafepoints_(mir->alloc()),
       numVirtualRegisters_(0),
       numInstructions_(1),  // First id is 1.
-      localSlotCount_(0),
+      localSlotsSize_(0),
       argumentSlotCount_(0),
       mir_(*mir) {}
 
@@ -291,7 +297,6 @@ LSnapshot::LSnapshot(LRecoverInfo* recoverInfo, BailoutKind kind)
       recoverInfo_(recoverInfo),
       snapshotOffset_(INVALID_SNAPSHOT_OFFSET),
       numSlots_(TotalOperandCount(recoverInfo) * BOX_PIECES),
-      bailoutId_(INVALID_BAILOUT_ID),
       bailoutKind_(kind) {}
 
 bool LSnapshot::init(MIRGenerator* gen) {
@@ -326,7 +331,7 @@ void LSnapshot::rewriteRecoveredInput(LUse input) {
 #ifdef JS_JITSPEW
 void LNode::printName(GenericPrinter& out, Opcode op) {
   static const char* const names[] = {
-#  define LIROP(x) #  x,
+#  define LIROP(x) #x,
       LIR_OPCODE_LIST(LIROP)
 #  undef LIROP
   };
@@ -407,18 +412,18 @@ UniqueChars LDefinition::toString() const {
 static UniqueChars PrintUse(const LUse* use) {
   switch (use->policy()) {
     case LUse::REGISTER:
-      return JS_smprintf("v%u:r", use->virtualRegister());
+      return JS_smprintf("v%u:R", use->virtualRegister());
     case LUse::FIXED:
-      return JS_smprintf("v%u:%s", use->virtualRegister(),
+      return JS_smprintf("v%u:F:%s", use->virtualRegister(),
                          AnyRegister::FromCode(use->registerCode()).name());
     case LUse::ANY:
-      return JS_smprintf("v%u:r?", use->virtualRegister());
+      return JS_smprintf("v%u:A", use->virtualRegister());
     case LUse::KEEPALIVE:
-      return JS_smprintf("v%u:*", use->virtualRegister());
+      return JS_smprintf("v%u:KA", use->virtualRegister());
     case LUse::STACK:
-      return JS_smprintf("v%u:s", use->virtualRegister());
+      return JS_smprintf("v%u:S", use->virtualRegister());
     case LUse::RECOVERED_INPUT:
-      return JS_smprintf("v%u:**", use->virtualRegister());
+      return JS_smprintf("v%u:RI", use->virtualRegister());
     default:
       MOZ_CRASH("invalid use policy");
   }
@@ -433,9 +438,49 @@ UniqueChars LAllocation::toString() const {
   } else {
     switch (kind()) {
       case LAllocation::CONSTANT_VALUE:
-      case LAllocation::CONSTANT_INDEX:
-        buf = JS_smprintf("c");
-        break;
+      case LAllocation::CONSTANT_INDEX: {
+        const MConstant* c = toConstant();
+        switch (c->type()) {
+          case MIRType::Int32:
+            buf = JS_smprintf("%d", c->toInt32());
+            break;
+          case MIRType::Int64:
+            buf = JS_smprintf("%" PRId64, c->toInt64());
+            break;
+          case MIRType::IntPtr:
+            buf = JS_smprintf("%" PRIxPTR, c->toIntPtr());
+            break;
+          case MIRType::String:
+            // If a JSContext is a available, output the actual string
+            if (JSContext* maybeCx = TlsContext.get()) {
+              Sprinter spr(maybeCx);
+              if (!spr.init()) {
+                oomUnsafe.crash("LAllocation::toString()");
+              }
+              spr.putString(c->toString());
+              buf = spr.release();
+            } else {
+              buf = JS_smprintf("string");
+            }
+            break;
+          case MIRType::Symbol:
+            buf = JS_smprintf("sym");
+            break;
+          case MIRType::Object:
+          case MIRType::Null:
+            buf = JS_smprintf("obj %p", c->toObjectOrNull());
+            break;
+          case MIRType::Shape:
+            buf = JS_smprintf("shape");
+            break;
+          default:
+            if (c->isTypeRepresentableAsDouble()) {
+              buf = JS_smprintf("%g", c->numberToDouble());
+            } else {
+              buf = JS_smprintf("const");
+            }
+        }
+      } break;
       case LAllocation::GPR:
         buf = JS_smprintf("%s", toGeneralReg()->reg().name());
         break;
@@ -486,6 +531,14 @@ static void PrintOperands(GenericPrinter& out, T* node) {
 void LNode::printOperands(GenericPrinter& out) {
   if (isMoveGroup()) {
     toMoveGroup()->printOperands(out);
+    return;
+  }
+  if (isInteger()) {
+    out.printf(" (%d)", toInteger()->i32());
+    return;
+  }
+  if (isInteger64()) {
+    out.printf(" (%" PRId64 ")", toInteger64()->i64());
     return;
   }
 

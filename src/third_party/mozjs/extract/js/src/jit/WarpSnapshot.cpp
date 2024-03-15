@@ -6,18 +6,17 @@
 
 #include "jit/WarpSnapshot.h"
 
-#include "mozilla/IntegerPrintfMacros.h"
+#include "mozilla/DebugOnly.h"
 
 #include <type_traits>
 
 #include "jit/CacheIRCompiler.h"
 #include "jit/CacheIRSpewer.h"
+#include "js/Printer.h"
+#include "vm/EnvironmentObject.h"
 #include "vm/GetterSetter.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSContext.h"
-#include "vm/Printer.h"
-
-#include "vm/EnvironmentObject-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -47,7 +46,8 @@ WarpScriptSnapshot::WarpScriptSnapshot(JSScript* script,
       environment_(env),
       opSnapshots_(std::move(opSnapshots)),
       moduleObject_(moduleObject),
-      isArrowFunction_(script->isFunction() && script->function()->isArrow()) {}
+      isArrowFunction_(script->isFunction() && script->function()->isArrow()),
+      isMonomorphicInlined_(false) {}
 
 #ifdef JS_JITSPEW
 void WarpSnapshot::dump() const {
@@ -104,7 +104,7 @@ void WarpScriptSnapshot::dump(GenericPrinter& out) const {
 
 static const char* OpSnapshotKindString(WarpOpSnapshot::Kind kind) {
   static const char* const names[] = {
-#  define NAME(x) #  x,
+#  define NAME(x) #x,
       WARP_OP_SNAPSHOT_LIST(NAME)
 #  undef NAME
   };
@@ -150,18 +150,24 @@ void WarpGetImport::dumpData(GenericPrinter& out) const {
   out.printf("    needsLexicalCheck: %u\n", needsLexicalCheck());
 }
 
-void WarpLambda::dumpData(GenericPrinter& out) const {
-  out.printf("    baseScript: 0x%p\n", baseScript());
-  out.printf("    flags: 0x%x\n", unsigned(flags().toRaw()));
-  out.printf("    nargs: %u\n", unsigned(nargs_));
-}
-
 void WarpRest::dumpData(GenericPrinter& out) const {
   out.printf("    shape: 0x%p\n", shape());
 }
 
 void WarpBindGName::dumpData(GenericPrinter& out) const {
   out.printf("    globalEnv: 0x%p\n", globalEnv());
+}
+
+void WarpVarEnvironment::dumpData(GenericPrinter& out) const {
+  out.printf("    template: 0x%p\n", templateObj());
+}
+
+void WarpLexicalEnvironment::dumpData(GenericPrinter& out) const {
+  out.printf("    template: 0x%p\n", templateObj());
+}
+
+void WarpClassBodyEnvironment::dumpData(GenericPrinter& out) const {
+  out.printf("    template: 0x%p\n", templateObj());
 }
 
 void WarpBailout::dumpData(GenericPrinter& out) const {
@@ -282,16 +288,24 @@ void WarpGetImport::traceData(JSTracer* trc) {
   TraceWarpGCPtr(trc, targetEnv_, "warp-import-env");
 }
 
-void WarpLambda::traceData(JSTracer* trc) {
-  TraceWarpGCPtr(trc, baseScript_, "warp-lambda-basescript");
-}
-
 void WarpRest::traceData(JSTracer* trc) {
   TraceWarpGCPtr(trc, shape_, "warp-rest-shape");
 }
 
 void WarpBindGName::traceData(JSTracer* trc) {
   TraceWarpGCPtr(trc, globalEnv_, "warp-bindgname-globalenv");
+}
+
+void WarpVarEnvironment::traceData(JSTracer* trc) {
+  TraceWarpGCPtr(trc, templateObj_, "warp-varenv-template");
+}
+
+void WarpLexicalEnvironment::traceData(JSTracer* trc) {
+  TraceWarpGCPtr(trc, templateObj_, "warp-lexenv-template");
+}
+
+void WarpClassBodyEnvironment::traceData(JSTracer* trc) {
+  TraceWarpGCPtr(trc, templateObj_, "warp-classbodyenv-template");
 }
 
 void WarpBailout::traceData(JSTracer* trc) {
@@ -319,6 +333,7 @@ void WarpCacheIR::traceData(JSTracer* trc) {
         case StubField::Type::RawInt32:
         case StubField::Type::RawPointer:
         case StubField::Type::RawInt64:
+        case StubField::Type::Double:
           break;
         case StubField::Type::Shape: {
           uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
@@ -354,6 +369,11 @@ void WarpCacheIR::traceData(JSTracer* trc) {
           TraceWarpStubPtr<BaseScript>(trc, word, "warp-cacheir-script");
           break;
         }
+        case StubField::Type::JitCode: {
+          uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
+          TraceWarpStubPtr<JitCode>(trc, word, "warp-cacheir-jitcode");
+          break;
+        }
         case StubField::Type::Id: {
           uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
           jsid id = jsid::fromRawBits(word);
@@ -367,9 +387,10 @@ void WarpCacheIR::traceData(JSTracer* trc) {
           break;
         }
         case StubField::Type::AllocSite: {
-          uintptr_t word = stubInfo_->getStubRawWord(stubData_, offset);
-          auto* site = reinterpret_cast<gc::AllocSite*>(word);
-          site->trace(trc);
+          mozilla::DebugOnly<uintptr_t> word =
+              stubInfo_->getStubRawWord(stubData_, offset);
+          MOZ_ASSERT(word == uintptr_t(gc::Heap::Default) ||
+                     word == uintptr_t(gc::Heap::Tenured));
           break;
         }
         case StubField::Type::Limit:

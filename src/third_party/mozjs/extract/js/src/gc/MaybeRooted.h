@@ -28,11 +28,12 @@ namespace js {
  * memory.
  */
 template <typename T>
-class MOZ_RAII FakeRooted : public RootedBase<T, FakeRooted<T>> {
+class MOZ_RAII FakeRooted : public RootedOperations<T, FakeRooted<T>> {
  public:
   using ElementType = T;
 
-  explicit FakeRooted(JSContext* cx) : ptr(JS::SafelyInitialized<T>()) {}
+  explicit FakeRooted(JSContext* cx)
+      : ptr(JS::SafelyInitialized<T>::create()) {}
 
   FakeRooted(JSContext* cx, T initial) : ptr(initial) {}
 
@@ -72,7 +73,7 @@ namespace js {
  */
 template <typename T>
 class FakeMutableHandle
-    : public js::MutableHandleBase<T, FakeMutableHandle<T>> {
+    : public js::MutableHandleOperations<T, FakeMutableHandle<T>> {
  public:
   using ElementType = T;
 

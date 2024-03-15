@@ -35,6 +35,7 @@ class TemplateObject {
   inline bool isTypedArrayObject() const;
   inline bool isRegExpObject() const;
   inline bool isCallObject() const;
+  inline bool isBlockLexicalEnvironmentObject() const;
   inline bool isPlainObject() const;
 
   // The shape should not change. This is true for template objects because
@@ -67,10 +68,7 @@ class TemplateNativeObject : public TemplateObject {
   inline bool hasDynamicElements() const;
   inline const Value* getDenseElements() const;
 
-  // Reading private slots is safe.
-  inline bool hasPrivate() const;
   inline gc::Cell* regExpShared() const;
-  inline void* getPrivate() const;
 };
 
 }  // namespace jit

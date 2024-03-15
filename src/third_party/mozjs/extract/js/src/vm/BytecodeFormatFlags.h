@@ -24,7 +24,7 @@ enum {
   JOF_ARGC = 10,        /* uint16_t argument count */
   JOF_QARG = 11,        /* function argument index */
   JOF_LOCAL = 12,       /* var or block-local variable */
-  JOF_RESUMEINDEX = 13, /* yield, await, or gosub resume index */
+  JOF_RESUMEINDEX = 13, /* yield or await resume index */
   JOF_DOUBLE = 14,      /* inline DoubleValue */
   JOF_GCTHING = 15,     /* uint32_t generic gc-thing index */
   JOF_ATOM = 16,        /* uint32_t constant index */
@@ -37,6 +37,8 @@ enum {
   JOF_TWO_UINT8 = 23,   /* A pair of unspecified uint8_t arguments */
   JOF_DEBUGCOORD = 24,  /* An embedded ScopeCoordinate immediate that may
                            traverse DebugEnvironmentProxies*/
+  JOF_SHAPE = 25,       /* uint32_t shape index */
+  JOF_STRING = 26,      /* uint32_t constant index */
   JOF_TYPEMASK = 0xFF,  /* mask for above immediate types */
 
   JOF_NAME = 1 << 8,        /* name operation */
@@ -53,6 +55,7 @@ enum {
   JOF_SPREAD = 1 << 22,      /* invoke instruction using spread argument */
   JOF_GNAME = 1 << 23,       /* predicted global name */
   JOF_IC = 1 << 24,          /* baseline may use an IC for this op */
+  JOF_USES_ENV = 1 << 25,    /* op uses the frame's environment chain */
 };
 
 #endif /* vm_BytecodeFormatFlags_h */

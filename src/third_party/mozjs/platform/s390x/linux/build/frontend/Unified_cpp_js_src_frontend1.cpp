@@ -17,6 +17,15 @@
 #error "frontend/CallOrNewEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "frontend/CompileScript.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "frontend/CompileScript.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "frontend/CompileScript.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "frontend/DefaultEmitter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "frontend/DefaultEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "frontend/ElemOpEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "frontend/EmitterScope.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/EmitterScope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "frontend/EmitterScope.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

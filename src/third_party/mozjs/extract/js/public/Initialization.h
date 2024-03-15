@@ -28,7 +28,10 @@ enum class InitState { Uninitialized = 0, Initializing, Running, ShutDown };
  */
 extern JS_PUBLIC_DATA InitState libraryInitState;
 
-extern JS_PUBLIC_API const char* InitWithFailureDiagnostic(bool isDebugBuild);
+enum class FrontendOnly { No, Yes };
+
+extern JS_PUBLIC_API const char* InitWithFailureDiagnostic(
+    bool isDebugBuild, FrontendOnly frontendOnly = FrontendOnly::No);
 
 }  // namespace detail
 }  // namespace JS
@@ -80,6 +83,21 @@ inline const char* JS_InitWithFailureDiagnostic(void) {
   return JS::detail::InitWithFailureDiagnostic(true);
 #else
   return JS::detail::InitWithFailureDiagnostic(false);
+#endif
+}
+
+/**
+ * A lightweight variant of JS_Init, which skips initializing runtime-specific
+ * part.
+ * Suitable for processes where only JSContext-free stencil-APIs are used.
+ */
+inline bool JS_FrontendOnlyInit(void) {
+#ifdef DEBUG
+  return !JS::detail::InitWithFailureDiagnostic(true,
+                                                JS::detail::FrontendOnly::Yes);
+#else
+  return !JS::detail::InitWithFailureDiagnostic(false,
+                                                JS::detail::FrontendOnly::Yes);
 #endif
 }
 
@@ -144,6 +162,15 @@ JS_PUBLIC_API bool InitSelfHostedCode(JSContext* cx,
                                       SelfHostedCache cache = nullptr,
                                       SelfHostedWriter writer = nullptr);
 
+/*
+ * Permanently disable the JIT backend for this process. This disables the JS
+ * Baseline Interpreter, JIT compilers, regular expression JIT and support for
+ * WebAssembly.
+ *
+ * If called, this *must* be called before JS_Init.
+ */
+JS_PUBLIC_API void DisableJitBackend();
+
 }  // namespace JS
 
 /**
@@ -164,5 +191,20 @@ JS_PUBLIC_API bool InitSelfHostedCode(JSContext* cx,
  * again).  This restriction may eventually be lifted.
  */
 extern JS_PUBLIC_API void JS_ShutDown(void);
+
+/**
+ * A variant of JS_ShutDown for process which used JS_FrontendOnlyInit instead
+ * of JS_Init.
+ */
+extern JS_PUBLIC_API void JS_FrontendOnlyShutDown(void);
+
+#if defined(ENABLE_WASM_SIMD) && \
+    (defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_X86))
+namespace JS {
+// Enable support for AVX instructions in the JIT/Wasm backend on x86/x64
+// platforms. Must be called before JS_Init*.
+void SetAVXEnabled(bool enabled);
+}  // namespace JS
+#endif
 
 #endif /* js_Initialization_h */

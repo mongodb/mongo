@@ -60,16 +60,12 @@ void BaseInfo::enumerate(JSContext* cx,
                          JS::HandleObject obj,
                          JS::MutableHandleIdVector properties,
                          bool enumerableOnly) {}
-void BaseInfo::finalize(JSFreeOp* fop, JSObject* obj) {}
+void BaseInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {}
 void BaseInfo::getProperty(JSContext* cx,
                            JS::HandleObject obj,
                            JS::HandleId id,
                            JS::HandleValue receiver,
                            JS::MutableHandleValue vp) {}
-void BaseInfo::hasInstance(JSContext* cx,
-                           JS::HandleObject obj,
-                           JS::MutableHandleValue vp,
-                           bool* bp) {}
 bool BaseInfo::mayResolve(const JSAtomState& names, jsid id, JSObject* maybeObj) {
     return false;
 }

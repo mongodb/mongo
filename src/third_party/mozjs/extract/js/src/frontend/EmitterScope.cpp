@@ -12,8 +12,7 @@
 #include "frontend/TDZCheckCache.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "vm/EnvironmentObject.h"     // ClassBodyLexicalEnvironmentObject
-#include "vm/GlobalObject.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
+#include "vm/WellKnownAtom.h"         // js_*_str
 
 using namespace js;
 using namespace js::frontend;
@@ -25,7 +24,7 @@ using mozilla::Some;
 
 EmitterScope::EmitterScope(BytecodeEmitter* bce)
     : Nestable<EmitterScope>(&bce->innermostEmitterScope_),
-      nameCache_(bce->cx->frontendCollectionPool()),
+      nameCache_(bce->fc->nameCollectionPool()),
       hasEnvironment_(false),
       environmentChainLength_(0),
       nextFrameSlot_(0),
@@ -33,7 +32,7 @@ EmitterScope::EmitterScope(BytecodeEmitter* bce)
       noteIndex_(ScopeNote::NoScopeNoteIndex) {}
 
 bool EmitterScope::ensureCache(BytecodeEmitter* bce) {
-  return nameCache_.acquire(bce->cx);
+  return nameCache_.acquire(bce->fc);
 }
 
 bool EmitterScope::checkSlotLimits(BytecodeEmitter* bce,
@@ -50,7 +49,7 @@ bool EmitterScope::checkEnvironmentChainLength(BytecodeEmitter* bce) {
   uint32_t hops;
   if (EmitterScope* emitterScope = enclosing(&bce)) {
     hops = emitterScope->environmentChainLength_;
-  } else if (bce->compilationState.input.enclosingScope) {
+  } else if (!bce->compilationState.input.enclosingScope.isNull()) {
     hops =
         bce->compilationState.scopeContext.enclosingScopeEnvironmentChainLength;
   } else {
@@ -88,7 +87,7 @@ bool EmitterScope::putNameInCache(BytecodeEmitter* bce,
   NameLocationMap::AddPtr p = cache.lookupForAdd(name);
   MOZ_ASSERT(!p);
   if (!cache.add(p, name, loc)) {
-    ReportOutOfMemory(bce->cx);
+    ReportOutOfMemory(bce->fc);
     return false;
   }
   return true;
@@ -180,7 +179,10 @@ NameLocation EmitterScope::searchAndCache(BytecodeEmitter* bce,
                    CompilationInput::CompilationTarget::Eval);
     inCurrentScript = false;
     loc = Some(bce->compilationState.scopeContext.searchInEnclosingScope(
-        bce->cx, bce->compilationState.input, bce->parserAtoms(), name, hops));
+        bce->fc, bce->compilationState.input, bce->parserAtoms(), name));
+    if (loc->kind() == NameLocation::Kind::EnvironmentCoordinate) {
+      *loc = loc->addHops(hops);
+    }
   }
 
   // Each script has its own frame. A free name that is accessed
@@ -192,7 +194,7 @@ NameLocation EmitterScope::searchAndCache(BytecodeEmitter* bce,
   // It is always correct to not cache the location. Ignore OOMs to make
   // lookups infallible.
   if (!putNameInCache(bce, name, *loc)) {
-    bce->cx->recoverFromOutOfMemory();
+    bce->fc->recoverFromOutOfMemory();
   }
 
   return *loc;
@@ -279,8 +281,9 @@ void EmitterScope::dump(BytecodeEmitter* bce) {
     const NameLocation& l = r.front().value();
 
     auto atom = r.front().key();
-    UniqueChars bytes = bce->parserAtoms().toPrintableString(bce->cx, atom);
+    UniqueChars bytes = bce->parserAtoms().toPrintableString(atom);
     if (!bytes) {
+      ReportOutOfMemory(bce->fc);
       return;
     }
     if (l.kind() != NameLocation::Kind::Dynamic) {
@@ -364,7 +367,7 @@ bool EmitterScope::enterLexical(BytecodeEmitter* bce, ScopeKind kind,
 
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForLexicalScope(
-          bce->cx, bce->compilationState, kind, bindings, firstFrameSlot,
+          bce->fc, bce->compilationState, kind, bindings, firstFrameSlot,
           enclosingScopeIndex(bce), &scopeIndex)) {
     return false;
   }
@@ -428,7 +431,7 @@ bool EmitterScope::enterClassBody(BytecodeEmitter* bce, ScopeKind kind,
 
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForClassBodyScope(
-          bce->cx, bce->compilationState, kind, bindings, firstFrameSlot,
+          bce->fc, bce->compilationState, kind, bindings, firstFrameSlot,
           enclosingScopeIndex(bce), &scopeIndex)) {
     return false;
   }
@@ -481,7 +484,7 @@ bool EmitterScope::enterNamedLambda(BytecodeEmitter* bce, FunctionBox* funbox) {
 
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForLexicalScope(
-          bce->cx, bce->compilationState, scopeKind,
+          bce->fc, bce->compilationState, scopeKind,
           funbox->namedLambdaBindings(), LOCALNO_LIMIT,
           enclosingScopeIndex(bce), &scopeIndex)) {
     return false;
@@ -531,7 +534,7 @@ bool EmitterScope::enterFunction(BytecodeEmitter* bce, FunctionBox* funbox) {
       }
 
       if (!cache.add(p, bi.name(), loc)) {
-        ReportOutOfMemory(bce->cx);
+        ReportOutOfMemory(bce->fc);
         return false;
       }
     }
@@ -581,7 +584,7 @@ bool EmitterScope::enterFunction(BytecodeEmitter* bce, FunctionBox* funbox) {
 
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForFunctionScope(
-          bce->cx, bce->compilationState, funbox->functionScopeBindings(),
+          bce->fc, bce->compilationState, funbox->functionScopeBindings(),
           funbox->hasParameterExprs,
           funbox->needsCallObjectRegardlessOfBindings(), funbox->index(),
           funbox->isArrow(), enclosingScopeIndex(bce), &scopeIndex)) {
@@ -652,7 +655,7 @@ bool EmitterScope::enterFunctionExtraBodyVar(BytecodeEmitter* bce,
   // Create and intern the VM scope.
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForVarScope(
-          bce->cx, bce->compilationState, ScopeKind::FunctionBodyVar,
+          bce->fc, bce->compilationState, ScopeKind::FunctionBodyVar,
           funbox->extraVarScopeBindings(), firstFrameSlot,
           funbox->needsExtraBodyVarEnvironmentRegardlessOfBindings(),
           enclosingScopeIndex(bce), &scopeIndex)) {
@@ -705,7 +708,7 @@ bool EmitterScope::enterGlobal(BytecodeEmitter* bce,
   }
 
   ScopeIndex scopeIndex;
-  if (!ScopeStencil::createForGlobalScope(bce->cx, bce->compilationState,
+  if (!ScopeStencil::createForGlobalScope(bce->fc, bce->compilationState,
                                           globalsc->scopeKind(),
                                           globalsc->bindings, &scopeIndex)) {
     return false;
@@ -759,7 +762,7 @@ bool EmitterScope::enterEval(BytecodeEmitter* bce, EvalSharedContext* evalsc) {
 
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForEvalScope(
-          bce->cx, bce->compilationState, scopeKind, evalsc->bindings,
+          bce->fc, bce->compilationState, scopeKind, evalsc->bindings,
           enclosingScopeIndex(bce), &scopeIndex)) {
     return false;
   }
@@ -865,7 +868,7 @@ bool EmitterScope::enterModule(BytecodeEmitter* bce,
   // Create and intern the VM scope creation data.
   ScopeIndex scopeIndex;
   if (!ScopeStencil::createForModuleScope(
-          bce->cx, bce->compilationState, modulesc->bindings,
+          bce->fc, bce->compilationState, modulesc->bindings,
           enclosingScopeIndex(bce), &scopeIndex)) {
     return false;
   }
@@ -887,7 +890,7 @@ bool EmitterScope::enterWith(BytecodeEmitter* bce) {
   fallbackFreeNameLocation_ = Some(NameLocation::Dynamic());
 
   ScopeIndex scopeIndex;
-  if (!ScopeStencil::createForWithScope(bce->cx, bce->compilationState,
+  if (!ScopeStencil::createForWithScope(bce->fc, bce->compilationState,
                                         enclosingScopeIndex(bce),
                                         &scopeIndex)) {
     return false;
@@ -1007,7 +1010,7 @@ uint32_t EmitterScope::CountEnclosingCompilationEnvironments(
   return environments;
 }
 
-bool EmitterScope::lookupPrivate(BytecodeEmitter* bce,
+void EmitterScope::lookupPrivate(BytecodeEmitter* bce,
                                  TaggedParserAtomIndex name, NameLocation& loc,
                                  mozilla::Maybe<NameLocation>& brandLoc) {
   loc = lookup(bce, name);
@@ -1065,7 +1068,7 @@ bool EmitterScope::lookupPrivate(BytecodeEmitter* bce,
     } else {
       brandLoc = Nothing();
     }
-    return true;
+    return;
   }
 
   if (loc.bindingKind() == BindingKind::PrivateMethod) {
@@ -1085,7 +1088,6 @@ bool EmitterScope::lookupPrivate(BytecodeEmitter* bce,
   } else {
     brandLoc = Nothing();
   }
-  return true;
 }
 
 Maybe<NameLocation> EmitterScope::locationBoundInScope(

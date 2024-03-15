@@ -26,15 +26,15 @@
 
 /**
  * @file
- * @brief   Implements the `ZydisFormatterToken` type and provides functions to use it.
+ * Implements the `ZydisFormatterToken` type and provides functions to use it.
  */
 
 #ifndef ZYDIS_FORMATTER_TOKEN_H
 #define ZYDIS_FORMATTER_TOKEN_H
 
-#include "zydis/ZydisExportConfig.h"
 #include "zydis/Zycore/String.h"
 #include "zydis/Zycore/Types.h"
+#include "zydis/Zydis/Defines.h"
 #include "zydis/Zydis/Status.h"
 
 #ifdef __cplusplus
@@ -50,70 +50,70 @@ extern "C" {
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @biref   Defines the `ZydisTokenType` data-type.
+ * Defines the `ZydisTokenType` data-type.
  */
 typedef ZyanU8 ZydisTokenType;
 
 #define ZYDIS_TOKEN_INVALID             0x00
 /**
- * @brief   A whitespace character.
+ * A whitespace character.
  */
 #define ZYDIS_TOKEN_WHITESPACE          0x01
 /**
- * @brief   A delimiter character (like `','`, `':'`, `'+'`, `'-'`, `'*'`).
+ * A delimiter character (like `','`, `':'`, `'+'`, `'-'`, `'*'`).
  */
 #define ZYDIS_TOKEN_DELIMITER           0x02
 /**
- * @brief   An opening parenthesis character (like `'('`, `'['`, `'{'`).
+ * An opening parenthesis character (like `'('`, `'['`, `'{'`).
  */
 #define ZYDIS_TOKEN_PARENTHESIS_OPEN    0x03
 /**
- * @brief   A closing parenthesis character (like `')'`, `']'`, `'}'`).
+ * A closing parenthesis character (like `')'`, `']'`, `'}'`).
  */
 #define ZYDIS_TOKEN_PARENTHESIS_CLOSE   0x04
 /**
- * @brief   A prefix literal (like `"LOCK"`, `"REP"`).
+ * A prefix literal (like `"LOCK"`, `"REP"`).
  */
 #define ZYDIS_TOKEN_PREFIX              0x05
 /**
- * @brief   A mnemonic literal (like `"MOV"`, `"VCMPPSD"`, `"LCALL"`).
+ * A mnemonic literal (like `"MOV"`, `"VCMPPSD"`, `"LCALL"`).
  */
 #define ZYDIS_TOKEN_MNEMONIC            0x06
 /**
- * @brief   A register literal (like `"RAX"`, `"DS"`, `"%ECX"`).
+ * A register literal (like `"RAX"`, `"DS"`, `"%ECX"`).
  */
 #define ZYDIS_TOKEN_REGISTER            0x07
 /**
- * @brief   An absolute address literal (like `0x00400000`).
+ * An absolute address literal (like `0x00400000`).
  */
 #define ZYDIS_TOKEN_ADDRESS_ABS         0x08
 /**
- * @brief   A relative address literal (like `-0x100`).
+ * A relative address literal (like `-0x100`).
  */
 #define ZYDIS_TOKEN_ADDRESS_REL         0x09
 /**
- * @brief   A displacement literal (like `0xFFFFFFFF`, `-0x100`, `+0x1234`).
+ * A displacement literal (like `0xFFFFFFFF`, `-0x100`, `+0x1234`).
  */
 #define ZYDIS_TOKEN_DISPLACEMENT        0x0A
 /**
- * @brief   An immediate literal (like `0xC0`, `-0x1234`, `$0x0000`).
+ * An immediate literal (like `0xC0`, `-0x1234`, `$0x0000`).
  */
 #define ZYDIS_TOKEN_IMMEDIATE           0x0B
 /**
- * @brief   A typecast literal (like `DWORD PTR`).
+ * A typecast literal (like `DWORD PTR`).
  */
 #define ZYDIS_TOKEN_TYPECAST            0x0C
 /**
- * @brief   A decorator literal (like `"Z"`, `"1TO4"`).
+ * A decorator literal (like `"Z"`, `"1TO4"`).
  */
 #define ZYDIS_TOKEN_DECORATOR           0x0D
 /**
- * @brief   A symbol literal.
+ * A symbol literal.
  */
 #define ZYDIS_TOKEN_SYMBOL              0x0E
 
 /**
- * @brief   The base for user-defined token types.
+ * The base for user-defined token types.
  */
 #define ZYDIS_TOKEN_USER                0x80
 
@@ -130,7 +130,7 @@ typedef ZyanU8 ZydisTokenType;
 #pragma pack(push, 1)
 
 /**
- * @brief   Defines the `ZydisFormatterToken` struct.
+ * Defines the `ZydisFormatterToken` struct.
  *
  * All fields in this struct should be considered as "private". Any changes may lead to unexpected
  * behavior.
@@ -138,11 +138,11 @@ typedef ZyanU8 ZydisTokenType;
 typedef struct ZydisFormatterToken_
 {
     /**
-     * @brief   The token type.
+     * The token type.
      */
     ZydisTokenType type;
     /**
-     * @brief   An offset to the next token, or `0`.
+     * An offset to the next token, or `0`.
      */
     ZyanU8 next;
 } ZydisFormatterToken;
@@ -150,7 +150,7 @@ typedef struct ZydisFormatterToken_
 #pragma pack(pop)
 
 /**
- * @brief   Defines the `ZydisFormatterTokenConst` data-type.
+ * Defines the `ZydisFormatterTokenConst` data-type.
  */
 typedef const ZydisFormatterToken ZydisFormatterTokenConst;
 
@@ -159,25 +159,25 @@ typedef const ZydisFormatterToken ZydisFormatterTokenConst;
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the `ZydisFormatterBuffer` struct.
+ * Defines the `ZydisFormatterBuffer` struct.
  *
- * All fields in this struct should be considered as "private". Any changes may lead to unexpected
- * behavior.
+ * All fields in this struct should be considered as "private". Any changes may
+ * lead to unexpected behavior.
  */
 typedef struct ZydisFormatterBuffer_
 {
     /**
-     * @brief   `ZYAN_TRUE`, if the buffer contains a token stream or `ZYAN_FALSE, if it contains
-     *          a simple string.
+     * `ZYAN_TRUE`, if the buffer contains a token stream or `ZYAN_FALSE, if it
+     *  contains a simple string.
      */
     ZyanBool is_token_list;
     /**
-     * @brief   The remaining capacity of the buffer.
+     * The remaining capacity of the buffer.
      */
     ZyanUSize capacity;
     /**
-     * @brief   The `ZyanString` instance that refers to the literal value of the most recently
-     *          added token.
+     * The `ZyanString` instance that refers to the literal value of the most
+     * recently added token.
      */
     ZyanString string;
 } ZydisFormatterBuffer;
@@ -193,7 +193,7 @@ typedef struct ZydisFormatterBuffer_
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Returns the `type` and the string `value` of the given `token`.
+ * Returns the `type` and the string `value` of the given `token`.
  *
  * @param   token   A pointer to the `ZydisFormatterToken` struct.
  * @param   type    Receives the token type.
@@ -205,10 +205,10 @@ ZYDIS_EXPORT ZyanStatus ZydisFormatterTokenGetValue(const ZydisFormatterToken* t
     ZydisTokenType* type, ZyanConstCharPointer* value);
 
 /**
- * @brief   Obtains the next `token` linked to the passed one.
+ * Obtains the next `token` linked to the passed one.
  *
- * @param   token   Receives a pointer to the next `ZydisFormatterToken` struct linked to the
- *                  passed one.
+ * @param   token   Receives a pointer to the next `ZydisFormatterToken` struct
+ *                  linked to the passed one.
  *
  * @return  A zyan status code.
  */
@@ -219,7 +219,7 @@ ZYDIS_EXPORT ZyanStatus ZydisFormatterTokenNext(ZydisFormatterTokenConst** token
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Returns the current (most recently added) token.
+ * Returns the current (most recently added) token.
  *
  * @param   buffer  A pointer to the `ZydisFormatterBuffer` struct.
  * @param   token   Receives a pointer to the current token.
@@ -233,7 +233,7 @@ ZYDIS_EXPORT ZyanStatus ZydisFormatterBufferGetToken(const ZydisFormatterBuffer*
     ZydisFormatterTokenConst** token);
 
 /**
- * @brief   Returns the `ZyanString` instance associated with the given buffer.
+ * Returns the `ZyanString` instance associated with the given buffer.
  *
  * @param   buffer  A pointer to the `ZydisFormatterBuffer` struct.
  * @param   string  Receives a pointer to the `ZyanString` instance associated with the given
@@ -251,7 +251,7 @@ ZYDIS_EXPORT ZyanStatus ZydisFormatterBufferGetString(ZydisFormatterBuffer* buff
     ZyanString** string);
 
 /**
- * @brief   Appends a new token to the `buffer`.
+ * Appends a new token to the `buffer`.
  *
  * @param   buffer  A pointer to the `ZydisFormatterBuffer` struct.
  * @param   type    The type of the new token.
@@ -265,7 +265,7 @@ ZYDIS_EXPORT ZyanStatus ZydisFormatterBufferAppend(ZydisFormatterBuffer* buffer,
     ZydisTokenType type);
 
 /**
- * @brief   Returns a snapshot of the buffer-state.
+ * Returns a snapshot of the buffer-state.
  *
  * @param   buffer  A pointer to the `ZydisFormatterBuffer` struct.
  * @param   state   Receives a snapshot of the buffer-state.
@@ -279,7 +279,7 @@ ZYDIS_EXPORT ZyanStatus ZydisFormatterBufferRemember(const ZydisFormatterBuffer*
     ZyanUPointer* state);
 
 /**
- * @brief   Restores a previously saved buffer-state.
+ * Restores a previously saved buffer-state.
  *
  * @param   buffer  A pointer to the `ZydisFormatterBuffer` struct.
  * @param   state   The buffer-state to restore.

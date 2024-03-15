@@ -41,25 +41,23 @@ inline const Value& EnvironmentObject::aliasedBinding(
   return getSlot(ec.slot());
 }
 
-inline void EnvironmentObject::setAliasedBinding(JSContext* cx, uint32_t slot,
+inline void EnvironmentObject::setAliasedBinding(uint32_t slot,
                                                  const Value& v) {
   setSlot(slot, v);
 }
 
-inline void EnvironmentObject::setAliasedBinding(JSContext* cx,
-                                                 EnvironmentCoordinate ec,
+inline void EnvironmentObject::setAliasedBinding(EnvironmentCoordinate ec,
                                                  const Value& v) {
   MOZ_ASSERT(!IsExtensibleLexicalEnvironment(this));
   MOZ_ASSERT(nonExtensibleIsFixedSlot(ec) ==
              NativeObject::isFixedSlot(ec.slot()));
-  setAliasedBinding(cx, ec.slot(), v);
+  setAliasedBinding(ec.slot(), v);
 }
 
-inline void EnvironmentObject::setAliasedBinding(JSContext* cx,
-                                                 const BindingIter& bi,
+inline void EnvironmentObject::setAliasedBinding(const BindingIter& bi,
                                                  const Value& v) {
   MOZ_ASSERT(bi.location().kind() == BindingLocation::Kind::Environment);
-  setAliasedBinding(cx, bi.location().slot(), v);
+  setAliasedBinding(bi.location().slot(), v);
 }
 
 inline void CallObject::setAliasedFormalFromArguments(const Value& argsValue,

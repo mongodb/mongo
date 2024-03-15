@@ -26,7 +26,7 @@
 
 /**
  * @file
- * @brief   Master include file, including everything else.
+ * Master include file. Includes everything else.
  */
 
 #ifndef ZYDIS_H
@@ -35,13 +35,25 @@
 #include "zydis/Zycore/Defines.h"
 #include "zydis/Zycore/Types.h"
 
-#ifndef ZYDIS_DISABLE_DECODER
+#if !defined(ZYDIS_DISABLE_DECODER)
 #   include "zydis/Zydis/Decoder.h"
 #   include "zydis/Zydis/DecoderTypes.h"
 #endif
 
-#ifndef ZYDIS_DISABLE_FORMATTER
+#if !defined(ZYDIS_DISABLE_ENCODER)
+#   include "zydis/Zydis/Encoder.h"
+#endif
+
+#if !defined(ZYDIS_DISABLE_FORMATTER)
 #   include "zydis/Zydis/Formatter.h"
+#endif
+
+#if !defined(ZYDIS_DISABLE_SEGMENT)
+#   include "zydis/Zydis/Segment.h"
+#endif
+
+#if !defined(ZYDIS_DISABLE_DECODER) && !defined(ZYDIS_DISABLE_FORMATTER)
+#   include "zydis/Zydis/Disassembler.h"
 #endif
 
 #include "zydis/Zydis/MetaInfo.h"
@@ -55,6 +67,14 @@
 extern "C" {
 #endif
 
+/**
+ * @addtogroup version Version
+ *
+ * Functions for checking the library version and build options.
+ *
+ * @{
+ */
+
 /* ============================================================================================== */
 /* Macros                                                                                         */
 /* ============================================================================================== */
@@ -64,37 +84,37 @@ extern "C" {
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   A macro that defines the zydis version.
+ * A macro that defines the zydis version.
  */
-#define ZYDIS_VERSION (ZyanU64)0x0003000000000000
+#define ZYDIS_VERSION (ZyanU64)0x0004000000000000
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Helper macros                                                                                  */
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Extracts the major-part of the zydis version.
+ * Extracts the major-part of the zydis version.
  *
  * @param   version The zydis version value
  */
 #define ZYDIS_VERSION_MAJOR(version) (ZyanU16)(((version) & 0xFFFF000000000000) >> 48)
 
 /**
- * @brief   Extracts the minor-part of the zydis version.
+ * Extracts the minor-part of the zydis version.
  *
  * @param   version The zydis version value
  */
 #define ZYDIS_VERSION_MINOR(version) (ZyanU16)(((version) & 0x0000FFFF00000000) >> 32)
 
 /**
- * @brief   Extracts the patch-part of the zydis version.
+ * Extracts the patch-part of the zydis version.
  *
  * @param   version The zydis version value
  */
 #define ZYDIS_VERSION_PATCH(version) (ZyanU16)(((version) & 0x00000000FFFF0000) >> 16)
 
 /**
- * @brief   Extracts the build-part of the zydis version.
+ * Extracts the build-part of the zydis version.
  *
  * @param   version The zydis version value
  */
@@ -107,21 +127,23 @@ extern "C" {
 /* ============================================================================================== */
 
 /**
- * @brief   Defines the `ZydisFeature` enum.
+ * Defines the `ZydisFeature` enum.
  */
 typedef enum ZydisFeature_
 {
     ZYDIS_FEATURE_DECODER,
+    ZYDIS_FEATURE_ENCODER,
     ZYDIS_FEATURE_FORMATTER,
     ZYDIS_FEATURE_AVX512,
     ZYDIS_FEATURE_KNC,
+    ZYDIS_FEATURE_SEGMENT,
 
     /**
-     * @brief   Maximum value of this enum.
+     * Maximum value of this enum.
      */
     ZYDIS_FEATURE_MAX_VALUE = ZYDIS_FEATURE_KNC,
     /**
-     * @brief   The minimum number of bits required to represent all values of this enum.
+     * The minimum number of bits required to represent all values of this enum.
      */
     ZYDIS_FEATURE_REQUIRED_BITS = ZYAN_BITS_TO_REPRESENT(ZYDIS_FEATURE_MAX_VALUE)
 } ZydisFeature;
@@ -131,13 +153,7 @@ typedef enum ZydisFeature_
 /* ============================================================================================== */
 
 /**
- * @addtogroup version Version
- * @brief Functions for checking the library version and build options.
- * @{
- */
-
-/**
- * @brief   Returns the zydis version.
+ * Returns the zydis version.
  *
  * @return  The zydis version.
  *
@@ -147,7 +163,7 @@ typedef enum ZydisFeature_
 ZYDIS_EXPORT ZyanU64 ZydisGetVersion(void);
 
 /**
- * @brief   Checks, if the specified feature is enabled in the current zydis library instance.
+ * Checks, if the specified feature is enabled in the current zydis library instance.
  *
  * @param   feature The feature.
  *
@@ -156,11 +172,11 @@ ZYDIS_EXPORT ZyanU64 ZydisGetVersion(void);
  */
 ZYDIS_EXPORT ZyanStatus ZydisIsFeatureEnabled(ZydisFeature feature);
 
+/* ============================================================================================== */
+
 /**
  * @}
  */
-
-/* ============================================================================================== */
 
 #ifdef __cplusplus
 }

@@ -11,6 +11,7 @@
 // necessary:
 //   - malloc_good_size (used to be called je_malloc_usable_in_advance)
 //   - jemalloc_stats
+//   - jemalloc_stats_num_bins
 //   - jemalloc_purge_freed_pages
 //   - jemalloc_free_dirty_pages
 //   - jemalloc_thread_local_arena
@@ -23,6 +24,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/Types.h"
 #include "mozjemalloc_types.h"
+#include "stdbool.h"
 
 #ifdef MOZ_MEMORY
 // On OSX, malloc/malloc.h contains the declaration for malloc_good_size,

@@ -255,12 +255,8 @@ static void InitResolution() {
 // TimeStampValue implementation
 // ----------------------------------------------------------------------------
 MFBT_API
-TimeStampValue::TimeStampValue(ULONGLONG aGTC, ULONGLONG aQPC, bool aHasQPC,
-                               bool aUsedCanonicalNow)
-    : mGTC(aGTC),
-      mQPC(aQPC),
-      mUsedCanonicalNow(aUsedCanonicalNow),
-      mHasQPC(aHasQPC) {
+TimeStampValue::TimeStampValue(ULONGLONG aGTC, ULONGLONG aQPC, bool aHasQPC)
+    : mGTC(aGTC), mQPC(aQPC), mHasQPC(aHasQPC) {
   mIsNull = aGTC == 0 && aQPC == 0;
 }
 
@@ -494,14 +490,10 @@ TimeStampValue NowInternal(bool aHighResolution) {
   // Both values are in [mt] units.
   ULONGLONG QPC = useQPC ? PerformanceCounter() : uint64_t(0);
   ULONGLONG GTC = ms2mt(GetTickCount64());
-  return TimeStampValue(GTC, QPC, useQPC, false);
+  return TimeStampValue(GTC, QPC, useQPC);
 }
 
 MFBT_API TimeStamp TimeStamp::Now(bool aHighResolution) {
-  return TimeStamp::NowFuzzy(NowInternal(aHighResolution));
-}
-
-MFBT_API TimeStamp TimeStamp::NowUnfuzzed(bool aHighResolution) {
   return TimeStamp(NowInternal(aHighResolution));
 }
 

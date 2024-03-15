@@ -10,39 +10,47 @@
 
 #include "NamespaceImports.h"
 
-#include "gc/GCInternals.h"
-#include "gc/Marking.h"
 #include "gc/PublicIterators.h"
-#include "gc/Zone.h"
+#include "jit/JitCode.h"
 #include "util/Memory.h"
 #include "util/Text.h"
 #include "vm/BigIntType.h"
-#include "vm/GetterSetter.h"
+#include "vm/JSContext.h"
 #include "vm/JSFunction.h"
 #include "vm/JSScript.h"
-#include "vm/PropMap.h"
+#include "vm/RegExpShared.h"
+#include "vm/Scope.h"
 #include "vm/Shape.h"
+#include "vm/StringType.h"
 #include "vm/SymbolType.h"
 
-#include "gc/GC-inl.h"
-#include "gc/Marking-inl.h"
-#include "vm/Realm-inl.h"
+#include "gc/TraceMethods-inl.h"
+#include "vm/Shape-inl.h"
 
 using namespace js;
 using namespace js::gc;
 using mozilla::DebugOnly;
 
-void JS::TracingContext::getEdgeName(char* buffer, size_t bufferSize) {
+template void RuntimeScopeData<LexicalScope::SlotInfo>::trace(JSTracer* trc);
+template void RuntimeScopeData<ClassBodyScope::SlotInfo>::trace(JSTracer* trc);
+template void RuntimeScopeData<VarScope::SlotInfo>::trace(JSTracer* trc);
+template void RuntimeScopeData<GlobalScope::SlotInfo>::trace(JSTracer* trc);
+template void RuntimeScopeData<EvalScope::SlotInfo>::trace(JSTracer* trc);
+template void RuntimeScopeData<WasmFunctionScope::SlotInfo>::trace(
+    JSTracer* trc);
+
+void JS::TracingContext::getEdgeName(const char* name, char* buffer,
+                                     size_t bufferSize) {
   MOZ_ASSERT(bufferSize > 0);
   if (functor_) {
     (*functor_)(this, buffer, bufferSize);
     return;
   }
   if (index_ != InvalidIndex) {
-    snprintf(buffer, bufferSize, "%s[%zu]", name_, index_);
+    snprintf(buffer, bufferSize, "%s[%zu]", name, index_);
     return;
   }
-  snprintf(buffer, bufferSize, "%s", name_);
+  snprintf(buffer, bufferSize, "%s", name);
 }
 
 /*** Public Tracing API *****************************************************/
@@ -50,8 +58,7 @@ void JS::TracingContext::getEdgeName(char* buffer, size_t bufferSize) {
 JS_PUBLIC_API void JS::TraceChildren(JSTracer* trc, GCCellPtr thing) {
   ApplyGCThingTyped(thing.asCell(), thing.kind(), [trc](auto t) {
     MOZ_ASSERT_IF(t->runtimeFromAnyThread() != trc->runtime(),
-                  t->isPermanentAndMayBeShared() ||
-                      t->zoneFromAnyThread()->isSelfHostingZone());
+                  t->isPermanentAndMayBeShared());
     t->traceChildren(trc);
   });
 }
@@ -225,10 +232,8 @@ void js::gc::GetTraceThingInfo(char* buf, size_t bufsize, void* thing,
             bufsize--;
             PutEscapedString(buf, bufsize, fun->displayAtom(), 0);
           }
-        } else if (obj->getClass()->flags & JSCLASS_HAS_PRIVATE) {
-          snprintf(buf, bufsize, " %p", obj->as<NativeObject>().getPrivate());
         } else {
-          snprintf(buf, bufsize, " <no private>");
+          snprintf(buf, bufsize, " <unknown object>");
         }
         break;
       }
@@ -263,10 +268,10 @@ void js::gc::GetTraceThingInfo(char* buf, size_t bufsize, void* thing,
       }
 
       case JS::TraceKind::Symbol: {
+        *buf++ = ' ';
+        bufsize--;
         auto* sym = static_cast<JS::Symbol*>(thing);
         if (JSAtom* desc = sym->description()) {
-          *buf++ = ' ';
-          bufsize--;
           PutEscapedString(buf, bufsize, desc, 0);
         } else {
           snprintf(buf, bufsize, "<null>");
@@ -290,8 +295,3 @@ void js::gc::GetTraceThingInfo(char* buf, size_t bufsize, void* thing,
 JS::CallbackTracer::CallbackTracer(JSContext* cx, JS::TracerKind kind,
                                    JS::TraceOptions options)
     : CallbackTracer(cx->runtime(), kind, options) {}
-
-uint32_t JSTracer::gcNumberForMarking() const {
-  MOZ_ASSERT(isMarkingTracer());
-  return runtime()->gc.gcNumber();
-}

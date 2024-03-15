@@ -3,7 +3,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
 #include "mozilla/Latin1.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/TextUtils.h"
@@ -13,10 +12,6 @@
 #include <functional>  // for std::function
 #include <stddef.h>
 #include <stdint.h>
-
-////////////////////////////////////////////////////////////
-// Utf8.h
-////////////////////////////////////////////////////////////
 
 MFBT_API bool mozilla::detail::IsValidUtf8(const void* aCodeUnits,
                                            size_t aCount) {
@@ -44,21 +39,24 @@ MFBT_API bool mozilla::detail::IsValidUtf8(const void* aCodeUnits,
 }
 
 #if !MOZ_HAS_JSRUST()
-#  include <memory>          // for std::shared_ptr
-#  include "unicode/ucnv.h"  // for UConverter
+#include <memory>          // for std::shared_ptr
+#include <unicode/ucnv.h>  // for UConverter
 
-mozilla::Tuple<UConverter*, UErrorCode> _getUConverter() {
+std::tuple<UConverter*, UErrorCode> _getUConverter() {
   static thread_local UErrorCode uConverterErr = U_ZERO_ERROR;
   static thread_local std::shared_ptr<UConverter> utf8Cnv(
       ucnv_open("UTF-8", &uConverterErr), ucnv_close);
-  return mozilla::MakeTuple(utf8Cnv.get(), uConverterErr);
+  return std::make_tuple(utf8Cnv.get(), uConverterErr);
 }
 
-mozilla::Tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
+static_assert(sizeof(char16_t) == sizeof(UChar));
+std::tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
     mozilla::Span<const char16_t> aSource, mozilla::Span<char> aDest) {
-  const char16_t* srcOrigPtr = aSource.Elements();
-  const char16_t* srcPtr = srcOrigPtr;
-  const char16_t* srcLimit = srcPtr + aSource.Length();
+  // The version of ICU we vendorize with mongo has UChar in its signature, not char16_t.
+  // This only causes issues on macOS, because we don't have a system icu installed.
+  const UChar* srcOrigPtr = reinterpret_cast<const UChar*>(aSource.Elements());
+  const UChar* srcPtr = reinterpret_cast<const UChar*>(srcOrigPtr);
+  const UChar* srcLimit = srcPtr + aSource.Length();
   char* dstOrigPtr = aDest.Elements();
   char* dstPtr = dstOrigPtr;
   const char* dstLimit = dstPtr + aDest.Length();
@@ -66,7 +64,7 @@ mozilla::Tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
   // Thread-local instance of a UTF-8 converter
   UConverter* utf8Conv;
   UErrorCode uConverterErr;
-  Tie(utf8Conv, uConverterErr) = _getUConverter();
+  std::tie(utf8Conv, uConverterErr) = _getUConverter();
 
   if (MOZ_LIKELY(U_SUCCESS(uConverterErr) && utf8Conv != NULL)) {
     UErrorCode err = U_ZERO_ERROR;
@@ -106,7 +104,7 @@ mozilla::Tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
             case 0:
               break;
           }
-          return mozilla::MakeTuple(static_cast<size_t>(srcPtr - srcOrigPtr),
+          return std::make_tuple(static_cast<size_t>(srcPtr - srcOrigPtr),
                                     static_cast<size_t>(dstPtr - dstOrigPtr));
         } else {
           // We do not need to handle it, as the problematic character will be
@@ -122,7 +120,7 @@ mozilla::Tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
     } while (srcPtr < srcLimit && dstPtr < dstLimit);
   }
 
-  return mozilla::MakeTuple(static_cast<size_t>(srcPtr - srcOrigPtr),
+  return std::make_tuple(static_cast<size_t>(srcPtr - srcOrigPtr),
                             static_cast<size_t>(dstPtr - dstOrigPtr));
 }
 
@@ -131,7 +129,7 @@ size_t mozilla::ConvertUtf16toUtf8(mozilla::Span<const char16_t> aSource,
   MOZ_ASSERT(aDest.Length() >= aSource.Length() * 3);
   size_t read;
   size_t written;
-  Tie(read, written) = mozilla::ConvertUtf16toUtf8Partial(aSource, aDest);
+  std::tie(read, written) = mozilla::ConvertUtf16toUtf8Partial(aSource, aDest);
   MOZ_ASSERT(read == aSource.Length());
   return written;
 }
@@ -143,14 +141,16 @@ size_t mozilla::ConvertUtf8toUtf16(mozilla::Span<const char> aSource,
   const char* srcOrigPtr = aSource.Elements();
   const char* srcPtr = srcOrigPtr;
   const char* srcLimit = srcPtr + aSource.Length();
-  char16_t* dstOrigPtr = aDest.Elements();
-  char16_t* dstPtr = dstOrigPtr;
-  const char16_t* dstLimit = dstPtr + aDest.Length();
+  // The version of ICU we vendorize with mongo has UChar in its signature, not char16_t.
+  // This only causes issues on macOS, because we don't have a system icu installed.
+  UChar* dstOrigPtr = reinterpret_cast<UChar*>(aDest.Elements());
+  UChar* dstPtr = dstOrigPtr;
+  const UChar* dstLimit = dstPtr + aDest.Length();
 
   // Thread-local instance of a UTF-8 converter
   UConverter* utf8Conv;
   UErrorCode uConverterErr;
-  Tie(utf8Conv, uConverterErr) = _getUConverter();
+  std::tie(utf8Conv, uConverterErr) = _getUConverter();
 
   if (MOZ_LIKELY(U_SUCCESS(uConverterErr) && utf8Conv != NULL)) {
     UErrorCode err = U_ZERO_ERROR;
@@ -178,17 +178,19 @@ size_t mozilla::UnsafeConvertValidUtf8toUtf16(mozilla::Span<const char> aSource,
   const char* srcPtr = srcOrigPtr;
   size_t srcLen = aSource.Length();
   const char* srcLimit = srcPtr + srcLen;
-  char16_t* dstOrigPtr = aDest.Elements();
-  char16_t* dstPtr = dstOrigPtr;
+  // The version of ICU we vendorize with mongo has UChar in its signature, not char16_t.
+  // This only causes issues on macOS, because we don't have a system icu installed.
+  UChar* dstOrigPtr = reinterpret_cast<UChar*>(aDest.Elements());
+  UChar* dstPtr = dstOrigPtr;
   size_t dstLen = aDest.Length();
-  const char16_t* dstLimit = dstPtr + dstLen;
+  const UChar* dstLimit = dstPtr + dstLen;
 
   MOZ_ASSERT(dstLen >= srcLen);
 
   // Thread-local instance of a UTF-8 converter
   UConverter* utf8Conv;
   UErrorCode uConverterErr;
-  Tie(utf8Conv, uConverterErr) = _getUConverter();
+  std::tie(utf8Conv, uConverterErr) = _getUConverter();
 
   if (MOZ_LIKELY(U_SUCCESS(uConverterErr) && utf8Conv != NULL)) {
     UErrorCode err = U_ZERO_ERROR;
@@ -219,6 +221,7 @@ size_t mozilla::Utf16ValidUpTo(mozilla::Span<const char16_t> aString) {
     size_t next = offset + 1;
 
     char16_t unit_minus_surrogate_start = (unit - 0xD800);
+
     if (unit_minus_surrogate_start > (0xDFFF - 0xD800)) {
       // Not a surrogate
       offset = next;

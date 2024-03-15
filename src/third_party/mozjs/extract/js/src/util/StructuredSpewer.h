@@ -17,8 +17,8 @@
 #  include "mozilla/Sprintf.h"
 
 #  include "jstypes.h"
+#  include "js/Printer.h"
 #  include "vm/JSONPrinter.h"
-#  include "vm/Printer.h"
 
 #  ifdef XP_WIN
 #    include <process.h>

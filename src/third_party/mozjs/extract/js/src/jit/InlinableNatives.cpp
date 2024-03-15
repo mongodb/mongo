@@ -162,7 +162,6 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::IsPossiblyWrappedRegExpObject:
     case InlinableNative::RegExpMatcher:
     case InlinableNative::RegExpSearcher:
-    case InlinableNative::RegExpTester:
     case InlinableNative::RegExpPrototypeOptimizable:
     case InlinableNative::RegExpInstanceOptimizable:
     case InlinableNative::GetFirstDollarIndex:
@@ -176,7 +175,6 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::IntrinsicUnsafeGetObjectFromReservedSlot:
     case InlinableNative::IntrinsicUnsafeGetInt32FromReservedSlot:
     case InlinableNative::IntrinsicUnsafeGetStringFromReservedSlot:
-    case InlinableNative::IntrinsicUnsafeGetBooleanFromReservedSlot:
     case InlinableNative::IntrinsicIsCallable:
     case InlinableNative::IntrinsicIsConstructor:
     case InlinableNative::IntrinsicToObject:
@@ -196,7 +194,6 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::IntrinsicGuardToIteratorHelper:
     case InlinableNative::IntrinsicGuardToAsyncIteratorHelper:
     case InlinableNative::IntrinsicObjectHasPrototype:
-    case InlinableNative::IntrinsicFinishBoundFunctionInit:
     case InlinableNative::IntrinsicIsPackedArray:
     case InlinableNative::IntrinsicGuardToMapObject:
     case InlinableNative::IntrinsicGetNextMapEntryForIterator:
@@ -210,6 +207,10 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::IntrinsicIsTypedArray:
     case InlinableNative::IntrinsicIsPossiblyWrappedTypedArray:
     case InlinableNative::IntrinsicPossiblyWrappedTypedArrayLength:
+    case InlinableNative::IntrinsicRegExpBuiltinExec:
+    case InlinableNative::IntrinsicRegExpBuiltinExecForTest:
+    case InlinableNative::IntrinsicRegExpExec:
+    case InlinableNative::IntrinsicRegExpExecForTest:
     case InlinableNative::IntrinsicTypedArrayLength:
     case InlinableNative::IntrinsicTypedArrayByteOffset:
     case InlinableNative::IntrinsicTypedArrayElementSize:
@@ -260,8 +261,14 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::DataViewSetFloat64:
     case InlinableNative::DataViewSetBigInt64:
     case InlinableNative::DataViewSetBigUint64:
+    case InlinableNative::FunctionBind:
+    case InlinableNative::MapGet:
+    case InlinableNative::MapHas:
+    case InlinableNative::Number:
+    case InlinableNative::NumberParseInt:
     case InlinableNative::NumberToString:
     case InlinableNative::ReflectGetPrototypeOf:
+    case InlinableNative::SetHas:
     case InlinableNative::String:
     case InlinableNative::StringToString:
     case InlinableNative::StringValueOf:
@@ -269,6 +276,9 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::StringFromCharCode:
     case InlinableNative::StringFromCodePoint:
     case InlinableNative::StringCharAt:
+    case InlinableNative::StringIndexOf:
+    case InlinableNative::StringStartsWith:
+    case InlinableNative::StringEndsWith:
     case InlinableNative::StringToLowerCase:
     case InlinableNative::StringToUpperCase:
     case InlinableNative::Object:
@@ -277,6 +287,9 @@ bool js::jit::CanInlineNativeCrossRealm(InlinableNative native) {
     case InlinableNative::ObjectIsPrototypeOf:
     case InlinableNative::ObjectToString:
     case InlinableNative::TypedArrayConstructor:
+#ifdef FUZZING_JS_FUZZILLI
+    case InlinableNative::FuzzilliHash:
+#endif
       // Default to false for most natives.
       return false;
 

@@ -70,8 +70,6 @@ class Proxy {
                                            MutableHandleIdVector props);
   static bool nativeCall(JSContext* cx, IsAcceptableThis test, NativeImpl impl,
                          const CallArgs& args);
-  static bool hasInstance(JSContext* cx, HandleObject proxy,
-                          MutableHandleValue v, bool* bp);
   static bool getBuiltinClass(JSContext* cx, HandleObject proxy, ESClass* cls);
   static bool isArray(JSContext* cx, HandleObject proxy,
                       JS::IsArrayAnswer* answer);

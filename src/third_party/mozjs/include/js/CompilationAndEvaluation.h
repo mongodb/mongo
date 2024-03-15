@@ -11,12 +11,10 @@
 #include <stddef.h>  // size_t
 #include <stdio.h>   // FILE
 
-#include "jsapi.h"    // JSGetElementCallback
 #include "jstypes.h"  // JS_PUBLIC_API
 
-#include "js/CompileOptions.h"  // JS::CompileOptions, JS::ReadOnlyCompileOptions
-#include "js/RootingAPI.h"      // JS::Handle, JS::MutableHandle
-#include "js/Value.h"  // JS::Value and specializations of JS::*Handle-related types
+#include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle
+#include "js/TypeDecls.h"
 
 struct JS_PUBLIC_API JSContext;
 class JS_PUBLIC_API JSFunction;
@@ -28,6 +26,9 @@ union Utf8Unit;
 }
 
 namespace JS {
+
+class JS_PUBLIC_API InstantiateOptions;
+class JS_PUBLIC_API ReadOnlyCompileOptions;
 
 template <typename UnitT>
 class SourceText;
@@ -94,24 +95,6 @@ extern JS_PUBLIC_API bool JS_ExecuteScript(JSContext* cx,
 namespace JS {
 
 /**
- * Like the above, but handles a cross-compartment script. If the script is
- * cross-compartment, it is cloned into the current compartment before
- * executing.
- */
-extern JS_PUBLIC_API bool CloneAndExecuteScript(JSContext* cx,
-                                                Handle<JSScript*> script,
-                                                MutableHandle<Value> rval);
-
-/**
- * Like CloneAndExecuteScript above, but allows executing under a non-syntactic
- * environment chain.
- */
-extern JS_PUBLIC_API bool CloneAndExecuteScript(JSContext* cx,
-                                                HandleObjectVector envChain,
-                                                Handle<JSScript*> script,
-                                                MutableHandle<Value> rval);
-
-/**
  * Evaluate the given source buffer in the scope of the current global of cx,
  * and return the completion value in |rval|.
  */
@@ -142,9 +125,8 @@ extern JS_PUBLIC_API bool Evaluate(JSContext* cx,
 
 /**
  * Evaluate the UTF-8 contents of the file at the given path, and return the
- * completion value in |rval|.  (The path itself is in the system encoding, not
- * [necessarily] UTF-8.)  If the contents contain any malformed UTF-8, an error
- * is reported.
+ * completion value in |rval|.  (The path itself is UTF-8 encoded, too.)  If
+ * the contents contain any malformed UTF-8, an error is reported.
  */
 extern JS_PUBLIC_API bool EvaluateUtf8Path(
     JSContext* cx, const ReadOnlyCompileOptions& options, const char* filename,
@@ -165,25 +147,6 @@ extern JS_PUBLIC_API JSScript* Compile(JSContext* cx,
 extern JS_PUBLIC_API JSScript* Compile(JSContext* cx,
                                        const ReadOnlyCompileOptions& options,
                                        SourceText<mozilla::Utf8Unit>& srcBuf);
-
-/**
- * Compile the provided script using the given options, and register an encoder
- * on is script source, such that all functions can be encoded as they are
- * parsed. This strategy is used to avoid blocking the main thread in a
- * non-interruptible way.
- *
- * See also JS::FinishIncrementalEncoding.
- *
- * Return the script on success, or return null on failure (usually with an
- * error reported)
- */
-extern JS_PUBLIC_API JSScript* CompileAndStartIncrementalEncoding(
-    JSContext* cx, const ReadOnlyCompileOptions& options,
-    SourceText<char16_t>& srcBuf);
-
-extern JS_PUBLIC_API JSScript* CompileAndStartIncrementalEncoding(
-    JSContext* cx, const ReadOnlyCompileOptions& options,
-    SourceText<mozilla::Utf8Unit>& srcBuf);
 
 /**
  * Compile the UTF-8 contents of the given file into a script.  It is an error
@@ -261,18 +224,9 @@ extern JS_PUBLIC_API void ExposeScriptToDebugger(JSContext* cx,
  * the debug metadata is provided by the UpdateDebugMetadata call.
  */
 extern JS_PUBLIC_API bool UpdateDebugMetadata(
-    JSContext* cx, Handle<JSScript*> script,
-    const ReadOnlyCompileOptions& options, HandleValue privateValue,
-    HandleString elementAttributeName, HandleScript introScript,
-    HandleScript scriptOrModule);
-
-// The debugger API exposes an optional "element" property on DebuggerSource
-// objects.  The callback defined here provides that value.  SpiderMonkey
-// doesn't particularly care about this, but within Firefox the "element" is the
-// HTML script tag for the script which DevTools can use for a better debugging
-// experience.
-extern JS_PUBLIC_API void SetSourceElementCallback(
-    JSContext* cx, JSSourceElementCallback callback);
+    JSContext* cx, Handle<JSScript*> script, const InstantiateOptions& options,
+    HandleValue privateValue, HandleString elementAttributeName,
+    HandleScript introScript, HandleScript scriptOrModule);
 
 } /* namespace JS */
 

@@ -50,10 +50,20 @@ bool SparseBitmap::getBit(size_t bit) const {
   size_t word = bit / JS_BITS_PER_WORD;
   size_t blockWord = blockStartWord(word);
 
-  BitBlock* block = getBlock(blockWord / WordsInBlock);
+  const BitBlock* block = getBlock(blockWord / WordsInBlock);
   if (block) {
-    return (*block)[word - blockWord] &
-           (uintptr_t(1) << (bit % JS_BITS_PER_WORD));
+    return (*block)[word - blockWord] & bitMask(bit);
+  }
+  return false;
+}
+
+bool SparseBitmap::readonlyThreadsafeGetBit(size_t bit) const {
+  size_t word = bit / JS_BITS_PER_WORD;
+  size_t blockWord = blockStartWord(word);
+
+  const BitBlock* block = readonlyThreadsafeGetBlock(blockWord / WordsInBlock);
+  if (block) {
+    return (*block)[word - blockWord] & bitMask(bit);
   }
   return false;
 }

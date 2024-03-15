@@ -210,8 +210,9 @@ class HashMap {
   // the empty storage and upon regrowth it will be given the minimum capacity.
   void compact() { mImpl.compact(); }
 
-  // Attempt to reserve enough space to fit at least |aLen| elements. Does
-  // nothing if the map already has sufficient capacity.
+  // Attempt to reserve enough space to fit at least |aLen| elements. This is
+  // total capacity, including elements already present. Does nothing if the
+  // map already has sufficient capacity.
   [[nodiscard]] bool reserve(uint32_t aLen) { return mImpl.reserve(aLen); }
 
   // -- Lookups --------------------------------------------------------------
@@ -248,7 +249,14 @@ class HashMap {
   // false on OOM.
   template <typename KeyInput, typename ValueInput>
   [[nodiscard]] bool put(KeyInput&& aKey, ValueInput&& aValue) {
-    AddPtr p = lookupForAdd(aKey);
+    return put(aKey, std::forward<KeyInput>(aKey),
+               std::forward<ValueInput>(aValue));
+  }
+
+  template <typename KeyInput, typename ValueInput>
+  [[nodiscard]] bool put(const Lookup& aLookup, KeyInput&& aKey,
+                         ValueInput&& aValue) {
+    AddPtr p = lookupForAdd(aLookup);
     if (p) {
       p->value() = std::forward<ValueInput>(aValue);
       return true;
@@ -499,8 +507,9 @@ class HashSet {
   // the empty storage and upon regrowth it will be given the minimum capacity.
   void compact() { mImpl.compact(); }
 
-  // Attempt to reserve enough space to fit at least |aLen| elements. Does
-  // nothing if the map already has sufficient capacity.
+  // Attempt to reserve enough space to fit at least |aLen| elements. This is
+  // total capacity, including elements already present. Does nothing if the
+  // map already has sufficient capacity.
   [[nodiscard]] bool reserve(uint32_t aLen) { return mImpl.reserve(aLen); }
 
   // -- Lookups --------------------------------------------------------------
@@ -870,39 +879,50 @@ struct CStringHasher {
 // Fallible Hashing Interface
 //---------------------------------------------------------------------------
 
-// Most of the time generating a hash code is infallible so this class provides
-// default methods that always succeed.  Specialize this class for your own hash
-// policy to provide fallible hashing.
+// Most of the time generating a hash code is infallible, but sometimes it is
+// necessary to generate hash codes on demand in a way that can fail. Specialize
+// this class for your own hash policy to provide fallible hashing.
 //
 // This is used by MovableCellHasher to handle the fact that generating a unique
 // ID for cell pointer may fail due to OOM.
+//
+// The default implementations of these methods delegate to the usual HashPolicy
+// implementation and always succeed.
 template <typename HashPolicy>
 struct FallibleHashMethods {
-  // Return true if a hashcode is already available for its argument.  Once
-  // this returns true for a specific argument it must continue to do so.
+  // Return true if a hashcode is already available for its argument, and
+  // sets |aHashOut|. Once this succeeds for a specific argument it
+  // must continue to do so.
+  //
+  // Return false if a hashcode is not already available. This implies that any
+  // lookup must fail, as the hash code would have to have been successfully
+  // created on insertion.
   template <typename Lookup>
-  static bool hasHash(Lookup&& aLookup) {
+  static bool maybeGetHash(Lookup&& aLookup, HashNumber* aHashOut) {
+    *aHashOut = HashPolicy::hash(aLookup);
     return true;
   }
 
-  // Fallible method to ensure a hashcode exists for its argument and create
-  // one if not.  Returns false on error, e.g. out of memory.
+  // Fallible method to ensure a hashcode exists for its argument and create one
+  // if not. Sets |aHashOut| to the hashcode and retuns true on success. Returns
+  // false on error, e.g. out of memory.
   template <typename Lookup>
-  static bool ensureHash(Lookup&& aLookup) {
+  static bool ensureHash(Lookup&& aLookup, HashNumber* aHashOut) {
+    *aHashOut = HashPolicy::hash(aLookup);
     return true;
   }
 };
 
 template <typename HashPolicy, typename Lookup>
-static bool HasHash(Lookup&& aLookup) {
-  return FallibleHashMethods<typename HashPolicy::Base>::hasHash(
-      std::forward<Lookup>(aLookup));
+static bool MaybeGetHash(Lookup&& aLookup, HashNumber* aHashOut) {
+  return FallibleHashMethods<typename HashPolicy::Base>::maybeGetHash(
+      std::forward<Lookup>(aLookup), aHashOut);
 }
 
 template <typename HashPolicy, typename Lookup>
-static bool EnsureHash(Lookup&& aLookup) {
+static bool EnsureHash(Lookup&& aLookup, HashNumber* aHashOut) {
   return FallibleHashMethods<typename HashPolicy::Base>::ensureHash(
-      std::forward<Lookup>(aLookup));
+      std::forward<Lookup>(aLookup), aHashOut);
 }
 
 //---------------------------------------------------------------------------
@@ -1625,8 +1645,8 @@ class HashTable : private AllocPolicy {
 
   static bool isLiveHash(HashNumber aHash) { return Entry::isLiveHash(aHash); }
 
-  static HashNumber prepareHash(const Lookup& aLookup) {
-    HashNumber keyHash = ScrambleHashCode(HashPolicy::hash(aLookup));
+  static HashNumber prepareHash(HashNumber aInputHash) {
+    HashNumber keyHash = ScrambleHashCode(aInputHash);
 
     // Avoid reserved hash codes.
     if (!isLiveHash(keyHash)) {
@@ -1962,24 +1982,20 @@ class HashTable : private AllocPolicy {
     // which approach is best.
   }
 
-  // Note: |aLookup| may be a reference to a piece of |u|, so this function
-  // must take care not to use |aLookup| after moving |u|.
-  //
   // Prefer to use putNewInfallible; this function does not check
   // invariants.
   template <typename... Args>
-  void putNewInfallibleInternal(const Lookup& aLookup, Args&&... aArgs) {
+  void putNewInfallibleInternal(HashNumber aKeyHash, Args&&... aArgs) {
     MOZ_ASSERT(mTable);
 
-    HashNumber keyHash = prepareHash(aLookup);
-    Slot slot = findNonLiveSlot(keyHash);
+    Slot slot = findNonLiveSlot(aKeyHash);
 
     if (slot.isRemoved()) {
       mRemovedCount--;
-      keyHash |= sCollisionBit;
+      aKeyHash |= sCollisionBit;
     }
 
-    slot.setLive(keyHash, std::forward<Args>(aArgs)...);
+    slot.setLive(aKeyHash, std::forward<Args>(aArgs)...);
     mEntryCount++;
 #ifdef DEBUG
     mMutationCount++;
@@ -2067,10 +2083,16 @@ class HashTable : private AllocPolicy {
   }
 
   MOZ_ALWAYS_INLINE Ptr readonlyThreadsafeLookup(const Lookup& aLookup) const {
-    if (empty() || !HasHash<HashPolicy>(aLookup)) {
+    if (empty()) {
       return Ptr();
     }
-    HashNumber keyHash = prepareHash(aLookup);
+
+    HashNumber inputHash;
+    if (!MaybeGetHash<HashPolicy>(aLookup, &inputHash)) {
+      return Ptr();
+    }
+
+    HashNumber keyHash = prepareHash(inputHash);
     return Ptr(lookup<ForNonAdd>(aLookup, keyHash), *this);
   }
 
@@ -2081,11 +2103,13 @@ class HashTable : private AllocPolicy {
 
   MOZ_ALWAYS_INLINE AddPtr lookupForAdd(const Lookup& aLookup) {
     ReentrancyGuard g(*this);
-    if (!EnsureHash<HashPolicy>(aLookup)) {
+
+    HashNumber inputHash;
+    if (!EnsureHash<HashPolicy>(aLookup, &inputHash)) {
       return AddPtr();
     }
 
-    HashNumber keyHash = prepareHash(aLookup);
+    HashNumber keyHash = prepareHash(inputHash);
 
     if (!mTable) {
       return AddPtr(*this, keyHash);
@@ -2158,34 +2182,39 @@ class HashTable : private AllocPolicy {
     return true;
   }
 
-  // Note: |aLookup| may be a reference to a piece of |u|, so this function
-  // must take care not to use |aLookup| after moving |u|.
+  // Note: |aLookup| may reference pieces of arguments in |aArgs|, so this
+  // function must take care not to use |aLookup| after moving |aArgs|.
   template <typename... Args>
   void putNewInfallible(const Lookup& aLookup, Args&&... aArgs) {
     MOZ_ASSERT(!lookup(aLookup).found());
     ReentrancyGuard g(*this);
-    putNewInfallibleInternal(aLookup, std::forward<Args>(aArgs)...);
+    HashNumber keyHash = prepareHash(HashPolicy::hash(aLookup));
+    putNewInfallibleInternal(keyHash, std::forward<Args>(aArgs)...);
   }
 
-  // Note: |aLookup| may be alias arguments in |aArgs|, so this function must
-  // take care not to use |aLookup| after moving |aArgs|.
+  // Note: |aLookup| may alias arguments in |aArgs|, so this function must take
+  // care not to use |aLookup| after moving |aArgs|.
   template <typename... Args>
   [[nodiscard]] bool putNew(const Lookup& aLookup, Args&&... aArgs) {
+    MOZ_ASSERT(!lookup(aLookup).found());
+    ReentrancyGuard g(*this);
     if (!this->checkSimulatedOOM()) {
       return false;
     }
-    if (!EnsureHash<HashPolicy>(aLookup)) {
+    HashNumber inputHash;
+    if (!EnsureHash<HashPolicy>(aLookup, &inputHash)) {
       return false;
     }
+    HashNumber keyHash = prepareHash(inputHash);
     if (rehashIfOverloaded() == RehashFailed) {
       return false;
     }
-    putNewInfallible(aLookup, std::forward<Args>(aArgs)...);
+    putNewInfallibleInternal(keyHash, std::forward<Args>(aArgs)...);
     return true;
   }
 
-  // Note: |aLookup| may be a reference to a piece of |u|, so this function
-  // must take care not to use |aLookup| after moving |u|.
+  // Note: |aLookup| may be a reference pieces of arguments in |aArgs|, so this
+  // function must take care not to use |aLookup| after moving |aArgs|.
   template <typename... Args>
   [[nodiscard]] bool relookupOrAdd(AddPtr& aPtr, const Lookup& aLookup,
                                    Args&&... aArgs) {
@@ -2200,7 +2229,7 @@ class HashTable : private AllocPolicy {
     if (mTable) {
       ReentrancyGuard g(*this);
       // Check that aLookup has not been destroyed.
-      MOZ_ASSERT(prepareHash(aLookup) == aPtr.mKeyHash);
+      MOZ_ASSERT(prepareHash(HashPolicy::hash(aLookup)) == aPtr.mKeyHash);
       aPtr.mSlot = lookup<ForAdd>(aLookup, aPtr.mKeyHash);
       if (aPtr.found()) {
         return true;
@@ -2230,7 +2259,8 @@ class HashTable : private AllocPolicy {
     typename HashTableEntry<T>::NonConstT t(std::move(*aPtr));
     HashPolicy::setKey(t, const_cast<Key&>(aKey));
     remove(aPtr.mSlot);
-    putNewInfallibleInternal(aLookup, std::move(t));
+    HashNumber keyHash = prepareHash(HashPolicy::hash(aLookup));
+    putNewInfallibleInternal(keyHash, std::move(t));
   }
 
   void rekeyAndMaybeRehash(Ptr aPtr, const Lookup& aLookup, const Key& aKey) {

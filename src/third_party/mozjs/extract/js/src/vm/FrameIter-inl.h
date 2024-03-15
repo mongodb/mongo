@@ -12,7 +12,6 @@
 #include "mozilla/Assertions.h"  // MOZ_ASSERT, MOZ_CRASH
 
 #include "jit/JSJitFrameIter.h"  // js::jit::{InlineFrameIterator,MaybeReadFallback,ReadFrame_Actuals}
-#include "vm/Stack.h"  // js::InterpreterFrame
 
 #include "vm/Stack-inl.h"  // js::InterpreterFrame::unaliasedForEachActual
 
@@ -31,8 +30,7 @@ inline void FrameIter::unaliasedForEachActual(JSContext* cx, Op op) {
       if (jsJitFrame().isIonJS()) {
         jit::MaybeReadFallback recover(cx, activation()->asJit(),
                                        &jsJitFrame());
-        ionInlineFrames_.unaliasedForEachActual(cx, op, jit::ReadFrame_Actuals,
-                                                recover);
+        ionInlineFrames_.unaliasedForEachActual(cx, op, recover);
       } else if (jsJitFrame().isBailoutJS()) {
         // :TODO: (Bug 1070962) If we are introspecting the frame which is
         // being bailed, then we might be in the middle of recovering
@@ -41,11 +39,10 @@ inline void FrameIter::unaliasedForEachActual(JSContext* cx, Op op) {
         // that, we just return Undefined values for instruction results
         // which are not yet recovered.
         jit::MaybeReadFallback fallback;
-        ionInlineFrames_.unaliasedForEachActual(cx, op, jit::ReadFrame_Actuals,
-                                                fallback);
+        ionInlineFrames_.unaliasedForEachActual(cx, op, fallback);
       } else {
         MOZ_ASSERT(jsJitFrame().isBaselineJS());
-        jsJitFrame().unaliasedForEachActual(op, jit::ReadFrame_Actuals);
+        jsJitFrame().unaliasedForEachActual(op);
       }
       return;
   }

@@ -6,7 +6,7 @@
 # GC rooting hazards. See
 # <https://wiki.mozilla.org/Javascript:SpiderMonkey:ExactStackRooting>.
 
-ac_add_options --enable-application=js
+ac_add_options --enable-project=js
 
 # Also compile NSPR to see through its part of the control flow graph (not
 # currently needed, but also helps with weird problems finding the right

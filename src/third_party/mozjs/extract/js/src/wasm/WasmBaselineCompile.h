@@ -19,6 +19,7 @@
 #ifndef asmjs_wasm_baseline_compile_h
 #define asmjs_wasm_baseline_compile_h
 
+#include "jit/ABIArgGenerator.h"
 #include "wasm/WasmGenerator.h"
 
 namespace js {
@@ -35,6 +36,11 @@ namespace wasm {
     LifoAlloc& lifo, const FuncCompileInputVector& inputs, CompiledCode* code,
     UniqueChars* error);
 
+// BaseLocalIter iterates over a vector of types of locals and provides offsets
+// from the Frame address for those locals, and associated data.
+//
+// The implementation of BaseLocalIter is the property of the BaseStackFrame.
+// But it is also exposed for eg the debugger to use.
 class BaseLocalIter {
  private:
   using ConstValTypeRange = mozilla::Range<const ValType>;

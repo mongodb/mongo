@@ -7,6 +7,8 @@
 #ifndef jit_x86_shared_Encoding_x86_shared_h
 #define jit_x86_shared_Encoding_x86_shared_h
 
+#include <type_traits>
+
 #include "jit/x86-shared/Constants-x86-shared.h"
 
 namespace js {
@@ -82,8 +84,11 @@ enum OneByteOpcodeID {
   OP_XOR_EvGv = 0x31,
   OP_XOR_GvEv = 0x33,
   OP_XOR_EAXIv = 0x35,
+  OP_CMP_EbGb = 0x38,
   OP_CMP_EvGv = 0x39,
+  OP_CMP_GbEb = 0x3A,
   OP_CMP_GvEv = 0x3B,
+  OP_CMP_EAXIb = 0x3C,
   OP_CMP_EAXIv = 0x3D,
 #ifdef JS_CODEGEN_X64
   PRE_REX = 0x40,
@@ -343,6 +348,7 @@ enum TwoByteOpcodeID {
 
 enum ThreeByteOpcodeID {
   OP3_PSHUFB_VdqWdq = 0x00,
+  OP3_PHADDD_VdqWdq = 0x02,
   OP3_PMADDUBSW_VdqWdq = 0x04,
   OP3_ROUNDPS_VpsWps = 0x08,
   OP3_ROUNDPD_VpdWpd = 0x09,
@@ -356,10 +362,12 @@ enum ThreeByteOpcodeID {
   OP3_BLENDVPS_VdqWdq = 0x14,
   OP3_PEXTRB_EvVdqIb = 0x14,
   OP3_PEXTRW_EwVdqIb = 0x15,
+  OP3_BLENDVPD_VdqWdq = 0x15,
   OP3_PEXTRD_EvVdqIb = 0x16,
   OP3_PEXTRQ_EvVdqIb = 0x16,
   OP3_PTEST_VdVd = 0x17,
   OP3_EXTRACTPS_EdVdqIb = 0x17,
+  OP3_VBROADCASTSS_VxWd = 0x18,
   OP3_PABSB_VdqWdq = 0x1C,
   OP3_PABSW_VdqWdq = 0x1D,
   OP3_PABSD_VdqWdq = 0x1E,
@@ -387,6 +395,16 @@ enum ThreeByteOpcodeID {
   OP3_PMAXUD_VdqWdq = 0x3F,
   OP3_PMULLD_VdqWdq = 0x40,
   OP3_VBLENDVPS_VdqWdq = 0x4A,
+  OP3_VBLENDVPD_VdqWdq = 0x4B,
+  OP3_VPBLENDVB_VdqWdq = 0x4C,
+  OP3_VBROADCASTD_VxWx = 0x58,
+  OP3_VBROADCASTQ_VxWx = 0x59,
+  OP3_VBROADCASTB_VxWx = 0x78,
+  OP3_VBROADCASTW_VxWx = 0x79,
+  OP3_VFMADD231PS_VxHxWx = 0xB8,
+  OP3_VFMADD231PD_VxHxWx = 0xB8,
+  OP3_VFNMADD231PS_VxHxWx = 0xBC,
+  OP3_VFNMADD231PD_VxHxWx = 0xBC,
   OP3_SHLX_GyEyBy = 0xF7,
   OP3_SARX_GyEyBy = 0xF7,
   OP3_SHRX_GyEyBy = 0xF7,
@@ -410,16 +428,18 @@ enum ThreeByteEscape { ESCAPE_38 = 0x38, ESCAPE_3A = 0x3A };
 enum VexOperandType { VEX_PS = 0, VEX_PD = 1, VEX_SS = 2, VEX_SD = 3 };
 
 inline OneByteOpcodeID jccRel8(Condition cond) {
-  return OneByteOpcodeID(OP_JCC_rel8 + cond);
+  return OneByteOpcodeID(OP_JCC_rel8 + std::underlying_type_t<Condition>(cond));
 }
 inline TwoByteOpcodeID jccRel32(Condition cond) {
-  return TwoByteOpcodeID(OP2_JCC_rel32 + cond);
+  return TwoByteOpcodeID(OP2_JCC_rel32 +
+                         std::underlying_type_t<Condition>(cond));
 }
 inline TwoByteOpcodeID setccOpcode(Condition cond) {
-  return TwoByteOpcodeID(OP_SETCC + cond);
+  return TwoByteOpcodeID(OP_SETCC + std::underlying_type_t<Condition>(cond));
 }
 inline TwoByteOpcodeID cmovccOpcode(Condition cond) {
-  return TwoByteOpcodeID(OP2_CMOVCC_GvEv + cond);
+  return TwoByteOpcodeID(OP2_CMOVCC_GvEv +
+                         std::underlying_type_t<Condition>(cond));
 }
 
 enum GroupOpcodeID {

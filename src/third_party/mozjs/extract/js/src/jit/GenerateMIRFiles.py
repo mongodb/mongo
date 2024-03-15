@@ -5,10 +5,11 @@
 # This script generates jit/MIROpsGenerated.h (list of MIR instructions)
 # from MIROps.yaml, as well as MIR op definitions.
 
-import buildconfig
-import yaml
-import six
 from collections import OrderedDict
+
+import buildconfig
+import six
+import yaml
 from mozbuild.preprocessor import Preprocessor
 
 HEADER_TEMPLATE = """\
@@ -67,8 +68,10 @@ type_policies = {
     "Value": "BoxPolicy",
     "Int32": "UnboxedInt32Policy",
     "BigInt": "BigIntPolicy",
+    "Boolean": "BooleanPolicy",
     "Double": "DoublePolicy",
     "String": "StringPolicy",
+    "Symbol": "SymbolPolicy",
 }
 
 
@@ -108,9 +111,11 @@ gc_pointer_types = [
     "GetterSetter*",
     "JSAtom*",
     "ClassBodyScope*",
+    "VarScope*",
     "NamedLambdaObject*",
     "RegExpObject*",
     "JSScript*",
+    "LexicalScope*",
 ]
 
 
@@ -125,6 +130,7 @@ def gen_mir_class(
     folds_to,
     congruent_to,
     alias_set,
+    might_alias,
     possibly_calls,
     compute_range,
     can_recover,
@@ -233,6 +239,8 @@ def gen_mir_class(
                 "  AliasSet getAliasSet() const override { "
                 "return AliasSet::None(); }\\\n"
             )
+    if might_alias:
+        code += "  AliasType mightAlias(const MDefinition* store) const override;\\\n"
     if folds_to:
         code += "  MDefinition* foldsTo(TempAllocator& alloc) override;\\\n"
     if congruent_to:
@@ -339,6 +347,9 @@ def generate_mir_header(c_out, yaml_path):
             alias_set = op.get("alias_set", None)
             assert alias_set is None or True or isinstance(alias_set, str)
 
+            might_alias = op.get("might_alias", None)
+            assert might_alias is None or might_alias == "custom"
+
             possibly_calls = op.get("possibly_calls", None)
             assert possibly_calls is None or True or possibly_calls == "custom"
 
@@ -362,6 +373,7 @@ def generate_mir_header(c_out, yaml_path):
                 folds_to,
                 congruent_to,
                 alias_set,
+                might_alias,
                 possibly_calls,
                 compute_range,
                 can_recover,

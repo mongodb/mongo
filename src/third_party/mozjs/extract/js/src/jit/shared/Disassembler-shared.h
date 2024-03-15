@@ -14,13 +14,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "jstypes.h"  // JS_PUBLIC_API
+
 #if defined(JS_DISASM_ARM) || defined(JS_DISASM_ARM64)
 #  define JS_DISASM_SUPPORTED
 #endif
 
 namespace js {
 
-class Sprinter;
+class JS_PUBLIC_API Sprinter;
 
 namespace jit {
 

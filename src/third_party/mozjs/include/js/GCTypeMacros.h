@@ -21,7 +21,7 @@ class JS_PUBLIC_API JSString;
 
 namespace JS {
 class JS_PUBLIC_API BigInt;
-struct JS_PUBLIC_API PropertyKey;
+class JS_PUBLIC_API PropertyKey;
 class JS_PUBLIC_API Symbol;
 class JS_PUBLIC_API Value;
 }  // namespace JS

@@ -9,13 +9,16 @@
 loadRelativeToScript('utility.js');
 loadRelativeToScript('annotations.js');
 
-var gcTypes_filename = scriptArgs[0] || "gcTypes.txt";
-var typeInfo_filename = scriptArgs[1] || "typeInfo.txt";
+var options = parse_options([
+    { name: "gcTypes", default: "gcTypes.txt" },
+    { name: "typeInfo", default: "typeInfo.txt" }
+]);
 
 var typeInfo = {
     'GCPointers': [],
     'GCThings': [],
     'GCInvalidated': [],
+    'GCRefs': [],
     'NonGCTypes': {}, // unused
     'NonGCPointers': {},
     'RootedGCThings': {},
@@ -43,6 +46,11 @@ var gcFields = new Map;
 
 var rootedPointers = {};
 
+// Accumulate the base GC types before propagating info through the type graph,
+// so that we can include edges from types processed later
+// (eg MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS).
+var pendingGCTypes = []; // array of [name, reason, ptrdness]
+
 function processCSU(csu, body)
 {
     for (let { 'Name': [ annType, tag ] } of (body.Annotation || [])) {
@@ -53,6 +61,8 @@ function processCSU(csu, body)
             typeInfo.GCPointers.push(csu);
         else if (tag == 'Invalidated by GC')
             typeInfo.GCInvalidated.push(csu);
+        else if (tag == 'GC Pointer or Reference')
+            typeInfo.GCRefs.push(csu);
         else if (tag == 'GC Thing')
             typeInfo.GCThings.push(csu);
         else if (tag == 'Suppressed GC Pointer')
@@ -182,42 +192,139 @@ for (const csu of typeInfo.GCPointers)
 for (const csu of typeInfo.GCInvalidated)
     addGCPointer(csu);
 
+function parseTemplateType(typeName, validate=false) {
+    // We only want templatized types. `Foo<U, T>::Member` doesn't count.
+    // Foo<U, T>::Bar<X, Y> does count. Which turns out to be a simple rule:
+    // check whether the type ends in '>'.
+    if (!typeName.endsWith(">")) {
+        return [typeName, undefined];
+    }
+
+    // "Tokenize" into angle brackets, commas, and everything else. We store
+    // match objects as tokens because we'll need the string offset after we
+    // finish grabbing the template parameters.
+    const tokens = [];
+    const tokenizer = /[<>,]|[^<>,]+/g;
+    let match;
+    while ((match = tokenizer.exec(typeName)) !== null) {
+    	tokens.push(match);
+    }
+
+    // Walk backwards through the tokens, stopping when we find the matching
+    // open bracket.
+    const args = [];
+    let depth = 0;
+    let arg;
+    let first_result;
+    for (const match of tokens.reverse()) {
+        const token = match[0];
+        if (depth == 1 && (token == ',' || token == '<')) {
+            // We've walked back to the beginning of a template parameter,
+            // where we will see either a comma or open bracket.
+            args.unshift(arg);
+            arg = '';
+        } else if (depth == 0 && token == '>') {
+            arg = ''; // We just started.
+        } else {
+            arg = token + arg;
+        }
+
+        // Maintain the depth.
+        if (token == '<') {
+            // This could be bug 1728151.
+            assert(depth > 0, `Invalid type: too many '<' signs in '${typeName}'`);
+            depth--;
+        } else if (token == '>') {
+            depth++;
+        }
+
+        if (depth == 0) {
+            // We've walked out of the template parameter list.
+            // Record the results.
+            assert(args.length > 0);
+            const templateName = typeName.substr(0, match.index);
+            const result = [templateName, args.map(arg => arg.trim())];
+            if (!validate) {
+                // Normal processing is to return the result the first time we
+                // get to the '<' that matches the terminal '>', without validating
+                // that the rest of the type name is balanced.
+                return result;
+            } else if (!first_result) {
+                // If we are validating, remember the result when we hit the
+                // first matching '<', but then keep processing the rest of
+                // the input string to count brackets.
+                first_result = result;
+            }
+        }
+    }
+
+    // This could be bug 1728151.
+    assert(depth == 0, `Invalid type: too many '>' signs in '${typeName}'`);
+    return first_result;
+}
+
+if (os.getenv("HAZARD_RUN_INTERNAL_TESTS")) {
+    function check_parse(typeName, result) {
+        assertEq(JSON.stringify(parseTemplateType(typeName)), JSON.stringify(result));
+    }
+
+    check_parse("int", ["int", undefined]);
+    check_parse("Type<int>", ["Type", ["int"]]);
+    check_parse("Container<int, double>", ["Container", ["int", "double"]]);
+    check_parse("Container<Container<void, void>, double>", ["Container", ["Container<void, void>", "double"]]);
+    check_parse("Foo<Bar<a,b>,Bar<a,b>>::Container<Container<void, void>, double>", ["Foo<Bar<a,b>,Bar<a,b>>::Container", ["Container<void, void>", "double"]]);
+    check_parse("AlignedStorage2<TypedArray<foo>>", ["AlignedStorage2", ["TypedArray<foo>"]]);
+    check_parse("mozilla::AlignedStorage2<mozilla::dom::TypedArray<unsigned char, JS::UnwrapArrayBufferMaybeShared, JS::GetArrayBufferMaybeSharedData, JS::GetArrayBufferMaybeSharedLengthAndData, JS::NewArrayBuffer> >",
+        [
+            "mozilla::AlignedStorage2",
+            [
+                "mozilla::dom::TypedArray<unsigned char, JS::UnwrapArrayBufferMaybeShared, JS::GetArrayBufferMaybeSharedData, JS::GetArrayBufferMaybeSharedLengthAndData, JS::NewArrayBuffer>"
+            ]
+        ]
+    );
+    check_parse(
+        "mozilla::ArrayIterator<const mozilla::dom::binding_detail::RecordEntry<nsTString<char16_t>, mozilla::dom::Nullable<mozilla::dom::TypedArray<unsigned char, JS::UnwrapArrayBufferMaybeShared, JS::GetArrayBufferMaybeSharedData, JS::GetArrayBufferMaybeSharedLengthAndData, JS::NewArrayBuffer> > >&, nsTArray_Impl<mozilla::dom::binding_detail::RecordEntry<nsTString<char16_t>, mozilla::dom::Nullable<mozilla::dom::TypedArray<unsigned char, JS::UnwrapArrayBufferMaybeShared, JS::GetArrayBufferMaybeSharedData, JS::GetArrayBufferMaybeSharedLengthAndData, JS::NewArrayBuffer> > >, nsTArrayInfallibleAllocator> >",
+        [
+            "mozilla::ArrayIterator",
+            [
+                "const mozilla::dom::binding_detail::RecordEntry<nsTString<char16_t>, mozilla::dom::Nullable<mozilla::dom::TypedArray<unsigned char, JS::UnwrapArrayBufferMaybeShared, JS::GetArrayBufferMaybeSharedData, JS::GetArrayBufferMaybeSharedLengthAndData, JS::NewArrayBuffer> > >&",
+                "nsTArray_Impl<mozilla::dom::binding_detail::RecordEntry<nsTString<char16_t>, mozilla::dom::Nullable<mozilla::dom::TypedArray<unsigned char, JS::UnwrapArrayBufferMaybeShared, JS::GetArrayBufferMaybeSharedData, JS::GetArrayBufferMaybeSharedLengthAndData, JS::NewArrayBuffer> > >, nsTArrayInfallibleAllocator>"
+            ]
+        ]
+    );
+
+    function check_throws(f, exc) {
+        try {
+            f();
+        } catch (e) {
+            assertEq(e.message.includes(exc), true, "incorrect exception: " + e.message);
+            return;
+        }
+        assertEq(undefined, exc);
+    }
+    // Note that these need to end in '>' or the whole thing will be ignored.
+    check_throws(() => parseTemplateType("foo>", true), "too many '>' signs");
+    check_throws(() => parseTemplateType("foo<<>", true), "too many '<' signs");
+    check_throws(() => parseTemplateType("foo<a::bar<a,b>", true), "too many '<' signs");
+    check_throws(() => parseTemplateType("foo<a>*>::bar<a,b>", true), "too many '>' signs");
+}
+
 // GC Thing and GC Pointer annotations can be inherited from template args if
 // this annotation is used. Think of Maybe<T> for example: Maybe<JSObject*> has
-// the same GC rules as JSObject*. But this needs to be done in a conservative
-// direction: Maybe<AutoSuppressGC> should not be regarding as suppressing GC
-// (because it might still be None).
-//
-// Note that there is an order-dependence here that is being mostly ignored (eg
-// Maybe<Maybe<Cell*>> -- if that is processed before Maybe<Cell*> is
-// processed, we won't get the right answer). We'll at least sort by string
-// length to make it hard to hit that case.
+// the same GC rules as JSObject*.
+
 var inheritors = Object.keys(typeInfo.InheritFromTemplateArgs).sort((a, b) => a.length - b.length);
 for (const csu of inheritors) {
-    // Unfortunately, we just have a string type name, not the full structure
-    // of a templatized type, so we will have to resort to loose (buggy)
-    // pattern matching.
-    //
-    // Currently, the simplest ways I know of to break this are:
-    //
-    //   foo<T>::bar<U>
-    //   foo<bar<T,U>>
-    //
-    const [_, params_str] = csu.match(/<(.*)>/);
-    for (let param of params_str.split(",")) {
-        param = param.replace(/^\s+/, '')
-        param = param.replace(/\s+$/, '')
-        const pieces = param.split("*");
-        const core_type = pieces[0];
-        const ptrdness = pieces.length - 1;
-        if (ptrdness > 1)
-            continue;
-        const paramDesc = 'template-param-' + param;
-        const why = '(inherited annotations from ' + param + ')';
-        if (core_type in gcTypes)
-            markGCType(csu, paramDesc, why, ptrdness, 0, "");
-        if (core_type in gcPointers)
-            markGCType(csu, paramDesc, why, ptrdness + 1, 0, "");
+    const [templateName, templateArgs] = parseTemplateType(csu);
+    for (const param of templateArgs) {
+        const pos = param.search(/\**$/);
+        const ptrdness = param.length - pos;
+        const core_type = param.substr(0, pos);
+        if (ptrdness == 0) {
+            addToKeyedList(structureParents, core_type, [csu, "template-param-" + param]);
+        } else if (ptrdness == 1) {
+            addToKeyedList(pointerParents, core_type, [csu, "template-param-" + param]);
+        }
     }
 }
 
@@ -301,12 +408,16 @@ function markGCType(typeName, child, why, typePtrLevel, fieldPtrLevel, indent)
 
 function addGCType(typeName, child, why, depth, fieldPtrLevel)
 {
-    markGCType(typeName, '<annotation>', '(annotation)', 0, 0, "");
+    pendingGCTypes.push([typeName, '<annotation>', '(annotation)', 0, 0]);
 }
 
 function addGCPointer(typeName)
 {
-    markGCType(typeName, '<pointer-annotation>', '(annotation)', 1, 0, "");
+    pendingGCTypes.push([typeName, '<pointer-annotation>', '(annotation)', 1, 0]);
+}
+
+for (const pending of pendingGCTypes) {
+    markGCType(...pending);
 }
 
 // Call a function for a type and every type that contains the type in a field
@@ -359,7 +470,11 @@ function explain(csu, indent, seen) {
         if (field[0] == '<')
             msg += "inherits from ";
         else {
-            msg += "contains field '" + field + "' ";
+            if (field.startsWith("template-param-")) {
+                msg += "inherits annotations from template parameter '" + field.substr(15) + "' ";
+            } else {
+                msg += "contains field '" + field + "' ";
+            }
             if (ptrdness == -1)
                 msg += "(with a pointer to unsafe storage) holding a ";
             else if (ptrdness == 0)
@@ -374,7 +489,7 @@ function explain(csu, indent, seen) {
     }
 }
 
-var origOut = os.file.redirect(gcTypes_filename);
+var origOut = os.file.redirect(options.gcTypes);
 
 for (var csu in gcTypes) {
     print("GCThing: " + csu);
@@ -386,7 +501,7 @@ for (var csu in gcPointers) {
 }
 
 // Redirect output to the typeInfo file and close the gcTypes file.
-os.file.close(os.file.redirect(typeInfo_filename));
+os.file.close(os.file.redirect(options.typeInfo));
 
 // Compute the set of types that suppress GC within their RAII scopes (eg
 // AutoSuppressGC, AutoSuppressGCForAnalysis).

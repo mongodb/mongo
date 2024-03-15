@@ -9,15 +9,13 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
 
-#include "jsmath.h"
-
 #include "jit/CodeGenerator.h"
 #include "jit/InlineScriptTree.h"
 #include "jit/JitRuntime.h"
 #include "jit/RangeAnalysis.h"
+#include "jit/ReciprocalMulConstants.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 #include "util/DifferentialTesting.h"
-#include "vm/TraceLogging.h"
 
 #include "jit/MacroAssembler-inl.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
@@ -76,12 +74,12 @@ void CodeGeneratorX86Shared::emitBranch(Assembler::Condition cond,
 
 void CodeGenerator::visitDouble(LDouble* ins) {
   const LDefinition* out = ins->getDef(0);
-  masm.loadConstantDouble(ins->getDouble(), ToFloatRegister(out));
+  masm.loadConstantDouble(ins->value(), ToFloatRegister(out));
 }
 
 void CodeGenerator::visitFloat32(LFloat32* ins) {
   const LDefinition* out = ins->getDef(0);
-  masm.loadConstantFloat32(ins->getFloat(), ToFloatRegister(out));
+  masm.loadConstantFloat32(ins->value(), ToFloatRegister(out));
 }
 
 void CodeGenerator::visitTestIAndBranch(LTestIAndBranch* test) {
@@ -120,21 +118,13 @@ void CodeGenerator::visitTestFAndBranch(LTestFAndBranch* test) {
   emitBranch(Assembler::NotEqual, test->ifTrue(), test->ifFalse());
 }
 
-void CodeGenerator::visitBitAndAndBranch(LBitAndAndBranch* baab) {
-  if (baab->right()->isConstant()) {
-    masm.test32(ToRegister(baab->left()), Imm32(ToInt32(baab->right())));
-  } else {
-    masm.test32(ToRegister(baab->left()), ToRegister(baab->right()));
-  }
-  emitBranch(baab->cond(), baab->ifTrue(), baab->ifFalse());
-}
-
 void CodeGeneratorX86Shared::emitCompare(MCompare::CompareType type,
                                          const LAllocation* left,
                                          const LAllocation* right) {
 #ifdef JS_CODEGEN_X64
   if (type == MCompare::Compare_Object || type == MCompare::Compare_Symbol ||
-      type == MCompare::Compare_UIntPtr) {
+      type == MCompare::Compare_UIntPtr ||
+      type == MCompare::Compare_RefOrNull) {
     if (right->isConstant()) {
       MOZ_ASSERT(type == MCompare::Compare_UIntPtr);
       masm.cmpPtr(ToRegister(left), Imm32(ToInt32(right)));
@@ -358,10 +348,6 @@ void CodeGenerator::visitWasmSelect(LWasmSelect* ins) {
   masm.bind(&done);
 }
 
-void CodeGenerator::visitWasmCompareAndSelect(LWasmCompareAndSelect* ins) {
-  emitWasmCompareAndSelect(ins);
-}
-
 void CodeGenerator::visitWasmReinterpret(LWasmReinterpret* lir) {
   MOZ_ASSERT(gen->compilingWasm());
   MWasmReinterpret* ins = lir->mir();
@@ -477,11 +463,25 @@ void CodeGenerator::visitWasmAddOffset(LWasmAddOffset* lir) {
     masm.move32(base, out);
   }
   masm.add32(Imm32(mir->offset()), out);
+  OutOfLineAbortingWasmTrap* ool = new (alloc())
+      OutOfLineAbortingWasmTrap(mir->bytecodeOffset(), wasm::Trap::OutOfBounds);
+  addOutOfLineCode(ool, mir);
+  masm.j(Assembler::CarrySet, ool->entry());
+}
 
-  Label ok;
-  masm.j(Assembler::CarryClear, &ok);
-  masm.wasmTrap(wasm::Trap::OutOfBounds, mir->bytecodeOffset());
-  masm.bind(&ok);
+void CodeGenerator::visitWasmAddOffset64(LWasmAddOffset64* lir) {
+  MWasmAddOffset* mir = lir->mir();
+  Register64 base = ToRegister64(lir->base());
+  Register64 out = ToOutRegister64(lir);
+
+  if (base != out) {
+    masm.move64(base, out);
+  }
+  masm.add64(Imm64(mir->offset()), out);
+  OutOfLineAbortingWasmTrap* ool = new (alloc())
+      OutOfLineAbortingWasmTrap(mir->bytecodeOffset(), wasm::Trap::OutOfBounds);
+  addOutOfLineCode(ool, mir);
+  masm.j(Assembler::CarrySet, ool->entry());
 }
 
 void CodeGenerator::visitWasmTruncateToInt32(LWasmTruncateToInt32* lir) {
@@ -579,27 +579,6 @@ template <typename T>
 void CodeGeneratorX86Shared::bailout(const T& binder, LSnapshot* snapshot) {
   encode(snapshot);
 
-  // Though the assembler doesn't track all frame pushes, at least make sure
-  // the known value makes sense. We can't use bailout tables if the stack
-  // isn't properly aligned to the static frame size.
-  MOZ_ASSERT_IF(frameClass_ != FrameSizeClass::None() && deoptTable_,
-                frameClass_.frameSize() == masm.framePushed());
-
-#ifdef JS_CODEGEN_X86
-  // On x64, bailout tables are pointless, because 16 extra bytes are
-  // reserved per external jump, whereas it takes only 10 bytes to encode a
-  // a non-table based bailout.
-  if (assignBailoutId(snapshot)) {
-    binder(masm, deoptTable_->value +
-                     snapshot->bailoutId() * BAILOUT_TABLE_ENTRY_SIZE);
-    return;
-  }
-#endif
-
-  // We could not use a jump table, either because all bailout IDs were
-  // reserved, or a jump table is not optimal for this frame size or
-  // platform. Whatever, we will generate a lazy bailout.
-  //
   // All bailout code is associated with the bytecodeSite of the block we are
   // bailing out from.
   InlineScriptTree* tree = snapshot->mir()->block()->trackedTree();
@@ -692,7 +671,7 @@ void CodeGenerator::visitPopcntI(LPopcntI* ins) {
   Register input = ToRegister(ins->input());
   Register output = ToRegister(ins->output());
   Register temp =
-      ins->temp()->isBogusTemp() ? InvalidReg : ToRegister(ins->temp());
+      ins->temp0()->isBogusTemp() ? InvalidReg : ToRegister(ins->temp0());
 
   masm.popcnt32(input, output, temp);
 }
@@ -1068,7 +1047,7 @@ void CodeGenerator::visitUDivOrModConstant(LUDivOrModConstant* ins) {
   // The denominator isn't a power of 2 (see LDivPowTwoI and LModPowTwoI).
   MOZ_ASSERT((d & (d - 1)) != 0);
 
-  ReciprocalMulConstants rmc = computeDivisionConstants(d, /* maxLog = */ 32);
+  auto rmc = ReciprocalMulConstants::computeUnsignedDivisionConstants(d);
 
   // We first compute (M * n) >> 32, where M = rmc.multiplier.
   masm.movl(Imm32(rmc.multiplier), eax);
@@ -1233,8 +1212,7 @@ void CodeGenerator::visitDivOrModConstantI(LDivOrModConstantI* ins) {
 
   // We will first divide by Abs(d), and negate the answer if d is negative.
   // If desired, this can be avoided by generalizing computeDivisionConstants.
-  ReciprocalMulConstants rmc =
-      computeDivisionConstants(Abs(d), /* maxLog = */ 31);
+  auto rmc = ReciprocalMulConstants::computeSignedDivisionConstants(Abs(d));
 
   // We first compute (M * n) >> 32, where M = rmc.multiplier.
   masm.movl(Imm32(rmc.multiplier), eax);
@@ -1546,7 +1524,6 @@ void CodeGenerator::visitModI(LModI* ins) {
     masm.bind(&negative);
 
     // Prevent an integer overflow exception from -2147483648 % -1
-    Label notmin;
     masm.cmp32(lhs, Imm32(INT32_MIN));
     overflow = new (alloc()) ModOverflowCheck(ins, rhs);
     masm.j(Assembler::Equal, overflow->entry());
@@ -1791,8 +1768,8 @@ MoveOperand CodeGeneratorX86Shared::toMoveOperand(LAllocation a) const {
   if (a.isFloatReg()) {
     return MoveOperand(ToFloatRegister(a));
   }
-  MoveOperand::Kind kind =
-      a.isStackArea() ? MoveOperand::EFFECTIVE_ADDRESS : MoveOperand::MEMORY;
+  MoveOperand::Kind kind = a.isStackArea() ? MoveOperand::Kind::EffectiveAddress
+                                           : MoveOperand::Kind::Memory;
   return MoveOperand(ToAddress(a), kind);
 }
 
@@ -2256,19 +2233,58 @@ void CodeGenerator::visitPopcntI64(LPopcntI64* lir) {
 void CodeGenerator::visitSimd128(LSimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
   const LDefinition* out = ins->getDef(0);
-  masm.loadConstantSimd128(ins->getSimd128(), ToFloatRegister(out));
+  masm.loadConstantSimd128(ins->simd128(), ToFloatRegister(out));
 #else
   MOZ_CRASH("No SIMD");
 #endif
 }
 
-void CodeGenerator::visitWasmBitselectSimd128(LWasmBitselectSimd128* ins) {
+void CodeGenerator::visitWasmTernarySimd128(LWasmTernarySimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
-  FloatRegister lhsDest = ToFloatRegister(ins->lhsDest());
-  FloatRegister rhs = ToFloatRegister(ins->rhs());
-  FloatRegister control = ToFloatRegister(ins->control());
-  FloatRegister temp = ToFloatRegister(ins->temp());
-  masm.bitwiseSelectSimd128(control, lhsDest, rhs, lhsDest, temp);
+  switch (ins->simdOp()) {
+    case wasm::SimdOp::V128Bitselect: {
+      FloatRegister lhsDest = ToFloatRegister(ins->v0());
+      FloatRegister rhs = ToFloatRegister(ins->v1());
+      FloatRegister control = ToFloatRegister(ins->v2());
+      FloatRegister temp = ToFloatRegister(ins->temp());
+      masm.bitwiseSelectSimd128(control, lhsDest, rhs, lhsDest, temp);
+      break;
+    }
+    case wasm::SimdOp::F32x4RelaxedFma:
+      masm.fmaFloat32x4(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
+                        ToFloatRegister(ins->v2()));
+      break;
+    case wasm::SimdOp::F32x4RelaxedFnma:
+      masm.fnmaFloat32x4(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
+                         ToFloatRegister(ins->v2()));
+      break;
+    case wasm::SimdOp::F64x2RelaxedFma:
+      masm.fmaFloat64x2(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
+                        ToFloatRegister(ins->v2()));
+      break;
+    case wasm::SimdOp::F64x2RelaxedFnma:
+      masm.fnmaFloat64x2(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
+                         ToFloatRegister(ins->v2()));
+      break;
+    case wasm::SimdOp::I8x16RelaxedLaneSelect:
+    case wasm::SimdOp::I16x8RelaxedLaneSelect:
+    case wasm::SimdOp::I32x4RelaxedLaneSelect:
+    case wasm::SimdOp::I64x2RelaxedLaneSelect: {
+      FloatRegister lhs = ToFloatRegister(ins->v0());
+      FloatRegister rhs = ToFloatRegister(ins->v1());
+      FloatRegister mask = ToFloatRegister(ins->v2());
+      FloatRegister dest = ToFloatRegister(ins->output());
+      masm.laneSelectSimd128(mask, lhs, rhs, dest);
+      break;
+    }
+    case wasm::SimdOp::I32x4DotI8x16I7x16AddS:
+      masm.dotInt8x16Int7x16ThenAdd(ToFloatRegister(ins->v0()),
+                                    ToFloatRegister(ins->v1()),
+                                    ToFloatRegister(ins->v2()));
+      break;
+    default:
+      MOZ_CRASH("NYI");
+  }
 #else
   MOZ_CRASH("No SIMD");
 #endif
@@ -2276,383 +2292,395 @@ void CodeGenerator::visitWasmBitselectSimd128(LWasmBitselectSimd128* ins) {
 
 void CodeGenerator::visitWasmBinarySimd128(LWasmBinarySimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
-  FloatRegister lhsDest = ToFloatRegister(ins->lhsDest());
+  FloatRegister lhs = ToFloatRegister(ins->lhsDest());
   FloatRegister rhs = ToFloatRegister(ins->rhs());
   FloatRegister temp1 = ToTempFloatRegisterOrInvalid(ins->getTemp(0));
   FloatRegister temp2 = ToTempFloatRegisterOrInvalid(ins->getTemp(1));
-
-  MOZ_ASSERT(ToFloatRegister(ins->output()) == lhsDest);
+  FloatRegister dest = ToFloatRegister(ins->output());
 
   switch (ins->simdOp()) {
     case wasm::SimdOp::V128And:
-      masm.bitwiseAndSimd128(rhs, lhsDest);
+      masm.bitwiseAndSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::V128Or:
-      masm.bitwiseOrSimd128(rhs, lhsDest);
+      masm.bitwiseOrSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::V128Xor:
-      masm.bitwiseXorSimd128(rhs, lhsDest);
+      masm.bitwiseXorSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::V128AndNot:
       // x86/x64 specific: The CPU provides ~A & B.  The operands were swapped
       // during lowering, and we'll compute A & ~B here as desired.
-      masm.bitwiseNotAndSimd128(rhs, lhsDest);
+      masm.bitwiseNotAndSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16AvgrU:
-      masm.unsignedAverageInt8x16(rhs, lhsDest);
+      masm.unsignedAverageInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8AvgrU:
-      masm.unsignedAverageInt16x8(rhs, lhsDest);
+      masm.unsignedAverageInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Add:
-      masm.addInt8x16(rhs, lhsDest);
+      masm.addInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16AddSaturateS:
-      masm.addSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16AddSatS:
+      masm.addSatInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16AddSaturateU:
-      masm.unsignedAddSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16AddSatU:
+      masm.unsignedAddSatInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Sub:
-      masm.subInt8x16(rhs, lhsDest);
+      masm.subInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16SubSaturateS:
-      masm.subSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16SubSatS:
+      masm.subSatInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16SubSaturateU:
-      masm.unsignedSubSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16SubSatU:
+      masm.unsignedSubSatInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MinS:
-      masm.minInt8x16(rhs, lhsDest);
+      masm.minInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MinU:
-      masm.unsignedMinInt8x16(rhs, lhsDest);
+      masm.unsignedMinInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MaxS:
-      masm.maxInt8x16(rhs, lhsDest);
+      masm.maxInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MaxU:
-      masm.unsignedMaxInt8x16(rhs, lhsDest);
+      masm.unsignedMaxInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Add:
-      masm.addInt16x8(rhs, lhsDest);
+      masm.addInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8AddSaturateS:
-      masm.addSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8AddSatS:
+      masm.addSatInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8AddSaturateU:
-      masm.unsignedAddSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8AddSatU:
+      masm.unsignedAddSatInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Sub:
-      masm.subInt16x8(rhs, lhsDest);
+      masm.subInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8SubSaturateS:
-      masm.subSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8SubSatS:
+      masm.subSatInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8SubSaturateU:
-      masm.unsignedSubSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8SubSatU:
+      masm.unsignedSubSatInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Mul:
-      masm.mulInt16x8(rhs, lhsDest);
+      masm.mulInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MinS:
-      masm.minInt16x8(rhs, lhsDest);
+      masm.minInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MinU:
-      masm.unsignedMinInt16x8(rhs, lhsDest);
+      masm.unsignedMinInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MaxS:
-      masm.maxInt16x8(rhs, lhsDest);
+      masm.maxInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MaxU:
-      masm.unsignedMaxInt16x8(rhs, lhsDest);
+      masm.unsignedMaxInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Add:
-      masm.addInt32x4(rhs, lhsDest);
+      masm.addInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Sub:
-      masm.subInt32x4(rhs, lhsDest);
+      masm.subInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Mul:
-      masm.mulInt32x4(rhs, lhsDest);
+      masm.mulInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MinS:
-      masm.minInt32x4(rhs, lhsDest);
+      masm.minInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MinU:
-      masm.unsignedMinInt32x4(rhs, lhsDest);
+      masm.unsignedMinInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MaxS:
-      masm.maxInt32x4(rhs, lhsDest);
+      masm.maxInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MaxU:
-      masm.unsignedMaxInt32x4(rhs, lhsDest);
+      masm.unsignedMaxInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Add:
-      masm.addInt64x2(rhs, lhsDest);
+      masm.addInt64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Sub:
-      masm.subInt64x2(rhs, lhsDest);
+      masm.subInt64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Mul:
-      masm.mulInt64x2(lhsDest, rhs, lhsDest, temp1);
+      masm.mulInt64x2(lhs, rhs, dest, temp1);
       break;
     case wasm::SimdOp::F32x4Add:
-      masm.addFloat32x4(rhs, lhsDest);
+      masm.addFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Sub:
-      masm.subFloat32x4(rhs, lhsDest);
+      masm.subFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Mul:
-      masm.mulFloat32x4(rhs, lhsDest);
+      masm.mulFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Div:
-      masm.divFloat32x4(rhs, lhsDest);
+      masm.divFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Min:
-      masm.minFloat32x4(rhs, lhsDest, temp1, temp2);
+      masm.minFloat32x4(lhs, rhs, dest, temp1, temp2);
       break;
     case wasm::SimdOp::F32x4Max:
-      masm.maxFloat32x4(rhs, lhsDest, temp1, temp2);
+      masm.maxFloat32x4(lhs, rhs, dest, temp1, temp2);
       break;
     case wasm::SimdOp::F64x2Add:
-      masm.addFloat64x2(rhs, lhsDest);
+      masm.addFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Sub:
-      masm.subFloat64x2(rhs, lhsDest);
+      masm.subFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Mul:
-      masm.mulFloat64x2(rhs, lhsDest);
+      masm.mulFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Div:
-      masm.divFloat64x2(rhs, lhsDest);
+      masm.divFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Min:
-      masm.minFloat64x2(rhs, lhsDest, temp1, temp2);
+      masm.minFloat64x2(lhs, rhs, dest, temp1, temp2);
       break;
     case wasm::SimdOp::F64x2Max:
-      masm.maxFloat64x2(rhs, lhsDest, temp1, temp2);
+      masm.maxFloat64x2(lhs, rhs, dest, temp1, temp2);
       break;
-    case wasm::SimdOp::V8x16Swizzle:
-      masm.swizzleInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16Swizzle:
+      masm.swizzleInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16NarrowSI16x8:
-      masm.narrowInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I8x16RelaxedSwizzle:
+      masm.swizzleInt8x16Relaxed(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16NarrowUI16x8:
-      masm.unsignedNarrowInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I8x16NarrowI16x8S:
+      masm.narrowInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8NarrowSI32x4:
-      masm.narrowInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I8x16NarrowI16x8U:
+      masm.unsignedNarrowInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8NarrowUI32x4:
-      masm.unsignedNarrowInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I16x8NarrowI32x4S:
+      masm.narrowInt32x4(lhs, rhs, dest);
+      break;
+    case wasm::SimdOp::I16x8NarrowI32x4U:
+      masm.unsignedNarrowInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Eq:
-      masm.compareInt8x16(Assembler::Equal, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Ne:
-      masm.compareInt8x16(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16LtS:
-      masm.compareInt8x16(Assembler::LessThan, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16GtS:
-      masm.compareInt8x16(Assembler::GreaterThan, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::GreaterThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16LeS:
-      masm.compareInt8x16(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16GeS:
-      masm.compareInt8x16(Assembler::GreaterThanOrEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::GreaterThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16LtU:
-      masm.compareInt8x16(Assembler::Below, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::Below, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16GtU:
-      masm.compareInt8x16(Assembler::Above, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::Above, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16LeU:
-      masm.compareInt8x16(Assembler::BelowOrEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::BelowOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16GeU:
-      masm.compareInt8x16(Assembler::AboveOrEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::AboveOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Eq:
-      masm.compareInt16x8(Assembler::Equal, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Ne:
-      masm.compareInt16x8(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8LtS:
-      masm.compareInt16x8(Assembler::LessThan, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8GtS:
-      masm.compareInt16x8(Assembler::GreaterThan, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::GreaterThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8LeS:
-      masm.compareInt16x8(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8GeS:
-      masm.compareInt16x8(Assembler::GreaterThanOrEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::GreaterThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8LtU:
-      masm.compareInt16x8(Assembler::Below, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::Below, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8GtU:
-      masm.compareInt16x8(Assembler::Above, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::Above, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8LeU:
-      masm.compareInt16x8(Assembler::BelowOrEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::BelowOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8GeU:
-      masm.compareInt16x8(Assembler::AboveOrEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::AboveOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Eq:
-      masm.compareInt32x4(Assembler::Equal, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Ne:
-      masm.compareInt32x4(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4LtS:
-      masm.compareInt32x4(Assembler::LessThan, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4GtS:
-      masm.compareInt32x4(Assembler::GreaterThan, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::GreaterThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4LeS:
-      masm.compareInt32x4(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4GeS:
-      masm.compareInt32x4(Assembler::GreaterThanOrEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::GreaterThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4LtU:
-      masm.compareInt32x4(Assembler::Below, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::Below, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4GtU:
-      masm.compareInt32x4(Assembler::Above, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::Above, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4LeU:
-      masm.compareInt32x4(Assembler::BelowOrEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::BelowOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4GeU:
-      masm.compareInt32x4(Assembler::AboveOrEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::AboveOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Eq:
-      masm.compareForEqualityInt64x2(Assembler::Equal, rhs, lhsDest);
+      masm.compareForEqualityInt64x2(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Ne:
-      masm.compareForEqualityInt64x2(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareForEqualityInt64x2(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2LtS:
-      masm.compareForOrderingInt64x2(Assembler::LessThan, rhs, lhsDest, temp1,
+      masm.compareForOrderingInt64x2(Assembler::LessThan, lhs, rhs, dest, temp1,
                                      temp2);
       break;
     case wasm::SimdOp::I64x2GtS:
-      masm.compareForOrderingInt64x2(Assembler::GreaterThan, rhs, lhsDest,
+      masm.compareForOrderingInt64x2(Assembler::GreaterThan, lhs, rhs, dest,
                                      temp1, temp2);
       break;
     case wasm::SimdOp::I64x2LeS:
-      masm.compareForOrderingInt64x2(Assembler::LessThanOrEqual, rhs, lhsDest,
+      masm.compareForOrderingInt64x2(Assembler::LessThanOrEqual, lhs, rhs, dest,
                                      temp1, temp2);
       break;
     case wasm::SimdOp::I64x2GeS:
-      masm.compareForOrderingInt64x2(Assembler::GreaterThanOrEqual, rhs,
-                                     lhsDest, temp1, temp2);
+      masm.compareForOrderingInt64x2(Assembler::GreaterThanOrEqual, lhs, rhs,
+                                     dest, temp1, temp2);
       break;
     case wasm::SimdOp::F32x4Eq:
-      masm.compareFloat32x4(Assembler::Equal, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Ne:
-      masm.compareFloat32x4(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Lt:
-      masm.compareFloat32x4(Assembler::LessThan, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Le:
-      masm.compareFloat32x4(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Eq:
-      masm.compareFloat64x2(Assembler::Equal, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Ne:
-      masm.compareFloat64x2(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Lt:
-      masm.compareFloat64x2(Assembler::LessThan, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Le:
-      masm.compareFloat64x2(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4PMax:
-      // `lhsDest` is actually rhsDest, and `rhs` is actually lhs
-      masm.pseudoMaxFloat32x4(lhsDest, rhs);
+      // `lhs` and `rhs` are swapped, for non-VEX platforms the output is rhs.
+      masm.pseudoMaxFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4PMin:
-      // `lhsDest` is actually rhsDest, and `rhs` is actually lhs
-      masm.pseudoMinFloat32x4(lhsDest, rhs);
+      // `lhs` and `rhs` are swapped, for non-VEX platforms the output is rhs.
+      masm.pseudoMinFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2PMax:
-      // `lhsDest` is actually rhsDest, and `rhs` is actually lhs
-      masm.pseudoMaxFloat64x2(lhsDest, rhs);
+      // `lhs` and `rhs` are swapped, for non-VEX platforms the output is rhs.
+      masm.pseudoMaxFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2PMin:
-      // `lhsDest` is actually rhsDest, and `rhs` is actually lhs
-      masm.pseudoMinFloat64x2(lhsDest, rhs);
+      // `lhs` and `rhs` are swapped, for non-VEX platforms the output is rhs.
+      masm.pseudoMinFloat64x2(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I32x4DotSI16x8:
-      masm.widenDotInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I32x4DotI16x8S:
+      masm.widenDotInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8ExtMulLowSI8x16:
-      masm.extMulLowInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I16x8ExtmulLowI8x16S:
+      masm.extMulLowInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8ExtMulHighSI8x16:
-      masm.extMulHighInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I16x8ExtmulHighI8x16S:
+      masm.extMulHighInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8ExtMulLowUI8x16:
-      masm.unsignedExtMulLowInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I16x8ExtmulLowI8x16U:
+      masm.unsignedExtMulLowInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8ExtMulHighUI8x16:
-      masm.unsignedExtMulHighInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I16x8ExtmulHighI8x16U:
+      masm.unsignedExtMulHighInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I32x4ExtMulLowSI16x8:
-      masm.extMulLowInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I32x4ExtmulLowI16x8S:
+      masm.extMulLowInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I32x4ExtMulHighSI16x8:
-      masm.extMulHighInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I32x4ExtmulHighI16x8S:
+      masm.extMulHighInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I32x4ExtMulLowUI16x8:
-      masm.unsignedExtMulLowInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I32x4ExtmulLowI16x8U:
+      masm.unsignedExtMulLowInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I32x4ExtMulHighUI16x8:
-      masm.unsignedExtMulHighInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I32x4ExtmulHighI16x8U:
+      masm.unsignedExtMulHighInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I64x2ExtMulLowSI32x4:
-      masm.extMulLowInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I64x2ExtmulLowI32x4S:
+      masm.extMulLowInt32x4(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I64x2ExtMulHighSI32x4:
-      masm.extMulHighInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I64x2ExtmulHighI32x4S:
+      masm.extMulHighInt32x4(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I64x2ExtMulLowUI32x4:
-      masm.unsignedExtMulLowInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I64x2ExtmulLowI32x4U:
+      masm.unsignedExtMulLowInt32x4(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I64x2ExtMulHighUI32x4:
-      masm.unsignedExtMulHighInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I64x2ExtmulHighI32x4U:
+      masm.unsignedExtMulHighInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Q15MulrSatS:
-      masm.q15MulrSatInt16x8(rhs, lhsDest);
+      masm.q15MulrSatInt16x8(lhs, rhs, dest);
       break;
-#  ifdef ENABLE_WASM_SIMD_WORMHOLE
-    case wasm::SimdOp::MozWHSELFTEST:
-      masm.loadConstantSimd128(wasm::WormholeSignature(), lhsDest);
+    case wasm::SimdOp::F32x4RelaxedMin:
+      masm.minFloat32x4Relaxed(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::MozWHPMADDUBSW:
-      masm.vpmaddubsw(rhs, lhsDest, lhsDest);
+    case wasm::SimdOp::F32x4RelaxedMax:
+      masm.maxFloat32x4Relaxed(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::MozWHPMADDWD:
-      masm.vpmaddwd(Operand(rhs), lhsDest, lhsDest);
+    case wasm::SimdOp::F64x2RelaxedMin:
+      masm.minFloat64x2Relaxed(lhs, rhs, dest);
       break;
-#  endif
+    case wasm::SimdOp::F64x2RelaxedMax:
+      masm.maxFloat64x2Relaxed(lhs, rhs, dest);
+      break;
+    case wasm::SimdOp::I16x8RelaxedQ15MulrS:
+      masm.q15MulrInt16x8Relaxed(lhs, rhs, dest);
+      break;
+    case wasm::SimdOp::I16x8DotI8x16I7x16S:
+      masm.dotInt8x16Int7x16(lhs, rhs, dest);
+      break;
+    case wasm::SimdOp::MozPMADDUBSW:
+      masm.vpmaddubsw(rhs, lhs, dest);
+      break;
     default:
       MOZ_CRASH("Binary SimdOp not implemented");
   }
@@ -2664,209 +2692,212 @@ void CodeGenerator::visitWasmBinarySimd128(LWasmBinarySimd128* ins) {
 void CodeGenerator::visitWasmBinarySimd128WithConstant(
     LWasmBinarySimd128WithConstant* ins) {
 #ifdef ENABLE_WASM_SIMD
-  FloatRegister lhsDest = ToFloatRegister(ins->lhsDest());
+  FloatRegister lhs = ToFloatRegister(ins->lhsDest());
   const SimdConstant& rhs = ins->rhs();
-
-  MOZ_ASSERT(ToFloatRegister(ins->output()) == lhsDest);
+  FloatRegister dest = ToFloatRegister(ins->output());
+  FloatRegister temp = ToTempFloatRegisterOrInvalid(ins->getTemp(0));
 
   switch (ins->simdOp()) {
     case wasm::SimdOp::I8x16Add:
-      masm.addInt8x16(rhs, lhsDest);
+      masm.addInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Add:
-      masm.addInt16x8(rhs, lhsDest);
+      masm.addInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Add:
-      masm.addInt32x4(rhs, lhsDest);
+      masm.addInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Add:
-      masm.addInt64x2(rhs, lhsDest);
+      masm.addInt64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Sub:
-      masm.subInt8x16(rhs, lhsDest);
+      masm.subInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Sub:
-      masm.subInt16x8(rhs, lhsDest);
+      masm.subInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Sub:
-      masm.subInt32x4(rhs, lhsDest);
+      masm.subInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I64x2Sub:
-      masm.subInt64x2(rhs, lhsDest);
+      masm.subInt64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Mul:
-      masm.mulInt16x8(rhs, lhsDest);
+      masm.mulInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Mul:
-      masm.mulInt32x4(rhs, lhsDest);
+      masm.mulInt32x4(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16AddSaturateS:
-      masm.addSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16AddSatS:
+      masm.addSatInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16AddSaturateU:
-      masm.unsignedAddSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16AddSatU:
+      masm.unsignedAddSatInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8AddSaturateS:
-      masm.addSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8AddSatS:
+      masm.addSatInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8AddSaturateU:
-      masm.unsignedAddSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8AddSatU:
+      masm.unsignedAddSatInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16SubSaturateS:
-      masm.subSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16SubSatS:
+      masm.subSatInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16SubSaturateU:
-      masm.unsignedSubSatInt8x16(rhs, lhsDest);
+    case wasm::SimdOp::I8x16SubSatU:
+      masm.unsignedSubSatInt8x16(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8SubSaturateS:
-      masm.subSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8SubSatS:
+      masm.subSatInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8SubSaturateU:
-      masm.unsignedSubSatInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I16x8SubSatU:
+      masm.unsignedSubSatInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MinS:
-      masm.minInt8x16(rhs, lhsDest);
+      masm.minInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MinU:
-      masm.unsignedMinInt8x16(rhs, lhsDest);
+      masm.unsignedMinInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MinS:
-      masm.minInt16x8(rhs, lhsDest);
+      masm.minInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MinU:
-      masm.unsignedMinInt16x8(rhs, lhsDest);
+      masm.unsignedMinInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MinS:
-      masm.minInt32x4(rhs, lhsDest);
+      masm.minInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MinU:
-      masm.unsignedMinInt32x4(rhs, lhsDest);
+      masm.unsignedMinInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MaxS:
-      masm.maxInt8x16(rhs, lhsDest);
+      masm.maxInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16MaxU:
-      masm.unsignedMaxInt8x16(rhs, lhsDest);
+      masm.unsignedMaxInt8x16(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MaxS:
-      masm.maxInt16x8(rhs, lhsDest);
+      masm.maxInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8MaxU:
-      masm.unsignedMaxInt16x8(rhs, lhsDest);
+      masm.unsignedMaxInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MaxS:
-      masm.maxInt32x4(rhs, lhsDest);
+      masm.maxInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4MaxU:
-      masm.unsignedMaxInt32x4(rhs, lhsDest);
+      masm.unsignedMaxInt32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::V128And:
-      masm.bitwiseAndSimd128(rhs, lhsDest);
+      masm.bitwiseAndSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::V128Or:
-      masm.bitwiseOrSimd128(rhs, lhsDest);
+      masm.bitwiseOrSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::V128Xor:
-      masm.bitwiseXorSimd128(rhs, lhsDest);
+      masm.bitwiseXorSimd128(lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Eq:
-      masm.compareInt8x16(Assembler::Equal, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16Ne:
-      masm.compareInt8x16(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16GtS:
-      masm.compareInt8x16(Assembler::GreaterThan, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::GreaterThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I8x16LeS:
-      masm.compareInt8x16(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareInt8x16(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Eq:
-      masm.compareInt16x8(Assembler::Equal, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8Ne:
-      masm.compareInt16x8(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8GtS:
-      masm.compareInt16x8(Assembler::GreaterThan, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::GreaterThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I16x8LeS:
-      masm.compareInt16x8(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareInt16x8(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Eq:
-      masm.compareInt32x4(Assembler::Equal, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4Ne:
-      masm.compareInt32x4(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4GtS:
-      masm.compareInt32x4(Assembler::GreaterThan, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::GreaterThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::I32x4LeS:
-      masm.compareInt32x4(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareInt32x4(Assembler::LessThanOrEqual, lhs, rhs, dest);
+      break;
+    case wasm::SimdOp::I64x2Mul:
+      masm.mulInt64x2(lhs, rhs, dest, temp);
       break;
     case wasm::SimdOp::F32x4Eq:
-      masm.compareFloat32x4(Assembler::Equal, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Ne:
-      masm.compareFloat32x4(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Lt:
-      masm.compareFloat32x4(Assembler::LessThan, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Le:
-      masm.compareFloat32x4(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareFloat32x4(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Eq:
-      masm.compareFloat64x2(Assembler::Equal, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::Equal, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Ne:
-      masm.compareFloat64x2(Assembler::NotEqual, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::NotEqual, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Lt:
-      masm.compareFloat64x2(Assembler::LessThan, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::LessThan, lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Le:
-      masm.compareFloat64x2(Assembler::LessThanOrEqual, rhs, lhsDest);
+      masm.compareFloat64x2(Assembler::LessThanOrEqual, lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I32x4DotSI16x8:
-      masm.widenDotInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I32x4DotI16x8S:
+      masm.widenDotInt16x8(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Add:
-      masm.addFloat32x4(rhs, lhsDest);
+      masm.addFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Add:
-      masm.addFloat64x2(rhs, lhsDest);
+      masm.addFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Sub:
-      masm.subFloat32x4(rhs, lhsDest);
+      masm.subFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Sub:
-      masm.subFloat64x2(rhs, lhsDest);
+      masm.subFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Div:
-      masm.divFloat32x4(rhs, lhsDest);
+      masm.divFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Div:
-      masm.divFloat64x2(rhs, lhsDest);
+      masm.divFloat64x2(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F32x4Mul:
-      masm.mulFloat32x4(rhs, lhsDest);
+      masm.mulFloat32x4(lhs, rhs, dest);
       break;
     case wasm::SimdOp::F64x2Mul:
-      masm.mulFloat64x2(rhs, lhsDest);
+      masm.mulFloat64x2(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16NarrowSI16x8:
-      masm.narrowInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I8x16NarrowI16x8S:
+      masm.narrowInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I8x16NarrowUI16x8:
-      masm.unsignedNarrowInt16x8(rhs, lhsDest);
+    case wasm::SimdOp::I8x16NarrowI16x8U:
+      masm.unsignedNarrowInt16x8(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8NarrowSI32x4:
-      masm.narrowInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I16x8NarrowI32x4S:
+      masm.narrowInt32x4(lhs, rhs, dest);
       break;
-    case wasm::SimdOp::I16x8NarrowUI32x4:
-      masm.unsignedNarrowInt32x4(rhs, lhsDest);
+    case wasm::SimdOp::I16x8NarrowI32x4U:
+      masm.unsignedNarrowInt32x4(lhs, rhs, dest);
       break;
     default:
       MOZ_CRASH("Binary SimdOp with constant not implemented");
@@ -2881,47 +2912,46 @@ void CodeGenerator::visitWasmVariableShiftSimd128(
 #ifdef ENABLE_WASM_SIMD
   FloatRegister lhsDest = ToFloatRegister(ins->lhsDest());
   Register rhs = ToRegister(ins->rhs());
-  Register temp1 = ToTempRegisterOrInvalid(ins->getTemp(0));
-  FloatRegister temp2 = ToTempFloatRegisterOrInvalid(ins->getTemp(1));
+  FloatRegister temp = ToTempFloatRegisterOrInvalid(ins->getTemp(0));
 
   MOZ_ASSERT(ToFloatRegister(ins->output()) == lhsDest);
 
   switch (ins->simdOp()) {
     case wasm::SimdOp::I8x16Shl:
-      masm.leftShiftInt8x16(rhs, lhsDest, temp1, temp2);
+      masm.leftShiftInt8x16(rhs, lhsDest, temp);
       break;
     case wasm::SimdOp::I8x16ShrS:
-      masm.rightShiftInt8x16(rhs, lhsDest, temp1, temp2);
+      masm.rightShiftInt8x16(rhs, lhsDest, temp);
       break;
     case wasm::SimdOp::I8x16ShrU:
-      masm.unsignedRightShiftInt8x16(rhs, lhsDest, temp1, temp2);
+      masm.unsignedRightShiftInt8x16(rhs, lhsDest, temp);
       break;
     case wasm::SimdOp::I16x8Shl:
-      masm.leftShiftInt16x8(rhs, lhsDest, temp1);
+      masm.leftShiftInt16x8(rhs, lhsDest);
       break;
     case wasm::SimdOp::I16x8ShrS:
-      masm.rightShiftInt16x8(rhs, lhsDest, temp1);
+      masm.rightShiftInt16x8(rhs, lhsDest);
       break;
     case wasm::SimdOp::I16x8ShrU:
-      masm.unsignedRightShiftInt16x8(rhs, lhsDest, temp1);
+      masm.unsignedRightShiftInt16x8(rhs, lhsDest);
       break;
     case wasm::SimdOp::I32x4Shl:
-      masm.leftShiftInt32x4(rhs, lhsDest, temp1);
+      masm.leftShiftInt32x4(rhs, lhsDest);
       break;
     case wasm::SimdOp::I32x4ShrS:
-      masm.rightShiftInt32x4(rhs, lhsDest, temp1);
+      masm.rightShiftInt32x4(rhs, lhsDest);
       break;
     case wasm::SimdOp::I32x4ShrU:
-      masm.unsignedRightShiftInt32x4(rhs, lhsDest, temp1);
+      masm.unsignedRightShiftInt32x4(rhs, lhsDest);
       break;
     case wasm::SimdOp::I64x2Shl:
-      masm.leftShiftInt64x2(rhs, lhsDest, temp1);
+      masm.leftShiftInt64x2(rhs, lhsDest);
       break;
     case wasm::SimdOp::I64x2ShrS:
-      masm.rightShiftInt64x2(rhs, lhsDest, temp1, temp2);
+      masm.rightShiftInt64x2(rhs, lhsDest, temp);
       break;
     case wasm::SimdOp::I64x2ShrU:
-      masm.unsignedRightShiftInt64x2(rhs, lhsDest, temp1);
+      masm.unsignedRightShiftInt64x2(rhs, lhsDest);
       break;
     default:
       MOZ_CRASH("Shift SimdOp not implemented");
@@ -2939,9 +2969,7 @@ void CodeGenerator::visitWasmConstantShiftSimd128(
   int32_t shift = ins->shift();
 
   if (shift == 0) {
-    if (src != dest) {
-      masm.moveSimd128(src, dest);
-    }
+    masm.moveSimd128(src, dest);
     return;
   }
 
@@ -3022,68 +3050,69 @@ void CodeGenerator::visitWasmShuffleSimd128(LWasmShuffleSimd128* ins) {
   FloatRegister lhsDest = ToFloatRegister(ins->lhsDest());
   FloatRegister rhs = ToFloatRegister(ins->rhs());
   SimdConstant control = ins->control();
+  FloatRegister output = ToFloatRegister(ins->output());
   switch (ins->op()) {
-    case LWasmShuffleSimd128::BLEND_8x16: {
+    case SimdShuffleOp::BLEND_8x16: {
       masm.blendInt8x16(reinterpret_cast<const uint8_t*>(control.asInt8x16()),
-                        lhsDest, rhs, lhsDest, ToFloatRegister(ins->temp()));
+                        lhsDest, rhs, output, ToFloatRegister(ins->temp()));
       break;
     }
-    case LWasmShuffleSimd128::BLEND_16x8: {
+    case SimdShuffleOp::BLEND_16x8: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
       masm.blendInt16x8(reinterpret_cast<const uint16_t*>(control.asInt16x8()),
-                        lhsDest, rhs, lhsDest);
+                        lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::CONCAT_RIGHT_SHIFT_8x16: {
+    case SimdShuffleOp::CONCAT_RIGHT_SHIFT_8x16: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
       int8_t count = 16 - control.asInt8x16()[0];
       MOZ_ASSERT(count > 0, "Should have been a MOVE operation");
-      masm.concatAndRightShiftSimd128(rhs, lhsDest, count);
+      masm.concatAndRightShiftSimd128(lhsDest, rhs, output, count);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_HIGH_8x16: {
+    case SimdShuffleOp::INTERLEAVE_HIGH_8x16: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveHighInt8x16(rhs, lhsDest);
+      masm.interleaveHighInt8x16(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_HIGH_16x8: {
+    case SimdShuffleOp::INTERLEAVE_HIGH_16x8: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveHighInt16x8(rhs, lhsDest);
+      masm.interleaveHighInt16x8(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_HIGH_32x4: {
+    case SimdShuffleOp::INTERLEAVE_HIGH_32x4: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveHighInt32x4(rhs, lhsDest);
+      masm.interleaveHighInt32x4(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_HIGH_64x2: {
+    case SimdShuffleOp::INTERLEAVE_HIGH_64x2: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveHighInt64x2(rhs, lhsDest);
+      masm.interleaveHighInt64x2(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_LOW_8x16: {
+    case SimdShuffleOp::INTERLEAVE_LOW_8x16: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveLowInt8x16(rhs, lhsDest);
+      masm.interleaveLowInt8x16(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_LOW_16x8: {
+    case SimdShuffleOp::INTERLEAVE_LOW_16x8: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveLowInt16x8(rhs, lhsDest);
+      masm.interleaveLowInt16x8(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_LOW_32x4: {
+    case SimdShuffleOp::INTERLEAVE_LOW_32x4: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveLowInt32x4(rhs, lhsDest);
+      masm.interleaveLowInt32x4(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::INTERLEAVE_LOW_64x2: {
+    case SimdShuffleOp::INTERLEAVE_LOW_64x2: {
       MOZ_ASSERT(ins->temp()->isBogusTemp());
-      masm.interleaveLowInt64x2(rhs, lhsDest);
+      masm.interleaveLowInt64x2(lhsDest, rhs, output);
       break;
     }
-    case LWasmShuffleSimd128::SHUFFLE_BLEND_8x16: {
+    case SimdShuffleOp::SHUFFLE_BLEND_8x16: {
       masm.shuffleInt8x16(reinterpret_cast<const uint8_t*>(control.asInt8x16()),
-                          rhs, lhsDest);
+                          lhsDest, rhs, output);
       break;
     }
     default: {
@@ -3184,16 +3213,18 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
   SimdConstant control = ins->control();
   switch (ins->op()) {
     // For broadcast, would MOVDDUP be better than PSHUFD for the last step?
-    case LWasmPermuteSimd128::BROADCAST_8x16: {
+    case SimdPermuteOp::BROADCAST_8x16: {
       const SimdConstant::I8x16& mask = control.asInt8x16();
       int8_t source = mask[0];
-      if (src != dest) {
-        masm.moveSimd128(src, dest);
+      if (source == 0 && Assembler::HasAVX2()) {
+        masm.vbroadcastb(Operand(src), dest);
+        break;
       }
+      MOZ_ASSERT_IF(!Assembler::HasAVX(), src == dest);
       if (source < 8) {
-        masm.interleaveLowInt8x16(dest, dest);
+        masm.interleaveLowInt8x16(src, src, dest);
       } else {
-        masm.interleaveHighInt8x16(dest, dest);
+        masm.interleaveHighInt8x16(src, src, dest);
         source -= 8;
       }
       uint16_t v = uint16_t(source & 3);
@@ -3209,9 +3240,13 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
       }
       break;
     }
-    case LWasmPermuteSimd128::BROADCAST_16x8: {
+    case SimdPermuteOp::BROADCAST_16x8: {
       const SimdConstant::I16x8& mask = control.asInt16x8();
       int16_t source = mask[0];
+      if (source == 0 && Assembler::HasAVX2()) {
+        masm.vbroadcastw(Operand(src), dest);
+        break;
+      }
       uint16_t v = uint16_t(source & 3);
       uint16_t wordMask[4] = {v, v, v, v};
       if (source < 4) {
@@ -3225,11 +3260,11 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
       }
       break;
     }
-    case LWasmPermuteSimd128::MOVE: {
+    case SimdPermuteOp::MOVE: {
       masm.moveSimd128(src, dest);
       break;
     }
-    case LWasmPermuteSimd128::PERMUTE_8x16: {
+    case SimdPermuteOp::PERMUTE_8x16: {
       const SimdConstant::I8x16& mask = control.asInt8x16();
 #  ifdef DEBUG
       DebugOnly<int> i;
@@ -3240,7 +3275,7 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
       masm.permuteInt8x16(reinterpret_cast<const uint8_t*>(mask), src, dest);
       break;
     }
-    case LWasmPermuteSimd128::PERMUTE_16x8: {
+    case SimdPermuteOp::PERMUTE_16x8: {
 #  ifdef DEBUG
       const SimdConstant::I16x8& mask = control.asInt16x8();
       DebugOnly<int> i;
@@ -3277,8 +3312,13 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
       }
       break;
     }
-    case LWasmPermuteSimd128::PERMUTE_32x4: {
+    case SimdPermuteOp::PERMUTE_32x4: {
       const SimdConstant::I32x4& mask = control.asInt32x4();
+      if (Assembler::HasAVX2() && mask[0] == 0 && mask[1] == 0 &&
+          mask[2] == 0 && mask[3] == 0) {
+        masm.vbroadcastd(Operand(src), dest);
+        break;
+      }
 #  ifdef DEBUG
       DebugOnly<int> i;
       for (i = 0; i < 4 && mask[i] == i; i++) {
@@ -3288,27 +3328,34 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
       masm.permuteInt32x4(reinterpret_cast<const uint32_t*>(mask), src, dest);
       break;
     }
-    case LWasmPermuteSimd128::ROTATE_RIGHT_8x16: {
-      if (src != dest) {
-        masm.moveSimd128(src, dest);
-      }
+    case SimdPermuteOp::ROTATE_RIGHT_8x16: {
+      MOZ_ASSERT_IF(!Assembler::HasAVX(), src == dest);
       int8_t count = control.asInt8x16()[0];
       MOZ_ASSERT(count > 0, "Should have been a MOVE operation");
-      masm.concatAndRightShiftSimd128(dest, dest, count);
+      masm.concatAndRightShiftSimd128(src, src, dest, count);
       break;
     }
-    case LWasmPermuteSimd128::SHIFT_LEFT_8x16: {
+    case SimdPermuteOp::SHIFT_LEFT_8x16: {
       int8_t count = control.asInt8x16()[0];
       MOZ_ASSERT(count > 0, "Should have been a MOVE operation");
       masm.leftShiftSimd128(Imm32(count), src, dest);
       break;
     }
-    case LWasmPermuteSimd128::SHIFT_RIGHT_8x16: {
+    case SimdPermuteOp::SHIFT_RIGHT_8x16: {
       int8_t count = control.asInt8x16()[0];
       MOZ_ASSERT(count > 0, "Should have been a MOVE operation");
       masm.rightShiftSimd128(Imm32(count), src, dest);
       break;
     }
+    case SimdPermuteOp::REVERSE_16x8:
+      masm.reverseInt16x8(src, dest);
+      break;
+    case SimdPermuteOp::REVERSE_32x4:
+      masm.reverseInt32x4(src, dest);
+      break;
+    case SimdPermuteOp::REVERSE_64x2:
+      masm.reverseInt64x2(src, dest);
+      break;
     default: {
       MOZ_CRASH("Unsupported SIMD permutation operation");
     }
@@ -3320,25 +3367,26 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
 
 void CodeGenerator::visitWasmReplaceLaneSimd128(LWasmReplaceLaneSimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
-  FloatRegister lhsDest = ToFloatRegister(ins->lhsDest());
+  FloatRegister lhs = ToFloatRegister(ins->lhsDest());
+  FloatRegister dest = ToFloatRegister(ins->output());
   const LAllocation* rhs = ins->rhs();
   uint32_t laneIndex = ins->laneIndex();
 
   switch (ins->simdOp()) {
     case wasm::SimdOp::I8x16ReplaceLane:
-      masm.replaceLaneInt8x16(laneIndex, ToRegister(rhs), lhsDest);
+      masm.replaceLaneInt8x16(laneIndex, lhs, ToRegister(rhs), dest);
       break;
     case wasm::SimdOp::I16x8ReplaceLane:
-      masm.replaceLaneInt16x8(laneIndex, ToRegister(rhs), lhsDest);
+      masm.replaceLaneInt16x8(laneIndex, lhs, ToRegister(rhs), dest);
       break;
     case wasm::SimdOp::I32x4ReplaceLane:
-      masm.replaceLaneInt32x4(laneIndex, ToRegister(rhs), lhsDest);
+      masm.replaceLaneInt32x4(laneIndex, lhs, ToRegister(rhs), dest);
       break;
     case wasm::SimdOp::F32x4ReplaceLane:
-      masm.replaceLaneFloat32x4(laneIndex, ToFloatRegister(rhs), lhsDest);
+      masm.replaceLaneFloat32x4(laneIndex, lhs, ToFloatRegister(rhs), dest);
       break;
     case wasm::SimdOp::F64x2ReplaceLane:
-      masm.replaceLaneFloat64x2(laneIndex, ToFloatRegister(rhs), lhsDest);
+      masm.replaceLaneFloat64x2(laneIndex, lhs, ToFloatRegister(rhs), dest);
       break;
     default:
       MOZ_CRASH("ReplaceLane SimdOp not implemented");
@@ -3352,8 +3400,9 @@ void CodeGenerator::visitWasmReplaceInt64LaneSimd128(
     LWasmReplaceInt64LaneSimd128* ins) {
 #ifdef ENABLE_WASM_SIMD
   MOZ_RELEASE_ASSERT(ins->simdOp() == wasm::SimdOp::I64x2ReplaceLane);
-  masm.replaceLaneInt64x2(ins->laneIndex(), ToRegister64(ins->rhs()),
-                          ToFloatRegister(ins->lhsDest()));
+  masm.replaceLaneInt64x2(ins->laneIndex(), ToFloatRegister(ins->lhs()),
+                          ToRegister64(ins->rhs()),
+                          ToFloatRegister(ins->output()));
 #else
   MOZ_CRASH("No SIMD");
 #endif
@@ -3396,27 +3445,27 @@ void CodeGenerator::visitWasmInt64ToSimd128(LWasmInt64ToSimd128* ins) {
     case wasm::SimdOp::I64x2Splat:
       masm.splatX2(src, dest);
       break;
-    case wasm::SimdOp::I16x8LoadS8x8:
+    case wasm::SimdOp::V128Load8x8S:
       masm.moveGPR64ToDouble(src, dest);
       masm.widenLowInt8x16(dest, dest);
       break;
-    case wasm::SimdOp::I16x8LoadU8x8:
+    case wasm::SimdOp::V128Load8x8U:
       masm.moveGPR64ToDouble(src, dest);
       masm.unsignedWidenLowInt8x16(dest, dest);
       break;
-    case wasm::SimdOp::I32x4LoadS16x4:
+    case wasm::SimdOp::V128Load16x4S:
       masm.moveGPR64ToDouble(src, dest);
       masm.widenLowInt16x8(dest, dest);
       break;
-    case wasm::SimdOp::I32x4LoadU16x4:
+    case wasm::SimdOp::V128Load16x4U:
       masm.moveGPR64ToDouble(src, dest);
       masm.unsignedWidenLowInt16x8(dest, dest);
       break;
-    case wasm::SimdOp::I64x2LoadS32x2:
+    case wasm::SimdOp::V128Load32x2S:
       masm.moveGPR64ToDouble(src, dest);
       masm.widenLowInt32x4(dest, dest);
       break;
-    case wasm::SimdOp::I64x2LoadU32x2:
+    case wasm::SimdOp::V128Load32x2U:
       masm.moveGPR64ToDouble(src, dest);
       masm.unsignedWidenLowInt32x4(dest, dest);
       break;
@@ -3440,53 +3489,53 @@ void CodeGenerator::visitWasmUnarySimd128(LWasmUnarySimd128* ins) {
     case wasm::SimdOp::I16x8Neg:
       masm.negInt16x8(src, dest);
       break;
-    case wasm::SimdOp::I16x8WidenLowSI8x16:
+    case wasm::SimdOp::I16x8ExtendLowI8x16S:
       masm.widenLowInt8x16(src, dest);
       break;
-    case wasm::SimdOp::I16x8WidenHighSI8x16:
+    case wasm::SimdOp::I16x8ExtendHighI8x16S:
       masm.widenHighInt8x16(src, dest);
       break;
-    case wasm::SimdOp::I16x8WidenLowUI8x16:
+    case wasm::SimdOp::I16x8ExtendLowI8x16U:
       masm.unsignedWidenLowInt8x16(src, dest);
       break;
-    case wasm::SimdOp::I16x8WidenHighUI8x16:
+    case wasm::SimdOp::I16x8ExtendHighI8x16U:
       masm.unsignedWidenHighInt8x16(src, dest);
       break;
     case wasm::SimdOp::I32x4Neg:
       masm.negInt32x4(src, dest);
       break;
-    case wasm::SimdOp::I32x4WidenLowSI16x8:
+    case wasm::SimdOp::I32x4ExtendLowI16x8S:
       masm.widenLowInt16x8(src, dest);
       break;
-    case wasm::SimdOp::I32x4WidenHighSI16x8:
+    case wasm::SimdOp::I32x4ExtendHighI16x8S:
       masm.widenHighInt16x8(src, dest);
       break;
-    case wasm::SimdOp::I32x4WidenLowUI16x8:
+    case wasm::SimdOp::I32x4ExtendLowI16x8U:
       masm.unsignedWidenLowInt16x8(src, dest);
       break;
-    case wasm::SimdOp::I32x4WidenHighUI16x8:
+    case wasm::SimdOp::I32x4ExtendHighI16x8U:
       masm.unsignedWidenHighInt16x8(src, dest);
       break;
-    case wasm::SimdOp::I32x4TruncSSatF32x4:
+    case wasm::SimdOp::I32x4TruncSatF32x4S:
       masm.truncSatFloat32x4ToInt32x4(src, dest);
       break;
-    case wasm::SimdOp::I32x4TruncUSatF32x4:
+    case wasm::SimdOp::I32x4TruncSatF32x4U:
       masm.unsignedTruncSatFloat32x4ToInt32x4(src, dest,
                                               ToFloatRegister(ins->temp()));
       break;
     case wasm::SimdOp::I64x2Neg:
       masm.negInt64x2(src, dest);
       break;
-    case wasm::SimdOp::I64x2WidenLowSI32x4:
+    case wasm::SimdOp::I64x2ExtendLowI32x4S:
       masm.widenLowInt32x4(src, dest);
       break;
-    case wasm::SimdOp::I64x2WidenHighSI32x4:
+    case wasm::SimdOp::I64x2ExtendHighI32x4S:
       masm.widenHighInt32x4(src, dest);
       break;
-    case wasm::SimdOp::I64x2WidenLowUI32x4:
+    case wasm::SimdOp::I64x2ExtendLowI32x4U:
       masm.unsignedWidenLowInt32x4(src, dest);
       break;
-    case wasm::SimdOp::I64x2WidenHighUI32x4:
+    case wasm::SimdOp::I64x2ExtendHighI32x4U:
       masm.unsignedWidenHighInt32x4(src, dest);
       break;
     case wasm::SimdOp::F32x4Abs:
@@ -3498,10 +3547,10 @@ void CodeGenerator::visitWasmUnarySimd128(LWasmUnarySimd128* ins) {
     case wasm::SimdOp::F32x4Sqrt:
       masm.sqrtFloat32x4(src, dest);
       break;
-    case wasm::SimdOp::F32x4ConvertSI32x4:
+    case wasm::SimdOp::F32x4ConvertI32x4S:
       masm.convertInt32x4ToFloat32x4(src, dest);
       break;
-    case wasm::SimdOp::F32x4ConvertUI32x4:
+    case wasm::SimdOp::F32x4ConvertI32x4U:
       masm.unsignedConvertInt32x4ToFloat32x4(src, dest);
       break;
     case wasm::SimdOp::F64x2Abs:
@@ -3574,17 +3623,29 @@ void CodeGenerator::visitWasmUnarySimd128(LWasmUnarySimd128* ins) {
       masm.unsignedTruncSatFloat64x2ToInt32x4(src, dest,
                                               ToFloatRegister(ins->temp()));
       break;
-    case wasm::SimdOp::I16x8ExtAddPairwiseI8x16S:
+    case wasm::SimdOp::I16x8ExtaddPairwiseI8x16S:
       masm.extAddPairwiseInt8x16(src, dest);
       break;
-    case wasm::SimdOp::I16x8ExtAddPairwiseI8x16U:
+    case wasm::SimdOp::I16x8ExtaddPairwiseI8x16U:
       masm.unsignedExtAddPairwiseInt8x16(src, dest);
       break;
-    case wasm::SimdOp::I32x4ExtAddPairwiseI16x8S:
+    case wasm::SimdOp::I32x4ExtaddPairwiseI16x8S:
       masm.extAddPairwiseInt16x8(src, dest);
       break;
-    case wasm::SimdOp::I32x4ExtAddPairwiseI16x8U:
+    case wasm::SimdOp::I32x4ExtaddPairwiseI16x8U:
       masm.unsignedExtAddPairwiseInt16x8(src, dest);
+      break;
+    case wasm::SimdOp::I32x4RelaxedTruncF32x4S:
+      masm.truncFloat32x4ToInt32x4Relaxed(src, dest);
+      break;
+    case wasm::SimdOp::I32x4RelaxedTruncF32x4U:
+      masm.unsignedTruncFloat32x4ToInt32x4Relaxed(src, dest);
+      break;
+    case wasm::SimdOp::I32x4RelaxedTruncF64x2SZero:
+      masm.truncFloat64x2ToInt32x4Relaxed(src, dest);
+      break;
+    case wasm::SimdOp::I32x4RelaxedTruncF64x2UZero:
+      masm.unsignedTruncFloat64x2ToInt32x4Relaxed(src, dest);
       break;
     default:
       MOZ_CRASH("Unary SimdOp not implemented");

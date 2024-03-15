@@ -9,10 +9,10 @@
 
 #include "builtin/Array.h"
 
-#include "vm/ArgumentsObject.h"
 #include "vm/JSObject.h"
 
 #include "vm/ArgumentsObject-inl.h"
+#include "vm/ObjectOperations-inl.h"
 
 namespace js {
 

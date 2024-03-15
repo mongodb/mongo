@@ -35,8 +35,27 @@ class Shape {
   shadow::BaseShape* base;
   uint32_t immutableFlags;
 
-  static constexpr uint32_t FIXED_SLOTS_SHIFT = 5;
+  enum class Kind : uint8_t {
+    // SharedShape or DictionaryShape for NativeObject.
+    // (Only) these two kinds must have the low bit set, to allow for fast
+    // is-native checking.
+    Shared = 1,
+    Dictionary = 3,
+    // ProxyShape for ProxyObject.
+    Proxy = 0,
+    // WasmGCShape for WasmGCObject.
+    WasmGC = 2,
+  };
+
+  static constexpr uint32_t KIND_SHIFT = 4;
+  static constexpr uint32_t KIND_MASK = 0b11;
+
+  static constexpr uint32_t FIXED_SLOTS_SHIFT = 6;
   static constexpr uint32_t FIXED_SLOTS_MASK = 0x1f << FIXED_SLOTS_SHIFT;
+
+  bool isProxy() const {
+    return Kind((immutableFlags >> KIND_SHIFT) & KIND_MASK) == Kind::Proxy;
+  }
 };
 
 }  // namespace shadow

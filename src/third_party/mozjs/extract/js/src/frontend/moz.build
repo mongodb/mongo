@@ -14,11 +14,19 @@ include("../js-cxxflags.mozbuild")
 
 
 # Generate frontend/ReservedWordsGenerated.h from frontend/ReservedWords.h
-GeneratedFile(
-    "ReservedWordsGenerated.h",
-    script="GenerateReservedWords.py",
-    inputs=["ReservedWords.h"],
-)
+if CONFIG["ENABLE_DECORATORS"]:
+    GeneratedFile(
+        "ReservedWordsGenerated.h",
+        script="GenerateReservedWords.py",
+        inputs=["ReservedWords.h"],
+        flags=["--enable-decorators"],
+    )
+else:
+    GeneratedFile(
+        "ReservedWordsGenerated.h",
+        script="GenerateReservedWords.py",
+        inputs=["ReservedWords.h"],
+    )
 
 if CONFIG["JS_ENABLE_SMOOSH"]:
     CbindgenHeader("smoosh_generated.h", inputs=["/js/src/frontend/smoosh"])
@@ -32,6 +40,7 @@ UNIFIED_SOURCES += [
     "BytecodeSection.cpp",
     "CallOrNewEmitter.cpp",
     "CForEmitter.cpp",
+    "CompileScript.cpp",
     "DefaultEmitter.cpp",
     "DoWhileEmitter.cpp",
     "ElemOpEmitter.cpp",
@@ -41,6 +50,7 @@ UNIFIED_SOURCES += [
     "ForInEmitter.cpp",
     "ForOfEmitter.cpp",
     "ForOfLoopControl.cpp",
+    "FrontendContext.cpp",
     "FunctionEmitter.cpp",
     "IfEmitter.cpp",
     "JumpList.cpp",
@@ -73,6 +83,10 @@ if CONFIG["JS_ENABLE_SMOOSH"]:
         "Frontend2.cpp",
     ]
 
+if CONFIG["ENABLE_DECORATORS"]:
+    UNIFIED_SOURCES += [
+        "DecoratorEmitter.cpp",
+    ]
 
 # Parser.cpp cannot be built in unified mode because of explicit
 #   template instantiations.

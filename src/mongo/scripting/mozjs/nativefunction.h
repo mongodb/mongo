@@ -55,12 +55,14 @@ namespace mozjs {
  * in JS via ::make() from C++.
  */
 struct NativeFunctionInfo : public BaseInfo {
+    enum Slots { NativeHolderSlot, NativeFunctionInfoSlotCount };
+
     static void call(JSContext* cx, JS::CallArgs args);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     static const char* const inheritFrom;
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(NativeFunctionInfoSlotCount);
     static const InstallType installType = InstallType::Private;
 
     struct Functions {

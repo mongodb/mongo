@@ -13,6 +13,7 @@
 
 #include "jit/CacheIRSpewer.h"
 #include "jit/CompileWrappers.h"
+#include "jit/Ion.h"
 #include "jit/JitCode.h"
 #include "jit/JitOptions.h"
 #include "jit/JitSpewer.h"
@@ -20,6 +21,10 @@
 #include "jit/PerfSpewer.h"
 #include "js/HeapAPI.h"
 #include "vm/JSContext.h"
+
+#ifdef JS_CODEGEN_ARM64
+#  include "jit/arm64/vixl/Cpu-vixl.h"
+#endif
 
 #if defined(ANDROID)
 #  include <sys/system_properties.h>
@@ -44,7 +49,10 @@ static JitContext* CurrentJitContext() {
   return TlsJitContext.get();
 }
 
-void jit::SetJitContext(JitContext* ctx) { TlsJitContext.set(ctx); }
+void jit::SetJitContext(JitContext* ctx) {
+  MOZ_ASSERT(!TlsJitContext.get());
+  TlsJitContext.set(ctx);
+}
 
 JitContext* jit::GetJitContext() {
   MOZ_ASSERT(CurrentJitContext());
@@ -53,35 +61,27 @@ JitContext* jit::GetJitContext() {
 
 JitContext* jit::MaybeGetJitContext() { return CurrentJitContext(); }
 
-JitContext::JitContext(CompileRuntime* rt, CompileRealm* realm,
-                       TempAllocator* temp)
-    : prev_(CurrentJitContext()), realm_(realm), temp(temp), runtime(rt) {
+JitContext::JitContext(CompileRuntime* rt) : runtime(rt) {
   MOZ_ASSERT(rt);
-  MOZ_ASSERT(realm);
-  MOZ_ASSERT(temp);
   SetJitContext(this);
 }
 
-JitContext::JitContext(JSContext* cx, TempAllocator* temp)
-    : prev_(CurrentJitContext()),
-      realm_(CompileRealm::get(cx->realm())),
-      cx(cx),
-      temp(temp),
-      runtime(CompileRuntime::get(cx->runtime())) {
+JitContext::JitContext(JSContext* cx)
+    : cx(cx), runtime(CompileRuntime::get(cx->runtime())) {
   SetJitContext(this);
 }
 
-JitContext::JitContext(TempAllocator* temp)
-    : prev_(CurrentJitContext()), temp(temp) {
+JitContext::JitContext() {
 #ifdef DEBUG
   isCompilingWasm_ = true;
 #endif
   SetJitContext(this);
 }
 
-JitContext::JitContext() : JitContext(nullptr) {}
-
-JitContext::~JitContext() { SetJitContext(prev_); }
+JitContext::~JitContext() {
+  MOZ_ASSERT(TlsJitContext.get() == this);
+  TlsJitContext.set(nullptr);
+}
 
 bool jit::InitializeJit() {
   if (!TlsJitContext.init()) {
@@ -97,28 +97,54 @@ bool jit::InitializeJit() {
   }
 #endif
 
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+  // Compute flags.
+  js::jit::CPUInfo::ComputeFlags();
+#endif
+
 #if defined(JS_CODEGEN_ARM)
   InitARMFlags();
 #endif
 
-  // Note: jit flags need to be initialized after the InitARMFlags call above.
-  ComputeJitSupportFlags();
+#ifdef JS_CODEGEN_ARM64
+  // Initialize instruction cache flushing.
+  vixl::CPU::SetUp();
+#endif
 
-  CheckPerf();
+#ifndef JS_CODEGEN_NONE
+  MOZ_ASSERT(js::jit::CPUFlagsHaveBeenComputed());
+#endif
+
+  // Note: jit flags need to be initialized after the InitARMFlags call above.
+  // This is the final point where we can set disableJitBackend = true, before
+  // we use this flag below with the HasJitBackend call.
+  if (!MacroAssembler::SupportsFloatingPoint()) {
+    JitOptions.disableJitBackend = true;
+  }
+  JitOptions.supportsUnalignedAccesses =
+      MacroAssembler::SupportsUnalignedAccesses();
+
+  if (HasJitBackend()) {
+    if (!InitProcessExecutableMemory()) {
+      return false;
+    }
+  }
+
+  PerfSpewer::Init();
   return true;
 }
 
-void jit::ComputeJitSupportFlags() {
-  JitOptions.supportsFloatingPoint = MacroAssembler::SupportsFloatingPoint();
-  JitOptions.supportsUnalignedAccesses =
-      MacroAssembler::SupportsUnalignedAccesses();
+void jit::ShutdownJit() {
+  if (HasJitBackend() && !JSRuntime::hasLiveRuntimes()) {
+    ReleaseProcessExecutableMemory();
+  }
 }
 
 bool jit::JitSupportsWasmSimd() {
 #if defined(ENABLE_WASM_SIMD)
   return js::jit::MacroAssembler::SupportsWasmSimd();
 #else
-  MOZ_CRASH("Do not call");
+  return false;
 #endif
 }
 

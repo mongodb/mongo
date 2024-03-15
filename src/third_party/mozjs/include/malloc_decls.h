@@ -63,10 +63,13 @@ MALLOC_DECL(malloc_good_size, size_t, size_t)
 #  endif
 
 #  if MALLOC_FUNCS & MALLOC_FUNCS_JEMALLOC
-// The 2nd argument points to an optional array exactly JEMALLOC_MAX_STATS_BINS
-// long to be filled in (if non-null). Any unused bin has it's size set to zero.
+// The 2nd argument points to an optional array exactly
+// jemalloc_stats_num_bins() long to be filled in (if non-null).
 MALLOC_DECL(jemalloc_stats_internal, void, jemalloc_stats_t*,
             jemalloc_bin_stats_t*)
+
+// Return the size of the jemalloc_bin_stats_t array.
+MALLOC_DECL(jemalloc_stats_num_bins, size_t)
 
 // On some operating systems (Mac), we use madvise(MADV_FREE) to hand pages
 // back to the operating system.  On Mac, the operating system doesn't take
@@ -118,6 +121,12 @@ MALLOC_DECL(moz_create_arena_with_params, arena_id_t, arena_params_t*)
 // Passing an invalid id (inexistent or already disposed) to this function
 // will crash. The arena must be empty prior to calling this function.
 MALLOC_DECL(moz_dispose_arena, void, arena_id_t)
+
+// Set the default modifier for mMaxDirty. The value is the number of shifts
+// applied to the value. Positive value is handled as <<, negative >>.
+// Arenas may override the default modifier.
+MALLOC_DECL(moz_set_max_dirty_page_modifier, void, int32_t)
+
 #  endif
 
 #  if MALLOC_FUNCS & MALLOC_FUNCS_ARENA_ALLOC

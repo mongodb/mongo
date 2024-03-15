@@ -22,117 +22,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "js/GCAPI.h"
+#include "jit/AtomicOperationsGenerated.h"
 #include "vm/Uint8Clamped.h"
 
 namespace js {
 namespace jit {
 
-// The function pointers in this section all point to jitted code.
-//
-// On 32-bit systems we assume for simplicity's sake that we don't have any
-// 64-bit atomic operations except cmpxchg (this is a concession to x86 but it's
-// not a hardship).  On 32-bit systems we therefore implement other 64-bit
-// atomic operations in terms of cmpxchg along with some C++ code and a local
-// reordering fence to prevent other loads and stores from being intermingled
-// with operations in the implementation of the atomic.
-
-// `fence` performs a full memory barrier.
-extern void (*AtomicFenceSeqCst)();
-
 #ifndef JS_64BIT
-// `compiler_fence` erects a reordering boundary for operations on the current
-// thread.  We use it to prevent the compiler from reordering loads and stores
-// inside larger primitives that are synthesized from cmpxchg.
-extern void (*AtomicCompilerFence)();
+// `AtomicCompilerFence` erects a reordering boundary for operations on the
+// current thread.  We use it to prevent the compiler from reordering loads and
+// stores inside larger primitives that are synthesized from cmpxchg.
+extern void AtomicCompilerFence();
 #endif
-
-extern uint8_t (*AtomicLoad8SeqCst)(const uint8_t* addr);
-extern uint16_t (*AtomicLoad16SeqCst)(const uint16_t* addr);
-extern uint32_t (*AtomicLoad32SeqCst)(const uint32_t* addr);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicLoad64SeqCst)(const uint64_t* addr);
-#endif
-
-// These are access-atomic up to sizeof(uintptr_t).
-extern uint8_t (*AtomicLoad8Unsynchronized)(const uint8_t* addr);
-extern uint16_t (*AtomicLoad16Unsynchronized)(const uint16_t* addr);
-extern uint32_t (*AtomicLoad32Unsynchronized)(const uint32_t* addr);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicLoad64Unsynchronized)(const uint64_t* addr);
-#endif
-
-extern uint8_t (*AtomicStore8SeqCst)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicStore16SeqCst)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicStore32SeqCst)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicStore64SeqCst)(uint64_t* addr, uint64_t val);
-#endif
-
-// These are access-atomic up to sizeof(uintptr_t).
-extern uint8_t (*AtomicStore8Unsynchronized)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicStore16Unsynchronized)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicStore32Unsynchronized)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicStore64Unsynchronized)(uint64_t* addr, uint64_t val);
-#endif
-
-// `exchange` takes a cell address and a value.  It stores it in the cell and
-// returns the value previously in the cell.
-extern uint8_t (*AtomicExchange8SeqCst)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicExchange16SeqCst)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicExchange32SeqCst)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicExchange64SeqCst)(uint64_t* addr, uint64_t val);
-#endif
-
-// `add` adds a value atomically to the cell and returns the old value in the
-// cell.  (There is no `sub`; just add the negated value.)
-extern uint8_t (*AtomicAdd8SeqCst)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicAdd16SeqCst)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicAdd32SeqCst)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicAdd64SeqCst)(uint64_t* addr, uint64_t val);
-#endif
-
-// `and` bitwise-ands a value atomically into the cell and returns the old value
-// in the cell.
-extern uint8_t (*AtomicAnd8SeqCst)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicAnd16SeqCst)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicAnd32SeqCst)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicAnd64SeqCst)(uint64_t* addr, uint64_t val);
-#endif
-
-// `or` bitwise-ors a value atomically into the cell and returns the old value
-// in the cell.
-extern uint8_t (*AtomicOr8SeqCst)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicOr16SeqCst)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicOr32SeqCst)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicOr64SeqCst)(uint64_t* addr, uint64_t val);
-#endif
-
-// `xor` bitwise-xors a value atomically into the cell and returns the old value
-// in the cell.
-extern uint8_t (*AtomicXor8SeqCst)(uint8_t* addr, uint8_t val);
-extern uint16_t (*AtomicXor16SeqCst)(uint16_t* addr, uint16_t val);
-extern uint32_t (*AtomicXor32SeqCst)(uint32_t* addr, uint32_t val);
-#ifdef JS_64BIT
-extern uint64_t (*AtomicXor64SeqCst)(uint64_t* addr, uint64_t val);
-#endif
-
-// `cmpxchg` takes a cell address, an expected value and a replacement value.
-// If the value in the cell equals the expected value then the replacement value
-// is stored in the cell.  It always returns the value previously in the cell.
-extern uint8_t (*AtomicCmpXchg8SeqCst)(uint8_t* addr, uint8_t oldval,
-                                       uint8_t newval);
-extern uint16_t (*AtomicCmpXchg16SeqCst)(uint16_t* addr, uint16_t oldval,
-                                         uint16_t newval);
-extern uint32_t (*AtomicCmpXchg32SeqCst)(uint32_t* addr, uint32_t oldval,
-                                         uint32_t newval);
-extern uint64_t (*AtomicCmpXchg64SeqCst)(uint64_t* addr, uint64_t oldval,
-                                         uint64_t newval);
 
 // `...MemcpyDown` moves bytes toward lower addresses in memory: dest <= src.
 // `...MemcpyUp` moves bytes toward higher addresses in memory: dest >= src.
@@ -153,7 +54,6 @@ inline void js::jit::AtomicOperations::fenceSeqCst() { AtomicFenceSeqCst(); }
 #define JIT_LOADOP(T, U, loadop)                   \
   template <>                                      \
   inline T AtomicOperations::loadSeqCst(T* addr) { \
-    JS::AutoSuppressGCAnalysis nogc;               \
     return (T)loadop((U*)addr);                    \
   }
 
@@ -161,7 +61,6 @@ inline void js::jit::AtomicOperations::fenceSeqCst() { AtomicFenceSeqCst(); }
 #  define JIT_LOADOP_CAS(T)                                   \
     template <>                                               \
     inline T AtomicOperations::loadSeqCst(T* addr) {          \
-      JS::AutoSuppressGCAnalysis nogc;                        \
       AtomicCompilerFence();                                  \
       return (T)AtomicCmpXchg64SeqCst((uint64_t*)addr, 0, 0); \
     }
@@ -194,7 +93,6 @@ JIT_LOADOP(uint64_t, uint64_t, AtomicLoad64SeqCst)
 #define JIT_STOREOP(T, U, storeop)                            \
   template <>                                                 \
   inline void AtomicOperations::storeSeqCst(T* addr, T val) { \
-    JS::AutoSuppressGCAnalysis nogc;                          \
     storeop((U*)addr, val);                                   \
   }
 
@@ -202,7 +100,6 @@ JIT_LOADOP(uint64_t, uint64_t, AtomicLoad64SeqCst)
 #  define JIT_STOREOP_CAS(T)                                                   \
     template <>                                                                \
     inline void AtomicOperations::storeSeqCst(T* addr, T val) {                \
-      JS::AutoSuppressGCAnalysis nogc;                                         \
       AtomicCompilerFence();                                                   \
       T oldval = *addr; /* good initial approximation */                       \
       for (;;) {                                                               \
@@ -244,7 +141,6 @@ JIT_STOREOP(uint64_t, uint64_t, AtomicStore64SeqCst)
 #define JIT_EXCHANGEOP(T, U, xchgop)                          \
   template <>                                                 \
   inline T AtomicOperations::exchangeSeqCst(T* addr, T val) { \
-    JS::AutoSuppressGCAnalysis nogc;                          \
     return (T)xchgop((U*)addr, (U)val);                       \
   }
 
@@ -252,7 +148,6 @@ JIT_STOREOP(uint64_t, uint64_t, AtomicStore64SeqCst)
 #  define JIT_EXCHANGEOP_CAS(T)                                                \
     template <>                                                                \
     inline T AtomicOperations::exchangeSeqCst(T* addr, T val) {                \
-      JS::AutoSuppressGCAnalysis nogc;                                         \
       AtomicCompilerFence();                                                   \
       T oldval = *addr;                                                        \
       for (;;) {                                                               \
@@ -296,7 +191,6 @@ JIT_EXCHANGEOP(uint64_t, uint64_t, AtomicExchange64SeqCst)
   template <>                                                         \
   inline T AtomicOperations::compareExchangeSeqCst(T* addr, T oldval, \
                                                    T newval) {        \
-    JS::AutoSuppressGCAnalysis nogc;                                  \
     return (T)cmpxchg((U*)addr, (U)oldval, (U)newval);                \
   }
 
@@ -320,14 +214,12 @@ JIT_CAS(uint64_t, uint64_t, AtomicCmpXchg64SeqCst)
 #define JIT_FETCHADDOP(T, U, xadd)                            \
   template <>                                                 \
   inline T AtomicOperations::fetchAddSeqCst(T* addr, T val) { \
-    JS::AutoSuppressGCAnalysis nogc;                          \
     return (T)xadd((U*)addr, (U)val);                         \
   }
 
 #define JIT_FETCHSUBOP(T)                                     \
   template <>                                                 \
   inline T AtomicOperations::fetchSubSeqCst(T* addr, T val) { \
-    JS::AutoSuppressGCAnalysis nogc;                          \
     return fetchAddSeqCst(addr, (T)(0 - val));                \
   }
 
@@ -335,7 +227,6 @@ JIT_CAS(uint64_t, uint64_t, AtomicCmpXchg64SeqCst)
 #  define JIT_FETCHADDOP_CAS(T)                                           \
     template <>                                                           \
     inline T AtomicOperations::fetchAddSeqCst(T* addr, T val) {           \
-      JS::AutoSuppressGCAnalysis nogc;                                    \
       AtomicCompilerFence();                                              \
       T oldval = *addr; /* Good initial approximation */                  \
       for (;;) {                                                          \
@@ -388,7 +279,6 @@ JIT_FETCHSUBOP(uint64_t)
 #define JIT_FETCHBITOPX(T, U, name, op)             \
   template <>                                       \
   inline T AtomicOperations::name(T* addr, T val) { \
-    JS::AutoSuppressGCAnalysis nogc;                \
     return (T)op((U*)addr, (U)val);                 \
   }
 
@@ -406,7 +296,6 @@ JIT_FETCHSUBOP(uint64_t)
 #  define JIT_FETCHBITOPX_CAS(T, name, OP)                                 \
     template <>                                                            \
     inline T AtomicOperations::name(T* addr, T val) {                      \
-      JS::AutoSuppressGCAnalysis nogc;                                     \
       AtomicCompilerFence();                                               \
       T oldval = *addr;                                                    \
       for (;;) {                                                           \
@@ -465,7 +354,6 @@ JIT_FETCHBITOP(uint64_t, uint64_t, AtomicAnd64SeqCst, AtomicOr64SeqCst,
 #define JIT_LOADSAFE(T, U, loadop)                                \
   template <>                                                     \
   inline T js::jit::AtomicOperations::loadSafeWhenRacy(T* addr) { \
-    JS::AutoSuppressGCAnalysis nogc;                              \
     union {                                                       \
       U u;                                                        \
       T t;                                                        \
@@ -478,7 +366,6 @@ JIT_FETCHBITOP(uint64_t, uint64_t, AtomicAnd64SeqCst, AtomicOr64SeqCst,
 #  define JIT_LOADSAFE_TEARING(T)                                   \
     template <>                                                     \
     inline T js::jit::AtomicOperations::loadSafeWhenRacy(T* addr) { \
-      JS::AutoSuppressGCAnalysis nogc;                              \
       MOZ_ASSERT(sizeof(T) == 8);                                   \
       union {                                                       \
         uint32_t u[2];                                              \
@@ -527,7 +414,6 @@ inline uint8_clamped js::jit::AtomicOperations::loadSafeWhenRacy(
 #define JIT_STORESAFE(T, U, storeop)                                         \
   template <>                                                                \
   inline void js::jit::AtomicOperations::storeSafeWhenRacy(T* addr, T val) { \
-    JS::AutoSuppressGCAnalysis nogc;                                         \
     union {                                                                  \
       U u;                                                                   \
       T t;                                                                   \
@@ -540,7 +426,6 @@ inline uint8_clamped js::jit::AtomicOperations::loadSafeWhenRacy(
 #  define JIT_STORESAFE_TEARING(T)                                             \
     template <>                                                                \
     inline void js::jit::AtomicOperations::storeSafeWhenRacy(T* addr, T val) { \
-      JS::AutoSuppressGCAnalysis nogc;                                         \
       union {                                                                  \
         uint32_t u[2];                                                         \
         T t;                                                                   \
@@ -587,7 +472,6 @@ inline void js::jit::AtomicOperations::storeSafeWhenRacy(uint8_clamped* addr,
 
 void js::jit::AtomicOperations::memcpySafeWhenRacy(void* dest, const void* src,
                                                    size_t nbytes) {
-  JS::AutoSuppressGCAnalysis nogc;
   MOZ_ASSERT(!((char*)dest <= (char*)src && (char*)src < (char*)dest + nbytes));
   MOZ_ASSERT(!((char*)src <= (char*)dest && (char*)dest < (char*)src + nbytes));
   AtomicMemcpyDownUnsynchronized((uint8_t*)dest, (const uint8_t*)src, nbytes);
@@ -596,27 +480,11 @@ void js::jit::AtomicOperations::memcpySafeWhenRacy(void* dest, const void* src,
 inline void js::jit::AtomicOperations::memmoveSafeWhenRacy(void* dest,
                                                            const void* src,
                                                            size_t nbytes) {
-  JS::AutoSuppressGCAnalysis nogc;
   if ((char*)dest <= (char*)src) {
     AtomicMemcpyDownUnsynchronized((uint8_t*)dest, (const uint8_t*)src, nbytes);
   } else {
     AtomicMemcpyUpUnsynchronized((uint8_t*)dest, (const uint8_t*)src, nbytes);
   }
 }
-
-namespace js {
-namespace jit {
-
-extern bool InitializeJittedAtomics();
-extern void ShutDownJittedAtomics();
-
-}  // namespace jit
-}  // namespace js
-
-inline bool js::jit::AtomicOperations::Initialize() {
-  return InitializeJittedAtomics();
-}
-
-inline void js::jit::AtomicOperations::ShutDown() { ShutDownJittedAtomics(); }
 
 #endif  // jit_shared_AtomicOperations_shared_jit_h

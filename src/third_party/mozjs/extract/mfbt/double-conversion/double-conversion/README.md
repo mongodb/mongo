@@ -49,7 +49,7 @@ Use `-DBUILD_TESTING=ON` to build the test executable.
 
     cmake . -DBUILD_TESTING=ON
     make
-    test/cctest/cctest --list | tr -d '<' | xargs test/cctest/cctest
+    test/cctest/cctest
 
 [0]: http://www.scons.org/
 [1]: https://cmake.org/

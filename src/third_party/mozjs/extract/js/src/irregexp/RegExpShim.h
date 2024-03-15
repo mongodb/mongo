@@ -49,6 +49,9 @@ class Isolate;
 class RegExpMatchInfo;
 class RegExpStack;
 
+template <typename T>
+class Handle;
+
 }  // namespace internal
 }  // namespace v8
 
@@ -56,6 +59,7 @@ class RegExpStack;
 #define V8_EXPORT_PRIVATE
 #define V8_FALLTHROUGH [[fallthrough]]
 #define V8_NODISCARD [[nodiscard]]
+#define V8_NOEXCEPT noexcept
 
 #define FATAL(x) MOZ_CRASH(x)
 #define UNREACHABLE() MOZ_CRASH("unreachable code")
@@ -73,19 +77,11 @@ class RegExpStack;
 #define DCHECK_NOT_NULL(val) MOZ_ASSERT((val) != nullptr)
 #define DCHECK_IMPLIES(lhs, rhs) MOZ_ASSERT_IF(lhs, rhs)
 #define CHECK MOZ_RELEASE_ASSERT
+#define CHECK_EQ(lhs, rhs) MOZ_RELEASE_ASSERT((lhs) == (rhs))
 #define CHECK_LE(lhs, rhs) MOZ_RELEASE_ASSERT((lhs) <= (rhs))
 #define CHECK_GE(lhs, rhs) MOZ_RELEASE_ASSERT((lhs) >= (rhs))
 #define CONSTEXPR_DCHECK MOZ_ASSERT
 
-template <class T>
-static constexpr inline T Min(T t1, T t2) {
-  return t1 < t2 ? t1 : t2;
-}
-
-template <class T>
-static constexpr inline T Max(T t1, T t2) {
-  return t1 > t2 ? t1 : t2;
-}
 #define MemCopy memcpy
 
 // Origin:
@@ -133,13 +129,23 @@ using byte = uint8_t;
 using Address = uintptr_t;
 static const Address kNullAddress = 0;
 
+inline uintptr_t GetCurrentStackPosition() {
+#ifdef _MSC_VER
+  return reinterpret_cast<uintptr_t>(_AddressOfReturnAddress());
+#else
+  return reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+#endif
+}
+
+namespace base {
+
 // Latin1/UTF-16 constants
 // Code-point values in Unicode 4.0 are 21 bits wide.
 // Code units in UTF-16 are 16 bits wide.
 using uc16 = char16_t;
 using uc32 = uint32_t;
 
-namespace base {
+constexpr int kUC16Size = sizeof(base::uc16);
 
 // Origin:
 // https://github.com/v8/v8/blob/855591a54d160303349a5f0a32fab15825c708d1/src/base/macros.h#L247-L258
@@ -213,6 +219,36 @@ class LazyInstance {
   using type = LazyInstanceImpl<T>;
 };
 
+// Origin:
+// https://github.com/v8/v8/blob/855591a54d160303349a5f0a32fab15825c708d1/src/utils/utils.h#L40-L48
+// Returns the value (0 .. 15) of a hexadecimal character c.
+// If c is not a legal hexadecimal character, returns a value < 0.
+// Used in regexp-parser.cc
+inline int HexValue(base::uc32 c) {
+  c -= '0';
+  if (static_cast<unsigned>(c) <= 9) return c;
+  c = (c | 0x20) - ('a' - '0');  // detect 0x11..0x16 and 0x31..0x36.
+  if (static_cast<unsigned>(c) <= 5) return c + 10;
+  return -1;
+}
+
+template <typename... Args>
+[[nodiscard]] uint32_t hash_combine(uint32_t aHash, Args... aArgs) {
+  return mozilla::AddToHash(aHash, aArgs...);
+}
+
+template <typename T>
+class Optional {
+  mozilla::Maybe<T> inner_;
+
+ public:
+  Optional() = default;
+  Optional(T t) { inner_.emplace(t); }
+
+  bool has_value() const { return inner_.isSome(); }
+  const T& value() const { return inner_.ref(); }
+};
+
 namespace bits {
 
 inline uint64_t CountTrailingZeros(uint64_t value) {
@@ -239,10 +275,10 @@ using uchar = unsigned int;
 // https://github.com/v8/v8/blob/1f1e4cdb04c75eab77adbecd5f5514ddc3eb56cf/src/strings/unicode.h#L133-L150
 class Latin1 {
  public:
-  static const uc16 kMaxChar = 0xff;
+  static const base::uc16 kMaxChar = 0xff;
 
   // Convert the character to Latin-1 case equivalent if possible.
-  static inline uc16 TryConvertToLatin1(uc16 c) {
+  static inline base::uc16 TryConvertToLatin1(base::uc16 c) {
     // "GREEK CAPITAL LETTER MU" case maps to "MICRO SIGN".
     // "GREEK SMALL LETTER MU" case maps to "MICRO SIGN".
     if (c == 0x039C || c == 0x03BC) {
@@ -267,10 +303,10 @@ class Utf16 {
   static inline bool IsTrailSurrogate(int code) {
     return js::unicode::IsTrailSurrogate(code);
   }
-  static inline uc16 LeadSurrogate(uint32_t char_code) {
+  static inline base::uc16 LeadSurrogate(uint32_t char_code) {
     return js::unicode::LeadSurrogate(char_code);
   }
-  static inline uc16 TrailSurrogate(uint32_t char_code) {
+  static inline base::uc16 TrailSurrogate(uint32_t char_code) {
     return js::unicode::TrailSurrogate(char_code);
   }
   static inline uint32_t CombineSurrogatePair(char16_t lead, char16_t trail) {
@@ -403,11 +439,17 @@ constexpr double kMaxSafeInteger = 9007199254740991.0;  // 2^53-1
 
 constexpr int kBitsPerByte = 8;
 constexpr int kBitsPerByteLog2 = 3;
+constexpr int kUInt16Size = sizeof(uint16_t);
 constexpr int kUInt32Size = sizeof(uint32_t);
 constexpr int kInt64Size = sizeof(int64_t);
-constexpr int kUC16Size = sizeof(uc16);
 
-inline constexpr bool IsDecimalDigit(uc32 c) { return c >= '0' && c <= '9'; }
+constexpr int kMaxUInt16 = (1 << 16) - 1;
+
+inline constexpr bool IsDecimalDigit(base::uc32 c) {
+  return c >= '0' && c <= '9';
+}
+
+inline constexpr int AsciiAlphaToLower(base::uc32 c) { return c | 0x20; }
 
 inline bool is_uint24(int64_t val) { return (val >> 24) == 0; }
 inline bool is_int24(int64_t val) {
@@ -415,11 +457,11 @@ inline bool is_int24(int64_t val) {
   return (-limit <= val) && (val < limit);
 }
 
-inline bool IsIdentifierStart(uc32 c) {
-  return js::unicode::IsIdentifierStart(uint32_t(c));
+inline bool IsIdentifierStart(base::uc32 c) {
+  return js::unicode::IsIdentifierStart(char32_t(c));
 }
-inline bool IsIdentifierPart(uc32 c) {
-  return js::unicode::IsIdentifierPart(uint32_t(c));
+inline bool IsIdentifierPart(base::uc32 c) {
+  return js::unicode::IsIdentifierPart(char32_t(c));
 }
 
 // Wrappers to disambiguate char16_t and uc16.
@@ -536,19 +578,6 @@ inline bool CompareCharsEqual(const lchar* lhs, const rchar* rhs,
                                    reinterpret_cast<const urchar*>(rhs), chars);
 }
 
-// Origin:
-// https://github.com/v8/v8/blob/855591a54d160303349a5f0a32fab15825c708d1/src/utils/utils.h#L40-L48
-// Returns the value (0 .. 15) of a hexadecimal character c.
-// If c is not a legal hexadecimal character, returns a value < 0.
-// Used in regexp-parser.cc
-inline int HexValue(uc32 c) {
-  c -= '0';
-  if (static_cast<unsigned>(c) <= 9) return c;
-  c = (c | 0x20) - ('a' - '0');  // detect 0x11..0x16 and 0x31..0x36.
-  if (static_cast<unsigned>(c) <= 5) return c + 10;
-  return -1;
-}
-
 // V8::Object ~= JS::Value
 class Object {
  public:
@@ -557,6 +586,10 @@ class Object {
   constexpr Object() : asBits_(JS::Int32Value(0).asRawBits()) {}
 
   Object(const JS::Value& value) : asBits_(value.asRawBits()) {}
+
+  // This constructor is only used in an unused implementation of
+  // IsCharacterInRangeArray in regexp-macro-assembler.cc.
+  Object(uintptr_t raw) : asBits_(raw) { MOZ_CRASH("unused"); }
 
   // Used in regexp-interpreter.cc to check the return value of
   // isolate->stack_guard()->HandleInterrupts(). We want to handle
@@ -631,22 +664,39 @@ inline uint8_t* ByteArrayData::data() {
   return reinterpret_cast<uint8_t*>(immediatelyAfter);
 }
 
+template <typename T>
+T* ByteArrayData::typedData() {
+  static_assert(alignof(T) <= alignof(ByteArrayData));
+  MOZ_ASSERT(uintptr_t(data()) % alignof(T) == 0);
+  return reinterpret_cast<T*>(data());
+}
+
+template <typename T>
+T ByteArrayData::getTyped(uint32_t index) {
+  MOZ_ASSERT(index < length / sizeof(T));
+  return typedData<T>()[index];
+}
+
+template <typename T>
+void ByteArrayData::setTyped(uint32_t index, T value) {
+  MOZ_ASSERT(index < length / sizeof(T));
+  typedData<T>()[index] = value;
+}
+
 // A fixed-size array of bytes.
 class ByteArray : public HeapObject {
+ protected:
   ByteArrayData* inner() const {
     return static_cast<ByteArrayData*>(value().toPrivate());
   }
 
  public:
   PseudoHandle<ByteArrayData> takeOwnership(Isolate* isolate);
-  byte get(uint32_t index) {
-    MOZ_ASSERT(index < length());
-    return inner()->data()[index];
-  }
-  void set(uint32_t index, byte val) {
-    MOZ_ASSERT(index < length());
-    inner()->data()[index] = val;
-  }
+  PseudoHandle<ByteArrayData> maybeTakeOwnership(Isolate* isolate);
+
+  byte get(uint32_t index) { return inner()->get(index); }
+  void set(uint32_t index, byte val) { inner()->set(index, val); }
+
   uint32_t length() const { return inner()->length; }
   byte* GetDataStartAddress() { return inner()->data(); }
 
@@ -655,7 +705,35 @@ class ByteArray : public HeapObject {
     b.setValue(object.value());
     return b;
   }
+
+  bool IsByteArray() const { return true; }
+
+  friend class SMRegExpMacroAssembler;
 };
+
+// This is a convenience class used in V8 for treating a ByteArray as an array
+// of fixed-size integers. This version supports integral types up to 32 bits.
+template <typename T>
+class FixedIntegerArray : public ByteArray {
+  static_assert(alignof(T) <= alignof(ByteArrayData));
+  static_assert(std::is_integral<T>::value);
+
+ public:
+  static Handle<FixedIntegerArray<T>> New(Isolate* isolate, uint32_t length);
+
+  T get(uint32_t index) { return inner()->template getTyped<T>(index); };
+  void set(uint32_t index, T value) {
+    inner()->template setTyped<T>(index, value);
+  }
+
+  static FixedIntegerArray<T> cast(Object object) {
+    FixedIntegerArray<T> f;
+    f.setValue(object.value());
+    return f;
+  }
+};
+
+using FixedUInt16Array = FixedIntegerArray<uint16_t>;
 
 // Like Handles in SM, V8 handles are references to marked pointers.
 // Unlike SM, where Rooted pointers are created individually on the
@@ -679,7 +757,9 @@ class ByteArray : public HeapObject {
 // managed by the GC but provide the same API to irregexp. The "root"
 // of a pseudohandle is a unique pointer living in a second arena. If
 // the allocated object should outlive the HandleScope, it must be
-// manually moved out of the arena using takeOwnership.
+// manually moved out of the arena using maybeTakeOwnership.
+// (If maybeTakeOwnership is called multiple times, it will return
+// a null pointer on subsequent calls.)
 
 class MOZ_STACK_CLASS HandleScope {
  public:
@@ -830,7 +910,7 @@ class String : public HeapObject {
   static const uint32_t kMaxOneByteCharCodeU = unibrow::Latin1::kMaxChar;
   static const int kMaxUtf16CodeUnit = 0xffff;
   static const uint32_t kMaxUtf16CodeUnitU = kMaxUtf16CodeUnit;
-  static const uc32 kMaxCodePoint = 0x10ffff;
+  static const base::uc32 kMaxCodePoint = 0x10ffff;
 
   MOZ_ALWAYS_INLINE int length() const { return str()->length(); }
   bool IsFlat() { return str()->isLinear(); };
@@ -844,15 +924,18 @@ class String : public HeapObject {
     inline bool IsOneByte() const { return string_->hasLatin1Chars(); }
     inline bool IsTwoByte() const { return !string_->hasLatin1Chars(); }
 
-    Vector<const uint8_t> ToOneByteVector() const {
+    base::Vector<const uint8_t> ToOneByteVector() const {
       MOZ_ASSERT(IsOneByte());
-      return Vector<const uint8_t>(string_->latin1Chars(no_gc_),
-                                   string_->length());
+      return base::Vector<const uint8_t>(string_->latin1Chars(no_gc_),
+                                         string_->length());
     }
-    Vector<const uc16> ToUC16Vector() const {
+    base::Vector<const base::uc16> ToUC16Vector() const {
       MOZ_ASSERT(IsTwoByte());
-      return Vector<const uc16>(string_->twoByteChars(no_gc_),
-                                string_->length());
+      return base::Vector<const base::uc16>(string_->twoByteChars(no_gc_),
+                                            string_->length());
+    }
+    void UnsafeDisableChecksumVerification() {
+      // Intentional no-op. See the comment for AllowGarbageCollection above.
     }
 
    private:
@@ -883,11 +966,12 @@ class String : public HeapObject {
   std::unique_ptr<char[]> ToCString();
 
   template <typename Char>
-  Vector<const Char> GetCharVector(const DisallowGarbageCollection& no_gc);
+  base::Vector<const Char> GetCharVector(
+      const DisallowGarbageCollection& no_gc);
 };
 
 template <>
-inline Vector<const uint8_t> String::GetCharVector(
+inline base::Vector<const uint8_t> String::GetCharVector(
     const DisallowGarbageCollection& no_gc) {
   String::FlatContent flat = GetFlatContent(no_gc);
   MOZ_ASSERT(flat.IsOneByte());
@@ -895,38 +979,12 @@ inline Vector<const uint8_t> String::GetCharVector(
 }
 
 template <>
-inline Vector<const uc16> String::GetCharVector(
+inline base::Vector<const base::uc16> String::GetCharVector(
     const DisallowGarbageCollection& no_gc) {
   String::FlatContent flat = GetFlatContent(no_gc);
   MOZ_ASSERT(flat.IsTwoByte());
   return flat.ToUC16Vector();
 }
-
-// A flat string reader provides random access to the contents of a
-// string independent of the character width of the string.
-class MOZ_STACK_CLASS FlatStringReader {
- public:
-  FlatStringReader(JSContext* cx, js::HandleLinearString string)
-      : string_(string), length_(string->length()) {}
-
-  FlatStringReader(const mozilla::Range<const char16_t> range)
-      : string_(nullptr), range_(range), length_(range.length()) {}
-
-  int length() { return length_; }
-
-  inline char16_t Get(size_t index) {
-    MOZ_ASSERT(index < length_);
-    if (string_) {
-      return string_->latin1OrTwoByteChar(index);
-    }
-    return range_[index];
-  }
-
- private:
-  js::HandleLinearString string_;
-  const mozilla::Range<const char16_t> range_;
-  size_t length_;
-};
 
 class JSRegExp : public HeapObject {
  public:
@@ -938,15 +996,12 @@ class JSRegExp : public HeapObject {
   // ******************************************************
   void TierUpTick() { inner()->tierUpTick(); }
 
-  Object Code(bool is_latin1) const {
-    return Object(JS::PrivateGCThingValue(inner()->getJitCode(is_latin1)));
-  }
-  Object Bytecode(bool is_latin1) const {
+  Object bytecode(bool is_latin1) const {
     return Object(JS::PrivateValue(inner()->getByteCode(is_latin1)));
   }
 
   // TODO: should we expose this?
-  uint32_t BacktrackLimit() const { return 0; }
+  uint32_t backtrack_limit() const { return 0; }
 
   static JSRegExp cast(Object object) {
     JSRegExp regexp;
@@ -961,29 +1016,15 @@ class JSRegExp : public HeapObject {
     return (count + 1) * 2;
   }
 
-  inline int MaxRegisterCount() const { return inner()->getMaxRegisters(); }
+  inline uint32_t max_register_count() const {
+    return inner()->getMaxRegisters();
+  }
 
   // ******************************
   // Static constants
   // ******************************
 
-  // Maximum number of captures allowed.
   static constexpr int kMaxCaptures = (1 << 15) - 1;
-
-  // **************************************************
-  // JSRegExp::Flags
-  // **************************************************
-
-  enum Flag : uint8_t {
-    kNone = JS::RegExpFlag::NoFlags,
-    kGlobal = JS::RegExpFlag::Global,
-    kIgnoreCase = JS::RegExpFlag::IgnoreCase,
-    kMultiline = JS::RegExpFlag::Multiline,
-    kSticky = JS::RegExpFlag::Sticky,
-    kUnicode = JS::RegExpFlag::Unicode,
-    kDotAll = JS::RegExpFlag::DotAll,
-  };
-  using Flags = JS::RegExpFlags;
 
   static constexpr int kNoBacktrackLimit = 0;
 
@@ -992,6 +1033,19 @@ class JSRegExp : public HeapObject {
     return value().toGCThing()->as<js::RegExpShared>();
   }
 };
+
+using RegExpFlags = JS::RegExpFlags;
+
+inline bool IsUnicode(RegExpFlags flags) { return flags.unicode(); }
+inline bool IsGlobal(RegExpFlags flags) { return flags.global(); }
+inline bool IsIgnoreCase(RegExpFlags flags) { return flags.ignoreCase(); }
+inline bool IsMultiline(RegExpFlags flags) { return flags.multiline(); }
+inline bool IsDotAll(RegExpFlags flags) { return flags.dotAll(); }
+inline bool IsSticky(RegExpFlags flags) { return flags.sticky(); }
+
+// TODO: Support /v flag (bug 1713657)
+inline bool IsUnicodeSets(RegExpFlags flags) { return false; }
+inline bool IsEitherUnicode(RegExpFlags flags) { return flags.unicode(); }
 
 class Histogram {
  public:
@@ -1005,10 +1059,6 @@ class Counters {
  private:
   Histogram regexp_backtracks_;
 };
-
-#define PROFILE(isolate, call) \
-  do {                         \
-  } while (false);
 
 enum class AllocationType : uint8_t {
   kYoung,  // Allocate in the nursery
@@ -1028,7 +1078,6 @@ class Isolate {
 
   //********** Isolate code **********//
   RegExpStack* regexp_stack() const { return regexpStack_; }
-  byte* top_of_regexp_stack() const;
 
   // This is called from inside no-GC code. Instead of suppressing GC
   // to allocate the error, we return false from Execute and call
@@ -1069,11 +1118,16 @@ class Isolate {
   // Allocates a fixed array initialized with undefined values.
   Handle<FixedArray> NewFixedArray(int length);
 
+  template <typename T>
+  Handle<FixedIntegerArray<T>> NewFixedIntegerArray(uint32_t length);
+
   template <typename Char>
-  Handle<String> InternalizeString(const Vector<const Char>& str);
+  Handle<String> InternalizeString(const base::Vector<const Char>& str);
 
   //********** Stack guard code **********//
   inline StackGuard* stack_guard() { return this; }
+
+  uintptr_t real_climit() { return cx_->stackLimit(JS::StackForSystemCode); }
 
   // This is called from inside no-GC code. V8 runs the interrupt
   // inside the no-GC code and then "manually relocates unhandlified
@@ -1098,6 +1152,8 @@ class Isolate {
  public:
   template <typename T>
   PseudoHandle<T> takeOwnership(void* ptr);
+  template <typename T>
+  PseudoHandle<T> maybeTakeOwnership(void* ptr);
 
   uint32_t liveHandles() const { return handleArena_.Length(); }
   uint32_t livePseudoHandles() const { return uniquePtrArena_.Length(); }
@@ -1129,11 +1185,12 @@ class Isolate {
 // https://github.com/v8/v8/blob/50dcf2af54ce27801a71c47c1be1d2c5e36b0dd6/src/execution/isolate.h#L1909-L1931
 class StackLimitCheck {
  public:
-  StackLimitCheck(Isolate* isolate) : cx_(isolate->cx()), recursion_(cx_) {}
+  StackLimitCheck(Isolate* isolate) : cx_(isolate->cx()) {}
 
   // Use this to check for stack-overflows in C++ code.
   bool HasOverflowed() {
-    bool overflowed = !recursion_.checkDontReport(cx_);
+    js::AutoCheckRecursionLimit recursion(cx_);
+    bool overflowed = !recursion.checkDontReport(cx_);
     if (overflowed && js::SupportDifferentialTesting()) {
       // We don't report overrecursion here, but we throw an exception later
       // and this still affects differential testing. Mimic ReportOverRecursed
@@ -1150,12 +1207,19 @@ class StackLimitCheck {
 
   // Use this to check for stack-overflow when entering runtime from JS code.
   bool JsHasOverflowed() {
-    return !recursion_.checkConservativeDontReport(cx_);
+    js::AutoCheckRecursionLimit recursion(cx_);
+    return !recursion.checkDontReport(cx_);
   }
 
  private:
   JSContext* cx_;
-  js::AutoCheckRecursionLimit recursion_;
+};
+
+class ExternalReference {
+ public:
+  static const void* TopOfRegexpStack(Isolate* isolate);
+  static size_t SizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf,
+                                    RegExpStack* regexpStack);
 };
 
 class Code : public HeapObject {
@@ -1174,17 +1238,9 @@ class Code : public HeapObject {
   }
 };
 
-enum class MessageTemplate { kStackOverflow };
-
-class MessageFormatter {
- public:
-  static const char* TemplateString(MessageTemplate index) {
-    switch (index) {
-      case MessageTemplate::kStackOverflow:
-        return "too much recursion";
-    }
-  }
-};
+// Only used in function signature of functions we don't implement
+// (NativeRegExpMacroAssembler::CheckStackGuardState)
+class InstructionStream {};
 
 // Origin: https://github.com/v8/v8/blob/master/src/codegen/label.h
 class Label {
@@ -1210,69 +1266,26 @@ class Label {
   friend class SMRegExpMacroAssembler;
 };
 
-//**************************************************
-// Constant Flags
-//**************************************************
-
-// V8 uses this for differential fuzzing to handle stack overflows.
-// We address the same problem in StackLimitCheck::HasOverflowed.
-const bool FLAG_correctness_fuzzer_suppressions = false;
-
-// Instead of using a flag for this, we provide an implementation of
-// CanReadUnaligned in SMRegExpMacroAssembler.
-const bool FLAG_enable_regexp_unaligned_accesses = false;
-
-// This is used to guard a prototype implementation of sequence properties.
-// See: https://github.com/tc39/proposal-regexp-unicode-sequence-properties
-// TODO: Expose this behind a pref once it is past stage 2?
-const bool FLAG_harmony_regexp_sequence = false;
-
-// This is only used in a helper function in regex.h that we never call.
-const bool FLAG_regexp_interpret_all = false;
-
-// This is used to guard a prototype implementation of mode modifiers,
-// which can modify the regexp flags on the fly inside the pattern.
-// As far as I can tell, there isn't even a TC39 proposal for this.
-const bool FLAG_regexp_mode_modifiers = false;
-
-// This is used to guard an old prototype implementation of possessive
-// quantifiers, which never got past the point of adding parser support.
-const bool FLAG_regexp_possessive_quantifier = false;
-
-// These affect the default level of optimization. We can still turn
-// optimization off on a case-by-case basis in CompilePattern - for
-// example, if a regexp is too long - so we might as well turn these
-// flags on unconditionally.
-const bool FLAG_regexp_optimization = true;
-#if MOZ_BIG_ENDIAN()
-// peephole optimization not supported on big endian
-const bool FLAG_regexp_peephole_optimization = false;
-#else
-const bool FLAG_regexp_peephole_optimization = true;
-#endif
-
-// This is used to control whether regexps tier up from interpreted to
-// compiled. We control this with --no-native-regexp and
-// --regexp-warmup-threshold.
-const bool FLAG_regexp_tier_up = true;
-
-//**************************************************
-// Debugging Flags
-//**************************************************
-
-#define FLAG_trace_regexp_bytecodes js::jit::JitOptions.traceRegExpInterpreter
-#define FLAG_trace_regexp_parser js::jit::JitOptions.traceRegExpParser
-#define FLAG_trace_regexp_peephole_optimization \
-  js::jit::JitOptions.traceRegExpPeephole
+#define v8_flags js::jit::JitOptions
 
 #ifndef NO_COMPUTED_GOTO
-# define V8_USE_COMPUTED_GOTO 1
+#  define V8_USE_COMPUTED_GOTO 1
 #else
-# define V8_USE_COMPUTED_GOTO 0
+#  define V8_USE_COMPUTED_GOTO 0
 #endif
 #define COMPILING_IRREGEXP_FOR_EXTERNAL_EMBEDDER
 
 }  // namespace internal
 }  // namespace v8
+
+namespace V8 {
+
+inline void FatalProcessOutOfMemory(v8::internal::Isolate* isolate,
+                                    const char* msg) {
+  js::AutoEnterOOMUnsafeRegion oomUnsafe;
+  oomUnsafe.crash(msg);
+}
+
+}  // namespace V8
 
 #endif  // RegexpShim_h

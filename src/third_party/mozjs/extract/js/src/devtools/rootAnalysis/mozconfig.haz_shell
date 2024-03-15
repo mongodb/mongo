@@ -9,8 +9,9 @@
 ac_add_options --enable-ctypes
 ac_add_options --enable-optimize
 ac_add_options --disable-debug
-ac_add_options --enable-application=js
+ac_add_options --enable-project=js
 ac_add_options --enable-nspr-build
+ac_add_options --disable-jemalloc
 
 if [ -n "$AUTOMATION" ]; then
   mk_add_options MOZ_OBJDIR="${HAZARD_SHELL_OBJDIR}"

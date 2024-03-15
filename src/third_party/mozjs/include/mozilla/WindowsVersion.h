@@ -162,6 +162,10 @@ MOZ_ALWAYS_INLINE bool IsWin10May2019UpdateOrLater() {
   return IsWindows10BuildOrLater(18362);
 }
 
+MOZ_ALWAYS_INLINE bool IsWin11OrLater() {
+  return IsWindows10BuildOrLater(22000);
+}
+
 MOZ_ALWAYS_INLINE bool IsNotWin7PreRTM() {
   return IsWin7SP1OrLater() || IsWindowsBuildOrLater(7600);
 }
@@ -198,6 +202,12 @@ inline bool IsWin7AndPre2000Compatible() {
     return false;
   }
   return info.dwMajorVersion < 5;
+}
+
+// Whether we're a Windows 11 build with "Suggested actions" feature which
+// causes hangs. See bug 1774285.
+MOZ_ALWAYS_INLINE bool NeedsWindows11SuggestedActionsWorkaround() {
+  return IsWindows10BuildOrLater(22621);
 }
 
 }  // namespace mozilla

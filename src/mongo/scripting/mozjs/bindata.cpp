@@ -111,20 +111,21 @@ void hexToBinData(JSContext* cx,
 }
 
 std::string* getEncoded(JS::HandleValue thisv) {
-    return static_cast<std::string*>(JS::GetPrivate(thisv.toObjectOrNull()));
+    return JS::GetMaybePtrFromReservedSlot<std::string>(thisv.toObjectOrNull(),
+                                                        BinDataInfo::BinDataStringSlot);
 }
 
 std::string* getEncoded(JSObject* thisv) {
-    return static_cast<std::string*>(JS::GetPrivate(thisv));
+    return JS::GetMaybePtrFromReservedSlot<std::string>(thisv, BinDataInfo::BinDataStringSlot);
 }
 
 }  // namespace
 
-void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void BinDataInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto str = getEncoded(obj);
 
     if (str) {
-        getScope(fop)->trackedDelete(str);
+        getScope(gcCtx)->trackedDelete(str);
     }
 }
 
@@ -276,7 +277,8 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.defineProperty(InternedString::len, len, JSPROP_READONLY);
     o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
-    JS::SetPrivate(thisv, scope->trackedNew<std::string>(std::move(str)));
+    JS::SetReservedSlot(
+        thisv, BinDataStringSlot, JS::PrivateValue(scope->trackedNew<std::string>(std::move(str))));
 
     args.rval().setObjectOrNull(thisv);
 }

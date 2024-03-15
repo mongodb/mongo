@@ -12,14 +12,23 @@
 #ifndef js_HelperThreadAPI_h
 #define js_HelperThreadAPI_h
 
+#include <stddef.h>  // size_t
+
+#include "jstypes.h"  // JS_PUBLIC_API
+
 namespace JS {
+
+// Argument passed to the task callback to indicate whether we're invoking it
+// because a new task was added by the JS engine or because we're on a helper
+// thread that just finished a task and there are other tasks pending.
+enum class DispatchReason { NewTask, FinishedTask };
 
 /**
  * Set callback to dispatch a tasks to an external thread pool.
  *
  * When the task runs it should call JS::RunHelperThreadTask.
  */
-using HelperThreadTaskCallback = void (*)();
+using HelperThreadTaskCallback = void (*)(DispatchReason reason);
 extern JS_PUBLIC_API void SetHelperThreadTaskCallback(
     HelperThreadTaskCallback callback, size_t threadCount, size_t stackSize);
 

@@ -259,6 +259,12 @@ class ProfilingStackFrame {
     }
   }
 
+  void setLabelCategory(JS::ProfilingCategoryPair aCategoryPair) {
+    MOZ_ASSERT(isLabelFrame());
+    flagsAndCategoryPair_ =
+        (uint32_t(aCategoryPair) << uint32_t(Flags::FLAGS_BITCOUNT)) | flags();
+  }
+
   const char* label() const {
     uint32_t flagsAndCategoryPair = flagsAndCategoryPair_;
     if (flagsAndCategoryPair &

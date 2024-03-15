@@ -8,7 +8,6 @@
 
 #include <algorithm>
 
-#include "gc/Marking.h"
 #include "jit/AutoWritableJitCode.h"
 #if defined(JS_CODEGEN_X86)
 #  include "jit/x86/MacroAssembler-x86.h"
@@ -90,41 +89,6 @@ void AssemblerX86Shared::TraceDataRelocations(JSTracer* trc, JitCode* code,
 
 void AssemblerX86Shared::executableCopy(void* buffer) {
   masm.executableCopy(buffer);
-
-  // Crash diagnostics for bug 1124397. Check the code buffer has not been
-  // poisoned with 0xE5 bytes.
-  static const size_t MinPoisoned = 16;
-  const uint8_t* bytes = (const uint8_t*)buffer;
-  size_t len = size();
-
-  for (size_t i = 0; i < len; i += MinPoisoned) {
-    if (bytes[i] != 0xE5) {
-      continue;
-    }
-
-    size_t startOffset = i;
-    while (startOffset > 0 && bytes[startOffset - 1] == 0xE5) {
-      startOffset--;
-    }
-
-    size_t endOffset = i;
-    while (endOffset + 1 < len && bytes[endOffset + 1] == 0xE5) {
-      endOffset++;
-    }
-
-    if (endOffset - startOffset < MinPoisoned) {
-      continue;
-    }
-
-    volatile uintptr_t dump[5];
-    blackbox = dump;
-    blackbox[0] = uintptr_t(0xABCD4321);
-    blackbox[1] = uintptr_t(len);
-    blackbox[2] = uintptr_t(startOffset);
-    blackbox[3] = uintptr_t(endOffset);
-    blackbox[4] = uintptr_t(0xFFFF8888);
-    MOZ_CRASH("Corrupt code buffer");
-  }
 }
 
 void AssemblerX86Shared::processCodeLabels(uint8_t* rawCode) {
@@ -239,11 +203,23 @@ AssemblerX86Shared::DoubleCondition AssemblerX86Shared::InvertCondition(
 CPUInfo::SSEVersion CPUInfo::maxSSEVersion = UnknownSSE;
 CPUInfo::SSEVersion CPUInfo::maxEnabledSSEVersion = UnknownSSE;
 bool CPUInfo::avxPresent = false;
+#ifdef ENABLE_WASM_AVX
+bool CPUInfo::avxEnabled = true;
+#else
 bool CPUInfo::avxEnabled = false;
+#endif
 bool CPUInfo::popcntPresent = false;
 bool CPUInfo::bmi1Present = false;
 bool CPUInfo::bmi2Present = false;
 bool CPUInfo::lzcntPresent = false;
+bool CPUInfo::avx2Present = false;
+bool CPUInfo::fmaPresent = false;
+
+namespace js {
+namespace jit {
+bool CPUFlagsHaveBeenComputed() { return CPUInfo::FlagsHaveBeenComputed(); }
+}  // namespace jit
+}  // namespace js
 
 static uintptr_t ReadXGETBV() {
   // We use a variety of low-level mechanisms to get at the xgetbv
@@ -297,7 +273,9 @@ static void ReadCPUInfo(int* flagsEax, int* flagsEbx, int* flagsEcx,
 #endif
 }
 
-void CPUInfo::SetSSEVersion() {
+void CPUInfo::ComputeFlags() {
+  MOZ_ASSERT(!FlagsHaveBeenComputed());
+
   int flagsEax = 1;
   int flagsEbx = 0;
   int flagsEcx = 0;
@@ -353,6 +331,10 @@ void CPUInfo::SetSSEVersion() {
   static constexpr int POPCNTBit = 1 << 23;
   popcntPresent = (flagsEcx & POPCNTBit);
 
+  // Use the avxEnabled flag to enable/disable FMA.
+  static constexpr int FMABit = 1 << 12;
+  fmaPresent = (flagsEcx & FMABit) && avxEnabled;
+
   flagsEax = 0x80000001;
   ReadCPUInfo(&flagsEax, &flagsEbx, &flagsEcx, &flagsEdx);
 
@@ -364,8 +346,10 @@ void CPUInfo::SetSSEVersion() {
 
   static constexpr int BMI1Bit = 1 << 3;
   static constexpr int BMI2Bit = 1 << 8;
+  static constexpr int AVX2Bit = 1 << 5;
   bmi1Present = (flagsEbx & BMI1Bit);
   bmi2Present = bmi1Present && (flagsEbx & BMI2Bit);
-}
+  avx2Present = avxPresent && (flagsEbx & AVX2Bit);
 
-volatile uintptr_t* blackbox = nullptr;
+  MOZ_ASSERT(FlagsHaveBeenComputed());
+}

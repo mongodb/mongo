@@ -14,16 +14,18 @@
 #include "jsexn.h"
 #include "jsfriendapi.h"
 
-#include "js/Debug.h"
+#include "js/CallAndConstruct.h"      // JS::Construct, JS::IsCallable
 #include "js/experimental/JitInfo.h"  // JSJitGetterOp, JSJitInfo
 #include "js/ForOfIterator.h"         // JS::ForOfIterator
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/PropertySpec.h"
+#include "js/Stack.h"
 #include "vm/ArrayObject.h"
 #include "vm/AsyncFunction.h"
 #include "vm/AsyncIteration.h"
+#include "vm/CompletionKind.h"
 #include "vm/ErrorObject.h"
-#include "vm/GeneratorObject.h"
+#include "vm/ErrorReporting.h"
 #include "vm/Iteration.h"
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
@@ -44,57 +46,55 @@ using namespace js;
 
 static double MillisecondsSinceStartup() {
   auto now = mozilla::TimeStamp::Now();
-  return (now - mozilla::TimeStamp::ProcessCreation()).ToMilliseconds();
+  return (now - mozilla::TimeStamp::FirstTimeStamp()).ToMilliseconds();
 }
-
-enum PromiseHandler {
-  PromiseHandlerIdentity = 0,
-  PromiseHandlerThrower,
-
-  // ES 2018 draft 25.5.5.4-5.
-  PromiseHandlerAsyncFunctionAwaitedFulfilled,
-  PromiseHandlerAsyncFunctionAwaitedRejected,
-
-  // ES2019 draft rev 49b781ec80117b60f73327ef3054703a3111e40c
-  // 6.2.3.1.1 Await Fulfilled Functions
-  // 6.2.3.1.2 Await Rejected Functions
-  PromiseHandlerAsyncGeneratorAwaitedFulfilled,
-  PromiseHandlerAsyncGeneratorAwaitedRejected,
-
-  // ES2019 draft rev 49b781ec80117b60f73327ef3054703a3111e40c
-  // 25.5.3.5.1 AsyncGeneratorResumeNext Return Processor Fulfilled Functions
-  // 25.5.3.5.2 AsyncGeneratorResumeNext Return Processor Rejected Functions
-  PromiseHandlerAsyncGeneratorResumeNextReturnFulfilled,
-  PromiseHandlerAsyncGeneratorResumeNextReturnRejected,
-
-  // ES2019 draft rev 49b781ec80117b60f73327ef3054703a3111e40c
-  // 25.5.3.7 AsyncGeneratorYield, steps 8.c-e.
-  PromiseHandlerAsyncGeneratorYieldReturnAwaitedFulfilled,
-  PromiseHandlerAsyncGeneratorYieldReturnAwaitedRejected,
-
-  // ES2019 draft rev 49b781ec80117b60f73327ef3054703a3111e40c
-  // 25.1.4.2.5 Async-from-Sync Iterator Value Unwrap Functions
-  //
-  // Async-from-Sync iterator handlers take the resolved value and create new
-  // iterator objects.  To do so it needs to forward whether the iterator is
-  // done. In spec, this is achieved via the [[Done]] internal slot. We
-  // enumerate both true and false cases here.
-  PromiseHandlerAsyncFromSyncIteratorValueUnwrapDone,
-  PromiseHandlerAsyncFromSyncIteratorValueUnwrapNotDone,
-
-  // One past the maximum allowed PromiseHandler value.
-  PromiseHandlerLimit
-};
 
 enum ResolutionMode { ResolveMode, RejectMode };
 
+/**
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * Promise Resolve Functions
+ * https://tc39.es/ecma262/#sec-promise-resolve-functions
+ */
 enum ResolveFunctionSlots {
+  // NOTE: All slot represent [[AlreadyResolved]].[[Value]].
+  //
+  // The spec creates single record for [[AlreadyResolved]] and shares it
+  // between Promise Resolve Function and Promise Reject Function.
+  //
+  //   Step 1. Let alreadyResolved be the Record { [[Value]]: false }.
+  //   ...
+  //   Step 6. Set resolve.[[AlreadyResolved]] to alreadyResolved.
+  //   ...
+  //   Step 11. Set reject.[[AlreadyResolved]] to alreadyResolved.
+  //
+  // We implement it by clearing all slots, both in
+  // Promise Resolve Function and Promise Reject Function at the same time.
+  //
+  // If none of slots are undefined, [[AlreadyResolved]].[[Value]] is false.
+  // If all slot are undefined, [[AlreadyResolved]].[[Value]] is true.
+
+  // [[Promise]] slot.
+  // A possibly-wrapped promise.
   ResolveFunctionSlot_Promise = 0,
+
+  // The corresponding Promise Reject Function.
   ResolveFunctionSlot_RejectFunction,
 };
 
+/**
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * Promise Reject Functions
+ * https://tc39.es/ecma262/#sec-promise-reject-functions
+ */
 enum RejectFunctionSlots {
+  // [[Promise]] slot.
+  // A possibly-wrapped promise.
   RejectFunctionSlot_Promise = 0,
+
+  // The corresponding Promise Resolve Function.
   RejectFunctionSlot_ResolveFunction,
 };
 
@@ -281,8 +281,8 @@ class WrappedPtrOperations<PromiseCombinatorElements, Wrapper> {
     return HandleValue::fromMarkedLocation(&elements().value);
   }
 
-  HandleArrayObject unwrappedArray() const {
-    return HandleArrayObject::fromMarkedLocation(&elements().unwrappedArray);
+  Handle<ArrayObject*> unwrappedArray() const {
+    return Handle<ArrayObject*>::fromMarkedLocation(&elements().unwrappedArray);
   }
 };
 
@@ -324,7 +324,7 @@ class MutableWrappedPtrOperations<PromiseCombinatorElements, Wrapper>
     // compartment proxy instead...
     AutoRealm ar(cx, unwrappedArray());
 
-    HandleArrayObject arrayObj = unwrappedArray();
+    Handle<ArrayObject*> arrayObj = unwrappedArray();
     return js::NewbornArrayPush(cx, arrayObj, UndefinedValue());
   }
 
@@ -474,7 +474,7 @@ class PromiseDebugInfo : public NativeObject {
   // will be used instead. This is also the default behavior for fulfilled
   // promises.
   static void setResolutionInfo(JSContext* cx, Handle<PromiseObject*> promise,
-                                HandleSavedFrame unwrappedRejectionStack) {
+                                Handle<SavedFrame*> unwrappedRejectionStack) {
     MOZ_ASSERT_IF(unwrappedRejectionStack,
                   promise->state() == JS::PromiseState::Rejected);
 
@@ -568,7 +568,11 @@ JSObject* PromiseObject::allocationSite() {
 JSObject* PromiseObject::resolutionSite() {
   auto debugInfo = PromiseDebugInfo::FromPromise(this);
   if (debugInfo) {
-    return debugInfo->resolutionSite();
+    JSObject* site = debugInfo->resolutionSite();
+    if (site && !JS_IsDeadWrapper(site)) {
+      MOZ_ASSERT(UncheckedUnwrap(site)->is<SavedFrame>());
+      return site;
+    }
   }
   return nullptr;
 }
@@ -578,9 +582,8 @@ JSObject* PromiseObject::resolutionSite() {
  * no exception is pending, but an error occurred.
  * This can be the case if an OOM was encountered while throwing the error.
  */
-static bool MaybeGetAndClearExceptionAndStack(JSContext* cx,
-                                              MutableHandleValue rval,
-                                              MutableHandleSavedFrame stack) {
+static bool MaybeGetAndClearExceptionAndStack(
+    JSContext* cx, MutableHandleValue rval, MutableHandle<SavedFrame*> stack) {
   if (!cx->isExceptionPending()) {
     return false;
   }
@@ -588,30 +591,39 @@ static bool MaybeGetAndClearExceptionAndStack(JSContext* cx,
   return GetAndClearExceptionAndStack(cx, rval, stack);
 }
 
-[[nodiscard]] static bool RunRejectFunction(
-    JSContext* cx, HandleObject onRejectedFunc, HandleValue result,
-    HandleObject promiseObj, HandleSavedFrame unwrappedRejectionStack,
+[[nodiscard]] static bool CallPromiseRejectFunction(
+    JSContext* cx, HandleObject rejectFun, HandleValue reason,
+    HandleObject promiseObj, Handle<SavedFrame*> unwrappedRejectionStack,
     UnhandledRejectionBehavior behavior);
 
-// ES2016, 25.4.1.1.1, Steps 1.a-b.
-// Extracting all of this internal spec algorithm into a helper function would
-// be tedious, so the check in step 1 and the entirety of step 2 aren't
-// included.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * IfAbruptRejectPromise ( value, capability )
+ * https://tc39.es/ecma262/#sec-ifabruptrejectpromise
+ *
+ * Steps 1.a-b.
+ *
+ * Extracting all of this internal spec algorithm into a helper function would
+ * be tedious, so the check in step 1 and the entirety of step 2 aren't
+ * included.
+ */
 static bool AbruptRejectPromise(JSContext* cx, CallArgs& args,
                                 HandleObject promiseObj, HandleObject reject) {
-  // Step 1.a.
+  // Step 1.a. Perform
+  //           ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
   RootedValue reason(cx);
-  RootedSavedFrame stack(cx);
+  Rooted<SavedFrame*> stack(cx);
   if (!MaybeGetAndClearExceptionAndStack(cx, &reason, &stack)) {
     return false;
   }
 
-  if (!RunRejectFunction(cx, reject, reason, promiseObj, stack,
-                         UnhandledRejectionBehavior::Report)) {
+  if (!CallPromiseRejectFunction(cx, reject, reason, promiseObj, stack,
+                                 UnhandledRejectionBehavior::Report)) {
     return false;
   }
 
-  // Step 1.b.
+  // Step 1.b. Return capability.[[Promise]].
   args.rval().setObject(*promiseObj);
   return true;
 }
@@ -703,14 +715,51 @@ enum ReactionRecordSlots {
   ReactionRecordSlots,
 };
 
-// ES2016, 25.4.1.2.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PromiseReaction Records
+ * https://tc39.es/ecma262/#sec-promisereaction-records
+ */
 class PromiseReactionRecord : public NativeObject {
+  // If this flag is set, this reaction record is already enqueued to the
+  // job queue, and the spec's [[Type]] field is represented by
+  // REACTION_FLAG_FULFILLED flag.
+  //
+  // If this flag isn't yet set, [[Type]] field is undefined.
   static constexpr uint32_t REACTION_FLAG_RESOLVED = 0x1;
+
+  // This bit is valid only when REACTION_FLAG_RESOLVED flag is set.
+  //
+  // If this flag is set, [[Type]] field is Fulfill.
+  // If this flag isn't set, [[Type]] field is Reject.
   static constexpr uint32_t REACTION_FLAG_FULFILLED = 0x2;
+
+  // If this flag is set, this reaction record is created for resolving
+  // one promise P1 to another promise P2, and
+  // ReactionRecordSlot_GeneratorOrPromiseToResolve slot holds P2.
   static constexpr uint32_t REACTION_FLAG_DEFAULT_RESOLVING_HANDLER = 0x4;
+
+  // If this flag is set, this reaction record is created for async function
+  // and ReactionRecordSlot_GeneratorOrPromiseToResolve slot holds
+  // internal generator object of the async function.
   static constexpr uint32_t REACTION_FLAG_ASYNC_FUNCTION = 0x8;
+
+  // If this flag is set, this reaction record is created for async generator
+  // and ReactionRecordSlot_GeneratorOrPromiseToResolve slot holds
+  // the async generator object of the async generator.
   static constexpr uint32_t REACTION_FLAG_ASYNC_GENERATOR = 0x10;
+
+  // If this flag is set, this reaction record is created only for providing
+  // information to debugger.
   static constexpr uint32_t REACTION_FLAG_DEBUGGER_DUMMY = 0x20;
+
+  // This bit is valid only when the promise object is optimized out
+  // for the reaction.
+  //
+  // If this flag is set, unhandled rejection should be ignored.
+  // Otherwise, promise object should be created on-demand for unhandled
+  // rejection.
   static constexpr uint32_t REACTION_FLAG_IGNORE_UNHANDLED_REJECTION = 0x40;
 
   void setFlagOnInitialState(uint32_t flag) {
@@ -740,9 +789,11 @@ class PromiseReactionRecord : public NativeObject {
   JSObject* promise() {
     return getFixedSlot(ReactionRecordSlot_Promise).toObjectOrNull();
   }
+
   int32_t flags() const {
     return getFixedSlot(ReactionRecordSlot_Flags).toInt32();
   }
+
   JS::PromiseState targetState() {
     int32_t flags = this->flags();
     if (!(flags & REACTION_FLAG_RESOLVED)) {
@@ -791,6 +842,7 @@ class PromiseReactionRecord : public NativeObject {
         getFixedSlot(ReactionRecordSlot_GeneratorOrPromiseToResolve);
     return &promiseToResolve.toObject().as<PromiseObject>();
   }
+
   void setIsAsyncFunction(AsyncFunctionGeneratorObject* genObj) {
     setFlagOnInitialState(REACTION_FLAG_ASYNC_FUNCTION);
     setFixedSlot(ReactionRecordSlot_GeneratorOrPromiseToResolve,
@@ -806,10 +858,11 @@ class PromiseReactionRecord : public NativeObject {
         getFixedSlot(ReactionRecordSlot_GeneratorOrPromiseToResolve);
     return &generator.toObject().as<AsyncFunctionGeneratorObject>();
   }
-  void setIsAsyncGenerator(AsyncGeneratorObject* asyncGenObj) {
+
+  void setIsAsyncGenerator(AsyncGeneratorObject* generator) {
     setFlagOnInitialState(REACTION_FLAG_ASYNC_GENERATOR);
     setFixedSlot(ReactionRecordSlot_GeneratorOrPromiseToResolve,
-                 ObjectValue(*asyncGenObj));
+                 ObjectValue(*generator));
   }
   bool isAsyncGenerator() {
     int32_t flags = this->flags();
@@ -821,6 +874,7 @@ class PromiseReactionRecord : public NativeObject {
         getFixedSlot(ReactionRecordSlot_GeneratorOrPromiseToResolve);
     return &generator.toObject().as<AsyncGeneratorObject>();
   }
+
   void setIsDebuggerDummy() {
     setFlagOnInitialState(REACTION_FLAG_DEBUGGER_DUMMY);
   }
@@ -828,6 +882,7 @@ class PromiseReactionRecord : public NativeObject {
     int32_t flags = this->flags();
     return flags & REACTION_FLAG_DEBUGGER_DUMMY;
   }
+
   Value handler() {
     MOZ_ASSERT(targetState() != JS::PromiseState::Pending);
     return getFixedSlot(handlerSlot());
@@ -836,6 +891,7 @@ class PromiseReactionRecord : public NativeObject {
     MOZ_ASSERT(targetState() != JS::PromiseState::Pending);
     return getFixedSlot(handlerArgSlot());
   }
+
   JSObject* getAndClearIncumbentGlobalObject() {
     JSObject* obj =
         getFixedSlot(ReactionRecordSlot_IncumbentGlobalObject).toObjectOrNull();
@@ -864,11 +920,162 @@ static bool PromiseHasAnyFlag(PromiseObject& promise, int32_t flag) {
 static bool ResolvePromiseFunction(JSContext* cx, unsigned argc, Value* vp);
 static bool RejectPromiseFunction(JSContext* cx, unsigned argc, Value* vp);
 
-// ES2016, 25.4.1.3.
+static JSFunction* GetResolveFunctionFromReject(JSFunction* reject);
+static JSFunction* GetRejectFunctionFromResolve(JSFunction* resolve);
+
+#ifdef DEBUG
+
+/**
+ * Returns Promise Resolve Function's [[AlreadyResolved]].[[Value]].
+ */
+static bool IsAlreadyResolvedMaybeWrappedResolveFunction(
+    JSObject* resolveFunObj) {
+  if (IsWrapper(resolveFunObj)) {
+    resolveFunObj = UncheckedUnwrap(resolveFunObj);
+  }
+
+  JSFunction* resolveFun = &resolveFunObj->as<JSFunction>();
+  MOZ_ASSERT(resolveFun->maybeNative() == ResolvePromiseFunction);
+
+  bool alreadyResolved =
+      resolveFun->getExtendedSlot(ResolveFunctionSlot_Promise).isUndefined();
+
+  // Other slots should agree.
+  if (alreadyResolved) {
+    MOZ_ASSERT(resolveFun->getExtendedSlot(ResolveFunctionSlot_RejectFunction)
+                   .isUndefined());
+  } else {
+    JSFunction* rejectFun = GetRejectFunctionFromResolve(resolveFun);
+    MOZ_ASSERT(
+        !rejectFun->getExtendedSlot(RejectFunctionSlot_Promise).isUndefined());
+    MOZ_ASSERT(!rejectFun->getExtendedSlot(RejectFunctionSlot_ResolveFunction)
+                    .isUndefined());
+  }
+
+  return alreadyResolved;
+}
+
+/**
+ * Returns Promise Reject Function's [[AlreadyResolved]].[[Value]].
+ */
+static bool IsAlreadyResolvedMaybeWrappedRejectFunction(
+    JSObject* rejectFunObj) {
+  if (IsWrapper(rejectFunObj)) {
+    rejectFunObj = UncheckedUnwrap(rejectFunObj);
+  }
+
+  JSFunction* rejectFun = &rejectFunObj->as<JSFunction>();
+  MOZ_ASSERT(rejectFun->maybeNative() == RejectPromiseFunction);
+
+  bool alreadyResolved =
+      rejectFun->getExtendedSlot(RejectFunctionSlot_Promise).isUndefined();
+
+  // Other slots should agree.
+  if (alreadyResolved) {
+    MOZ_ASSERT(rejectFun->getExtendedSlot(RejectFunctionSlot_ResolveFunction)
+                   .isUndefined());
+  } else {
+    JSFunction* resolveFun = GetResolveFunctionFromReject(rejectFun);
+    MOZ_ASSERT(!resolveFun->getExtendedSlot(ResolveFunctionSlot_Promise)
+                    .isUndefined());
+    MOZ_ASSERT(!resolveFun->getExtendedSlot(ResolveFunctionSlot_RejectFunction)
+                    .isUndefined());
+  }
+
+  return alreadyResolved;
+}
+
+#endif  // DEBUG
+
+/**
+ * Set Promise Resolve Function's and Promise Reject Function's
+ * [[AlreadyResolved]].[[Value]] to true.
+ *
+ * `resolutionFun` can be either of them.
+ */
+static void SetAlreadyResolvedResolutionFunction(JSFunction* resolutionFun) {
+  JSFunction* resolve;
+  JSFunction* reject;
+  if (resolutionFun->maybeNative() == ResolvePromiseFunction) {
+    resolve = resolutionFun;
+    reject = GetRejectFunctionFromResolve(resolutionFun);
+  } else {
+    resolve = GetResolveFunctionFromReject(resolutionFun);
+    reject = resolutionFun;
+  }
+
+  resolve->setExtendedSlot(ResolveFunctionSlot_Promise, UndefinedValue());
+  resolve->setExtendedSlot(ResolveFunctionSlot_RejectFunction,
+                           UndefinedValue());
+
+  reject->setExtendedSlot(RejectFunctionSlot_Promise, UndefinedValue());
+  reject->setExtendedSlot(RejectFunctionSlot_ResolveFunction, UndefinedValue());
+
+  MOZ_ASSERT(IsAlreadyResolvedMaybeWrappedResolveFunction(resolve));
+  MOZ_ASSERT(IsAlreadyResolvedMaybeWrappedRejectFunction(reject));
+}
+
+/**
+ * Returns true if given promise is created by
+ * CreatePromiseObjectWithoutResolutionFunctions.
+ */
+bool js::IsPromiseWithDefaultResolvingFunction(PromiseObject* promise) {
+  return PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS);
+}
+
+/**
+ * Returns Promise Resolve Function's [[AlreadyResolved]].[[Value]] for
+ * a promise created by CreatePromiseObjectWithoutResolutionFunctions.
+ */
+static bool IsAlreadyResolvedPromiseWithDefaultResolvingFunction(
+    PromiseObject* promise) {
+  MOZ_ASSERT(IsPromiseWithDefaultResolvingFunction(promise));
+
+  if (promise->as<PromiseObject>().state() != JS::PromiseState::Pending) {
+    MOZ_ASSERT(PromiseHasAnyFlag(
+        *promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS_ALREADY_RESOLVED));
+    return true;
+  }
+
+  return PromiseHasAnyFlag(
+      *promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS_ALREADY_RESOLVED);
+}
+
+/**
+ * Set Promise Resolve Function's [[AlreadyResolved]].[[Value]] to true for
+ * a promise created by CreatePromiseObjectWithoutResolutionFunctions.
+ */
+void js::SetAlreadyResolvedPromiseWithDefaultResolvingFunction(
+    PromiseObject* promise) {
+  MOZ_ASSERT(IsPromiseWithDefaultResolvingFunction(promise));
+
+  promise->setFixedSlot(
+      PromiseSlot_Flags,
+      JS::Int32Value(
+          promise->flags() |
+          PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS_ALREADY_RESOLVED));
+}
+
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * CreateResolvingFunctions ( promise )
+ * https://tc39.es/ecma262/#sec-createresolvingfunctions
+ */
 [[nodiscard]] static MOZ_ALWAYS_INLINE bool CreateResolvingFunctions(
     JSContext* cx, HandleObject promise, MutableHandleObject resolveFn,
     MutableHandleObject rejectFn) {
-  HandlePropertyName funName = cx->names().empty;
+  // Step 1. Let alreadyResolved be the Record { [[Value]]: false }.
+  // (implicit, see steps 5-6, 10-11 below)
+
+  // Step 2. Let stepsResolve be the algorithm steps defined in Promise Resolve
+  //         Functions.
+  // Step 3. Let lengthResolve be the number of non-optional parameters of the
+  //         function definition in Promise Resolve Functions.
+  // Step 4. Let resolve be
+  //         ! CreateBuiltinFunction(stepsResolve, lengthResolve, "",
+  //                                 « [[Promise]], [[AlreadyResolved]] »).
+  Handle<PropertyName*> funName = cx->names().empty;
   resolveFn.set(NewNativeFunction(cx, ResolvePromiseFunction, 1, funName,
                                   gc::AllocKind::FUNCTION_EXTENDED,
                                   GenericObject));
@@ -876,6 +1083,13 @@ static bool RejectPromiseFunction(JSContext* cx, unsigned argc, Value* vp);
     return false;
   }
 
+  // Step 7. Let stepsReject be the algorithm steps defined in Promise Reject
+  //         Functions.
+  // Step 8. Let lengthReject be the number of non-optional parameters of the
+  //         function definition in Promise Reject Functions.
+  // Step 9. Let reject be
+  //         ! CreateBuiltinFunction(stepsReject, lengthReject, "",
+  //                                 « [[Promise]], [[AlreadyResolved]] »).
   rejectFn.set(NewNativeFunction(cx, RejectPromiseFunction, 1, funName,
                                  gc::AllocKind::FUNCTION_EXTENDED,
                                  GenericObject));
@@ -886,20 +1100,32 @@ static bool RejectPromiseFunction(JSContext* cx, unsigned argc, Value* vp);
   JSFunction* resolveFun = &resolveFn->as<JSFunction>();
   JSFunction* rejectFun = &rejectFn->as<JSFunction>();
 
+  // Step 5. Set resolve.[[Promise]] to promise.
+  // Step 6. Set resolve.[[AlreadyResolved]] to alreadyResolved.
+  //
+  // NOTE: We use these references as [[AlreadyResolved]].[[Value]].
+  //       See the comment in ResolveFunctionSlots for more details.
   resolveFun->initExtendedSlot(ResolveFunctionSlot_Promise,
                                ObjectValue(*promise));
   resolveFun->initExtendedSlot(ResolveFunctionSlot_RejectFunction,
                                ObjectValue(*rejectFun));
 
+  // Step 10. Set reject.[[Promise]] to promise.
+  // Step 11. Set reject.[[AlreadyResolved]] to alreadyResolved.
+  //
+  // NOTE: We use these references as [[AlreadyResolved]].[[Value]].
+  //       See the comment in ResolveFunctionSlots for more details.
   rejectFun->initExtendedSlot(RejectFunctionSlot_Promise,
                               ObjectValue(*promise));
   rejectFun->initExtendedSlot(RejectFunctionSlot_ResolveFunction,
                               ObjectValue(*resolveFun));
 
+  MOZ_ASSERT(!IsAlreadyResolvedMaybeWrappedResolveFunction(resolveFun));
+  MOZ_ASSERT(!IsAlreadyResolvedMaybeWrappedRejectFunction(rejectFun));
+
+  // Step 12. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
   return true;
 }
-
-static void ClearResolutionFunctionSlots(JSFunction* resolutionFun);
 
 static bool IsSettledMaybeWrappedPromise(JSObject* promise) {
   if (IsProxy(promise)) {
@@ -914,42 +1140,46 @@ static bool IsSettledMaybeWrappedPromise(JSObject* promise) {
   return promise->as<PromiseObject>().state() != JS::PromiseState::Pending;
 }
 
-// ES2016, 25.4.1.7.
 [[nodiscard]] static bool RejectMaybeWrappedPromise(
     JSContext* cx, HandleObject promiseObj, HandleValue reason,
-    HandleSavedFrame unwrappedRejectionStack);
+    Handle<SavedFrame*> unwrappedRejectionStack);
 
-// ES2016, 25.4.1.7.
-[[nodiscard]] static bool RejectPromiseInternal(
-    JSContext* cx, Handle<PromiseObject*> promise, HandleValue reason,
-    HandleSavedFrame unwrappedRejectionStack = nullptr);
-
-// ES2016, 25.4.1.3.1.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise Reject Functions
+ * https://tc39.es/ecma262/#sec-promise-reject-functions
+ */
 static bool RejectPromiseFunction(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
   JSFunction* reject = &args.callee().as<JSFunction>();
   HandleValue reasonVal = args.get(0);
 
-  // Steps 1-2.
+  // Step 1. Let F be the active function object.
+  // Step 2. Assert: F has a [[Promise]] internal slot whose value is an Object.
+  // (implicit)
+
+  // Step 3. Let promise be F.[[Promise]].
   const Value& promiseVal = reject->getExtendedSlot(RejectFunctionSlot_Promise);
 
-  // Steps 3-4.
+  // Step 4. Let alreadyResolved be F.[[AlreadyResolved]].
+  // Step 5. If alreadyResolved.[[Value]] is true, return undefined.
+  //
   // If the Promise isn't available anymore, it has been resolved and the
   // reference to it removed to make it eligible for collection.
-  if (promiseVal.isUndefined()) {
+  bool alreadyResolved = promiseVal.isUndefined();
+  MOZ_ASSERT(IsAlreadyResolvedMaybeWrappedRejectFunction(reject) ==
+             alreadyResolved);
+  if (alreadyResolved) {
     args.rval().setUndefined();
     return true;
   }
 
-  // Store the promise value in |promise| before ClearResolutionFunctionSlots
-  // removes the reference.
   RootedObject promise(cx, &promiseVal.toObject());
 
-  // Step 5.
-  // Here, we only remove the Promise reference from the resolution
-  // functions. Actually marking it as fulfilled/rejected happens later.
-  ClearResolutionFunctionSlots(reject);
+  // Step 6. Set alreadyResolved.[[Value]] to true.
+  SetAlreadyResolvedResolutionFunction(reject);
 
   // In some cases the Promise reference on the resolution function won't
   // have been removed during resolution, so we need to check that here,
@@ -959,7 +1189,7 @@ static bool RejectPromiseFunction(JSContext* cx, unsigned argc, Value* vp) {
     return true;
   }
 
-  // Step 6.
+  // Step 7. Return RejectPromise(promise, reason).
   if (!RejectMaybeWrappedPromise(cx, promise, reasonVal, nullptr)) {
     return false;
   }
@@ -980,45 +1210,57 @@ static bool RejectPromiseFunction(JSContext* cx, unsigned argc, Value* vp) {
 
 static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
                               HandleValue onFulfilled, HandleValue onRejected,
-                              MutableHandleValue rval, bool rvalUsed);
+                              MutableHandleValue rval, bool rvalExplicitlyUsed);
 
-// ES2016, 25.4.1.3.2, steps 6-13.
-[[nodiscard]] static bool ResolvePromiseInternal(JSContext* cx,
-                                                 HandleObject promise,
-                                                 HandleValue resolutionVal) {
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise Resolve Functions
+ * https://tc39.es/ecma262/#sec-promise-resolve-functions
+ *
+ * Steps 7-15.
+ */
+[[nodiscard]] bool js::ResolvePromiseInternal(
+    JSContext* cx, JS::Handle<JSObject*> promise,
+    JS::Handle<JS::Value> resolutionVal) {
   cx->check(promise, resolutionVal);
   MOZ_ASSERT(!IsSettledMaybeWrappedPromise(promise));
 
-  // Step 7 (reordered).
+  // (reordered)
+  // Step 8. If Type(resolution) is not Object, then
   if (!resolutionVal.isObject()) {
+    // Step 8.a. Return FulfillPromise(promise, resolution).
     return FulfillMaybeWrappedPromise(cx, promise, resolutionVal);
   }
 
   RootedObject resolution(cx, &resolutionVal.toObject());
 
-  // Step 6.
+  // Step 7. If SameValue(resolution, promise) is true, then
   if (resolution == promise) {
-    // Step 6.a.
+    // Step 7.a. Let selfResolutionError be a newly created TypeError object.
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                               JSMSG_CANNOT_RESOLVE_PROMISE_WITH_ITSELF);
     RootedValue selfResolutionError(cx);
-    RootedSavedFrame stack(cx);
+    Rooted<SavedFrame*> stack(cx);
     if (!MaybeGetAndClearExceptionAndStack(cx, &selfResolutionError, &stack)) {
       return false;
     }
 
-    // Step 6.b.
+    // Step 7.b. Return RejectPromise(promise, selfResolutionError).
     return RejectMaybeWrappedPromise(cx, promise, selfResolutionError, stack);
   }
 
-  // Step 8.
+  // Step 9. Let then be Get(resolution, "then").
   RootedValue thenVal(cx);
   bool status =
       GetProperty(cx, resolution, resolution, cx->names().then, &thenVal);
 
   RootedValue error(cx);
-  RootedSavedFrame errorStack(cx);
+  Rooted<SavedFrame*> errorStack(cx);
+
+  // Step 10. If then is an abrupt completion, then
   if (!status) {
+    // Get the `then.[[Value]]` value used in the step 10.a.
     if (!MaybeGetAndClearExceptionAndStack(cx, &error, &errorStack)) {
       return false;
     }
@@ -1033,17 +1275,28 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
     return true;
   }
 
-  // Step 9.
+  // Step 10. If then is an abrupt completion, then
   if (!status) {
+    // Step 10.a. Return RejectPromise(promise, then.[[Value]]).
     return RejectMaybeWrappedPromise(cx, promise, error, errorStack);
   }
 
-  // Step 10 (implicit).
+  // Step 11. Let thenAction be then.[[Value]].
+  // (implicit)
 
-  // Step 11.
+  // Step 12. If IsCallable(thenAction) is false, then
   if (!IsCallable(thenVal)) {
+    // Step 12.a. Return FulfillPromise(promise, resolution).
     return FulfillMaybeWrappedPromise(cx, promise, resolutionVal);
   }
+
+  // Step 13. Let thenJobCallback be HostMakeJobCallback(thenAction).
+  // (implicit)
+
+  // Step 14. Let job be
+  //          NewPromiseResolveThenableJob(promise, resolution,
+  //                                       thenJobCallback).
+  // Step 15. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
 
   // If the resolution object is a built-in Promise object and the
   // `then` property is the original Promise.prototype.then function
@@ -1057,7 +1310,6 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
     isBuiltinThen = true;
   }
 
-  // Step 12.
   if (!isBuiltinThen) {
     RootedValue promiseVal(cx, ObjectValue(*promise));
     if (!EnqueuePromiseResolveThenableJob(cx, promiseVal, resolutionVal,
@@ -1070,35 +1322,45 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
     }
   }
 
-  // Step 13.
   return true;
 }
 
-// ES2016, 25.4.1.3.2.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise Resolve Functions
+ * https://tc39.es/ecma262/#sec-promise-resolve-functions
+ */
 static bool ResolvePromiseFunction(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
+
+  // Step 1. Let F be the active function object.
+  // Step 2. Assert: F has a [[Promise]] internal slot whose value is an Object.
+  // (implicit)
 
   JSFunction* resolve = &args.callee().as<JSFunction>();
   HandleValue resolutionVal = args.get(0);
 
-  // Steps 3-4 (reordered).
-  // We use the reference to the reject function as a signal for whether
-  // the resolve or reject function was already called, at which point
-  // the references on each of the functions are cleared.
-  if (!resolve->getExtendedSlot(ResolveFunctionSlot_RejectFunction)
-           .isObject()) {
+  // Step 3. Let promise be F.[[Promise]].
+  const Value& promiseVal =
+      resolve->getExtendedSlot(ResolveFunctionSlot_Promise);
+
+  // Step 4. Let alreadyResolved be F.[[AlreadyResolved]].
+  // Step 5. If alreadyResolved.[[Value]] is true, return undefined.
+  //
+  // NOTE: We use the reference to the reject function as [[AlreadyResolved]].
+  bool alreadyResolved = promiseVal.isUndefined();
+  MOZ_ASSERT(IsAlreadyResolvedMaybeWrappedResolveFunction(resolve) ==
+             alreadyResolved);
+  if (alreadyResolved) {
     args.rval().setUndefined();
     return true;
   }
 
-  // Steps 1-2 (reordered).
-  RootedObject promise(
-      cx, &resolve->getExtendedSlot(ResolveFunctionSlot_Promise).toObject());
+  RootedObject promise(cx, &promiseVal.toObject());
 
-  // Step 5.
-  // Here, we only remove the Promise reference from the resolution
-  // functions. Actually marking it as fulfilled/rejected happens later.
-  ClearResolutionFunctionSlots(resolve);
+  // Step 6. Set alreadyResolved.[[Value]] to true.
+  SetAlreadyResolvedResolutionFunction(resolve);
 
   // In some cases the Promise reference on the resolution function won't
   // have been removed during resolution, so we need to check that here,
@@ -1108,10 +1370,12 @@ static bool ResolvePromiseFunction(JSContext* cx, unsigned argc, Value* vp) {
     return true;
   }
 
-  // Steps 6-13.
+  // Steps 7-15.
   if (!ResolvePromiseInternal(cx, promise, resolutionVal)) {
     return false;
   }
+
+  // Step 16. Return undefined.
   args.rval().setUndefined();
   return true;
 }
@@ -1119,6 +1383,13 @@ static bool ResolvePromiseFunction(JSContext* cx, unsigned argc, Value* vp) {
 static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
 
 /**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * NewPromiseReactionJob ( reaction, argument )
+ * https://tc39.es/ecma262/#sec-newpromisereactionjob
+ * HostEnqueuePromiseJob ( job, realm )
+ * https://tc39.es/ecma262/#sec-hostenqueuepromisejob
+ *
  * Tells the embedding to enqueue a Promise reaction job, based on
  * three parameters:
  * reactionObj - The reaction record.
@@ -1168,25 +1439,56 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
   // Must not enqueue a reaction job more than once.
   MOZ_ASSERT(reaction->targetState() == JS::PromiseState::Pending);
 
+  // NOTE: Instead of capturing reaction and arguments separately in the
+  //       Job Abstract Closure below, store arguments (= handlerArg) in
+  //       reaction object and capture it.
+  //       Also, set reaction.[[Type]] is represented by targetState here.
   cx->check(handlerArg);
   reaction->setTargetStateAndHandlerArg(targetState, handlerArg);
 
   RootedValue reactionVal(cx, ObjectValue(*reaction));
   RootedValue handler(cx, reaction->handler());
 
-  // If we have a handler callback, we enter that handler's compartment so
-  // that the promise reaction job function is created in that compartment.
-  // That guarantees that the embedding ends up with the right entry global.
-  // This is relevant for some html APIs like fetch that derive information
-  // from said global.
-  mozilla::Maybe<AutoRealm> ar2;
+  // NewPromiseReactionJob
+  // Step 2. Let handlerRealm be null.
+  // NOTE: Instead of passing job and realm separately, we use the job's
+  //       JSFunction object's realm as the job's realm.
+  //       So we should enter the handlerRealm before creating the job function.
+  //
+  // GetFunctionRealm performed inside AutoFunctionOrCurrentRealm uses checked
+  // unwrap and it can hit permission error if there's a security wrapper, and
+  // in that case the reaction job is created in the current realm, instead of
+  // the target function's realm.
+  //
+  // If this reaction crosses chrome/content boundary, and the security
+  // wrapper would allow "call" operation, it still works inside the
+  // reaction job.
+  //
+  // This behavior is observable only when the job belonging to the content
+  // realm stops working (*1, *2), and it won't matter in practice.
+  //
+  // *1: "we can run script" performed inside HostEnqueuePromiseJob
+  //     in HTML spec
+  //       https://html.spec.whatwg.org/#hostenqueuepromisejob
+  //       https://html.spec.whatwg.org/#check-if-we-can-run-script
+  //       https://html.spec.whatwg.org/#fully-active
+  // *2: nsIGlobalObject::IsDying performed inside PromiseJobRunnable::Run
+  //     in our implementation
+  mozilla::Maybe<AutoFunctionOrCurrentRealm> ar2;
+
+  // NewPromiseReactionJob
+  // Step 3. If reaction.[[Handler]] is not empty, then
   if (handler.isObject()) {
-    // The unwrapping has to be unchecked because we specifically want to
-    // be able to use handlers with wrappers that would only allow calls.
-    // E.g., it's ok to have a handler from a chrome compartment in a
-    // reaction to a content compartment's Promise instance.
-    JSObject* handlerObj = UncheckedUnwrap(&handler.toObject());
-    MOZ_ASSERT(handlerObj);
+    // Step 3.a. Let getHandlerRealmResult be
+    //           GetFunctionRealm(reaction.[[Handler]].[[Callback]]).
+    // Step 3.b. If getHandlerRealmResult is a normal completion,
+    //           set handlerRealm to getHandlerRealmResult.[[Value]].
+    // Step 3.c. Else, set handlerRealm to the current Realm Record.
+    // Step 3.d. NOTE: handlerRealm is never null unless the handler is
+    //           undefined. When the handler is a revoked Proxy and no
+    //           ECMAScript code runs, handlerRealm is used to create error
+    //           objects.
+    RootedObject handlerObj(cx, &handler.toObject());
     ar2.emplace(cx, handlerObj);
 
     // We need to wrap the reaction to store it on the job function.
@@ -1195,8 +1497,11 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
     }
   }
 
-  // Create the JS function to call when the job is triggered.
-  HandlePropertyName funName = cx->names().empty;
+  // NewPromiseReactionJob
+  // Step 1. Let job be a new Job Abstract Closure with no parameters that
+  //         captures reaction and argument and performs the following steps
+  //         when called:
+  Handle<PropertyName*> funName = cx->names().empty;
   RootedFunction job(
       cx, NewNativeFunction(cx, PromiseReactionJob, 0, funName,
                             gc::AllocKind::FUNCTION_EXTENDED, GenericObject));
@@ -1204,7 +1509,6 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
     return false;
   }
 
-  // Store the reaction on the reaction job.
   job->setExtendedSlot(ReactionJobSlot_ReactionRecord, reactionVal);
 
   // When using JS::AddPromiseReactions{,IgnoringUnHandledRejection}, no actual
@@ -1252,6 +1556,8 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
     global = &objectFromIncumbentGlobal->nonCCWGlobal();
   }
 
+  // HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
+  //
   // Note: the global we pass here might be from a different compartment
   // than job and promise. While it's somewhat unusual to pass objects
   // from multiple compartments, in this case we specifically need the
@@ -1265,35 +1571,56 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
                                                   JS::PromiseState state,
                                                   HandleValue valueOrReason);
 
-// ES2016, Commoned-out implementation of 25.4.1.4. and 25.4.1.7.
-//
-// This method takes an additional optional |unwrappedRejectionStack| parameter,
-// which is only used for debugging purposes.
-// It allows callers to to pass in the stack of some exception which
-// triggered the rejection of the promise.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * FulfillPromise ( promise, value )
+ * https://tc39.es/ecma262/#sec-fulfillpromise
+ * RejectPromise ( promise, reason )
+ * https://tc39.es/ecma262/#sec-rejectpromise
+ *
+ * This method takes an additional optional |unwrappedRejectionStack| parameter,
+ * which is only used for debugging purposes.
+ * It allows callers to to pass in the stack of some exception which
+ * triggered the rejection of the promise.
+ */
 [[nodiscard]] static bool ResolvePromise(
     JSContext* cx, Handle<PromiseObject*> promise, HandleValue valueOrReason,
     JS::PromiseState state,
-    HandleSavedFrame unwrappedRejectionStack = nullptr) {
-  // Step 1.
+    Handle<SavedFrame*> unwrappedRejectionStack = nullptr) {
+  // Step 1. Assert: The value of promise.[[PromiseState]] is pending.
   MOZ_ASSERT(promise->state() == JS::PromiseState::Pending);
   MOZ_ASSERT(state == JS::PromiseState::Fulfilled ||
              state == JS::PromiseState::Rejected);
   MOZ_ASSERT_IF(unwrappedRejectionStack, state == JS::PromiseState::Rejected);
 
-  // Step 2.
+  // FulfillPromise
+  // Step 2. Let reactions be promise.[[PromiseFulfillReactions]].
+  // RejectPromise
+  // Step 2. Let reactions be promise.[[PromiseRejectReactions]].
+  //
   // We only have one list of reactions for both resolution types. So
   // instead of getting the right list of reactions, we determine the
   // resolution type to retrieve the right information from the
   // reaction records.
   RootedValue reactionsVal(cx, promise->reactions());
 
-  // Steps 3-5.
+  // FulfillPromise
+  // Step 3. Set promise.[[PromiseResult]] to value.
+  // RejectPromise
+  // Step 3. Set promise.[[PromiseResult]] to reason.
+  //
+  // Step 4. Set promise.[[PromiseFulfillReactions]] to undefined.
+  // Step 5. Set promise.[[PromiseRejectReactions]] to undefined.
+  //
   // The same slot is used for the reactions list and the result, so setting
   // the result also removes the reactions list.
   promise->setFixedSlot(PromiseSlot_ReactionsOrResult, valueOrReason);
 
-  // Step 6.
+  // FulfillPromise
+  // Step 6. Set promise.[[PromiseState]] to fulfilled.
+  // RejectPromise
+  // Step 6. Set promise.[[PromiseState]] to rejected.
   int32_t flags = promise->flags();
   flags |= PROMISE_FLAG_RESOLVED;
   if (state == JS::PromiseState::Fulfilled) {
@@ -1305,23 +1632,39 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp);
   promise->setFixedSlot(PromiseSlot_RejectFunction, UndefinedValue());
 
   // Now that everything else is done, do the things the debugger needs.
-  // Step 7 of RejectPromise implemented in onSettled.
+
+  // RejectPromise
+  // Step 7. If promise.[[PromiseIsHandled]] is false, perform
+  //         HostPromiseRejectionTracker(promise, "reject").
   PromiseObject::onSettled(cx, promise, unwrappedRejectionStack);
 
-  // Step 7 of FulfillPromise.
-  // Step 8 of RejectPromise.
+  // FulfillPromise
+  // Step 7. Return TriggerPromiseReactions(reactions, value).
+  // RejectPromise
+  // Step 8. Return TriggerPromiseReactions(reactions, reason).
   return TriggerPromiseReactions(cx, reactionsVal, state, valueOrReason);
 }
 
-// ES2016, 25.4.1.7.
-[[nodiscard]] static bool RejectPromiseInternal(
-    JSContext* cx, Handle<PromiseObject*> promise, HandleValue reason,
-    HandleSavedFrame unwrappedRejectionStack) {
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * RejectPromise ( promise, reason )
+ * https://tc39.es/ecma262/#sec-rejectpromise
+ */
+[[nodiscard]] bool js::RejectPromiseInternal(
+    JSContext* cx, JS::Handle<PromiseObject*> promise,
+    JS::Handle<JS::Value> reason,
+    JS::Handle<SavedFrame*> unwrappedRejectionStack /* = nullptr */) {
   return ResolvePromise(cx, promise, reason, JS::PromiseState::Rejected,
                         unwrappedRejectionStack);
 }
 
-// ES2016, 25.4.1.4.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * FulfillPromise ( promise, value )
+ * https://tc39.es/ecma262/#sec-fulfillpromise
+ */
 [[nodiscard]] static bool FulfillMaybeWrappedPromise(JSContext* cx,
                                                      HandleObject promiseObj,
                                                      HandleValue value_) {
@@ -1359,50 +1702,67 @@ enum GetCapabilitiesExecutorSlots {
   GetCapabilitiesExecutorSlots_Reject
 };
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise ( executor )
+ * https://tc39.es/ecma262/#sec-promise-executor
+ */
 [[nodiscard]] static PromiseObject*
 CreatePromiseObjectWithoutResolutionFunctions(JSContext* cx) {
+  // Steps 3-7.
   PromiseObject* promise = CreatePromiseObjectInternal(cx);
   if (!promise) {
     return nullptr;
   }
 
   AddPromiseFlags(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS);
+
+  // Step 11. Return promise.
   return promise;
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise ( executor )
+ * https://tc39.es/ecma262/#sec-promise-executor
+ *
+ * As if called with GetCapabilitiesExecutor as the executor argument.
+ */
 [[nodiscard]] static PromiseObject* CreatePromiseWithDefaultResolutionFunctions(
     JSContext* cx, MutableHandleObject resolve, MutableHandleObject reject) {
-  // ES2016, 25.4.3.1., as if called with GetCapabilitiesExecutor as the
-  // executor argument.
-
-  // Steps 1-2 (Not applicable).
-
   // Steps 3-7.
   Rooted<PromiseObject*> promise(cx, CreatePromiseObjectInternal(cx));
   if (!promise) {
     return nullptr;
   }
 
-  // Step 8.
+  // Step 8. Let resolvingFunctions be CreateResolvingFunctions(promise).
   if (!CreateResolvingFunctions(cx, promise, resolve, reject)) {
     return nullptr;
   }
 
   promise->setFixedSlot(PromiseSlot_RejectFunction, ObjectValue(*reject));
 
-  // Steps 9-10 (Not applicable).
-
-  // Step 11.
+  // Step 11. Return promise.
   return promise;
 }
 
-// ES2016, 25.4.1.5.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * NewPromiseCapability ( C )
+ * https://tc39.es/ecma262/#sec-newpromisecapability
+ */
 [[nodiscard]] static bool NewPromiseCapability(
     JSContext* cx, HandleObject C, MutableHandle<PromiseCapability> capability,
     bool canOmitResolutionFunctions) {
   RootedValue cVal(cx, ObjectValue(*C));
 
-  // Steps 1-2.
+  // Step 1. If IsConstructor(C) is false, throw a TypeError exception.
+  // Step 2. NOTE: C is assumed to be a constructor function that supports the
+  // parameter conventions of the Promise constructor (see 27.2.3.1).
   if (!IsConstructor(C)) {
     ReportValueError(cx, JSMSG_NOT_CONSTRUCTOR, JSDVG_SEARCH_STACK, cVal,
                      nullptr);
@@ -1435,14 +1795,19 @@ CreatePromiseObjectWithoutResolutionFunctions(JSContext* cx) {
       return false;
     }
 
+    // Step 3. Let promiseCapability be the PromiseCapability Record
+    //         { [[Promise]]: undefined, [[Resolve]]: undefined,
+    //           [[Reject]]: undefined }.
     capability.promise().set(promise);
+
+    // Step 10. Return promiseCapability.
     return true;
   }
 
-  // Step 3 (omitted).
-
-  // Step 4.
-  HandlePropertyName funName = cx->names().empty;
+  // Step 4. Let executorClosure be a new Abstract Closure with parameters
+  //         (resolve, reject) that captures promiseCapability and performs the
+  //         following steps when called:
+  Handle<PropertyName*> funName = cx->names().empty;
   RootedFunction executor(
       cx, NewNativeFunction(cx, GetCapabilitiesExecutor, 2, funName,
                             gc::AllocKind::FUNCTION_EXTENDED, GenericObject));
@@ -1450,16 +1815,20 @@ CreatePromiseObjectWithoutResolutionFunctions(JSContext* cx) {
     return false;
   }
 
-  // Step 5 (omitted).
+  // Step 5. Let executor be
+  //         ! CreateBuiltinFunction(executorClosure, 2, "", « »).
+  // (omitted)
 
-  // Step 6.
+  // Step 6. Let promise be ? Construct(C, « executor »).
+  // Step 9. Set promiseCapability.[[Promise]] to promise.
   FixedConstructArgs<1> cargs(cx);
   cargs[0].setObject(*executor);
   if (!Construct(cx, cVal, cargs, cVal, capability.promise())) {
     return false;
   }
 
-  // Step 7.
+  // Step 7. If IsCallable(promiseCapability.[[Resolve]]) is false,
+  //         throw a TypeError exception.
   const Value& resolveVal =
       executor->getExtendedSlot(GetCapabilitiesExecutorSlots_Resolve);
   if (!IsCallable(resolveVal)) {
@@ -1468,7 +1837,8 @@ CreatePromiseObjectWithoutResolutionFunctions(JSContext* cx) {
     return false;
   }
 
-  // Step 8.
+  // Step 8. If IsCallable(promiseCapability.[[Reject]]) is false,
+  //         throw a TypeError exception.
   const Value& rejectVal =
       executor->getExtendedSlot(GetCapabilitiesExecutorSlots_Reject);
   if (!IsCallable(rejectVal)) {
@@ -1477,22 +1847,33 @@ CreatePromiseObjectWithoutResolutionFunctions(JSContext* cx) {
     return false;
   }
 
-  // Step 9 (well, the equivalent for all of promiseCapabilities' fields.)
+  // (reordered)
+  // Step 3. Let promiseCapability be the PromiseCapability Record
+  //         { [[Promise]]: undefined, [[Resolve]]: undefined,
+  //           [[Reject]]: undefined }.
   capability.resolve().set(&resolveVal.toObject());
   capability.reject().set(&rejectVal.toObject());
 
-  // Step 10.
+  // Step 10. Return promiseCapability.
   return true;
 }
 
-// ES2016, 25.4.1.5.1.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * NewPromiseCapability ( C )
+ * https://tc39.es/ecma262/#sec-newpromisecapability
+ *
+ * Steps 4.a-e.
+ */
 static bool GetCapabilitiesExecutor(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   JSFunction* F = &args.callee().as<JSFunction>();
 
-  // Steps 1-2 (implicit).
-
-  // Steps 3-4.
+  // Step 4.a. If promiseCapability.[[Resolve]] is not undefined,
+  //           throw a TypeError exception.
+  // Step 4.b. If promiseCapability.[[Reject]] is not undefined,
+  //           throw a TypeError exception.
   if (!F->getExtendedSlot(GetCapabilitiesExecutorSlots_Resolve).isUndefined() ||
       !F->getExtendedSlot(GetCapabilitiesExecutorSlots_Reject).isUndefined()) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
@@ -1500,21 +1881,26 @@ static bool GetCapabilitiesExecutor(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  // Step 5.
+  // Step 4.c. Set promiseCapability.[[Resolve]] to resolve.
   F->setExtendedSlot(GetCapabilitiesExecutorSlots_Resolve, args.get(0));
 
-  // Step 6.
+  // Step 4.d. Set promiseCapability.[[Reject]] to reject.
   F->setExtendedSlot(GetCapabilitiesExecutorSlots_Reject, args.get(1));
 
-  // Step 7.
+  // Step 4.e. Return undefined.
   args.rval().setUndefined();
   return true;
 }
 
-// ES2016, 25.4.1.7.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * RejectPromise ( promise, reason )
+ * https://tc39.es/ecma262/#sec-rejectpromise
+ */
 [[nodiscard]] static bool RejectMaybeWrappedPromise(
     JSContext* cx, HandleObject promiseObj, HandleValue reason_,
-    HandleSavedFrame unwrappedRejectionStack) {
+    Handle<SavedFrame*> unwrappedRejectionStack) {
   Rooted<PromiseObject*> promise(cx);
   RootedValue reason(cx, reason_);
 
@@ -1594,7 +1980,7 @@ static bool ForEachReaction(JSContext* cx, HandleValue reactionsVal, F f) {
     return f(&reactions);
   }
 
-  HandleNativeObject reactionsList = reactions.as<NativeObject>();
+  Handle<NativeObject*> reactionsList = reactions.as<NativeObject>();
   uint32_t reactionsCount = reactionsList->getDenseInitializedLength();
   MOZ_ASSERT(reactionsCount > 1, "Reactions list should be created lazily");
 
@@ -1610,7 +1996,12 @@ static bool ForEachReaction(JSContext* cx, HandleValue reactionsVal, F f) {
   return true;
 }
 
-// ES2016, 25.4.1.8.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * TriggerPromiseReactions ( reactions, argument )
+ * https://tc39.es/ecma262/#sec-triggerpromisereactions
+ */
 [[nodiscard]] static bool TriggerPromiseReactions(JSContext* cx,
                                                   HandleValue reactionsVal,
                                                   JS::PromiseState state,
@@ -1618,19 +2009,32 @@ static bool ForEachReaction(JSContext* cx, HandleValue reactionsVal, F f) {
   MOZ_ASSERT(state == JS::PromiseState::Fulfilled ||
              state == JS::PromiseState::Rejected);
 
+  // Step 1. For each element reaction of reactions, do
+  // Step 2. Return undefined.
   return ForEachReaction(cx, reactionsVal, [&](MutableHandleObject reaction) {
+    // Step 1.a. Let job be NewPromiseReactionJob(reaction, argument).
+    // Step 1.b. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
     return EnqueuePromiseReactionJob(cx, reaction, valueOrReason, state);
   });
 }
 
-[[nodiscard]] static bool RunFulfillFunction(JSContext* cx,
-                                             HandleObject onFulfilledFunc,
-                                             HandleValue result,
-                                             HandleObject promiseObj);
+[[nodiscard]] static bool CallPromiseResolveFunction(JSContext* cx,
+                                                     HandleObject resolveFun,
+                                                     HandleValue value,
+                                                     HandleObject promiseObj);
 
-// Implements PromiseReactionJob optimized for the case when the reaction
-// handler is one of the default resolving functions as created by the
-// CreateResolvingFunctions abstract operation.
+/**
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * NewPromiseReactionJob ( reaction, argument )
+ * https://tc39.es/ecma262/#sec-newpromisereactionjob
+ *
+ * Step 1.
+ *
+ * Implements PromiseReactionJob optimized for the case when the reaction
+ * handler is one of the default resolving functions as created by the
+ * CreateResolvingFunctions abstract operation.
+ */
 [[nodiscard]] static bool DefaultResolvingPromiseReactionJob(
     JSContext* cx, Handle<PromiseReactionRecord*> reaction) {
   MOZ_ASSERT(reaction->targetState() != JS::PromiseState::Pending);
@@ -1645,11 +2049,13 @@ static bool ForEachReaction(JSContext* cx, HandleValue reactionsVal, F f) {
   // Run{Fulfill,Reject}Function for consistency with PromiseReactionJob.
   ResolutionMode resolutionMode = ResolveMode;
   RootedValue handlerResult(cx, UndefinedValue());
-  RootedSavedFrame unwrappedRejectionStack(cx);
+  Rooted<SavedFrame*> unwrappedRejectionStack(cx);
   if (promiseToResolve->state() == JS::PromiseState::Pending) {
     RootedValue argument(cx, reaction->handlerArg());
 
-    // Step 6.
+    // Step 1.e. Else, let handlerResult be
+    //           Completion(HostCallJobCallback(handler, undefined,
+    //                                          « argument »)).
     bool ok;
     if (reaction->targetState() == JS::PromiseState::Fulfilled) {
       ok = ResolvePromiseInternal(cx, promiseToResolve, argument);
@@ -1666,28 +2072,37 @@ static bool ForEachReaction(JSContext* cx, HandleValue reactionsVal, F f) {
     }
   }
 
-  // Steps 7-9.
+  // Steps 1.f-i.
   RootedObject promiseObj(cx, reaction->promise());
   RootedObject callee(cx);
   if (resolutionMode == ResolveMode) {
     callee =
         reaction->getFixedSlot(ReactionRecordSlot_Resolve).toObjectOrNull();
 
-    return RunFulfillFunction(cx, callee, handlerResult, promiseObj);
+    return CallPromiseResolveFunction(cx, callee, handlerResult, promiseObj);
   }
 
   callee = reaction->getFixedSlot(ReactionRecordSlot_Reject).toObjectOrNull();
 
-  return RunRejectFunction(cx, callee, handlerResult, promiseObj,
-                           unwrappedRejectionStack,
-                           reaction->unhandledRejectionBehavior());
+  return CallPromiseRejectFunction(cx, callee, handlerResult, promiseObj,
+                                   unwrappedRejectionStack,
+                                   reaction->unhandledRejectionBehavior());
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Await in async function
+ * https://tc39.es/ecma262/#await
+ *
+ * Step 3. fulfilledClosure Abstract Closure.
+ * Step 5. rejectedClosure Abstract Closure.
+ */
 [[nodiscard]] static bool AsyncFunctionPromiseReactionJob(
     JSContext* cx, Handle<PromiseReactionRecord*> reaction) {
   MOZ_ASSERT(reaction->isAsyncFunction());
 
-  int32_t handler = reaction->handler().toInt32();
+  auto handler = static_cast<PromiseHandler>(reaction->handler().toInt32());
   RootedValue argument(cx, reaction->handlerArg());
   Rooted<AsyncFunctionGeneratorObject*> generator(
       cx, reaction->asyncFunctionGenerator());
@@ -1695,119 +2110,27 @@ static bool ForEachReaction(JSContext* cx, HandleValue reactionsVal, F f) {
   // Await's handlers don't return a value, nor throw any exceptions.
   // They fail only on OOM.
 
-  if (handler == PromiseHandlerAsyncFunctionAwaitedFulfilled) {
+  if (handler == PromiseHandler::AsyncFunctionAwaitedFulfilled) {
+    // Step 3. fulfilledClosure Abstract Closure.
     return AsyncFunctionAwaitedFulfilled(cx, generator, argument);
   }
 
-  MOZ_ASSERT(handler == PromiseHandlerAsyncFunctionAwaitedRejected);
+  // Step 5. rejectedClosure Abstract Closure.
+  MOZ_ASSERT(handler == PromiseHandler::AsyncFunctionAwaitedRejected);
   return AsyncFunctionAwaitedRejected(cx, generator, argument);
 }
 
-[[nodiscard]] static bool AsyncGeneratorPromiseReactionJob(
-    JSContext* cx, Handle<PromiseReactionRecord*> reaction) {
-  MOZ_ASSERT(reaction->isAsyncGenerator());
-
-  RootedValue argument(cx, reaction->handlerArg());
-  Rooted<AsyncGeneratorObject*> asyncGenObj(cx, reaction->asyncGenerator());
-
-  // Await's handlers don't return a value, nor throw any exceptions.
-  // They fail only on OOM.
-  switch (int32_t handler = reaction->handler().toInt32(); handler) {
-    // ES2020 draft rev a09fc232c137800dbf51b6204f37fdede4ba1646
-    // 6.2.3.1.1 Await Fulfilled Functions
-    case PromiseHandlerAsyncGeneratorAwaitedFulfilled: {
-      MOZ_ASSERT(asyncGenObj->isExecuting(),
-                 "Await fulfilled when not in 'Executing' state");
-
-      return AsyncGeneratorAwaitedFulfilled(cx, asyncGenObj, argument);
-    }
-
-    // ES2020 draft rev a09fc232c137800dbf51b6204f37fdede4ba1646
-    // 6.2.3.1.2 Await Rejected Functions
-    case PromiseHandlerAsyncGeneratorAwaitedRejected: {
-      MOZ_ASSERT(asyncGenObj->isExecuting(),
-                 "Await rejected when not in 'Executing' state");
-
-      return AsyncGeneratorAwaitedRejected(cx, asyncGenObj, argument);
-    }
-
-    // ES2020 draft rev a09fc232c137800dbf51b6204f37fdede4ba1646
-    // 25.5.3.5.1 AsyncGeneratorResumeNext Return Processor Fulfilled Functions
-    case PromiseHandlerAsyncGeneratorResumeNextReturnFulfilled: {
-      MOZ_ASSERT(asyncGenObj->isAwaitingReturn(),
-                 "AsyncGeneratorResumeNext-Return fulfilled when not in "
-                 "'AwaitingReturn' state");
-
-      // Steps 1-2.
-      asyncGenObj->setCompleted();
-
-      // Step 3.
-      return AsyncGeneratorResolve(cx, asyncGenObj, argument, true);
-    }
-
-    // ES2020 draft rev a09fc232c137800dbf51b6204f37fdede4ba1646
-    // 25.5.3.5.2 AsyncGeneratorResumeNext Return Processor Rejected Functions
-    case PromiseHandlerAsyncGeneratorResumeNextReturnRejected: {
-      MOZ_ASSERT(asyncGenObj->isAwaitingReturn(),
-                 "AsyncGeneratorResumeNext-Return rejected when not in "
-                 "'AwaitingReturn' state");
-
-      // Steps 1-2.
-      asyncGenObj->setCompleted();
-
-      // Step 3.
-      return AsyncGeneratorReject(cx, asyncGenObj, argument);
-    }
-
-    // ES2020 draft rev a09fc232c137800dbf51b6204f37fdede4ba1646
-    // 25.5.3.7 AsyncGeneratorYield
-    case PromiseHandlerAsyncGeneratorYieldReturnAwaitedFulfilled: {
-      MOZ_ASSERT(asyncGenObj->isAwaitingYieldReturn(),
-                 "YieldReturn-Await fulfilled when not in "
-                 "'AwaitingYieldReturn' state");
-
-      // We're using a separate 'AwaitingYieldReturn' state when awaiting a
-      // return completion in yield expressions, whereas the spec uses the
-      // 'Executing' state all along. So we now need to transition into the
-      // 'Executing' state.
-      asyncGenObj->setExecuting();
-
-      // Steps 8.d-e.
-      return AsyncGeneratorYieldReturnAwaitedFulfilled(cx, asyncGenObj,
-                                                       argument);
-    }
-
-    // ES2020 draft rev a09fc232c137800dbf51b6204f37fdede4ba1646
-    // 25.5.3.7 AsyncGeneratorYield
-    case PromiseHandlerAsyncGeneratorYieldReturnAwaitedRejected: {
-      MOZ_ASSERT(
-          asyncGenObj->isAwaitingYieldReturn(),
-          "YieldReturn-Await rejected when not in 'AwaitingYieldReturn' state");
-
-      // We're using a separate 'AwaitingYieldReturn' state when awaiting a
-      // return completion in yield expressions, whereas the spec uses the
-      // 'Executing' state all along. So we now need to transition into the
-      // 'Executing' state.
-      asyncGenObj->setExecuting();
-
-      // Step 8.c.
-      return AsyncGeneratorYieldReturnAwaitedRejected(cx, asyncGenObj,
-                                                      argument);
-    }
-
-    default:
-      MOZ_CRASH("Bad handler in AsyncGeneratorPromiseReactionJob");
-  }
-}
-
-// ES2016, 25.4.2.1.
 /**
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * NewPromiseReactionJob ( reaction, argument )
+ * https://tc39.es/ecma262/#sec-newpromisereactionjob
+ *
+ * Step 1.
+ *
  * Callback triggering the fulfill/reject reaction for a resolved Promise,
  * to be invoked by the embedding during its processing of the Promise job
  * queue.
- *
- * See
- * http://www.ecma-international.org/ecma-262/7.0/index.html#sec-jobs-and-job-queues
  *
  * A PromiseReactionJob is set as the native function of an extended
  * JSFunction object, with all information required for the job's
@@ -1845,7 +2168,7 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp) {
     ar.emplace(cx, reactionObj);
   }
 
-  // Steps 1-2.
+  // Optimized/special cases.
   Handle<PromiseReactionRecord*> reaction =
       reactionObj.as<PromiseReactionRecord>();
   if (reaction->isDefaultResolvingHandler()) {
@@ -1855,13 +2178,19 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp) {
     return AsyncFunctionPromiseReactionJob(cx, reaction);
   }
   if (reaction->isAsyncGenerator()) {
-    return AsyncGeneratorPromiseReactionJob(cx, reaction);
+    RootedValue argument(cx, reaction->handlerArg());
+    Rooted<AsyncGeneratorObject*> generator(cx, reaction->asyncGenerator());
+    auto handler = static_cast<PromiseHandler>(reaction->handler().toInt32());
+    return AsyncGeneratorPromiseReactionJob(cx, handler, generator, argument);
   }
   if (reaction->isDebuggerDummy()) {
     return true;
   }
 
-  // Step 3.
+  // Step 1.a. Let promiseCapability be reaction.[[Capability]].
+  // (implicit)
+
+  // Step 1.c. Let handler be reaction.[[Handler]].
   RootedValue handlerVal(cx, reaction->handler());
 
   RootedValue argument(cx, reaction->handlerArg());
@@ -1869,26 +2198,34 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp) {
   RootedValue handlerResult(cx);
   ResolutionMode resolutionMode = ResolveMode;
 
-  RootedSavedFrame unwrappedRejectionStack(cx);
+  Rooted<SavedFrame*> unwrappedRejectionStack(cx);
 
-  // Steps 4-6.
+  // Step 1.d. If handler is empty, then
   if (handlerVal.isInt32()) {
-    int32_t handlerNum = handlerVal.toInt32();
+    // Step 1.b. Let type be reaction.[[Type]].
+    // (reordered)
+    auto handlerNum = static_cast<PromiseHandler>(handlerVal.toInt32());
 
-    // Step 4.
-    if (handlerNum == PromiseHandlerIdentity) {
+    // Step 1.d.i. If type is Fulfill, let handlerResult be
+    //             NormalCompletion(argument).
+    if (handlerNum == PromiseHandler::Identity) {
       handlerResult = argument;
-    } else if (handlerNum == PromiseHandlerThrower) {
-      // Step 5.
+    } else if (handlerNum == PromiseHandler::Thrower) {
+      // Step 1.d.ii. Else,
+      // Step 1.d.ii.1. Assert: type is Reject.
+      // Step 1.d.ii.2. Let handlerResult be ThrowCompletion(argument).
       resolutionMode = RejectMode;
       handlerResult = argument;
     } else {
-      MOZ_ASSERT(
-          handlerNum == PromiseHandlerAsyncFromSyncIteratorValueUnwrapDone ||
-          handlerNum == PromiseHandlerAsyncFromSyncIteratorValueUnwrapNotDone);
+      // Special case for Async-from-Sync Iterator.
+
+      MOZ_ASSERT(handlerNum ==
+                     PromiseHandler::AsyncFromSyncIteratorValueUnwrapDone ||
+                 handlerNum ==
+                     PromiseHandler::AsyncFromSyncIteratorValueUnwrapNotDone);
 
       bool done =
-          handlerNum == PromiseHandlerAsyncFromSyncIteratorValueUnwrapDone;
+          handlerNum == PromiseHandler::AsyncFromSyncIteratorValueUnwrapDone;
       // 25.1.4.2.5 Async-from-Sync Iterator Value Unwrap Functions, steps 1-2.
       PlainObject* resultObj = CreateIterResultObject(cx, argument, done);
       if (!resultObj) {
@@ -1901,7 +2238,9 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp) {
     MOZ_ASSERT(handlerVal.isObject());
     MOZ_ASSERT(IsCallable(handlerVal));
 
-    // Step 6.
+    // Step 1.e. Else, let handlerResult be
+    //           Completion(HostCallJobCallback(handler, undefined,
+    //                                          « argument »)).
     if (!Call(cx, handlerVal, UndefinedHandleValue, argument, &handlerResult)) {
       resolutionMode = RejectMode;
       if (!MaybeGetAndClearExceptionAndStack(cx, &handlerResult,
@@ -1911,29 +2250,30 @@ static bool PromiseReactionJob(JSContext* cx, unsigned argc, Value* vp) {
     }
   }
 
-  // Steps 7-9.
+  // Steps 1.f-i.
   RootedObject promiseObj(cx, reaction->promise());
   RootedObject callee(cx);
   if (resolutionMode == ResolveMode) {
     callee =
         reaction->getFixedSlot(ReactionRecordSlot_Resolve).toObjectOrNull();
 
-    return RunFulfillFunction(cx, callee, handlerResult, promiseObj);
+    return CallPromiseResolveFunction(cx, callee, handlerResult, promiseObj);
   }
 
   callee = reaction->getFixedSlot(ReactionRecordSlot_Reject).toObjectOrNull();
 
-  return RunRejectFunction(cx, callee, handlerResult, promiseObj,
-                           unwrappedRejectionStack,
-                           reaction->unhandledRejectionBehavior());
+  return CallPromiseRejectFunction(cx, callee, handlerResult, promiseObj,
+                                   unwrappedRejectionStack,
+                                   reaction->unhandledRejectionBehavior());
 }
 
-// ES2016, 25.4.2.2.
 /**
- * Callback for resolving a thenable, to be invoked by the embedding during
- * its processing of the Promise job queue.
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
  *
- * See https://tc39.github.io/ecma262/#sec-jobs-and-job-queues
+ * NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
+ * https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
+ *
+ * Steps 1.a-d.
  *
  * A PromiseResolveThenableJob is set as the native function of an extended
  * JSFunction object, with all information required for the job's
@@ -1948,24 +2288,28 @@ static bool PromiseResolveThenableJob(JSContext* cx, unsigned argc, Value* vp) {
   RootedFunction job(cx, &args.callee().as<JSFunction>());
   RootedValue then(cx, job->getExtendedSlot(ThenableJobSlot_Handler));
   MOZ_ASSERT(then.isObject());
-  MOZ_ASSERT(!IsWrapper(&then.toObject()));
-  RootedNativeObject jobArgs(cx, &job->getExtendedSlot(ThenableJobSlot_JobData)
-                                      .toObject()
-                                      .as<NativeObject>());
+  Rooted<NativeObject*> jobArgs(cx,
+                                &job->getExtendedSlot(ThenableJobSlot_JobData)
+                                     .toObject()
+                                     .as<NativeObject>());
 
   RootedObject promise(
       cx, &jobArgs->getDenseElement(ThenableJobDataIndex_Promise).toObject());
   RootedValue thenable(cx,
                        jobArgs->getDenseElement(ThenableJobDataIndex_Thenable));
 
-  // Step 1.
+  // Step 1.a. Let resolvingFunctions be
+  //           CreateResolvingFunctions(promiseToResolve).
   RootedObject resolveFn(cx);
   RootedObject rejectFn(cx);
   if (!CreateResolvingFunctions(cx, promise, &resolveFn, &rejectFn)) {
     return false;
   }
 
-  // Step 2.
+  // Step 1.b. Let thenCallResult be
+  //           HostCallJobCallback(then, thenable,
+  //                               « resolvingFunctions.[[Resolve]],
+  //                                 resolvingFunctions.[[Reject]] »).
   FixedInvokeArgs<2> args2(cx);
   args2[0].setObject(*resolveFn);
   args2[1].setObject(*rejectFn);
@@ -1973,16 +2317,21 @@ static bool PromiseResolveThenableJob(JSContext* cx, unsigned argc, Value* vp) {
   // In difference to the usual pattern, we return immediately on success.
   RootedValue rval(cx);
   if (Call(cx, then, thenable, args2, &rval)) {
+    // Step 1.d. Return Completion(thenCallResult).
     return true;
   }
 
-  // Steps 3-4.
-  // Can't pass stack to a JS function.
-  RootedSavedFrame stack(cx);
+  // Step 1.c. If thenCallResult is an abrupt completion, then
+
+  Rooted<SavedFrame*> stack(cx);
   if (!MaybeGetAndClearExceptionAndStack(cx, &rval, &stack)) {
     return false;
   }
 
+  // Step 1.c.i. Let status be
+  //             Call(resolvingFunctions.[[Reject]], undefined,
+  //                  « thenCallResult.[[Value]] »).
+  // Step 1.c.ii. Return Completion(status).
   RootedValue rejectVal(cx, ObjectValue(*rejectFn));
   return Call(cx, rejectVal, UndefinedHandleValue, rval, &rval);
 }
@@ -1992,6 +2341,13 @@ static bool PromiseResolveThenableJob(JSContext* cx, unsigned argc, Value* vp) {
     Handle<PromiseObject*> promiseToResolve);
 
 /**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
+ * https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
+ *
+ * Step 1.a-d.
+ *
  * Specialization of PromiseResolveThenableJob when the `thenable` is a
  * built-in Promise object and the `then` property is the built-in
  * `Promise.prototype.then` function.
@@ -2017,18 +2373,25 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
   MOZ_ASSERT(promise->is<PromiseObject>());
   MOZ_ASSERT(thenable->is<PromiseObject>());
 
-  // Step 1 (Skipped).
+  // Step 1.a. Let resolvingFunctions be
+  //           CreateResolvingFunctions(promiseToResolve).
+  // (skipped)
 
-  // Step 2.
-  // In difference to the usual pattern, we return immediately on success.
+  // Step 1.b. Let thenCallResult be HostCallJobCallback(
+  //             then, thenable,
+  //             « resolvingFunctions.[[Resolve]],
+  //               resolvingFunctions.[[Reject]] »).
+  //
+  // NOTE: In difference to the usual pattern, we return immediately on success.
   if (OriginalPromiseThenWithoutSettleHandlers(cx, thenable.as<PromiseObject>(),
                                                promise.as<PromiseObject>())) {
+    // Step 1.d. Return Completion(thenCallResult).
     return true;
   }
 
-  // Steps 3-4.
+  // Step 1.c. If thenCallResult is an abrupt completion, then
   RootedValue exception(cx);
-  RootedSavedFrame stack(cx);
+  Rooted<SavedFrame*> stack(cx);
   if (!MaybeGetAndClearExceptionAndStack(cx, &exception, &stack)) {
     return false;
   }
@@ -2042,11 +2405,22 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
     return true;
   }
 
+  // Step 1.c.i. Let status be
+  //             Call(resolvingFunctions.[[Reject]], undefined,
+  //                  « thenCallResult.[[Value]] »).
+  // Step 1.c.ii. Return Completion(status).
   return RejectPromiseInternal(cx, promise.as<PromiseObject>(), exception,
                                stack);
 }
 
 /**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
+ * https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
+ * HostEnqueuePromiseJob ( job, realm )
+ * https://tc39.es/ecma262/#sec-hostenqueuepromisejob
+ *
  * Tells the embedding to enqueue a Promise resolve thenable job, based on
  * three parameters:
  * promiseToResolve_ - The promise to resolve, obviously.
@@ -2060,13 +2434,32 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
   RootedValue promiseToResolve(cx, promiseToResolve_);
   RootedValue thenable(cx, thenable_);
 
-  // We enter the `then` callable's compartment so that the job function is
-  // created in that compartment.
-  // That guarantees that the embedding ends up with the right entry global.
-  // This is relevant for some html APIs like fetch that derive information
-  // from said global.
-  RootedObject then(cx, CheckedUnwrapStatic(&thenVal.toObject()));
-  AutoRealm ar(cx, then);
+  // Step 2. Let getThenRealmResult be GetFunctionRealm(then.[[Callback]]).
+  // Step 3. If getThenRealmResult is a normal completion, let thenRealm be
+  //         getThenRealmResult.[[Value]].
+  // Step 4. Else, let thenRealm be the current Realm Record.
+  // Step 5. NOTE: thenRealm is never null. When then.[[Callback]] is a revoked
+  //         Proxy and no code runs, thenRealm is used to create error objects.
+  //
+  // NOTE: Instead of passing job and realm separately, we use the job's
+  //       JSFunction object's realm as the job's realm.
+  //       So we should enter the thenRealm before creating the job function.
+  //
+  // GetFunctionRealm performed inside AutoFunctionOrCurrentRealm uses checked
+  // unwrap and this is fine given the behavior difference (see the comment
+  // around AutoFunctionOrCurrentRealm usage in EnqueuePromiseReactionJob for
+  // more details) is observable only when the `thenable` is from content realm
+  // and `then` is from chrome realm, that shouldn't happen in practice.
+  //
+  // NOTE: If `thenable` is also from chrome realm, accessing `then` silently
+  //       fails and it returns `undefined`, and that case doesn't reach here.
+  RootedObject then(cx, &thenVal.toObject());
+  AutoFunctionOrCurrentRealm ar(cx, then);
+  if (then->maybeCCWRealm() != cx->realm()) {
+    if (!cx->compartment()->wrap(cx, &then)) {
+      return false;
+    }
+  }
 
   // Wrap the `promiseToResolve` and `thenable` arguments.
   if (!cx->compartment()->wrap(cx, &promiseToResolve)) {
@@ -2078,7 +2471,10 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
     return false;
   }
 
-  HandlePropertyName funName = cx->names().empty;
+  // Step 1. Let job be a new Job Abstract Closure with no parameters that
+  //         captures promiseToResolve, thenable, and then and performs the
+  //         following steps when called:
+  Handle<PropertyName*> funName = cx->names().empty;
   RootedFunction job(
       cx, NewNativeFunction(cx, PromiseResolveThenableJob, 0, funName,
                             gc::AllocKind::FUNCTION_EXTENDED, GenericObject));
@@ -2092,7 +2488,7 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
   // Create a dense array to hold the data needed for the reaction job to
   // work.
   // The layout is described in the ThenableJobDataIndices enum.
-  RootedArrayObject data(
+  Rooted<ArrayObject*> data(
       cx, NewDenseFullyAllocatedArray(cx, ThenableJobDataLength));
   if (!data) {
     return false;
@@ -2112,10 +2508,19 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
 
   Rooted<GlobalObject*> incumbentGlobal(cx,
                                         cx->runtime()->getIncumbentGlobal(cx));
+
+  // Step X. HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
   return cx->runtime()->enqueuePromiseJob(cx, job, promise, incumbentGlobal);
 }
 
 /**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
+ * https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
+ * HostEnqueuePromiseJob ( job, realm )
+ * https://tc39.es/ecma262/#sec-hostenqueuepromisejob
+ *
  * Tells the embedding to enqueue a Promise resolve thenable built-in job,
  * based on two parameters:
  * promiseToResolve - The promise to resolve, obviously.
@@ -2127,13 +2532,21 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
   MOZ_ASSERT(promiseToResolve->is<PromiseObject>());
   MOZ_ASSERT(thenable->is<PromiseObject>());
 
-  HandlePropertyName funName = cx->names().empty;
+  // Step 1. Let job be a new Job Abstract Closure with no parameters that
+  //         captures promiseToResolve, thenable, and then and performs the
+  //         following steps when called:
+  Handle<PropertyName*> funName = cx->names().empty;
   RootedFunction job(
       cx, NewNativeFunction(cx, PromiseResolveBuiltinThenableJob, 0, funName,
                             gc::AllocKind::FUNCTION_EXTENDED, GenericObject));
   if (!job) {
     return false;
   }
+
+  // Steps 2-5.
+  // (implicit)
+  // `then` is built-in Promise.prototype.then in the current realm.,
+  // thus `thenRealm` is also current realm, and we have nothing to do here.
 
   // Store the promise and the thenable on the reaction job.
   job->setExtendedSlot(BuiltinThenableJobSlot_Promise,
@@ -2142,6 +2555,8 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx, unsigned argc,
 
   Rooted<GlobalObject*> incumbentGlobal(cx,
                                         cx->runtime()->getIncumbentGlobal(cx));
+
+  // HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
   return cx->runtime()->enqueuePromiseJob(cx, job, promiseToResolve,
                                           incumbentGlobal);
 }
@@ -2205,31 +2620,18 @@ static JSFunction* GetResolveFunctionFromPromise(PromiseObject* promise) {
   return GetResolveFunctionFromReject(rejectFun);
 }
 
-static void ClearResolutionFunctionSlots(JSFunction* resolutionFun) {
-  JSFunction* resolve;
-  JSFunction* reject;
-  if (resolutionFun->maybeNative() == ResolvePromiseFunction) {
-    resolve = resolutionFun;
-    reject = GetRejectFunctionFromResolve(resolutionFun);
-  } else {
-    resolve = GetResolveFunctionFromReject(resolutionFun);
-    reject = resolutionFun;
-  }
-
-  resolve->setExtendedSlot(ResolveFunctionSlot_Promise, UndefinedValue());
-  resolve->setExtendedSlot(ResolveFunctionSlot_RejectFunction,
-                           UndefinedValue());
-
-  reject->setExtendedSlot(RejectFunctionSlot_Promise, UndefinedValue());
-  reject->setExtendedSlot(RejectFunctionSlot_ResolveFunction, UndefinedValue());
-}
-
-// ES2016, 25.4.3.1. steps 3-7.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise ( executor )
+ * https://tc39.es/ecma262/#sec-promise-executor
+ *
+ * Steps 3-7.
+ */
 [[nodiscard]] static MOZ_ALWAYS_INLINE PromiseObject*
 CreatePromiseObjectInternal(JSContext* cx, HandleObject proto /* = nullptr */,
                             bool protoIsWrapped /* = false */,
                             bool informDebugger /* = true */) {
-  // Step 3.
   // Enter the unwrapped proto's compartment, if that's different from
   // the current one.
   // All state stored in a Promise's fixed slots must be created in the
@@ -2240,19 +2642,28 @@ CreatePromiseObjectInternal(JSContext* cx, HandleObject proto /* = nullptr */,
     ar.emplace(cx, proto);
   }
 
+  // Step 3. Let promise be
+  //         ? OrdinaryCreateFromConstructor(
+  //             NewTarget, "%Promise.prototype%",
+  //             « [[PromiseState]], [[PromiseResult]],
+  //               [[PromiseFulfillReactions]], [[PromiseRejectReactions]],
+  //               [[PromiseIsHandled]] »).
   PromiseObject* promise = NewObjectWithClassProto<PromiseObject>(cx, proto);
   if (!promise) {
     return nullptr;
   }
 
-  // Step 4.
+  // Step 4. Set promise.[[PromiseState]] to pending.
   promise->initFixedSlot(PromiseSlot_Flags, Int32Value(0));
 
-  // Steps 5-6.
-  // Omitted, we allocate our single list of reaction records lazily.
+  // Step 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
+  // Step 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
+  // (omitted)
+  // We allocate our single list of reaction records lazily.
 
-  // Step 7.
-  // Implicit, the handled flag is unset by default.
+  // Step 7. Set promise.[[PromiseIsHandled]] to false.
+  // (implicit)
+  // The handled flag is unset by default.
 
   if (MOZ_LIKELY(!JS::IsAsyncStackCaptureEnabledForRealm(cx))) {
     return promise;
@@ -2277,23 +2688,27 @@ CreatePromiseObjectInternal(JSContext* cx, HandleObject proto /* = nullptr */,
   return promiseRoot;
 }
 
-// ES2016, 25.4.3.1.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise ( executor )
+ * https://tc39.es/ecma262/#sec-promise-executor
+ */
 static bool PromiseConstructor(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
-  // Step 1.
+  // Step 1. If NewTarget is undefined, throw a TypeError exception.
   if (!ThrowIfNotConstructing(cx, args, "Promise")) {
     return false;
   }
 
-  // Step 2.
+  // Step 2. If IsCallable(executor) is false, throw a TypeError exception.
   HandleValue executorVal = args.get(0);
   if (!IsCallable(executorVal)) {
     return ReportIsNotFunction(cx, executorVal);
   }
   RootedObject executor(cx, &executorVal.toObject());
 
-  // Steps 3-10.
   RootedObject newTarget(cx, &args.newTarget().toObject());
 
   // If the constructor is called via an Xray wrapper, then the newTarget
@@ -2378,7 +2793,14 @@ static bool PromiseConstructor(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
-// ES2016, 25.4.3.1. steps 3-11.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise ( executor )
+ * https://tc39.es/ecma262/#sec-promise-executor
+ *
+ * Steps 3-11.
+ */
 /* static */
 PromiseObject* PromiseObject::create(JSContext* cx, HandleObject executor,
                                      HandleObject proto /* = nullptr */,
@@ -2411,7 +2833,8 @@ PromiseObject* PromiseObject::create(JSContext* cx, HandleObject executor,
     return nullptr;
   }
 
-  // Step 8.
+  // Step 8. Let resolvingFunctions be CreateResolvingFunctions(promise).
+  //
   // The resolving functions are created in the compartment active when the
   // (maybe wrapped) Promise constructor was called. They contain checks and
   // can unwrap the Promise if required.
@@ -2436,7 +2859,9 @@ PromiseObject* PromiseObject::create(JSContext* cx, HandleObject executor,
     promise->initFixedSlot(PromiseSlot_RejectFunction, ObjectValue(*rejectFn));
   }
 
-  // Step 9.
+  // Step 9. Let completion be
+  //         Call(executor, undefined, « resolvingFunctions.[[Resolve]],
+  //                                     resolvingFunctions.[[Reject]] »).
   bool success;
   {
     FixedInvokeArgs<2> args(cx);
@@ -2447,15 +2872,17 @@ PromiseObject* PromiseObject::create(JSContext* cx, HandleObject executor,
     success = Call(cx, calleeOrRval, UndefinedHandleValue, args, &calleeOrRval);
   }
 
-  // Step 10.
+  // Step 10. If completion is an abrupt completion, then
   if (!success) {
     RootedValue exceptionVal(cx);
-    // Can't pass stack to a JS function.
-    RootedSavedFrame stack(cx);
+    Rooted<SavedFrame*> stack(cx);
     if (!MaybeGetAndClearExceptionAndStack(cx, &exceptionVal, &stack)) {
       return nullptr;
     }
 
+    // Step 10.a. Perform
+    //            ? Call(resolvingFunctions.[[Reject]], undefined,
+    //                   « completion.[[Value]] »).
     RootedValue calleeOrRval(cx, ObjectValue(*rejectFn));
     if (!Call(cx, calleeOrRval, UndefinedHandleValue, exceptionVal,
               &calleeOrRval)) {
@@ -2466,12 +2893,18 @@ PromiseObject* PromiseObject::create(JSContext* cx, HandleObject executor,
   // Let the Debugger know about this Promise.
   DebugAPI::onNewPromise(cx, promise);
 
-  // Step 11.
+  // Step 11. Return promise.
   return promise;
 }
 
-// ES2016, 25.4.3.1. skipping creation of resolution functions and executor
-// function invocation.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise ( executor )
+ * https://tc39.es/ecma262/#sec-promise-executor
+ *
+ * skipping creation of resolution functions and executor function invocation.
+ */
 /* static */
 PromiseObject* PromiseObject::createSkippingExecutor(JSContext* cx) {
   return CreatePromiseObjectWithoutResolutionFunctions(cx);
@@ -2509,22 +2942,28 @@ class MOZ_STACK_CLASS PromiseForOfIterator : public JS::ForOfIterator {
 
 enum class CombinatorKind { All, AllSettled, Any, Race };
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-//
-// Unified implementation of
-// 25.6.4.1 Promise.all ( iterable )
-// 25.6.4.2 Promise.allSettled ( iterable )
-// 25.6.4.4 Promise.race ( iterable )
-//
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// Promise.any ( iterable )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Unified implementation of
+ *
+ * Promise.all ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.all
+ * Promise.allSettled ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.allsettled
+ * Promise.race ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.race
+ * Promise.any ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.any
+ * GetPromiseResolve ( promiseConstructor )
+ * https://tc39.es/ecma262/#sec-getpromiseresolve
+ */
 [[nodiscard]] static bool CommonPromiseCombinator(JSContext* cx, CallArgs& args,
                                                   CombinatorKind kind) {
   HandleValue iterable = args.get(0);
 
-  // Step 2 (moved from NewPromiseCapability, step 1).
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
+  // (moved from NewPromiseCapability, step 1).
   HandleValue CVal = args.thisv();
   if (!CVal.isObject()) {
     const char* message;
@@ -2547,10 +2986,10 @@ enum class CombinatorKind { All, AllSettled, Any, Race };
     return false;
   }
 
-  // Step 1.
+  // Step 1. Let C be the this value.
   RootedObject C(cx, &CVal.toObject());
 
-  // Step 2.
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
   Rooted<PromiseCapability> promiseCapability(cx);
   if (!NewPromiseCapability(cx, C, &promiseCapability, false)) {
     return false;
@@ -2566,30 +3005,36 @@ enum class CombinatorKind { All, AllSettled, Any, Race };
 
     PromiseLookup& promiseLookup = cx->realm()->promiseLookup;
     if (C != promiseCtor || !promiseLookup.isDefaultPromiseState(cx)) {
-      // 25.6.4.1, step 3.
-      // 25.6.4.2, step 3.
-      // 25.6.4.4, step 3.
+      // Step 3. Let promiseResolve be GetPromiseResolve(C).
+
+      // GetPromiseResolve
+      // Step 1. Let promiseResolve be ? Get(promiseConstructor, "resolve").
       if (!GetProperty(cx, C, C, cx->names().resolve, &promiseResolve)) {
+        // Step 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
         return AbruptRejectPromise(cx, args, promiseCapability);
       }
 
-      // 25.6.4.1, step 4.
-      // 25.6.4.2, step 4.
-      // 25.6.4.4, step 4.
+      // GetPromiseResolve
+      // Step 2. If IsCallable(promiseResolve) is false,
+      //         throw a TypeError exception.
       if (!IsCallable(promiseResolve)) {
         ReportIsNotFunction(cx, promiseResolve);
+
+        // Step 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
         return AbruptRejectPromise(cx, args, promiseCapability);
       }
     }
   }
 
-  // Steps 3-4.
+  // Step 5. Let iteratorRecord be GetIterator(iterable).
   PromiseForOfIterator iter(cx);
   if (!iter.init(iterable, JS::ForOfIterator::AllowNonIterable)) {
+    // Step 6. IfAbruptRejectPromise(iteratorRecord, promiseCapability).
     return AbruptRejectPromise(cx, args, promiseCapability);
   }
 
   if (!iter.valueIsIterable()) {
+    // Step 6. IfAbruptRejectPromise(iteratorRecord, promiseCapability).
     const char* message;
     switch (kind) {
       case CombinatorKind::All:
@@ -2610,45 +3055,65 @@ enum class CombinatorKind { All, AllSettled, Any, Race };
     return AbruptRejectPromise(cx, args, promiseCapability);
   }
 
-  // Step 5.
   bool done, result;
   switch (kind) {
     case CombinatorKind::All:
+      // Promise.all
+      // Step 7. Let result be
+      //         PerformPromiseAll(iteratorRecord, C, promiseCapability,
+      //                           promiseResolve).
       result = PerformPromiseAll(cx, iter, C, promiseCapability, promiseResolve,
                                  &done);
       break;
     case CombinatorKind::AllSettled:
+      // Promise.allSettled
+      // Step 7. Let result be
+      //         PerformPromiseAllSettled(iteratorRecord, C, promiseCapability,
+      //                                  promiseResolve).
       result = PerformPromiseAllSettled(cx, iter, C, promiseCapability,
                                         promiseResolve, &done);
       break;
     case CombinatorKind::Any:
+      // Promise.any
+      // Step 7. Let result be
+      //         PerformPromiseAny(iteratorRecord, C, promiseCapability,
+      //                           promiseResolve).
       result = PerformPromiseAny(cx, iter, C, promiseCapability, promiseResolve,
                                  &done);
       break;
     case CombinatorKind::Race:
+      // Promise.race
+      // Step 7. Let result be
+      //         PerformPromiseRace(iteratorRecord, C, promiseCapability,
+      //                            promiseResolve).
       result = PerformPromiseRace(cx, iter, C, promiseCapability,
                                   promiseResolve, &done);
       break;
   }
 
-  // Step 6.
+  // Step 8. If result is an abrupt completion, then
   if (!result) {
-    // Step 6.a.
+    // Step 8.a. If iteratorRecord.[[Done]] is false,
+    //           set result to IteratorClose(iteratorRecord, result).
     if (!done) {
       iter.closeThrow();
     }
 
-    // Step 6.b.
+    // Step 8.b. IfAbruptRejectPromise(result, promiseCapability).
     return AbruptRejectPromise(cx, args, promiseCapability);
   }
 
-  // Step 7.
+  // Step 9. Return Completion(result).
   args.rval().setObject(*promiseCapability.promise());
   return true;
 }
 
-// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
-// 25.6.4.1 Promise.all ( iterable )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.all ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.all
+ */
 static bool Promise_static_all(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return CommonPromiseCombinator(cx, args, CombinatorKind::All);
@@ -2670,7 +3135,17 @@ static JSFunction* NewPromiseCombinatorElementFunction(
 static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
                                              Value* vp);
 
-// Unforgeable version of ES2016, 25.4.4.1.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.all ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.all
+ * PerformPromiseAll ( iteratorRecord, constructor, resultCapability,
+ *                     promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseall
+ *
+ * Unforgeable version.
+ */
 [[nodiscard]] JSObject* js::GetWaitForAllPromise(
     JSContext* cx, JS::HandleObjectVector promises) {
 #ifdef DEBUG
@@ -2681,31 +3156,32 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
   }
 #endif
 
-  // Step 1.
+  // Step 1. Let C be the this value.
   RootedObject C(cx,
                  GlobalObject::getOrCreatePromiseConstructor(cx, cx->global()));
   if (!C) {
     return nullptr;
   }
 
-  // Step 2 (omitted).
-
-  // Step 3.
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
   Rooted<PromiseCapability> resultCapability(cx);
   if (!NewPromiseCapability(cx, C, &resultCapability, false)) {
     return nullptr;
   }
 
-  // Steps 4-6 (omitted).
+  // Steps 3-6 for iterator and iteratorRecord.
+  // (omitted)
 
-  // Step 7.
-  // Implemented as an inlined, simplied version of ES2016 25.4.4.1.1,
-  // PerformPromiseAll.
+  // Step 7. Let result be
+  //         PerformPromiseAll(iteratorRecord, C, promiseCapability,
+  //                           promiseResolve).
+  //
+  // Implemented as an inlined, simplied version of PerformPromiseAll.
   {
     uint32_t promiseCount = promises.length();
-    // Sub-steps 1-2 (omitted).
+    // PerformPromiseAll
 
-    // Sub-step 3.
+    // Step 1. Let values be a new empty List.
     Rooted<PromiseCombinatorElements> values(cx);
     {
       auto* valuesArray = NewDenseFullyAllocatedArray(cx, promiseCount);
@@ -2717,7 +3193,8 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
       values.initialize(valuesArray);
     }
 
-    // Sub-step 4.
+    // Step 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    //
     // Create our data holder that holds all the things shared across
     // every step of the iterator.  In particular, this holds the
     // remainingElementsCount (as an integer reserved slot), the array of
@@ -2733,31 +3210,39 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
     Rooted<PromiseCapability> resultCapabilityWithoutResolving(cx);
     resultCapabilityWithoutResolving.promise().set(resultCapability.promise());
 
-    // Sub-step 5 (inline in loop-header below).
-
-    // Sub-step 6.
+    // Step 3. Let index be 0.
+    // Step 4. Repeat,
+    // Step 4.t. Set index to index + 1.
     for (uint32_t index = 0; index < promiseCount; index++) {
-      // Steps a-c (omitted).
-      // Step d (implemented after the loop).
-      // Steps e-g (omitted).
+      // Steps 4.a-c for IteratorStep.
+      // (omitted)
 
-      // Step h.
+      // Step 4.d. (implemented after the loop).
+
+      // Steps 4.e-g for IteratorValue
+      // (omitted)
+
+      // Step 4.h. Append undefined to values.
       values.unwrappedArray()->setDenseElement(index, UndefinedHandleValue);
 
-      // Step i, vastly simplified.
+      // Step 4.i. Let nextPromise be
+      //           ? Call(promiseResolve, constructor, « nextValue »).
       RootedObject nextPromiseObj(cx, promises[index]);
 
-      // Steps j-o.
+      // Steps 4.j-q.
       JSFunction* resolveFunc = NewPromiseCombinatorElementFunction(
           cx, PromiseAllResolveElementFunction, dataHolder, index);
       if (!resolveFunc) {
         return nullptr;
       }
 
-      // Step p.
+      // Step 4.r. Set remainingElementsCount.[[Value]] to
+      //           remainingElementsCount.[[Value]] + 1.
       dataHolder->increaseRemainingCount();
 
-      // Step q, very roughly.
+      // Step 4.s. Perform
+      //           ? Invoke(nextPromise, "then",
+      //                    « onFulfilled, resultCapability.[[Reject]] »).
       RootedValue resolveFunVal(cx, ObjectValue(*resolveFunc));
       RootedValue rejectFunVal(cx, ObjectValue(*resultCapability.reject()));
       Rooted<PromiseObject*> nextPromise(cx);
@@ -2774,16 +3259,23 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
                               resultCapabilityWithoutResolving)) {
         return nullptr;
       }
-
-      // Step r (inline in loop-header).
     }
 
-    // Sub-step d.i (implicit).
-    // Sub-step d.ii.
+    // Step 4.d.i. Set iteratorRecord.[[Done]] to true.
+    // (implicit)
+
+    // Step 4.d.ii. Set remainingElementsCount.[[Value]] to
+    //              remainingElementsCount.[[Value]] - 1.
     int32_t remainingCount = dataHolder->decreaseRemainingCount();
 
-    // Sub-step d.iii-iv.
+    // Step 4.d.iii.If remainingElementsCount.[[Value]] is 0, then
     if (remainingCount == 0) {
+      // Step 4.d.iii.1. Let valuesArray be ! CreateArrayFromList(values).
+      // (already performed)
+
+      // Step 4.d.iii.2. Perform
+      //                 ? Call(resultCapability.[[Resolve]], undefined,
+      //                        « valuesArray »).
       if (!ResolvePromiseInternal(cx, resultCapability.promise(),
                                   values.value())) {
         return nullptr;
@@ -2791,64 +3283,135 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
     }
   }
 
-  // Step 8 (omitted).
-
-  // Step 9.
+  // Step 4.d.iv. Return resultCapability.[[Promise]].
   return resultCapability.promise();
 }
 
-[[nodiscard]] static bool RunFulfillFunction(JSContext* cx,
-                                             HandleObject onFulfilledFunc,
-                                             HandleValue result,
-                                             HandleObject promiseObj) {
-  cx->check(onFulfilledFunc);
-  cx->check(result);
+static bool CallDefaultPromiseResolveFunction(JSContext* cx,
+                                              Handle<PromiseObject*> promise,
+                                              HandleValue resolutionValue);
+static bool CallDefaultPromiseRejectFunction(
+    JSContext* cx, Handle<PromiseObject*> promise, HandleValue rejectionValue,
+    JS::Handle<SavedFrame*> unwrappedRejectionStack = nullptr);
+
+/**
+ * Perform Call(promiseCapability.[[Resolve]], undefined ,« value ») given
+ * promiseCapability = { promiseObj, resolveFun }.
+ *
+ * Also,
+ *
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * NewPromiseReactionJob ( reaction, argument )
+ * https://tc39.es/ecma262/#sec-newpromisereactionjob
+ *
+ * Steps 1.f-i. "type is Fulfill" case.
+ */
+[[nodiscard]] static bool CallPromiseResolveFunction(JSContext* cx,
+                                                     HandleObject resolveFun,
+                                                     HandleValue value,
+                                                     HandleObject promiseObj) {
+  cx->check(resolveFun);
+  cx->check(value);
   cx->check(promiseObj);
 
-  // If |onFulfilledFunc| couldn't be optimized away, just call it.
-  if (onFulfilledFunc) {
-    RootedValue calleeOrRval(cx, ObjectValue(*onFulfilledFunc));
-    return Call(cx, calleeOrRval, UndefinedHandleValue, result, &calleeOrRval);
+  // NewPromiseReactionJob
+  // Step 1.g. Assert: promiseCapability is a PromiseCapability Record.
+  // (implicit)
+
+  if (resolveFun) {
+    // NewPromiseReactionJob
+    // Step 1.h. If handlerResult is an abrupt completion, then
+    //           (handled in CallPromiseRejectFunction)
+    // Step 1.i. Else,
+    // Step 1.i.i. Return
+    //             ? Call(promiseCapability.[[Resolve]], undefined,
+    //                    « handlerResult.[[Value]] »).
+    RootedValue calleeOrRval(cx, ObjectValue(*resolveFun));
+    return Call(cx, calleeOrRval, UndefinedHandleValue, value, &calleeOrRval);
   }
 
-  // The promise itself may be optimized away.  If so, we're done.
+  // `promiseObj` can be optimized away if it's known to be unused.
+  //
+  // NewPromiseReactionJob
+  // Step f. If promiseCapability is undefined, then
+  // (reordered)
+  //
+  // NOTE: "promiseCapability is undefined" case is represented by
+  //       `resolveFun == nullptr && promiseObj == nullptr`.
   if (!promiseObj) {
+    // NewPromiseReactionJob
+    // Step f.i. Assert: handlerResult is not an abrupt completion.
+    // (implicit)
+
+    // Step f.ii. Return empty.
     return true;
   }
 
-  // Resolve the promise only if it's still pending.
+  // NewPromiseReactionJob
+  // Step 1.h. If handlerResult is an abrupt completion, then
+  //           (handled in CallPromiseRejectFunction)
+  // Step 1.i. Else,
+  // Step 1.i.i. Return
+  //             ? Call(promiseCapability.[[Resolve]], undefined,
+  //                    « handlerResult.[[Value]] »).
   Handle<PromiseObject*> promise = promiseObj.as<PromiseObject>();
-  if (promise->state() != JS::PromiseState::Pending) {
-    return true;
+  if (IsPromiseWithDefaultResolvingFunction(promise)) {
+    return CallDefaultPromiseResolveFunction(cx, promise, value);
   }
 
-  // If the promise has a default resolution function, perform its steps.
-  if (PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS)) {
-    return ResolvePromiseInternal(cx, promise, result);
-  }
+  // This case is used by resultCapabilityWithoutResolving in
+  // GetWaitForAllPromise, and nothing should be done.
 
-  // Otherwise we're done.
   return true;
 }
 
-[[nodiscard]] static bool RunRejectFunction(
-    JSContext* cx, HandleObject onRejectedFunc, HandleValue result,
-    HandleObject promiseObj, HandleSavedFrame unwrappedRejectionStack,
+/**
+ * Perform Call(promiseCapability.[[Reject]], undefined ,« reason ») given
+ * promiseCapability = { promiseObj, rejectFun }.
+ *
+ * Also,
+ *
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * NewPromiseReactionJob ( reaction, argument )
+ * https://tc39.es/ecma262/#sec-newpromisereactionjob
+ *
+ * Steps 1.g-i. "type is Reject" case.
+ */
+[[nodiscard]] static bool CallPromiseRejectFunction(
+    JSContext* cx, HandleObject rejectFun, HandleValue reason,
+    HandleObject promiseObj, Handle<SavedFrame*> unwrappedRejectionStack,
     UnhandledRejectionBehavior behavior) {
-  cx->check(onRejectedFunc);
-  cx->check(result);
+  cx->check(rejectFun);
+  cx->check(reason);
   cx->check(promiseObj);
 
-  // If |onRejectedFunc| couldn't be optimized away, just call it.
-  if (onRejectedFunc) {
-    RootedValue calleeOrRval(cx, ObjectValue(*onRejectedFunc));
-    return Call(cx, calleeOrRval, UndefinedHandleValue, result, &calleeOrRval);
+  // NewPromiseReactionJob
+  // Step 1.g. Assert: promiseCapability is a PromiseCapability Record.
+  // (implicit)
+
+  if (rejectFun) {
+    // NewPromiseReactionJob
+    // Step 1.h. If handlerResult is an abrupt completion, then
+    // Step 1.h.i. Return
+    //             ? Call(promiseCapability.[[Reject]], undefined,
+    //                    « handlerResult.[[Value]] »).
+    RootedValue calleeOrRval(cx, ObjectValue(*rejectFun));
+    return Call(cx, calleeOrRval, UndefinedHandleValue, reason, &calleeOrRval);
   }
 
-  // The promise itself may be optimized away.
+  // NewPromiseReactionJob
+  // See the comment in CallPromiseResolveFunction for promiseCapability field
+  //
+  // Step f. If promiseCapability is undefined, then
+  // Step f.i. Assert: handlerResult is not an abrupt completion.
+  //
+  // The spec doesn't allow promiseCapability to be undefined for reject case,
+  // but `promiseObj` can be optimized away if it's known to be unused.
   if (!promiseObj) {
-    // Do nothing if unhandled rejections are to be ignored.
     if (behavior == UnhandledRejectionBehavior::Ignore) {
+      // Do nothing if unhandled rejections are to be ignored.
       return true;
     }
 
@@ -2861,22 +3424,29 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
       return true;
     }
 
-    return RejectPromiseInternal(cx, temporaryPromise, result,
+    // NewPromiseReactionJob
+    // Step 1.h. If handlerResult is an abrupt completion, then
+    // Step 1.h.i. Return
+    //             ? Call(promiseCapability.[[Reject]], undefined,
+    //                    « handlerResult.[[Value]] »).
+    return RejectPromiseInternal(cx, temporaryPromise, reason,
                                  unwrappedRejectionStack);
   }
 
-  // Reject the promise only if it's still pending.
+  // NewPromiseReactionJob
+  // Step 1.h. If handlerResult is an abrupt completion, then
+  // Step 1.h.i. Return
+  //             ? Call(promiseCapability.[[Reject]], undefined,
+  //                    « handlerResult.[[Value]] »).
   Handle<PromiseObject*> promise = promiseObj.as<PromiseObject>();
-  if (promise->state() != JS::PromiseState::Pending) {
-    return true;
+  if (IsPromiseWithDefaultResolvingFunction(promise)) {
+    return CallDefaultPromiseRejectFunction(cx, promise, reason,
+                                            unwrappedRejectionStack);
   }
 
-  // If the promise has a default rejection function, perform its steps.
-  if (PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS)) {
-    return RejectPromiseInternal(cx, promise, result, unwrappedRejectionStack);
-  }
+  // This case is used by resultCapabilityWithoutResolving in
+  // GetWaitForAllPromise, and nothing should be done.
 
-  // Otherwise we're done.
   return true;
 }
 
@@ -2886,14 +3456,27 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
 
 static bool IsPromiseSpecies(JSContext* cx, JSFunction* species);
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.1.1 Runtime Semantics: PerformPromiseAll, steps 5-6 and step 8.
-// 25.6.4.2.1 Runtime Semantics: PerformPromiseAllSettled, steps 5-6 and step 8.
-// 25.6.4.4.1 Runtime Semantics: PerformPromiseRace, steps 3-5.
-//
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-// Runtime Semantics: PerformPromiseAny, steps 6-8.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Unified implementation of
+ *
+ * PerformPromiseAll ( iteratorRecord, constructor, resultCapability,
+ *                     promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseall
+ * PerformPromiseAllSettled ( iteratorRecord, constructor, resultCapability,
+ *                            promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseallsettled
+ * PerformPromiseRace ( iteratorRecord, constructor, resultCapability,
+ *                      promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiserace
+ * PerformPromiseAny ( iteratorRecord, constructor, resultCapability,
+ *                     promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseany
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ */
 template <typename T>
 [[nodiscard]] static bool CommonPerformPromiseCombinator(
     JSContext* cx, PromiseForOfIterator& iterator, HandleObject C,
@@ -2931,18 +3514,26 @@ template <typename T>
   RootedObject thenSpeciesOrBlockedPromise(cx);
   Rooted<PromiseCapability> thenCapability(cx);
 
+  // PerformPromiseAll, PerformPromiseAllSettled, PerformPromiseAny
+  // Step 4.
+  // PerformPromiseRace
+  // Step 1.
   while (true) {
-    // Steps a-c, e-g.
+    // Step a. Let next be IteratorStep(iteratorRecord).
+    // Step b. If next is an abrupt completion, set iteratorRecord.[[Done]] to
+    //         true.
+    // Step c. ReturnIfAbrupt(next).
+    // Step e. Let nextValue be IteratorValue(next).
+    // Step f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]]
+    //         to true.
+    // Step g. ReturnIfAbrupt(nextValue).
     RootedValue& nextValue = nextValueOrNextPromise;
     if (!iterator.next(&nextValue, done)) {
-      // Steps b, f.
       *done = true;
-
-      // Steps c, g.
       return false;
     }
 
-    // Step d.
+    // Step d. If next is false, then
     if (*done) {
       return true;
     }
@@ -2971,8 +3562,8 @@ template <typename T>
         // side-effects.
         validatePromiseState = iterationMayHaveSideEffects;
 
-        // 25.6.4.1.1, step 8.i.
-        // 25.6.4.3.1, step 5.h.
+        // Step {i, h}. Let nextPromise be
+        //              ? Call(promiseResolve, constructor, « nextValue »).
         // Promise.resolve is a no-op for the default case.
         MOZ_ASSERT(&nextPromise.toObject() == nextValuePromise);
 
@@ -2983,8 +3574,8 @@ template <typename T>
         // because CommonStaticResolveRejectImpl may have modified it.
         validatePromiseState = true;
 
-        // 25.6.4.1.1, step 8.i.
-        // 25.6.4.3.1, step 5.h.
+        // Step {i, h}. Let nextPromise be
+        //              ? Call(promiseResolve, constructor, « nextValue »).
         // Inline the call to Promise.resolve.
         JSObject* res =
             CommonStaticResolveRejectImpl(cx, CVal, nextValue, ResolveMode);
@@ -2999,8 +3590,8 @@ template <typename T>
       // initially in its default state, i.e. if it had been retrieved, it would
       // have been set to |Promise.resolve|.
 
-      // 25.6.4.1.1, step 8.i.
-      // 25.6.4.3.1, step 5.h.
+      // Step {i, h}. Let nextPromise be
+      //              ? Call(promiseResolve, constructor, « nextValue »).
       // Inline the call to Promise.resolve.
       JSObject* res =
           CommonStaticResolveRejectImpl(cx, CVal, nextValue, ResolveMode);
@@ -3010,15 +3601,22 @@ template <typename T>
 
       nextPromise.setObject(*res);
     } else {
-      // 25.6.4.1.1, step 8.i.
-      // 25.6.4.3.1, step 5.h.
+      // Step {i, h}. Let nextPromise be
+      //              ? Call(promiseResolve, constructor, « nextValue »).
       if (!Call(cx, promiseResolve, CVal, nextValue, &nextPromise)) {
         return false;
       }
     }
 
     // Get the resolving functions for this iteration.
-    // 25.6.4.1.1, steps 8.j-q.
+    // PerformPromiseAll
+    // Steps j-r.
+    // PerformPromiseAllSettled
+    // Steps j-aa.
+    // PerformPromiseRace
+    // Step i.
+    // PerformPromiseAny
+    // Steps j-q.
     if (!getResolveAndReject(&resolveFunVal, &rejectFunVal)) {
       return false;
     }
@@ -3032,8 +3630,22 @@ template <typename T>
     // call to |nextPromise.then| and thus creating a new promise that
     // would not be observable by content.
 
-    // 25.6.4.1.1, step 8.r.
-    // 25.6.4.3.1, step 5.i.
+    // PerformPromiseAll
+    // Step s. Perform
+    //         ? Invoke(nextPromise, "then",
+    //                  « onFulfilled, resultCapability.[[Reject]] »).
+    // PerformPromiseAllSettled
+    // Step ab. Perform
+    //          ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
+    // PerformPromiseRace
+    // Step i. Perform
+    //         ? Invoke(nextPromise, "then",
+    //                  « resultCapability.[[Resolve]],
+    //                    resultCapability.[[Reject]] »).
+    // PerformPromiseAny
+    // Step s. Perform
+    //         ? Invoke(nextPromise, "then",
+    //                  « resultCapability.[[Resolve]], onRejected »).
     nextPromiseObj = ToObject(cx, nextPromise);
     if (!nextPromiseObj) {
       return false;
@@ -3065,7 +3677,8 @@ template <typename T>
       MOZ_ASSERT(nextPromise.isObject());
       MOZ_ASSERT(&nextPromise.toObject() == nextPromiseObj);
 
-      // 25.6.5.4, step 3.
+      // Promise.prototype.then
+      // Step 3. Let C be ? SpeciesConstructor(promise, %Promise%).
       RootedObject& thenSpecies = thenSpeciesOrBlockedPromise;
       if (getThen) {
         thenSpecies = SpeciesConstructor(cx, nextPromiseObj, JSProto_Promise,
@@ -3093,18 +3706,22 @@ template <typename T>
       //    PromiseReactionJob won't try to resolve the promise.
       if (thenSpecies == promiseCtor && resolveReturnsUndefined &&
           resultPromise->is<PromiseObject>() &&
-          !PromiseHasAnyFlag(resultPromise->as<PromiseObject>(),
-                             PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS)) {
+          !IsPromiseWithDefaultResolvingFunction(
+              &resultPromise->as<PromiseObject>())) {
         thenCapability.promise().set(resultPromise);
         addToDependent = false;
       } else {
-        // 25.6.5.4, step 4.
+        // Promise.prototype.then
+        // Step 4. Let resultCapability be ? NewPromiseCapability(C).
         if (!NewPromiseCapability(cx, thenSpecies, &thenCapability, true)) {
           return false;
         }
       }
 
-      // 25.6.5.4, step 5.
+      // Promise.prototype.then
+      // Step 5. Return
+      //         PerformPromiseThen(promise, onFulfilled, onRejected,
+      //                            resultCapability).
       Handle<PromiseObject*> promise = nextPromiseObj.as<PromiseObject>();
       if (!PerformPromiseThen(cx, promise, resolveFunVal, rejectFunVal,
                               thenCapability)) {
@@ -3268,38 +3885,63 @@ static JSFunction* NewPromiseCombinatorElementFunction(
   return fn;
 }
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.1.2 Promise.all Resolve Element Functions
-// 25.6.4.2.2 Promise.allSettled Resolve Element Functions
-// 25.6.4.2.3 Promise.allSettled Reject Element Functions
-//
-// Common implementation for Promise combinator element functions to check if
-// they've already been called.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Unified implementation of
+ *
+ * Promise.all Resolve Element Functions
+ * https://tc39.es/ecma262/#sec-promise.all-resolve-element-functions
+ *
+ * Steps 1-4.
+ *
+ * Promise.allSettled Resolve Element Functions
+ * https://tc39.es/ecma262/#sec-promise.allsettled-resolve-element-functions
+ *
+ * Steps 1-5.
+ *
+ * Promise.allSettled Reject Element Functions
+ * https://tc39.es/ecma262/#sec-promise.allsettled-reject-element-functions
+ *
+ * Steps 1-5.
+ *
+ * Common implementation for Promise combinator element functions to check if
+ * they've already been called.
+ */
 static bool PromiseCombinatorElementFunctionAlreadyCalled(
     const CallArgs& args, MutableHandle<PromiseCombinatorDataHolder*> data,
     uint32_t* index) {
-  // Step 1.
+  // Step 1. Let F be the active function object.
   JSFunction* fn = &args.callee().as<JSFunction>();
 
-  // Step 2.
-  const Value& dataVal =
-      fn->getExtendedSlot(PromiseCombinatorElementFunctionSlot_Data);
-
-  // Step 3.
+  // Promise.all functions
+  // Step 2. If F.[[AlreadyCalled]] is true, return undefined.
+  // Promise.allSettled functions
+  // Step 2. Let alreadyCalled be F.[[AlreadyCalled]].
+  // Step 3. If alreadyCalled.[[Value]] is true, return undefined.
+  //
   // We use the existence of the data holder as a signal for whether the Promise
   // combinator element function was already called. Upon resolution, it's reset
   // to `undefined`.
+  const Value& dataVal =
+      fn->getExtendedSlot(PromiseCombinatorElementFunctionSlot_Data);
   if (dataVal.isUndefined()) {
     return true;
   }
 
   data.set(&dataVal.toObject().as<PromiseCombinatorDataHolder>());
 
-  // Step 4.
+  // Promise.all functions
+  // Step 3. Set F.[[AlreadyCalled]] to true.
+  // Promise.allSettled functions
+  // Step 4. Set alreadyCalled.[[Value]] to true.
   fn->setExtendedSlot(PromiseCombinatorElementFunctionSlot_Data,
                       UndefinedValue());
 
-  // Step 5.
+  // Promise.all functions
+  // Step 4. Let index be F.[[Index]].
+  // Promise.allSettled functions
+  // Step 5. Let index be F.[[Index]].
   int32_t idx =
       fn->getExtendedSlot(PromiseCombinatorElementFunctionSlot_ElementIndex)
           .toInt32();
@@ -3309,26 +3951,29 @@ static bool PromiseCombinatorElementFunctionAlreadyCalled(
   return false;
 }
 
-// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
-// 25.6.4.1.1 PerformPromiseAll (iteratorRecord, constructor, resultCapability)
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseAll ( iteratorRecord, constructor, resultCapability,
+ *                     promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseall
+ */
 [[nodiscard]] static bool PerformPromiseAll(
     JSContext* cx, PromiseForOfIterator& iterator, HandleObject C,
     Handle<PromiseCapability> resultCapability, HandleValue promiseResolve,
     bool* done) {
   *done = false;
 
-  // Step 1.
   MOZ_ASSERT(C->isConstructor());
 
-  // Step 2 (omitted).
-
-  // Step 3.
+  // Step 1. Let values be a new empty List.
   Rooted<PromiseCombinatorElements> values(cx);
   if (!NewPromiseCombinatorElements(cx, resultCapability, &values)) {
     return false;
   }
 
-  // Step 4.
+  // Step 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+  //
   // Create our data holder that holds all the things shared across
   // every step of the iterator.  In particular, this holds the
   // remainingElementsCount (as an integer reserved slot), the array of
@@ -3340,28 +3985,29 @@ static bool PromiseCombinatorElementFunctionAlreadyCalled(
     return false;
   }
 
-  // Step 7.
+  // Step 3. Let index be 0.
   uint32_t index = 0;
 
   auto getResolveAndReject = [cx, &resultCapability, &values, &dataHolder,
                               &index](MutableHandleValue resolveFunVal,
                                       MutableHandleValue rejectFunVal) {
-    // Step 8.h.
+    // Step 4.h. Append undefined to values.
     if (!values.pushUndefined(cx)) {
       return false;
     }
 
-    // Steps 8.j-p.
+    // Steps 4.j-q.
     JSFunction* resolveFunc = NewPromiseCombinatorElementFunction(
         cx, PromiseAllResolveElementFunction, dataHolder, index);
     if (!resolveFunc) {
       return false;
     }
 
-    // Step 8.q.
+    // Step 4.r. Set remainingElementsCount.[[Value]] to
+    //           remainingElementsCount.[[Value]] + 1.
     dataHolder->increaseRemainingCount();
 
-    // Step 8.s.
+    // Step 4.t. Set index to index + 1.
     index++;
     MOZ_ASSERT(index > 0);
 
@@ -3370,33 +4016,46 @@ static bool PromiseCombinatorElementFunctionAlreadyCalled(
     return true;
   };
 
-  // Steps 5-6 and 8.
+  // Steps 4.
   if (!CommonPerformPromiseCombinator(
           cx, iterator, C, resultCapability.promise(), promiseResolve, done,
           true, getResolveAndReject)) {
     return false;
   }
 
-  // Step 8.d.ii.
+  // Step 4.d.ii. Set remainingElementsCount.[[Value]] to
+  //              remainingElementsCount.[[Value]] - 1.
   int32_t remainingCount = dataHolder->decreaseRemainingCount();
 
-  // Steps 8.d.iii-iv.
+  // Step 4.d.iii. If remainingElementsCount.[[Value]] is 0, then
   if (remainingCount == 0) {
-    return RunFulfillFunction(cx, resultCapability.resolve(), values.value(),
-                              resultCapability.promise());
+    // Step 4.d.iii.1. Let valuesArray be ! CreateArrayFromList(values).
+    // (already performed)
+
+    // Step 4.d.iii.2. Perform
+    //                 ? Call(resultCapability.[[Resolve]], undefined,
+    //                        « valuesArray »).
+    return CallPromiseResolveFunction(cx, resultCapability.resolve(),
+                                      values.value(),
+                                      resultCapability.promise());
   }
 
+  // Step 4.d.iv. Return resultCapability.[[Promise]].
   return true;
 }
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.1.2 Promise.all Resolve Element Functions
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.all Resolve Element Functions
+ * https://tc39.es/ecma262/#sec-promise.all-resolve-element-functions
+ */
 static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
                                              Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   HandleValue xVal = args.get(0);
 
-  // Steps 1-5.
+  // Steps 1-4.
   Rooted<PromiseCombinatorDataHolder*> data(cx);
   uint32_t index;
   if (PromiseCombinatorElementFunctionAlreadyCalled(args, &data, &index)) {
@@ -3404,60 +4063,73 @@ static bool PromiseAllResolveElementFunction(JSContext* cx, unsigned argc,
     return true;
   }
 
-  // Step 6.
+  // Step 5. Let values be F.[[Values]].
   Rooted<PromiseCombinatorElements> values(cx);
   if (!GetPromiseCombinatorElements(cx, data, &values)) {
     return false;
   }
 
-  // Step 7 (moved under step 11).
-  // Step 8 (moved to step 10).
-
-  // Step 9.
+  // Step 8. Set values[index] to x.
   if (!values.setElement(cx, index, xVal)) {
     return false;
   }
 
-  // Steps 8,10.
+  // (reordered)
+  // Step 7. Let remainingElementsCount be F.[[RemainingElements]].
+  //
+  // Step 9. Set remainingElementsCount.[[Value]] to
+  //         remainingElementsCount.[[Value]] - 1.
   uint32_t remainingCount = data->decreaseRemainingCount();
 
-  // Step 11.
+  // Step 10. If remainingElementsCount.[[Value]] is 0, then
   if (remainingCount == 0) {
-    // Step 11.a. (Omitted, happened in PerformPromiseAll.)
-    // Step 11.b.
+    // Step 10.a. Let valuesArray be ! CreateArrayFromList(values).
+    // (already performed)
 
-    // Step 7 (Adapted to work with PromiseCombinatorDataHolder's layout).
+    // (reordered)
+    // Step 6. Let promiseCapability be F.[[Capability]].
+    //
+    // Step 10.b. Return
+    //            ? Call(promiseCapability.[[Resolve]], undefined,
+    //                   « valuesArray »).
     RootedObject resolveAllFun(cx, data->resolveOrRejectObj());
     RootedObject promiseObj(cx, data->promiseObj());
-    if (!RunFulfillFunction(cx, resolveAllFun, values.value(), promiseObj)) {
+    if (!CallPromiseResolveFunction(cx, resolveAllFun, values.value(),
+                                    promiseObj)) {
       return false;
     }
   }
 
-  // Step 12.
+  // Step 11. Return undefined.
   args.rval().setUndefined();
   return true;
 }
 
-// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
-// 25.6.4.3 Promise.race ( iterable )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.race ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.race
+ */
 static bool Promise_static_race(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return CommonPromiseCombinator(cx, args, CombinatorKind::Race);
 }
 
-// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
-// 25.6.4.3.1 PerformPromiseRace (iteratorRecord, constructor, resultCapability)
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseRace ( iteratorRecord, constructor, resultCapability,
+ *                      promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiserace
+ */
 [[nodiscard]] static bool PerformPromiseRace(
     JSContext* cx, PromiseForOfIterator& iterator, HandleObject C,
     Handle<PromiseCapability> resultCapability, HandleValue promiseResolve,
     bool* done) {
   *done = false;
 
-  // Step 1.
   MOZ_ASSERT(C->isConstructor());
-
-  // Step 2 (omitted).
 
   // BlockOnPromise fast path requires the passed onFulfilled function
   // doesn't return an object value, because otherwise the skipped promise
@@ -3473,7 +4145,7 @@ static bool Promise_static_race(JSContext* cx, unsigned argc, Value* vp) {
     return true;
   };
 
-  // Steps 3-5.
+  // Step 1.
   return CommonPerformPromiseCombinator(
       cx, iterator, C, resultCapability.promise(), promiseResolve, done,
       isDefaultResolveFn, getResolveAndReject);
@@ -3481,46 +4153,44 @@ static bool Promise_static_race(JSContext* cx, unsigned argc, Value* vp) {
 
 enum class PromiseAllSettledElementFunctionKind { Resolve, Reject };
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.2 Promise.allSettled ( iterable )
-//
-// Promise.allSettled Resolve Element Functions
-// Promise.allSettled Reject Element Functions
 template <PromiseAllSettledElementFunctionKind Kind>
 static bool PromiseAllSettledElementFunction(JSContext* cx, unsigned argc,
                                              Value* vp);
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.2 Promise.allSettled ( iterable )
-//
-// Promise.allSettled ( iterable )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.allSettled ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.allsettled
+ */
 static bool Promise_static_allSettled(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return CommonPromiseCombinator(cx, args, CombinatorKind::AllSettled);
 }
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.2 Promise.allSettled ( iterable )
-//
-// PerformPromiseAllSettled ( iteratorRecord, constructor, resultCapability )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseAllSettled ( iteratorRecord, constructor, resultCapability,
+ *                            promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseallsettled
+ */
 [[nodiscard]] static bool PerformPromiseAllSettled(
     JSContext* cx, PromiseForOfIterator& iterator, HandleObject C,
     Handle<PromiseCapability> resultCapability, HandleValue promiseResolve,
     bool* done) {
   *done = false;
 
-  // Step 1.
   MOZ_ASSERT(C->isConstructor());
 
-  // Step 2 (omitted).
-
-  // Step 3.
+  // Step 1. Let values be a new empty List.
   Rooted<PromiseCombinatorElements> values(cx);
   if (!NewPromiseCombinatorElements(cx, resultCapability, &values)) {
     return false;
   }
 
-  // Step 4.
+  // Step 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+  //
   // Create our data holder that holds all the things shared across every step
   // of the iterator. In particular, this holds the remainingElementsCount
   // (as an integer reserved slot), the array of values, and the resolve
@@ -3532,13 +4202,13 @@ static bool Promise_static_allSettled(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  // Step 7.
+  // Step 3. Let index be 0.
   uint32_t index = 0;
 
   auto getResolveAndReject = [cx, &values, &dataHolder, &index](
                                  MutableHandleValue resolveFunVal,
                                  MutableHandleValue rejectFunVal) {
-    // Step 8.h.
+    // Step 4.h. Append undefined to values.
     if (!values.pushUndefined(cx)) {
       return false;
     }
@@ -3550,7 +4220,7 @@ static bool Promise_static_allSettled(JSContext* cx, unsigned argc, Value* vp) {
         PromiseAllSettledElementFunction<
             PromiseAllSettledElementFunctionKind::Reject>;
 
-    // Steps 8.j-q.
+    // Steps 4.j-r.
     JSFunction* resolveFunc = NewPromiseCombinatorElementFunction(
         cx, PromiseAllSettledResolveElementFunction, dataHolder, index);
     if (!resolveFunc) {
@@ -3558,7 +4228,7 @@ static bool Promise_static_allSettled(JSContext* cx, unsigned argc, Value* vp) {
     }
     resolveFunVal.setObject(*resolveFunc);
 
-    // Steps 8.r-x.
+    // Steps 4.s-z.
     JSFunction* rejectFunc = NewPromiseCombinatorElementFunction(
         cx, PromiseAllSettledRejectElementFunction, dataHolder, index);
     if (!rejectFunc) {
@@ -3566,38 +4236,54 @@ static bool Promise_static_allSettled(JSContext* cx, unsigned argc, Value* vp) {
     }
     rejectFunVal.setObject(*rejectFunc);
 
-    // Step 8.y.
+    // Step 4.aa. Set remainingElementsCount.[[Value]] to
+    //            remainingElementsCount.[[Value]] + 1.
     dataHolder->increaseRemainingCount();
 
-    // Step 8.aa.
+    // Step 4.ac. Set index to index + 1.
     index++;
     MOZ_ASSERT(index > 0);
 
     return true;
   };
 
-  // Steps 5-6 and 8.
+  // Steps 4.
   if (!CommonPerformPromiseCombinator(
           cx, iterator, C, resultCapability.promise(), promiseResolve, done,
           true, getResolveAndReject)) {
     return false;
   }
 
-  // Step 8.d.ii.
+  // Step 4.d.ii. Set remainingElementsCount.[[Value]] to
+  //              remainingElementsCount.[[Value]] - 1.
   int32_t remainingCount = dataHolder->decreaseRemainingCount();
 
-  // Steps 8.d.iii-iv.
+  // Step 4.d.iii. If remainingElementsCount.[[Value]] is 0, then
   if (remainingCount == 0) {
-    return RunFulfillFunction(cx, resultCapability.resolve(), values.value(),
-                              resultCapability.promise());
+    // Step 4.d.iii.1. Let valuesArray be ! CreateArrayFromList(values).
+    // (already performed)
+
+    // Step 4.d.iii.2. Perform
+    //                 ? Call(resultCapability.[[Resolve]], undefined,
+    //                        « valuesArray »).
+    return CallPromiseResolveFunction(cx, resultCapability.resolve(),
+                                      values.value(),
+                                      resultCapability.promise());
   }
 
   return true;
 }
 
-// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
-// 25.6.4.2.2 Promise.allSettled Resolve Element Functions
-// 25.6.4.2.3 Promise.allSettled Reject Element Functions
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Unified implementation of
+ *
+ * Promise.allSettled Resolve Element Functions
+ * https://tc39.es/ecma262/#sec-promise.allsettled-resolve-element-functions
+ * Promise.allSettled Reject Element Functions
+ * https://tc39.es/ecma262/#sec-promise.allsettled-reject-element-functions
+ */
 template <PromiseAllSettledElementFunctionKind Kind>
 static bool PromiseAllSettledElementFunction(JSContext* cx, unsigned argc,
                                              Value* vp) {
@@ -3612,13 +4298,15 @@ static bool PromiseAllSettledElementFunction(JSContext* cx, unsigned argc,
     return true;
   }
 
-  // Step 6.
+  // Step 6. Let values be F.[[Values]].
   Rooted<PromiseCombinatorElements> values(cx);
   if (!GetPromiseCombinatorElements(cx, data, &values)) {
     return false;
   }
 
-  // Steps 2-3.
+  // Step 2. Let alreadyCalled be F.[[AlreadyCalled]].
+  // Step 3. If alreadyCalled.[[Value]] is true, return undefined.
+  //
   // The already-called check above only handles the case when |this| function
   // is called repeatedly, so we still need to check if the other pair of this
   // resolving function was already called:
@@ -3629,15 +4317,16 @@ static bool PromiseAllSettledElementFunction(JSContext* cx, unsigned argc,
     return true;
   }
 
-  // Steps 7-8 (moved below).
-
-  // Step 9.
-  RootedPlainObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
+  // Step 9. Let obj be ! OrdinaryObjectCreate(%Object.prototype%).
+  Rooted<PlainObject*> obj(cx, NewPlainObject(cx));
   if (!obj) {
     return false;
   }
 
-  // Step 10.
+  // Promise.allSettled Resolve Element Functions
+  // Step 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
+  // Promise.allSettled Reject Element Functions
+  // Step 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
   RootedId id(cx, NameToId(cx->names().status));
   RootedValue statusValue(cx);
   if (Kind == PromiseAllSettledElementFunctionKind::Resolve) {
@@ -3649,7 +4338,10 @@ static bool PromiseAllSettledElementFunction(JSContext* cx, unsigned argc,
     return false;
   }
 
-  // Step 11.
+  // Promise.allSettled Resolve Element Functions
+  // Step 11. Perform ! CreateDataPropertyOrThrow(obj, "value", x).
+  // Promise.allSettled Reject Element Functions
+  // Step 11. Perform ! CreateDataPropertyOrThrow(obj, "reason", x).
   if (Kind == PromiseAllSettledElementFunctionKind::Resolve) {
     id = NameToId(cx->names().value);
   } else {
@@ -3659,73 +4351,83 @@ static bool PromiseAllSettledElementFunction(JSContext* cx, unsigned argc,
     return false;
   }
 
-  // Steps 4, 12.
+  // Step 12. Set values[index] to obj.
   RootedValue objVal(cx, ObjectValue(*obj));
   if (!values.setElement(cx, index, objVal)) {
     return false;
   }
 
-  // Steps 8, 13.
+  // (reordered)
+  // Step 8. Let remainingElementsCount be F.[[RemainingElements]].
+  //
+  // Step 13. Set remainingElementsCount.[[Value]] to
+  // remainingElementsCount.[[Value]] - 1.
   uint32_t remainingCount = data->decreaseRemainingCount();
 
-  // Step 14.
+  // Step 14. If remainingElementsCount.[[Value]] is 0, then
   if (remainingCount == 0) {
-    // Step 14.a. (Omitted, happened in PerformPromiseAllSettled.)
-    // Step 14.b.
+    // Step 14.a. Let valuesArray be ! CreateArrayFromList(values).
+    // (already performed)
 
-    // Step 7 (Adapted to work with PromiseCombinatorDataHolder's layout).
+    // (reordered)
+    // Step 7. Let promiseCapability be F.[[Capability]].
+    //
+    // Step 14.b. Return
+    //            ? Call(promiseCapability.[[Resolve]], undefined,
+    //                   « valuesArray »).
     RootedObject resolveAllFun(cx, data->resolveOrRejectObj());
     RootedObject promiseObj(cx, data->promiseObj());
-    if (!RunFulfillFunction(cx, resolveAllFun, values.value(), promiseObj)) {
+    if (!CallPromiseResolveFunction(cx, resolveAllFun, values.value(),
+                                    promiseObj)) {
       return false;
     }
   }
 
-  // Step 15.
+  // Step 15. Return undefined.
   args.rval().setUndefined();
   return true;
 }
 
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// Promise.any ( iterable )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.any ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.any
+ */
 static bool Promise_static_any(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return CommonPromiseCombinator(cx, args, CombinatorKind::Any);
 }
 
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// Promise.any Reject Element Functions
 static bool PromiseAnyRejectElementFunction(JSContext* cx, unsigned argc,
                                             Value* vp);
 
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// ThrowAggregateError ( errors )
 static void ThrowAggregateError(JSContext* cx,
                                 Handle<PromiseCombinatorElements> errors,
                                 HandleObject promise);
 
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// PerformPromiseAny ( iteratorRecord, constructor, resultCapability )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.any ( iterable )
+ * https://tc39.es/ecma262/#sec-promise.any
+ * PerformPromiseAny ( iteratorRecord, constructor, resultCapability,
+ *                     promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseany
+ */
 [[nodiscard]] static bool PerformPromiseAny(
     JSContext* cx, PromiseForOfIterator& iterator, HandleObject C,
     Handle<PromiseCapability> resultCapability, HandleValue promiseResolve,
     bool* done) {
   *done = false;
 
-  // Step 1.
+  // Step 1. Let C be the this value.
   MOZ_ASSERT(C->isConstructor());
 
-  // Step 2 (omitted).
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
+  // (omitted).
 
-  // Step 3.
+  // Step 3. Let promiseResolve be GetPromiseResolve(C).
   Rooted<PromiseCombinatorElements> errors(cx);
   if (!NewPromiseCombinatorElements(cx, resultCapability, &errors)) {
     return false;
@@ -3743,28 +4445,30 @@ static void ThrowAggregateError(JSContext* cx,
     return false;
   }
 
-  // Step 5.
+  // PerformPromiseAny
+  // Step 3. Let index be 0.
   uint32_t index = 0;
 
   auto getResolveAndReject = [cx, &resultCapability, &errors, &dataHolder,
                               &index](MutableHandleValue resolveFunVal,
                                       MutableHandleValue rejectFunVal) {
-    // Step 8.h.
+    // Step 4.h. Append undefined to errors.
     if (!errors.pushUndefined(cx)) {
       return false;
     }
 
-    // Steps 8.j-p.
+    // Steps 4.j-q.
     JSFunction* rejectFunc = NewPromiseCombinatorElementFunction(
         cx, PromiseAnyRejectElementFunction, dataHolder, index);
     if (!rejectFunc) {
       return false;
     }
 
-    // Step 8.q.
+    // Step 4.r. Set remainingElementsCount.[[Value]] to
+    //           remainingElementsCount.[[Value]] + 1.
     dataHolder->increaseRemainingCount();
 
-    // Step 8.s.
+    // Step 4.t. Set index to index + 1.
     index++;
     MOZ_ASSERT(index > 0);
 
@@ -3779,30 +4483,33 @@ static void ThrowAggregateError(JSContext* cx,
   bool isDefaultResolveFn =
       IsNativeFunction(resultCapability.resolve(), ResolvePromiseFunction);
 
-  // Steps 6-8.
+  // Steps 4.
   if (!CommonPerformPromiseCombinator(
           cx, iterator, C, resultCapability.promise(), promiseResolve, done,
           isDefaultResolveFn, getResolveAndReject)) {
     return false;
   }
 
-  // Step 8.d.ii.
+  // Step 4.d.ii. Set remainingElementsCount.[[Value]] to
+  //              remainingElementsCount.[[Value]] - 1.
   int32_t remainingCount = dataHolder->decreaseRemainingCount();
 
-  // Step 8.d.iii.
+  // Step 4.d.iii. If remainingElementsCount.[[Value]] is 0, then
   if (remainingCount == 0) {
     ThrowAggregateError(cx, errors, resultCapability.promise());
     return false;
   }
 
-  // Step 8.d.iv.
+  // Step 4.d.iv. Return resultCapability.[[Promise]].
   return true;
 }
 
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// Promise.any Reject Element Functions
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.any Reject Element Functions
+ * https://tc39.es/ecma262/#sec-promise.any-reject-element-functions
+ */
 static bool PromiseAnyRejectElementFunction(JSContext* cx, unsigned argc,
                                             Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -3839,13 +4546,13 @@ static bool PromiseAnyRejectElementFunction(JSContext* cx, unsigned argc,
     ThrowAggregateError(cx, errors, promiseObj);
 
     RootedValue reason(cx);
-    RootedSavedFrame stack(cx);
+    Rooted<SavedFrame*> stack(cx);
     if (!MaybeGetAndClearExceptionAndStack(cx, &reason, &stack)) {
       return false;
     }
 
-    if (!RunRejectFunction(cx, rejectFun, reason, promiseObj, stack,
-                           UnhandledRejectionBehavior::Report)) {
+    if (!CallPromiseRejectFunction(cx, rejectFun, reason, promiseObj, stack,
+                                   UnhandledRejectionBehavior::Report)) {
       return false;
     }
   }
@@ -3855,10 +4562,15 @@ static bool PromiseAnyRejectElementFunction(JSContext* cx, unsigned argc,
   return true;
 }
 
-// Promise.any (Stage 3 proposal)
-// https://tc39.es/proposal-promise-any/
-//
-// ThrowAggregateError ( errors )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseAny ( iteratorRecord, constructor, resultCapability,
+ *                     promiseResolve )
+ * https://tc39.es/ecma262/#sec-performpromiseany
+ *
+ * Steps 4.d.iii.1-3
+ */
 static void ThrowAggregateError(JSContext* cx,
                                 Handle<PromiseCombinatorElements> errors,
                                 HandleObject promise) {
@@ -3885,6 +4597,8 @@ static void ThrowAggregateError(JSContext* cx,
     }
   }
 
+  // Step 4.d.iii.1. Let error be a newly created AggregateError object.
+  //
   // AutoSetAsyncStackForNewCalls requires a new activation before it takes
   // effect, so call into the self-hosting helper to set-up new call frames.
   RootedValue error(cx);
@@ -3892,9 +4606,15 @@ static void ThrowAggregateError(JSContext* cx,
     return;
   }
 
+  // Step 4.d.iii.2. Perform ! DefinePropertyOrThrow(
+  //                   error, "errors", PropertyDescriptor {
+  //                     [[Configurable]]: true, [[Enumerable]]: false,
+  //                     [[Writable]]: true,
+  //                     [[Value]]: ! CreateArrayFromList(errors) }).
+  //
   // |error| isn't guaranteed to be an AggregateError in case of OOM or stack
   // overflow.
-  RootedSavedFrame stack(cx);
+  Rooted<SavedFrame*> stack(cx);
   if (error.isObject() && error.toObject().is<ErrorObject>()) {
     Rooted<ErrorObject*> errorObj(cx, &error.toObject().as<ErrorObject>());
     if (errorObj->type() == JSEXN_AGGREGATEERR) {
@@ -3911,21 +4631,37 @@ static void ThrowAggregateError(JSContext* cx,
     }
   }
 
+  // Step 4.d.iii.3. Return ThrowCompletion(error).
   cx->setPendingException(error, stack);
 }
 
-// https://tc39.github.io/ecma262/#sec-promise.reject
-//
-// Unified implementation of
-// 25.6.4.4 Promise.reject ( r )
-// 25.6.4.5 Promise.resolve ( x )
-// 25.6.4.5.1 PromiseResolve ( C, x )
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Unified implementation of
+ *
+ * Promise.reject ( r )
+ * https://tc39.es/ecma262/#sec-promise.reject
+ * NewPromiseCapability ( C )
+ * https://tc39.es/ecma262/#sec-newpromisecapability
+ * Promise.resolve ( x )
+ * https://tc39.es/ecma262/#sec-promise.resolve
+ * PromiseResolve ( C, x )
+ * https://tc39.es/ecma262/#sec-promise-resolve
+ */
 [[nodiscard]] static JSObject* CommonStaticResolveRejectImpl(
     JSContext* cx, HandleValue thisVal, HandleValue argVal,
     ResolutionMode mode) {
-  // Steps 1-2 of Promise.reject and Promise.resolve.
-  // Step 1: Let C be the this value.
-  // Step 2: If Type(C) is not Object, throw a TypeError exception.
+  // Promise.reject
+  // Step 1. Let C be the this value.
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
+  //
+  // Promise.reject => NewPromiseCapability
+  // Step 1. If IsConstructor(C) is false, throw a TypeError exception.
+  //
+  // Promise.resolve
+  // Step 1. Let C be the this value.
+  // Step 2. If Type(C) is not Object, throw a TypeError exception.
   if (!thisVal.isObject()) {
     const char* msg = mode == ResolveMode ? "Receiver of Promise.resolve call"
                                           : "Receiver of Promise.reject call";
@@ -3935,9 +4671,12 @@ static void ThrowAggregateError(JSContext* cx,
   }
   RootedObject C(cx, &thisVal.toObject());
 
-  // Promise.resolve, step 3: Return ? PromiseResolve(C, x).
-  // PromiseResolve, step 1: Assert: Type(C) is Object (implicit).
-  // PromiseResolve, step 2: If IsPromise(x) is true, then
+  // Promise.resolve
+  // Step 3. Return ? PromiseResolve(C, x).
+  //
+  // PromiseResolve
+  // Step 1. Assert: Type(C) is Object.
+  // (implicit)
   if (mode == ResolveMode && argVal.isObject()) {
     RootedObject xObj(cx, &argVal.toObject());
     bool isPromise = false;
@@ -3955,23 +4694,27 @@ static void ThrowAggregateError(JSContext* cx,
         isPromise = true;
       }
     }
+
+    // PromiseResolve
+    // Step 2. If IsPromise(x) is true, then
     if (isPromise) {
-      // Step 2.a: Let xConstructor be ? Get(x, "constructor").
+      // Step 2.a. Let xConstructor be ? Get(x, "constructor").
       RootedValue ctorVal(cx);
       if (!GetProperty(cx, xObj, xObj, cx->names().constructor, &ctorVal)) {
         return nullptr;
       }
 
-      // Step 2.b: If SameValue(xConstructor, C) is true, return x.
+      // Step 2.b. If SameValue(xConstructor, C) is true, return x.
       if (ctorVal == thisVal) {
         return xObj;
       }
     }
   }
 
-  // The step numbers below happen to be the same for PromiseResolve and
-  // Promise.reject.
-  // Step 3: Let promiseCapability be ? NewPromiseCapability(C).
+  // Promise.reject
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
+  // PromiseResolve
+  // Step 3. Let promiseCapability be ? NewPromiseCapability(C).
   Rooted<PromiseCapability> capability(cx);
   if (!NewPromiseCapability(cx, C, &capability, true)) {
     return nullptr;
@@ -3979,21 +4722,26 @@ static void ThrowAggregateError(JSContext* cx,
 
   HandleObject promise = capability.promise();
   if (mode == ResolveMode) {
-    // PromiseResolve, step 4:
-    //      Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
-    if (!RunFulfillFunction(cx, capability.resolve(), argVal, promise)) {
+    // PromiseResolve
+    // Step 4. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
+    if (!CallPromiseResolveFunction(cx, capability.resolve(), argVal,
+                                    promise)) {
       return nullptr;
     }
   } else {
-    // Promise.reject, step 4:
-    //      Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
-    if (!RunRejectFunction(cx, capability.reject(), argVal, promise, nullptr,
-                           UnhandledRejectionBehavior::Report)) {
+    // Promise.reject
+    // Step 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
+    if (!CallPromiseRejectFunction(cx, capability.reject(), argVal, promise,
+                                   nullptr,
+                                   UnhandledRejectionBehavior::Report)) {
       return nullptr;
     }
   }
 
-  // Step 5: Return promiseCapability.[[Promise]].
+  // Promise.reject
+  // Step 4. Return promiseCapability.[[Promise]].
+  // PromiseResolve
+  // Step 5. Return promiseCapability.[[Promise]].
   return promise;
 }
 
@@ -4005,7 +4753,10 @@ static void ThrowAggregateError(JSContext* cx,
 }
 
 /**
- * ES2016, 25.4.4.4, Promise.reject.
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.reject ( r )
+ * https://tc39.es/ecma262/#sec-promise.reject
  */
 static bool Promise_reject(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -4021,13 +4772,20 @@ static bool Promise_reject(JSContext* cx, unsigned argc, Value* vp) {
 }
 
 /**
- * Unforgeable version of ES2016, 25.4.4.4, Promise.reject.
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.reject ( r )
+ * https://tc39.es/ecma262/#sec-promise.reject
+ *
+ * Unforgeable version.
  */
 /* static */
 PromiseObject* PromiseObject::unforgeableReject(JSContext* cx,
                                                 HandleValue value) {
   cx->check(value);
 
+  // Step 1. Let C be the this value.
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
   Rooted<PromiseObject*> promise(
       cx, CreatePromiseObjectWithoutResolutionFunctions(cx));
   if (!promise) {
@@ -4035,18 +4793,22 @@ PromiseObject* PromiseObject::unforgeableReject(JSContext* cx,
   }
 
   MOZ_ASSERT(promise->state() == JS::PromiseState::Pending);
-  MOZ_ASSERT(
-      PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS));
+  MOZ_ASSERT(IsPromiseWithDefaultResolvingFunction(promise));
 
+  // Step 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
   if (!RejectPromiseInternal(cx, promise, value)) {
     return nullptr;
   }
 
+  // Step 4. Return promiseCapability.[[Promise]].
   return promise;
 }
 
 /**
- * ES2016, 25.4.4.5, Promise.resolve.
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.resolve ( x )
+ * https://tc39.es/ecma262/#sec-promise.resolve
  */
 bool js::Promise_static_resolve(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -4062,7 +4824,12 @@ bool js::Promise_static_resolve(JSContext* cx, unsigned argc, Value* vp) {
 }
 
 /**
- * Unforgeable version of ES2016, 25.4.4.5, Promise.resolve.
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.resolve ( x )
+ * https://tc39.es/ecma262/#sec-promise.resolve
+ *
+ * Unforgeable version.
  */
 /* static */
 JSObject* PromiseObject::unforgeableResolve(JSContext* cx, HandleValue value) {
@@ -4075,8 +4842,14 @@ JSObject* PromiseObject::unforgeableResolve(JSContext* cx, HandleValue value) {
 }
 
 /**
- * Unforgeable version of ES2016, 25.4.4.5, Promise.resolve(value), where
- * value is guaranteed not to be a promise.
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.resolve ( x )
+ * https://tc39.es/ecma262/#sec-promise.resolve
+ * PromiseResolve ( C, x )
+ * https://tc39.es/ecma262/#sec-promise-resolve
+ *
+ * Unforgeable version, where `x` is guaranteed not to be a promise.
  */
 /* static */
 PromiseObject* PromiseObject::unforgeableResolveWithNonPromise(
@@ -4103,6 +4876,11 @@ PromiseObject* PromiseObject::unforgeableResolveWithNonPromise(
   MOZ_ASSERT(!IsPromise(value), "must use unforgeableResolve with this value");
 #endif
 
+  // Promise.resolve
+  // Step 3. Return ? PromiseResolve(C, x).
+
+  // PromiseResolve
+  // Step 2. Let promiseCapability be ? NewPromiseCapability(C).
   Rooted<PromiseObject*> promise(
       cx, CreatePromiseObjectWithoutResolutionFunctions(cx));
   if (!promise) {
@@ -4110,28 +4888,32 @@ PromiseObject* PromiseObject::unforgeableResolveWithNonPromise(
   }
 
   MOZ_ASSERT(promise->state() == JS::PromiseState::Pending);
-  MOZ_ASSERT(
-      PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS));
+  MOZ_ASSERT(IsPromiseWithDefaultResolvingFunction(promise));
 
+  // PromiseResolve
+  // Step 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
   if (!ResolvePromiseInternal(cx, promise, value)) {
     return nullptr;
   }
 
+  // PromiseResolve
+  // Step 4. Return promiseCapability.[[Promise]].
   return promise;
 }
 
 /**
- * ES2016, 25.4.4.6 get Promise [ @@species ]
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * get Promise [ @@species ]
+ * https://tc39.es/ecma262/#sec-get-promise-@@species
  */
 bool js::Promise_static_species(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
-  // Step 1: Return the this value.
+  // Step 1. Return the this value.
   args.rval().set(args.thisv());
   return true;
 }
-
-// ES2016, 25.4.5.1, implemented in Promise.js.
 
 enum class IncumbentGlobalObject {
   // Do not use the incumbent global, this is a special case used by the
@@ -4142,6 +4924,16 @@ enum class IncumbentGlobalObject {
   Yes
 };
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseThen ( promise, onFulfilled, onRejected
+ *                      [ , resultCapability ] )
+ * https://tc39.es/ecma262/#sec-performpromisethen
+ *
+ * Steps 7-8 for creating PromiseReaction record.
+ * We use single object for both fulfillReaction and rejectReaction.
+ */
 static PromiseReactionRecord* NewReactionRecord(
     JSContext* cx, Handle<PromiseCapability> resultCapability,
     HandleValue onFulfilled, HandleValue onRejected,
@@ -4194,14 +4986,14 @@ static PromiseReactionRecord* NewReactionRecord(
   MOZ_ASSERT_IF(onFulfilled.isObject(), IsCallable(onFulfilled));
   MOZ_ASSERT_IF(onFulfilled.isInt32(),
                 0 <= onFulfilled.toInt32() &&
-                    onFulfilled.toInt32() < PromiseHandlerLimit);
+                    onFulfilled.toInt32() < int32_t(PromiseHandler::Limit));
 
   // Ensure the onRejected handler has the expected type.
   MOZ_ASSERT(onRejected.isInt32() || onRejected.isObjectOrNull());
   MOZ_ASSERT_IF(onRejected.isObject(), IsCallable(onRejected));
-  MOZ_ASSERT_IF(
-      onRejected.isInt32(),
-      0 <= onRejected.toInt32() && onRejected.toInt32() < PromiseHandlerLimit);
+  MOZ_ASSERT_IF(onRejected.isInt32(),
+                0 <= onRejected.toInt32() &&
+                    onRejected.toInt32() < int32_t(PromiseHandler::Limit));
 
   // Handlers must either both be present or both be absent.
   MOZ_ASSERT(onFulfilled.isNull() == onRejected.isNull());
@@ -4226,8 +5018,19 @@ static PromiseReactionRecord* NewReactionRecord(
   cx->check(resultCapability.reject());
   cx->check(incumbentGlobalObject);
 
+  // Step 7. Let fulfillReaction be the PromiseReaction
+  //         { [[Capability]]: resultCapability, [[Type]]: Fulfill,
+  //           [[Handler]]: onFulfilledJobCallback }.
+  // Step 8. Let rejectReaction be the PromiseReaction
+  //         { [[Capability]]: resultCapability, [[Type]]: Reject,
+  //           [[Handler]]: onRejectedJobCallback }.
+
+  // See comments for ReactionRecordSlots for the relation between
+  // spec record fields and PromiseReactionRecord slots.
   reaction->setFixedSlot(ReactionRecordSlot_Promise,
                          ObjectOrNullValue(resultCapability.promise()));
+  // We set [[Type]] in EnqueuePromiseReactionJob, by calling
+  // setTargetStateAndHandlerArg.
   reaction->setFixedSlot(ReactionRecordSlot_Flags, Int32Value(0));
   reaction->setFixedSlot(ReactionRecordSlot_OnFulfilled, onFulfilled);
   reaction->setFixedSlot(ReactionRecordSlot_OnRejected, onRejected);
@@ -4250,43 +5053,60 @@ static bool IsPromiseSpecies(JSContext* cx, JSFunction* species) {
 // to be unobservable, we can skip creating the promise.
 enum class CreateDependentPromise { Always, SkipIfCtorUnobservable };
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ *
+ * Steps 3-4.
+ */
 static bool PromiseThenNewPromiseCapability(
     JSContext* cx, HandleObject promiseObj,
     CreateDependentPromise createDependent,
     MutableHandle<PromiseCapability> resultCapability) {
-  // Step 3.
+  // Step 3. Let C be ? SpeciesConstructor(promise, %Promise%).
   RootedObject C(cx, SpeciesConstructor(cx, promiseObj, JSProto_Promise,
                                         IsPromiseSpecies));
   if (!C) {
     return false;
   }
 
-  if (createDependent == CreateDependentPromise::Always ||
-      !IsNativeFunction(C, PromiseConstructor)) {
-    // Step 4.
-    if (!NewPromiseCapability(cx, C, resultCapability, true)) {
-      return false;
-    }
+  if (createDependent != CreateDependentPromise::Always &&
+      IsNativeFunction(C, PromiseConstructor)) {
+    return true;
+  }
 
-    RootedObject unwrappedPromise(cx, promiseObj);
-    if (IsWrapper(promiseObj)) {
-      unwrappedPromise = UncheckedUnwrap(promiseObj);
-    }
-    RootedObject unwrappedNewPromise(cx, resultCapability.promise());
-    if (IsWrapper(resultCapability.promise())) {
-      unwrappedNewPromise = UncheckedUnwrap(resultCapability.promise());
-    }
-    if (unwrappedPromise->is<PromiseObject>() &&
-        unwrappedNewPromise->is<PromiseObject>()) {
-      unwrappedNewPromise->as<PromiseObject>().copyUserInteractionFlagsFrom(
-          *unwrappedPromise.as<PromiseObject>());
-    }
+  // Step 4. Let resultCapability be ? NewPromiseCapability(C).
+  if (!NewPromiseCapability(cx, C, resultCapability, true)) {
+    return false;
+  }
+
+  RootedObject unwrappedPromise(cx, promiseObj);
+  if (IsWrapper(promiseObj)) {
+    unwrappedPromise = UncheckedUnwrap(promiseObj);
+  }
+  RootedObject unwrappedNewPromise(cx, resultCapability.promise());
+  if (IsWrapper(resultCapability.promise())) {
+    unwrappedNewPromise = UncheckedUnwrap(resultCapability.promise());
+  }
+  if (unwrappedPromise->is<PromiseObject>() &&
+      unwrappedNewPromise->is<PromiseObject>()) {
+    unwrappedNewPromise->as<PromiseObject>().copyUserInteractionFlagsFrom(
+        *unwrappedPromise.as<PromiseObject>());
   }
 
   return true;
 }
 
-// ES2016, 25.4.5.3., steps 3-5.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ *
+ * Steps 3-5.
+ */
 [[nodiscard]] PromiseObject* js::OriginalPromiseThen(JSContext* cx,
                                                      HandleObject promiseObj,
                                                      HandleObject onFulfilled,
@@ -4307,7 +5127,8 @@ static bool PromiseThenNewPromiseCapability(
     return nullptr;
   }
 
-  // Steps 3-4.
+  // Step 3. Let C be ? SpeciesConstructor(promise, %Promise%).
+  // Step 4. Let resultCapability be ? NewPromiseCapability(C).
   Rooted<PromiseObject*> newPromise(
       cx, CreatePromiseObjectWithoutResolutionFunctions(cx));
   if (!newPromise) {
@@ -4318,7 +5139,8 @@ static bool PromiseThenNewPromiseCapability(
   Rooted<PromiseCapability> resultCapability(cx);
   resultCapability.promise().set(newPromise);
 
-  // Step 5.
+  // Step 5. Return PerformPromiseThen(promise, onFulfilled, onRejected,
+  //                                   resultCapability).
   {
     RootedValue onFulfilledVal(cx, ObjectOrNullValue(onFulfilled));
     RootedValue onRejectedVal(cx, ObjectOrNullValue(onRejected));
@@ -4331,12 +5153,21 @@ static bool PromiseThenNewPromiseCapability(
   return newPromise;
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ *
+ * Steps 3-5.
+ */
 [[nodiscard]] static bool OriginalPromiseThenWithoutSettleHandlers(
     JSContext* cx, Handle<PromiseObject*> promise,
     Handle<PromiseObject*> promiseToResolve) {
   cx->check(promise);
 
-  // Steps 3-4.
+  // Step 3. Let C be ? SpeciesConstructor(promise, %Promise%).
+  // Step 4. Let resultCapability be ? NewPromiseCapability(C).
   Rooted<PromiseCapability> resultCapability(cx);
   if (!PromiseThenNewPromiseCapability(
           cx, promise, CreateDependentPromise::SkipIfCtorUnobservable,
@@ -4344,7 +5175,8 @@ static bool PromiseThenNewPromiseCapability(
     return false;
   }
 
-  // Step 5.
+  // Step 5. Return PerformPromiseThen(promise, onFulfilled, onRejected,
+  //                                   resultCapability).
   return PerformPromiseThenWithoutSettleHandlers(cx, promise, promiseToResolve,
                                                  resultCapability);
 }
@@ -4363,12 +5195,13 @@ static bool PromiseThenNewPromiseCapability(
   MOZ_ASSERT_IF(onFulfilled_, IsCallable(onFulfilled_));
   MOZ_ASSERT_IF(onRejected_, IsCallable(onRejected_));
 
-  RootedValue onFulfilled(cx, onFulfilled_
-                                  ? ObjectValue(*onFulfilled_)
-                                  : Int32Value(PromiseHandlerIdentity));
+  RootedValue onFulfilled(
+      cx, onFulfilled_ ? ObjectValue(*onFulfilled_)
+                       : Int32Value(int32_t(PromiseHandler::Identity)));
 
-  RootedValue onRejected(cx, onRejected_ ? ObjectValue(*onRejected_)
-                                         : Int32Value(PromiseHandlerThrower));
+  RootedValue onRejected(
+      cx, onRejected_ ? ObjectValue(*onRejected_)
+                      : Int32Value(int32_t(PromiseHandler::Thrower)));
 
   Rooted<PromiseCapability> resultCapability(cx);
   MOZ_ASSERT(!resultCapability.promise());
@@ -4394,18 +5227,66 @@ static bool CanCallOriginalPromiseThenBuiltin(JSContext* cx,
              cx, &promise.toObject().as<PromiseObject>());
 }
 
-// ES2016, 25.4.5.3., steps 3-5.
+static MOZ_ALWAYS_INLINE bool IsPromiseThenOrCatchRetValImplicitlyUsed(
+    JSContext* cx, PromiseObject* promise) {
+  // Embedding requires the return value of then/catch as
+  // `enqueuePromiseJob` parameter, to propaggate the user-interaction.
+  // We cannot optimize out the return value if the flag is set by embedding.
+  if (promise->requiresUserInteractionHandling()) {
+    return true;
+  }
+
+  // The returned promise of Promise#then and Promise#catch contains
+  // stack info if async stack is enabled.  Even if their return value is not
+  // used explicitly in the script, the stack info is observable in devtools
+  // and profilers.  We shouldn't apply the optimization not to allocate the
+  // returned Promise object if the it's implicitly used by them.
+  if (!cx->options().asyncStack()) {
+    return false;
+  }
+
+  // If devtools is opened, the current realm will become debuggee.
+  if (cx->realm()->isDebuggee()) {
+    return true;
+  }
+
+  // There are 2 profilers, and they can be independently enabled.
+  if (cx->runtime()->geckoProfiler().enabled()) {
+    return true;
+  }
+  if (JS::IsProfileTimelineRecordingEnabled()) {
+    return true;
+  }
+
+  // The stack is also observable from Error#stack, but we don't care since
+  // it's nonstandard feature.
+  return false;
+}
+
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ *
+ * Steps 3-5.
+ */
 static bool OriginalPromiseThenBuiltin(JSContext* cx, HandleValue promiseVal,
                                        HandleValue onFulfilled,
                                        HandleValue onRejected,
-                                       MutableHandleValue rval, bool rvalUsed) {
+                                       MutableHandleValue rval,
+                                       bool rvalExplicitlyUsed) {
   cx->check(promiseVal, onFulfilled, onRejected);
   MOZ_ASSERT(CanCallOriginalPromiseThenBuiltin(cx, promiseVal));
 
   Rooted<PromiseObject*> promise(cx,
                                  &promiseVal.toObject().as<PromiseObject>());
 
-  // Steps 3-4.
+  bool rvalUsed = rvalExplicitlyUsed ||
+                  IsPromiseThenOrCatchRetValImplicitlyUsed(cx, promise);
+
+  // Step 3. Let C be ? SpeciesConstructor(promise, %Promise%).
+  // Step 4. Let resultCapability be ? NewPromiseCapability(C).
   Rooted<PromiseCapability> resultCapability(cx);
   if (rvalUsed) {
     PromiseObject* resultPromise =
@@ -4419,7 +5300,8 @@ static bool OriginalPromiseThenBuiltin(JSContext* cx, HandleValue promiseVal,
     resultCapability.promise().set(resultPromise);
   }
 
-  // Step 5.
+  // Step 5. Return PerformPromiseThen(promise, onFulfilled, onRejected,
+  //                                   resultCapability).
   if (!PerformPromiseThen(cx, promise, onFulfilled, onRejected,
                           resultCapability)) {
     return false;
@@ -4453,9 +5335,19 @@ static bool OriginalPromiseThenBuiltin(JSContext* cx, HandleValue promiseVal,
 // Some async/await functions are implemented here instead of
 // js/src/builtin/AsyncFunction.cpp, to call Promise internal functions.
 
-// ES 2018 draft 14.6.11 and 14.7.14 step 1.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Runtime Semantics: EvaluateAsyncFunctionBody
+ * AsyncFunctionBody : FunctionBody
+ * https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncfunctionbody
+ *
+ * Runtime Semantics: EvaluateAsyncConciseBody
+ * AsyncConciseBody : ExpressionBody
+ * https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncconcisebody
+ */
 [[nodiscard]] PromiseObject* js::CreatePromiseObjectForAsync(JSContext* cx) {
-  // Step 1.
+  // Step 1. Let promiseCapability be ! NewPromiseCapability(%Promise%).
   PromiseObject* promise = CreatePromiseObjectWithoutResolutionFunctions(cx);
   if (!promise) {
     return nullptr;
@@ -4470,7 +5362,7 @@ bool js::IsPromiseForAsyncFunctionOrGenerator(JSObject* promise) {
          PromiseHasAnyFlag(promise->as<PromiseObject>(), PROMISE_FLAG_ASYNC);
 }
 
-[[nodiscard]] static PromiseObject* CreatePromiseObjectForAsyncGenerator(
+[[nodiscard]] PromiseObject* js::CreatePromiseObjectForAsyncGenerator(
     JSContext* cx) {
   PromiseObject* promise = CreatePromiseObjectWithoutResolutionFunctions(cx);
   if (!promise) {
@@ -4481,8 +5373,14 @@ bool js::IsPromiseForAsyncFunctionOrGenerator(JSObject* promise) {
   return promise;
 }
 
-// ES2019 draft rev 7428c89bef626548084cd4e697a19ece7168f24c
-// 25.7.5.1 AsyncFunctionStart, steps 3.f-g.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * AsyncFunctionStart ( promiseCapability, asyncFunctionBody )
+ * https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
+ *
+ * Steps 4.f-g.
+ */
 [[nodiscard]] bool js::AsyncFunctionThrown(JSContext* cx,
                                            Handle<PromiseObject*> resultPromise,
                                            HandleValue reason) {
@@ -4497,27 +5395,48 @@ bool js::IsPromiseForAsyncFunctionOrGenerator(JSObject* promise) {
     return true;
   }
 
+  // Step 4.f. Else,
+  // Step 4.f.i. Assert: result.[[Type]] is throw.
+  // Step 4.f.ii. Perform
+  //              ! Call(promiseCapability.[[Reject]], undefined,
+  //                 « result.[[Value]] »).
+  // Step 4.g. Return.
   return RejectPromiseInternal(cx, resultPromise, reason);
 }
 
-// ES2019 draft rev 7428c89bef626548084cd4e697a19ece7168f24c
-// 25.7.5.1 AsyncFunctionStart, steps 3.d-e, 3.g.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * AsyncFunctionStart ( promiseCapability, asyncFunctionBody )
+ * https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
+ *
+ * Steps 4.e, 4.g.
+ */
 [[nodiscard]] bool js::AsyncFunctionReturned(
     JSContext* cx, Handle<PromiseObject*> resultPromise, HandleValue value) {
+  // Step 4.e. Else if result.[[Type]] is return, then
+  // Step 4.e.i. Perform
+  //             ! Call(promiseCapability.[[Resolve]], undefined,
+  //                    « result.[[Value]] »).
   return ResolvePromiseInternal(cx, resultPromise, value);
 }
 
-// https://tc39.github.io/ecma262/#await
-//
-// Helper function that performs 6.2.3.1 Await(promise) steps 2 and 9.
-// The same steps are also used in a few other places in the spec.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Await
+ * https://tc39.github.io/ecma262/#await
+ *
+ * Helper function that performs Await(promise) steps 2-7.
+ * The same steps are also used in a few other places in the spec.
+ */
 template <typename T>
 [[nodiscard]] static bool InternalAwait(JSContext* cx, HandleValue value,
                                         HandleObject resultPromise,
                                         PromiseHandler onFulfilled,
                                         PromiseHandler onRejected,
                                         T extraStep) {
-  // Step 2: Let promise be ? PromiseResolve(%Promise%, « value »).
+  // Step 2. Let promise be ? PromiseResolve(%Promise%, value).
   RootedObject promise(cx, PromiseObject::unforgeableResolve(cx, value));
   if (!promise) {
     return false;
@@ -4532,11 +5451,11 @@ template <typename T>
     return false;
   }
 
-  // Steps 3-8 of the spec create onFulfilled and onRejected functions.
+  // Steps 3-6 for creating onFulfilled/onRejected are done by caller.
 
-  // Step 9: Perform ! PerformPromiseThen(promise, onFulfilled, onRejected).
-  RootedValue onFulfilledValue(cx, Int32Value(onFulfilled));
-  RootedValue onRejectedValue(cx, Int32Value(onRejected));
+  // Step 7. Perform ! PerformPromiseThen(promise, onFulfilled, onRejected).
+  RootedValue onFulfilledValue(cx, Int32Value(int32_t(onFulfilled)));
+  RootedValue onRejectedValue(cx, Int32Value(int32_t(onRejected)));
   Rooted<PromiseCapability> resultCapability(cx);
   resultCapability.promise().set(resultPromise);
   Rooted<PromiseReactionRecord*> reaction(
@@ -4549,10 +5468,22 @@ template <typename T>
   return PerformPromiseThenWithReaction(cx, unwrappedPromise, reaction);
 }
 
-// https://tc39.github.io/ecma262/#await
-//
-// 6.2.3.1 Await(promise) steps 2-10 when the running execution context is
-// evaluating an `await` expression in an async function.
+[[nodiscard]] bool js::InternalAsyncGeneratorAwait(
+    JSContext* cx, JS::Handle<AsyncGeneratorObject*> generator,
+    JS::Handle<JS::Value> value, PromiseHandler onFulfilled,
+    PromiseHandler onRejected) {
+  auto extra = [&](Handle<PromiseReactionRecord*> reaction) {
+    reaction->setIsAsyncGenerator(generator);
+  };
+  return InternalAwait(cx, value, nullptr, onFulfilled, onRejected, extra);
+}
+
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Await
+ * https://tc39.es/ecma262/#await
+ */
 [[nodiscard]] JSObject* js::AsyncFunctionAwait(
     JSContext* cx, Handle<AsyncFunctionGeneratorObject*> genObj,
     HandleValue value) {
@@ -4560,24 +5491,11 @@ template <typename T>
     reaction->setIsAsyncFunction(genObj);
   };
   if (!InternalAwait(cx, value, nullptr,
-                     PromiseHandlerAsyncFunctionAwaitedFulfilled,
-                     PromiseHandlerAsyncFunctionAwaitedRejected, extra)) {
+                     PromiseHandler::AsyncFunctionAwaitedFulfilled,
+                     PromiseHandler::AsyncFunctionAwaitedRejected, extra)) {
     return nullptr;
   }
   return genObj->promise();
-}
-
-// 6.2.3.1 Await(promise) steps 2-10 when the running execution context is
-// evaluating an `await` expression in an async generator.
-[[nodiscard]] bool js::AsyncGeneratorAwait(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    HandleValue value) {
-  auto extra = [&](Handle<PromiseReactionRecord*> reaction) {
-    reaction->setIsAsyncGenerator(asyncGenObj);
-  };
-  return InternalAwait(cx, value, nullptr,
-                       PromiseHandlerAsyncGeneratorAwaitedFulfilled,
-                       PromiseHandlerAsyncGeneratorAwaitedRejected, extra);
 }
 
 // https://tc39.github.io/ecma262/#sec-%asyncfromsynciteratorprototype%.next
@@ -4765,9 +5683,9 @@ bool js::AsyncFromSyncIteratorMethod(JSContext* cx, CallArgs& args,
   // Step 8: Let onFulfilled be CreateBuiltinFunction(steps, « [[Done]] »).
   // Step 9: Set onFulfilled.[[Done]] to done.
   PromiseHandler onFulfilled =
-      done ? PromiseHandlerAsyncFromSyncIteratorValueUnwrapDone
-           : PromiseHandlerAsyncFromSyncIteratorValueUnwrapNotDone;
-  PromiseHandler onRejected = PromiseHandlerThrower;
+      done ? PromiseHandler::AsyncFromSyncIteratorValueUnwrapDone
+           : PromiseHandler::AsyncFromSyncIteratorValueUnwrapNotDone;
+  PromiseHandler onRejected = PromiseHandler::Thrower;
 
   // Steps 5 and 10 are identical to some steps in Await; we have a utility
   // function InternalAwait() that implements the idiom.
@@ -4787,351 +5705,17 @@ bool js::AsyncFromSyncIteratorMethod(JSContext* cx, CallArgs& args,
   return true;
 }
 
-enum class ResumeNextKind { Enqueue, Reject, Resolve };
-
-[[nodiscard]] static bool AsyncGeneratorResumeNext(
-    JSContext* cx, Handle<AsyncGeneratorObject*> generator, ResumeNextKind kind,
-    HandleValue valueOrException = UndefinedHandleValue, bool done = false);
-
-// 25.5.3.3 AsyncGeneratorResolve ( generator, value, done )
-[[nodiscard]] bool js::AsyncGeneratorResolve(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj, HandleValue value,
-    bool done) {
-  return AsyncGeneratorResumeNext(cx, asyncGenObj, ResumeNextKind::Resolve,
-                                  value, done);
-}
-
-// 25.5.3.4 AsyncGeneratorReject ( generator, exception )
-[[nodiscard]] bool js::AsyncGeneratorReject(
-    JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-    HandleValue exception) {
-  return AsyncGeneratorResumeNext(cx, asyncGenObj, ResumeNextKind::Reject,
-                                  exception);
-}
-
-// Unified implementation of:
-// 25.5.3.3 AsyncGeneratorResolve ( generator, value, done )
-// 25.5.3.4 AsyncGeneratorReject ( generator, exception )
-// 25.5.3.5 AsyncGeneratorResumeNext ( generator )
-[[nodiscard]] static bool AsyncGeneratorResumeNext(
-    JSContext* cx, Handle<AsyncGeneratorObject*> generator, ResumeNextKind kind,
-    HandleValue valueOrException_ /* = UndefinedHandleValue */,
-    bool done /* = false */) {
-  RootedValue valueOrException(cx, valueOrException_);
-
-  // Many paths through the algorithm end in recursive tail-calls.
-  // We implement these with a loop.
-  while (true) {
-    switch (kind) {
-      case ResumeNextKind::Enqueue:
-        // No further action required.
-        break;
-      case ResumeNextKind::Reject: {
-        // 25.5.3.4 AsyncGeneratorReject ( generator, exception )
-        HandleValue exception = valueOrException;
-
-        // Step 1: Assert: generator is an AsyncGenerator instance (implicit).
-        // Step 2: Let queue be generator.[[AsyncGeneratorQueue]].
-        // Step 3: Assert: queue is not an empty List.
-        MOZ_ASSERT(!generator->isQueueEmpty());
-
-        // Step 4: Remove the first element from queue and let next be the value
-        //         of that element.
-        AsyncGeneratorRequest* request =
-            AsyncGeneratorObject::dequeueRequest(cx, generator);
-        if (!request) {
-          return false;
-        }
-
-        // Step 5: Let promiseCapability be next.[[Capability]].
-        Rooted<PromiseObject*> resultPromise(cx, request->promise());
-
-        generator->cacheRequest(request);
-
-        // Step 6: Perform ! Call(promiseCapability.[[Reject]], undefined,
-        //                        « exception »).
-        if (!RejectPromiseInternal(cx, resultPromise, exception)) {
-          return false;
-        }
-
-        // Step 7: Perform ! AsyncGeneratorResumeNext(generator).
-        // Step 8: Return undefined.
-        break;
-      }
-      case ResumeNextKind::Resolve: {
-        // 25.5.3.3 AsyncGeneratorResolve ( generator, value, done )
-        HandleValue value = valueOrException;
-
-        // Step 1: Assert: generator is an AsyncGenerator instance (implicit).
-        // Step 2: Let queue be generator.[[AsyncGeneratorQueue]].
-        // Step 3: Assert: queue is not an empty List.
-        MOZ_ASSERT(!generator->isQueueEmpty());
-
-        // Step 4: Remove the first element from queue and let next be the value
-        //         of that element.
-        AsyncGeneratorRequest* request =
-            AsyncGeneratorObject::dequeueRequest(cx, generator);
-        if (!request) {
-          return false;
-        }
-
-        // Step 5: Let promiseCapability be next.[[Capability]].
-        Rooted<PromiseObject*> resultPromise(cx, request->promise());
-
-        generator->cacheRequest(request);
-
-        // Step 6: Let iteratorResult be ! CreateIterResultObject(value, done).
-        JSObject* resultObj = CreateIterResultObject(cx, value, done);
-        if (!resultObj) {
-          return false;
-        }
-
-        RootedValue resultValue(cx, ObjectValue(*resultObj));
-
-        // Step 7: Perform ! Call(promiseCapability.[[Resolve]], undefined,
-        //                        « iteratorResult »).
-        if (!ResolvePromiseInternal(cx, resultPromise, resultValue)) {
-          return false;
-        }
-
-        // Step 8: Perform ! AsyncGeneratorResumeNext(generator).
-        // Step 9: Return undefined.
-        break;
-      }
-    }
-
-    // 25.5.3.5 AsyncGeneratorResumeNext ( generator )
-    // Step 1: Assert: generator is an AsyncGenerator instance (implicit).
-    // Step 2: Let state be generator.[[AsyncGeneratorState]] (implicit).
-    // Step 3: Assert: state is not "executing".
-    MOZ_ASSERT(!generator->isExecuting());
-    MOZ_ASSERT(!generator->isAwaitingYieldReturn());
-
-    // Step 4: If state is "awaiting-return", return undefined.
-    if (generator->isAwaitingReturn()) {
-      return true;
-    }
-
-    // Step 5: Let queue be generator.[[AsyncGeneratorQueue]].
-    // Step 6: If queue is an empty List, return undefined.
-    if (generator->isQueueEmpty()) {
-      return true;
-    }
-
-    // Step 7: Let next be the value of the first element of queue.
-    // Step 8: Assert: next is an AsyncGeneratorRequest record.
-    Rooted<AsyncGeneratorRequest*> request(
-        cx, AsyncGeneratorObject::peekRequest(generator));
-    if (!request) {
-      return false;
-    }
-
-    // Step 9: Let completion be next.[[Completion]].
-    CompletionKind completionKind = request->completionKind();
-
-    // Step 10: If completion is an abrupt completion, then
-    if (completionKind != CompletionKind::Normal) {
-      // Step 10.a: If state is "suspendedStart", then
-      if (generator->isSuspendedStart()) {
-        // Step 10.a.i: Set generator.[[AsyncGeneratorState]] to "completed".
-        // Step 10.a.ii: Set state to "completed".
-        generator->setCompleted();
-      }
-
-      // Step 10.b: If state is "completed", then
-      if (generator->isCompleted()) {
-        RootedValue value(cx, request->completionValue());
-
-        // Step 10.b.i: If completion.[[Type]] is return, then
-        if (completionKind == CompletionKind::Return) {
-          // Step 10.b.i.1: Set generator.[[AsyncGeneratorState]] to
-          //                "awaiting-return".
-          generator->setAwaitingReturn();
-
-          // (reordered)
-          // Step 10.b.i.3: Let stepsFulfilled be the algorithm steps defined in
-          //                AsyncGeneratorResumeNext Return Processor Fulfilled
-          //                Functions.
-          // Step 10.b.i.4: Let onFulfilled be CreateBuiltinFunction(
-          //                stepsFulfilled, « [[Generator]] »).
-          // Step 10.b.i.5: Set onFulfilled.[[Generator]] to generator.
-          // Step 10.b.i.6: Let stepsRejected be the algorithm steps defined in
-          //                AsyncGeneratorResumeNext Return Processor Rejected
-          //                Functions.
-          // Step 10.b.i.7: Let onRejected be CreateBuiltinFunction(
-          //                stepsRejected, « [[Generator]] »).
-          // Step 10.b.i.8: Set onRejected.[[Generator]] to generator.
-          //
-          const PromiseHandler onFulfilled =
-              PromiseHandlerAsyncGeneratorResumeNextReturnFulfilled;
-          const PromiseHandler onRejected =
-              PromiseHandlerAsyncGeneratorResumeNextReturnRejected;
-
-          // These steps are nearly identical to some steps in Await;
-          // InternalAwait() implements the idiom.
-          //
-          // Step 10.b.i.2: Let promise be ? PromiseResolve(%Promise%,
-          //                « _completion_.[[Value]] »).
-          // Step 10.b.i.9: Perform ! PerformPromiseThen(promise, onFulfilled,
-          //                                             onRejected).
-          // Step 10.b.i.10: Return undefined.
-          auto extra = [&](Handle<PromiseReactionRecord*> reaction) {
-            reaction->setIsAsyncGenerator(generator);
-          };
-          return InternalAwait(cx, value, nullptr, onFulfilled, onRejected,
-                               extra);
-        }
-
-        // Step 10.b.ii: Else,
-
-        // Step 10.b.ii.1: Assert: completion.[[Type]] is throw.
-        MOZ_ASSERT(completionKind == CompletionKind::Throw);
-
-        // Step 10.b.ii.2: Perform ! AsyncGeneratorReject(generator,
-        //                 completion.[[Value]]).
-        // Step 10.b.ii.3: Return undefined.
-        kind = ResumeNextKind::Reject;
-        valueOrException.set(value);
-        continue;
-      }
-    } else if (generator->isCompleted()) {
-      // Step 11: Else if state is "completed", return
-      //          ! AsyncGeneratorResolve(generator, undefined, true).
-      kind = ResumeNextKind::Resolve;
-      valueOrException.setUndefined();
-      done = true;
-      continue;
-    }
-
-    // Step 12: Assert: state is either "suspendedStart" or "suspendedYield".
-    MOZ_ASSERT(generator->isSuspendedStart() || generator->isSuspendedYield());
-
-    RootedValue argument(cx, request->completionValue());
-
-    if (completionKind == CompletionKind::Return) {
-      // 25.5.3.7 AsyncGeneratorYield steps 8.b-e.
-      // Since we don't have the place that handles return from yield
-      // inside the generator, handle the case here, with extra state
-      // State_AwaitingYieldReturn.
-      generator->setAwaitingYieldReturn();
-
-      const PromiseHandler onFulfilled =
-          PromiseHandlerAsyncGeneratorYieldReturnAwaitedFulfilled;
-      const PromiseHandler onRejected =
-          PromiseHandlerAsyncGeneratorYieldReturnAwaitedRejected;
-
-      auto extra = [&](Handle<PromiseReactionRecord*> reaction) {
-        reaction->setIsAsyncGenerator(generator);
-      };
-      return InternalAwait(cx, argument, nullptr, onFulfilled, onRejected,
-                           extra);
-    }
-
-    // Step 16 (reordered): Set generator.[[AsyncGeneratorState]] to
-    //                      "executing".
-    generator->setExecuting();
-
-    // Steps 13-15, 17-21.
-    return AsyncGeneratorResume(cx, generator, completionKind, argument);
-  }
-}
-
-// 25.5.3.6 AsyncGeneratorEnqueue ( generator, completion )
-[[nodiscard]] bool js::AsyncGeneratorEnqueue(JSContext* cx,
-                                             HandleValue asyncGenVal,
-                                             CompletionKind completionKind,
-                                             HandleValue completionValue,
-                                             MutableHandleValue result) {
-  // Step 1 (implicit).
-
-  // Step 3.
-  if (!asyncGenVal.isObject() ||
-      !asyncGenVal.toObject().canUnwrapAs<AsyncGeneratorObject>()) {
-    // Step 2.
-    Rooted<PromiseObject*> resultPromise(
-        cx, CreatePromiseObjectForAsyncGenerator(cx));
-    if (!resultPromise) {
-      return false;
-    }
-
-    // Step 3.a.
-    RootedValue badGeneratorError(cx);
-    if (!GetTypeError(cx, JSMSG_NOT_AN_ASYNC_GENERATOR, &badGeneratorError)) {
-      return false;
-    }
-
-    // Step 3.b.
-    if (!RejectPromiseInternal(cx, resultPromise, badGeneratorError)) {
-      return false;
-    }
-
-    // Step 3.c.
-    result.setObject(*resultPromise);
-    return true;
-  }
-
-  Rooted<AsyncGeneratorObject*> asyncGenObj(
-      cx, &asyncGenVal.toObject().unwrapAs<AsyncGeneratorObject>());
-
-  bool wrapResult = false;
-  {
-    // The |resultPromise| must be same-compartment with |asyncGenObj|, because
-    // it is stored in AsyncGeneratorRequest, which in turn is stored in a
-    // reserved slot of |asyncGenObj|.
-    // So we first enter the realm of |asyncGenObj|, then create the result
-    // promise and resume the generator, and finally wrap the result promise to
-    // match the original compartment.
-
-    mozilla::Maybe<AutoRealm> ar;
-    RootedValue completionVal(cx, completionValue);
-    if (asyncGenObj->compartment() != cx->compartment()) {
-      ar.emplace(cx, asyncGenObj);
-      wrapResult = true;
-
-      if (!cx->compartment()->wrap(cx, &completionVal)) {
-        return false;
-      }
-    }
-
-    // Step 2.
-    Rooted<PromiseObject*> resultPromise(
-        cx, CreatePromiseObjectForAsyncGenerator(cx));
-    if (!resultPromise) {
-      return false;
-    }
-
-    // Step 5 (reordered).
-    Rooted<AsyncGeneratorRequest*> request(
-        cx, AsyncGeneratorObject::createRequest(cx, asyncGenObj, completionKind,
-                                                completionVal, resultPromise));
-    if (!request) {
-      return false;
-    }
-
-    // Steps 4, 6.
-    if (!AsyncGeneratorObject::enqueueRequest(cx, asyncGenObj, request)) {
-      return false;
-    }
-
-    // Step 7.
-    if (!asyncGenObj->isExecuting() && !asyncGenObj->isAwaitingYieldReturn()) {
-      // Step 8.
-      if (!AsyncGeneratorResumeNext(cx, asyncGenObj, ResumeNextKind::Enqueue)) {
-        return false;
-      }
-    }
-
-    // Step 9.
-    result.setObject(*resultPromise);
-  }
-
-  return !wrapResult || cx->compartment()->wrap(cx, result);
-}
-
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.catch ( onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.catch
+ */
 static bool Promise_catch_impl(JSContext* cx, unsigned argc, Value* vp,
-                               bool rvalUsed) {
+                               bool rvalExplicitlyUsed) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
+  // Step 1. Let promise be the this value.
   HandleValue thisVal = args.thisv();
   HandleValue onFulfilled = UndefinedHandleValue;
   HandleValue onRejected = args.get(0);
@@ -5139,10 +5723,10 @@ static bool Promise_catch_impl(JSContext* cx, unsigned argc, Value* vp,
   // Fast path when the default Promise state is intact.
   if (CanCallOriginalPromiseThenBuiltin(cx, thisVal)) {
     return OriginalPromiseThenBuiltin(cx, thisVal, onFulfilled, onRejected,
-                                      args.rval(), rvalUsed);
+                                      args.rval(), rvalExplicitlyUsed);
   }
 
-  // Step 1.
+  // Step 2. Return ? Invoke(promise, "then", « undefined, onRejected »).
   RootedValue thenVal(cx);
   if (!GetProperty(cx, thisVal, cx->names().then, &thenVal)) {
     return false;
@@ -5151,58 +5735,47 @@ static bool Promise_catch_impl(JSContext* cx, unsigned argc, Value* vp,
   if (IsNativeFunction(thenVal, &Promise_then) &&
       thenVal.toObject().nonCCWRealm() == cx->realm()) {
     return Promise_then_impl(cx, thisVal, onFulfilled, onRejected, args.rval(),
-                             rvalUsed);
+                             rvalExplicitlyUsed);
   }
 
   return Call(cx, thenVal, thisVal, UndefinedHandleValue, onRejected,
               args.rval());
 }
 
-static MOZ_ALWAYS_INLINE bool IsPromiseThenOrCatchRetValImplicitlyUsed(
-    JSContext* cx) {
-  // The returned promise of Promise#then and Promise#catch contains
-  // stack info if async stack is enabled.  Even if their return value is not
-  // used explicitly in the script, the stack info is observable in devtools
-  // and profilers.  We shouldn't apply the optimization not to allocate the
-  // returned Promise object if the it's implicitly used by them.
-  if (!cx->options().asyncStack()) {
-    return false;
-  }
-
-  // If devtools is opened, the current realm will become debuggee.
-  if (cx->realm()->isDebuggee()) {
-    return true;
-  }
-
-  // There are 2 profilers, and they can be independently enabled.
-  if (cx->runtime()->geckoProfiler().enabled()) {
-    return true;
-  }
-  if (JS::IsProfileTimelineRecordingEnabled()) {
-    return true;
-  }
-
-  // The stack is also observable from Error#stack, but we don't care since
-  // it's nonstandard feature.
-  return false;
-}
-
-// ES2016, 25.4.5.3.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.catch ( onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.catch
+ */
 static bool Promise_catch_noRetVal(JSContext* cx, unsigned argc, Value* vp) {
-  return Promise_catch_impl(cx, argc, vp,
-                            IsPromiseThenOrCatchRetValImplicitlyUsed(cx));
+  return Promise_catch_impl(cx, argc, vp, false);
 }
 
-// ES2016, 25.4.5.3.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.catch ( onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.catch
+ */
 static bool Promise_catch(JSContext* cx, unsigned argc, Value* vp) {
   return Promise_catch_impl(cx, argc, vp, true);
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ */
 static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
                               HandleValue onFulfilled, HandleValue onRejected,
-                              MutableHandleValue rval, bool rvalUsed) {
-  // Step 1 (implicit).
-  // Step 2.
+                              MutableHandleValue rval,
+                              bool rvalExplicitlyUsed) {
+  // Step 1. Let promise be the this value.
+  // (implicit)
+
+  // Step 2. If IsPromise(promise) is false, throw a TypeError exception.
   if (!promiseVal.isObject()) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                               JSMSG_OBJECT_REQUIRED,
@@ -5212,8 +5785,9 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
 
   // Fast path when the default Promise state is intact.
   if (CanCallOriginalPromiseThenBuiltin(cx, promiseVal)) {
+    // Steps 3-5.
     return OriginalPromiseThenBuiltin(cx, promiseVal, onFulfilled, onRejected,
-                                      rval, rvalUsed);
+                                      rval, rvalExplicitlyUsed);
   }
 
   RootedObject promiseObj(cx, &promiseVal.toObject());
@@ -5228,7 +5802,12 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
     return false;
   }
 
-  // Steps 3-4.
+  bool rvalUsed =
+      rvalExplicitlyUsed ||
+      IsPromiseThenOrCatchRetValImplicitlyUsed(cx, unwrappedPromise);
+
+  // Step 3. Let C be ? SpeciesConstructor(promise, %Promise%).
+  // Step 4. Let resultCapability be ? NewPromiseCapability(C).
   CreateDependentPromise createDependent =
       rvalUsed ? CreateDependentPromise::Always
                : CreateDependentPromise::SkipIfCtorUnobservable;
@@ -5238,7 +5817,8 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
     return false;
   }
 
-  // Step 5.
+  // Step 5. Return PerformPromiseThen(promise, onFulfilled, onRejected,
+  //                                   resultCapability).
   if (!PerformPromiseThen(cx, unwrappedPromise, onFulfilled, onRejected,
                           resultCapability)) {
     return false;
@@ -5252,41 +5832,77 @@ static bool Promise_then_impl(JSContext* cx, HandleValue promiseVal,
   return true;
 }
 
-// ES2016, 25.4.5.3.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ */
 bool Promise_then_noRetVal(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return Promise_then_impl(cx, args.thisv(), args.get(0), args.get(1),
-                           args.rval(),
-                           IsPromiseThenOrCatchRetValImplicitlyUsed(cx));
+                           args.rval(), false);
 }
 
-// ES2016, 25.4.5.3.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * Promise.prototype.then ( onFulfilled, onRejected )
+ * https://tc39.es/ecma262/#sec-promise.prototype.then
+ */
 bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return Promise_then_impl(cx, args.thisv(), args.get(0), args.get(1),
                            args.rval(), true);
 }
 
-// ES2016, 25.4.5.3.1.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseThen ( promise, onFulfilled, onRejected
+ *                      [ , resultCapability ] )
+ * https://tc39.es/ecma262/#sec-performpromisethen
+ *
+ * Steps 1-12.
+ */
 [[nodiscard]] static bool PerformPromiseThen(
     JSContext* cx, Handle<PromiseObject*> promise, HandleValue onFulfilled_,
     HandleValue onRejected_, Handle<PromiseCapability> resultCapability) {
-  // Step 1 (implicit).
-  // Step 2 (implicit).
+  // Step 1. Assert: IsPromise(promise) is true.
+  // Step 2. If resultCapability is not present, then
+  // Step 2. a. Set resultCapability to undefined.
+  // (implicit)
 
-  // Step 3.
+  // (reordered)
+  // Step 4. Else,
+  // Step 4. a. Let onFulfilledJobCallback be HostMakeJobCallback(onFulfilled).
   RootedValue onFulfilled(cx, onFulfilled_);
+
+  // Step 3. If IsCallable(onFulfilled) is false, then
   if (!IsCallable(onFulfilled)) {
-    onFulfilled = Int32Value(PromiseHandlerIdentity);
+    // Step 3. a. Let onFulfilledJobCallback be empty.
+    onFulfilled = Int32Value(int32_t(PromiseHandler::Identity));
   }
 
-  // Step 4.
+  // (reordered)
+  // Step 6. Else,
+  // Step 6. a. Let onRejectedJobCallback be HostMakeJobCallback(onRejected).
   RootedValue onRejected(cx, onRejected_);
+
+  // Step 5. If IsCallable(onRejected) is false, then
   if (!IsCallable(onRejected)) {
-    onRejected = Int32Value(PromiseHandlerThrower);
+    // Step 5. a. Let onRejectedJobCallback be empty.
+    onRejected = Int32Value(int32_t(PromiseHandler::Thrower));
   }
 
-  // Step 7.
+  // Step 7. Let fulfillReaction be the PromiseReaction
+  //         { [[Capability]]: resultCapability, [[Type]]: Fulfill,
+  //           [[Handler]]: onFulfilledJobCallback }.
+  // Step 8. Let rejectReaction be the PromiseReaction
+  //         { [[Capability]]: resultCapability, [[Type]]: Reject,
+  //           [[Handler]]: onRejectedJobCallback }.
+  //
+  // NOTE: We use single object for both reactions.
   Rooted<PromiseReactionRecord*> reaction(
       cx, NewReactionRecord(cx, resultCapability, onFulfilled, onRejected,
                             IncumbentGlobalObject::Yes));
@@ -5294,23 +5910,39 @@ bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
+  // Steps 9-14.
   return PerformPromiseThenWithReaction(cx, promise, reaction);
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseThen ( promise, onFulfilled, onRejected
+ *                      [ , resultCapability ] )
+ * https://tc39.es/ecma262/#sec-performpromisethen
+ */
 [[nodiscard]] static bool PerformPromiseThenWithoutSettleHandlers(
     JSContext* cx, Handle<PromiseObject*> promise,
     Handle<PromiseObject*> promiseToResolve,
     Handle<PromiseCapability> resultCapability) {
-  // Step 1 (implicit).
-  // Step 2 (implicit).
+  // Step 1. Assert: IsPromise(promise) is true.
+  // Step 2. If resultCapability is not present, then
+  // (implicit)
 
-  // Step 3.
+  // Step 3. If IsCallable(onFulfilled) is false, then
+  // Step 3.a. Let onFulfilledJobCallback be empty.
   HandleValue onFulfilled = NullHandleValue;
 
-  // Step 4.
+  // Step 5. If IsCallable(onRejected) is false, then
+  // Step 5.a. Let onRejectedJobCallback be empty.
   HandleValue onRejected = NullHandleValue;
 
-  // Step 7.
+  // Step 7. Let fulfillReaction be the PromiseReaction
+  //         { [[Capability]]: resultCapability, [[Type]]: Fulfill,
+  //           [[Handler]]: onFulfilledJobCallback }.
+  // Step 8. Let rejectReaction be the PromiseReaction
+  //         { [[Capability]]: resultCapability, [[Type]]: Reject,
+  //           [[Handler]]: onRejectedJobCallback }.
   Rooted<PromiseReactionRecord*> reaction(
       cx, NewReactionRecord(cx, resultCapability, onFulfilled, onRejected,
                             IncumbentGlobalObject::Yes));
@@ -5320,21 +5952,29 @@ bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
 
   reaction->setIsDefaultResolvingHandler(promiseToResolve);
 
+  // Steps 9-12.
   return PerformPromiseThenWithReaction(cx, promise, reaction);
 }
 
-// https://tc39.github.io/ecma262/#sec-performpromisethen
-// 25.6.5.4.1 PerformPromiseThen steps 8-11.
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseThen ( promise, onFulfilled, onRejected
+ *                      [ , resultCapability ] )
+ * https://tc39.github.io/ecma262/#sec-performpromisethen
+ *
+ * Steps 9-12.
+ */
 [[nodiscard]] static bool PerformPromiseThenWithReaction(
     JSContext* cx, Handle<PromiseObject*> unwrappedPromise,
     Handle<PromiseReactionRecord*> reaction) {
-  // Step 8: If promise.[[PromiseState]] is "pending", then
+  // Step 9. If promise.[[PromiseState]] is pending, then
   JS::PromiseState state = unwrappedPromise->state();
   int32_t flags = unwrappedPromise->flags();
   if (state == JS::PromiseState::Pending) {
-    // Step 8.a: Append fulfillReaction as the last element of the List that is
+    // Step 9.a. Append fulfillReaction as the last element of the List that is
     //           promise.[[PromiseFulfillReactions]].
-    // Step 8.b: Append rejectReaction as the last element of the List that is
+    // Step 9.b. Append rejectReaction as the last element of the List that is
     //           promise.[[PromiseRejectReactions]].
     //
     // Instead of creating separate reaction records for fulfillment and
@@ -5345,15 +5985,14 @@ bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
     }
   }
 
-  // Steps 9-10. In the spec, step 9 runs if the promise is fulfilled, step 10
-  // if it is rejected. This implementation unifies the two paths.
+  // Steps 10-11.
   else {
-    // Step 10.a.
+    // Step 11.a. Assert: The value of promise.[[PromiseState]] is rejected.
     MOZ_ASSERT_IF(state != JS::PromiseState::Fulfilled,
                   state == JS::PromiseState::Rejected);
 
-    // Step 9.a: Let value be promise.[[PromiseResult]].
-    // Step 10.b: Let reason be promise.[[PromiseResult]].
+    // Step 10.a. Let value be promise.[[PromiseResult]].
+    // Step 11.b. Let reason be promise.[[PromiseResult]].
     RootedValue valueOrReason(cx, unwrappedPromise->valueOrReason());
 
     // We might be operating on a promise from another compartment. In that
@@ -5362,28 +6001,41 @@ bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
       return false;
     }
 
-    // Step 10.c: If promise.[[PromiseIsHandled]] is false,
+    // Step 11.c. If promise.[[PromiseIsHandled]] is false,
     //            perform HostPromiseRejectionTracker(promise, "handle").
     if (state == JS::PromiseState::Rejected &&
         !(flags & PROMISE_FLAG_HANDLED)) {
       cx->runtime()->removeUnhandledRejectedPromise(cx, unwrappedPromise);
     }
 
-    // Step 9.b: Perform EnqueueJob("PromiseJobs", PromiseReactionJob,
-    //                              « fulfillReaction, value »).
-    // Step 10.d: Perform EnqueueJob("PromiseJobs", PromiseReactionJob,
-    //                               « rejectReaction, reason »).
+    // Step 10.b. Let fulfillJob be
+    //            NewPromiseReactionJob(fulfillReaction, value).
+    // Step 10.c. Perform HostEnqueuePromiseJob(fulfillJob.[[Job]],
+    //                                          fulfillJob.[[Realm]]).
+    // Step 11.d. Let rejectJob be
+    //            NewPromiseReactionJob(rejectReaction, reason).
+    // Step 11.e. Perform HostEnqueuePromiseJob(rejectJob.[[Job]],
+    //                                          rejectJob.[[Realm]]).
     if (!EnqueuePromiseReactionJob(cx, reaction, valueOrReason, state)) {
       return false;
     }
   }
 
-  // Step 11: Set promise.[[PromiseIsHandled]] to true.
+  // Step 12. Set promise.[[PromiseIsHandled]] to true.
   unwrappedPromise->setHandled();
 
   return true;
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * PerformPromiseThen ( promise, onFulfilled, onRejected
+ *                      [ , resultCapability ] )
+ * https://tc39.github.io/ecma262/#sec-performpromisethen
+ *
+ * Steps 9.a-b.
+ */
 [[nodiscard]] static bool AddPromiseReaction(
     JSContext* cx, Handle<PromiseObject*> unwrappedPromise,
     Handle<PromiseReactionRecord*> reaction) {
@@ -5404,7 +6056,10 @@ bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
   }
   Handle<PromiseObject*> promise = unwrappedPromise;
 
-  // 25.4.5.3.1 steps 7.a,b.
+  // Step 9.a. Append fulfillReaction as the last element of the List that is
+  //           promise.[[PromiseFulfillReactions]].
+  // Step 9.b. Append rejectReaction as the last element of the List that is
+  //           promise.[[PromiseRejectReactions]].
   RootedValue reactionsVal(cx, promise->reactions());
 
   if (reactionsVal.isUndefined()) {
@@ -5445,7 +6100,7 @@ bool js::Promise_then(JSContext* cx, unsigned argc, Value* vp) {
   } else {
     // Otherwise, just store the new reaction.
     MOZ_RELEASE_ASSERT(reactionsObj->is<NativeObject>());
-    HandleNativeObject reactions = reactionsObj.as<NativeObject>();
+    Handle<NativeObject*> reactions = reactionsObj.as<NativeObject>();
     uint32_t len = reactions->getDenseInitializedLength();
     DenseElementResult result = reactions->ensureDenseElements(cx, len, 1);
     if (result != DenseElementResult::Success) {
@@ -5606,6 +6261,34 @@ bool PromiseObject::forEachReactionRecord(
   });
 }
 
+/**
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * Promise Reject Functions
+ * https://tc39.es/ecma262/#sec-promise-reject-functions
+ */
+static bool CallDefaultPromiseResolveFunction(JSContext* cx,
+                                              Handle<PromiseObject*> promise,
+                                              HandleValue resolutionValue) {
+  MOZ_ASSERT(IsPromiseWithDefaultResolvingFunction(promise));
+
+  // Steps 1-3.
+  // (implicit)
+
+  // Step 4. Let alreadyResolved be F.[[AlreadyResolved]].
+  // Step 5. If alreadyResolved.[[Value]] is true, return undefined.
+  if (IsAlreadyResolvedPromiseWithDefaultResolvingFunction(promise)) {
+    return true;
+  }
+
+  // Step 6. Set alreadyResolved.[[Value]] to true.
+  SetAlreadyResolvedPromiseWithDefaultResolvingFunction(promise);
+
+  // Steps 7-15.
+  // (implicit) Step 16. Return undefined.
+  return ResolvePromiseInternal(cx, promise, resolutionValue);
+}
+
 /* static */
 bool PromiseObject::resolve(JSContext* cx, Handle<PromiseObject*> promise,
                             HandleValue resolutionValue) {
@@ -5614,8 +6297,8 @@ bool PromiseObject::resolve(JSContext* cx, Handle<PromiseObject*> promise,
     return true;
   }
 
-  if (PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS)) {
-    return ResolvePromiseInternal(cx, promise, resolutionValue);
+  if (IsPromiseWithDefaultResolvingFunction(promise)) {
+    return CallDefaultPromiseResolveFunction(cx, promise, resolutionValue);
   }
 
   JSFunction* resolveFun = GetResolveFunctionFromPromise(promise);
@@ -5636,6 +6319,33 @@ bool PromiseObject::resolve(JSContext* cx, Handle<PromiseObject*> promise,
   return Call(cx, funVal, UndefinedHandleValue, resolutionValue, &dummy);
 }
 
+/**
+ * ES2023 draft rev 714fa3dd1e8237ae9c666146270f81880089eca5
+ *
+ * Promise Reject Functions
+ * https://tc39.es/ecma262/#sec-promise-reject-functions
+ */
+static bool CallDefaultPromiseRejectFunction(
+    JSContext* cx, Handle<PromiseObject*> promise, HandleValue rejectionValue,
+    JS::Handle<SavedFrame*> unwrappedRejectionStack /* = nullptr */) {
+  MOZ_ASSERT(IsPromiseWithDefaultResolvingFunction(promise));
+
+  // Steps 1-3.
+  // (implicit)
+
+  // Step 4. Let alreadyResolved be F.[[AlreadyResolved]].
+  // Step 5. If alreadyResolved.[[Value]] is true, return undefined.
+  if (IsAlreadyResolvedPromiseWithDefaultResolvingFunction(promise)) {
+    return true;
+  }
+
+  // Step 6. Set alreadyResolved.[[Value]] to true.
+  SetAlreadyResolvedPromiseWithDefaultResolvingFunction(promise);
+
+  return RejectPromiseInternal(cx, promise, rejectionValue,
+                               unwrappedRejectionStack);
+}
+
 /* static */
 bool PromiseObject::reject(JSContext* cx, Handle<PromiseObject*> promise,
                            HandleValue rejectionValue) {
@@ -5644,9 +6354,8 @@ bool PromiseObject::reject(JSContext* cx, Handle<PromiseObject*> promise,
     return true;
   }
 
-  if (PromiseHasAnyFlag(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS)) {
-    return ResolvePromise(cx, promise, rejectionValue,
-                          JS::PromiseState::Rejected);
+  if (IsPromiseWithDefaultResolvingFunction(promise)) {
+    return CallDefaultPromiseRejectFunction(cx, promise, rejectionValue);
   }
 
   RootedValue funVal(cx, promise->getFixedSlot(PromiseSlot_RejectFunction));
@@ -5656,11 +6365,21 @@ bool PromiseObject::reject(JSContext* cx, Handle<PromiseObject*> promise,
   return Call(cx, funVal, UndefinedHandleValue, rejectionValue, &dummy);
 }
 
+/**
+ * ES2022 draft rev d03c1ec6e235a5180fa772b6178727c17974cb14
+ *
+ * RejectPromise ( promise, reason )
+ * https://tc39.es/ecma262/#sec-rejectpromise
+ *
+ * Step 7.
+ */
 /* static */
 void PromiseObject::onSettled(JSContext* cx, Handle<PromiseObject*> promise,
-                              HandleSavedFrame unwrappedRejectionStack) {
+                              Handle<SavedFrame*> unwrappedRejectionStack) {
   PromiseDebugInfo::setResolutionInfo(cx, promise, unwrappedRejectionStack);
 
+  // Step 7. If promise.[[PromiseIsHandled]] is false, perform
+  //         HostPromiseRejectionTracker(promise, "reject").
   if (promise->state() == JS::PromiseState::Rejected &&
       promise->isUnhandled()) {
     cx->runtime()->addUnhandledRejectedPromise(cx, promise);

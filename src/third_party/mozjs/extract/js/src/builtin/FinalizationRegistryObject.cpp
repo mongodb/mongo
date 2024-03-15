@@ -10,12 +10,14 @@
 
 #include "mozilla/ScopeExit.h"
 
-#include "gc/Zone.h"
+#include "jsapi.h"
+
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "vm/GlobalObject.h"
-#include "vm/PlainObject.h"    // js::PlainObject
+#include "vm/Interpreter.h"
 #include "vm/WellKnownAtom.h"  // js_*_str
 
+#include "gc/GCContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
 
@@ -41,6 +43,7 @@ FinalizationRecordObject* FinalizationRecordObject::create(
 
   record->initReservedSlot(QueueSlot, ObjectValue(*queue));
   record->initReservedSlot(HeldValueSlot, heldValue);
+  record->initReservedSlot(InMapSlot, BooleanValue(false));
 
   return record;
 }
@@ -57,15 +60,25 @@ Value FinalizationRecordObject::heldValue() const {
   return getReservedSlot(HeldValueSlot);
 }
 
-bool FinalizationRecordObject::isActive() const {
+bool FinalizationRecordObject::isRegistered() const {
   MOZ_ASSERT_IF(!queue(), heldValue().isUndefined());
   return queue();
+}
+
+bool FinalizationRecordObject::isInRecordMap() const {
+  return getReservedSlot(InMapSlot).toBoolean();
+}
+
+void FinalizationRecordObject::setInRecordMap(bool newValue) {
+  MOZ_ASSERT(newValue != isInRecordMap());
+  setReservedSlot(InMapSlot, BooleanValue(newValue));
 }
 
 void FinalizationRecordObject::clear() {
   MOZ_ASSERT(queue());
   setReservedSlot(QueueSlot, UndefinedValue());
   setReservedSlot(HeldValueSlot, UndefinedValue());
+  MOZ_ASSERT(!isRegistered());
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -85,7 +98,6 @@ const JSClassOps FinalizationRegistrationsObject::classOps_ = {
     nullptr,                                    // mayResolve
     FinalizationRegistrationsObject::finalize,  // finalize
     nullptr,                                    // call
-    nullptr,                                    // hasInstance
     nullptr,                                    // construct
     FinalizationRegistrationsObject::trace,     // trace
 };
@@ -124,9 +136,10 @@ void FinalizationRegistrationsObject::trace(JSTracer* trc, JSObject* obj) {
 }
 
 /* static */
-void FinalizationRegistrationsObject::finalize(JSFreeOp* fop, JSObject* obj) {
+void FinalizationRegistrationsObject::finalize(JS::GCContext* gcx,
+                                               JSObject* obj) {
   auto* self = &obj->as<FinalizationRegistrationsObject>();
-  fop->delete_(obj, self->records(), MemoryUse::FinalizationRecordVector);
+  gcx->delete_(obj, self->records(), MemoryUse::FinalizationRecordVector);
 }
 
 inline WeakFinalizationRecordVector*
@@ -166,9 +179,9 @@ inline void FinalizationRegistrationsObject::remove(
   records()->eraseIfEqual(record);
 }
 
-inline void FinalizationRegistrationsObject::sweep() {
+inline bool FinalizationRegistrationsObject::traceWeak(JSTracer* trc) {
   MOZ_ASSERT(records());
-  return records()->sweep();
+  return records()->traceWeak(trc);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -197,7 +210,6 @@ const JSClassOps FinalizationRegistryObject::classOps_ = {
     nullptr,                               // mayResolve
     FinalizationRegistryObject::finalize,  // finalize
     nullptr,                               // call
-    nullptr,                               // hasInstance
     nullptr,                               // construct
     FinalizationRegistryObject::trace,     // trace
 };
@@ -228,15 +240,15 @@ bool FinalizationRegistryObject::construct(JSContext* cx, unsigned argc,
     return false;
   }
 
-  RootedObject proto(cx);
-  if (!GetPrototypeFromBuiltinConstructor(
-          cx, args, JSProto_FinalizationRegistry, &proto)) {
-    return false;
-  }
-
   RootedObject cleanupCallback(
       cx, ValueToCallable(cx, args.get(0), 1, NO_CONSTRUCT));
   if (!cleanupCallback) {
+    return false;
+  }
+
+  RootedObject proto(cx);
+  if (!GetPrototypeFromBuiltinConstructor(
+          cx, args, JSProto_FinalizationRegistry, &proto)) {
     return false;
   }
 
@@ -274,39 +286,40 @@ bool FinalizationRegistryObject::construct(JSContext* cx, unsigned argc,
 
 /* static */
 void FinalizationRegistryObject::trace(JSTracer* trc, JSObject* obj) {
-  auto registry = &obj->as<FinalizationRegistryObject>();
-
   // Trace the registrations weak map. At most this traces the
   // FinalizationRegistrationsObject values of the map; the contents of those
-  // objects are weakly held and are not traced.
+  // objects are weakly held and are not traced by this method.
+
+  auto* registry = &obj->as<FinalizationRegistryObject>();
   if (ObjectWeakMap* registrations = registry->registrations()) {
     registrations->trace(trc);
   }
 }
 
-void FinalizationRegistryObject::sweep() {
-  // Sweep the contents of the registrations weak map's values.
+void FinalizationRegistryObject::traceWeak(JSTracer* trc) {
+  // Trace and update the contents of the registrations weak map's values, which
+  // are weakly held.
+
   MOZ_ASSERT(registrations());
   for (ObjectValueWeakMap::Enum e(registrations()->valueMap()); !e.empty();
        e.popFront()) {
-    auto registrations =
+    auto* registrations =
         &e.front().value().toObject().as<FinalizationRegistrationsObject>();
-    registrations->sweep();
-    if (registrations->isEmpty()) {
+    if (!registrations->traceWeak(trc)) {
       e.removeFront();
     }
   }
 }
 
 /* static */
-void FinalizationRegistryObject::finalize(JSFreeOp* fop, JSObject* obj) {
+void FinalizationRegistryObject::finalize(JS::GCContext* gcx, JSObject* obj) {
   auto registry = &obj->as<FinalizationRegistryObject>();
 
   // The queue's flag should have been updated by
   // GCRuntime::sweepFinalizationRegistries.
   MOZ_ASSERT_IF(registry->queue(), !registry->queue()->hasRegistry());
 
-  fop->delete_(obj, registry->registrations(),
+  gcx->delete_(obj, registry->registrations(),
                MemoryUse::FinalizationRegistryRegistrations);
 }
 
@@ -567,7 +580,7 @@ bool FinalizationRegistryObject::unregister(JSContext* cx, unsigned argc,
 /* static */
 bool FinalizationRegistryObject::unregisterRecord(
     FinalizationRecordObject* record) {
-  if (!record->isActive()) {
+  if (!record->isRegistered()) {
     return false;
   }
 
@@ -636,7 +649,6 @@ const JSClassOps FinalizationQueueObject::classOps_ = {
     nullptr,                            // mayResolve
     FinalizationQueueObject::finalize,  // finalize
     nullptr,                            // call
-    nullptr,                            // hasInstance
     nullptr,                            // construct
     FinalizationQueueObject::trace,     // trace
 };
@@ -652,7 +664,7 @@ FinalizationQueueObject* FinalizationQueueObject::create(
     return nullptr;
   }
 
-  HandlePropertyName funName = cx->names().empty;
+  Handle<PropertyName*> funName = cx->names().empty;
   RootedFunction doCleanupFunction(
       cx, NewNativeFunction(cx, doCleanup, 0, funName,
                             gc::AllocKind::FUNCTION_EXTENDED));
@@ -701,10 +713,10 @@ void FinalizationQueueObject::trace(JSTracer* trc, JSObject* obj) {
 }
 
 /* static */
-void FinalizationQueueObject::finalize(JSFreeOp* fop, JSObject* obj) {
+void FinalizationQueueObject::finalize(JS::GCContext* gcx, JSObject* obj) {
   auto queue = &obj->as<FinalizationQueueObject>();
 
-  fop->delete_(obj, queue->recordsToBeCleanedUp(),
+  gcx->delete_(obj, queue->recordsToBeCleanedUp(),
                MemoryUse::FinalizationRegistryRecordVector);
 }
 
@@ -820,7 +832,7 @@ bool FinalizationQueueObject::cleanupQueuedRecords(
     FinalizationRecordObject* record = records->popCopy();
 
     // Skip over records that have been unregistered.
-    if (!record->isActive()) {
+    if (!record->isRegistered()) {
       continue;
     }
 

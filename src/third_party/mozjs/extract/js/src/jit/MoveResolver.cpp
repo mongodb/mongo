@@ -17,23 +17,23 @@ using namespace js::jit;
 MoveOperand::MoveOperand(MacroAssembler& masm, const ABIArg& arg) : disp_(0) {
   switch (arg.kind()) {
     case ABIArg::GPR:
-      kind_ = REG;
+      kind_ = Kind::Reg;
       code_ = arg.gpr().code();
       break;
 #ifdef JS_CODEGEN_REGISTER_PAIR
     case ABIArg::GPR_PAIR:
-      kind_ = REG_PAIR;
+      kind_ = Kind::RegPair;
       code_ = arg.evenGpr().code();
       MOZ_ASSERT(code_ % 2 == 0);
       MOZ_ASSERT(code_ + 1 == arg.oddGpr().code());
       break;
 #endif
     case ABIArg::FPU:
-      kind_ = FLOAT_REG;
+      kind_ = Kind::FloatReg;
       code_ = arg.fpu().code();
       break;
     case ABIArg::Stack:
-      kind_ = MEMORY;
+      kind_ = Kind::Memory;
       if (IsHiddenSP(masm.getStackPointer())) {
         MOZ_CRASH(
             "Hidden SP cannot be represented as register code on this "

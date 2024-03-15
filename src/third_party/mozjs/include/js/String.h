@@ -17,7 +17,7 @@
 #include "mozilla/Maybe.h"       // mozilla::Maybe
 #include "mozilla/Range.h"       // mozilla::Range
 #include "mozilla/Span.h"        // mozilla::Span
-#include "mozilla/Tuple.h"       // mozilla::Tuple
+                                 // std::tuple
 
 #include <algorithm>  // std::copy_n
 #include <stddef.h>   // size_t
@@ -70,18 +70,19 @@ extern JS_PUBLIC_API JSString* JS_NewStringCopyUTF8Z(
 extern JS_PUBLIC_API JSString* JS_NewStringCopyUTF8N(JSContext* cx,
                                                      const JS::UTF8Chars s);
 
-extern JS_PUBLIC_API JSString* JS_AtomizeAndPinJSString(JSContext* cx,
-                                                        JS::HandleString str);
-
 extern JS_PUBLIC_API JSString* JS_AtomizeStringN(JSContext* cx, const char* s,
                                                  size_t length);
 
 extern JS_PUBLIC_API JSString* JS_AtomizeString(JSContext* cx, const char* s);
 
+// Note: unlike the non-pinning JS_Atomize* functions, this can be called
+// without entering a realm/zone.
 extern JS_PUBLIC_API JSString* JS_AtomizeAndPinStringN(JSContext* cx,
                                                        const char* s,
                                                        size_t length);
 
+// Note: unlike the non-pinning JS_Atomize* functions, this can be called
+// without entering a realm/zone.
 extern JS_PUBLIC_API JSString* JS_AtomizeAndPinString(JSContext* cx,
                                                       const char* s);
 
@@ -108,13 +109,6 @@ extern JS_PUBLIC_API JSString* JS_AtomizeUCStringN(JSContext* cx,
 
 extern JS_PUBLIC_API JSString* JS_AtomizeUCString(JSContext* cx,
                                                   const char16_t* s);
-
-extern JS_PUBLIC_API JSString* JS_AtomizeAndPinUCStringN(JSContext* cx,
-                                                         const char16_t* s,
-                                                         size_t length);
-
-extern JS_PUBLIC_API JSString* JS_AtomizeAndPinUCString(JSContext* cx,
-                                                        const char16_t* s);
 
 extern JS_PUBLIC_API bool JS_CompareStrings(JSContext* cx, JSString* str1,
                                             JSString* str2, int32_t* result);
@@ -212,11 +206,6 @@ extern JS_PUBLIC_API JS::UniqueTwoByteChars JS_CopyStringCharsZ(JSContext* cx,
 
 extern JS_PUBLIC_API JSLinearString* JS_EnsureLinearString(JSContext* cx,
                                                            JSString* str);
-
-static MOZ_ALWAYS_INLINE JSLinearString* JSID_TO_LINEAR_STRING(jsid id) {
-  MOZ_ASSERT(JSID_IS_STRING(id));
-  return reinterpret_cast<JSLinearString*>(JSID_TO_STRING(id));
-}
 
 static MOZ_ALWAYS_INLINE JSLinearString* JS_ASSERT_STRING_IS_LINEAR(
     JSString* str) {
@@ -328,7 +317,7 @@ JS_PUBLIC_API size_t JS_GetStringEncodingLength(JSContext* cx, JSString* str);
  *
  * The function does not store an additional zero byte.
  */
-JS_PUBLIC_API mozilla::Maybe<mozilla::Tuple<size_t, size_t>>
+JS_PUBLIC_API mozilla::Maybe<std::tuple<size_t, size_t>>
 JS_EncodeStringToUTF8BufferPartial(JSContext* cx, JSString* str,
                                    mozilla::Span<char> buffer);
 
@@ -532,5 +521,18 @@ MOZ_ALWAYS_INLINE void LossyCopyLinearStringChars(char* dest, JSLinearString* s,
 /** DO NOT USE, only present for Rust bindings as a temporary hack */
 [[deprecated]] extern JS_PUBLIC_API bool JS_DeprecatedStringHasLatin1Chars(
     JSString* str);
+
+// JSString* is an aligned pointer, but this information isn't available in the
+// public header. We specialize HasFreeLSB here so that JS::Result<JSString*>
+// compiles.
+
+namespace mozilla {
+namespace detail {
+template <>
+struct HasFreeLSB<JSString*> {
+  static constexpr bool value = true;
+};
+}  // namespace detail
+}  // namespace mozilla
 
 #endif  // js_String_h

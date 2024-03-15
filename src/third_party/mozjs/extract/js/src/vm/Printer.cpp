@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "vm/Printer.h"
+#include "js/Printer.h"
 
 #include "mozilla/PodOperations.h"
 #include "mozilla/Printf.h"
@@ -17,8 +17,8 @@
 #include "js/CharacterEncoding.h"
 #include "util/Memory.h"
 #include "util/Text.h"
-#include "util/Windows.h"
-#include "vm/JSContext.h"
+#include "util/WindowsWrapper.h"
+#include "vm/StringType.h"
 
 using mozilla::PodCopy;
 
@@ -86,12 +86,12 @@ bool Sprinter::realloc_(size_t newSize) {
   return true;
 }
 
-Sprinter::Sprinter(JSContext* cx, bool shouldReportOOM)
-    : context(cx),
+Sprinter::Sprinter(JSContext* maybeCx, bool shouldReportOOM)
+    : maybeCx(maybeCx),
 #ifdef DEBUG
       initialized(false),
 #endif
-      shouldReportOOM(shouldReportOOM),
+      shouldReportOOM(maybeCx && shouldReportOOM),
       base(nullptr),
       size(0),
       offset(0) {
@@ -194,9 +194,10 @@ bool Sprinter::put(const char* s, size_t len) {
 }
 
 bool Sprinter::putString(JSString* s) {
+  MOZ_ASSERT(maybeCx);
   InvariantChecker ic(this);
 
-  JSLinearString* linear = s->ensureLinear(context);
+  JSLinearString* linear = s->ensureLinear(maybeCx);
   if (!linear) {
     return false;
   }
@@ -222,8 +223,8 @@ void Sprinter::reportOutOfMemory() {
   if (hadOOM_) {
     return;
   }
-  if (context && shouldReportOOM) {
-    ReportOutOfMemory(context);
+  if (maybeCx && shouldReportOOM) {
+    ReportOutOfMemory(maybeCx);
   }
   hadOOM_ = true;
 }
@@ -267,8 +268,9 @@ static const char JSONEscapeMap[] = {
 };
 
 template <QuoteTarget target, typename CharT>
-bool QuoteString(Sprinter* sp, const mozilla::Range<const CharT> chars,
-                 char quote) {
+JS_PUBLIC_API bool QuoteString(Sprinter* sp,
+                               const mozilla::Range<const CharT> chars,
+                               char quote) {
   MOZ_ASSERT_IF(target == QuoteTarget::JSON, quote == '\0');
 
   using CharPtr = mozilla::RangedPtr<const CharT>;
@@ -353,20 +355,22 @@ bool QuoteString(Sprinter* sp, const mozilla::Range<const CharT> chars,
   return true;
 }
 
-template bool QuoteString<QuoteTarget::String, Latin1Char>(
+template JS_PUBLIC_API bool QuoteString<QuoteTarget::String, Latin1Char>(
     Sprinter* sp, const mozilla::Range<const Latin1Char> chars, char quote);
 
-template bool QuoteString<QuoteTarget::String, char16_t>(
+template JS_PUBLIC_API bool QuoteString<QuoteTarget::String, char16_t>(
     Sprinter* sp, const mozilla::Range<const char16_t> chars, char quote);
 
-template bool QuoteString<QuoteTarget::JSON, Latin1Char>(
+template JS_PUBLIC_API bool QuoteString<QuoteTarget::JSON, Latin1Char>(
     Sprinter* sp, const mozilla::Range<const Latin1Char> chars, char quote);
 
-template bool QuoteString<QuoteTarget::JSON, char16_t>(
+template JS_PUBLIC_API bool QuoteString<QuoteTarget::JSON, char16_t>(
     Sprinter* sp, const mozilla::Range<const char16_t> chars, char quote);
 
-bool QuoteString(Sprinter* sp, JSString* str, char quote /*= '\0' */) {
-  JSLinearString* linear = str->ensureLinear(sp->context);
+JS_PUBLIC_API bool QuoteString(Sprinter* sp, JSString* str,
+                               char quote /*= '\0' */) {
+  MOZ_ASSERT(sp->maybeCx);
+  JSLinearString* linear = str->ensureLinear(sp->maybeCx);
   if (!linear) {
     return false;
   }
@@ -378,7 +382,8 @@ bool QuoteString(Sprinter* sp, JSString* str, char quote /*= '\0' */) {
                                         sp, linear->twoByteRange(nogc), quote);
 }
 
-UniqueChars QuoteString(JSContext* cx, JSString* str, char quote /* = '\0' */) {
+JS_PUBLIC_API UniqueChars QuoteString(JSContext* cx, JSString* str,
+                                      char quote /* = '\0' */) {
   Sprinter sprinter(cx);
   if (!sprinter.init()) {
     return nullptr;
@@ -389,8 +394,9 @@ UniqueChars QuoteString(JSContext* cx, JSString* str, char quote /* = '\0' */) {
   return sprinter.release();
 }
 
-bool JSONQuoteString(Sprinter* sp, JSString* str) {
-  JSLinearString* linear = str->ensureLinear(sp->context);
+JS_PUBLIC_API bool JSONQuoteString(Sprinter* sp, JSString* str) {
+  MOZ_ASSERT(sp->maybeCx);
+  JSLinearString* linear = str->ensureLinear(sp->maybeCx);
   if (!linear) {
     return false;
   }

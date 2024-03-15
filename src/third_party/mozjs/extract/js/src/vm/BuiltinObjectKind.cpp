@@ -8,8 +8,8 @@
 
 #include "jspubtd.h"
 
+#include "frontend/ParserAtom.h"
 #include "vm/GlobalObject.h"
-#include "vm/JSContext.h"
 
 using namespace js;
 
@@ -23,10 +23,14 @@ static JSProtoKey ToProtoKey(BuiltinObjectKind kind) {
       return JSProto_Int32Array;
     case BuiltinObjectKind::Iterator:
       return JSProto_Iterator;
+    case BuiltinObjectKind::Map:
+      return JSProto_Map;
     case BuiltinObjectKind::Promise:
       return JSProto_Promise;
     case BuiltinObjectKind::RegExp:
       return JSProto_RegExp;
+    case BuiltinObjectKind::Set:
+      return JSProto_Set;
     case BuiltinObjectKind::SharedArrayBuffer:
       return JSProto_SharedArrayBuffer;
     case BuiltinObjectKind::Symbol:
@@ -58,8 +62,10 @@ static bool IsPrototype(BuiltinObjectKind kind) {
     case BuiltinObjectKind::ArrayBuffer:
     case BuiltinObjectKind::Int32Array:
     case BuiltinObjectKind::Iterator:
+    case BuiltinObjectKind::Map:
     case BuiltinObjectKind::Promise:
     case BuiltinObjectKind::RegExp:
+    case BuiltinObjectKind::Set:
     case BuiltinObjectKind::SharedArrayBuffer:
     case BuiltinObjectKind::Symbol:
       return false;
@@ -94,11 +100,17 @@ BuiltinObjectKind js::BuiltinConstructorForName(
   if (name == frontend::TaggedParserAtomIndex::WellKnown::Iterator()) {
     return BuiltinObjectKind::Iterator;
   }
+  if (name == frontend::TaggedParserAtomIndex::WellKnown::Map()) {
+    return BuiltinObjectKind::Map;
+  }
   if (name == frontend::TaggedParserAtomIndex::WellKnown::Promise()) {
     return BuiltinObjectKind::Promise;
   }
   if (name == frontend::TaggedParserAtomIndex::WellKnown::RegExp()) {
     return BuiltinObjectKind::RegExp;
+  }
+  if (name == frontend::TaggedParserAtomIndex::WellKnown::Set()) {
+    return BuiltinObjectKind::Set;
   }
   if (name == frontend::TaggedParserAtomIndex::WellKnown::SharedArrayBuffer()) {
     return BuiltinObjectKind::SharedArrayBuffer;
@@ -159,12 +171,16 @@ const char* js::BuiltinObjectName(BuiltinObjectKind kind) {
       return "Int32Array";
     case BuiltinObjectKind::Iterator:
       return "Iterator";
+    case BuiltinObjectKind::Map:
+      return "Map";
     case BuiltinObjectKind::Promise:
       return "Promise";
     case BuiltinObjectKind::RegExp:
       return "RegExp";
     case BuiltinObjectKind::SharedArrayBuffer:
       return "SharedArrayBuffer";
+    case BuiltinObjectKind::Set:
+      return "Set";
     case BuiltinObjectKind::Symbol:
       return "Symbol";
 

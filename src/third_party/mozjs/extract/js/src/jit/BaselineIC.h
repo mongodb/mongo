@@ -12,26 +12,16 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <utility>
 
-#include "gc/Barrier.h"
-#include "gc/GC.h"
-#include "gc/Rooting.h"
-#include "jit/BaselineICList.h"
 #include "jit/ICState.h"
-#include "jit/ICStubSpace.h"
 #include "jit/JitCode.h"
-#include "jit/JitOptions.h"
-#include "jit/Registers.h"
-#include "jit/RegisterSets.h"
 #include "jit/shared/Assembler-shared.h"
 #include "jit/TypeData.h"
 #include "js/TypeDecls.h"
-#include "js/Value.h"
-#include "vm/ArrayObject.h"
-#include "vm/JSScript.h"
 
 class JS_PUBLIC_API JSTracer;
+
+enum class JSOp : uint8_t;
 
 namespace js {
 
@@ -42,7 +32,6 @@ namespace jit {
 class BaselineFrame;
 class CacheIRStubInfo;
 class ICScript;
-class MacroAssembler;
 
 enum class TailCallVMFunctionId;
 enum class VMFunctionId;
@@ -238,9 +227,6 @@ class ICFallbackStub final : public ICStub {
   ICState& state() { return state_; }
 
   uint32_t pcOffset() const { return pcOffset_; }
-  jsbytecode* pc(JSScript* script) const {
-    return script->offsetToPC(pcOffset_);
-  }
 
   // Add a new stub to the IC chain terminated by this fallback stub.
   inline void addNewStub(ICEntry* icEntry, ICCacheIRStub* stub);
@@ -249,6 +235,11 @@ class ICFallbackStub final : public ICStub {
 
   void clearUsedByTranspiler() { state_.clearUsedByTranspiler(); }
   void setUsedByTranspiler() { state_.setUsedByTranspiler(); }
+  bool usedByTranspiler() const { return state_.usedByTranspiler(); }
+
+  void clearHasFoldedStub() { state_.clearHasFoldedStub(); }
+  void setHasFoldedStub() { state_.setHasFoldedStub(); }
+  bool hasFoldedStub() const { return state_.hasFoldedStub(); }
 
   TrialInliningState trialInliningState() const {
     return state_.trialInliningState();
@@ -281,6 +272,10 @@ class ICCacheIRStub final : public ICStub {
 
   ICStub* next() const { return next_; }
   void setNext(ICStub* stub) { next_ = stub; }
+
+  ICCacheIRStub* nextCacheIR() const {
+    return next_->isFallback() ? nullptr : next_->toCacheIRStub();
+  }
 
   const CacheIRStubInfo* stubInfo() const { return stubInfo_; }
   uint8_t* stubDataStart();
@@ -434,6 +429,9 @@ extern bool DoNewObjectFallback(JSContext* cx, BaselineFrame* frame,
 extern bool DoCompareFallback(JSContext* cx, BaselineFrame* frame,
                               ICFallbackStub* stub, HandleValue lhs,
                               HandleValue rhs, MutableHandleValue ret);
+
+extern bool DoCloseIterFallback(JSContext* cx, BaselineFrame* frame,
+                                ICFallbackStub* stub, HandleObject iter);
 
 }  // namespace jit
 }  // namespace js

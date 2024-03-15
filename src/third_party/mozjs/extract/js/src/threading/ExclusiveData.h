@@ -84,7 +84,7 @@ namespace js {
 template <typename T>
 class ExclusiveData {
  protected:
-  mutable Mutex lock_;
+  mutable Mutex lock_ MOZ_UNANNOTATED;
   mutable T value_;
 
   ExclusiveData(const ExclusiveData&) = delete;
@@ -129,8 +129,11 @@ class ExclusiveData {
    * Guard utilizes both.
    */
   class MOZ_STACK_CLASS Guard {
+   protected:
     const ExclusiveData* parent_;
+    explicit Guard(std::nullptr_t) : parent_(nullptr) {}
 
+   private:
     Guard(const Guard&) = delete;
     Guard& operator=(const Guard&) = delete;
 
@@ -171,9 +174,54 @@ class ExclusiveData {
   };
 
   /**
+   * NullableGuard are similar to Guard, except that one the access to the
+   * ExclusiveData might not always be granted. This is useful when contextual
+   * information is enough to prevent useless use of Mutex.
+   *
+   * The NullableGuard can be manipulated as follows:
+   *
+   *     if (NullableGuard guard = data.mightAccess()) {
+   *         // NullableGuard is acquired.
+   *         guard->...
+   *     }
+   *     // NullableGuard was either not acquired or released.
+   *
+   * Where mightAccess returns either a NullableGuard from `noAccess()` or a
+   * Guard from `lock()`.
+   */
+  class MOZ_STACK_CLASS NullableGuard : public Guard {
+   public:
+    explicit NullableGuard(std::nullptr_t) : Guard((std::nullptr_t) nullptr) {}
+    explicit NullableGuard(const ExclusiveData& parent) : Guard(parent) {}
+    explicit NullableGuard(Guard&& rhs) : Guard(std::move(rhs)) {}
+
+    NullableGuard& operator=(Guard&& rhs) {
+      this->~NullableGuard();
+      new (this) NullableGuard(std::move(rhs));
+      return *this;
+    }
+
+    /**
+     * Returns whether this NullableGuard has access to the exclusive data.
+     */
+    bool hasAccess() const { return this->parent_; }
+    explicit operator bool() const { return hasAccess(); }
+  };
+
+  /**
    * Access the protected inner `T` value for exclusive reading and writing.
    */
   Guard lock() const { return Guard(*this); }
+
+  /**
+   * Provide a no-access guard, which coerces to false when tested. This value
+   * can be returned if the guard access is conditioned on external factors.
+   *
+   * See NullableGuard.
+   */
+  NullableGuard noAccess() const {
+    return NullableGuard((std::nullptr_t) nullptr);
+  }
 };
 
 template <class T>
@@ -218,6 +266,158 @@ class ExclusiveWaitableData : public ExclusiveData<T> {
   };
 
   Guard lock() const { return Guard(*this); }
+};
+
+/**
+ * Multiple-readers / single-writer variant of ExclusiveData.
+ *
+ * Readers call readLock() to obtain a stack-only RAII reader lock, which will
+ * allow other readers to read concurrently but block writers; the yielded value
+ * is const.  Writers call writeLock() to obtain a ditto writer lock, which
+ * yields exclusive access to non-const data.
+ *
+ * See ExclusiveData and its implementation for more documentation.
+ */
+template <typename T>
+class RWExclusiveData {
+  mutable Mutex lock_ MOZ_UNANNOTATED;
+  mutable ConditionVariable cond_;
+  mutable T value_;
+  mutable int readers_;
+
+  // We maintain a count of active readers.  Writers may enter the critical
+  // section only when the reader count is zero, so the reader that decrements
+  // the count to zero must wake up any waiting writers.
+  //
+  // There can be multiple writers waiting, so a writer leaving the critical
+  // section must also wake up any other waiting writers.
+
+  void acquireReaderLock() const {
+    lock_.lock();
+    readers_++;
+    lock_.unlock();
+  }
+
+  void releaseReaderLock() const {
+    lock_.lock();
+    MOZ_ASSERT(readers_ > 0);
+    if (--readers_ == 0) {
+      cond_.notify_all();
+    }
+    lock_.unlock();
+  }
+
+  void acquireWriterLock() const {
+    lock_.lock();
+    while (readers_ > 0) {
+      cond_.wait(lock_);
+    }
+  }
+
+  void releaseWriterLock() const {
+    cond_.notify_all();
+    lock_.unlock();
+  }
+
+ public:
+  RWExclusiveData(const RWExclusiveData&) = delete;
+  RWExclusiveData& operator=(const RWExclusiveData&) = delete;
+
+  /**
+   * Create a new `RWExclusiveData`, constructing the protected value in place.
+   */
+  template <typename... Args>
+  explicit RWExclusiveData(const MutexId& id, Args&&... args)
+      : lock_(id), value_(std::forward<Args>(args)...), readers_(0) {}
+
+  class MOZ_STACK_CLASS ReadGuard {
+    const RWExclusiveData* parent_;
+    explicit ReadGuard(std::nullptr_t) : parent_(nullptr) {}
+
+   public:
+    ReadGuard(const ReadGuard&) = delete;
+    ReadGuard& operator=(const ReadGuard&) = delete;
+
+    explicit ReadGuard(const RWExclusiveData& parent) : parent_(&parent) {
+      parent_->acquireReaderLock();
+    }
+
+    ReadGuard(ReadGuard&& rhs) : parent_(rhs.parent_) {
+      MOZ_ASSERT(&rhs != this, "self-move disallowed!");
+      rhs.parent_ = nullptr;
+    }
+
+    ReadGuard& operator=(ReadGuard&& rhs) {
+      this->~ReadGuard();
+      new (this) ReadGuard(std::move(rhs));
+      return *this;
+    }
+
+    const T& get() const {
+      MOZ_ASSERT(parent_);
+      return parent_->value_;
+    }
+
+    operator const T&() const { return get(); }
+    const T* operator->() const { return &get(); }
+
+    const RWExclusiveData<T>* parent() const {
+      MOZ_ASSERT(parent_);
+      return parent_;
+    }
+
+    ~ReadGuard() {
+      if (parent_) {
+        parent_->releaseReaderLock();
+      }
+    }
+  };
+
+  class MOZ_STACK_CLASS WriteGuard {
+    const RWExclusiveData* parent_;
+    explicit WriteGuard(std::nullptr_t) : parent_(nullptr) {}
+
+   public:
+    WriteGuard(const WriteGuard&) = delete;
+    WriteGuard& operator=(const WriteGuard&) = delete;
+
+    explicit WriteGuard(const RWExclusiveData& parent) : parent_(&parent) {
+      parent_->acquireWriterLock();
+    }
+
+    WriteGuard(WriteGuard&& rhs) : parent_(rhs.parent_) {
+      MOZ_ASSERT(&rhs != this, "self-move disallowed!");
+      rhs.parent_ = nullptr;
+    }
+
+    WriteGuard& operator=(WriteGuard&& rhs) {
+      this->~WriteGuard();
+      new (this) WriteGuard(std::move(rhs));
+      return *this;
+    }
+
+    T& get() const {
+      MOZ_ASSERT(parent_);
+      return parent_->value_;
+    }
+
+    operator T&() const { return get(); }
+    T* operator->() const { return &get(); }
+
+    const RWExclusiveData<T>* parent() const {
+      MOZ_ASSERT(parent_);
+      return parent_;
+    }
+
+    ~WriteGuard() {
+      if (parent_) {
+        parent_->releaseWriterLock();
+      }
+    }
+  };
+
+  ReadGuard readLock() const { return ReadGuard(*this); }
+  WriteGuard writeLock() const { return WriteGuard(*this); }
 };
 
 }  // namespace js

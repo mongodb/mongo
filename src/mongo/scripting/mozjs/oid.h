@@ -47,8 +47,10 @@ namespace mozjs {
  * Holds a private bson OID
  */
 struct OIDInfo : public BaseInfo {
+    enum Slots { OIDSlot, OIDInfoSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(getter);
@@ -58,7 +60,7 @@ struct OIDInfo : public BaseInfo {
 
     static const JSFunctionSpec methods[3];
 
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(OIDInfoSlotCount);
 
     static const char* const className;
 

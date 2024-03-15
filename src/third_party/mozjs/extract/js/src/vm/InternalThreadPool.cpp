@@ -13,6 +13,7 @@
 #include "threading/Thread.h"
 #include "util/NativeStack.h"
 #include "vm/HelperThreadState.h"
+#include "vm/JSContext.h"
 
 // We want our default stack size limit to be approximately 2MB, to be safe, but
 // expect most threads to use much less. On Linux, however, requesting a stack
@@ -181,12 +182,22 @@ size_t InternalThreadPool::sizeOfIncludingThis(
 }
 
 /* static */
-void InternalThreadPool::DispatchTask() { Get().dispatchTask(); }
+void InternalThreadPool::DispatchTask(JS::DispatchReason reason) {
+  Get().dispatchTask(reason);
+}
 
-void InternalThreadPool::dispatchTask() {
+void InternalThreadPool::dispatchTask(JS::DispatchReason reason) {
   gHelperThreadLock.assertOwnedByCurrentThread();
   queuedTasks++;
-  wakeup.notify_one();
+  if (reason == JS::DispatchReason::NewTask) {
+    wakeup.notify_one();
+  } else {
+    // We're called from a helper thread right before returning to
+    // HelperThread::threadLoop. There we will check queuedTasks so there's no
+    // need to wake up any threads.
+    MOZ_ASSERT(reason == JS::DispatchReason::FinishedTask);
+    MOZ_ASSERT(!TlsContext.get(), "we should be on a helper thread");
+  }
 }
 
 void InternalThreadPool::notifyAll(const AutoLockHelperThreadState& lock) {

@@ -50,6 +50,12 @@ class OptimizationInfo {
   // Toggles whether redundant checks get removed.
   bool eliminateRedundantChecks_;
 
+  // Toggles whether redundant shape guards get removed.
+  bool eliminateRedundantShapeGuards_;
+
+  // Toggles whether redundant GC barriers get removed.
+  bool eliminateRedundantGCBarriers_;
+
   // Toggles whether interpreted scripts get inlined.
   bool inlineInterpreted_;
 
@@ -92,6 +98,8 @@ class OptimizationInfo {
         ama_(false),
         edgeCaseAnalysis_(false),
         eliminateRedundantChecks_(false),
+        eliminateRedundantShapeGuards_(false),
+        eliminateRedundantGCBarriers_(false),
         inlineInterpreted_(false),
         inlineNative_(false),
         gvn_(false),
@@ -149,6 +157,16 @@ class OptimizationInfo {
 
   bool eliminateRedundantChecksEnabled() const {
     return eliminateRedundantChecks_;
+  }
+
+  bool eliminateRedundantShapeGuardsEnabled() const {
+    return eliminateRedundantShapeGuards_ &&
+           !JitOptions.disableRedundantShapeGuards;
+  }
+
+  bool eliminateRedundantGCBarriersEnabled() const {
+    return eliminateRedundantGCBarriers_ &&
+           !JitOptions.disableRedundantGCBarriers;
   }
 
   IonRegisterAllocator registerAllocator() const {

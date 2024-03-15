@@ -31,6 +31,8 @@ enum class EnterJitStatus {
   NotEntered,
 };
 
+extern bool EnterInterpreterEntryTrampoline(uint8_t* code, JSContext* cx,
+                                            RunState* state);
 extern EnterJitStatus MaybeEnterJit(JSContext* cx, RunState& state);
 
 }  // namespace jit

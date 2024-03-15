@@ -213,10 +213,9 @@ public class IcuMemoryUsage {
         objects.add(Entry.of("DisplayNames", "o.of('en')"));
         objects.add(Entry.of("ListFormat", "o.format(['a', 'b'])"));
         objects.add(Entry.of("NumberFormat", "o.format(0)"));
-        // Instantiates UPluralRules and UNumberFormatter
-        // objects.add(Entry.of("PluralRules", "o.select(0)"));
-        // Instantiates only UPluralRules
-        objects.add(Entry.of("PluralRules", "o.resolvedOptions()"));
+        objects.add(Entry.of("NumberFormat", "NumberFormat (UNumberRangeFormatter)",
+                             "o.formatRange(0, 1000)"));
+        objects.add(Entry.of("PluralRules", "o.select(0)"));
         objects.add(Entry.of("RelativeTimeFormat", "o.format(0, 'hour')"));
 
         for (var entry : objects) {
@@ -231,18 +230,19 @@ const locales = scriptArgs[2].split(",");
 
 const extras = {};
 addIntlExtras(extras);
-if (extras.DisplayNames) {
-  Intl.DisplayNames = extras.DisplayNames;
-}
 
 for (let i = 0; i < locales.length; ++i) {
   // Loop twice in case the first time we create an object with a new locale
   // allocates additional memory when loading the locale data.
   for (let j = 0; j < 2; ++j) {
     let constructor = Intl[constructorName];
+    let options = undefined;
+    if (constructor === Intl.DisplayNames) {
+      options = {type: "language"};
+    }
 
     print("Create");
-    let obj = new constructor(locales[i]);
+    let obj = new constructor(locales[i], options);
 
     print("Init");
     initializer(obj);

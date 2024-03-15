@@ -9,7 +9,6 @@
 #include <type_traits>
 
 #include "gc/PublicIterators.h"
-#include "vm/Realm.h"
 
 #include "gc/GC-inl.h"
 #include "gc/Heap-inl.h"
@@ -75,7 +74,6 @@ void AtomMarkingRuntime::unregisterArena(Arena* arena, const AutoLockGC& lock) {
 bool AtomMarkingRuntime::computeBitmapFromChunkMarkBits(JSRuntime* runtime,
                                                         DenseBitmap& bitmap) {
   MOZ_ASSERT(CurrentThreadIsPerformingGC());
-  MOZ_ASSERT(!runtime->hasHelperThreadZones());
 
   if (!bitmap.ensureSpace(allocatedWords)) {
     return false;
@@ -129,7 +127,6 @@ static void BitwiseOrIntoChunkMarkBits(JSRuntime* runtime, Bitmap& bitmap) {
 
 void AtomMarkingRuntime::markAtomsUsedByUncollectedZones(JSRuntime* runtime) {
   MOZ_ASSERT(CurrentThreadIsPerformingGC());
-  MOZ_ASSERT(!runtime->hasHelperThreadZones());
 
   // Try to compute a simple union of the zone atom bitmaps before updating
   // the chunk mark bitmaps. If this allocation fails then fall back to
@@ -190,12 +187,6 @@ void AtomMarkingRuntime::markAtomValue(JSContext* cx, const Value& value) {
                                        value.isBigInt());
 }
 
-void AtomMarkingRuntime::adoptMarkedAtoms(Zone* target, Zone* source) {
-  MOZ_ASSERT(CurrentThreadCanAccessZone(source));
-  MOZ_ASSERT(CurrentThreadCanAccessZone(target));
-  target->markedAtoms().bitwiseOrWith(source->markedAtoms());
-}
-
 #ifdef DEBUG
 template <typename T>
 bool AtomMarkingRuntime::atomIsMarked(Zone* zone, T* thing) {
@@ -215,14 +206,13 @@ bool AtomMarkingRuntime::atomIsMarked(Zone* zone, T* thing) {
   }
 
   if constexpr (std::is_same_v<T, JSAtom>) {
-    JSRuntime* rt = zone->runtimeFromAnyThread();
-    if (rt->atoms().atomIsPinned(rt, thing)) {
+    if (thing->isPinned()) {
       return true;
     }
   }
 
   size_t bit = GetAtomBit(&thing->asTenured());
-  return zone->markedAtoms().getBit(bit);
+  return zone->markedAtoms().readonlyThreadsafeGetBit(bit);
 }
 
 template bool AtomMarkingRuntime::atomIsMarked(Zone* zone, JSAtom* thing);
@@ -274,7 +264,7 @@ bool AtomMarkingRuntime::valueIsMarked(Zone* zone, const Value& value) {
     return atomIsMarked(zone, value.toSymbol());
   }
 
-  MOZ_ASSERT_IF(value.isGCThing(), value.isObject() ||
+  MOZ_ASSERT_IF(value.isGCThing(), value.hasObjectPayload() ||
                                        value.isPrivateGCThing() ||
                                        value.isBigInt());
   return true;

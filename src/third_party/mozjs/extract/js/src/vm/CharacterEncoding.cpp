@@ -6,16 +6,26 @@
 
 #include "js/CharacterEncoding.h"
 
+#include "mozilla/CheckedInt.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/Latin1.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/Range.h"
 #include "mozilla/Span.h"
 #include "mozilla/Sprintf.h"
 #include "mozilla/TextUtils.h"
 #include "mozilla/Utf8.h"
 
-#include <algorithm>
+#ifndef XP_LINUX
+// We still support libstd++ versions without codecvt support on Linux.
+#  include <codecvt>
+#endif
+#include <cwchar>
+#include <limits>
+#include <locale>
 #include <type_traits>
 
+#include "frontend/FrontendContext.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "util/StringBuffer.h"
 #include "util/Unicode.h"  // unicode::REPLACEMENT_CHARACTER
@@ -30,8 +40,6 @@ using mozilla::IsAscii;
 using mozilla::IsUtf8Latin1;
 using mozilla::LossyConvertUtf16toLatin1;
 using mozilla::Span;
-using mozilla::Tie;
-using mozilla::Tuple;
 using mozilla::Utf8Unit;
 
 using JS::Latin1CharsZ;
@@ -63,7 +71,7 @@ static size_t GetDeflatedUTF8StringLength(const CharT* chars, size_t nchars) {
     if (c < 0x80) {
       continue;
     }
-    uint32_t v;
+    char32_t v;
     if (IsSurrogate(c)) {
       /* nbytes sets 1 length since this is surrogate pair. */
       if (IsTrailSurrogate(c) || (chars + 1) == end) {
@@ -104,16 +112,12 @@ JS_PUBLIC_API size_t JS::DeflateStringToUTF8Buffer(JSLinearString* src,
   JS::AutoCheckCannotGC nogc;
   if (src->hasLatin1Chars()) {
     auto source = AsChars(Span(src->latin1Chars(nogc), src->length()));
-    size_t read;
-    size_t written;
-    Tie(read, written) = ConvertLatin1toUtf8Partial(source, dst);
+    auto [read, written] = ConvertLatin1toUtf8Partial(source, dst);
     (void)read;
     return written;
   }
   auto source = Span(src->twoByteChars(nogc), src->length());
-  size_t read;
-  size_t written;
-  Tie(read, written) = ConvertUtf16toUtf8Partial(source, dst);
+  auto [read, written] = ConvertUtf16toUtf8Partial(source, dst);
   (void)read;
   return written;
 }
@@ -133,15 +137,15 @@ void ConvertToUTF8<const Latin1Char>(mozilla::Span<const Latin1Char> src,
   (void)ConvertLatin1toUtf8Partial(AsChars(src), dst);
 }
 
-template <typename CharT>
-UTF8CharsZ JS::CharsToNewUTF8CharsZ(JSContext* cx,
+template <typename CharT, typename Allocator>
+UTF8CharsZ JS::CharsToNewUTF8CharsZ(Allocator* alloc,
                                     const mozilla::Range<CharT> chars) {
   /* Get required buffer size. */
   const CharT* str = chars.begin().get();
   size_t len = ::GetDeflatedUTF8StringLength(str, chars.length());
 
   /* Allocate buffer. */
-  char* utf8 = cx->pod_malloc<char>(len + 1);
+  char* utf8 = alloc->template pod_malloc<char>(len + 1);
   if (!utf8) {
     return UTF8CharsZ();
   }
@@ -165,14 +169,26 @@ template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
 template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
     JSContext* cx, const mozilla::Range<const char16_t> chars);
 
-static const uint32_t INVALID_UTF8 = UINT32_MAX;
+template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
+    FrontendAllocator* cx, const mozilla::Range<Latin1Char> chars);
+
+template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
+    FrontendAllocator* cx, const mozilla::Range<char16_t> chars);
+
+template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
+    FrontendAllocator* cx, const mozilla::Range<const Latin1Char> chars);
+
+template UTF8CharsZ JS::CharsToNewUTF8CharsZ(
+    FrontendAllocator* cx, const mozilla::Range<const char16_t> chars);
+
+static constexpr uint32_t INVALID_UTF8 = std::numeric_limits<char32_t>::max();
 
 /*
  * Convert a UTF-8 character sequence into a UCS-4 character and return that
  * character. It is assumed that the caller already checked that the sequence
  * is valid.
  */
-static uint32_t Utf8ToOneUcs4CharImpl(const uint8_t* utf8Buffer,
+static char32_t Utf8ToOneUcs4CharImpl(const uint8_t* utf8Buffer,
                                       int utf8Length) {
   MOZ_ASSERT(1 <= utf8Length && utf8Length <= 4);
 
@@ -182,12 +198,12 @@ static uint32_t Utf8ToOneUcs4CharImpl(const uint8_t* utf8Buffer,
   }
 
   /* from Unicode 3.1, non-shortest form is illegal */
-  static const uint32_t minucs4Table[] = {0x80, 0x800, NonBMPMin};
+  static const char32_t minucs4Table[] = {0x80, 0x800, NonBMPMin};
 
   MOZ_ASSERT((*utf8Buffer & (0x100 - (1 << (7 - utf8Length)))) ==
              (0x100 - (1 << (8 - utf8Length))));
-  uint32_t ucs4Char = *utf8Buffer++ & ((1 << (7 - utf8Length)) - 1);
-  uint32_t minucs4Char = minucs4Table[utf8Length - 2];
+  char32_t ucs4Char = *utf8Buffer++ & ((1 << (7 - utf8Length)) - 1);
+  char32_t minucs4Char = minucs4Table[utf8Length - 2];
   while (--utf8Length) {
     MOZ_ASSERT((*utf8Buffer & 0xC0) == 0x80);
     ucs4Char = (ucs4Char << 6) | (*utf8Buffer++ & 0x3F);
@@ -204,7 +220,7 @@ static uint32_t Utf8ToOneUcs4CharImpl(const uint8_t* utf8Buffer,
   return ucs4Char;
 }
 
-uint32_t JS::Utf8ToOneUcs4Char(const uint8_t* utf8Buffer, int utf8Length) {
+char32_t JS::Utf8ToOneUcs4Char(const uint8_t* utf8Buffer, int utf8Length) {
   return Utf8ToOneUcs4CharImpl(utf8Buffer, utf8Length);
 }
 
@@ -361,7 +377,6 @@ static void CopyAndInflateUTF8IntoBuffer(JSContext* cx, const UTF8Chars src,
     MOZ_ALWAYS_TRUE((InflateUTF8ToUTF16<ErrorAction>(cx, src, push)));
     MOZ_ASSERT(j == outlen);
   }
-  dst[outlen] = CharT('\0');  // NUL char
 }
 
 template <OnUTF8Error ErrorAction, typename CharsT>
@@ -399,6 +414,7 @@ static CharsT InflateUTF8StringHelper(JSContext* cx, const UTF8Chars src,
           ? OnUTF8Error::InsertQuestionMark
           : OnUTF8Error::InsertReplacementCharacter;
   CopyAndInflateUTF8IntoBuffer<errorMode>(cx, src, dst, *outlen, allASCII);
+  dst[*outlen] = CharT('\0');
 
   return CharsT(dst, *outlen);
 }
@@ -543,20 +559,19 @@ template bool UTF8EqualsChars(const JS::UTF8Chars, const char16_t*);
 template bool UTF8EqualsChars(const JS::UTF8Chars, const JS::Latin1Char*);
 
 template <typename CharT>
-void InflateUTF8CharsToBufferAndTerminate(const JS::UTF8Chars src, CharT* dst,
-                                          size_t dstLen,
-                                          JS::SmallestEncoding encoding) {
+void InflateUTF8CharsToBuffer(const JS::UTF8Chars src, CharT* dst,
+                              size_t dstLen, JS::SmallestEncoding encoding) {
   CopyAndInflateUTF8IntoBuffer<OnUTF8Error::Crash>(
       /* cx = */ nullptr, src, dst, dstLen,
       encoding == JS::SmallestEncoding::ASCII);
 }
 
-template void InflateUTF8CharsToBufferAndTerminate(
-    const UTF8Chars src, char16_t* dst, size_t dstLen,
-    JS::SmallestEncoding encoding);
-template void InflateUTF8CharsToBufferAndTerminate(
-    const UTF8Chars src, JS::Latin1Char* dst, size_t dstLen,
-    JS::SmallestEncoding encoding);
+template void InflateUTF8CharsToBuffer(const UTF8Chars src, char16_t* dst,
+                                       size_t dstLen,
+                                       JS::SmallestEncoding encoding);
+template void InflateUTF8CharsToBuffer(const UTF8Chars src, JS::Latin1Char* dst,
+                                       size_t dstLen,
+                                       JS::SmallestEncoding encoding);
 
 #ifdef DEBUG
 void JS::ConstUTF8CharsZ::validate(size_t aLength) {
@@ -581,7 +596,233 @@ bool JS::StringIsASCII(const char* s) {
 
 bool JS::StringIsASCII(Span<const char> s) { return IsAscii(s); }
 
+JS_PUBLIC_API JS::UniqueChars JS::EncodeNarrowToUtf8(JSContext* cx,
+                                                     const char* chars) {
+  // Convert the narrow multibyte character string to a wide string and then
+  // use EncodeWideToUtf8() to convert the wide string to a UTF-8 string.
+
+  std::mbstate_t mb{};
+
+  // NOTE: The 2nd parameter is overwritten even if the 1st parameter is nullptr
+  //       on Android NDK older than v16.  Use a temporary variable to save the
+  //       `chars` for the subsequent call.  See bug 1492090.
+  const char* tmpChars = chars;
+
+  size_t wideLen = std::mbsrtowcs(nullptr, &tmpChars, 0, &mb);
+  if (wideLen == size_t(-1)) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_CANT_CONVERT_TO_WIDE);
+    return nullptr;
+  }
+  MOZ_ASSERT(std::mbsinit(&mb),
+             "multi-byte state is in its initial state when no conversion "
+             "error occured");
+
+  size_t bufLen = wideLen + 1;
+  auto wideChars = cx->make_pod_array<wchar_t>(bufLen);
+  if (!wideChars) {
+    return nullptr;
+  }
+
+  mozilla::DebugOnly<size_t> actualLen =
+      std::mbsrtowcs(wideChars.get(), &chars, bufLen, &mb);
+  MOZ_ASSERT(wideLen == actualLen);
+  MOZ_ASSERT(wideChars[actualLen] == '\0');
+
+  return EncodeWideToUtf8(cx, wideChars.get());
+}
+
+JS_PUBLIC_API JS::UniqueChars JS::EncodeWideToUtf8(JSContext* cx,
+                                                   const wchar_t* chars) {
+  using CheckedSizeT = mozilla::CheckedInt<size_t>;
+
+#ifndef XP_LINUX
+  // Use the standard codecvt facet to convert a wide string to UTF-8.
+  std::codecvt_utf8<wchar_t> cv;
+
+  size_t len = std::wcslen(chars);
+  CheckedSizeT utf8MaxLen = CheckedSizeT(len) * cv.max_length();
+  CheckedSizeT utf8BufLen = utf8MaxLen + 1;
+  if (!utf8BufLen.isValid()) {
+    JS_ReportAllocationOverflow(cx);
+    return nullptr;
+  }
+  auto utf8 = cx->make_pod_array<char>(utf8BufLen.value());
+  if (!utf8) {
+    return nullptr;
+  }
+
+  // STL returns |codecvt_base::partial| for empty strings.
+  if (len == 0) {
+    return utf8;
+  }
+
+  std::mbstate_t mb{};
+  const wchar_t* fromNext;
+  char* toNext;
+  std::codecvt_base::result result =
+      cv.out(mb, chars, chars + len, fromNext, utf8.get(),
+             utf8.get() + utf8MaxLen.value(), toNext);
+  if (result != std::codecvt_base::ok) {
+    MOZ_ASSERT(result == std::codecvt_base::error);
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_CANT_CONVERT_WIDE_TO_UTF8);
+    return nullptr;
+  }
+  *toNext = '\0';  // Explicit null-termination required.
+
+  // codecvt_utf8 doesn't validate its output and may produce WTF-8 instead
+  // of UTF-8 on some platforms when the input contains unpaired surrogate
+  // characters. We don't allow this.
+  if (!mozilla::IsUtf8(
+          mozilla::Span(utf8.get(), size_t(toNext - utf8.get())))) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_CANT_CONVERT_WIDE_TO_UTF8);
+    return nullptr;
+  }
+
+  return utf8;
+#else
+  static_assert(sizeof(wchar_t) == 4,
+                "Assume wchar_t is UTF-32 on Linux systems");
+
+  constexpr size_t MaxUtf8CharLength = 4;
+
+  size_t len = std::wcslen(chars);
+  CheckedSizeT utf8MaxLen = CheckedSizeT(len) * MaxUtf8CharLength;
+  CheckedSizeT utf8BufLen = utf8MaxLen + 1;
+  if (!utf8BufLen.isValid()) {
+    JS_ReportAllocationOverflow(cx);
+    return nullptr;
+  }
+  auto utf8 = cx->make_pod_array<char>(utf8BufLen.value());
+  if (!utf8) {
+    return nullptr;
+  }
+
+  char* dst = utf8.get();
+  for (size_t i = 0; i < len; i++) {
+    uint8_t utf8buf[MaxUtf8CharLength];
+    uint32_t utf8Len = OneUcs4ToUtf8Char(utf8buf, chars[i]);
+    for (size_t j = 0; j < utf8Len; j++) {
+      *dst++ = char(utf8buf[j]);
+    }
+  }
+  *dst = '\0';
+
+  return utf8;
+#endif
+}
+
+JS_PUBLIC_API JS::UniqueChars JS::EncodeUtf8ToNarrow(JSContext* cx,
+                                                     const char* chars) {
+  // Convert the UTF-8 string to a wide string via EncodeUtf8ToWide() and
+  // then convert the resulting wide string to a narrow multibyte character
+  // string.
+
+  auto wideChars = EncodeUtf8ToWide(cx, chars);
+  if (!wideChars) {
+    return nullptr;
+  }
+
+  const wchar_t* cWideChars = wideChars.get();
+  std::mbstate_t mb{};
+  size_t narrowLen = std::wcsrtombs(nullptr, &cWideChars, 0, &mb);
+  if (narrowLen == size_t(-1)) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_CANT_CONVERT_TO_NARROW);
+    return nullptr;
+  }
+  MOZ_ASSERT(std::mbsinit(&mb),
+             "multi-byte state is in its initial state when no conversion "
+             "error occured");
+
+  size_t bufLen = narrowLen + 1;
+  auto narrow = cx->make_pod_array<char>(bufLen);
+  if (!narrow) {
+    return nullptr;
+  }
+
+  mozilla::DebugOnly<size_t> actualLen =
+      std::wcsrtombs(narrow.get(), &cWideChars, bufLen, &mb);
+  MOZ_ASSERT(narrowLen == actualLen);
+  MOZ_ASSERT(narrow[actualLen] == '\0');
+
+  return narrow;
+}
+
+JS_PUBLIC_API JS::UniqueWideChars JS::EncodeUtf8ToWide(JSContext* cx,
+                                                       const char* chars) {
+  // Only valid UTF-8 strings should be passed to this function.
+  MOZ_ASSERT(mozilla::IsUtf8(mozilla::Span(chars, strlen(chars))));
+
+#ifndef XP_LINUX
+  // Use the standard codecvt facet to convert from UTF-8 to a wide string.
+  std::codecvt_utf8<wchar_t> cv;
+
+  size_t len = strlen(chars);
+  auto wideChars = cx->make_pod_array<wchar_t>(len + 1);
+  if (!wideChars) {
+    return nullptr;
+  }
+
+  // STL returns |codecvt_base::partial| for empty strings.
+  if (len == 0) {
+    return wideChars;
+  }
+
+  std::mbstate_t mb{};
+  const char* fromNext;
+  wchar_t* toNext;
+  std::codecvt_base::result result =
+      cv.in(mb, chars, chars + len, fromNext, wideChars.get(),
+            wideChars.get() + len, toNext);
+  if (result != std::codecvt_base::ok) {
+    MOZ_ASSERT(result == std::codecvt_base::error);
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_CANT_CONVERT_UTF8_TO_WIDE);
+    return nullptr;
+  }
+  *toNext = '\0';  // Explicit null-termination required.
+
+  return wideChars;
+#else
+  static_assert(sizeof(wchar_t) == 4,
+                "Assume wchar_t is UTF-32 on Linux systems");
+
+  size_t len = strlen(chars);
+  auto wideChars = cx->make_pod_array<wchar_t>(len + 1);
+  if (!wideChars) {
+    return nullptr;
+  }
+
+  const auto* s = reinterpret_cast<const unsigned char*>(chars);
+  const auto* const limit = s + len;
+
+  wchar_t* dst = wideChars.get();
+  while (s < limit) {
+    unsigned char c = *s++;
+
+    if (mozilla::IsAscii(c)) {
+      *dst++ = wchar_t(c);
+      continue;
+    }
+
+    mozilla::Utf8Unit utf8(c);
+    mozilla::Maybe<char32_t> codePoint =
+        mozilla::DecodeOneUtf8CodePoint(utf8, &s, limit);
+    MOZ_ASSERT(codePoint.isSome());
+    *dst++ = wchar_t(*codePoint);
+  }
+  *dst++ = '\0';
+
+  return wideChars;
+#endif
+}
+
 bool StringBuffer::append(const Utf8Unit* units, size_t len) {
+  MOZ_ASSERT(maybeCx_);
+
   if (isLatin1()) {
     Latin1CharBuffer& latin1 = latin1Chars();
 
@@ -620,7 +861,7 @@ bool StringBuffer::append(const Utf8Unit* units, size_t len) {
     utf16Len++;
     return LoopDisposition::Continue;
   };
-  if (!InflateUTF8ToUTF16<OnUTF8Error::Throw>(cx_, remainingUtf8,
+  if (!InflateUTF8ToUTF16<OnUTF8Error::Throw>(maybeCx_, remainingUtf8,
                                               countInflated)) {
     return false;
   }
@@ -640,8 +881,8 @@ bool StringBuffer::append(const Utf8Unit* units, size_t len) {
     return LoopDisposition::Continue;
   };
 
-  MOZ_ALWAYS_TRUE(
-      InflateUTF8ToUTF16<OnUTF8Error::Throw>(cx_, remainingUtf8, appendUtf16));
+  MOZ_ALWAYS_TRUE(InflateUTF8ToUTF16<OnUTF8Error::Throw>(
+      maybeCx_, remainingUtf8, appendUtf16));
   MOZ_ASSERT(toFill == buf.end());
   return true;
 }

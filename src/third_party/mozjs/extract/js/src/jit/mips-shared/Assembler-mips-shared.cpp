@@ -209,6 +209,7 @@ size_t AssemblerMIPSShared::bytesNeeded() const {
 
 // write a blob of binary into the instruction stream
 BufferOffset AssemblerMIPSShared::writeInst(uint32_t x, uint32_t* dest) {
+  MOZ_ASSERT(hasCreator());
   if (dest == nullptr) {
     return m_buffer.putInt(x);
   }

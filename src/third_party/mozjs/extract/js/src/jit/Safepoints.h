@@ -30,11 +30,11 @@ static const uint32_t INVALID_SAFEPOINT_OFFSET = uint32_t(-1);
 
 class SafepointWriter {
   CompactBufferWriter stream_;
-  BitSet frameSlots_;
+  BitSet localSlots_;
   BitSet argumentSlots_;
 
  public:
-  explicit SafepointWriter(uint32_t slotCount, uint32_t argumentCount);
+  explicit SafepointWriter(uint32_t localSlotsSize, uint32_t argumentsSize);
   [[nodiscard]] bool init(TempAllocator& alloc);
 
  private:
@@ -65,7 +65,7 @@ class SafepointWriter {
 
 class SafepointReader {
   CompactBufferReader stream_;
-  uint32_t frameSlots_;
+  uint32_t localSlots_;
   uint32_t argumentSlots_;
   uint32_t currentSlotChunk_;
   bool currentSlotsAreStack_;

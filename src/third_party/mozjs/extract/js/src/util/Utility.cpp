@@ -18,7 +18,6 @@
 #include "jstypes.h"
 
 #include "util/Poison.h"
-#include "util/Windows.h"
 #include "vm/HelperThreads.h"
 
 using namespace js;
@@ -106,9 +105,12 @@ JS_PUBLIC_DATA arena_id_t js::ArrayBufferContentsArena;
 JS_PUBLIC_DATA arena_id_t js::StringBufferArena;
 
 void js::InitMallocAllocator() {
-  MallocArena = moz_create_arena();
+  arena_params_t mallocArenaParams;
+  mallocArenaParams.mMaxDirtyIncreaseOverride = 5;
+  MallocArena = moz_create_arena_with_params(&mallocArenaParams);
 
   arena_params_t params;
+  params.mMaxDirtyIncreaseOverride = 5;
   params.mFlags |= ARENA_FLAG_RANDOMIZE_SMALL_ENABLED;
   ArrayBufferContentsArena = moz_create_arena_with_params(&params);
   StringBufferArena = moz_create_arena_with_params(&params);

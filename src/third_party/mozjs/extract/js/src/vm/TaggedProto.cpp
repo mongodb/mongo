@@ -7,7 +7,6 @@
 #include "vm/TaggedProto.h"
 
 #include "gc/Barrier.h"
-#include "vm/JSFunction.h"
 #include "vm/JSObject.h"
 
 namespace js {
@@ -29,5 +28,7 @@ namespace js {
     const TaggedProto& proto) {
   InternalBarrierMethods<JSObject*>::readBarrier(proto.toObjectOrNull());
 }
+
+void TaggedProto::trace(JSTracer* trc) { TraceRoot(trc, this, "TaggedProto"); }
 
 }  // namespace js

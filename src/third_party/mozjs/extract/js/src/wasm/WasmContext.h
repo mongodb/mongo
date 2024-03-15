@@ -19,40 +19,20 @@
 #ifndef wasm_context_h
 #define wasm_context_h
 
-#include "mozilla/MemoryReporting.h"
-#include "jstypes.h"
-#include "js/UniquePtr.h"
-
-struct JS_PUBLIC_API JSContext;
-
 namespace js {
 namespace wasm {
-
-class TypeContext;
 
 // wasm::Context lives in JSContext and contains the wasm-related per-context
 // state.
 
 class Context {
  public:
-  Context()
-      : triedToInstallSignalHandlers(false),
-        haveSignalHandlers(false),
-        typeContext(nullptr) {}
+  Context() : triedToInstallSignalHandlers(false), haveSignalHandlers(false) {}
 
   // Used by wasm::EnsureThreadSignalHandlers(cx) to install thread signal
   // handlers once per JSContext/thread.
   bool triedToInstallSignalHandlers;
   bool haveSignalHandlers;
-
-  [[nodiscard]] bool ensureTypeContext(JSContext* cx);
-
-  // The global type context.
-  UniquePtr<TypeContext> typeContext;
-
-  // about:memory reporting
-
-  size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 };
 
 }  // namespace wasm

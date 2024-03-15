@@ -41,6 +41,8 @@ struct JitCodeHeader {
 };
 
 class JitCode : public gc::TenuredCellWithNonGCPointer<uint8_t> {
+  friend class gc::CellAllocator;
+
  public:
   // Raw code pointer, stored in the cell header.
   uint8_t* raw() const { return headerPtr(); }
@@ -94,7 +96,7 @@ class JitCode : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   size_t headerSize() const { return headerSize_; }
 
   void traceChildren(JSTracer* trc);
-  void finalize(JSFreeOp* fop);
+  void finalize(JS::GCContext* gcx);
   void setInvalidated() { invalidated_ = true; }
 
   void setHasBytecodeMap() { hasBytecodeMap_ = true; }

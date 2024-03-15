@@ -51,10 +51,12 @@ namespace mozjs {
  * }
  */
 struct DBRefInfo : public BaseInfo {
+    enum Slots { BSONHolderSlot, DBRefInfoSlotCount };
+
     static void construct(JSContext* cx, JS::CallArgs args);
 
     static const char* const className;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(DBRefInfoSlotCount);
 
     static void delProperty(JSContext* cx,
                             JS::HandleObject obj,
@@ -64,7 +66,7 @@ struct DBRefInfo : public BaseInfo {
                           JS::HandleObject obj,
                           JS::MutableHandleIdVector properties,
                           bool enumerableOnly);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
     static void setProperty(JSContext* cx,
                             JS::HandleObject obj,

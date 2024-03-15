@@ -17,15 +17,7 @@
 
 class JS_PUBLIC_API JSObject;
 
-// The Debugger.Environment.prototype object also has a class of
-// DebuggerEnvironment::class_ so we differentiate instances from the prototype
-// based on the presence of an owner debugger.
-inline bool js::DebuggerEnvironment::isInstance() const {
-  return !getReservedSlot(OWNER_SLOT).isUndefined();
-}
-
 inline js::Debugger* js::DebuggerEnvironment::owner() const {
-  MOZ_ASSERT(isInstance());
   JSObject* dbgobj = &getReservedSlot(OWNER_SLOT).toObject();
   return Debugger::fromJSObject(dbgobj);
 }

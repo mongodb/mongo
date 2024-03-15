@@ -25,6 +25,10 @@ class MOZ_STACK_CLASS WarpOracle {
   HandleScript outerScript_;
   WarpBailoutInfo bailoutInfo_;
   WarpScriptSnapshotList scriptSnapshots_;
+  size_t accumulatedBytecodeSize_ = 0;
+#ifdef DEBUG
+  mozilla::HashNumber runningScriptHash_ = 0;
+#endif
 
   // List of nursery objects to copy to the snapshot. See WarpObjectField.
   // The HashMap is used to de-duplicate the Vector. It maps each object to the
@@ -52,7 +56,10 @@ class MOZ_STACK_CLASS WarpOracle {
   mozilla::GenericErrorResult<AbortReason> abort(HandleScript script,
                                                  AbortReason r,
                                                  const char* message, ...);
-  void addScriptSnapshot(WarpScriptSnapshot* scriptSnapshot);
+  void addScriptSnapshot(WarpScriptSnapshot* scriptSnapshot, ICScript* icScript,
+                         size_t bytecodeLength);
+
+  size_t accumulatedBytecodeSize() { return accumulatedBytecodeSize_; }
 };
 
 }  // namespace jit

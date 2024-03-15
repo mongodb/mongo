@@ -7,9 +7,7 @@
 /* API for getting a stack trace of the C/C++ stack on the current thread */
 
 #include "mozilla/ArrayUtils.h"
-#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/StackWalk.h"
 #ifdef XP_WIN
 #  include "mozilla/StackWalkThread.h"
@@ -639,7 +637,6 @@ MFBT_API bool MozDescribeCodeAddress(void* aPC,
      MOZ_STACKWALK_SUPPORTS_MACOSX)
 
 #  include <stdlib.h>
-#  include <string.h>
 #  include <stdio.h>
 
 // On glibc 2.1, the Dl_info api defined in <dlfcn.h> is only exposed
@@ -866,7 +863,7 @@ const uintptr_t kPointerMask =
 const uintptr_t kPointerMask = ~uintptr_t(0);
 #  endif
 
-MOZ_ASAN_BLACKLIST
+MOZ_ASAN_IGNORE
 static void DoFramePointerStackWalk(MozWalkStackCallback aCallback,
                                     const void* aFirstFramePC,
                                     uint32_t aMaxFrames, void* aClosure,
@@ -875,6 +872,21 @@ static void DoFramePointerStackWalk(MozWalkStackCallback aCallback,
 
   FrameSkipper skipper(aFirstFramePC);
   uint32_t numFrames = 0;
+
+  // Sanitize the given aBp. Assume that something reasonably close to
+  // but before the stack end is going be a valid frame pointer. Also
+  // check that it is an aligned address. This increases the chances
+  // that if the pointer is not valid (which might happen if the caller
+  // called __builtin_frame_address(1) and its frame is busted for some
+  // reason), we won't read it, leading to a crash. Because the calling
+  // code is not using frame pointers when returning, it might actually
+  // recover just fine.
+  static const uintptr_t kMaxStackSize = 8 * 1024 * 1024;
+  if (uintptr_t(aBp) < uintptr_t(aStackEnd) -
+                           std::min(kMaxStackSize, uintptr_t(aStackEnd)) ||
+      aBp >= aStackEnd || (uintptr_t(aBp) & 3)) {
+    return;
+  }
 
   while (aBp) {
     void** next = (void**)*aBp;

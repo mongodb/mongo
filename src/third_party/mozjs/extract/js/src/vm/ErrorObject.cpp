@@ -14,34 +14,30 @@
 
 #include <utility>
 
-#include "jsapi.h"
 #include "jsexn.h"
-#include "jsfriendapi.h"
-#include "jsnum.h"
 #include "jspubtd.h"
 #include "NamespaceImports.h"
 
-#include "builtin/Array.h"
 #include "gc/AllocKind.h"
-#include "gc/FreeOp.h"
-#include "gc/Rooting.h"
+#include "gc/GCContext.h"
 #include "js/CallArgs.h"
 #include "js/CallNonGenericMethod.h"
 #include "js/CharacterEncoding.h"
 #include "js/Class.h"
 #include "js/Conversions.h"
 #include "js/ErrorReport.h"
-#include "js/ForOfIterator.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/friend/StackLimits.h"    // js::AutoCheckRecursionLimit
 #include "js/PropertySpec.h"
 #include "js/RootingAPI.h"
+#include "js/Stack.h"
 #include "js/TypeDecls.h"
 #include "js/Utility.h"
 #include "js/Value.h"
 #include "js/Wrapper.h"
 #include "util/StringBuffer.h"
 #include "vm/GlobalObject.h"
+#include "vm/Iteration.h"
 #include "vm/JSAtom.h"
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
@@ -55,10 +51,8 @@
 #include "vm/ToSource.h"       // js::ValueToSource
 #include "vm/WellKnownAtom.h"  // js_*_str
 
-#include "vm/ArrayObject-inl.h"
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
-#include "vm/NativeObject-inl.h"
 #include "vm/ObjectOperations-inl.h"
 #include "vm/SavedStacks-inl.h"
 #include "vm/Shape-inl.h"
@@ -67,7 +61,7 @@ using namespace js;
 
 #define IMPLEMENT_ERROR_PROTO_CLASS(name)                         \
   {                                                               \
-#    name ".prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_##name), \
+    #name ".prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_##name), \
         JS_NULL_CLASS_OPS,                                        \
         &ErrorObject::classSpecs[JSProto_##name - JSProto_Error]  \
   }
@@ -156,7 +150,7 @@ const ClassSpec ErrorObject::classSpecs[JSEXN_ERROR_LIMIT] = {
 
 #define IMPLEMENT_ERROR_CLASS_CORE(name, reserved_slots)         \
   {                                                              \
-#    name,                                                       \
+    #name,                                                       \
         JSCLASS_HAS_CACHED_PROTO(JSProto_##name) |               \
             JSCLASS_HAS_RESERVED_SLOTS(reserved_slots) |         \
             JSCLASS_BACKGROUND_FINALIZE,                         \
@@ -173,7 +167,7 @@ const ClassSpec ErrorObject::classSpecs[JSEXN_ERROR_LIMIT] = {
 #define IMPLEMENT_ERROR_CLASS_MAYBE_WASM_TRAP(name) \
   IMPLEMENT_ERROR_CLASS_CORE(name, ErrorObject::RESERVED_SLOTS_MAYBE_WASM_TRAP)
 
-static void exn_finalize(JSFreeOp* fop, JSObject* obj);
+static void exn_finalize(JS::GCContext* gcx, JSObject* obj);
 
 static const JSClassOps ErrorObjectClassOps = {
     nullptr,       // addProperty
@@ -184,7 +178,6 @@ static const JSClassOps ErrorObjectClassOps = {
     nullptr,       // mayResolve
     exn_finalize,  // finalize
     nullptr,       // call
-    nullptr,       // hasInstance
     nullptr,       // construct
     nullptr,       // trace
 };
@@ -201,11 +194,10 @@ const JSClass ErrorObject::classes[JSEXN_ERROR_LIMIT] = {
     IMPLEMENT_ERROR_CLASS(CompileError), IMPLEMENT_ERROR_CLASS(LinkError),
     IMPLEMENT_ERROR_CLASS_MAYBE_WASM_TRAP(RuntimeError)};
 
-static void exn_finalize(JSFreeOp* fop, JSObject* obj) {
-  MOZ_ASSERT(fop->maybeOnHelperThread());
+static void exn_finalize(JS::GCContext* gcx, JSObject* obj) {
   if (JSErrorReport* report = obj->as<ErrorObject>().getErrorReport()) {
     // Bug 1560019: This allocation is not currently tracked.
-    fop->deleteUntracked(report);
+    gcx->deleteUntracked(report);
   }
 }
 
@@ -255,7 +247,8 @@ static ErrorObject* CreateErrorObject(JSContext* cx, const CallArgs& args,
     fileName = cx->runtime()->emptyString;
     if (!iter.done()) {
       if (const char* cfilename = iter.filename()) {
-        fileName = JS_NewStringCopyZ(cx, cfilename);
+        fileName = JS_NewStringCopyUTF8Z(
+            cx, JS::ConstUTF8CharsZ(cfilename, strlen(cfilename)));
       }
       if (iter.hasScript()) {
         sourceId = iter.script()->scriptSource()->id();
@@ -316,33 +309,6 @@ static bool Error(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
-static ArrayObject* IterableToArray(JSContext* cx, HandleValue iterable) {
-  JS::ForOfIterator iterator(cx);
-  if (!iterator.init(iterable, JS::ForOfIterator::ThrowOnNonIterable)) {
-    return nullptr;
-  }
-
-  RootedArrayObject array(cx, NewDenseEmptyArray(cx));
-  if (!array) {
-    return nullptr;
-  }
-
-  RootedValue nextValue(cx);
-  while (true) {
-    bool done;
-    if (!iterator.next(&nextValue, &done)) {
-      return nullptr;
-    }
-    if (done) {
-      return array;
-    }
-
-    if (!NewbornArrayPush(cx, array, nextValue)) {
-      return nullptr;
-    }
-  }
-}
-
 // AggregateError ( errors, message )
 static bool AggregateError(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -374,8 +340,8 @@ static bool AggregateError(JSContext* cx, unsigned argc, Value* vp) {
 
   // Step 4.
 
-  RootedArrayObject errorsList(cx, IterableToArray(cx, args.get(0)));
-  if (!errorsList) {
+  Rooted<ArrayObject*> errorsList(cx);
+  if (!IterableToArray(cx, args.get(0), &errorsList)) {
     return false;
   }
 
@@ -449,8 +415,8 @@ JSObject* ErrorObject::createConstructor(JSContext* cx, JSProtoKey key) {
 }
 
 /* static */
-Shape* js::ErrorObject::assignInitialShape(JSContext* cx,
-                                           Handle<ErrorObject*> obj) {
+SharedShape* js::ErrorObject::assignInitialShape(JSContext* cx,
+                                                 Handle<ErrorObject*> obj) {
   MOZ_ASSERT(obj->empty());
 
   constexpr PropertyFlags propFlags = {PropertyFlag::Configurable,
@@ -471,7 +437,7 @@ Shape* js::ErrorObject::assignInitialShape(JSContext* cx,
     return nullptr;
   }
 
-  return obj->shape();
+  return obj->sharedShape();
 }
 
 /* static */
@@ -606,7 +572,8 @@ JSErrorReport* js::ErrorObject::getOrCreateErrorReport(JSContext* cx) {
   report.exnType = type_;
 
   // Filename.
-  UniqueChars filenameStr = JS_EncodeStringToLatin1(cx, fileName(cx));
+  RootedString filename(cx, fileName(cx));
+  UniqueChars filenameStr = JS_EncodeStringToUTF8(cx, filename);
   if (!filenameStr) {
     return nullptr;
   }
@@ -650,36 +617,30 @@ static bool FindErrorInstanceOrPrototype(JSContext* cx, HandleObject obj,
   //   (new NYI).stack
   // to continue returning stacks that are useless, but at least don't throw.
 
-  RootedObject target(cx, CheckedUnwrapStatic(obj));
-  if (!target) {
-    ReportAccessDenied(cx);
-    return false;
-  }
-
-  RootedObject proto(cx);
-  while (!IsErrorProtoKey(StandardProtoKeyOrNull(target))) {
-    if (!GetPrototype(cx, target, &proto)) {
-      return false;
-    }
-
-    if (!proto) {
-      // We walked the whole prototype chain and did not find an Error
-      // object.
-      JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                                JSMSG_INCOMPATIBLE_PROTO, js_Error_str,
-                                "(get stack)", obj->getClass()->name);
-      return false;
-    }
-
-    target = CheckedUnwrapStatic(proto);
+  RootedObject curr(cx, obj);
+  RootedObject target(cx);
+  do {
+    target = CheckedUnwrapStatic(curr);
     if (!target) {
       ReportAccessDenied(cx);
       return false;
     }
-  }
+    if (IsErrorProtoKey(StandardProtoKeyOrNull(target))) {
+      result.set(target);
+      return true;
+    }
 
-  result.set(target);
-  return true;
+    if (!GetPrototype(cx, curr, &curr)) {
+      return false;
+    }
+  } while (curr);
+
+  // We walked the whole prototype chain and did not find an Error
+  // object.
+  JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                            JSMSG_INCOMPATIBLE_PROTO, js_Error_str,
+                            "(get stack)", obj->getClass()->name);
+  return false;
 }
 
 static MOZ_ALWAYS_INLINE bool IsObject(HandleValue v) { return v.isObject(); }
@@ -718,7 +679,7 @@ bool js::ErrorObject::getStack_impl(JSContext* cx, const CallArgs& args) {
   if (cx->runtime()->stackFormat() == js::StackFormat::V8) {
     // When emulating V8 stack frames, we also need to prepend the
     // stringified Error to the stack string.
-    HandlePropertyName name = cx->names().ErrorToStringWithTrailingNewline;
+    Handle<PropertyName*> name = cx->names().ErrorToStringWithTrailingNewline;
     FixedInvokeArgs<0> args2(cx);
     RootedValue rval(cx);
     if (!CallSelfHostedFunction(cx, name, args.thisv(), args2, &rval)) {

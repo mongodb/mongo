@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "builtin/streams/ReadableStreamDefaultController.cpp"
+#include "jsnum.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/streams/ReadableStreamDefaultController.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jsnum.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/streams/ReadableStreamDefaultController.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jsnum.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/streams/ReadableStreamDefaultControllerOperations.cpp"
+#include "proxy/BaseProxyHandler.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/streams/ReadableStreamDefaultControllerOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/BaseProxyHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/streams/ReadableStreamDefaultControllerOperations.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/BaseProxyHandler.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/streams/ReadableStreamDefaultReader.cpp"
+#include "proxy/CrossCompartmentWrapper.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/streams/ReadableStreamDefaultReader.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/CrossCompartmentWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/streams/ReadableStreamDefaultReader.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/CrossCompartmentWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/streams/ReadableStreamInternals.cpp"
+#include "proxy/DOMProxy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/streams/ReadableStreamInternals.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/DOMProxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/streams/ReadableStreamInternals.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/DOMProxy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/streams/ReadableStreamOperations.cpp"
+#include "proxy/DeadObjectProxy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/streams/ReadableStreamOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/DeadObjectProxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/streams/ReadableStreamOperations.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/DeadObjectProxy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/streams/ReadableStreamReader.cpp"
+#include "proxy/OpaqueCrossCompartmentWrapper.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/streams/ReadableStreamReader.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/OpaqueCrossCompartmentWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/streams/ReadableStreamReader.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/OpaqueCrossCompartmentWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

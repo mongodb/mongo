@@ -1,13 +1,4 @@
 #define MOZ_UNIFIED_BUILD
-#include "irregexp/imported/regexp-compiler-tonode.cc"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/imported/regexp-compiler-tonode.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "irregexp/imported/regexp-compiler-tonode.cc defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
 #include "irregexp/imported/regexp-dotprinter.cc"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "irregexp/imported/regexp-dotprinter.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -51,5 +42,14 @@
 #endif
 #ifdef INITGUID
 #error "irregexp/imported/regexp-parser.cc defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "irregexp/imported/regexp-stack.cc"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "irregexp/imported/regexp-stack.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "irregexp/imported/regexp-stack.cc defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

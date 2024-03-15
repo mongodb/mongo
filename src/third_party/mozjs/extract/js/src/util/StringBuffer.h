@@ -7,22 +7,58 @@
 #ifndef util_StringBuffer_h
 #define util_StringBuffer_h
 
-#include "mozilla/DebugOnly.h"
+#include "mozilla/CheckedInt.h"
 #include "mozilla/MaybeOneOf.h"
 #include "mozilla/Utf8.h"
 
-#include "frontend/ParserAtom.h"  // ParserAtomsTable, TaggedParserAtomIndex
+#include "frontend/FrontendContext.h"
 #include "js/Vector.h"
-#include "vm/JSContext.h"
+#include "vm/StringType.h"
 
 namespace js {
 
+class FrontendContext;
+
+namespace frontend {
+class ParserAtomsTable;
+class TaggedParserAtomIndex;
+}  // namespace frontend
+
+namespace detail {
+
+// GrowEltsAggressively will multiply the space by a factor of 8 on overflow, to
+// avoid very expensive memcpys for large strings (eg giant toJSON output for
+// sessionstore.js). Drop back to the normal expansion policy once the buffer
+// hits 128MB.
+static constexpr size_t AggressiveLimit = 128 << 20;
+
+template <size_t EltSize>
+inline size_t GrowEltsAggressively(size_t aOldElts, size_t aIncr) {
+  mozilla::CheckedInt<size_t> required =
+      mozilla::CheckedInt<size_t>(aOldElts) + aIncr;
+  if (!(required * 2).isValid()) {
+    return 0;
+  }
+  required = mozilla::RoundUpPow2(required.value());
+  required *= 8;
+  if (!(required * EltSize).isValid() || required.value() > AggressiveLimit) {
+    // Fall back to doubling behavior if the aggressive growth fails or gets too
+    // big.
+    return mozilla::detail::GrowEltsByDoubling<EltSize>(aOldElts, aIncr);
+  }
+  return required.value();
+};
+
+}  // namespace detail
+
 class StringBufferAllocPolicy {
   TempAllocPolicy impl_;
-
   const arena_id_t& arenaId_;
 
  public:
+  StringBufferAllocPolicy(FrontendContext* fc, const arena_id_t& arenaId)
+      : impl_(fc), arenaId_(arenaId) {}
+
   StringBufferAllocPolicy(JSContext* cx, const arena_id_t& arenaId)
       : impl_(cx), arenaId_(arenaId) {}
 
@@ -56,6 +92,12 @@ class StringBufferAllocPolicy {
   }
   void reportAllocOverflow() const { impl_.reportAllocOverflow(); }
   bool checkSimulatedOOM() const { return impl_.checkSimulatedOOM(); }
+
+  // See ComputeGrowth in mfbt/Vector.h.
+  template <size_t EltSize>
+  static size_t computeGrowth(size_t aOldElts, size_t aIncr) {
+    return detail::GrowEltsAggressively<EltSize>(aOldElts, aIncr);
+  }
 };
 
 /*
@@ -81,8 +123,7 @@ class StringBuffer {
   using Latin1CharBuffer = BufferType<Latin1Char>;
   using TwoByteCharBuffer = BufferType<char16_t>;
 
-  JSContext* cx_;
-  const arena_id_t& arenaId_;
+  JSContext* maybeCx_ = nullptr;
 
   /*
    * If Latin1 strings are enabled, cb starts out as a Latin1CharBuffer. When
@@ -92,7 +133,7 @@ class StringBuffer {
   mozilla::MaybeOneOf<Latin1CharBuffer, TwoByteCharBuffer> cb;
 
   /* Number of reserve()'d chars, see inflateChars. */
-  size_t reserved_;
+  size_t reserved_ = 0;
 
   StringBuffer(const StringBuffer& other) = delete;
   void operator=(const StringBuffer& other) = delete;
@@ -142,8 +183,20 @@ class StringBuffer {
  public:
   explicit StringBuffer(JSContext* cx,
                         const arena_id_t& arenaId = js::MallocArena)
-      : cx_(cx), arenaId_(arenaId), reserved_(0) {
-    cb.construct<Latin1CharBuffer>(StringBufferAllocPolicy{cx_, arenaId_});
+      : maybeCx_(cx) {
+    MOZ_ASSERT(cx);
+    cb.construct<Latin1CharBuffer>(StringBufferAllocPolicy{cx, arenaId});
+  }
+
+  // This constructor should only be used if the methods related to the
+  // following are not used, because they require a JSContext:
+  //   * JSString
+  //   * JSAtom
+  //   * mozilla::Utf8Unit
+  explicit StringBuffer(FrontendContext* fc,
+                        const arena_id_t& arenaId = js::MallocArena) {
+    MOZ_ASSERT(fc);
+    cb.construct<Latin1CharBuffer>(StringBufferAllocPolicy{fc, arenaId});
   }
 
   void clear() {
@@ -315,7 +368,7 @@ class StringBuffer {
   /* Identical to finishString() except that an atom is created. */
   JSAtom* finishAtom();
   frontend::TaggedParserAtomIndex finishParserAtom(
-      frontend::ParserAtomsTable& parserAtoms);
+      frontend::ParserAtomsTable& parserAtoms, FrontendContext* fc);
 
   /*
    * Creates a raw string from the characters in this buffer.  The string is
@@ -325,6 +378,7 @@ class StringBuffer {
   char16_t* stealChars();
 };
 
+// Like StringBuffer, but uses StringBufferArena for the characters.
 class JSStringBuilder : public StringBuffer {
  public:
   explicit JSStringBuilder(JSContext* cx)
@@ -333,6 +387,8 @@ class JSStringBuilder : public StringBuffer {
   /*
    * Creates a string from the characters in this buffer, then (regardless
    * whether string creation succeeded or failed) empties the buffer.
+   *
+   * Returns nullptr if string creation failed.
    */
   JSLinearString* finishString();
 };
@@ -407,7 +463,9 @@ inline bool StringBuffer::appendSubstring(JSLinearString* base, size_t off,
 
 inline bool StringBuffer::appendSubstring(JSString* base, size_t off,
                                           size_t len) {
-  JSLinearString* linear = base->ensureLinear(cx_);
+  MOZ_ASSERT(maybeCx_);
+
+  JSLinearString* linear = base->ensureLinear(maybeCx_);
   if (!linear) {
     return false;
   }
@@ -416,7 +474,9 @@ inline bool StringBuffer::appendSubstring(JSString* base, size_t off,
 }
 
 inline bool StringBuffer::append(JSString* str) {
-  JSLinearString* linear = str->ensureLinear(cx_);
+  MOZ_ASSERT(maybeCx_);
+
+  JSLinearString* linear = str->ensureLinear(maybeCx_);
   if (!linear) {
     return false;
   }

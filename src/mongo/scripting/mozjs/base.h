@@ -79,16 +79,13 @@ struct BaseInfo {
                           JS::HandleObject obj,
                           JS::MutableHandleIdVector properties,
                           bool enumerableOnly);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(JS::GCContext* gcCtx, JSObject* obj);
     static void getProperty(JSContext* cx,
                             JS::HandleObject obj,
                             JS::HandleId id,
                             JS::HandleValue receiver,
                             JS::MutableHandleValue vp);
-    static void hasInstance(JSContext* cx,
-                            JS::HandleObject obj,
-                            JS::MutableHandleValue vp,
-                            bool* bp);
+
     static bool mayResolve(const JSAtomState& names, jsid id, JSObject* maybeObj);
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);

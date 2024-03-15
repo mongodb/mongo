@@ -46,6 +46,12 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
   JSContext* cx_;
   mozilla::Maybe<uint64_t> samplePositionInProfilerBuffer_;
   js::Activation* activation_;
+  // For each JitActivation, this records the lowest (most recent) stack
+  // address. This will usually be either the exitFP of the activation or the
+  // frame or stack pointer of currently executing JIT/Wasm code. The Gecko
+  // profiler uses this to skip native frames between the activation and
+  // endStackAddress_.
+  void* endStackAddress_ = nullptr;
   Kind kind_;
 
   static const unsigned StorageSpace = 8 * sizeof(void*);
@@ -75,6 +81,14 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
     MOZ_ASSERT(!done());
     MOZ_ASSERT(isJSJit());
     return *static_cast<const js::jit::JSJitProfilingFrameIterator*>(storage());
+  }
+
+  void maybeSetEndStackAddress(void* addr) {
+    // If endStackAddress_ has already been set, don't change it because we
+    // want this to correspond to the most recent frame.
+    if (!endStackAddress_) {
+      endStackAddress_ = addr;
+    }
   }
 
   void settleFrames();
@@ -149,7 +163,7 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
 
  private:
   mozilla::Maybe<Frame> getPhysicalFrameAndEntry(
-      js::jit::JitcodeGlobalEntry* entry) const;
+      const js::jit::JitcodeGlobalEntry** entry) const;
 
   void iteratorConstruct(const RegisterState& state);
   void iteratorConstruct();
@@ -212,8 +226,8 @@ class ProfiledFrameRange {
       ++index_;
       return *this;
     }
-    bool operator==(const Iter& rhs) { return index_ == rhs.index_; }
-    bool operator!=(const Iter& rhs) { return !(*this == rhs); }
+    bool operator==(const Iter& rhs) const { return index_ == rhs.index_; }
+    bool operator!=(const Iter& rhs) const { return !(*this == rhs); }
 
    private:
     const ProfiledFrameRange& range_;

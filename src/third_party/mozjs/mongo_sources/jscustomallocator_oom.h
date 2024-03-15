@@ -37,6 +37,8 @@ enum ThreadType {
     THREAD_TYPE_ION_FREE,              // 9
     THREAD_TYPE_WASM_GENERATOR_TIER2,  // 10
     THREAD_TYPE_WORKER,                // 11
+    THREAD_TYPE_DELAZIFY,              // 12
+    THREAD_TYPE_DELAZIFY_FREE,         // 13
     THREAD_TYPE_MAX                    // Used to check shell function arguments
 };
 
@@ -57,7 +59,7 @@ namespace oom {
 // like. Testing worker threads is not supported.
 const ThreadType FirstThreadTypeToTest = THREAD_TYPE_MAIN;
 const ThreadType LastThreadTypeToTest = THREAD_TYPE_WASM_GENERATOR_TIER2;
-
+# SERVER-64574 TODO: Should last thread type be changed here for testing 
 extern bool InitThreadType(void);
 extern void SetThreadType(ThreadType);
 extern JS_PUBLIC_API uint32_t GetThreadType(void);
@@ -88,7 +90,7 @@ static MOZ_NEVER_INLINE void js_failedAllocBreakpoint() { asm(""); }
 #    else
 #      define JS_OOM_CALL_BP_FUNC() \
         do {                        \
-        } while (0)
+    } while (0)
 #    endif
 
 namespace js {

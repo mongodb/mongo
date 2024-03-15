@@ -14,20 +14,19 @@
 
 #include <stdint.h>  // uint32_t
 
-#include "jsapi.h"  // JSPROP_ENUMERATE, JS::PropertyDescriptor
+#include "js/Id.h"  // INT_TO_JSID, jsid, JSID_INT_MAX, SYMBOL_TO_JSID
+#include "js/PropertyDescriptor.h"  // JSPROP_ENUMERATE, JS::PropertyDescriptor
+#include "js/RootingAPI.h"          // JS::Handle, JS::MutableHandle, JS::Rooted
+#include "js/TypeDecls.h"           // fwd-decl: JSContext, Symbol, Value
+#include "vm/StringType.h"          // js::NameToId
 
-#include "js/Class.h"       // JS::ObjectOpResult
-#include "js/Id.h"          // INT_TO_JSID, jsid, JSID_INT_MAX, SYMBOL_TO_JSID
-#include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle, JS::Rooted
-#include "js/Value.h"       // JS::Value
-#include "vm/JSContext.h"   // JSContext
-#include "vm/JSObject.h"    // JSObject
-#include "vm/StringType.h"  // js::NameToId
-#include "vm/SymbolType.h"  // JS::Symbol
+namespace JS {
+class ObjectOpResult;
+}
 
 namespace js {
 
-class PropertyName;
+class PropertyResult;
 
 // The functions below are the fundamental operations on objects. See the
 // comment about "Standard internal methods" in jsapi.h.

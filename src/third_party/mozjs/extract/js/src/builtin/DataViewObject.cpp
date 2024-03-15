@@ -15,10 +15,8 @@
 #include <string.h>
 #include <type_traits>
 
-#include "jsapi.h"
 #include "jsnum.h"
 
-#include "builtin/Array.h"
 #include "jit/AtomicOperations.h"
 #include "jit/InlinableNatives.h"
 #include "js/Conversions.h"
@@ -27,8 +25,8 @@
 #include "js/PropertySpec.h"
 #include "js/Wrapper.h"
 #include "util/DifferentialTesting.h"
-#include "util/Windows.h"
 #include "vm/ArrayBufferObject.h"
+#include "vm/Compartment.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
 #include "vm/JSContext.h"
@@ -37,8 +35,6 @@
 #include "vm/Uint8Clamped.h"
 #include "vm/WrapperObject.h"
 
-#include "gc/Nursery-inl.h"
-#include "gc/StoreBuffer-inl.h"
 #include "vm/ArrayBufferObject-inl.h"
 #include "vm/NativeObject-inl.h"
 
@@ -105,7 +101,7 @@ bool DataViewObject::getAndCheckConstructorArgs(JSContext* cx,
                               JSMSG_OFFSET_OUT_OF_BUFFER);
     return false;
   }
-  MOZ_ASSERT(offset <= ArrayBufferObject::maxBufferByteLength());
+  MOZ_ASSERT(offset <= ArrayBufferObject::MaxByteLength);
 
   // Step 8.a
   uint64_t viewByteLength = bufferByteLength - offset;
@@ -126,7 +122,7 @@ bool DataViewObject::getAndCheckConstructorArgs(JSContext* cx,
       return false;
     }
   }
-  MOZ_ASSERT(viewByteLength <= ArrayBufferObject::maxBufferByteLength());
+  MOZ_ASSERT(viewByteLength <= ArrayBufferObject::MaxByteLength);
 
   *byteOffsetPtr = offset;
   *byteLengthPtr = viewByteLength;
@@ -945,7 +941,6 @@ static const JSClassOps DataViewObjectClassOps = {
     nullptr,                       // mayResolve
     nullptr,                       // finalize
     nullptr,                       // call
-    nullptr,                       // hasInstance
     nullptr,                       // construct
     ArrayBufferViewObject::trace,  // trace
 };
@@ -961,10 +956,11 @@ const ClassSpec DataViewObject::classSpec_ = {
 
 const JSClass DataViewObject::class_ = {
     "DataView",
-    JSCLASS_HAS_PRIVATE |
-        JSCLASS_HAS_RESERVED_SLOTS(DataViewObject::RESERVED_SLOTS) |
+    JSCLASS_HAS_RESERVED_SLOTS(DataViewObject::RESERVED_SLOTS) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_DataView),
     &DataViewObjectClassOps, &DataViewObject::classSpec_};
+
+const JSClass* const JS::DataView::ClassPtr = &DataViewObject::class_;
 
 const JSClass DataViewObject::protoClass_ = {
     "DataView.prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_DataView),

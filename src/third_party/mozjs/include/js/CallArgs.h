@@ -94,7 +94,7 @@ extern JS_PUBLIC_API void CheckIsValidConstructible(const Value& v);
 #endif
 
 class MOZ_STACK_CLASS IncludeUsedRval {
-  mutable bool usedRval_;
+  mutable bool usedRval_ = false;
 
  public:
   bool usedRval() const { return usedRval_; }
@@ -118,8 +118,8 @@ class MOZ_STACK_CLASS CallArgsBase {
                 "WantUsedRval can only be IncludeUsedRval or NoUsedRval");
 
  protected:
-  Value* argv_;
-  unsigned argc_;
+  Value* argv_ = nullptr;
+  unsigned argc_ = 0;
   bool constructing_ : 1;
 
   // True if the caller does not use the return value.
@@ -137,6 +137,8 @@ class MOZ_STACK_CLASS CallArgsBase {
   void clearUsedRval() const {}
   void assertUnusedRval() const {}
 #endif
+
+  CallArgsBase() : constructing_(false), ignoresReturnValue_(false) {}
 
  public:
   // CALLEE ACCESS

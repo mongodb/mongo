@@ -86,9 +86,9 @@ const char16_t LeadSurrogateMax = 0xDBFF;
 const char16_t TrailSurrogateMin = 0xDC00;
 const char16_t TrailSurrogateMax = 0xDFFF;
 
-const uint32_t UTF16Max = 0xFFFF;
-const uint32_t NonBMPMin = 0x10000;
-const uint32_t NonBMPMax = 0x10FFFF;
+const char32_t UTF16Max = 0xFFFF;
+const char32_t NonBMPMin = 0x10000;
+const char32_t NonBMPMax = 0x10FFFF;
 
 class CharacterInfo {
   /*
@@ -158,9 +158,9 @@ inline bool IsIdentifierStartASCII(char ch) {
   return js_isidstart[uint8_t(ch)];
 }
 
-bool IsIdentifierStartNonBMP(uint32_t codePoint);
+bool IsIdentifierStartNonBMP(char32_t codePoint);
 
-inline bool IsIdentifierStart(uint32_t codePoint) {
+inline bool IsIdentifierStart(char32_t codePoint) {
   if (MOZ_UNLIKELY(codePoint > UTF16Max)) {
     return IsIdentifierStartNonBMP(codePoint);
   }
@@ -191,9 +191,9 @@ inline bool IsIdentifierPartASCII(char ch) {
   return js_isident[uint8_t(ch)];
 }
 
-bool IsIdentifierPartNonBMP(uint32_t codePoint);
+bool IsIdentifierPartNonBMP(char32_t codePoint);
 
-inline bool IsIdentifierPart(uint32_t codePoint) {
+inline bool IsIdentifierPart(char32_t codePoint) {
   if (MOZ_UNLIKELY(codePoint > UTF16Max)) {
     return IsIdentifierPartNonBMP(codePoint);
   }
@@ -204,9 +204,9 @@ inline bool IsUnicodeIDStart(char16_t ch) {
   return CharInfo(ch).isUnicodeIDStart();
 }
 
-bool IsUnicodeIDStartNonBMP(uint32_t codePoint);
+bool IsUnicodeIDStartNonBMP(char32_t codePoint);
 
-inline bool IsUnicodeIDStart(uint32_t codePoint) {
+inline bool IsUnicodeIDStart(char32_t codePoint) {
   if (MOZ_UNLIKELY(codePoint > UTF16Max)) {
     return IsIdentifierStartNonBMP(codePoint);
   }
@@ -479,15 +479,15 @@ inline char16_t FoldCase(char16_t ch) {
   return uint16_t(ch) + info.folding;
 }
 
-inline bool IsSupplementary(uint32_t codePoint) {
+inline bool IsSupplementary(char32_t codePoint) {
   return codePoint >= NonBMPMin && codePoint <= NonBMPMax;
 }
 
-inline bool IsLeadSurrogate(uint32_t codePoint) {
+inline bool IsLeadSurrogate(char32_t codePoint) {
   return codePoint >= LeadSurrogateMin && codePoint <= LeadSurrogateMax;
 }
 
-inline bool IsTrailSurrogate(uint32_t codePoint) {
+inline bool IsTrailSurrogate(char32_t codePoint) {
   return codePoint >= TrailSurrogateMin && codePoint <= TrailSurrogateMax;
 }
 
@@ -498,30 +498,30 @@ inline bool IsTrailSurrogate(uint32_t codePoint) {
  * to be tested to see if they reside in the surrogate range, so it doesn't
  * just take char16_t.
  */
-inline bool IsSurrogate(uint32_t codePoint) {
+inline bool IsSurrogate(char32_t codePoint) {
   return LeadSurrogateMin <= codePoint && codePoint <= TrailSurrogateMax;
 }
 
-inline char16_t LeadSurrogate(uint32_t codePoint) {
+inline char16_t LeadSurrogate(char32_t codePoint) {
   MOZ_ASSERT(IsSupplementary(codePoint));
 
   return char16_t((codePoint >> 10) + (LeadSurrogateMin - (NonBMPMin >> 10)));
 }
 
-inline char16_t TrailSurrogate(uint32_t codePoint) {
+inline char16_t TrailSurrogate(char32_t codePoint) {
   MOZ_ASSERT(IsSupplementary(codePoint));
 
   return char16_t((codePoint & 0x3FF) | TrailSurrogateMin);
 }
 
-inline void UTF16Encode(uint32_t codePoint, char16_t* lead, char16_t* trail) {
+inline void UTF16Encode(char32_t codePoint, char16_t* lead, char16_t* trail) {
   MOZ_ASSERT(IsSupplementary(codePoint));
 
   *lead = LeadSurrogate(codePoint);
   *trail = TrailSurrogate(codePoint);
 }
 
-inline void UTF16Encode(uint32_t codePoint, char16_t* elements,
+inline void UTF16Encode(char32_t codePoint, char16_t* elements,
                         unsigned* index) {
   if (!IsSupplementary(codePoint)) {
     elements[(*index)++] = char16_t(codePoint);
@@ -531,7 +531,7 @@ inline void UTF16Encode(uint32_t codePoint, char16_t* elements,
   }
 }
 
-inline uint32_t UTF16Decode(char16_t lead, char16_t trail) {
+inline char32_t UTF16Decode(char16_t lead, char16_t trail) {
   MOZ_ASSERT(IsLeadSurrogate(lead));
   MOZ_ASSERT(IsTrailSurrogate(trail));
 

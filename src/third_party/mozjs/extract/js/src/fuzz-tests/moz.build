@@ -39,6 +39,7 @@ if CONFIG["FUZZING_INTERFACES"]:
 
 USE_LIBS += [
     "static:js",
+    "static:jsrust",
 ]
 
 DEFINES["topsrcdir"] = "%s/js/src" % TOPSRCDIR

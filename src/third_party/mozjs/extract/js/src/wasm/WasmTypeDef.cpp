@@ -18,22 +18,213 @@
 
 #include "wasm/WasmTypeDef.h"
 
-#include "mozilla/CheckedInt.h"
 #include "mozilla/MathAlgorithms.h"
 
 #include "jit/JitOptions.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
+#include "js/HashTable.h"
 #include "js/Printf.h"
 #include "js/Value.h"
+#include "threading/ExclusiveData.h"
+#include "vm/Runtime.h"
 #include "vm/StringType.h"
+#include "wasm/WasmCodegenConstants.h"
+#include "wasm/WasmGcObject.h"
 #include "wasm/WasmJS.h"
 
 using namespace js;
 using namespace js::jit;
 using namespace js::wasm;
 
-using mozilla::CheckedInt32;
+using mozilla::CheckedUint32;
 using mozilla::IsPowerOfTwo;
+
+// [SMDOC] Immediate type signature encoding
+//
+// call_indirect requires a signature check to ensure the dynamic callee type
+// matches the static specified callee type. This involves comparing whether
+// the two function types are equal. We canonicalize function types so that
+// comparing the pointers of the types will indicate if they're equal. The
+// canonicalized function types are loaded from the instance at runtime.
+//
+// For the common case of simple/small function types, we can avoid the cost
+// of loading the function type pointers from the instance by having an
+// alternate 'immediate' form that encodes a function type in a constant.
+// We encode the function types such that bitwise equality implies the original
+// function types were equal. We use a tag bit such that if one of the types
+// is a pointer and the other an immediate, they will not compare as equal.
+//
+// The encoding is optimized for common function types that have at most one
+// result and an arbitrary amount of arguments.
+//
+// [
+//   1 bit : tag (always 1),
+//   1 bit : numResults,
+//   3 bits : numArgs,
+//   numResults * 3 bits : results,
+//   numArgs * 3 bits : args
+// ]
+// (lsb -> msb order)
+//
+// Any function type that cannot be encoded in the above format is falls back
+// to the pointer representation.
+//
+
+//=========================================================================
+// ImmediateType
+
+// ImmediateType is 32-bits to ensure it's easy to materialize the constant
+// on all platforms.
+using ImmediateType = uint32_t;
+static const unsigned sTotalBits = sizeof(ImmediateType) * 8;
+static const unsigned sTagBits = 1;
+static const unsigned sNumResultsBits = 1;
+static const unsigned sNumArgsBits = 3;
+static const unsigned sValTypeBits = 3;
+static const unsigned sMaxValTypes = 8;
+
+static_assert(((1 << sNumResultsBits) - 1) + ((1 << sNumArgsBits) - 1) ==
+                  sMaxValTypes,
+              "sNumResultsBits, sNumArgsBits, sMaxValTypes are consistent");
+
+static_assert(sTagBits + sNumResultsBits + sNumArgsBits +
+                      sValTypeBits * sMaxValTypes <=
+                  sTotalBits,
+              "have room");
+
+static bool IsImmediateValType(ValType vt) {
+  switch (vt.kind()) {
+    case ValType::I32:
+    case ValType::I64:
+    case ValType::F32:
+    case ValType::F64:
+    case ValType::V128:
+      return true;
+    case ValType::Ref:
+      // We don't have space to encode nullability, so we optimize for
+      // non-nullable types.
+      if (!vt.isNullable()) {
+        return false;
+      }
+      switch (vt.refType().kind()) {
+        case RefType::Func:
+        case RefType::Extern:
+        case RefType::Any:
+          return true;
+        default:
+          return false;
+      }
+    default:
+      return false;
+  }
+}
+
+static unsigned EncodeImmediateValType(ValType vt) {
+  // We have run out of bits for each type, anything new must increase the
+  // sValTypeBits.
+  static_assert(7 < (1 << sValTypeBits), "enough space for ValType kind");
+
+  switch (vt.kind()) {
+    case ValType::I32:
+      return 0;
+    case ValType::I64:
+      return 1;
+    case ValType::F32:
+      return 2;
+    case ValType::F64:
+      return 3;
+    case ValType::V128:
+      return 4;
+    case ValType::Ref:
+      MOZ_ASSERT(vt.isNullable());
+      switch (vt.refType().kind()) {
+        case RefType::Func:
+          return 5;
+        case RefType::Extern:
+          return 6;
+        case RefType::Any:
+          return 7;
+        default:
+          MOZ_CRASH("bad RefType");
+      }
+    default:
+      MOZ_CRASH("bad ValType");
+  }
+}
+
+static bool IsImmediateFuncType(const FuncType& funcType) {
+  const ValTypeVector& results = funcType.results();
+  const ValTypeVector& args = funcType.args();
+
+  // Check the number of results and args fits
+  if (results.length() > ((1 << sNumResultsBits) - 1) ||
+      args.length() > ((1 << sNumArgsBits) - 1)) {
+    return false;
+  }
+
+  // Ensure every result is compatible
+  for (ValType v : results) {
+    if (!IsImmediateValType(v)) {
+      return false;
+    }
+  }
+
+  // Ensure every arg is compatible
+  for (ValType v : args) {
+    if (!IsImmediateValType(v)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static ImmediateType EncodeNumResults(uint32_t numResults) {
+  MOZ_ASSERT(numResults <= (1 << sNumResultsBits) - 1);
+  return numResults;
+}
+
+static ImmediateType EncodeNumArgs(uint32_t numArgs) {
+  MOZ_ASSERT(numArgs <= (1 << sNumArgsBits) - 1);
+  return numArgs;
+}
+
+static ImmediateType EncodeImmediateFuncType(const FuncType& funcType) {
+  ImmediateType immediate = FuncType::ImmediateBit;
+  uint32_t shift = sTagBits;
+
+  // Encode the results
+  immediate |= EncodeNumResults(funcType.results().length()) << shift;
+  shift += sNumResultsBits;
+
+  for (ValType resultType : funcType.results()) {
+    immediate |= EncodeImmediateValType(resultType) << shift;
+    shift += sValTypeBits;
+  }
+
+  // Encode the args
+  immediate |= EncodeNumArgs(funcType.args().length()) << shift;
+  shift += sNumArgsBits;
+
+  for (ValType argType : funcType.args()) {
+    immediate |= EncodeImmediateValType(argType) << shift;
+    shift += sValTypeBits;
+  }
+
+  MOZ_ASSERT(shift <= sTotalBits);
+  return immediate;
+}
+
+//=========================================================================
+// FuncType
+
+void FuncType::initImmediateTypeId() {
+  if (!IsImmediateFuncType(*this)) {
+    immediateTypeId_ = NO_IMMEDIATE_TYPE_ID;
+    return;
+  }
+  immediateTypeId_ = EncodeImmediateFuncType(*this);
+}
 
 bool FuncType::canHaveJitEntry() const {
   return !hasUnexposableArgOrRet() &&
@@ -44,31 +235,16 @@ bool FuncType::canHaveJitEntry() const {
 
 bool FuncType::canHaveJitExit() const {
   return !hasUnexposableArgOrRet() && !temporarilyUnsupportedReftypeForExit() &&
-         !temporarilyUnsupportedResultCountForJitExit() &&
+         !hasInt64Arg() && !temporarilyUnsupportedResultCountForJitExit() &&
          JitOptions.enableWasmJitExit;
-}
-
-size_t FuncType::serializedSize() const {
-  return SerializedPodVectorSize(results_) + SerializedPodVectorSize(args_);
-}
-
-uint8_t* FuncType::serialize(uint8_t* cursor) const {
-  cursor = SerializePodVector(cursor, results_);
-  cursor = SerializePodVector(cursor, args_);
-  return cursor;
-}
-
-const uint8_t* FuncType::deserialize(const uint8_t* cursor) {
-  cursor = DeserializePodVector(cursor, &results_);
-  if (!cursor) {
-    return nullptr;
-  }
-  return DeserializePodVector(cursor, &args_);
 }
 
 size_t FuncType::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
   return args_.sizeOfExcludingThis(mallocSizeOf);
 }
+
+//=========================================================================
+// StructType and StructLayout
 
 static inline CheckedInt32 RoundUpToAlignment(CheckedInt32 address,
                                               uint32_t align) {
@@ -85,42 +261,42 @@ static inline CheckedInt32 RoundUpToAlignment(CheckedInt32 address,
   return ((address + (align - 1)) / align) * align;
 }
 
-class StructLayout {
-  CheckedInt32 sizeSoFar = 0;
-  uint32_t structAlignment = 1;
+CheckedInt32 StructLayout::addField(FieldType type) {
+  uint32_t fieldSize = type.size();
+  uint32_t fieldAlignment = type.alignmentInStruct();
 
- public:
-  // The field adders return the offset of the the field.
-  CheckedInt32 addField(FieldType type) {
-    uint32_t fieldSize = type.size();
-    uint32_t fieldAlignment = type.alignmentInStruct();
+  // We have to ensure that `offset` is chosen so that no field crosses the
+  // inline/outline boundary.  The assertions here ensure that.  See comment
+  // on `class StructLayout` for background.
+  MOZ_ASSERT(fieldSize >= 1 && fieldSize <= 16);
+  MOZ_ASSERT((fieldSize & (fieldSize - 1)) == 0);  // is a power of 2
+  MOZ_ASSERT(fieldAlignment == fieldSize);         // is naturally aligned
 
-    // Alignment of the struct is the max of the alignment of its fields.
-    structAlignment = std::max(structAlignment, fieldAlignment);
+  // Alignment of the struct is the max of the alignment of its fields.
+  structAlignment = std::max(structAlignment, fieldAlignment);
 
-    // Align the pointer.
-    CheckedInt32 offset = RoundUpToAlignment(sizeSoFar, fieldAlignment);
-    if (!offset.isValid()) {
-      return offset;
-    }
-
-    // Allocate space.
-    sizeSoFar = offset + fieldSize;
-    if (!sizeSoFar.isValid()) {
-      return sizeSoFar;
-    }
-
+  // Align the pointer.
+  CheckedInt32 offset = RoundUpToAlignment(sizeSoFar, fieldAlignment);
+  if (!offset.isValid()) {
     return offset;
   }
 
-  // The close method rounds up the structure size to the appropriate
-  // alignment and returns that size.
-  CheckedInt32 close() {
-    return RoundUpToAlignment(sizeSoFar, structAlignment);
+  // Allocate space.
+  sizeSoFar = offset + fieldSize;
+  if (!sizeSoFar.isValid()) {
+    return sizeSoFar;
   }
-};
 
-bool StructType::computeLayout() {
+  // The following should hold if the three assertions above hold.
+  MOZ_ASSERT(offset / 16 == (offset + fieldSize - 1) / 16);
+  return offset;
+}
+
+CheckedInt32 StructLayout::close() {
+  return RoundUpToAlignment(sizeSoFar, structAlignment);
+}
+
+bool StructType::init() {
   StructLayout layout;
   for (StructField& field : fields_) {
     CheckedInt32 offset = layout.addField(field.type);
@@ -128,6 +304,23 @@ bool StructType::computeLayout() {
       return false;
     }
     field.offset = offset.value();
+    if (!field.type.isRefRepr()) {
+      continue;
+    }
+
+    bool isOutline;
+    uint32_t adjustedOffset;
+    WasmStructObject::fieldOffsetToAreaAndOffset(field.type, field.offset,
+                                                 &isOutline, &adjustedOffset);
+    if (isOutline) {
+      if (!outlineTraceOffsets_.append(adjustedOffset)) {
+        return false;
+      }
+    } else {
+      if (!inlineTraceOffsets_.append(adjustedOffset)) {
+        return false;
+      }
+    }
   }
 
   CheckedInt32 size = layout.close();
@@ -139,87 +332,12 @@ bool StructType::computeLayout() {
   return true;
 }
 
-size_t StructType::serializedSize() const {
-  return SerializedPodVectorSize(fields_) + sizeof(size_);
-}
-
-uint8_t* StructType::serialize(uint8_t* cursor) const {
-  cursor = SerializePodVector(cursor, fields_);
-  cursor = WriteBytes(cursor, &size_, sizeof(size_));
-  return cursor;
-}
-
-const uint8_t* StructType::deserialize(const uint8_t* cursor) {
-  (cursor = DeserializePodVector(cursor, &fields_)) &&
-      (cursor = ReadBytes(cursor, &size_, sizeof(size_)));
-  return cursor;
-}
-
 size_t StructType::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
   return fields_.sizeOfExcludingThis(mallocSizeOf);
 }
 
-size_t TypeDef::serializedSize() const {
-  size_t size = sizeof(kind_);
-  switch (kind_) {
-    case TypeDefKind::Struct: {
-      size += structType_.serializedSize();
-      break;
-    }
-    case TypeDefKind::Func: {
-      size += funcType_.serializedSize();
-      break;
-    }
-    case TypeDefKind::None: {
-      break;
-    }
-    default:
-      MOZ_ASSERT_UNREACHABLE();
-  }
-  return size;
-}
-
-uint8_t* TypeDef::serialize(uint8_t* cursor) const {
-  cursor = WriteBytes(cursor, &kind_, sizeof(kind_));
-  switch (kind_) {
-    case TypeDefKind::Struct: {
-      cursor = structType_.serialize(cursor);
-      break;
-    }
-    case TypeDefKind::Func: {
-      cursor = funcType_.serialize(cursor);
-      break;
-    }
-    case TypeDefKind::None: {
-      break;
-    }
-    default:
-      MOZ_ASSERT_UNREACHABLE();
-  }
-  return cursor;
-}
-
-const uint8_t* TypeDef::deserialize(const uint8_t* cursor) {
-  cursor = ReadBytes(cursor, &kind_, sizeof(kind_));
-  // kind_ was replaced -- call in-place constructors for union members.
-  switch (kind_) {
-    case TypeDefKind::Struct: {
-      StructType* structType = new (&structType_) StructType();
-      cursor = structType->deserialize(cursor);
-      break;
-    }
-    case TypeDefKind::Func: {
-      FuncType* funcType = new (&funcType_) FuncType();
-      cursor = funcType->deserialize(cursor);
-      break;
-    }
-    case TypeDefKind::None: {
-      break;
-    }
-    default:
-      MOZ_ASSERT_UNREACHABLE();
-  }
-  return cursor;
+size_t ArrayType::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
+  return 0;
 }
 
 size_t TypeDef::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
@@ -229,6 +347,9 @@ size_t TypeDef::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
     }
     case TypeDefKind::Func: {
       return funcType_.sizeOfExcludingThis(mallocSizeOf);
+    }
+    case TypeDefKind::Array: {
+      return arrayType_.sizeOfExcludingThis(mallocSizeOf);
     }
     case TypeDefKind::None: {
       return 0;
@@ -240,284 +361,190 @@ size_t TypeDef::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
   return 0;
 }
 
-TypeResult TypeContext::isRefEquivalent(RefType one, RefType two,
-                                        TypeCache* cache) const {
-  // Anything's equal to itself.
-  if (one == two) {
-    return TypeResult::True;
-  }
+//=========================================================================
+// SuperTypeVector
 
-#ifdef ENABLE_WASM_FUNCTION_REFERENCES
-  if (features_.functionReferences) {
-    // Two references must have the same nullability to be equal
-    if (one.isNullable() != two.isNullable()) {
-      return TypeResult::False;
-    }
-
-    // Non type-index references are equal if they have the same kind
-    if (!one.isTypeIndex() && !two.isTypeIndex() && one.kind() == two.kind()) {
-      return TypeResult::True;
-    }
-
-    // Type-index references can be equal
-    if (one.isTypeIndex() && two.isTypeIndex()) {
-      return isTypeIndexEquivalent(one.typeIndex(), two.typeIndex(), cache);
-    }
-  }
-#endif
-  return TypeResult::False;
+/* static */
+size_t SuperTypeVector::offsetOfTypeDefInVector(uint32_t typeDefDepth) {
+  return offsetof(SuperTypeVector, types_) + sizeof(void*) * typeDefDepth;
 }
 
-#ifdef ENABLE_WASM_FUNCTION_REFERENCES
-TypeResult TypeContext::isTypeIndexEquivalent(uint32_t one, uint32_t two,
-                                              TypeCache* cache) const {
-  MOZ_ASSERT(features_.functionReferences);
-
-  // Anything's equal to itself.
-  if (one == two) {
-    return TypeResult::True;
-  }
-
-#  ifdef ENABLE_WASM_GC
-  if (features_.gc) {
-    // A struct may be equal to a struct
-    if (isStructType(one) && isStructType(two)) {
-      return isStructEquivalent(one, two, cache);
-    }
-
-    // An array may be equal to an array
-    if (isArrayType(one) && isArrayType(two)) {
-      return isArrayEquivalent(one, two, cache);
-    }
-  }
-#  endif
-
-  return TypeResult::False;
-}
-#endif
-
-#ifdef ENABLE_WASM_GC
-TypeResult TypeContext::isStructEquivalent(uint32_t oneIndex, uint32_t twoIndex,
-                                           TypeCache* cache) const {
-  if (cache->isEquivalent(oneIndex, twoIndex)) {
-    return TypeResult::True;
-  }
-
-  const StructType& one = structType(oneIndex);
-  const StructType& two = structType(twoIndex);
-
-  // Structs must have the same number of fields to be equal
-  if (one.fields_.length() != two.fields_.length()) {
-    return TypeResult::False;
-  }
-
-  // Assume these structs are equal while checking fields. If any field is
-  // not equal then we remove the assumption.
-  if (!cache->markEquivalent(oneIndex, twoIndex)) {
-    return TypeResult::OOM;
-  }
-
-  for (uint32_t i = 0; i < two.fields_.length(); i++) {
-    TypeResult result =
-        isStructFieldEquivalent(one.fields_[i], two.fields_[i], cache);
-    if (result != TypeResult::True) {
-      cache->unmarkEquivalent(oneIndex, twoIndex);
-      return result;
-    }
-  }
-  return TypeResult::True;
+/* static */
+size_t SuperTypeVector::lengthForTypeDef(const TypeDef& typeDef) {
+  return std::max(uint32_t(typeDef.subTypingDepth()) + 1,
+                  MinSuperTypeVectorLength);
 }
 
-TypeResult TypeContext::isStructFieldEquivalent(const StructField one,
-                                                const StructField two,
-                                                TypeCache* cache) const {
-  // Struct fields must share the same mutability to equal
-  if (one.isMutable != two.isMutable) {
-    return TypeResult::False;
-  }
-  // Struct field types must be equal
-  return isEquivalent(one.type, two.type, cache);
+/* static */
+size_t SuperTypeVector::byteSizeForTypeDef(const TypeDef& typeDef) {
+  static_assert(
+      sizeof(SuperTypeVector) + sizeof(void*) * (MaxSubTypingDepth + 1) <=
+          UINT16_MAX,
+      "cannot overflow");
+  return sizeof(SuperTypeVector) + (sizeof(void*) * lengthForTypeDef(typeDef));
 }
 
-TypeResult TypeContext::isArrayEquivalent(uint32_t oneIndex, uint32_t twoIndex,
-                                          TypeCache* cache) const {
-  if (cache->isEquivalent(oneIndex, twoIndex)) {
-    return TypeResult::True;
+/* static */
+const SuperTypeVector* SuperTypeVector::createMultipleForRecGroup(
+    RecGroup* recGroup) {
+  // Pre-size the amount of space needed for all the super type vectors in this
+  // recursion group.
+  CheckedUint32 totalBytes = 0;
+  for (uint32_t typeIndex = 0; typeIndex < recGroup->numTypes(); typeIndex++) {
+    totalBytes +=
+        SuperTypeVector::byteSizeForTypeDef(recGroup->type(typeIndex));
+  }
+  if (!totalBytes.isValid()) {
+    return nullptr;
   }
 
-  const ArrayType& one = arrayType(oneIndex);
-  const ArrayType& two = arrayType(twoIndex);
-
-  // Assume these arrays are equal while checking fields. If the array
-  // element is not equal then we remove the assumption.
-  if (!cache->markEquivalent(oneIndex, twoIndex)) {
-    return TypeResult::OOM;
+  // Allocate the batch, and retain reference to the first one.
+  SuperTypeVector* firstVector =
+      (SuperTypeVector*)js_malloc(totalBytes.value());
+  if (!firstVector) {
+    return nullptr;
   }
 
-  TypeResult result = isArrayElementEquivalent(one, two, cache);
-  if (result != TypeResult::True) {
-    cache->unmarkEquivalent(oneIndex, twoIndex);
-  }
-  return result;
-}
+  // Initialize the vectors, one by one
+  SuperTypeVector* currentVector = firstVector;
+  for (uint32_t typeIndex = 0; typeIndex < recGroup->numTypes(); typeIndex++) {
+    TypeDef& typeDef = recGroup->type(typeIndex);
 
-TypeResult TypeContext::isArrayElementEquivalent(const ArrayType& one,
-                                                 const ArrayType& two,
-                                                 TypeCache* cache) const {
-  // Array elements must share the same mutability to be equal
-  if (one.isMutable_ != two.isMutable_) {
-    return TypeResult::False;
-  }
-  // Array elements must be equal
-  return isEquivalent(one.elementType_, two.elementType_, cache);
-}
-#endif
+    // Compute the size again to know where the next vector can be found.
+    size_t vectorByteSize = SuperTypeVector::byteSizeForTypeDef(typeDef);
 
-TypeResult TypeContext::isRefSubtypeOf(RefType one, RefType two,
-                                       TypeCache* cache) const {
-  // Anything's a subtype of itself.
-  if (one == two) {
-    return TypeResult::True;
-  }
+    // Make the typedef and the vector point at each other.
+    typeDef.setSuperTypeVector(currentVector);
+    currentVector->setTypeDef(&typeDef);
 
-#ifdef ENABLE_WASM_FUNCTION_REFERENCES
-  if (features_.functionReferences) {
-    // A subtype must have the same nullability as the supertype or the
-    // supertype must be nullable.
-    if (!(one.isNullable() == two.isNullable() || two.isNullable())) {
-      return TypeResult::False;
+    // Every vector stores all ancestor types and itself.
+    currentVector->setLength(SuperTypeVector::lengthForTypeDef(typeDef));
+
+    // Initialize the entries in the vector
+    const TypeDef* currentTypeDef = &typeDef;
+    for (uint32_t index = 0; index < currentVector->length(); index++) {
+      uint32_t reverseIndex = currentVector->length() - index - 1;
+
+      // If this entry is required just to hit the minimum size, then
+      // initialize it to null.
+      if (reverseIndex > typeDef.subTypingDepth()) {
+        currentVector->setType(reverseIndex, nullptr);
+        continue;
+      }
+
+      // Otherwise we should always be iterating at the same depth as our
+      // currentTypeDef.
+      MOZ_ASSERT(reverseIndex == currentTypeDef->subTypingDepth());
+
+      currentVector->setType(reverseIndex, currentTypeDef->superTypeVector());
+      currentTypeDef = currentTypeDef->superTypeDef();
     }
 
-    // Non type-index references are subtypes if they have the same kind
-    if (!one.isTypeIndex() && !two.isTypeIndex() && one.kind() == two.kind()) {
-      return TypeResult::True;
-    }
+    // There should be no more super types left over
+    MOZ_ASSERT(currentTypeDef == nullptr);
 
-    // Structs are subtypes of eqref
-    if (isStructType(one) && two.isEq()) {
-      return TypeResult::True;
-    }
-
-    // Arrays are subtypes of eqref
-    if (isArrayType(one) && two.isEq()) {
-      return TypeResult::True;
-    }
-
-    // Type-index references can be subtypes
-    if (one.isTypeIndex() && two.isTypeIndex()) {
-      return isTypeIndexSubtypeOf(one.typeIndex(), two.typeIndex(), cache);
-    }
+    // Advance to the next super type vector
+    currentVector =
+        (SuperTypeVector*)(((const char*)currentVector) + vectorByteSize);
   }
-#endif
-  return TypeResult::False;
+
+  return firstVector;
 }
 
-#ifdef ENABLE_WASM_FUNCTION_REFERENCES
-TypeResult TypeContext::isTypeIndexSubtypeOf(uint32_t one, uint32_t two,
-                                             TypeCache* cache) const {
-  MOZ_ASSERT(features_.functionReferences);
+//=========================================================================
+// TypeIdSet and TypeContext
 
-  // Anything's a subtype of itself.
-  if (one == two) {
-    return TypeResult::True;
+struct RecGroupHashPolicy {
+  using Lookup = const SharedRecGroup&;
+
+  static HashNumber hash(Lookup lookup) { return lookup->hash(); }
+
+  static bool match(const SharedRecGroup& lhs, Lookup rhs) {
+    return RecGroup::matches(*rhs, *lhs);
   }
+};
 
-#  ifdef ENABLE_WASM_GC
-  if (features_.gc) {
-    // Structs may be subtypes of structs
-    if (isStructType(one) && isStructType(two)) {
-      return isStructSubtypeOf(one, two, cache);
+// A global hash set of recursion groups for use in fast type equality checks.
+class TypeIdSet {
+  using Set = HashSet<SharedRecGroup, RecGroupHashPolicy, SystemAllocPolicy>;
+  Set set_;
+
+ public:
+  // Attempt to insert a recursion group into the set, returning an existing
+  // recursion group if there was one.
+  SharedRecGroup insert(SharedRecGroup recGroup) {
+    Set::AddPtr p = set_.lookupForAdd(recGroup);
+    if (p) {
+      // A canonical recursion group already existed, return it.
+      return *p;
     }
 
-    // Arrays may be subtypes of arrays
-    if (isArrayType(one) && isArrayType(two)) {
-      return isArraySubtypeOf(one, two, cache);
+    // Insert this recursion group into the set, and return it as the canonical
+    // recursion group instance.
+    if (!set_.add(p, recGroup)) {
+      return nullptr;
+    }
+    return recGroup;
+  }
+
+  void purge() {
+    // TODO: this is not guaranteed to remove all types that are not referenced
+    // from outside the canonical set, as removing a type may make a previous
+    // type we've visited now only have one ref and be eligible to be freed.
+    //
+    // Solving this either involves iterating to a fixed point, or else a much
+    // more invasive change to the lifetime management of recursion groups.
+    for (auto iter = set_.modIter(); !iter.done(); iter.next()) {
+      if (iter.get()->hasOneRef()) {
+        iter.remove();
+      }
     }
   }
-#  endif
-  return TypeResult::False;
-}
-#endif
 
-#ifdef ENABLE_WASM_GC
-TypeResult TypeContext::isStructSubtypeOf(uint32_t oneIndex, uint32_t twoIndex,
-                                          TypeCache* cache) const {
-  if (cache->isSubtypeOf(oneIndex, twoIndex)) {
-    return TypeResult::True;
-  }
-
-  const StructType& one = structType(oneIndex);
-  const StructType& two = structType(twoIndex);
-
-  // A subtype must have at least as many fields as its supertype
-  if (one.fields_.length() < two.fields_.length()) {
-    return TypeResult::False;
-  }
-
-  // Assume these structs are subtypes while checking fields. If any field
-  // fails a check then we remove the assumption.
-  if (!cache->markSubtypeOf(oneIndex, twoIndex)) {
-    return TypeResult::OOM;
-  }
-
-  for (uint32_t i = 0; i < two.fields_.length(); i++) {
-    TypeResult result =
-        isStructFieldSubtypeOf(one.fields_[i], two.fields_[i], cache);
-    if (result != TypeResult::True) {
-      cache->unmarkSubtypeOf(oneIndex, twoIndex);
-      return result;
+  // Release the provided recursion group reference and remove it from the
+  // canonical set if it was the last reference. This is one unified method
+  // because we need to perform the lookup before releasing the reference, but
+  // need to release the reference in order to see if it was the last reference
+  // outside the canonical set.
+  void clearRecGroup(SharedRecGroup* recGroupCell) {
+    if (Set::Ptr p = set_.lookup(*recGroupCell)) {
+      *recGroupCell = nullptr;
+      if ((*p)->hasOneRef()) {
+        set_.remove(p);
+      }
+    } else {
+      *recGroupCell = nullptr;
     }
   }
-  return TypeResult::True;
+};
+
+ExclusiveData<TypeIdSet> typeIdSet(mutexid::WasmTypeIdSet);
+
+void wasm::PurgeCanonicalTypes() {
+  ExclusiveData<TypeIdSet>::Guard locked = typeIdSet.lock();
+  locked->purge();
 }
 
-TypeResult TypeContext::isStructFieldSubtypeOf(const StructField one,
-                                               const StructField two,
-                                               TypeCache* cache) const {
-  // Mutable fields are invariant w.r.t. field types
-  if (one.isMutable && two.isMutable) {
-    return isEquivalent(one.type, two.type, cache);
-  }
-  // Immutable fields are covariant w.r.t. field types
-  if (!one.isMutable && !two.isMutable) {
-    return isSubtypeOf(one.type, two.type, cache);
-  }
-  return TypeResult::False;
+SharedRecGroup TypeContext::canonicalizeGroup(SharedRecGroup recGroup) {
+  ExclusiveData<TypeIdSet>::Guard locked = typeIdSet.lock();
+  return locked->insert(recGroup);
 }
 
-TypeResult TypeContext::isArraySubtypeOf(uint32_t oneIndex, uint32_t twoIndex,
-                                         TypeCache* cache) const {
-  if (cache->isSubtypeOf(oneIndex, twoIndex)) {
-    return TypeResult::True;
-  }
+TypeContext::~TypeContext() {
+  ExclusiveData<TypeIdSet>::Guard locked = typeIdSet.lock();
 
-  const ArrayType& one = arrayType(oneIndex);
-  const ArrayType& two = arrayType(twoIndex);
-
-  // Assume these arrays are subtypes while checking elements. If the elements
-  // fail the check then we remove the assumption.
-  if (!cache->markSubtypeOf(oneIndex, twoIndex)) {
-    return TypeResult::OOM;
+  // Clear out the recursion groups in this module, freeing them from the
+  // canonical type set if needed.
+  //
+  // We iterate backwards here so that we free every previous recursion group
+  // that may be referring to the current recursion group we're freeing. This
+  // is possible due to recursion groups being ordered.
+  for (int32_t groupIndex = recGroups_.length() - 1; groupIndex >= 0;
+       groupIndex--) {
+    // Try to remove this entry from the canonical set if we have the last
+    // strong reference. The entry may not exist if canonicalization failed
+    // and this type context was aborted. This will clear the reference in the
+    // vector.
+    locked->clearRecGroup(&recGroups_[groupIndex]);
   }
-
-  TypeResult result = isArrayElementSubtypeOf(one, two, cache);
-  if (result != TypeResult::True) {
-    cache->unmarkSubtypeOf(oneIndex, twoIndex);
-  }
-  return result;
 }
-
-TypeResult TypeContext::isArrayElementSubtypeOf(const ArrayType& one,
-                                                const ArrayType& two,
-                                                TypeCache* cache) const {
-  // Mutable elements are invariant w.r.t. field types
-  if (one.isMutable_ && two.isMutable_) {
-    return isEquivalent(one.elementType_, two.elementType_, cache);
-  }
-  // Immutable elements are covariant w.r.t. field types
-  if (!one.isMutable_ && !two.isMutable_) {
-    return isSubtypeOf(one.elementType_, two.elementType_, cache);
-  }
-  return TypeResult::False;
-}
-#endif

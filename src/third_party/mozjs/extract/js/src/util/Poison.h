@@ -50,18 +50,13 @@ static MOZ_ALWAYS_INLINE void PodSet(T* aDst, const T& aSrc, size_t aNElem) {
 
 /*
  * Patterns used by SpiderMonkey to overwrite unused memory. If you are
- * accessing an object with one of these pattern, you probably have a dangling
- * pointer. These values should be odd, see the comment in IsThingPoisoned.
- *
- * Note: new patterns should also be added to the array in IsThingPoisoned!
- *
- * We try to keep our IRC bot, mrgiggles, up to date with these and other
- * patterns:
- * https://bitbucket.org/sfink/mrgiggles/src/default/plugins/knowledge/__init__.py
+ * accessing an object with one of these patterns, you probably have a dangling
+ * pointer. These values should be odd.
  */
 const uint8_t JS_FRESH_NURSERY_PATTERN = 0x2F;
 const uint8_t JS_SWEPT_NURSERY_PATTERN = 0x2B;
 const uint8_t JS_ALLOCATED_NURSERY_PATTERN = 0x2D;
+const uint8_t JS_NOTINUSE_TRAILER_PATTERN = 0x43;
 const uint8_t JS_FRESH_TENURED_PATTERN = 0x4F;
 const uint8_t JS_MOVED_TENURED_PATTERN = 0x49;
 const uint8_t JS_SWEPT_TENURED_PATTERN = 0x4B;
@@ -69,7 +64,6 @@ const uint8_t JS_ALLOCATED_TENURED_PATTERN = 0x4D;
 const uint8_t JS_FREED_HEAP_PTR_PATTERN = 0x6B;
 const uint8_t JS_FREED_CHUNK_PATTERN = 0x8B;
 const uint8_t JS_FREED_ARENA_PATTERN = 0x9B;
-const uint8_t JS_SWEPT_TI_PATTERN = 0x6F;
 const uint8_t JS_FRESH_MARK_STACK_PATTERN = 0x9F;
 const uint8_t JS_RESET_VALUE_PATTERN = 0xBB;
 const uint8_t JS_POISONED_JSSCRIPT_DATA_PATTERN = 0xDB;
@@ -78,7 +72,6 @@ const uint8_t JS_LIFO_UNDEFINED_PATTERN = 0xcd;
 const uint8_t JS_LIFO_UNINITIALIZED_PATTERN = 0xce;
 
 // Even ones
-const uint8_t JS_NEW_NATIVE_ITERATOR_PATTERN = 0xCC;
 const uint8_t JS_SCOPE_DATA_TRAILING_NAMES_PATTERN = 0xCC;
 
 /*
@@ -87,12 +80,17 @@ const uint8_t JS_SCOPE_DATA_TRAILING_NAMES_PATTERN = 0xCC;
  * illegal in user mode.
  */
 #if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64) || \
-    defined(JS_CODEGEN_NONE)
+    defined(JS_CODEGEN_NONE) || defined(JS_CODEGEN_WASM32)
 #  define JS_SWEPT_CODE_PATTERN 0xED  // IN instruction, crashes in user mode.
 #elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64)
 #  define JS_SWEPT_CODE_PATTERN 0xA3  // undefined instruction
 #elif defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
 #  define JS_SWEPT_CODE_PATTERN 0x01  // undefined instruction
+#elif defined(JS_CODEGEN_LOONG64)
+#  define JS_SWEPT_CODE_PATTERN 0x01  // undefined instruction
+#elif defined(JS_CODEGEN_RISCV64)
+#  define JS_SWEPT_CODE_PATTERN \
+    0x29  // illegal sb instruction, crashes in user mode.
 #else
 #  error "JS_SWEPT_CODE_PATTERN not defined for this platform"
 #endif

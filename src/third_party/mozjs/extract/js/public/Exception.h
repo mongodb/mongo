@@ -8,6 +8,7 @@
 #define js_Exception_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/Maybe.h"
 
 #include "jstypes.h"
 
@@ -52,6 +53,33 @@ extern JS_PUBLIC_API JSErrorReport* JS_ErrorFromException(JSContext* cx,
                                                           JS::HandleObject obj);
 
 namespace JS {
+
+// When propagating an exception up the call stack, we store the underlying
+// reason on the JSContext as one of the following enum values.
+//
+// TODO: Track uncatchable exceptions explicitly.
+enum class ExceptionStatus {
+  // No exception status.
+  None,
+
+  // Used by debugger when forcing an early return from a frame. This uses
+  // exception machinery, but at the right time is turned back into a normal
+  // non-error completion.
+  ForcedReturn,
+
+  // Throwing a (catchable) exception. Certain well-known exceptions are
+  // explicitly tracked for convenience.
+  Throwing,
+  OutOfMemory,
+  OverRecursed,
+};
+
+// Returns true if the status is a catchable exception. Formerly this was
+// indicated by the `JSContext::throwing` flag.
+static MOZ_ALWAYS_INLINE bool IsCatchableExceptionStatus(
+    ExceptionStatus status) {
+  return status >= ExceptionStatus::Throwing;
+}
 
 // This class encapsulates a (pending) exception and the corresponding optional
 // SavedFrame stack object captured when the pending exception was set
@@ -100,9 +128,7 @@ class MOZ_STACK_CLASS ExceptionStack {
 class JS_PUBLIC_API AutoSaveExceptionState {
  private:
   JSContext* context;
-  bool wasPropagatingForcedReturn;
-  bool wasOverRecursed;
-  bool wasThrowing;
+  ExceptionStatus status;
   RootedValue exceptionValue;
   RootedObject exceptionStack;
 
@@ -158,6 +184,12 @@ extern JS_PUBLIC_API void SetPendingExceptionStack(
  * the exception has no stack.
  */
 extern JS_PUBLIC_API JSObject* ExceptionStackOrNull(JS::HandleObject obj);
+
+/**
+ * If the given object is an exception object, return the error cause for that
+ * exception, if any, or mozilla::Nothing.
+ */
+extern JS_PUBLIC_API mozilla::Maybe<JS::Value> GetExceptionCause(JSObject* exc);
 
 }  // namespace JS
 

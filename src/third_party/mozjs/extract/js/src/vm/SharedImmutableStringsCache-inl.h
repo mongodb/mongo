@@ -27,7 +27,7 @@ template <typename IntoOwnedChars>
     }
     MOZ_ASSERT(ownedChars.get() == chars ||
                memcmp(ownedChars.get(), chars, length) == 0);
-    auto box = StringBox::Create(std::move(ownedChars), length, this->inner_);
+    auto box = StringBox::Create(std::move(ownedChars), length, inner_);
     if (!box || !locked->set.add(entry, std::move(box))) {
       return SharedImmutableString();
     }
@@ -60,7 +60,7 @@ SharedImmutableStringsCache::getOrCreate(
         memcmp(ownedTwoByteChars.get(), chars, length * sizeof(char16_t)) == 0);
     OwnedChars ownedChars(reinterpret_cast<char*>(ownedTwoByteChars.release()));
     auto box = StringBox::Create(std::move(ownedChars),
-                                 length * sizeof(char16_t), this->inner_);
+                                 length * sizeof(char16_t), inner_);
     if (!box || !locked->set.add(entry, std::move(box))) {
       return SharedImmutableTwoByteString();
     }

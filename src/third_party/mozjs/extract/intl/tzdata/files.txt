@@ -1,5 +1,0 @@
-# tzdata resources in icudt*.dat
-zoneinfo64.res
-windowsZones.res
-timezoneTypes.res
-metaZones.res

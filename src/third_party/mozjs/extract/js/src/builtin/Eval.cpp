@@ -9,7 +9,6 @@
 #include "mozilla/HashFunctions.h"
 #include "mozilla/Range.h"
 
-#include "ds/LifoAlloc.h"
 #include "frontend/BytecodeCompilation.h"
 #include "gc/HashUtil.h"
 #include "js/CompilationAndEvaluation.h"
@@ -18,12 +17,17 @@
 #include "js/friend/WindowProxy.h"     // js::IsWindowProxy
 #include "js/SourceText.h"
 #include "js/StableStringChars.h"
+#include "vm/EnvironmentObject.h"
+#include "vm/FrameIter.h"
 #include "vm/GlobalObject.h"
+#include "vm/Interpreter.h"
 #include "vm/JSContext.h"
 #include "vm/JSONParser.h"
 
-#include "debugger/DebugAPI-inl.h"
-#include "vm/Interpreter-inl.h"
+#include "gc/Marking-inl.h"
+#include "vm/EnvironmentObject-inl.h"
+#include "vm/JSContext-inl.h"
+#include "vm/Stack-inl.h"
 
 using namespace js;
 
@@ -87,7 +91,7 @@ class EvalScriptGuard {
   EvalCacheLookup lookup_;
   mozilla::Maybe<DependentAddPtr<EvalCache>> p_;
 
-  RootedLinearString lookupStr_;
+  Rooted<JSLinearString*> lookupStr_;
 
  public:
   explicit EvalScriptGuard(JSContext* cx)
@@ -178,7 +182,7 @@ static EvalJSONResult ParseEvalStringAsJSON(
 
   Rooted<JSONParser<CharT>> parser(
       cx, JSONParser<CharT>(cx, jsonChars,
-                            JSONParserBase::ParseType::AttemptForEval));
+                            JSONParser<CharT>::ParseType::AttemptForEval));
   if (!parser.parse(rval)) {
     return EvalJSONResult::Failure;
   }
@@ -238,7 +242,7 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
 
   // Steps 3-4.
   RootedString str(cx, v.toString());
-  if (!GlobalObject::isRuntimeCodeGenEnabled(cx, str, cx->global())) {
+  if (!cx->isRuntimeCodeGenEnabled(JS::RuntimeCode::JS, str)) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                               JSMSG_CSP_BLOCKED_EVAL);
     return false;
@@ -253,7 +257,7 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
       evalType != DIRECT_EVAL,
       cx->global() == &env->as<GlobalLexicalEnvironmentObject>().global());
 
-  RootedLinearString linearStr(cx, str->ensureLinear(cx));
+  Rooted<JSLinearString*> linearStr(cx, str->ensureLinear(cx));
   if (!linearStr) {
     return false;
   }
@@ -290,7 +294,7 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
       introducerFilename = maybeScript->scriptSource()->introducerFilename();
     }
 
-    RootedScope enclosing(cx);
+    Rooted<Scope*> enclosing(cx);
     if (evalType == DIRECT_EVAL) {
       enclosing = callerScript->innermostScope(pc);
     } else {
@@ -301,7 +305,7 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
     options.setIsRunOnce(true)
         .setNoScriptRval(false)
         .setMutedErrors(mutedErrors)
-        .setdeferDebugMetadata();
+        .setDeferDebugMetadata();
 
     RootedScript introScript(cx);
 
@@ -326,12 +330,7 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
     }
 
     SourceText<char16_t> srcBuf;
-
-    const char16_t* chars = linearChars.twoByteRange().begin().get();
-    SourceOwnership ownership = linearChars.maybeGiveOwnershipToCaller()
-                                    ? SourceOwnership::TakeOwnership
-                                    : SourceOwnership::Borrowed;
-    if (!srcBuf.init(cx, chars, linearStr->length(), ownership)) {
+    if (!srcBuf.initMaybeBorrowed(cx, linearChars)) {
       return false;
     }
 
@@ -342,22 +341,17 @@ static bool EvalKernel(JSContext* cx, HandleValue v, EvalType evalType,
     }
 
     RootedValue undefValue(cx);
-    if (!JS::UpdateDebugMetadata(cx, script, options, undefValue, nullptr,
-                                 introScript, maybeScript)) {
+    JS::InstantiateOptions instantiateOptions(options);
+    if (!JS::UpdateDebugMetadata(cx, script, instantiateOptions, undefValue,
+                                 nullptr, introScript, maybeScript)) {
       return false;
     }
 
     esg.setNewScript(script);
   }
 
-  // If this is a direct eval we need to use the caller's newTarget.
-  RootedValue newTargetVal(cx);
-  if (esg.script()->isDirectEvalInFunction()) {
-    newTargetVal = caller.newTarget();
-  }
-
-  return ExecuteKernel(cx, esg.script(), env, newTargetVal,
-                       NullFramePtr() /* evalInFrame */, vp);
+  return ExecuteKernel(cx, esg.script(), env, NullFramePtr() /* evalInFrame */,
+                       vp);
 }
 
 bool js::IndirectEval(JSContext* cx, unsigned argc, Value* vp) {
@@ -395,19 +389,12 @@ static bool ExecuteInExtensibleLexicalEnvironment(
     Handle<ExtensibleLexicalEnvironmentObject*> env) {
   CHECK_THREAD(cx);
   cx->check(env);
+  cx->check(scriptArg);
   MOZ_RELEASE_ASSERT(scriptArg->hasNonSyntacticScope());
 
-  RootedScript script(cx, scriptArg);
-  if (script->realm() != cx->realm()) {
-    script = CloneGlobalScript(cx, script);
-    if (!script) {
-      return false;
-    }
-  }
-
   RootedValue rval(cx);
-  return ExecuteKernel(cx, script, env, UndefinedHandleValue,
-                       NullFramePtr() /* evalInFrame */, &rval);
+  return ExecuteKernel(cx, scriptArg, env, NullFramePtr() /* evalInFrame */,
+                       &rval);
 }
 
 JS_PUBLIC_API bool js::ExecuteInFrameScriptEnvironment(
@@ -542,3 +529,19 @@ JS_PUBLIC_API bool JS::IsJSMEnvironment(JSObject* obj) {
   // created for reasons other than the JSM loader.
   return obj->is<NonSyntacticVariablesObject>();
 }
+
+#ifdef JSGC_HASH_TABLE_CHECKS
+void RuntimeCaches::checkEvalCacheAfterMinorGC() {
+  JSContext* cx = TlsContext.get();
+  for (auto r = evalCache.all(); !r.empty(); r.popFront()) {
+    const EvalCacheEntry& entry = r.front();
+    CheckGCThingAfterMovingGC(entry.str);
+    EvalCacheLookup lookup(cx);
+    lookup.str = entry.str;
+    lookup.callerScript = entry.callerScript;
+    lookup.pc = entry.pc;
+    auto ptr = evalCache.lookup(lookup);
+    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
+  }
+}
+#endif

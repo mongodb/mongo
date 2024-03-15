@@ -13,12 +13,14 @@ _(GuardToObject, 1, true, 1)\
 _(GuardIsNullOrUndefined, 1, true, 1)\
 _(GuardIsNull, 1, true, 1)\
 _(GuardIsUndefined, 1, true, 1)\
+_(GuardIsNotUninitializedLexical, 1, true, 1)\
 _(GuardToBoolean, 1, true, 1)\
 _(GuardToString, 1, true, 1)\
 _(GuardToSymbol, 1, true, 1)\
 _(GuardToBigInt, 1, true, 1)\
 _(GuardIsNumber, 1, true, 1)\
 _(GuardToInt32, 1, true, 1)\
+_(GuardToNonGCThing, 1, true, 1)\
 _(GuardBooleanToInt32, 1 + 1, true, 1)\
 _(GuardToInt32Index, 1 + 1, true, 1)\
 _(Int32ToIntPtr, 1 + 1, true, 1)\
@@ -27,14 +29,17 @@ _(GuardToInt32ModUint32, 1 + 1, true, 2)\
 _(GuardToUint8Clamped, 1 + 1, true, 2)\
 _(GuardNonDoubleType, 1 + 1, true, 1)\
 _(GuardShape, 1 + 1, true, 1)\
+_(GuardMultipleShapes, 1 + 1, true, 2)\
 _(GuardProto, 1 + 1, true, 1)\
 _(GuardNullProto, 1, true, 1)\
 _(GuardClass, 1 + 1, true, 1)\
 _(GuardAnyClass, 1 + 1, true, 1)\
+_(GuardGlobalGeneration, 1 + 1, true, 1)\
 _(HasClassResult, 1 + 1, true, 1)\
-_(CallRegExpMatcherResult, 1 + 1 + 1, true, 5)\
-_(CallRegExpSearcherResult, 1 + 1 + 1, true, 5)\
-_(CallRegExpTesterResult, 1 + 1 + 1, true, 5)\
+_(CallRegExpMatcherResult, 1 + 1 + 1 + 1, true, 5)\
+_(CallRegExpSearcherResult, 1 + 1 + 1 + 1, true, 5)\
+_(RegExpBuiltinExecMatchResult, 1 + 1 + 1, true, 5)\
+_(RegExpBuiltinExecTestResult, 1 + 1 + 1, true, 5)\
 _(RegExpFlagResult, 1 + 4, true, 2)\
 _(CallSubstringKernelResult, 1 + 1 + 1, true, 5)\
 _(StringReplaceStringResult, 1 + 1 + 1, true, 5)\
@@ -52,26 +57,30 @@ _(GuardIsTypedArray, 1, true, 1)\
 _(GuardHasProxyHandler, 1 + 1, false, 1)\
 _(GuardIsNotDOMProxy, 1, true, 1)\
 _(GuardSpecificObject, 1 + 1, true, 1)\
+_(GuardObjectIdentity, 1 + 1, true, 1)\
 _(GuardSpecificFunction, 1 + 1 + 1, true, 1)\
 _(GuardFunctionScript, 1 + 1 + 1, true, 1)\
 _(GuardSpecificAtom, 1 + 1, true, 4)\
 _(GuardSpecificSymbol, 1 + 1, true, 1)\
+_(GuardSpecificInt32, 1 + 4, true, 1)\
 _(GuardNoDenseElements, 1, true, 1)\
 _(GuardStringToIndex, 1 + 1, true, 4)\
 _(GuardStringToInt32, 1 + 1, true, 4)\
 _(GuardStringToNumber, 1 + 1, true, 4)\
 _(BooleanToNumber, 1 + 1, true, 1)\
-_(GuardAndGetIterator, 1 + 1 + 1 + 1, false, 4)\
 _(GuardHasGetterSetter, 1 + 1 + 1, true, 4)\
 _(GuardInt32IsNonNegative, 1, true, 1)\
 _(GuardIndexIsValidUpdateOrAdd, 1 + 1, true, 1)\
-_(GuardIndexGreaterThanDenseInitLength, 1 + 1, true, 1)\
+_(GuardIndexIsNotDenseElement, 1 + 1, true, 1)\
 _(GuardTagNotEqual, 1 + 1, true, 1)\
 _(GuardXrayExpandoShapeAndDefaultProto, 1 + 1, false, 2)\
 _(GuardXrayNoExpando, 1, false, 2)\
 _(GuardDynamicSlotIsSpecificObject, 1 + 1 + 1, true, 1)\
+_(GuardDynamicSlotIsNotObject, 1 + 1, true, 1)\
 _(GuardFixedSlotValue, 1 + 1 + 1, true, 1)\
 _(GuardDynamicSlotValue, 1 + 1 + 1, true, 1)\
+_(LoadFixedSlot, 1 + 1 + 1, true, 1)\
+_(LoadDynamicSlot, 1 + 1 + 1, true, 1)\
 _(GuardNoAllocationMetadataBuilder, 1, true, 1)\
 _(GuardFunctionHasJitEntry, 1 + 1, true, 1)\
 _(GuardFunctionHasNoJitEntry, 1, true, 1)\
@@ -81,6 +90,7 @@ _(GuardNotClassConstructor, 1, true, 1)\
 _(GuardArrayIsPacked, 1, true, 1)\
 _(GuardArgumentsObjectFlags, 1 + 1, true, 1)\
 _(LoadObject, 1 + 1, true, 1)\
+_(LoadProtoObject, 1 + 1 + 1, true, 1)\
 _(LoadProto, 1 + 1, true, 1)\
 _(LoadEnclosingEnvironment, 1 + 1, true, 1)\
 _(LoadWrapperTarget, 1 + 1, true, 1)\
@@ -90,9 +100,11 @@ _(LoadArgumentDynamicSlot, 1 + 1 + 1, true, 1)\
 _(TruncateDoubleToUInt32, 1 + 1, true, 4)\
 _(MegamorphicLoadSlotResult, 1 + 1, true, 4)\
 _(MegamorphicLoadSlotByValueResult, 1 + 1, true, 4)\
-_(MegamorphicStoreSlot, 1 + 1 + 1, true, 4)\
+_(MegamorphicStoreSlot, 1 + 1 + 1 + 1, true, 5)\
 _(MegamorphicSetElement, 1 + 1 + 1 + 1, true, 5)\
 _(MegamorphicHasPropResult, 1 + 1 + 1, true, 4)\
+_(ObjectToIteratorResult, 1 + 1, true, 5)\
+_(ValueToIteratorResult, 1, true, 5)\
 _(LoadDOMExpandoValue, 1 + 1, true, 1)\
 _(LoadDOMExpandoValueGuardGeneration, 1 + 1 + 1 + 1, true, 2)\
 _(LoadDOMExpandoValueIgnoreGeneration, 1 + 1, true, 1)\
@@ -102,6 +114,7 @@ _(StoreDynamicSlot, 1 + 1 + 1, true, 6)\
 _(AddAndStoreFixedSlot, 1 + 1 + 1 + 1, true, 6)\
 _(AddAndStoreDynamicSlot, 1 + 1 + 1 + 1, true, 6)\
 _(AllocateAndStoreDynamicSlot, 1 + 1 + 1 + 1 + 1, true, 6)\
+_(AddSlotAndCallAddPropHook, 1 + 1 + 1, true, 6)\
 _(StoreDenseElement, 1 + 1 + 1, true, 6)\
 _(StoreDenseElementHole, 1 + 1 + 1 + 1, true, 6)\
 _(ArrayPush, 1 + 1, true, 6)\
@@ -109,6 +122,7 @@ _(ArrayJoinResult, 1 + 1, true, 5)\
 _(PackedArrayPopResult, 1, true, 2)\
 _(PackedArrayShiftResult, 1, true, 4)\
 _(PackedArraySliceResult, 1 + 1 + 1 + 1, true, 5)\
+_(ArgumentsSliceResult, 1 + 1 + 1 + 1, true, 5)\
 _(IsArrayResult, 1, true, 5)\
 _(StoreFixedSlotUndefinedResult, 1 + 1 + 1, true, 4294967295)\
 _(IsObjectResult, 1, true, 1)\
@@ -124,7 +138,6 @@ _(TypedArrayByteLengthInt32Result, 1, true, 2)\
 _(TypedArrayByteLengthDoubleResult, 1, true, 2)\
 _(TypedArrayElementSizeResult, 1, true, 2)\
 _(GuardHasAttachedArrayBuffer, 1, true, 2)\
-_(FinishBoundFunctionInitResult, 1 + 1 + 1, true, 5)\
 _(NewArrayIteratorResult, 1, true, 5)\
 _(NewStringIteratorResult, 1, true, 5)\
 _(NewRegExpStringIteratorResult, 1, true, 5)\
@@ -136,6 +149,9 @@ _(NewTypedArrayFromArrayResult, 1 + 1, true, 5)\
 _(NewStringObjectResult, 1 + 1, true, 5)\
 _(StringFromCharCodeResult, 1, true, 5)\
 _(StringFromCodePointResult, 1, true, 5)\
+_(StringIndexOfResult, 1 + 1, true, 5)\
+_(StringStartsWithResult, 1 + 1, true, 5)\
+_(StringEndsWithResult, 1 + 1, true, 5)\
 _(StringToLowerCaseResult, 1, true, 5)\
 _(StringToUpperCaseResult, 1, true, 5)\
 _(MathAbsInt32Result, 1, true, 2)\
@@ -164,6 +180,8 @@ _(NumberMinMax, 1 + 1 + 1 + 1, true, 1)\
 _(Int32MinMaxArrayResult, 1 + 1, true, 3)\
 _(NumberMinMaxArrayResult, 1 + 1, true, 3)\
 _(MathFunctionNumberResult, 1 + 1, true, 4)\
+_(NumberParseIntResult, 1 + 1, true, 5)\
+_(DoubleParseIntResult, 1, true, 2)\
 _(ObjectToStringResult, 1, true, 4)\
 _(ReflectGetPrototypeOfResult, 1, true, 5)\
 _(StoreTypedArrayElement, 1 + 1 + 1 + 1 + 1, true, 3)\
@@ -187,15 +205,19 @@ _(ProxySetByValue, 1 + 1 + 1 + 1, true, 5)\
 _(CallAddOrUpdateSparseElementHelper, 1 + 1 + 1 + 1, true, 5)\
 _(CallInt32ToString, 1 + 1, true, 4)\
 _(CallNumberToString, 1 + 1, true, 4)\
+_(Int32ToStringWithBaseResult, 1 + 1, true, 3)\
 _(BooleanToString, 1 + 1, true, 2)\
-_(CallScriptedFunction, 1 + 1 + 1, true, 3)\
-_(CallWasmFunction, 1 + 1 + 1 + 1 + 1, true, 3)\
+_(CallScriptedFunction, 1 + 1 + 1 + 4, true, 3)\
+_(CallBoundScriptedFunction, 1 + 1 + 1 + 1 + 4, true, 3)\
+_(CallWasmFunction, 1 + 1 + 1 + 4 + 1 + 1, true, 3)\
 _(GuardWasmArg, 1 + 1, true, 2)\
-_(CallNativeFunction, 1 + 1 + 1 + 1, true, 4)\
-_(CallDOMFunction, 1 + 1 + 1 + 1, true, 4)\
-_(CallClassHook, 1 + 1 + 1 + 1, false, 4)\
-_(CallInlinedFunction, 1 + 1 + 1 + 1, true, 4)\
-_(MetaTwoByte, 1 + 1, true, 0)\
+_(CallNativeFunction, 1 + 1 + 1 + 4 + 1, true, 4)\
+_(CallDOMFunction, 1 + 1 + 1 + 1 + 4, true, 4)\
+_(CallClassHook, 1 + 1 + 1 + 4 + 1, true, 4)\
+_(CallInlinedFunction, 1 + 1 + 1 + 1 + 4, true, 4)\
+_(MetaScriptedThisShape, 1, true, 0)\
+_(BindFunctionResult, 1 + 4 + 1, true, 5)\
+_(SpecializedBindFunctionResult, 1 + 4 + 1, true, 4)\
 _(LoadFixedSlotResult, 1 + 1, true, 1)\
 _(LoadFixedSlotTypedResult, 1 + 1 + 1, true, 1)\
 _(LoadDynamicSlotResult, 1 + 1, true, 1)\
@@ -211,19 +233,24 @@ _(StoreDataViewValueResult, 1 + 1 + 1 + 1 + 1, true, 4)\
 _(LoadInt32ArrayLengthResult, 1, true, 1)\
 _(LoadInt32ArrayLength, 1 + 1, true, 1)\
 _(LoadArgumentsObjectArgResult, 1 + 1, true, 2)\
+_(LoadArgumentsObjectArgHoleResult, 1 + 1, true, 2)\
+_(LoadArgumentsObjectArgExistsResult, 1 + 1, true, 2)\
 _(LoadArgumentsObjectLengthResult, 1, true, 1)\
+_(LoadArgumentsObjectLength, 1 + 1, true, 1)\
 _(LoadFunctionLengthResult, 1, true, 2)\
 _(LoadFunctionNameResult, 1, true, 2)\
+_(LoadBoundFunctionNumArgs, 1 + 1, true, 1)\
+_(LoadBoundFunctionTarget, 1 + 1, true, 1)\
+_(GuardBoundFunctionIsConstructor, 1, true, 1)\
 _(LoadArrayBufferByteLengthInt32Result, 1, true, 1)\
 _(LoadArrayBufferByteLengthDoubleResult, 1, true, 1)\
 _(LoadArrayBufferViewLengthInt32Result, 1, true, 1)\
 _(LoadArrayBufferViewLengthDoubleResult, 1, true, 1)\
-_(LoadStringCharResult, 1 + 1, true, 5)\
-_(LoadStringCharCodeResult, 1 + 1, true, 3)\
+_(LinearizeForCharAccess, 1 + 1 + 1, true, 4)\
+_(LoadStringCharResult, 1 + 1 + 1, true, 5)\
+_(LoadStringCharCodeResult, 1 + 1 + 1, true, 3)\
 _(LoadStringLengthResult, 1, true, 1)\
 _(FrameIsConstructingResult, 0, true, 1)\
-_(LoadEnvironmentFixedSlotResult, 1 + 1, true, 1)\
-_(LoadEnvironmentDynamicSlotResult, 1 + 1, true, 1)\
 _(LoadObjectResult, 1, true, 1)\
 _(LoadStringResult, 1, true, 1)\
 _(LoadSymbolResult, 1, true, 1)\
@@ -239,10 +266,12 @@ _(ProxyGetByValueResult, 1 + 1, true, 5)\
 _(ProxyHasPropResult, 1 + 1 + 1, true, 5)\
 _(CallObjectHasSparseElementResult, 1 + 1, true, 4)\
 _(CallNativeGetElementResult, 1 + 1, true, 5)\
+_(CallNativeGetElementSuperResult, 1 + 1 + 1, true, 5)\
 _(GetNextMapSetEntryForIteratorResult, 1 + 1 + 1, true, 4)\
 _(LoadUndefinedResult, 0, true, 1)\
 _(LoadBooleanResult, 1, true, 1)\
 _(LoadInt32Constant, 1 + 1, true, 1)\
+_(LoadDoubleConstant, 1 + 1, true, 1)\
 _(LoadBooleanConstant, 1 + 1, true, 1)\
 _(LoadUndefined, 1, true, 1)\
 _(LoadConstantString, 1 + 1, true, 1)\
@@ -317,11 +346,34 @@ _(SameValueResult, 1 + 1, true, 4)\
 _(IndirectTruncateInt32Result, 1, true, 1)\
 _(BigIntAsIntNResult, 1 + 1, true, 5)\
 _(BigIntAsUintNResult, 1 + 1, true, 5)\
+_(SetHasResult, 1 + 1, true, 5)\
+_(SetHasNonGCThingResult, 1 + 1, true, 3)\
+_(SetHasStringResult, 1 + 1, true, 5)\
+_(SetHasSymbolResult, 1 + 1, true, 3)\
+_(SetHasBigIntResult, 1 + 1, true, 3)\
+_(SetHasObjectResult, 1 + 1, true, 3)\
+_(SetSizeResult, 1, true, 1)\
+_(MapHasResult, 1 + 1, true, 5)\
+_(MapHasNonGCThingResult, 1 + 1, true, 3)\
+_(MapHasStringResult, 1 + 1, true, 5)\
+_(MapHasSymbolResult, 1 + 1, true, 3)\
+_(MapHasBigIntResult, 1 + 1, true, 3)\
+_(MapHasObjectResult, 1 + 1, true, 3)\
+_(MapGetResult, 1 + 1, true, 5)\
+_(MapGetNonGCThingResult, 1 + 1, true, 3)\
+_(MapGetStringResult, 1 + 1, true, 5)\
+_(MapGetSymbolResult, 1 + 1, true, 3)\
+_(MapGetBigIntResult, 1 + 1, true, 3)\
+_(MapGetObjectResult, 1 + 1, true, 3)\
+_(MapSizeResult, 1, true, 1)\
+_(ArrayFromArgumentsObjectResult, 1 + 1, true, 5)\
+_(CloseIterScriptedResult, 1 + 1 + 1 + 4, true, 5)\
 _(CallPrintString, sizeof(uintptr_t), false, 1)\
 _(Breakpoint, 0, false, 1)\
 _(WrapResult, 0, false, 4)\
 _(Bailout, 0, true, 0)\
-_(AssertRecoveredOnBailoutResult, 1 + 1, true, 1)
+_(AssertRecoveredOnBailoutResult, 1 + 1, true, 1)\
+_(AssertPropertyLookup, 1 + 1 + 1, true, 4)
 
 #define CACHE_IR_WRITER_GENERATED \
 void returnFromIC() {\
@@ -348,6 +400,11 @@ void guardIsNull(ValOperandId input) {\
 void guardIsUndefined(ValOperandId input) {\
   writeOp(CacheOp::GuardIsUndefined);\
   writeOperandId(input);\
+  assertLengthMatches();\
+}\
+void guardIsNotUninitializedLexical(ValOperandId val) {\
+  writeOp(CacheOp::GuardIsNotUninitializedLexical);\
+  writeOperandId(val);\
   assertLengthMatches();\
 }\
 private:\
@@ -392,6 +449,11 @@ void guardToInt32_(ValOperandId input) {\
   assertLengthMatches();\
 }\
 public:\
+void guardToNonGCThing(ValOperandId input) {\
+  writeOp(CacheOp::GuardToNonGCThing);\
+  writeOperandId(input);\
+  assertLengthMatches();\
+}\
 Int32OperandId guardBooleanToInt32(ValOperandId input) {\
   writeOp(CacheOp::GuardBooleanToInt32);\
   writeOperandId(input);\
@@ -453,6 +515,14 @@ void guardShape(ObjOperandId obj, Shape* shape) {\
   writeShapeField(shape);\
   assertLengthMatches();\
 }\
+private:\
+void guardMultipleShapes_(ObjOperandId obj, JSObject* shapes) {\
+  writeOp(CacheOp::GuardMultipleShapes);\
+  writeOperandId(obj);\
+  writeObjectField(shapes);\
+  assertLengthMatches();\
+}\
+public:\
 void guardProto(ObjOperandId obj, JSObject* proto) {\
   writeOp(CacheOp::GuardProto);\
   writeOperandId(obj);\
@@ -476,31 +546,46 @@ void guardAnyClass(ObjOperandId obj, const void* clasp) {\
   writeRawPointerField(clasp);\
   assertLengthMatches();\
 }\
+void guardGlobalGeneration(uint32_t expected, const void* generationAddr) {\
+  writeOp(CacheOp::GuardGlobalGeneration);\
+  writeRawInt32Field(expected);\
+  writeRawPointerField(generationAddr);\
+  assertLengthMatches();\
+}\
 void hasClassResult(ObjOperandId obj, const void* clasp) {\
   writeOp(CacheOp::HasClassResult);\
   writeOperandId(obj);\
   writeRawPointerField(clasp);\
   assertLengthMatches();\
 }\
-void callRegExpMatcherResult(ObjOperandId regexp, StringOperandId input, Int32OperandId lastIndex) {\
+void callRegExpMatcherResult(ObjOperandId regexp, StringOperandId input, Int32OperandId lastIndex, JitCode* stub) {\
   writeOp(CacheOp::CallRegExpMatcherResult);\
   writeOperandId(regexp);\
   writeOperandId(input);\
   writeOperandId(lastIndex);\
+  writeJitCodeField(stub);\
   assertLengthMatches();\
 }\
-void callRegExpSearcherResult(ObjOperandId regexp, StringOperandId input, Int32OperandId lastIndex) {\
+void callRegExpSearcherResult(ObjOperandId regexp, StringOperandId input, Int32OperandId lastIndex, JitCode* stub) {\
   writeOp(CacheOp::CallRegExpSearcherResult);\
   writeOperandId(regexp);\
   writeOperandId(input);\
   writeOperandId(lastIndex);\
+  writeJitCodeField(stub);\
   assertLengthMatches();\
 }\
-void callRegExpTesterResult(ObjOperandId regexp, StringOperandId input, Int32OperandId lastIndex) {\
-  writeOp(CacheOp::CallRegExpTesterResult);\
+void regExpBuiltinExecMatchResult(ObjOperandId regexp, StringOperandId input, JitCode* stub) {\
+  writeOp(CacheOp::RegExpBuiltinExecMatchResult);\
   writeOperandId(regexp);\
   writeOperandId(input);\
-  writeOperandId(lastIndex);\
+  writeJitCodeField(stub);\
+  assertLengthMatches();\
+}\
+void regExpBuiltinExecTestResult(ObjOperandId regexp, StringOperandId input, JitCode* stub) {\
+  writeOp(CacheOp::RegExpBuiltinExecTestResult);\
+  writeOperandId(regexp);\
+  writeOperandId(input);\
+  writeJitCodeField(stub);\
   assertLengthMatches();\
 }\
 void regExpFlagResult(ObjOperandId regexp, int32_t flagsMask) {\
@@ -599,6 +684,12 @@ void guardSpecificObject(ObjOperandId obj, JSObject* expected) {\
   writeObjectField(expected);\
   assertLengthMatches();\
 }\
+void guardObjectIdentity(ObjOperandId obj1, ObjOperandId obj2) {\
+  writeOp(CacheOp::GuardObjectIdentity);\
+  writeOperandId(obj1);\
+  writeOperandId(obj2);\
+  assertLengthMatches();\
+}\
 private:\
 void guardSpecificFunction_(ObjOperandId fun, JSObject* expected, uint32_t nargsAndFlags) {\
   writeOp(CacheOp::GuardSpecificFunction);\
@@ -627,6 +718,12 @@ void guardSpecificSymbol(SymbolOperandId sym, JS::Symbol* expected) {\
   writeOp(CacheOp::GuardSpecificSymbol);\
   writeOperandId(sym);\
   writeSymbolField(expected);\
+  assertLengthMatches();\
+}\
+void guardSpecificInt32(Int32OperandId num, int32_t expected) {\
+  writeOp(CacheOp::GuardSpecificInt32);\
+  writeOperandId(num);\
+  writeInt32Imm(expected);\
   assertLengthMatches();\
 }\
 void guardNoDenseElements(ObjOperandId obj) {\
@@ -666,16 +763,6 @@ NumberOperandId booleanToNumber(BooleanOperandId boolean) {\
   assertLengthMatches();\
   return result;\
 }\
-ObjOperandId guardAndGetIterator(ObjOperandId obj, JSObject* iter, const void* enumeratorsAddr) {\
-  writeOp(CacheOp::GuardAndGetIterator);\
-  writeOperandId(obj);\
-  writeObjectField(iter);\
-  writeRawPointerField(enumeratorsAddr);\
-  ObjOperandId result(newOperandId());\
-  writeOperandId(result);\
-  assertLengthMatches();\
-  return result;\
-}\
 void guardHasGetterSetter(ObjOperandId obj, jsid id, GetterSetter* getterSetter) {\
   writeOp(CacheOp::GuardHasGetterSetter);\
   writeOperandId(obj);\
@@ -694,8 +781,8 @@ void guardIndexIsValidUpdateOrAdd(ObjOperandId obj, Int32OperandId index) {\
   writeOperandId(index);\
   assertLengthMatches();\
 }\
-void guardIndexGreaterThanDenseInitLength(ObjOperandId obj, Int32OperandId index) {\
-  writeOp(CacheOp::GuardIndexGreaterThanDenseInitLength);\
+void guardIndexIsNotDenseElement(ObjOperandId obj, Int32OperandId index) {\
+  writeOp(CacheOp::GuardIndexIsNotDenseElement);\
   writeOperandId(obj);\
   writeOperandId(index);\
   assertLengthMatches();\
@@ -724,6 +811,12 @@ void guardDynamicSlotIsSpecificObject(ObjOperandId obj, ObjOperandId expected, u
   writeRawInt32Field(slot);\
   assertLengthMatches();\
 }\
+void guardDynamicSlotIsNotObject(ObjOperandId obj, uint32_t slot) {\
+  writeOp(CacheOp::GuardDynamicSlotIsNotObject);\
+  writeOperandId(obj);\
+  writeRawInt32Field(slot);\
+  assertLengthMatches();\
+}\
 void guardFixedSlotValue(ObjOperandId obj, uint32_t offset, const Value& val) {\
   writeOp(CacheOp::GuardFixedSlotValue);\
   writeOperandId(obj);\
@@ -737,6 +830,24 @@ void guardDynamicSlotValue(ObjOperandId obj, uint32_t offset, const Value& val) 
   writeRawInt32Field(offset);\
   writeValueField(val);\
   assertLengthMatches();\
+}\
+ValOperandId loadFixedSlot(ObjOperandId obj, uint32_t offset) {\
+  writeOp(CacheOp::LoadFixedSlot);\
+  ValOperandId result(newOperandId());\
+  writeOperandId(result);\
+  writeOperandId(obj);\
+  writeRawInt32Field(offset);\
+  assertLengthMatches();\
+  return result;\
+}\
+ValOperandId loadDynamicSlot(ObjOperandId obj, uint32_t slot) {\
+  writeOp(CacheOp::LoadDynamicSlot);\
+  ValOperandId result(newOperandId());\
+  writeOperandId(result);\
+  writeOperandId(obj);\
+  writeRawInt32Field(slot);\
+  assertLengthMatches();\
+  return result;\
 }\
 void guardNoAllocationMetadataBuilder(const void* builderAddr) {\
   writeOp(CacheOp::GuardNoAllocationMetadataBuilder);\
@@ -785,6 +896,15 @@ ObjOperandId loadObject(JSObject* obj) {\
   ObjOperandId result(newOperandId());\
   writeOperandId(result);\
   writeObjectField(obj);\
+  assertLengthMatches();\
+  return result;\
+}\
+ObjOperandId loadProtoObject(JSObject* protoObj, ObjOperandId receiverObj) {\
+  writeOp(CacheOp::LoadProtoObject);\
+  ObjOperandId result(newOperandId());\
+  writeOperandId(result);\
+  writeObjectField(protoObj);\
+  writeOperandId(receiverObj);\
   assertLengthMatches();\
   return result;\
 }\
@@ -849,10 +969,10 @@ Int32OperandId truncateDoubleToUInt32(NumberOperandId input) {\
   assertLengthMatches();\
   return result;\
 }\
-void megamorphicLoadSlotResult(ObjOperandId obj, PropertyName* name) {\
+void megamorphicLoadSlotResult(ObjOperandId obj, jsid name) {\
   writeOp(CacheOp::MegamorphicLoadSlotResult);\
   writeOperandId(obj);\
-  writeStringField(name);\
+  writeIdField(name);\
   assertLengthMatches();\
 }\
 void megamorphicLoadSlotByValueResult(ObjOperandId obj, ValOperandId id) {\
@@ -861,11 +981,12 @@ void megamorphicLoadSlotByValueResult(ObjOperandId obj, ValOperandId id) {\
   writeOperandId(id);\
   assertLengthMatches();\
 }\
-void megamorphicStoreSlot(ObjOperandId obj, PropertyName* name, ValOperandId rhs) {\
+void megamorphicStoreSlot(ObjOperandId obj, jsid name, ValOperandId rhs, bool strict) {\
   writeOp(CacheOp::MegamorphicStoreSlot);\
   writeOperandId(obj);\
-  writeStringField(name);\
+  writeIdField(name);\
   writeOperandId(rhs);\
+  writeBoolImm(strict);\
   assertLengthMatches();\
 }\
 void megamorphicSetElement(ObjOperandId obj, ValOperandId id, ValOperandId rhs, bool strict) {\
@@ -881,6 +1002,17 @@ void megamorphicHasPropResult(ObjOperandId obj, ValOperandId id, bool hasOwn) {\
   writeOperandId(obj);\
   writeOperandId(id);\
   writeBoolImm(hasOwn);\
+  assertLengthMatches();\
+}\
+void objectToIteratorResult(ObjOperandId obj, const void* enumeratorsAddr) {\
+  writeOp(CacheOp::ObjectToIteratorResult);\
+  writeOperandId(obj);\
+  writeRawPointerField(enumeratorsAddr);\
+  assertLengthMatches();\
+}\
+void valueToIteratorResult(ValOperandId val) {\
+  writeOp(CacheOp::ValueToIteratorResult);\
+  writeOperandId(val);\
   assertLengthMatches();\
 }\
 ValOperandId loadDOMExpandoValue(ObjOperandId obj) {\
@@ -954,6 +1086,13 @@ void allocateAndStoreDynamicSlot(ObjOperandId obj, uint32_t offset, ValOperandId
   writeRawInt32Field(numNewSlots);\
   assertLengthMatches();\
 }\
+void addSlotAndCallAddPropHook(ObjOperandId obj, ValOperandId rhs, Shape* newShape) {\
+  writeOp(CacheOp::AddSlotAndCallAddPropHook);\
+  writeOperandId(obj);\
+  writeOperandId(rhs);\
+  writeShapeField(newShape);\
+  assertLengthMatches();\
+}\
 void storeDenseElement(ObjOperandId obj, Int32OperandId index, ValOperandId rhs) {\
   writeOp(CacheOp::StoreDenseElement);\
   writeOperandId(obj);\
@@ -995,6 +1134,14 @@ void packedArraySliceResult(JSObject* templateObject, ObjOperandId array, Int32O
   writeOp(CacheOp::PackedArraySliceResult);\
   writeObjectField(templateObject);\
   writeOperandId(array);\
+  writeOperandId(begin);\
+  writeOperandId(end);\
+  assertLengthMatches();\
+}\
+void argumentsSliceResult(JSObject* templateObject, ObjOperandId args, Int32OperandId begin, Int32OperandId end) {\
+  writeOp(CacheOp::ArgumentsSliceResult);\
+  writeObjectField(templateObject);\
+  writeOperandId(args);\
   writeOperandId(begin);\
   writeOperandId(end);\
   assertLengthMatches();\
@@ -1077,13 +1224,6 @@ void guardHasAttachedArrayBuffer(ObjOperandId obj) {\
   writeOperandId(obj);\
   assertLengthMatches();\
 }\
-void finishBoundFunctionInitResult(ObjOperandId bound, ObjOperandId target, Int32OperandId argCount) {\
-  writeOp(CacheOp::FinishBoundFunctionInitResult);\
-  writeOperandId(bound);\
-  writeOperandId(target);\
-  writeOperandId(argCount);\
-  assertLengthMatches();\
-}\
 void newArrayIteratorResult(JSObject* templateObject) {\
   writeOp(CacheOp::NewArrayIteratorResult);\
   writeObjectField(templateObject);\
@@ -1144,6 +1284,24 @@ void stringFromCharCodeResult(Int32OperandId code) {\
 void stringFromCodePointResult(Int32OperandId code) {\
   writeOp(CacheOp::StringFromCodePointResult);\
   writeOperandId(code);\
+  assertLengthMatches();\
+}\
+void stringIndexOfResult(StringOperandId str, StringOperandId searchStr) {\
+  writeOp(CacheOp::StringIndexOfResult);\
+  writeOperandId(str);\
+  writeOperandId(searchStr);\
+  assertLengthMatches();\
+}\
+void stringStartsWithResult(StringOperandId str, StringOperandId searchStr) {\
+  writeOp(CacheOp::StringStartsWithResult);\
+  writeOperandId(str);\
+  writeOperandId(searchStr);\
+  assertLengthMatches();\
+}\
+void stringEndsWithResult(StringOperandId str, StringOperandId searchStr) {\
+  writeOp(CacheOp::StringEndsWithResult);\
+  writeOperandId(str);\
+  writeOperandId(searchStr);\
   assertLengthMatches();\
 }\
 void stringToLowerCaseResult(StringOperandId str) {\
@@ -1305,6 +1463,17 @@ void mathFunctionNumberResult(NumberOperandId input, UnaryMathFunction fun) {\
   writeOp(CacheOp::MathFunctionNumberResult);\
   writeOperandId(input);\
   writeUnaryMathFunctionImm(fun);\
+  assertLengthMatches();\
+}\
+void numberParseIntResult(StringOperandId str, Int32OperandId radix) {\
+  writeOp(CacheOp::NumberParseIntResult);\
+  writeOperandId(str);\
+  writeOperandId(radix);\
+  assertLengthMatches();\
+}\
+void doubleParseIntResult(NumberOperandId num) {\
+  writeOp(CacheOp::DoubleParseIntResult);\
+  writeOperandId(num);\
   assertLengthMatches();\
 }\
 void objectToStringResult(ObjOperandId obj) {\
@@ -1496,6 +1665,12 @@ StringOperandId callNumberToString(NumberOperandId input) {\
   assertLengthMatches();\
   return result;\
 }\
+void int32ToStringWithBaseResult(Int32OperandId input, Int32OperandId base) {\
+  writeOp(CacheOp::Int32ToStringWithBaseResult);\
+  writeOperandId(input);\
+  writeOperandId(base);\
+  assertLengthMatches();\
+}\
 StringOperandId booleanToString(BooleanOperandId input) {\
   writeOp(CacheOp::BooleanToString);\
   writeOperandId(input);\
@@ -1505,19 +1680,30 @@ StringOperandId booleanToString(BooleanOperandId input) {\
   return result;\
 }\
 private:\
-void callScriptedFunction_(ObjOperandId callee, Int32OperandId argc, CallFlags flags) {\
+void callScriptedFunction_(ObjOperandId callee, Int32OperandId argc, CallFlags flags, uint32_t argcFixed) {\
   writeOp(CacheOp::CallScriptedFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
   assertLengthMatches();\
 }\
 public:\
-void callWasmFunction(ObjOperandId callee, Int32OperandId argc, CallFlags flags, const void* funcExport, JSObject* instance) {\
+void callBoundScriptedFunction(ObjOperandId callee, ObjOperandId target, Int32OperandId argc, CallFlags flags, uint32_t numBoundArgs) {\
+  writeOp(CacheOp::CallBoundScriptedFunction);\
+  writeOperandId(callee);\
+  writeOperandId(target);\
+  writeOperandId(argc);\
+  writeCallFlagsImm(flags);\
+  writeUInt32Imm(numBoundArgs);\
+  assertLengthMatches();\
+}\
+void callWasmFunction(ObjOperandId callee, Int32OperandId argc, CallFlags flags, uint32_t argcFixed, const void* funcExport, JSObject* instance) {\
   writeOp(CacheOp::CallWasmFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
   writeRawPointerField(funcExport);\
   writeObjectField(instance);\
   assertLengthMatches();\
@@ -1529,53 +1715,70 @@ void guardWasmArg(ValOperandId arg, wasm::ValType::Kind type) {\
   assertLengthMatches();\
 }\
 private:\
-void callNativeFunction_(ObjOperandId callee, Int32OperandId argc, CallFlags flags, bool ignoresReturnValue) {\
+void callNativeFunction_(ObjOperandId callee, Int32OperandId argc, CallFlags flags, uint32_t argcFixed, bool ignoresReturnValue) {\
   writeOp(CacheOp::CallNativeFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
   writeBoolImm(ignoresReturnValue);\
   assertLengthMatches();\
 }\
 public:\
 private:\
-void callDOMFunction_(ObjOperandId callee, Int32OperandId argc, ObjOperandId thisObj, CallFlags flags) {\
+void callDOMFunction_(ObjOperandId callee, Int32OperandId argc, ObjOperandId thisObj, CallFlags flags, uint32_t argcFixed) {\
   writeOp(CacheOp::CallDOMFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeOperandId(thisObj);\
   writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
   assertLengthMatches();\
 }\
 public:\
 private:\
-void callClassHook_(ObjOperandId callee, Int32OperandId argc, CallFlags flags, const void* target) {\
+void callClassHook_(ObjOperandId callee, Int32OperandId argc, CallFlags flags, uint32_t argcFixed, const void* target) {\
   writeOp(CacheOp::CallClassHook);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
   writeRawPointerField(target);\
   assertLengthMatches();\
 }\
 public:\
 private:\
-void callInlinedFunction_(ObjOperandId callee, Int32OperandId argc, const void* icScript, CallFlags flags) {\
+void callInlinedFunction_(ObjOperandId callee, Int32OperandId argc, const void* icScript, CallFlags flags, uint32_t argcFixed) {\
   writeOp(CacheOp::CallInlinedFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
   writeRawPointerField(icScript);\
   writeCallFlagsImm(flags);\
+  writeUInt32Imm(argcFixed);\
   assertLengthMatches();\
 }\
 public:\
 private:\
-void metaTwoByte_(JSObject* functionObject, JSObject* templateObject) {\
-  writeOp(CacheOp::MetaTwoByte);\
-  writeObjectField(functionObject);\
-  writeObjectField(templateObject);\
+void metaScriptedThisShape_(Shape* thisShape) {\
+  writeOp(CacheOp::MetaScriptedThisShape);\
+  writeShapeField(thisShape);\
   assertLengthMatches();\
 }\
 public:\
+void bindFunctionResult(ObjOperandId target, uint32_t argc, JSObject* templateObject) {\
+  writeOp(CacheOp::BindFunctionResult);\
+  writeOperandId(target);\
+  writeUInt32Imm(argc);\
+  writeObjectField(templateObject);\
+  assertLengthMatches();\
+}\
+void specializedBindFunctionResult(ObjOperandId target, uint32_t argc, JSObject* templateObject) {\
+  writeOp(CacheOp::SpecializedBindFunctionResult);\
+  writeOperandId(target);\
+  writeUInt32Imm(argc);\
+  writeObjectField(templateObject);\
+  assertLengthMatches();\
+}\
 void loadFixedSlotResult(ObjOperandId obj, uint32_t offset) {\
   writeOp(CacheOp::LoadFixedSlotResult);\
   writeOperandId(obj);\
@@ -1677,10 +1880,30 @@ void loadArgumentsObjectArgResult(ObjOperandId obj, Int32OperandId index) {\
   writeOperandId(index);\
   assertLengthMatches();\
 }\
+void loadArgumentsObjectArgHoleResult(ObjOperandId obj, Int32OperandId index) {\
+  writeOp(CacheOp::LoadArgumentsObjectArgHoleResult);\
+  writeOperandId(obj);\
+  writeOperandId(index);\
+  assertLengthMatches();\
+}\
+void loadArgumentsObjectArgExistsResult(ObjOperandId obj, Int32OperandId index) {\
+  writeOp(CacheOp::LoadArgumentsObjectArgExistsResult);\
+  writeOperandId(obj);\
+  writeOperandId(index);\
+  assertLengthMatches();\
+}\
 void loadArgumentsObjectLengthResult(ObjOperandId obj) {\
   writeOp(CacheOp::LoadArgumentsObjectLengthResult);\
   writeOperandId(obj);\
   assertLengthMatches();\
+}\
+Int32OperandId loadArgumentsObjectLength(ObjOperandId obj) {\
+  writeOp(CacheOp::LoadArgumentsObjectLength);\
+  writeOperandId(obj);\
+  Int32OperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
 }\
 void loadFunctionLengthResult(ObjOperandId obj) {\
   writeOp(CacheOp::LoadFunctionLengthResult);\
@@ -1689,6 +1912,27 @@ void loadFunctionLengthResult(ObjOperandId obj) {\
 }\
 void loadFunctionNameResult(ObjOperandId obj) {\
   writeOp(CacheOp::LoadFunctionNameResult);\
+  writeOperandId(obj);\
+  assertLengthMatches();\
+}\
+Int32OperandId loadBoundFunctionNumArgs(ObjOperandId obj) {\
+  writeOp(CacheOp::LoadBoundFunctionNumArgs);\
+  writeOperandId(obj);\
+  Int32OperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+ObjOperandId loadBoundFunctionTarget(ObjOperandId obj) {\
+  writeOp(CacheOp::LoadBoundFunctionTarget);\
+  writeOperandId(obj);\
+  ObjOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+void guardBoundFunctionIsConstructor(ObjOperandId obj) {\
+  writeOp(CacheOp::GuardBoundFunctionIsConstructor);\
   writeOperandId(obj);\
   assertLengthMatches();\
 }\
@@ -1712,16 +1956,27 @@ void loadArrayBufferViewLengthDoubleResult(ObjOperandId obj) {\
   writeOperandId(obj);\
   assertLengthMatches();\
 }\
-void loadStringCharResult(StringOperandId str, Int32OperandId index) {\
+StringOperandId linearizeForCharAccess(StringOperandId str, Int32OperandId index) {\
+  writeOp(CacheOp::LinearizeForCharAccess);\
+  writeOperandId(str);\
+  writeOperandId(index);\
+  StringOperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+void loadStringCharResult(StringOperandId str, Int32OperandId index, bool handleOOB) {\
   writeOp(CacheOp::LoadStringCharResult);\
   writeOperandId(str);\
   writeOperandId(index);\
+  writeBoolImm(handleOOB);\
   assertLengthMatches();\
 }\
-void loadStringCharCodeResult(StringOperandId str, Int32OperandId index) {\
+void loadStringCharCodeResult(StringOperandId str, Int32OperandId index, bool handleOOB) {\
   writeOp(CacheOp::LoadStringCharCodeResult);\
   writeOperandId(str);\
   writeOperandId(index);\
+  writeBoolImm(handleOOB);\
   assertLengthMatches();\
 }\
 void loadStringLengthResult(StringOperandId str) {\
@@ -1731,18 +1986,6 @@ void loadStringLengthResult(StringOperandId str) {\
 }\
 void frameIsConstructingResult() {\
   writeOp(CacheOp::FrameIsConstructingResult);\
-  assertLengthMatches();\
-}\
-void loadEnvironmentFixedSlotResult(ObjOperandId obj, uint32_t offset) {\
-  writeOp(CacheOp::LoadEnvironmentFixedSlotResult);\
-  writeOperandId(obj);\
-  writeRawInt32Field(offset);\
-  assertLengthMatches();\
-}\
-void loadEnvironmentDynamicSlotResult(ObjOperandId obj, uint32_t offset) {\
-  writeOp(CacheOp::LoadEnvironmentDynamicSlotResult);\
-  writeOperandId(obj);\
-  writeRawInt32Field(offset);\
   assertLengthMatches();\
 }\
 void loadObjectResult(ObjOperandId obj) {\
@@ -1843,6 +2086,13 @@ void callNativeGetElementResult(ObjOperandId obj, Int32OperandId index) {\
   writeOperandId(index);\
   assertLengthMatches();\
 }\
+void callNativeGetElementSuperResult(ObjOperandId obj, Int32OperandId index, ValOperandId receiver) {\
+  writeOp(CacheOp::CallNativeGetElementSuperResult);\
+  writeOperandId(obj);\
+  writeOperandId(index);\
+  writeOperandId(receiver);\
+  assertLengthMatches();\
+}\
 void getNextMapSetEntryForIteratorResult(ObjOperandId iter, ObjOperandId resultArr, bool isMap) {\
   writeOp(CacheOp::GetNextMapSetEntryForIteratorResult);\
   writeOperandId(iter);\
@@ -1863,6 +2113,14 @@ Int32OperandId loadInt32Constant(uint32_t val) {\
   writeOp(CacheOp::LoadInt32Constant);\
   writeRawInt32Field(val);\
   Int32OperandId result(newOperandId());\
+  writeOperandId(result);\
+  assertLengthMatches();\
+  return result;\
+}\
+NumberOperandId loadDoubleConstant(double val) {\
+  writeOp(CacheOp::LoadDoubleConstant);\
+  writeDoubleField(val);\
+  NumberOperandId result(newOperandId());\
   writeOperandId(result);\
   assertLengthMatches();\
   return result;\
@@ -2308,6 +2566,138 @@ void bigIntAsUintNResult(Int32OperandId bits, BigIntOperandId bigInt) {\
   writeOperandId(bigInt);\
   assertLengthMatches();\
 }\
+void setHasResult(ObjOperandId set, ValOperandId val) {\
+  writeOp(CacheOp::SetHasResult);\
+  writeOperandId(set);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void setHasNonGCThingResult(ObjOperandId set, ValOperandId val) {\
+  writeOp(CacheOp::SetHasNonGCThingResult);\
+  writeOperandId(set);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void setHasStringResult(ObjOperandId set, StringOperandId str) {\
+  writeOp(CacheOp::SetHasStringResult);\
+  writeOperandId(set);\
+  writeOperandId(str);\
+  assertLengthMatches();\
+}\
+void setHasSymbolResult(ObjOperandId set, SymbolOperandId sym) {\
+  writeOp(CacheOp::SetHasSymbolResult);\
+  writeOperandId(set);\
+  writeOperandId(sym);\
+  assertLengthMatches();\
+}\
+void setHasBigIntResult(ObjOperandId set, BigIntOperandId bigInt) {\
+  writeOp(CacheOp::SetHasBigIntResult);\
+  writeOperandId(set);\
+  writeOperandId(bigInt);\
+  assertLengthMatches();\
+}\
+void setHasObjectResult(ObjOperandId set, ObjOperandId obj) {\
+  writeOp(CacheOp::SetHasObjectResult);\
+  writeOperandId(set);\
+  writeOperandId(obj);\
+  assertLengthMatches();\
+}\
+void setSizeResult(ObjOperandId set) {\
+  writeOp(CacheOp::SetSizeResult);\
+  writeOperandId(set);\
+  assertLengthMatches();\
+}\
+void mapHasResult(ObjOperandId map, ValOperandId val) {\
+  writeOp(CacheOp::MapHasResult);\
+  writeOperandId(map);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void mapHasNonGCThingResult(ObjOperandId map, ValOperandId val) {\
+  writeOp(CacheOp::MapHasNonGCThingResult);\
+  writeOperandId(map);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void mapHasStringResult(ObjOperandId map, StringOperandId str) {\
+  writeOp(CacheOp::MapHasStringResult);\
+  writeOperandId(map);\
+  writeOperandId(str);\
+  assertLengthMatches();\
+}\
+void mapHasSymbolResult(ObjOperandId map, SymbolOperandId sym) {\
+  writeOp(CacheOp::MapHasSymbolResult);\
+  writeOperandId(map);\
+  writeOperandId(sym);\
+  assertLengthMatches();\
+}\
+void mapHasBigIntResult(ObjOperandId map, BigIntOperandId bigInt) {\
+  writeOp(CacheOp::MapHasBigIntResult);\
+  writeOperandId(map);\
+  writeOperandId(bigInt);\
+  assertLengthMatches();\
+}\
+void mapHasObjectResult(ObjOperandId map, ObjOperandId obj) {\
+  writeOp(CacheOp::MapHasObjectResult);\
+  writeOperandId(map);\
+  writeOperandId(obj);\
+  assertLengthMatches();\
+}\
+void mapGetResult(ObjOperandId map, ValOperandId val) {\
+  writeOp(CacheOp::MapGetResult);\
+  writeOperandId(map);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void mapGetNonGCThingResult(ObjOperandId map, ValOperandId val) {\
+  writeOp(CacheOp::MapGetNonGCThingResult);\
+  writeOperandId(map);\
+  writeOperandId(val);\
+  assertLengthMatches();\
+}\
+void mapGetStringResult(ObjOperandId map, StringOperandId str) {\
+  writeOp(CacheOp::MapGetStringResult);\
+  writeOperandId(map);\
+  writeOperandId(str);\
+  assertLengthMatches();\
+}\
+void mapGetSymbolResult(ObjOperandId map, SymbolOperandId sym) {\
+  writeOp(CacheOp::MapGetSymbolResult);\
+  writeOperandId(map);\
+  writeOperandId(sym);\
+  assertLengthMatches();\
+}\
+void mapGetBigIntResult(ObjOperandId map, BigIntOperandId bigInt) {\
+  writeOp(CacheOp::MapGetBigIntResult);\
+  writeOperandId(map);\
+  writeOperandId(bigInt);\
+  assertLengthMatches();\
+}\
+void mapGetObjectResult(ObjOperandId map, ObjOperandId obj) {\
+  writeOp(CacheOp::MapGetObjectResult);\
+  writeOperandId(map);\
+  writeOperandId(obj);\
+  assertLengthMatches();\
+}\
+void mapSizeResult(ObjOperandId map) {\
+  writeOp(CacheOp::MapSizeResult);\
+  writeOperandId(map);\
+  assertLengthMatches();\
+}\
+void arrayFromArgumentsObjectResult(ObjOperandId obj, Shape* shape) {\
+  writeOp(CacheOp::ArrayFromArgumentsObjectResult);\
+  writeOperandId(obj);\
+  writeShapeField(shape);\
+  assertLengthMatches();\
+}\
+void closeIterScriptedResult(ObjOperandId iter, ObjOperandId callee, CompletionKind kind, uint32_t targetNargs) {\
+  writeOp(CacheOp::CloseIterScriptedResult);\
+  writeOperandId(iter);\
+  writeOperandId(callee);\
+  writeCompletionKindImm(kind);\
+  writeUInt32Imm(targetNargs);\
+  assertLengthMatches();\
+}\
 void callPrintString(const char* str) {\
   writeOp(CacheOp::CallPrintString);\
   writeStaticStringImm(str);\
@@ -2329,6 +2719,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   writeOp(CacheOp::AssertRecoveredOnBailoutResult);\
   writeOperandId(val);\
   writeBoolImm(mustBeRecovered);\
+  assertLengthMatches();\
+}\
+void assertPropertyLookup(ObjOperandId obj, jsid id, uint32_t slot) {\
+  writeOp(CacheOp::AssertPropertyLookup);\
+  writeOperandId(obj);\
+  writeIdField(id);\
+  writeRawInt32Field(slot);\
   assertLengthMatches();\
 }
 
@@ -2355,6 +2752,12 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitGuardIsUndefined(CacheIRReader& reader) {\
   ValOperandId inputId = reader.valOperandId();\
   return emitGuardIsUndefined(inputId);\
+}\
+\
+[[nodiscard]] bool emitGuardIsNotUninitializedLexical(ValOperandId valId);\
+[[nodiscard]] bool emitGuardIsNotUninitializedLexical(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  return emitGuardIsNotUninitializedLexical(valId);\
 }\
 \
 [[nodiscard]] bool emitGuardToBoolean(ValOperandId inputId);\
@@ -2391,6 +2794,12 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitGuardToInt32(CacheIRReader& reader) {\
   ValOperandId inputId = reader.valOperandId();\
   return emitGuardToInt32(inputId);\
+}\
+\
+[[nodiscard]] bool emitGuardToNonGCThing(ValOperandId inputId);\
+[[nodiscard]] bool emitGuardToNonGCThing(CacheIRReader& reader) {\
+  ValOperandId inputId = reader.valOperandId();\
+  return emitGuardToNonGCThing(inputId);\
 }\
 \
 [[nodiscard]] bool emitGuardBooleanToInt32(ValOperandId inputId, Int32OperandId resultId);\
@@ -2443,6 +2852,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardNonDoubleType(inputId, type);\
 }\
 \
+[[nodiscard]] bool emitGuardMultipleShapes(ObjOperandId objId, uint32_t shapesOffset);\
+[[nodiscard]] bool emitGuardMultipleShapes(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t shapesOffset = reader.stubOffset();\
+  return emitGuardMultipleShapes(objId, shapesOffset);\
+}\
+\
 [[nodiscard]] bool emitGuardNullProto(ObjOperandId objId);\
 [[nodiscard]] bool emitGuardNullProto(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -2456,28 +2872,11 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardClass(objId, kind);\
 }\
 \
-[[nodiscard]] bool emitCallRegExpMatcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId);\
-[[nodiscard]] bool emitCallRegExpMatcherResult(CacheIRReader& reader) {\
-  ObjOperandId regexpId = reader.objOperandId();\
-  StringOperandId inputId = reader.stringOperandId();\
-  Int32OperandId lastIndexId = reader.int32OperandId();\
-  return emitCallRegExpMatcherResult(regexpId, inputId, lastIndexId);\
-}\
-\
-[[nodiscard]] bool emitCallRegExpSearcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId);\
-[[nodiscard]] bool emitCallRegExpSearcherResult(CacheIRReader& reader) {\
-  ObjOperandId regexpId = reader.objOperandId();\
-  StringOperandId inputId = reader.stringOperandId();\
-  Int32OperandId lastIndexId = reader.int32OperandId();\
-  return emitCallRegExpSearcherResult(regexpId, inputId, lastIndexId);\
-}\
-\
-[[nodiscard]] bool emitCallRegExpTesterResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId);\
-[[nodiscard]] bool emitCallRegExpTesterResult(CacheIRReader& reader) {\
-  ObjOperandId regexpId = reader.objOperandId();\
-  StringOperandId inputId = reader.stringOperandId();\
-  Int32OperandId lastIndexId = reader.int32OperandId();\
-  return emitCallRegExpTesterResult(regexpId, inputId, lastIndexId);\
+[[nodiscard]] bool emitGuardGlobalGeneration(uint32_t expectedOffset, uint32_t generationAddrOffset);\
+[[nodiscard]] bool emitGuardGlobalGeneration(CacheIRReader& reader) {\
+  uint32_t expectedOffset = reader.stubOffset();\
+  uint32_t generationAddrOffset = reader.stubOffset();\
+  return emitGuardGlobalGeneration(expectedOffset, generationAddrOffset);\
 }\
 \
 [[nodiscard]] bool emitRegExpFlagResult(ObjOperandId regexpId, int32_t flagsMask);\
@@ -2571,6 +2970,20 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardIsNotDOMProxy(objId);\
 }\
 \
+[[nodiscard]] bool emitGuardObjectIdentity(ObjOperandId obj1Id, ObjOperandId obj2Id);\
+[[nodiscard]] bool emitGuardObjectIdentity(CacheIRReader& reader) {\
+  ObjOperandId obj1Id = reader.objOperandId();\
+  ObjOperandId obj2Id = reader.objOperandId();\
+  return emitGuardObjectIdentity(obj1Id, obj2Id);\
+}\
+\
+[[nodiscard]] bool emitGuardSpecificInt32(Int32OperandId numId, int32_t expected);\
+[[nodiscard]] bool emitGuardSpecificInt32(CacheIRReader& reader) {\
+  Int32OperandId numId = reader.int32OperandId();\
+  int32_t expected = reader.int32Immediate();\
+  return emitGuardSpecificInt32(numId, expected);\
+}\
+\
 [[nodiscard]] bool emitGuardNoDenseElements(ObjOperandId objId);\
 [[nodiscard]] bool emitGuardNoDenseElements(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -2626,11 +3039,11 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardIndexIsValidUpdateOrAdd(objId, indexId);\
 }\
 \
-[[nodiscard]] bool emitGuardIndexGreaterThanDenseInitLength(ObjOperandId objId, Int32OperandId indexId);\
-[[nodiscard]] bool emitGuardIndexGreaterThanDenseInitLength(CacheIRReader& reader) {\
+[[nodiscard]] bool emitGuardIndexIsNotDenseElement(ObjOperandId objId, Int32OperandId indexId);\
+[[nodiscard]] bool emitGuardIndexIsNotDenseElement(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   Int32OperandId indexId = reader.int32OperandId();\
-  return emitGuardIndexGreaterThanDenseInitLength(objId, indexId);\
+  return emitGuardIndexIsNotDenseElement(objId, indexId);\
 }\
 \
 [[nodiscard]] bool emitGuardTagNotEqual(ValueTagOperandId lhsId, ValueTagOperandId rhsId);\
@@ -2661,6 +3074,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardDynamicSlotIsSpecificObject(objId, expectedId, slotOffset);\
 }\
 \
+[[nodiscard]] bool emitGuardDynamicSlotIsNotObject(ObjOperandId objId, uint32_t slotOffset);\
+[[nodiscard]] bool emitGuardDynamicSlotIsNotObject(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t slotOffset = reader.stubOffset();\
+  return emitGuardDynamicSlotIsNotObject(objId, slotOffset);\
+}\
+\
 [[nodiscard]] bool emitGuardFixedSlotValue(ObjOperandId objId, uint32_t offsetOffset, uint32_t valOffset);\
 [[nodiscard]] bool emitGuardFixedSlotValue(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -2675,6 +3095,22 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   uint32_t offsetOffset = reader.stubOffset();\
   uint32_t valOffset = reader.stubOffset();\
   return emitGuardDynamicSlotValue(objId, offsetOffset, valOffset);\
+}\
+\
+[[nodiscard]] bool emitLoadFixedSlot(ValOperandId resultId, ObjOperandId objId, uint32_t offsetOffset);\
+[[nodiscard]] bool emitLoadFixedSlot(CacheIRReader& reader) {\
+  ValOperandId resultId = reader.valOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t offsetOffset = reader.stubOffset();\
+  return emitLoadFixedSlot(resultId, objId, offsetOffset);\
+}\
+\
+[[nodiscard]] bool emitLoadDynamicSlot(ValOperandId resultId, ObjOperandId objId, uint32_t slotOffset);\
+[[nodiscard]] bool emitLoadDynamicSlot(CacheIRReader& reader) {\
+  ValOperandId resultId = reader.valOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t slotOffset = reader.stubOffset();\
+  return emitLoadDynamicSlot(resultId, objId, slotOffset);\
 }\
 \
 [[nodiscard]] bool emitGuardNoAllocationMetadataBuilder(uint32_t builderAddrOffset);\
@@ -2734,6 +3170,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitLoadObject(resultId, objOffset);\
 }\
 \
+[[nodiscard]] bool emitLoadProtoObject(ObjOperandId resultId, uint32_t protoObjOffset, ObjOperandId receiverObjId);\
+[[nodiscard]] bool emitLoadProtoObject(CacheIRReader& reader) {\
+  ObjOperandId resultId = reader.objOperandId();\
+  uint32_t protoObjOffset = reader.stubOffset();\
+  ObjOperandId receiverObjId = reader.objOperandId();\
+  return emitLoadProtoObject(resultId, protoObjOffset, receiverObjId);\
+}\
+\
 [[nodiscard]] bool emitLoadProto(ObjOperandId objId, ObjOperandId resultId);\
 [[nodiscard]] bool emitLoadProto(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -2783,12 +3227,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitMegamorphicLoadSlotByValueResult(objId, idId);\
 }\
 \
-[[nodiscard]] bool emitMegamorphicStoreSlot(ObjOperandId objId, uint32_t nameOffset, ValOperandId rhsId);\
+[[nodiscard]] bool emitMegamorphicStoreSlot(ObjOperandId objId, uint32_t nameOffset, ValOperandId rhsId, bool strict);\
 [[nodiscard]] bool emitMegamorphicStoreSlot(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   uint32_t nameOffset = reader.stubOffset();\
   ValOperandId rhsId = reader.valOperandId();\
-  return emitMegamorphicStoreSlot(objId, nameOffset, rhsId);\
+  bool strict = reader.readBool();\
+  return emitMegamorphicStoreSlot(objId, nameOffset, rhsId, strict);\
 }\
 \
 [[nodiscard]] bool emitMegamorphicHasPropResult(ObjOperandId objId, ValOperandId idId, bool hasOwn);\
@@ -2797,6 +3242,19 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ValOperandId idId = reader.valOperandId();\
   bool hasOwn = reader.readBool();\
   return emitMegamorphicHasPropResult(objId, idId, hasOwn);\
+}\
+\
+[[nodiscard]] bool emitObjectToIteratorResult(ObjOperandId objId, uint32_t enumeratorsAddrOffset);\
+[[nodiscard]] bool emitObjectToIteratorResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t enumeratorsAddrOffset = reader.stubOffset();\
+  return emitObjectToIteratorResult(objId, enumeratorsAddrOffset);\
+}\
+\
+[[nodiscard]] bool emitValueToIteratorResult(ValOperandId valId);\
+[[nodiscard]] bool emitValueToIteratorResult(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  return emitValueToIteratorResult(valId);\
 }\
 \
 [[nodiscard]] bool emitLoadDOMExpandoValue(ObjOperandId objId, ValOperandId resultId);\
@@ -2811,6 +3269,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ObjOperandId objId = reader.objOperandId();\
   ValOperandId resultId = reader.valOperandId();\
   return emitLoadDOMExpandoValueIgnoreGeneration(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitAddSlotAndCallAddPropHook(ObjOperandId objId, ValOperandId rhsId, uint32_t newShapeOffset);\
+[[nodiscard]] bool emitAddSlotAndCallAddPropHook(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  ValOperandId rhsId = reader.valOperandId();\
+  uint32_t newShapeOffset = reader.stubOffset();\
+  return emitAddSlotAndCallAddPropHook(objId, rhsId, newShapeOffset);\
 }\
 \
 [[nodiscard]] bool emitStoreDenseElement(ObjOperandId objId, Int32OperandId indexId, ValOperandId rhsId);\
@@ -2929,14 +3395,6 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardHasAttachedArrayBuffer(objId);\
 }\
 \
-[[nodiscard]] bool emitFinishBoundFunctionInitResult(ObjOperandId boundId, ObjOperandId targetId, Int32OperandId argCountId);\
-[[nodiscard]] bool emitFinishBoundFunctionInitResult(CacheIRReader& reader) {\
-  ObjOperandId boundId = reader.objOperandId();\
-  ObjOperandId targetId = reader.objOperandId();\
-  Int32OperandId argCountId = reader.int32OperandId();\
-  return emitFinishBoundFunctionInitResult(boundId, targetId, argCountId);\
-}\
-\
 [[nodiscard]] bool emitNewArrayIteratorResult(uint32_t templateObjectOffset);\
 [[nodiscard]] bool emitNewArrayIteratorResult(CacheIRReader& reader) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
@@ -2996,6 +3454,27 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
   StringOperandId strId = reader.stringOperandId();\
   return emitNewStringObjectResult(templateObjectOffset, strId);\
+}\
+\
+[[nodiscard]] bool emitStringIndexOfResult(StringOperandId strId, StringOperandId searchStrId);\
+[[nodiscard]] bool emitStringIndexOfResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  return emitStringIndexOfResult(strId, searchStrId);\
+}\
+\
+[[nodiscard]] bool emitStringStartsWithResult(StringOperandId strId, StringOperandId searchStrId);\
+[[nodiscard]] bool emitStringStartsWithResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  return emitStringStartsWithResult(strId, searchStrId);\
+}\
+\
+[[nodiscard]] bool emitStringEndsWithResult(StringOperandId strId, StringOperandId searchStrId);\
+[[nodiscard]] bool emitStringEndsWithResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  return emitStringEndsWithResult(strId, searchStrId);\
 }\
 \
 [[nodiscard]] bool emitStringToLowerCaseResult(StringOperandId strId);\
@@ -3177,6 +3656,19 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitMathFunctionNumberResult(inputId, fun);\
 }\
 \
+[[nodiscard]] bool emitNumberParseIntResult(StringOperandId strId, Int32OperandId radixId);\
+[[nodiscard]] bool emitNumberParseIntResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  Int32OperandId radixId = reader.int32OperandId();\
+  return emitNumberParseIntResult(strId, radixId);\
+}\
+\
+[[nodiscard]] bool emitDoubleParseIntResult(NumberOperandId numId);\
+[[nodiscard]] bool emitDoubleParseIntResult(CacheIRReader& reader) {\
+  NumberOperandId numId = reader.numberOperandId();\
+  return emitDoubleParseIntResult(numId);\
+}\
+\
 [[nodiscard]] bool emitObjectToStringResult(ObjOperandId objId);\
 [[nodiscard]] bool emitObjectToStringResult(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -3299,6 +3791,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitCallNumberToString(inputId, resultId);\
 }\
 \
+[[nodiscard]] bool emitInt32ToStringWithBaseResult(Int32OperandId inputId, Int32OperandId baseId);\
+[[nodiscard]] bool emitInt32ToStringWithBaseResult(CacheIRReader& reader) {\
+  Int32OperandId inputId = reader.int32OperandId();\
+  Int32OperandId baseId = reader.int32OperandId();\
+  return emitInt32ToStringWithBaseResult(inputId, baseId);\
+}\
+\
 [[nodiscard]] bool emitBooleanToString(BooleanOperandId inputId, StringOperandId resultId);\
 [[nodiscard]] bool emitBooleanToString(CacheIRReader& reader) {\
   BooleanOperandId inputId = reader.booleanOperandId();\
@@ -3313,11 +3812,10 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardWasmArg(argId, type);\
 }\
 \
-[[nodiscard]] bool emitMetaTwoByte(uint32_t functionObjectOffset, uint32_t templateObjectOffset);\
-[[nodiscard]] bool emitMetaTwoByte(CacheIRReader& reader) {\
-  uint32_t functionObjectOffset = reader.stubOffset();\
-  uint32_t templateObjectOffset = reader.stubOffset();\
-  return emitMetaTwoByte(functionObjectOffset, templateObjectOffset);\
+[[nodiscard]] bool emitMetaScriptedThisShape(uint32_t thisShapeOffset);\
+[[nodiscard]] bool emitMetaScriptedThisShape(CacheIRReader& reader) {\
+  uint32_t thisShapeOffset = reader.stubOffset();\
+  return emitMetaScriptedThisShape(thisShapeOffset);\
 }\
 \
 [[nodiscard]] bool emitLoadDenseElementResult(ObjOperandId objId, Int32OperandId indexId);\
@@ -3412,10 +3910,31 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitLoadArgumentsObjectArgResult(objId, indexId);\
 }\
 \
+[[nodiscard]] bool emitLoadArgumentsObjectArgHoleResult(ObjOperandId objId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLoadArgumentsObjectArgHoleResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  return emitLoadArgumentsObjectArgHoleResult(objId, indexId);\
+}\
+\
+[[nodiscard]] bool emitLoadArgumentsObjectArgExistsResult(ObjOperandId objId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLoadArgumentsObjectArgExistsResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  return emitLoadArgumentsObjectArgExistsResult(objId, indexId);\
+}\
+\
 [[nodiscard]] bool emitLoadArgumentsObjectLengthResult(ObjOperandId objId);\
 [[nodiscard]] bool emitLoadArgumentsObjectLengthResult(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   return emitLoadArgumentsObjectLengthResult(objId);\
+}\
+\
+[[nodiscard]] bool emitLoadArgumentsObjectLength(ObjOperandId objId, Int32OperandId resultId);\
+[[nodiscard]] bool emitLoadArgumentsObjectLength(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId resultId = reader.int32OperandId();\
+  return emitLoadArgumentsObjectLength(objId, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadFunctionLengthResult(ObjOperandId objId);\
@@ -3428,6 +3947,26 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitLoadFunctionNameResult(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   return emitLoadFunctionNameResult(objId);\
+}\
+\
+[[nodiscard]] bool emitLoadBoundFunctionNumArgs(ObjOperandId objId, Int32OperandId resultId);\
+[[nodiscard]] bool emitLoadBoundFunctionNumArgs(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId resultId = reader.int32OperandId();\
+  return emitLoadBoundFunctionNumArgs(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadBoundFunctionTarget(ObjOperandId objId, ObjOperandId resultId);\
+[[nodiscard]] bool emitLoadBoundFunctionTarget(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  ObjOperandId resultId = reader.objOperandId();\
+  return emitLoadBoundFunctionTarget(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitGuardBoundFunctionIsConstructor(ObjOperandId objId);\
+[[nodiscard]] bool emitGuardBoundFunctionIsConstructor(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitGuardBoundFunctionIsConstructor(objId);\
 }\
 \
 [[nodiscard]] bool emitLoadArrayBufferByteLengthInt32Result(ObjOperandId objId);\
@@ -3454,11 +3993,20 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitLoadArrayBufferViewLengthDoubleResult(objId);\
 }\
 \
-[[nodiscard]] bool emitLoadStringCharCodeResult(StringOperandId strId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLinearizeForCharAccess(StringOperandId strId, Int32OperandId indexId, StringOperandId resultId);\
+[[nodiscard]] bool emitLinearizeForCharAccess(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  StringOperandId resultId = reader.stringOperandId();\
+  return emitLinearizeForCharAccess(strId, indexId, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadStringCharCodeResult(StringOperandId strId, Int32OperandId indexId, bool handleOOB);\
 [[nodiscard]] bool emitLoadStringCharCodeResult(CacheIRReader& reader) {\
   StringOperandId strId = reader.stringOperandId();\
   Int32OperandId indexId = reader.int32OperandId();\
-  return emitLoadStringCharCodeResult(strId, indexId);\
+  bool handleOOB = reader.readBool();\
+  return emitLoadStringCharCodeResult(strId, indexId, handleOOB);\
 }\
 \
 [[nodiscard]] bool emitLoadStringLengthResult(StringOperandId strId);\
@@ -3532,6 +4080,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitCallNativeGetElementResult(objId, indexId);\
 }\
 \
+[[nodiscard]] bool emitCallNativeGetElementSuperResult(ObjOperandId objId, Int32OperandId indexId, ValOperandId receiverId);\
+[[nodiscard]] bool emitCallNativeGetElementSuperResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  ValOperandId receiverId = reader.valOperandId();\
+  return emitCallNativeGetElementSuperResult(objId, indexId, receiverId);\
+}\
+\
 [[nodiscard]] bool emitGetNextMapSetEntryForIteratorResult(ObjOperandId iterId, ObjOperandId resultArrId, bool isMap);\
 [[nodiscard]] bool emitGetNextMapSetEntryForIteratorResult(CacheIRReader& reader) {\
   ObjOperandId iterId = reader.objOperandId();\
@@ -3556,6 +4112,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   uint32_t valOffset = reader.stubOffset();\
   Int32OperandId resultId = reader.int32OperandId();\
   return emitLoadInt32Constant(valOffset, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadDoubleConstant(uint32_t valOffset, NumberOperandId resultId);\
+[[nodiscard]] bool emitLoadDoubleConstant(CacheIRReader& reader) {\
+  uint32_t valOffset = reader.stubOffset();\
+  NumberOperandId resultId = reader.numberOperandId();\
+  return emitLoadDoubleConstant(valOffset, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadBooleanConstant(bool val, BooleanOperandId resultId);\
@@ -4015,6 +4578,130 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitBigIntAsUintNResult(bitsId, bigIntId);\
 }\
 \
+[[nodiscard]] bool emitSetHasResult(ObjOperandId setId, ValOperandId valId);\
+[[nodiscard]] bool emitSetHasResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitSetHasResult(setId, valId);\
+}\
+\
+[[nodiscard]] bool emitSetHasNonGCThingResult(ObjOperandId setId, ValOperandId valId);\
+[[nodiscard]] bool emitSetHasNonGCThingResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitSetHasNonGCThingResult(setId, valId);\
+}\
+\
+[[nodiscard]] bool emitSetHasSymbolResult(ObjOperandId setId, SymbolOperandId symId);\
+[[nodiscard]] bool emitSetHasSymbolResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  return emitSetHasSymbolResult(setId, symId);\
+}\
+\
+[[nodiscard]] bool emitSetHasBigIntResult(ObjOperandId setId, BigIntOperandId bigIntId);\
+[[nodiscard]] bool emitSetHasBigIntResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  return emitSetHasBigIntResult(setId, bigIntId);\
+}\
+\
+[[nodiscard]] bool emitSetHasObjectResult(ObjOperandId setId, ObjOperandId objId);\
+[[nodiscard]] bool emitSetHasObjectResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitSetHasObjectResult(setId, objId);\
+}\
+\
+[[nodiscard]] bool emitSetSizeResult(ObjOperandId setId);\
+[[nodiscard]] bool emitSetSizeResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  return emitSetSizeResult(setId);\
+}\
+\
+[[nodiscard]] bool emitMapHasResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapHasResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapHasResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapHasNonGCThingResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapHasNonGCThingResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapHasNonGCThingResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapHasSymbolResult(ObjOperandId mapId, SymbolOperandId symId);\
+[[nodiscard]] bool emitMapHasSymbolResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  return emitMapHasSymbolResult(mapId, symId);\
+}\
+\
+[[nodiscard]] bool emitMapHasBigIntResult(ObjOperandId mapId, BigIntOperandId bigIntId);\
+[[nodiscard]] bool emitMapHasBigIntResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  return emitMapHasBigIntResult(mapId, bigIntId);\
+}\
+\
+[[nodiscard]] bool emitMapHasObjectResult(ObjOperandId mapId, ObjOperandId objId);\
+[[nodiscard]] bool emitMapHasObjectResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitMapHasObjectResult(mapId, objId);\
+}\
+\
+[[nodiscard]] bool emitMapGetResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapGetResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapGetResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapGetNonGCThingResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapGetNonGCThingResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapGetNonGCThingResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapGetSymbolResult(ObjOperandId mapId, SymbolOperandId symId);\
+[[nodiscard]] bool emitMapGetSymbolResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  return emitMapGetSymbolResult(mapId, symId);\
+}\
+\
+[[nodiscard]] bool emitMapGetBigIntResult(ObjOperandId mapId, BigIntOperandId bigIntId);\
+[[nodiscard]] bool emitMapGetBigIntResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  return emitMapGetBigIntResult(mapId, bigIntId);\
+}\
+\
+[[nodiscard]] bool emitMapGetObjectResult(ObjOperandId mapId, ObjOperandId objId);\
+[[nodiscard]] bool emitMapGetObjectResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitMapGetObjectResult(mapId, objId);\
+}\
+\
+[[nodiscard]] bool emitMapSizeResult(ObjOperandId mapId);\
+[[nodiscard]] bool emitMapSizeResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  return emitMapSizeResult(mapId);\
+}\
+\
+[[nodiscard]] bool emitArrayFromArgumentsObjectResult(ObjOperandId objId, uint32_t shapeOffset);\
+[[nodiscard]] bool emitArrayFromArgumentsObjectResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t shapeOffset = reader.stubOffset();\
+  return emitArrayFromArgumentsObjectResult(objId, shapeOffset);\
+}\
+\
 [[nodiscard]] bool emitCallPrintString(const char* str);\
 [[nodiscard]] bool emitCallPrintString(CacheIRReader& reader) {\
   const char* str = reinterpret_cast<char*>(reader.pointer());\
@@ -4041,6 +4728,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ValOperandId valId = reader.valOperandId();\
   bool mustBeRecovered = reader.readBool();\
   return emitAssertRecoveredOnBailoutResult(valId, mustBeRecovered);\
+}\
+\
+[[nodiscard]] bool emitAssertPropertyLookup(ObjOperandId objId, uint32_t idOffset, uint32_t slotOffset);\
+[[nodiscard]] bool emitAssertPropertyLookup(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t idOffset = reader.stubOffset();\
+  uint32_t slotOffset = reader.stubOffset();\
+  return emitAssertPropertyLookup(objId, idOffset, slotOffset);\
 }\
 
 
@@ -4076,6 +4771,40 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ObjOperandId objId = reader.objOperandId();\
   uint32_t claspOffset = reader.stubOffset();\
   return emitHasClassResult(objId, claspOffset);\
+}\
+\
+[[nodiscard]] bool emitCallRegExpMatcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId, uint32_t stubOffset);\
+[[nodiscard]] bool emitCallRegExpMatcherResult(CacheIRReader& reader) {\
+  ObjOperandId regexpId = reader.objOperandId();\
+  StringOperandId inputId = reader.stringOperandId();\
+  Int32OperandId lastIndexId = reader.int32OperandId();\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitCallRegExpMatcherResult(regexpId, inputId, lastIndexId, stubOffset);\
+}\
+\
+[[nodiscard]] bool emitCallRegExpSearcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId, uint32_t stubOffset);\
+[[nodiscard]] bool emitCallRegExpSearcherResult(CacheIRReader& reader) {\
+  ObjOperandId regexpId = reader.objOperandId();\
+  StringOperandId inputId = reader.stringOperandId();\
+  Int32OperandId lastIndexId = reader.int32OperandId();\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitCallRegExpSearcherResult(regexpId, inputId, lastIndexId, stubOffset);\
+}\
+\
+[[nodiscard]] bool emitRegExpBuiltinExecMatchResult(ObjOperandId regexpId, StringOperandId inputId, uint32_t stubOffset);\
+[[nodiscard]] bool emitRegExpBuiltinExecMatchResult(CacheIRReader& reader) {\
+  ObjOperandId regexpId = reader.objOperandId();\
+  StringOperandId inputId = reader.stringOperandId();\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitRegExpBuiltinExecMatchResult(regexpId, inputId, stubOffset);\
+}\
+\
+[[nodiscard]] bool emitRegExpBuiltinExecTestResult(ObjOperandId regexpId, StringOperandId inputId, uint32_t stubOffset);\
+[[nodiscard]] bool emitRegExpBuiltinExecTestResult(CacheIRReader& reader) {\
+  ObjOperandId regexpId = reader.objOperandId();\
+  StringOperandId inputId = reader.stringOperandId();\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitRegExpBuiltinExecTestResult(regexpId, inputId, stubOffset);\
 }\
 \
 [[nodiscard]] bool emitGuardCompartment(ObjOperandId objId, uint32_t globalOffset, uint32_t compartmentOffset);\
@@ -4128,15 +4857,6 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   SymbolOperandId symId = reader.symbolOperandId();\
   uint32_t expectedOffset = reader.stubOffset();\
   return emitGuardSpecificSymbol(symId, expectedOffset);\
-}\
-\
-[[nodiscard]] bool emitGuardAndGetIterator(ObjOperandId objId, uint32_t iterOffset, uint32_t enumeratorsAddrOffset, ObjOperandId resultId);\
-[[nodiscard]] bool emitGuardAndGetIterator(CacheIRReader& reader) {\
-  ObjOperandId objId = reader.objOperandId();\
-  uint32_t iterOffset = reader.stubOffset();\
-  uint32_t enumeratorsAddrOffset = reader.stubOffset();\
-  ObjOperandId resultId = reader.objOperandId();\
-  return emitGuardAndGetIterator(objId, iterOffset, enumeratorsAddrOffset, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadArgumentFixedSlot(ValOperandId resultId, uint8_t slotIndex);\
@@ -4237,6 +4957,15 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   Int32OperandId beginId = reader.int32OperandId();\
   Int32OperandId endId = reader.int32OperandId();\
   return emitPackedArraySliceResult(templateObjectOffset, arrayId, beginId, endId);\
+}\
+\
+[[nodiscard]] bool emitArgumentsSliceResult(uint32_t templateObjectOffset, ObjOperandId argsId, Int32OperandId beginId, Int32OperandId endId);\
+[[nodiscard]] bool emitArgumentsSliceResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  ObjOperandId argsId = reader.objOperandId();\
+  Int32OperandId beginId = reader.int32OperandId();\
+  Int32OperandId endId = reader.int32OperandId();\
+  return emitArgumentsSliceResult(templateObjectOffset, argsId, beginId, endId);\
 }\
 \
 [[nodiscard]] bool emitIsArrayResult(ValOperandId inputId);\
@@ -4350,58 +5079,90 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitCallAddOrUpdateSparseElementHelper(objId, idId, rhsId, strict);\
 }\
 \
-[[nodiscard]] bool emitCallScriptedFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags);\
+[[nodiscard]] bool emitCallScriptedFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed);\
 [[nodiscard]] bool emitCallScriptedFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
-  return emitCallScriptedFunction(calleeId, argcId, flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  return emitCallScriptedFunction(calleeId, argcId, flags, argcFixed);\
 }\
 \
-[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t funcExportOffset, uint32_t instanceOffset);\
+[[nodiscard]] bool emitCallBoundScriptedFunction(ObjOperandId calleeId, ObjOperandId targetId, Int32OperandId argcId, CallFlags flags, uint32_t numBoundArgs);\
+[[nodiscard]] bool emitCallBoundScriptedFunction(CacheIRReader& reader) {\
+  ObjOperandId calleeId = reader.objOperandId();\
+  ObjOperandId targetId = reader.objOperandId();\
+  Int32OperandId argcId = reader.int32OperandId();\
+  CallFlags flags = reader.callFlags();\
+  uint32_t numBoundArgs = reader.uint32Immediate();\
+  return emitCallBoundScriptedFunction(calleeId, targetId, argcId, flags, numBoundArgs);\
+}\
+\
+[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t funcExportOffset, uint32_t instanceOffset);\
 [[nodiscard]] bool emitCallWasmFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
   uint32_t funcExportOffset = reader.stubOffset();\
   uint32_t instanceOffset = reader.stubOffset();\
-  return emitCallWasmFunction(calleeId, argcId, flags, funcExportOffset, instanceOffset);\
+  return emitCallWasmFunction(calleeId, argcId, flags, argcFixed, funcExportOffset, instanceOffset);\
 }\
 \
-[[nodiscard]] bool emitCallNativeFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, bool ignoresReturnValue);\
+[[nodiscard]] bool emitCallNativeFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, bool ignoresReturnValue);\
 [[nodiscard]] bool emitCallNativeFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
   bool ignoresReturnValue = reader.readBool();\
-  return emitCallNativeFunction(calleeId, argcId, flags, ignoresReturnValue);\
+  return emitCallNativeFunction(calleeId, argcId, flags, argcFixed, ignoresReturnValue);\
 }\
 \
-[[nodiscard]] bool emitCallDOMFunction(ObjOperandId calleeId, Int32OperandId argcId, ObjOperandId thisObjId, CallFlags flags);\
+[[nodiscard]] bool emitCallDOMFunction(ObjOperandId calleeId, Int32OperandId argcId, ObjOperandId thisObjId, CallFlags flags, uint32_t argcFixed);\
 [[nodiscard]] bool emitCallDOMFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   ObjOperandId thisObjId = reader.objOperandId();\
   CallFlags flags = reader.callFlags();\
-  return emitCallDOMFunction(calleeId, argcId, thisObjId, flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  return emitCallDOMFunction(calleeId, argcId, thisObjId, flags, argcFixed);\
 }\
 \
-[[nodiscard]] bool emitCallClassHook(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t targetOffset);\
+[[nodiscard]] bool emitCallClassHook(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t targetOffset);\
 [[nodiscard]] bool emitCallClassHook(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
   uint32_t targetOffset = reader.stubOffset();\
-  return emitCallClassHook(calleeId, argcId, flags, targetOffset);\
+  return emitCallClassHook(calleeId, argcId, flags, argcFixed, targetOffset);\
 }\
 \
-[[nodiscard]] bool emitCallInlinedFunction(ObjOperandId calleeId, Int32OperandId argcId, uint32_t icScriptOffset, CallFlags flags);\
+[[nodiscard]] bool emitCallInlinedFunction(ObjOperandId calleeId, Int32OperandId argcId, uint32_t icScriptOffset, CallFlags flags, uint32_t argcFixed);\
 [[nodiscard]] bool emitCallInlinedFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   uint32_t icScriptOffset = reader.stubOffset();\
   CallFlags flags = reader.callFlags();\
-  return emitCallInlinedFunction(calleeId, argcId, icScriptOffset, flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  return emitCallInlinedFunction(calleeId, argcId, icScriptOffset, flags, argcFixed);\
+}\
+\
+[[nodiscard]] bool emitBindFunctionResult(ObjOperandId targetId, uint32_t argc, uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitBindFunctionResult(CacheIRReader& reader) {\
+  ObjOperandId targetId = reader.objOperandId();\
+  uint32_t argc = reader.uint32Immediate();\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitBindFunctionResult(targetId, argc, templateObjectOffset);\
+}\
+\
+[[nodiscard]] bool emitSpecializedBindFunctionResult(ObjOperandId targetId, uint32_t argc, uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitSpecializedBindFunctionResult(CacheIRReader& reader) {\
+  ObjOperandId targetId = reader.objOperandId();\
+  uint32_t argc = reader.uint32Immediate();\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitSpecializedBindFunctionResult(targetId, argc, templateObjectOffset);\
 }\
 \
 [[nodiscard]] bool emitLoadFixedSlotResult(ObjOperandId objId, uint32_t offsetOffset);\
@@ -4426,30 +5187,17 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitLoadDynamicSlotResult(objId, offsetOffset);\
 }\
 \
-[[nodiscard]] bool emitLoadStringCharResult(StringOperandId strId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLoadStringCharResult(StringOperandId strId, Int32OperandId indexId, bool handleOOB);\
 [[nodiscard]] bool emitLoadStringCharResult(CacheIRReader& reader) {\
   StringOperandId strId = reader.stringOperandId();\
   Int32OperandId indexId = reader.int32OperandId();\
-  return emitLoadStringCharResult(strId, indexId);\
+  bool handleOOB = reader.readBool();\
+  return emitLoadStringCharResult(strId, indexId, handleOOB);\
 }\
 \
 [[nodiscard]] bool emitFrameIsConstructingResult();\
 [[nodiscard]] bool emitFrameIsConstructingResult(CacheIRReader& reader) {\
   return emitFrameIsConstructingResult();\
-}\
-\
-[[nodiscard]] bool emitLoadEnvironmentFixedSlotResult(ObjOperandId objId, uint32_t offsetOffset);\
-[[nodiscard]] bool emitLoadEnvironmentFixedSlotResult(CacheIRReader& reader) {\
-  ObjOperandId objId = reader.objOperandId();\
-  uint32_t offsetOffset = reader.stubOffset();\
-  return emitLoadEnvironmentFixedSlotResult(objId, offsetOffset);\
-}\
-\
-[[nodiscard]] bool emitLoadEnvironmentDynamicSlotResult(ObjOperandId objId, uint32_t offsetOffset);\
-[[nodiscard]] bool emitLoadEnvironmentDynamicSlotResult(CacheIRReader& reader) {\
-  ObjOperandId objId = reader.objOperandId();\
-  uint32_t offsetOffset = reader.stubOffset();\
-  return emitLoadEnvironmentDynamicSlotResult(objId, offsetOffset);\
 }\
 \
 [[nodiscard]] bool emitCallScriptedGetterResult(ValOperandId receiverId, uint32_t getterOffset, bool sameRealm, uint32_t nargsAndFlagsOffset);\
@@ -4545,6 +5293,36 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ValOperandId rhsId = reader.valOperandId();\
   return emitSameValueResult(lhsId, rhsId);\
 }\
+\
+[[nodiscard]] bool emitSetHasStringResult(ObjOperandId setId, StringOperandId strId);\
+[[nodiscard]] bool emitSetHasStringResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  StringOperandId strId = reader.stringOperandId();\
+  return emitSetHasStringResult(setId, strId);\
+}\
+\
+[[nodiscard]] bool emitMapHasStringResult(ObjOperandId mapId, StringOperandId strId);\
+[[nodiscard]] bool emitMapHasStringResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  StringOperandId strId = reader.stringOperandId();\
+  return emitMapHasStringResult(mapId, strId);\
+}\
+\
+[[nodiscard]] bool emitMapGetStringResult(ObjOperandId mapId, StringOperandId strId);\
+[[nodiscard]] bool emitMapGetStringResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  StringOperandId strId = reader.stringOperandId();\
+  return emitMapGetStringResult(mapId, strId);\
+}\
+\
+[[nodiscard]] bool emitCloseIterScriptedResult(ObjOperandId iterId, ObjOperandId calleeId, CompletionKind kind, uint32_t targetNargs);\
+[[nodiscard]] bool emitCloseIterScriptedResult(CacheIRReader& reader) {\
+  ObjOperandId iterId = reader.objOperandId();\
+  ObjOperandId calleeId = reader.objOperandId();\
+  CompletionKind kind = reader.completionKind();\
+  uint32_t targetNargs = reader.uint32Immediate();\
+  return emitCloseIterScriptedResult(iterId, calleeId, kind, targetNargs);\
+}\
 
 
 #define CACHE_IR_TRANSPILER_GENERATED \
@@ -4575,6 +5353,12 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitGuardIsUndefined(CacheIRReader& reader) {\
   ValOperandId inputId = reader.valOperandId();\
   return emitGuardIsUndefined(inputId);\
+}\
+\
+[[nodiscard]] bool emitGuardIsNotUninitializedLexical(ValOperandId valId);\
+[[nodiscard]] bool emitGuardIsNotUninitializedLexical(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  return emitGuardIsNotUninitializedLexical(valId);\
 }\
 \
 [[nodiscard]] bool emitGuardToBoolean(ValOperandId inputId);\
@@ -4611,6 +5395,12 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitGuardToInt32(CacheIRReader& reader) {\
   ValOperandId inputId = reader.valOperandId();\
   return emitGuardToInt32(inputId);\
+}\
+\
+[[nodiscard]] bool emitGuardToNonGCThing(ValOperandId inputId);\
+[[nodiscard]] bool emitGuardToNonGCThing(CacheIRReader& reader) {\
+  ValOperandId inputId = reader.valOperandId();\
+  return emitGuardToNonGCThing(inputId);\
 }\
 \
 [[nodiscard]] bool emitGuardBooleanToInt32(ValOperandId inputId, Int32OperandId resultId);\
@@ -4670,6 +5460,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardShape(objId, shapeOffset);\
 }\
 \
+[[nodiscard]] bool emitGuardMultipleShapes(ObjOperandId objId, uint32_t shapesOffset);\
+[[nodiscard]] bool emitGuardMultipleShapes(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t shapesOffset = reader.stubOffset();\
+  return emitGuardMultipleShapes(objId, shapesOffset);\
+}\
+\
 [[nodiscard]] bool emitGuardProto(ObjOperandId objId, uint32_t protoOffset);\
 [[nodiscard]] bool emitGuardProto(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -4697,6 +5494,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardAnyClass(objId, claspOffset);\
 }\
 \
+[[nodiscard]] bool emitGuardGlobalGeneration(uint32_t expectedOffset, uint32_t generationAddrOffset);\
+[[nodiscard]] bool emitGuardGlobalGeneration(CacheIRReader& reader) {\
+  uint32_t expectedOffset = reader.stubOffset();\
+  uint32_t generationAddrOffset = reader.stubOffset();\
+  return emitGuardGlobalGeneration(expectedOffset, generationAddrOffset);\
+}\
+\
 [[nodiscard]] bool emitHasClassResult(ObjOperandId objId, uint32_t claspOffset);\
 [[nodiscard]] bool emitHasClassResult(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -4704,28 +5508,38 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitHasClassResult(objId, claspOffset);\
 }\
 \
-[[nodiscard]] bool emitCallRegExpMatcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId);\
+[[nodiscard]] bool emitCallRegExpMatcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId, uint32_t stubOffset);\
 [[nodiscard]] bool emitCallRegExpMatcherResult(CacheIRReader& reader) {\
   ObjOperandId regexpId = reader.objOperandId();\
   StringOperandId inputId = reader.stringOperandId();\
   Int32OperandId lastIndexId = reader.int32OperandId();\
-  return emitCallRegExpMatcherResult(regexpId, inputId, lastIndexId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitCallRegExpMatcherResult(regexpId, inputId, lastIndexId, stubOffset);\
 }\
 \
-[[nodiscard]] bool emitCallRegExpSearcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId);\
+[[nodiscard]] bool emitCallRegExpSearcherResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId, uint32_t stubOffset);\
 [[nodiscard]] bool emitCallRegExpSearcherResult(CacheIRReader& reader) {\
   ObjOperandId regexpId = reader.objOperandId();\
   StringOperandId inputId = reader.stringOperandId();\
   Int32OperandId lastIndexId = reader.int32OperandId();\
-  return emitCallRegExpSearcherResult(regexpId, inputId, lastIndexId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitCallRegExpSearcherResult(regexpId, inputId, lastIndexId, stubOffset);\
 }\
 \
-[[nodiscard]] bool emitCallRegExpTesterResult(ObjOperandId regexpId, StringOperandId inputId, Int32OperandId lastIndexId);\
-[[nodiscard]] bool emitCallRegExpTesterResult(CacheIRReader& reader) {\
+[[nodiscard]] bool emitRegExpBuiltinExecMatchResult(ObjOperandId regexpId, StringOperandId inputId, uint32_t stubOffset);\
+[[nodiscard]] bool emitRegExpBuiltinExecMatchResult(CacheIRReader& reader) {\
   ObjOperandId regexpId = reader.objOperandId();\
   StringOperandId inputId = reader.stringOperandId();\
-  Int32OperandId lastIndexId = reader.int32OperandId();\
-  return emitCallRegExpTesterResult(regexpId, inputId, lastIndexId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitRegExpBuiltinExecMatchResult(regexpId, inputId, stubOffset);\
+}\
+\
+[[nodiscard]] bool emitRegExpBuiltinExecTestResult(ObjOperandId regexpId, StringOperandId inputId, uint32_t stubOffset);\
+[[nodiscard]] bool emitRegExpBuiltinExecTestResult(CacheIRReader& reader) {\
+  ObjOperandId regexpId = reader.objOperandId();\
+  StringOperandId inputId = reader.stringOperandId();\
+  uint32_t stubOffset = reader.stubOffset();\
+  return emitRegExpBuiltinExecTestResult(regexpId, inputId, stubOffset);\
 }\
 \
 [[nodiscard]] bool emitRegExpFlagResult(ObjOperandId regexpId, int32_t flagsMask);\
@@ -4826,6 +5640,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardSpecificObject(objId, expectedOffset);\
 }\
 \
+[[nodiscard]] bool emitGuardObjectIdentity(ObjOperandId obj1Id, ObjOperandId obj2Id);\
+[[nodiscard]] bool emitGuardObjectIdentity(CacheIRReader& reader) {\
+  ObjOperandId obj1Id = reader.objOperandId();\
+  ObjOperandId obj2Id = reader.objOperandId();\
+  return emitGuardObjectIdentity(obj1Id, obj2Id);\
+}\
+\
 [[nodiscard]] bool emitGuardSpecificFunction(ObjOperandId funId, uint32_t expectedOffset, uint32_t nargsAndFlagsOffset);\
 [[nodiscard]] bool emitGuardSpecificFunction(CacheIRReader& reader) {\
   ObjOperandId funId = reader.objOperandId();\
@@ -4854,6 +5675,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   SymbolOperandId symId = reader.symbolOperandId();\
   uint32_t expectedOffset = reader.stubOffset();\
   return emitGuardSpecificSymbol(symId, expectedOffset);\
+}\
+\
+[[nodiscard]] bool emitGuardSpecificInt32(Int32OperandId numId, int32_t expected);\
+[[nodiscard]] bool emitGuardSpecificInt32(CacheIRReader& reader) {\
+  Int32OperandId numId = reader.int32OperandId();\
+  int32_t expected = reader.int32Immediate();\
+  return emitGuardSpecificInt32(numId, expected);\
 }\
 \
 [[nodiscard]] bool emitGuardNoDenseElements(ObjOperandId objId);\
@@ -4911,11 +5739,11 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardIndexIsValidUpdateOrAdd(objId, indexId);\
 }\
 \
-[[nodiscard]] bool emitGuardIndexGreaterThanDenseInitLength(ObjOperandId objId, Int32OperandId indexId);\
-[[nodiscard]] bool emitGuardIndexGreaterThanDenseInitLength(CacheIRReader& reader) {\
+[[nodiscard]] bool emitGuardIndexIsNotDenseElement(ObjOperandId objId, Int32OperandId indexId);\
+[[nodiscard]] bool emitGuardIndexIsNotDenseElement(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   Int32OperandId indexId = reader.int32OperandId();\
-  return emitGuardIndexGreaterThanDenseInitLength(objId, indexId);\
+  return emitGuardIndexIsNotDenseElement(objId, indexId);\
 }\
 \
 [[nodiscard]] bool emitGuardTagNotEqual(ValueTagOperandId lhsId, ValueTagOperandId rhsId);\
@@ -4933,6 +5761,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardDynamicSlotIsSpecificObject(objId, expectedId, slotOffset);\
 }\
 \
+[[nodiscard]] bool emitGuardDynamicSlotIsNotObject(ObjOperandId objId, uint32_t slotOffset);\
+[[nodiscard]] bool emitGuardDynamicSlotIsNotObject(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t slotOffset = reader.stubOffset();\
+  return emitGuardDynamicSlotIsNotObject(objId, slotOffset);\
+}\
+\
 [[nodiscard]] bool emitGuardFixedSlotValue(ObjOperandId objId, uint32_t offsetOffset, uint32_t valOffset);\
 [[nodiscard]] bool emitGuardFixedSlotValue(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -4947,6 +5782,22 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   uint32_t offsetOffset = reader.stubOffset();\
   uint32_t valOffset = reader.stubOffset();\
   return emitGuardDynamicSlotValue(objId, offsetOffset, valOffset);\
+}\
+\
+[[nodiscard]] bool emitLoadFixedSlot(ValOperandId resultId, ObjOperandId objId, uint32_t offsetOffset);\
+[[nodiscard]] bool emitLoadFixedSlot(CacheIRReader& reader) {\
+  ValOperandId resultId = reader.valOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t offsetOffset = reader.stubOffset();\
+  return emitLoadFixedSlot(resultId, objId, offsetOffset);\
+}\
+\
+[[nodiscard]] bool emitLoadDynamicSlot(ValOperandId resultId, ObjOperandId objId, uint32_t slotOffset);\
+[[nodiscard]] bool emitLoadDynamicSlot(CacheIRReader& reader) {\
+  ValOperandId resultId = reader.valOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t slotOffset = reader.stubOffset();\
+  return emitLoadDynamicSlot(resultId, objId, slotOffset);\
 }\
 \
 [[nodiscard]] bool emitGuardNoAllocationMetadataBuilder(uint32_t builderAddrOffset);\
@@ -5004,6 +5855,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ObjOperandId resultId = reader.objOperandId();\
   uint32_t objOffset = reader.stubOffset();\
   return emitLoadObject(resultId, objOffset);\
+}\
+\
+[[nodiscard]] bool emitLoadProtoObject(ObjOperandId resultId, uint32_t protoObjOffset, ObjOperandId receiverObjId);\
+[[nodiscard]] bool emitLoadProtoObject(CacheIRReader& reader) {\
+  ObjOperandId resultId = reader.objOperandId();\
+  uint32_t protoObjOffset = reader.stubOffset();\
+  ObjOperandId receiverObjId = reader.objOperandId();\
+  return emitLoadProtoObject(resultId, protoObjOffset, receiverObjId);\
 }\
 \
 [[nodiscard]] bool emitLoadProto(ObjOperandId objId, ObjOperandId resultId);\
@@ -5070,12 +5929,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitMegamorphicLoadSlotByValueResult(objId, idId);\
 }\
 \
-[[nodiscard]] bool emitMegamorphicStoreSlot(ObjOperandId objId, uint32_t nameOffset, ValOperandId rhsId);\
+[[nodiscard]] bool emitMegamorphicStoreSlot(ObjOperandId objId, uint32_t nameOffset, ValOperandId rhsId, bool strict);\
 [[nodiscard]] bool emitMegamorphicStoreSlot(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   uint32_t nameOffset = reader.stubOffset();\
   ValOperandId rhsId = reader.valOperandId();\
-  return emitMegamorphicStoreSlot(objId, nameOffset, rhsId);\
+  bool strict = reader.readBool();\
+  return emitMegamorphicStoreSlot(objId, nameOffset, rhsId, strict);\
 }\
 \
 [[nodiscard]] bool emitMegamorphicSetElement(ObjOperandId objId, ValOperandId idId, ValOperandId rhsId, bool strict);\
@@ -5093,6 +5953,19 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   ValOperandId idId = reader.valOperandId();\
   bool hasOwn = reader.readBool();\
   return emitMegamorphicHasPropResult(objId, idId, hasOwn);\
+}\
+\
+[[nodiscard]] bool emitObjectToIteratorResult(ObjOperandId objId, uint32_t enumeratorsAddrOffset);\
+[[nodiscard]] bool emitObjectToIteratorResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t enumeratorsAddrOffset = reader.stubOffset();\
+  return emitObjectToIteratorResult(objId, enumeratorsAddrOffset);\
+}\
+\
+[[nodiscard]] bool emitValueToIteratorResult(ValOperandId valId);\
+[[nodiscard]] bool emitValueToIteratorResult(CacheIRReader& reader) {\
+  ValOperandId valId = reader.valOperandId();\
+  return emitValueToIteratorResult(valId);\
 }\
 \
 [[nodiscard]] bool emitLoadDOMExpandoValue(ObjOperandId objId, ValOperandId resultId);\
@@ -5169,6 +6042,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitAllocateAndStoreDynamicSlot(objId, offsetOffset, rhsId, newShapeOffset, numNewSlotsOffset);\
 }\
 \
+[[nodiscard]] bool emitAddSlotAndCallAddPropHook(ObjOperandId objId, ValOperandId rhsId, uint32_t newShapeOffset);\
+[[nodiscard]] bool emitAddSlotAndCallAddPropHook(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  ValOperandId rhsId = reader.valOperandId();\
+  uint32_t newShapeOffset = reader.stubOffset();\
+  return emitAddSlotAndCallAddPropHook(objId, rhsId, newShapeOffset);\
+}\
+\
 [[nodiscard]] bool emitStoreDenseElement(ObjOperandId objId, Int32OperandId indexId, ValOperandId rhsId);\
 [[nodiscard]] bool emitStoreDenseElement(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
@@ -5219,6 +6100,15 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   Int32OperandId beginId = reader.int32OperandId();\
   Int32OperandId endId = reader.int32OperandId();\
   return emitPackedArraySliceResult(templateObjectOffset, arrayId, beginId, endId);\
+}\
+\
+[[nodiscard]] bool emitArgumentsSliceResult(uint32_t templateObjectOffset, ObjOperandId argsId, Int32OperandId beginId, Int32OperandId endId);\
+[[nodiscard]] bool emitArgumentsSliceResult(CacheIRReader& reader) {\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  ObjOperandId argsId = reader.objOperandId();\
+  Int32OperandId beginId = reader.int32OperandId();\
+  Int32OperandId endId = reader.int32OperandId();\
+  return emitArgumentsSliceResult(templateObjectOffset, argsId, beginId, endId);\
 }\
 \
 [[nodiscard]] bool emitIsArrayResult(ValOperandId inputId);\
@@ -5314,14 +6204,6 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardHasAttachedArrayBuffer(objId);\
 }\
 \
-[[nodiscard]] bool emitFinishBoundFunctionInitResult(ObjOperandId boundId, ObjOperandId targetId, Int32OperandId argCountId);\
-[[nodiscard]] bool emitFinishBoundFunctionInitResult(CacheIRReader& reader) {\
-  ObjOperandId boundId = reader.objOperandId();\
-  ObjOperandId targetId = reader.objOperandId();\
-  Int32OperandId argCountId = reader.int32OperandId();\
-  return emitFinishBoundFunctionInitResult(boundId, targetId, argCountId);\
-}\
-\
 [[nodiscard]] bool emitNewArrayIteratorResult(uint32_t templateObjectOffset);\
 [[nodiscard]] bool emitNewArrayIteratorResult(CacheIRReader& reader) {\
   uint32_t templateObjectOffset = reader.stubOffset();\
@@ -5393,6 +6275,27 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitStringFromCodePointResult(CacheIRReader& reader) {\
   Int32OperandId codeId = reader.int32OperandId();\
   return emitStringFromCodePointResult(codeId);\
+}\
+\
+[[nodiscard]] bool emitStringIndexOfResult(StringOperandId strId, StringOperandId searchStrId);\
+[[nodiscard]] bool emitStringIndexOfResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  return emitStringIndexOfResult(strId, searchStrId);\
+}\
+\
+[[nodiscard]] bool emitStringStartsWithResult(StringOperandId strId, StringOperandId searchStrId);\
+[[nodiscard]] bool emitStringStartsWithResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  return emitStringStartsWithResult(strId, searchStrId);\
+}\
+\
+[[nodiscard]] bool emitStringEndsWithResult(StringOperandId strId, StringOperandId searchStrId);\
+[[nodiscard]] bool emitStringEndsWithResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  return emitStringEndsWithResult(strId, searchStrId);\
 }\
 \
 [[nodiscard]] bool emitStringToLowerCaseResult(StringOperandId strId);\
@@ -5578,6 +6481,19 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   NumberOperandId inputId = reader.numberOperandId();\
   UnaryMathFunction fun = reader.unaryMathFunction();\
   return emitMathFunctionNumberResult(inputId, fun);\
+}\
+\
+[[nodiscard]] bool emitNumberParseIntResult(StringOperandId strId, Int32OperandId radixId);\
+[[nodiscard]] bool emitNumberParseIntResult(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  Int32OperandId radixId = reader.int32OperandId();\
+  return emitNumberParseIntResult(strId, radixId);\
+}\
+\
+[[nodiscard]] bool emitDoubleParseIntResult(NumberOperandId numId);\
+[[nodiscard]] bool emitDoubleParseIntResult(CacheIRReader& reader) {\
+  NumberOperandId numId = reader.numberOperandId();\
+  return emitDoubleParseIntResult(numId);\
 }\
 \
 [[nodiscard]] bool emitObjectToStringResult(ObjOperandId objId);\
@@ -5782,6 +6698,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitCallNumberToString(inputId, resultId);\
 }\
 \
+[[nodiscard]] bool emitInt32ToStringWithBaseResult(Int32OperandId inputId, Int32OperandId baseId);\
+[[nodiscard]] bool emitInt32ToStringWithBaseResult(CacheIRReader& reader) {\
+  Int32OperandId inputId = reader.int32OperandId();\
+  Int32OperandId baseId = reader.int32OperandId();\
+  return emitInt32ToStringWithBaseResult(inputId, baseId);\
+}\
+\
 [[nodiscard]] bool emitBooleanToString(BooleanOperandId inputId, StringOperandId resultId);\
 [[nodiscard]] bool emitBooleanToString(CacheIRReader& reader) {\
   BooleanOperandId inputId = reader.booleanOperandId();\
@@ -5789,22 +6712,34 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitBooleanToString(inputId, resultId);\
 }\
 \
-[[nodiscard]] bool emitCallScriptedFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags);\
+[[nodiscard]] bool emitCallScriptedFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed);\
 [[nodiscard]] bool emitCallScriptedFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
-  return emitCallScriptedFunction(calleeId, argcId, flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  return emitCallScriptedFunction(calleeId, argcId, flags, argcFixed);\
 }\
 \
-[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t funcExportOffset, uint32_t instanceOffset);\
+[[nodiscard]] bool emitCallBoundScriptedFunction(ObjOperandId calleeId, ObjOperandId targetId, Int32OperandId argcId, CallFlags flags, uint32_t numBoundArgs);\
+[[nodiscard]] bool emitCallBoundScriptedFunction(CacheIRReader& reader) {\
+  ObjOperandId calleeId = reader.objOperandId();\
+  ObjOperandId targetId = reader.objOperandId();\
+  Int32OperandId argcId = reader.int32OperandId();\
+  CallFlags flags = reader.callFlags();\
+  uint32_t numBoundArgs = reader.uint32Immediate();\
+  return emitCallBoundScriptedFunction(calleeId, targetId, argcId, flags, numBoundArgs);\
+}\
+\
+[[nodiscard]] bool emitCallWasmFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t funcExportOffset, uint32_t instanceOffset);\
 [[nodiscard]] bool emitCallWasmFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
   uint32_t funcExportOffset = reader.stubOffset();\
   uint32_t instanceOffset = reader.stubOffset();\
-  return emitCallWasmFunction(calleeId, argcId, flags, funcExportOffset, instanceOffset);\
+  return emitCallWasmFunction(calleeId, argcId, flags, argcFixed, funcExportOffset, instanceOffset);\
 }\
 \
 [[nodiscard]] bool emitGuardWasmArg(ValOperandId argId, wasm::ValType::Kind type);\
@@ -5814,38 +6749,66 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitGuardWasmArg(argId, type);\
 }\
 \
-[[nodiscard]] bool emitCallNativeFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, bool ignoresReturnValue);\
+[[nodiscard]] bool emitCallNativeFunction(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, bool ignoresReturnValue);\
 [[nodiscard]] bool emitCallNativeFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
   bool ignoresReturnValue = reader.readBool();\
-  return emitCallNativeFunction(calleeId, argcId, flags, ignoresReturnValue);\
+  return emitCallNativeFunction(calleeId, argcId, flags, argcFixed, ignoresReturnValue);\
 }\
 \
-[[nodiscard]] bool emitCallDOMFunction(ObjOperandId calleeId, Int32OperandId argcId, ObjOperandId thisObjId, CallFlags flags);\
+[[nodiscard]] bool emitCallDOMFunction(ObjOperandId calleeId, Int32OperandId argcId, ObjOperandId thisObjId, CallFlags flags, uint32_t argcFixed);\
 [[nodiscard]] bool emitCallDOMFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   ObjOperandId thisObjId = reader.objOperandId();\
   CallFlags flags = reader.callFlags();\
-  return emitCallDOMFunction(calleeId, argcId, thisObjId, flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  return emitCallDOMFunction(calleeId, argcId, thisObjId, flags, argcFixed);\
 }\
 \
-[[nodiscard]] bool emitCallInlinedFunction(ObjOperandId calleeId, Int32OperandId argcId, uint32_t icScriptOffset, CallFlags flags);\
+[[nodiscard]] bool emitCallClassHook(ObjOperandId calleeId, Int32OperandId argcId, CallFlags flags, uint32_t argcFixed, uint32_t targetOffset);\
+[[nodiscard]] bool emitCallClassHook(CacheIRReader& reader) {\
+  ObjOperandId calleeId = reader.objOperandId();\
+  Int32OperandId argcId = reader.int32OperandId();\
+  CallFlags flags = reader.callFlags();\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  uint32_t targetOffset = reader.stubOffset();\
+  return emitCallClassHook(calleeId, argcId, flags, argcFixed, targetOffset);\
+}\
+\
+[[nodiscard]] bool emitCallInlinedFunction(ObjOperandId calleeId, Int32OperandId argcId, uint32_t icScriptOffset, CallFlags flags, uint32_t argcFixed);\
 [[nodiscard]] bool emitCallInlinedFunction(CacheIRReader& reader) {\
   ObjOperandId calleeId = reader.objOperandId();\
   Int32OperandId argcId = reader.int32OperandId();\
   uint32_t icScriptOffset = reader.stubOffset();\
   CallFlags flags = reader.callFlags();\
-  return emitCallInlinedFunction(calleeId, argcId, icScriptOffset, flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  return emitCallInlinedFunction(calleeId, argcId, icScriptOffset, flags, argcFixed);\
 }\
 \
-[[nodiscard]] bool emitMetaTwoByte(uint32_t functionObjectOffset, uint32_t templateObjectOffset);\
-[[nodiscard]] bool emitMetaTwoByte(CacheIRReader& reader) {\
-  uint32_t functionObjectOffset = reader.stubOffset();\
+[[nodiscard]] bool emitMetaScriptedThisShape(uint32_t thisShapeOffset);\
+[[nodiscard]] bool emitMetaScriptedThisShape(CacheIRReader& reader) {\
+  uint32_t thisShapeOffset = reader.stubOffset();\
+  return emitMetaScriptedThisShape(thisShapeOffset);\
+}\
+\
+[[nodiscard]] bool emitBindFunctionResult(ObjOperandId targetId, uint32_t argc, uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitBindFunctionResult(CacheIRReader& reader) {\
+  ObjOperandId targetId = reader.objOperandId();\
+  uint32_t argc = reader.uint32Immediate();\
   uint32_t templateObjectOffset = reader.stubOffset();\
-  return emitMetaTwoByte(functionObjectOffset, templateObjectOffset);\
+  return emitBindFunctionResult(targetId, argc, templateObjectOffset);\
+}\
+\
+[[nodiscard]] bool emitSpecializedBindFunctionResult(ObjOperandId targetId, uint32_t argc, uint32_t templateObjectOffset);\
+[[nodiscard]] bool emitSpecializedBindFunctionResult(CacheIRReader& reader) {\
+  ObjOperandId targetId = reader.objOperandId();\
+  uint32_t argc = reader.uint32Immediate();\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  return emitSpecializedBindFunctionResult(targetId, argc, templateObjectOffset);\
 }\
 \
 [[nodiscard]] bool emitLoadFixedSlotResult(ObjOperandId objId, uint32_t offsetOffset);\
@@ -5962,10 +6925,31 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitLoadArgumentsObjectArgResult(objId, indexId);\
 }\
 \
+[[nodiscard]] bool emitLoadArgumentsObjectArgHoleResult(ObjOperandId objId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLoadArgumentsObjectArgHoleResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  return emitLoadArgumentsObjectArgHoleResult(objId, indexId);\
+}\
+\
+[[nodiscard]] bool emitLoadArgumentsObjectArgExistsResult(ObjOperandId objId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLoadArgumentsObjectArgExistsResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  return emitLoadArgumentsObjectArgExistsResult(objId, indexId);\
+}\
+\
 [[nodiscard]] bool emitLoadArgumentsObjectLengthResult(ObjOperandId objId);\
 [[nodiscard]] bool emitLoadArgumentsObjectLengthResult(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   return emitLoadArgumentsObjectLengthResult(objId);\
+}\
+\
+[[nodiscard]] bool emitLoadArgumentsObjectLength(ObjOperandId objId, Int32OperandId resultId);\
+[[nodiscard]] bool emitLoadArgumentsObjectLength(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId resultId = reader.int32OperandId();\
+  return emitLoadArgumentsObjectLength(objId, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadFunctionLengthResult(ObjOperandId objId);\
@@ -5978,6 +6962,26 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitLoadFunctionNameResult(CacheIRReader& reader) {\
   ObjOperandId objId = reader.objOperandId();\
   return emitLoadFunctionNameResult(objId);\
+}\
+\
+[[nodiscard]] bool emitLoadBoundFunctionNumArgs(ObjOperandId objId, Int32OperandId resultId);\
+[[nodiscard]] bool emitLoadBoundFunctionNumArgs(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId resultId = reader.int32OperandId();\
+  return emitLoadBoundFunctionNumArgs(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadBoundFunctionTarget(ObjOperandId objId, ObjOperandId resultId);\
+[[nodiscard]] bool emitLoadBoundFunctionTarget(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  ObjOperandId resultId = reader.objOperandId();\
+  return emitLoadBoundFunctionTarget(objId, resultId);\
+}\
+\
+[[nodiscard]] bool emitGuardBoundFunctionIsConstructor(ObjOperandId objId);\
+[[nodiscard]] bool emitGuardBoundFunctionIsConstructor(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitGuardBoundFunctionIsConstructor(objId);\
 }\
 \
 [[nodiscard]] bool emitLoadArrayBufferByteLengthInt32Result(ObjOperandId objId);\
@@ -6004,18 +7008,28 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitLoadArrayBufferViewLengthDoubleResult(objId);\
 }\
 \
-[[nodiscard]] bool emitLoadStringCharResult(StringOperandId strId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLinearizeForCharAccess(StringOperandId strId, Int32OperandId indexId, StringOperandId resultId);\
+[[nodiscard]] bool emitLinearizeForCharAccess(CacheIRReader& reader) {\
+  StringOperandId strId = reader.stringOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  StringOperandId resultId = reader.stringOperandId();\
+  return emitLinearizeForCharAccess(strId, indexId, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadStringCharResult(StringOperandId strId, Int32OperandId indexId, bool handleOOB);\
 [[nodiscard]] bool emitLoadStringCharResult(CacheIRReader& reader) {\
   StringOperandId strId = reader.stringOperandId();\
   Int32OperandId indexId = reader.int32OperandId();\
-  return emitLoadStringCharResult(strId, indexId);\
+  bool handleOOB = reader.readBool();\
+  return emitLoadStringCharResult(strId, indexId, handleOOB);\
 }\
 \
-[[nodiscard]] bool emitLoadStringCharCodeResult(StringOperandId strId, Int32OperandId indexId);\
+[[nodiscard]] bool emitLoadStringCharCodeResult(StringOperandId strId, Int32OperandId indexId, bool handleOOB);\
 [[nodiscard]] bool emitLoadStringCharCodeResult(CacheIRReader& reader) {\
   StringOperandId strId = reader.stringOperandId();\
   Int32OperandId indexId = reader.int32OperandId();\
-  return emitLoadStringCharCodeResult(strId, indexId);\
+  bool handleOOB = reader.readBool();\
+  return emitLoadStringCharCodeResult(strId, indexId, handleOOB);\
 }\
 \
 [[nodiscard]] bool emitLoadStringLengthResult(StringOperandId strId);\
@@ -6027,20 +7041,6 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
 [[nodiscard]] bool emitFrameIsConstructingResult();\
 [[nodiscard]] bool emitFrameIsConstructingResult(CacheIRReader& reader) {\
   return emitFrameIsConstructingResult();\
-}\
-\
-[[nodiscard]] bool emitLoadEnvironmentFixedSlotResult(ObjOperandId objId, uint32_t offsetOffset);\
-[[nodiscard]] bool emitLoadEnvironmentFixedSlotResult(CacheIRReader& reader) {\
-  ObjOperandId objId = reader.objOperandId();\
-  uint32_t offsetOffset = reader.stubOffset();\
-  return emitLoadEnvironmentFixedSlotResult(objId, offsetOffset);\
-}\
-\
-[[nodiscard]] bool emitLoadEnvironmentDynamicSlotResult(ObjOperandId objId, uint32_t offsetOffset);\
-[[nodiscard]] bool emitLoadEnvironmentDynamicSlotResult(CacheIRReader& reader) {\
-  ObjOperandId objId = reader.objOperandId();\
-  uint32_t offsetOffset = reader.stubOffset();\
-  return emitLoadEnvironmentDynamicSlotResult(objId, offsetOffset);\
 }\
 \
 [[nodiscard]] bool emitLoadObjectResult(ObjOperandId objId);\
@@ -6150,6 +7150,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitCallNativeGetElementResult(objId, indexId);\
 }\
 \
+[[nodiscard]] bool emitCallNativeGetElementSuperResult(ObjOperandId objId, Int32OperandId indexId, ValOperandId receiverId);\
+[[nodiscard]] bool emitCallNativeGetElementSuperResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  Int32OperandId indexId = reader.int32OperandId();\
+  ValOperandId receiverId = reader.valOperandId();\
+  return emitCallNativeGetElementSuperResult(objId, indexId, receiverId);\
+}\
+\
 [[nodiscard]] bool emitGetNextMapSetEntryForIteratorResult(ObjOperandId iterId, ObjOperandId resultArrId, bool isMap);\
 [[nodiscard]] bool emitGetNextMapSetEntryForIteratorResult(CacheIRReader& reader) {\
   ObjOperandId iterId = reader.objOperandId();\
@@ -6174,6 +7182,13 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   uint32_t valOffset = reader.stubOffset();\
   Int32OperandId resultId = reader.int32OperandId();\
   return emitLoadInt32Constant(valOffset, resultId);\
+}\
+\
+[[nodiscard]] bool emitLoadDoubleConstant(uint32_t valOffset, NumberOperandId resultId);\
+[[nodiscard]] bool emitLoadDoubleConstant(CacheIRReader& reader) {\
+  uint32_t valOffset = reader.stubOffset();\
+  NumberOperandId resultId = reader.numberOperandId();\
+  return emitLoadDoubleConstant(valOffset, resultId);\
 }\
 \
 [[nodiscard]] bool emitLoadBooleanConstant(bool val, BooleanOperandId resultId);\
@@ -6666,6 +7681,160 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   return emitBigIntAsUintNResult(bitsId, bigIntId);\
 }\
 \
+[[nodiscard]] bool emitSetHasResult(ObjOperandId setId, ValOperandId valId);\
+[[nodiscard]] bool emitSetHasResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitSetHasResult(setId, valId);\
+}\
+\
+[[nodiscard]] bool emitSetHasNonGCThingResult(ObjOperandId setId, ValOperandId valId);\
+[[nodiscard]] bool emitSetHasNonGCThingResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitSetHasNonGCThingResult(setId, valId);\
+}\
+\
+[[nodiscard]] bool emitSetHasStringResult(ObjOperandId setId, StringOperandId strId);\
+[[nodiscard]] bool emitSetHasStringResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  StringOperandId strId = reader.stringOperandId();\
+  return emitSetHasStringResult(setId, strId);\
+}\
+\
+[[nodiscard]] bool emitSetHasSymbolResult(ObjOperandId setId, SymbolOperandId symId);\
+[[nodiscard]] bool emitSetHasSymbolResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  return emitSetHasSymbolResult(setId, symId);\
+}\
+\
+[[nodiscard]] bool emitSetHasBigIntResult(ObjOperandId setId, BigIntOperandId bigIntId);\
+[[nodiscard]] bool emitSetHasBigIntResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  return emitSetHasBigIntResult(setId, bigIntId);\
+}\
+\
+[[nodiscard]] bool emitSetHasObjectResult(ObjOperandId setId, ObjOperandId objId);\
+[[nodiscard]] bool emitSetHasObjectResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitSetHasObjectResult(setId, objId);\
+}\
+\
+[[nodiscard]] bool emitSetSizeResult(ObjOperandId setId);\
+[[nodiscard]] bool emitSetSizeResult(CacheIRReader& reader) {\
+  ObjOperandId setId = reader.objOperandId();\
+  return emitSetSizeResult(setId);\
+}\
+\
+[[nodiscard]] bool emitMapHasResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapHasResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapHasResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapHasNonGCThingResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapHasNonGCThingResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapHasNonGCThingResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapHasStringResult(ObjOperandId mapId, StringOperandId strId);\
+[[nodiscard]] bool emitMapHasStringResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  StringOperandId strId = reader.stringOperandId();\
+  return emitMapHasStringResult(mapId, strId);\
+}\
+\
+[[nodiscard]] bool emitMapHasSymbolResult(ObjOperandId mapId, SymbolOperandId symId);\
+[[nodiscard]] bool emitMapHasSymbolResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  return emitMapHasSymbolResult(mapId, symId);\
+}\
+\
+[[nodiscard]] bool emitMapHasBigIntResult(ObjOperandId mapId, BigIntOperandId bigIntId);\
+[[nodiscard]] bool emitMapHasBigIntResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  return emitMapHasBigIntResult(mapId, bigIntId);\
+}\
+\
+[[nodiscard]] bool emitMapHasObjectResult(ObjOperandId mapId, ObjOperandId objId);\
+[[nodiscard]] bool emitMapHasObjectResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitMapHasObjectResult(mapId, objId);\
+}\
+\
+[[nodiscard]] bool emitMapGetResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapGetResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapGetResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapGetNonGCThingResult(ObjOperandId mapId, ValOperandId valId);\
+[[nodiscard]] bool emitMapGetNonGCThingResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ValOperandId valId = reader.valOperandId();\
+  return emitMapGetNonGCThingResult(mapId, valId);\
+}\
+\
+[[nodiscard]] bool emitMapGetStringResult(ObjOperandId mapId, StringOperandId strId);\
+[[nodiscard]] bool emitMapGetStringResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  StringOperandId strId = reader.stringOperandId();\
+  return emitMapGetStringResult(mapId, strId);\
+}\
+\
+[[nodiscard]] bool emitMapGetSymbolResult(ObjOperandId mapId, SymbolOperandId symId);\
+[[nodiscard]] bool emitMapGetSymbolResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  return emitMapGetSymbolResult(mapId, symId);\
+}\
+\
+[[nodiscard]] bool emitMapGetBigIntResult(ObjOperandId mapId, BigIntOperandId bigIntId);\
+[[nodiscard]] bool emitMapGetBigIntResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  return emitMapGetBigIntResult(mapId, bigIntId);\
+}\
+\
+[[nodiscard]] bool emitMapGetObjectResult(ObjOperandId mapId, ObjOperandId objId);\
+[[nodiscard]] bool emitMapGetObjectResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  ObjOperandId objId = reader.objOperandId();\
+  return emitMapGetObjectResult(mapId, objId);\
+}\
+\
+[[nodiscard]] bool emitMapSizeResult(ObjOperandId mapId);\
+[[nodiscard]] bool emitMapSizeResult(CacheIRReader& reader) {\
+  ObjOperandId mapId = reader.objOperandId();\
+  return emitMapSizeResult(mapId);\
+}\
+\
+[[nodiscard]] bool emitArrayFromArgumentsObjectResult(ObjOperandId objId, uint32_t shapeOffset);\
+[[nodiscard]] bool emitArrayFromArgumentsObjectResult(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t shapeOffset = reader.stubOffset();\
+  return emitArrayFromArgumentsObjectResult(objId, shapeOffset);\
+}\
+\
+[[nodiscard]] bool emitCloseIterScriptedResult(ObjOperandId iterId, ObjOperandId calleeId, CompletionKind kind, uint32_t targetNargs);\
+[[nodiscard]] bool emitCloseIterScriptedResult(CacheIRReader& reader) {\
+  ObjOperandId iterId = reader.objOperandId();\
+  ObjOperandId calleeId = reader.objOperandId();\
+  CompletionKind kind = reader.completionKind();\
+  uint32_t targetNargs = reader.uint32Immediate();\
+  return emitCloseIterScriptedResult(iterId, calleeId, kind, targetNargs);\
+}\
+\
 [[nodiscard]] bool emitBailout();\
 [[nodiscard]] bool emitBailout(CacheIRReader& reader) {\
   return emitBailout();\
@@ -6677,6 +7846,14 @@ void assertRecoveredOnBailoutResult(ValOperandId val, bool mustBeRecovered) {\
   bool mustBeRecovered = reader.readBool();\
   return emitAssertRecoveredOnBailoutResult(valId, mustBeRecovered);\
 }\
+\
+[[nodiscard]] bool emitAssertPropertyLookup(ObjOperandId objId, uint32_t idOffset, uint32_t slotOffset);\
+[[nodiscard]] bool emitAssertPropertyLookup(CacheIRReader& reader) {\
+  ObjOperandId objId = reader.objOperandId();\
+  uint32_t idOffset = reader.stubOffset();\
+  uint32_t slotOffset = reader.stubOffset();\
+  return emitAssertPropertyLookup(objId, idOffset, slotOffset);\
+}\
 
 
 #define CACHE_IR_TRANSPILER_OPS(_)\
@@ -6685,12 +7862,14 @@ _(GuardToObject)\
 _(GuardIsNullOrUndefined)\
 _(GuardIsNull)\
 _(GuardIsUndefined)\
+_(GuardIsNotUninitializedLexical)\
 _(GuardToBoolean)\
 _(GuardToString)\
 _(GuardToSymbol)\
 _(GuardToBigInt)\
 _(GuardIsNumber)\
 _(GuardToInt32)\
+_(GuardToNonGCThing)\
 _(GuardBooleanToInt32)\
 _(GuardToInt32Index)\
 _(Int32ToIntPtr)\
@@ -6699,14 +7878,17 @@ _(GuardToInt32ModUint32)\
 _(GuardToUint8Clamped)\
 _(GuardNonDoubleType)\
 _(GuardShape)\
+_(GuardMultipleShapes)\
 _(GuardProto)\
 _(GuardNullProto)\
 _(GuardClass)\
 _(GuardAnyClass)\
+_(GuardGlobalGeneration)\
 _(HasClassResult)\
 _(CallRegExpMatcherResult)\
 _(CallRegExpSearcherResult)\
-_(CallRegExpTesterResult)\
+_(RegExpBuiltinExecMatchResult)\
+_(RegExpBuiltinExecTestResult)\
 _(RegExpFlagResult)\
 _(CallSubstringKernelResult)\
 _(StringReplaceStringResult)\
@@ -6722,10 +7904,12 @@ _(GuardIsNotArrayBufferMaybeShared)\
 _(GuardIsTypedArray)\
 _(GuardIsNotDOMProxy)\
 _(GuardSpecificObject)\
+_(GuardObjectIdentity)\
 _(GuardSpecificFunction)\
 _(GuardFunctionScript)\
 _(GuardSpecificAtom)\
 _(GuardSpecificSymbol)\
+_(GuardSpecificInt32)\
 _(GuardNoDenseElements)\
 _(GuardStringToIndex)\
 _(GuardStringToInt32)\
@@ -6734,11 +7918,14 @@ _(BooleanToNumber)\
 _(GuardHasGetterSetter)\
 _(GuardInt32IsNonNegative)\
 _(GuardIndexIsValidUpdateOrAdd)\
-_(GuardIndexGreaterThanDenseInitLength)\
+_(GuardIndexIsNotDenseElement)\
 _(GuardTagNotEqual)\
 _(GuardDynamicSlotIsSpecificObject)\
+_(GuardDynamicSlotIsNotObject)\
 _(GuardFixedSlotValue)\
 _(GuardDynamicSlotValue)\
+_(LoadFixedSlot)\
+_(LoadDynamicSlot)\
 _(GuardNoAllocationMetadataBuilder)\
 _(GuardFunctionHasJitEntry)\
 _(GuardFunctionHasNoJitEntry)\
@@ -6748,6 +7935,7 @@ _(GuardNotClassConstructor)\
 _(GuardArrayIsPacked)\
 _(GuardArgumentsObjectFlags)\
 _(LoadObject)\
+_(LoadProtoObject)\
 _(LoadProto)\
 _(LoadEnclosingEnvironment)\
 _(LoadWrapperTarget)\
@@ -6760,6 +7948,8 @@ _(MegamorphicLoadSlotByValueResult)\
 _(MegamorphicStoreSlot)\
 _(MegamorphicSetElement)\
 _(MegamorphicHasPropResult)\
+_(ObjectToIteratorResult)\
+_(ValueToIteratorResult)\
 _(LoadDOMExpandoValue)\
 _(LoadDOMExpandoValueGuardGeneration)\
 _(LoadDOMExpandoValueIgnoreGeneration)\
@@ -6769,6 +7959,7 @@ _(StoreDynamicSlot)\
 _(AddAndStoreFixedSlot)\
 _(AddAndStoreDynamicSlot)\
 _(AllocateAndStoreDynamicSlot)\
+_(AddSlotAndCallAddPropHook)\
 _(StoreDenseElement)\
 _(StoreDenseElementHole)\
 _(ArrayPush)\
@@ -6776,6 +7967,7 @@ _(ArrayJoinResult)\
 _(PackedArrayPopResult)\
 _(PackedArrayShiftResult)\
 _(PackedArraySliceResult)\
+_(ArgumentsSliceResult)\
 _(IsArrayResult)\
 _(StoreFixedSlotUndefinedResult)\
 _(IsObjectResult)\
@@ -6791,7 +7983,6 @@ _(TypedArrayByteLengthInt32Result)\
 _(TypedArrayByteLengthDoubleResult)\
 _(TypedArrayElementSizeResult)\
 _(GuardHasAttachedArrayBuffer)\
-_(FinishBoundFunctionInitResult)\
 _(NewArrayIteratorResult)\
 _(NewStringIteratorResult)\
 _(NewRegExpStringIteratorResult)\
@@ -6803,6 +7994,9 @@ _(NewTypedArrayFromArrayResult)\
 _(NewStringObjectResult)\
 _(StringFromCharCodeResult)\
 _(StringFromCodePointResult)\
+_(StringIndexOfResult)\
+_(StringStartsWithResult)\
+_(StringEndsWithResult)\
 _(StringToLowerCaseResult)\
 _(StringToUpperCaseResult)\
 _(MathAbsInt32Result)\
@@ -6831,6 +8025,8 @@ _(NumberMinMax)\
 _(Int32MinMaxArrayResult)\
 _(NumberMinMaxArrayResult)\
 _(MathFunctionNumberResult)\
+_(NumberParseIntResult)\
+_(DoubleParseIntResult)\
 _(ObjectToStringResult)\
 _(ReflectGetPrototypeOfResult)\
 _(StoreTypedArrayElement)\
@@ -6854,14 +8050,19 @@ _(ProxySetByValue)\
 _(CallAddOrUpdateSparseElementHelper)\
 _(CallInt32ToString)\
 _(CallNumberToString)\
+_(Int32ToStringWithBaseResult)\
 _(BooleanToString)\
 _(CallScriptedFunction)\
+_(CallBoundScriptedFunction)\
 _(CallWasmFunction)\
 _(GuardWasmArg)\
 _(CallNativeFunction)\
 _(CallDOMFunction)\
+_(CallClassHook)\
 _(CallInlinedFunction)\
-_(MetaTwoByte)\
+_(MetaScriptedThisShape)\
+_(BindFunctionResult)\
+_(SpecializedBindFunctionResult)\
 _(LoadFixedSlotResult)\
 _(LoadFixedSlotTypedResult)\
 _(LoadDynamicSlotResult)\
@@ -6877,19 +8078,24 @@ _(StoreDataViewValueResult)\
 _(LoadInt32ArrayLengthResult)\
 _(LoadInt32ArrayLength)\
 _(LoadArgumentsObjectArgResult)\
+_(LoadArgumentsObjectArgHoleResult)\
+_(LoadArgumentsObjectArgExistsResult)\
 _(LoadArgumentsObjectLengthResult)\
+_(LoadArgumentsObjectLength)\
 _(LoadFunctionLengthResult)\
 _(LoadFunctionNameResult)\
+_(LoadBoundFunctionNumArgs)\
+_(LoadBoundFunctionTarget)\
+_(GuardBoundFunctionIsConstructor)\
 _(LoadArrayBufferByteLengthInt32Result)\
 _(LoadArrayBufferByteLengthDoubleResult)\
 _(LoadArrayBufferViewLengthInt32Result)\
 _(LoadArrayBufferViewLengthDoubleResult)\
+_(LinearizeForCharAccess)\
 _(LoadStringCharResult)\
 _(LoadStringCharCodeResult)\
 _(LoadStringLengthResult)\
 _(FrameIsConstructingResult)\
-_(LoadEnvironmentFixedSlotResult)\
-_(LoadEnvironmentDynamicSlotResult)\
 _(LoadObjectResult)\
 _(LoadStringResult)\
 _(LoadSymbolResult)\
@@ -6905,10 +8111,12 @@ _(ProxyGetByValueResult)\
 _(ProxyHasPropResult)\
 _(CallObjectHasSparseElementResult)\
 _(CallNativeGetElementResult)\
+_(CallNativeGetElementSuperResult)\
 _(GetNextMapSetEntryForIteratorResult)\
 _(LoadUndefinedResult)\
 _(LoadBooleanResult)\
 _(LoadInt32Constant)\
+_(LoadDoubleConstant)\
 _(LoadBooleanConstant)\
 _(LoadUndefined)\
 _(LoadConstantString)\
@@ -6980,8 +8188,31 @@ _(SameValueResult)\
 _(IndirectTruncateInt32Result)\
 _(BigIntAsIntNResult)\
 _(BigIntAsUintNResult)\
+_(SetHasResult)\
+_(SetHasNonGCThingResult)\
+_(SetHasStringResult)\
+_(SetHasSymbolResult)\
+_(SetHasBigIntResult)\
+_(SetHasObjectResult)\
+_(SetSizeResult)\
+_(MapHasResult)\
+_(MapHasNonGCThingResult)\
+_(MapHasStringResult)\
+_(MapHasSymbolResult)\
+_(MapHasBigIntResult)\
+_(MapHasObjectResult)\
+_(MapGetResult)\
+_(MapGetNonGCThingResult)\
+_(MapGetStringResult)\
+_(MapGetSymbolResult)\
+_(MapGetBigIntResult)\
+_(MapGetObjectResult)\
+_(MapSizeResult)\
+_(ArrayFromArgumentsObjectResult)\
+_(CloseIterScriptedResult)\
 _(Bailout)\
-_(AssertRecoveredOnBailoutResult)
+_(AssertRecoveredOnBailoutResult)\
+_(AssertPropertyLookup)
 
 #define CACHE_IR_SPEWER_GENERATED \
 void spewReturnFromIC(CacheIRReader& reader) {\
@@ -7010,6 +8241,12 @@ void spewGuardIsNull(CacheIRReader& reader) {\
 void spewGuardIsUndefined(CacheIRReader& reader) {\
   spewOp(CacheOp::GuardIsUndefined);\
   spewOperandId("inputId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewGuardIsNotUninitializedLexical(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardIsNotUninitializedLexical);\
+  spewOperandId("valId", reader.valOperandId());\
   spewOpEnd();\
 }\
 \
@@ -7045,6 +8282,12 @@ void spewGuardIsNumber(CacheIRReader& reader) {\
 \
 void spewGuardToInt32(CacheIRReader& reader) {\
   spewOp(CacheOp::GuardToInt32);\
+  spewOperandId("inputId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewGuardToNonGCThing(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardToNonGCThing);\
   spewOperandId("inputId", reader.valOperandId());\
   spewOpEnd();\
 }\
@@ -7115,6 +8358,14 @@ void spewGuardShape(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewGuardMultipleShapes(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardMultipleShapes);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("shapesOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
 void spewGuardProto(CacheIRReader& reader) {\
   spewOp(CacheOp::GuardProto);\
   spewOperandId("objId", reader.objOperandId());\
@@ -7145,6 +8396,14 @@ void spewGuardAnyClass(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewGuardGlobalGeneration(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardGlobalGeneration);\
+  spewField("expectedOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewField("generationAddrOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
 void spewHasClassResult(CacheIRReader& reader) {\
   spewOp(CacheOp::HasClassResult);\
   spewOperandId("objId", reader.objOperandId());\
@@ -7160,6 +8419,8 @@ void spewCallRegExpMatcherResult(CacheIRReader& reader) {\
   spewOperandId("inputId", reader.stringOperandId());\
   spewArgSeparator();\
   spewOperandId("lastIndexId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewField("stubOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -7170,16 +8431,28 @@ void spewCallRegExpSearcherResult(CacheIRReader& reader) {\
   spewOperandId("inputId", reader.stringOperandId());\
   spewArgSeparator();\
   spewOperandId("lastIndexId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewField("stubOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
-void spewCallRegExpTesterResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::CallRegExpTesterResult);\
+void spewRegExpBuiltinExecMatchResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::RegExpBuiltinExecMatchResult);\
   spewOperandId("regexpId", reader.objOperandId());\
   spewArgSeparator();\
   spewOperandId("inputId", reader.stringOperandId());\
   spewArgSeparator();\
-  spewOperandId("lastIndexId", reader.int32OperandId());\
+  spewField("stubOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewRegExpBuiltinExecTestResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::RegExpBuiltinExecTestResult);\
+  spewOperandId("regexpId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("inputId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewField("stubOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -7307,6 +8580,14 @@ void spewGuardSpecificObject(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewGuardObjectIdentity(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardObjectIdentity);\
+  spewOperandId("obj1Id", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("obj2Id", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewGuardSpecificFunction(CacheIRReader& reader) {\
   spewOp(CacheOp::GuardSpecificFunction);\
   spewOperandId("funId", reader.objOperandId());\
@@ -7340,6 +8621,14 @@ void spewGuardSpecificSymbol(CacheIRReader& reader) {\
   spewOperandId("symId", reader.symbolOperandId());\
   spewArgSeparator();\
   spewField("expectedOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewGuardSpecificInt32(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardSpecificInt32);\
+  spewOperandId("numId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewInt32Imm("expected", reader.int32Immediate());\
   spewOpEnd();\
 }\
 \
@@ -7381,18 +8670,6 @@ void spewBooleanToNumber(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
-void spewGuardAndGetIterator(CacheIRReader& reader) {\
-  spewOp(CacheOp::GuardAndGetIterator);\
-  spewOperandId("objId", reader.objOperandId());\
-  spewArgSeparator();\
-  spewField("iterOffset", reader.stubOffset());\
-  spewArgSeparator();\
-  spewField("enumeratorsAddrOffset", reader.stubOffset());\
-  spewArgSeparator();\
-  spewOperandId("resultId", reader.objOperandId());\
-  spewOpEnd();\
-}\
-\
 void spewGuardHasGetterSetter(CacheIRReader& reader) {\
   spewOp(CacheOp::GuardHasGetterSetter);\
   spewOperandId("objId", reader.objOperandId());\
@@ -7417,8 +8694,8 @@ void spewGuardIndexIsValidUpdateOrAdd(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
-void spewGuardIndexGreaterThanDenseInitLength(CacheIRReader& reader) {\
-  spewOp(CacheOp::GuardIndexGreaterThanDenseInitLength);\
+void spewGuardIndexIsNotDenseElement(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardIndexIsNotDenseElement);\
   spewOperandId("objId", reader.objOperandId());\
   spewArgSeparator();\
   spewOperandId("indexId", reader.int32OperandId());\
@@ -7457,6 +8734,14 @@ void spewGuardDynamicSlotIsSpecificObject(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewGuardDynamicSlotIsNotObject(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardDynamicSlotIsNotObject);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("slotOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
 void spewGuardFixedSlotValue(CacheIRReader& reader) {\
   spewOp(CacheOp::GuardFixedSlotValue);\
   spewOperandId("objId", reader.objOperandId());\
@@ -7474,6 +8759,26 @@ void spewGuardDynamicSlotValue(CacheIRReader& reader) {\
   spewField("offsetOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewField("valOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewLoadFixedSlot(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadFixedSlot);\
+  spewOperandId("resultId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("offsetOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewLoadDynamicSlot(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadDynamicSlot);\
+  spewOperandId("resultId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("slotOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -7534,6 +8839,16 @@ void spewLoadObject(CacheIRReader& reader) {\
   spewOperandId("resultId", reader.objOperandId());\
   spewArgSeparator();\
   spewField("objOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewLoadProtoObject(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadProtoObject);\
+  spewOperandId("resultId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("protoObjOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewOperandId("receiverObjId", reader.objOperandId());\
   spewOpEnd();\
 }\
 \
@@ -7618,6 +8933,8 @@ void spewMegamorphicStoreSlot(CacheIRReader& reader) {\
   spewField("nameOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewOperandId("rhsId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewBoolImm("strict", reader.readBool());\
   spewOpEnd();\
 }\
 \
@@ -7640,6 +8957,20 @@ void spewMegamorphicHasPropResult(CacheIRReader& reader) {\
   spewOperandId("idId", reader.valOperandId());\
   spewArgSeparator();\
   spewBoolImm("hasOwn", reader.readBool());\
+  spewOpEnd();\
+}\
+\
+void spewObjectToIteratorResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::ObjectToIteratorResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("enumeratorsAddrOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewValueToIteratorResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::ValueToIteratorResult);\
+  spewOperandId("valId", reader.valOperandId());\
   spewOpEnd();\
 }\
 \
@@ -7737,6 +9068,16 @@ void spewAllocateAndStoreDynamicSlot(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewAddSlotAndCallAddPropHook(CacheIRReader& reader) {\
+  spewOp(CacheOp::AddSlotAndCallAddPropHook);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("rhsId", reader.valOperandId());\
+  spewArgSeparator();\
+  spewField("newShapeOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
 void spewStoreDenseElement(CacheIRReader& reader) {\
   spewOp(CacheOp::StoreDenseElement);\
   spewOperandId("objId", reader.objOperandId());\
@@ -7792,6 +9133,18 @@ void spewPackedArraySliceResult(CacheIRReader& reader) {\
   spewField("templateObjectOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewOperandId("arrayId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("beginId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewOperandId("endId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
+void spewArgumentsSliceResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::ArgumentsSliceResult);\
+  spewField("templateObjectOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewOperandId("argsId", reader.objOperandId());\
   spewArgSeparator();\
   spewOperandId("beginId", reader.int32OperandId());\
   spewArgSeparator();\
@@ -7895,16 +9248,6 @@ void spewGuardHasAttachedArrayBuffer(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
-void spewFinishBoundFunctionInitResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::FinishBoundFunctionInitResult);\
-  spewOperandId("boundId", reader.objOperandId());\
-  spewArgSeparator();\
-  spewOperandId("targetId", reader.objOperandId());\
-  spewArgSeparator();\
-  spewOperandId("argCountId", reader.int32OperandId());\
-  spewOpEnd();\
-}\
-\
 void spewNewArrayIteratorResult(CacheIRReader& reader) {\
   spewOp(CacheOp::NewArrayIteratorResult);\
   spewField("templateObjectOffset", reader.stubOffset());\
@@ -7982,6 +9325,30 @@ void spewStringFromCharCodeResult(CacheIRReader& reader) {\
 void spewStringFromCodePointResult(CacheIRReader& reader) {\
   spewOp(CacheOp::StringFromCodePointResult);\
   spewOperandId("codeId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
+void spewStringIndexOfResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::StringIndexOfResult);\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewOperandId("searchStrId", reader.stringOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewStringStartsWithResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::StringStartsWithResult);\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewOperandId("searchStrId", reader.stringOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewStringEndsWithResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::StringEndsWithResult);\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewOperandId("searchStrId", reader.stringOperandId());\
   spewOpEnd();\
 }\
 \
@@ -8184,6 +9551,20 @@ void spewMathFunctionNumberResult(CacheIRReader& reader) {\
   spewOperandId("inputId", reader.numberOperandId());\
   spewArgSeparator();\
   spewUnaryMathFunctionImm("fun", reader.unaryMathFunction());\
+  spewOpEnd();\
+}\
+\
+void spewNumberParseIntResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::NumberParseIntResult);\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewOperandId("radixId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
+void spewDoubleParseIntResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::DoubleParseIntResult);\
+  spewOperandId("numId", reader.numberOperandId());\
   spewOpEnd();\
 }\
 \
@@ -8453,6 +9834,14 @@ void spewCallNumberToString(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewInt32ToStringWithBaseResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::Int32ToStringWithBaseResult);\
+  spewOperandId("inputId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewOperandId("baseId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
 void spewBooleanToString(CacheIRReader& reader) {\
   spewOp(CacheOp::BooleanToString);\
   spewOperandId("inputId", reader.booleanOperandId());\
@@ -8468,6 +9857,22 @@ void spewCallScriptedFunction(CacheIRReader& reader) {\
   spewOperandId("argcId", reader.int32OperandId());\
   spewArgSeparator();\
   spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
+  spewOpEnd();\
+}\
+\
+void spewCallBoundScriptedFunction(CacheIRReader& reader) {\
+  spewOp(CacheOp::CallBoundScriptedFunction);\
+  spewOperandId("calleeId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("targetId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("argcId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("numBoundArgs", reader.uint32Immediate());\
   spewOpEnd();\
 }\
 \
@@ -8478,6 +9883,8 @@ void spewCallWasmFunction(CacheIRReader& reader) {\
   spewOperandId("argcId", reader.int32OperandId());\
   spewArgSeparator();\
   spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
   spewArgSeparator();\
   spewField("funcExportOffset", reader.stubOffset());\
   spewArgSeparator();\
@@ -8501,6 +9908,8 @@ void spewCallNativeFunction(CacheIRReader& reader) {\
   spewArgSeparator();\
   spewCallFlagsImm("flags", reader.callFlags());\
   spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
+  spewArgSeparator();\
   spewBoolImm("ignoresReturnValue", reader.readBool());\
   spewOpEnd();\
 }\
@@ -8514,6 +9923,8 @@ void spewCallDOMFunction(CacheIRReader& reader) {\
   spewOperandId("thisObjId", reader.objOperandId());\
   spewArgSeparator();\
   spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
   spewOpEnd();\
 }\
 \
@@ -8524,6 +9935,8 @@ void spewCallClassHook(CacheIRReader& reader) {\
   spewOperandId("argcId", reader.int32OperandId());\
   spewArgSeparator();\
   spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
   spewArgSeparator();\
   spewField("targetOffset", reader.stubOffset());\
   spewOpEnd();\
@@ -8538,12 +9951,32 @@ void spewCallInlinedFunction(CacheIRReader& reader) {\
   spewField("icScriptOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewCallFlagsImm("flags", reader.callFlags());\
+  spewArgSeparator();\
+  spewUInt32Imm("argcFixed", reader.uint32Immediate());\
   spewOpEnd();\
 }\
 \
-void spewMetaTwoByte(CacheIRReader& reader) {\
-  spewOp(CacheOp::MetaTwoByte);\
-  spewField("functionObjectOffset", reader.stubOffset());\
+void spewMetaScriptedThisShape(CacheIRReader& reader) {\
+  spewOp(CacheOp::MetaScriptedThisShape);\
+  spewField("thisShapeOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewBindFunctionResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::BindFunctionResult);\
+  spewOperandId("targetId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewUInt32Imm("argc", reader.uint32Immediate());\
+  spewArgSeparator();\
+  spewField("templateObjectOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewSpecializedBindFunctionResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SpecializedBindFunctionResult);\
+  spewOperandId("targetId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewUInt32Imm("argc", reader.uint32Immediate());\
   spewArgSeparator();\
   spewField("templateObjectOffset", reader.stubOffset());\
   spewOpEnd();\
@@ -8687,9 +10120,33 @@ void spewLoadArgumentsObjectArgResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewLoadArgumentsObjectArgHoleResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadArgumentsObjectArgHoleResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("indexId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
+void spewLoadArgumentsObjectArgExistsResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadArgumentsObjectArgExistsResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("indexId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
 void spewLoadArgumentsObjectLengthResult(CacheIRReader& reader) {\
   spewOp(CacheOp::LoadArgumentsObjectLengthResult);\
   spewOperandId("objId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewLoadArgumentsObjectLength(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadArgumentsObjectLength);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.int32OperandId());\
   spewOpEnd();\
 }\
 \
@@ -8701,6 +10158,28 @@ void spewLoadFunctionLengthResult(CacheIRReader& reader) {\
 \
 void spewLoadFunctionNameResult(CacheIRReader& reader) {\
   spewOp(CacheOp::LoadFunctionNameResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewLoadBoundFunctionNumArgs(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadBoundFunctionNumArgs);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
+void spewLoadBoundFunctionTarget(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadBoundFunctionTarget);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewGuardBoundFunctionIsConstructor(CacheIRReader& reader) {\
+  spewOp(CacheOp::GuardBoundFunctionIsConstructor);\
   spewOperandId("objId", reader.objOperandId());\
   spewOpEnd();\
 }\
@@ -8729,11 +10208,23 @@ void spewLoadArrayBufferViewLengthDoubleResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewLinearizeForCharAccess(CacheIRReader& reader) {\
+  spewOp(CacheOp::LinearizeForCharAccess);\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewArgSeparator();\
+  spewOperandId("indexId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.stringOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewLoadStringCharResult(CacheIRReader& reader) {\
   spewOp(CacheOp::LoadStringCharResult);\
   spewOperandId("strId", reader.stringOperandId());\
   spewArgSeparator();\
   spewOperandId("indexId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewBoolImm("handleOOB", reader.readBool());\
   spewOpEnd();\
 }\
 \
@@ -8742,6 +10233,8 @@ void spewLoadStringCharCodeResult(CacheIRReader& reader) {\
   spewOperandId("strId", reader.stringOperandId());\
   spewArgSeparator();\
   spewOperandId("indexId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewBoolImm("handleOOB", reader.readBool());\
   spewOpEnd();\
 }\
 \
@@ -8753,22 +10246,6 @@ void spewLoadStringLengthResult(CacheIRReader& reader) {\
 \
 void spewFrameIsConstructingResult(CacheIRReader& reader) {\
   spewOp(CacheOp::FrameIsConstructingResult);\
-  spewOpEnd();\
-}\
-\
-void spewLoadEnvironmentFixedSlotResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::LoadEnvironmentFixedSlotResult);\
-  spewOperandId("objId", reader.objOperandId());\
-  spewArgSeparator();\
-  spewField("offsetOffset", reader.stubOffset());\
-  spewOpEnd();\
-}\
-\
-void spewLoadEnvironmentDynamicSlotResult(CacheIRReader& reader) {\
-  spewOp(CacheOp::LoadEnvironmentDynamicSlotResult);\
-  spewOperandId("objId", reader.objOperandId());\
-  spewArgSeparator();\
-  spewField("offsetOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 \
@@ -8896,6 +10373,16 @@ void spewCallNativeGetElementResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewCallNativeGetElementSuperResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::CallNativeGetElementSuperResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("indexId", reader.int32OperandId());\
+  spewArgSeparator();\
+  spewOperandId("receiverId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
 void spewGetNextMapSetEntryForIteratorResult(CacheIRReader& reader) {\
   spewOp(CacheOp::GetNextMapSetEntryForIteratorResult);\
   spewOperandId("iterId", reader.objOperandId());\
@@ -8922,6 +10409,14 @@ void spewLoadInt32Constant(CacheIRReader& reader) {\
   spewField("valOffset", reader.stubOffset());\
   spewArgSeparator();\
   spewOperandId("resultId", reader.int32OperandId());\
+  spewOpEnd();\
+}\
+\
+void spewLoadDoubleConstant(CacheIRReader& reader) {\
+  spewOp(CacheOp::LoadDoubleConstant);\
+  spewField("valOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewOperandId("resultId", reader.numberOperandId());\
   spewOpEnd();\
 }\
 \
@@ -9499,6 +10994,182 @@ void spewBigIntAsUintNResult(CacheIRReader& reader) {\
   spewOpEnd();\
 }\
 \
+void spewSetHasResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetHasResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetHasNonGCThingResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetHasNonGCThingResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetHasStringResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetHasStringResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetHasSymbolResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetHasSymbolResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("symId", reader.symbolOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetHasBigIntResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetHasBigIntResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("bigIntId", reader.bigIntOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetHasObjectResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetHasObjectResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("objId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewSetSizeResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::SetSizeResult);\
+  spewOperandId("setId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapHasResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapHasResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapHasNonGCThingResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapHasNonGCThingResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapHasStringResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapHasStringResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapHasSymbolResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapHasSymbolResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("symId", reader.symbolOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapHasBigIntResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapHasBigIntResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("bigIntId", reader.bigIntOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapHasObjectResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapHasObjectResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("objId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapGetResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapGetResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapGetNonGCThingResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapGetNonGCThingResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("valId", reader.valOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapGetStringResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapGetStringResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("strId", reader.stringOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapGetSymbolResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapGetSymbolResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("symId", reader.symbolOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapGetBigIntResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapGetBigIntResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("bigIntId", reader.bigIntOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapGetObjectResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapGetObjectResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("objId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewMapSizeResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::MapSizeResult);\
+  spewOperandId("mapId", reader.objOperandId());\
+  spewOpEnd();\
+}\
+\
+void spewArrayFromArgumentsObjectResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::ArrayFromArgumentsObjectResult);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("shapeOffset", reader.stubOffset());\
+  spewOpEnd();\
+}\
+\
+void spewCloseIterScriptedResult(CacheIRReader& reader) {\
+  spewOp(CacheOp::CloseIterScriptedResult);\
+  spewOperandId("iterId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewOperandId("calleeId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewCompletionKindImm("kind", reader.completionKind());\
+  spewArgSeparator();\
+  spewUInt32Imm("targetNargs", reader.uint32Immediate());\
+  spewOpEnd();\
+}\
+\
 void spewCallPrintString(CacheIRReader& reader) {\
   spewOp(CacheOp::CallPrintString);\
   spewStaticStringImm("str", reinterpret_cast<char*>(reader.pointer()));\
@@ -9525,6 +11196,16 @@ void spewAssertRecoveredOnBailoutResult(CacheIRReader& reader) {\
   spewOperandId("valId", reader.valOperandId());\
   spewArgSeparator();\
   spewBoolImm("mustBeRecovered", reader.readBool());\
+  spewOpEnd();\
+}\
+\
+void spewAssertPropertyLookup(CacheIRReader& reader) {\
+  spewOp(CacheOp::AssertPropertyLookup);\
+  spewOperandId("objId", reader.objOperandId());\
+  spewArgSeparator();\
+  spewField("idOffset", reader.stubOffset());\
+  spewArgSeparator();\
+  spewField("slotOffset", reader.stubOffset());\
   spewOpEnd();\
 }\
 
@@ -9560,6 +11241,13 @@ void cloneGuardIsUndefined(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GuardIsUndefined);\
   ValOperandId inputId = reader.valOperandId();\
   writer.writeOperandId(inputId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneGuardIsNotUninitializedLexical(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardIsNotUninitializedLexical);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -9600,6 +11288,13 @@ void cloneGuardIsNumber(CacheIRReader& reader, CacheIRWriter& writer) {{\
 \
 void cloneGuardToInt32(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GuardToInt32);\
+  ValOperandId inputId = reader.valOperandId();\
+  writer.writeOperandId(inputId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneGuardToNonGCThing(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardToNonGCThing);\
   ValOperandId inputId = reader.valOperandId();\
   writer.writeOperandId(inputId);\
   writer.assertLengthMatches();\
@@ -9686,6 +11381,16 @@ void cloneGuardShape(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneGuardMultipleShapes(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardMultipleShapes);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t shapesOffset = reader.stubOffset();\
+  JSObject* shapes = getObjectField(shapesOffset);\
+  writer.writeObjectField(shapes);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneGuardProto(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GuardProto);\
   ObjOperandId objId = reader.objOperandId();\
@@ -9722,6 +11427,17 @@ void cloneGuardAnyClass(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneGuardGlobalGeneration(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardGlobalGeneration);\
+  uint32_t expectedOffset = reader.stubOffset();\
+  uint32_t expected = getRawInt32Field(expectedOffset);\
+  writer.writeRawInt32Field(expected);\
+  uint32_t generationAddrOffset = reader.stubOffset();\
+  const void* generationAddr = getRawPointerField(generationAddrOffset);\
+  writer.writeRawPointerField(generationAddr);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneHasClassResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::HasClassResult);\
   ObjOperandId objId = reader.objOperandId();\
@@ -9740,6 +11456,9 @@ void cloneCallRegExpMatcherResult(CacheIRReader& reader, CacheIRWriter& writer) 
   writer.writeOperandId(inputId);\
   Int32OperandId lastIndexId = reader.int32OperandId();\
   writer.writeOperandId(lastIndexId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  JitCode* stub = getJitCodeField(stubOffset);\
+  writer.writeJitCodeField(stub);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -9751,17 +11470,33 @@ void cloneCallRegExpSearcherResult(CacheIRReader& reader, CacheIRWriter& writer)
   writer.writeOperandId(inputId);\
   Int32OperandId lastIndexId = reader.int32OperandId();\
   writer.writeOperandId(lastIndexId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  JitCode* stub = getJitCodeField(stubOffset);\
+  writer.writeJitCodeField(stub);\
   writer.assertLengthMatches();\
 }}\
 \
-void cloneCallRegExpTesterResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::CallRegExpTesterResult);\
+void cloneRegExpBuiltinExecMatchResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::RegExpBuiltinExecMatchResult);\
   ObjOperandId regexpId = reader.objOperandId();\
   writer.writeOperandId(regexpId);\
   StringOperandId inputId = reader.stringOperandId();\
   writer.writeOperandId(inputId);\
-  Int32OperandId lastIndexId = reader.int32OperandId();\
-  writer.writeOperandId(lastIndexId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  JitCode* stub = getJitCodeField(stubOffset);\
+  writer.writeJitCodeField(stub);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneRegExpBuiltinExecTestResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::RegExpBuiltinExecTestResult);\
+  ObjOperandId regexpId = reader.objOperandId();\
+  writer.writeOperandId(regexpId);\
+  StringOperandId inputId = reader.stringOperandId();\
+  writer.writeOperandId(inputId);\
+  uint32_t stubOffset = reader.stubOffset();\
+  JitCode* stub = getJitCodeField(stubOffset);\
+  writer.writeJitCodeField(stub);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -9910,6 +11645,15 @@ void cloneGuardSpecificObject(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneGuardObjectIdentity(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardObjectIdentity);\
+  ObjOperandId obj1Id = reader.objOperandId();\
+  writer.writeOperandId(obj1Id);\
+  ObjOperandId obj2Id = reader.objOperandId();\
+  writer.writeOperandId(obj2Id);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneGuardSpecificFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GuardSpecificFunction);\
   ObjOperandId funId = reader.objOperandId();\
@@ -9953,6 +11697,15 @@ void cloneGuardSpecificSymbol(CacheIRReader& reader, CacheIRWriter& writer) {{\
   uint32_t expectedOffset = reader.stubOffset();\
   JS::Symbol* expected = getSymbolField(expectedOffset);\
   writer.writeSymbolField(expected);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneGuardSpecificInt32(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardSpecificInt32);\
+  Int32OperandId numId = reader.int32OperandId();\
+  writer.writeOperandId(numId);\
+  int32_t expected = reader.int32Immediate();\
+  writer.writeInt32Imm(expected);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10003,22 +11756,6 @@ void cloneBooleanToNumber(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
-void cloneGuardAndGetIterator(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::GuardAndGetIterator);\
-  ObjOperandId objId = reader.objOperandId();\
-  writer.writeOperandId(objId);\
-  uint32_t iterOffset = reader.stubOffset();\
-  JSObject* iter = getObjectField(iterOffset);\
-  writer.writeObjectField(iter);\
-  uint32_t enumeratorsAddrOffset = reader.stubOffset();\
-  const void* enumeratorsAddr = getRawPointerField(enumeratorsAddrOffset);\
-  writer.writeRawPointerField(enumeratorsAddr);\
-  ObjOperandId resultId = reader.objOperandId();\
-  writer.newOperandId();\
-  writer.writeOperandId(resultId);\
-  writer.assertLengthMatches();\
-}}\
-\
 void cloneGuardHasGetterSetter(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GuardHasGetterSetter);\
   ObjOperandId objId = reader.objOperandId();\
@@ -10048,8 +11785,8 @@ void cloneGuardIndexIsValidUpdateOrAdd(CacheIRReader& reader, CacheIRWriter& wri
   writer.assertLengthMatches();\
 }}\
 \
-void cloneGuardIndexGreaterThanDenseInitLength(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::GuardIndexGreaterThanDenseInitLength);\
+void cloneGuardIndexIsNotDenseElement(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardIndexIsNotDenseElement);\
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
   Int32OperandId indexId = reader.int32OperandId();\
@@ -10095,6 +11832,16 @@ void cloneGuardDynamicSlotIsSpecificObject(CacheIRReader& reader, CacheIRWriter&
   writer.assertLengthMatches();\
 }}\
 \
+void cloneGuardDynamicSlotIsNotObject(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardDynamicSlotIsNotObject);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t slotOffset = reader.stubOffset();\
+  uint32_t slot = getRawInt32Field(slotOffset);\
+  writer.writeRawInt32Field(slot);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneGuardFixedSlotValue(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GuardFixedSlotValue);\
   ObjOperandId objId = reader.objOperandId();\
@@ -10118,6 +11865,32 @@ void cloneGuardDynamicSlotValue(CacheIRReader& reader, CacheIRWriter& writer) {{
   uint32_t valOffset = reader.stubOffset();\
   const Value val = getValueField(valOffset);\
   writer.writeValueField(val);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadFixedSlot(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadFixedSlot);\
+  ValOperandId resultId = reader.valOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t offsetOffset = reader.stubOffset();\
+  uint32_t offset = getRawInt32Field(offsetOffset);\
+  writer.writeRawInt32Field(offset);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadDynamicSlot(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadDynamicSlot);\
+  ValOperandId resultId = reader.valOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t slotOffset = reader.stubOffset();\
+  uint32_t slot = getRawInt32Field(slotOffset);\
+  writer.writeRawInt32Field(slot);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10190,6 +11963,19 @@ void cloneLoadObject(CacheIRReader& reader, CacheIRWriter& writer) {{\
   uint32_t objOffset = reader.stubOffset();\
   JSObject* obj = getObjectField(objOffset);\
   writer.writeObjectField(obj);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadProtoObject(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadProtoObject);\
+  ObjOperandId resultId = reader.objOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  uint32_t protoObjOffset = reader.stubOffset();\
+  JSObject* protoObj = getObjectField(protoObjOffset);\
+  writer.writeObjectField(protoObj);\
+  ObjOperandId receiverObjId = reader.objOperandId();\
+  writer.writeOperandId(receiverObjId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10270,8 +12056,8 @@ void cloneMegamorphicLoadSlotResult(CacheIRReader& reader, CacheIRWriter& writer
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
   uint32_t nameOffset = reader.stubOffset();\
-  PropertyName* name = getPropertyNameField(nameOffset);\
-  writer.writeStringField(name);\
+  jsid name = getIdField(nameOffset);\
+  writer.writeIdField(name);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10289,10 +12075,12 @@ void cloneMegamorphicStoreSlot(CacheIRReader& reader, CacheIRWriter& writer) {{\
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
   uint32_t nameOffset = reader.stubOffset();\
-  PropertyName* name = getPropertyNameField(nameOffset);\
-  writer.writeStringField(name);\
+  jsid name = getIdField(nameOffset);\
+  writer.writeIdField(name);\
   ValOperandId rhsId = reader.valOperandId();\
   writer.writeOperandId(rhsId);\
+  bool strict = reader.readBool();\
+  writer.writeBoolImm(strict);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10317,6 +12105,23 @@ void cloneMegamorphicHasPropResult(CacheIRReader& reader, CacheIRWriter& writer)
   writer.writeOperandId(idId);\
   bool hasOwn = reader.readBool();\
   writer.writeBoolImm(hasOwn);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneObjectToIteratorResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::ObjectToIteratorResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t enumeratorsAddrOffset = reader.stubOffset();\
+  const void* enumeratorsAddr = getRawPointerField(enumeratorsAddrOffset);\
+  writer.writeRawPointerField(enumeratorsAddr);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneValueToIteratorResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::ValueToIteratorResult);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10438,6 +12243,18 @@ void cloneAllocateAndStoreDynamicSlot(CacheIRReader& reader, CacheIRWriter& writ
   writer.assertLengthMatches();\
 }}\
 \
+void cloneAddSlotAndCallAddPropHook(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::AddSlotAndCallAddPropHook);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  ValOperandId rhsId = reader.valOperandId();\
+  writer.writeOperandId(rhsId);\
+  uint32_t newShapeOffset = reader.stubOffset();\
+  Shape* newShape = getShapeField(newShapeOffset);\
+  writer.writeShapeField(newShape);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneStoreDenseElement(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::StoreDenseElement);\
   ObjOperandId objId = reader.objOperandId();\
@@ -10501,6 +12318,20 @@ void clonePackedArraySliceResult(CacheIRReader& reader, CacheIRWriter& writer) {
   writer.writeObjectField(templateObject);\
   ObjOperandId arrayId = reader.objOperandId();\
   writer.writeOperandId(arrayId);\
+  Int32OperandId beginId = reader.int32OperandId();\
+  writer.writeOperandId(beginId);\
+  Int32OperandId endId = reader.int32OperandId();\
+  writer.writeOperandId(endId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneArgumentsSliceResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::ArgumentsSliceResult);\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  JSObject* templateObject = getObjectField(templateObjectOffset);\
+  writer.writeObjectField(templateObject);\
+  ObjOperandId argsId = reader.objOperandId();\
+  writer.writeOperandId(argsId);\
   Int32OperandId beginId = reader.int32OperandId();\
   writer.writeOperandId(beginId);\
   Int32OperandId endId = reader.int32OperandId();\
@@ -10620,17 +12451,6 @@ void cloneGuardHasAttachedArrayBuffer(CacheIRReader& reader, CacheIRWriter& writ
   writer.assertLengthMatches();\
 }}\
 \
-void cloneFinishBoundFunctionInitResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::FinishBoundFunctionInitResult);\
-  ObjOperandId boundId = reader.objOperandId();\
-  writer.writeOperandId(boundId);\
-  ObjOperandId targetId = reader.objOperandId();\
-  writer.writeOperandId(targetId);\
-  Int32OperandId argCountId = reader.int32OperandId();\
-  writer.writeOperandId(argCountId);\
-  writer.assertLengthMatches();\
-}}\
-\
 void cloneNewArrayIteratorResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::NewArrayIteratorResult);\
   uint32_t templateObjectOffset = reader.stubOffset();\
@@ -10728,6 +12548,33 @@ void cloneStringFromCodePointResult(CacheIRReader& reader, CacheIRWriter& writer
   writer.writeOp(CacheOp::StringFromCodePointResult);\
   Int32OperandId codeId = reader.int32OperandId();\
   writer.writeOperandId(codeId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneStringIndexOfResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::StringIndexOfResult);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  writer.writeOperandId(searchStrId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneStringStartsWithResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::StringStartsWithResult);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  writer.writeOperandId(searchStrId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneStringEndsWithResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::StringEndsWithResult);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  StringOperandId searchStrId = reader.stringOperandId();\
+  writer.writeOperandId(searchStrId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -10961,6 +12808,22 @@ void cloneMathFunctionNumberResult(CacheIRReader& reader, CacheIRWriter& writer)
   writer.writeOperandId(inputId);\
   UnaryMathFunction fun = reader.unaryMathFunction();\
   writer.writeUnaryMathFunctionImm(fun);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneNumberParseIntResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::NumberParseIntResult);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  Int32OperandId radixId = reader.int32OperandId();\
+  writer.writeOperandId(radixId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneDoubleParseIntResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::DoubleParseIntResult);\
+  NumberOperandId numId = reader.numberOperandId();\
+  writer.writeOperandId(numId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11264,6 +13127,15 @@ void cloneCallNumberToString(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneInt32ToStringWithBaseResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::Int32ToStringWithBaseResult);\
+  Int32OperandId inputId = reader.int32OperandId();\
+  writer.writeOperandId(inputId);\
+  Int32OperandId baseId = reader.int32OperandId();\
+  writer.writeOperandId(baseId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneBooleanToString(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::BooleanToString);\
   BooleanOperandId inputId = reader.booleanOperandId();\
@@ -11282,6 +13154,23 @@ void cloneCallScriptedFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOperandId(argcId);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneCallBoundScriptedFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::CallBoundScriptedFunction);\
+  ObjOperandId calleeId = reader.objOperandId();\
+  writer.writeOperandId(calleeId);\
+  ObjOperandId targetId = reader.objOperandId();\
+  writer.writeOperandId(targetId);\
+  Int32OperandId argcId = reader.int32OperandId();\
+  writer.writeOperandId(argcId);\
+  CallFlags flags = reader.callFlags();\
+  writer.writeCallFlagsImm(flags);\
+  uint32_t numBoundArgs = reader.uint32Immediate();\
+  writer.writeUInt32Imm(numBoundArgs);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11293,6 +13182,8 @@ void cloneCallWasmFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOperandId(argcId);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
   uint32_t funcExportOffset = reader.stubOffset();\
   const void* funcExport = getRawPointerField(funcExportOffset);\
   writer.writeRawPointerField(funcExport);\
@@ -11319,6 +13210,8 @@ void cloneCallNativeFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOperandId(argcId);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
   bool ignoresReturnValue = reader.readBool();\
   writer.writeBoolImm(ignoresReturnValue);\
   writer.assertLengthMatches();\
@@ -11334,6 +13227,8 @@ void cloneCallDOMFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOperandId(thisObjId);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11345,6 +13240,8 @@ void cloneCallClassHook(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOperandId(argcId);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
   uint32_t targetOffset = reader.stubOffset();\
   const void* target = getRawPointerField(targetOffset);\
   writer.writeRawPointerField(target);\
@@ -11362,14 +13259,37 @@ void cloneCallInlinedFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeRawPointerField(icScript);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
+  uint32_t argcFixed = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argcFixed);\
   writer.assertLengthMatches();\
 }}\
 \
-void cloneMetaTwoByte(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::MetaTwoByte);\
-  uint32_t functionObjectOffset = reader.stubOffset();\
-  JSObject* functionObject = getObjectField(functionObjectOffset);\
-  writer.writeObjectField(functionObject);\
+void cloneMetaScriptedThisShape(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MetaScriptedThisShape);\
+  uint32_t thisShapeOffset = reader.stubOffset();\
+  Shape* thisShape = getShapeField(thisShapeOffset);\
+  writer.writeShapeField(thisShape);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneBindFunctionResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::BindFunctionResult);\
+  ObjOperandId targetId = reader.objOperandId();\
+  writer.writeOperandId(targetId);\
+  uint32_t argc = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argc);\
+  uint32_t templateObjectOffset = reader.stubOffset();\
+  JSObject* templateObject = getObjectField(templateObjectOffset);\
+  writer.writeObjectField(templateObject);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSpecializedBindFunctionResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SpecializedBindFunctionResult);\
+  ObjOperandId targetId = reader.objOperandId();\
+  writer.writeOperandId(targetId);\
+  uint32_t argc = reader.uint32Immediate();\
+  writer.writeUInt32Imm(argc);\
   uint32_t templateObjectOffset = reader.stubOffset();\
   JSObject* templateObject = getObjectField(templateObjectOffset);\
   writer.writeObjectField(templateObject);\
@@ -11533,10 +13453,38 @@ void cloneLoadArgumentsObjectArgResult(CacheIRReader& reader, CacheIRWriter& wri
   writer.assertLengthMatches();\
 }}\
 \
+void cloneLoadArgumentsObjectArgHoleResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadArgumentsObjectArgHoleResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  Int32OperandId indexId = reader.int32OperandId();\
+  writer.writeOperandId(indexId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadArgumentsObjectArgExistsResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadArgumentsObjectArgExistsResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  Int32OperandId indexId = reader.int32OperandId();\
+  writer.writeOperandId(indexId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneLoadArgumentsObjectLengthResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::LoadArgumentsObjectLengthResult);\
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadArgumentsObjectLength(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadArgumentsObjectLength);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  Int32OperandId resultId = reader.int32OperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11549,6 +13497,33 @@ void cloneLoadFunctionLengthResult(CacheIRReader& reader, CacheIRWriter& writer)
 \
 void cloneLoadFunctionNameResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::LoadFunctionNameResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadBoundFunctionNumArgs(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadBoundFunctionNumArgs);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  Int32OperandId resultId = reader.int32OperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadBoundFunctionTarget(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadBoundFunctionTarget);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  ObjOperandId resultId = reader.objOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneGuardBoundFunctionIsConstructor(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::GuardBoundFunctionIsConstructor);\
   ObjOperandId objId = reader.objOperandId();\
   writer.writeOperandId(objId);\
   writer.assertLengthMatches();\
@@ -11582,12 +13557,26 @@ void cloneLoadArrayBufferViewLengthDoubleResult(CacheIRReader& reader, CacheIRWr
   writer.assertLengthMatches();\
 }}\
 \
+void cloneLinearizeForCharAccess(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LinearizeForCharAccess);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  Int32OperandId indexId = reader.int32OperandId();\
+  writer.writeOperandId(indexId);\
+  StringOperandId resultId = reader.stringOperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneLoadStringCharResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::LoadStringCharResult);\
   StringOperandId strId = reader.stringOperandId();\
   writer.writeOperandId(strId);\
   Int32OperandId indexId = reader.int32OperandId();\
   writer.writeOperandId(indexId);\
+  bool handleOOB = reader.readBool();\
+  writer.writeBoolImm(handleOOB);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11597,6 +13586,8 @@ void cloneLoadStringCharCodeResult(CacheIRReader& reader, CacheIRWriter& writer)
   writer.writeOperandId(strId);\
   Int32OperandId indexId = reader.int32OperandId();\
   writer.writeOperandId(indexId);\
+  bool handleOOB = reader.readBool();\
+  writer.writeBoolImm(handleOOB);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11609,26 +13600,6 @@ void cloneLoadStringLengthResult(CacheIRReader& reader, CacheIRWriter& writer) {
 \
 void cloneFrameIsConstructingResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::FrameIsConstructingResult);\
-  writer.assertLengthMatches();\
-}}\
-\
-void cloneLoadEnvironmentFixedSlotResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::LoadEnvironmentFixedSlotResult);\
-  ObjOperandId objId = reader.objOperandId();\
-  writer.writeOperandId(objId);\
-  uint32_t offsetOffset = reader.stubOffset();\
-  uint32_t offset = getRawInt32Field(offsetOffset);\
-  writer.writeRawInt32Field(offset);\
-  writer.assertLengthMatches();\
-}}\
-\
-void cloneLoadEnvironmentDynamicSlotResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
-  writer.writeOp(CacheOp::LoadEnvironmentDynamicSlotResult);\
-  ObjOperandId objId = reader.objOperandId();\
-  writer.writeOperandId(objId);\
-  uint32_t offsetOffset = reader.stubOffset();\
-  uint32_t offset = getRawInt32Field(offsetOffset);\
-  writer.writeRawInt32Field(offset);\
   writer.assertLengthMatches();\
 }}\
 \
@@ -11780,6 +13751,17 @@ void cloneCallNativeGetElementResult(CacheIRReader& reader, CacheIRWriter& write
   writer.assertLengthMatches();\
 }}\
 \
+void cloneCallNativeGetElementSuperResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::CallNativeGetElementSuperResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  Int32OperandId indexId = reader.int32OperandId();\
+  writer.writeOperandId(indexId);\
+  ValOperandId receiverId = reader.valOperandId();\
+  writer.writeOperandId(receiverId);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneGetNextMapSetEntryForIteratorResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::GetNextMapSetEntryForIteratorResult);\
   ObjOperandId iterId = reader.objOperandId();\
@@ -11809,6 +13791,17 @@ void cloneLoadInt32Constant(CacheIRReader& reader, CacheIRWriter& writer) {{\
   uint32_t val = getRawInt32Field(valOffset);\
   writer.writeRawInt32Field(val);\
   Int32OperandId resultId = reader.int32OperandId();\
+  writer.newOperandId();\
+  writer.writeOperandId(resultId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneLoadDoubleConstant(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::LoadDoubleConstant);\
+  uint32_t valOffset = reader.stubOffset();\
+  double val = getDoubleField(valOffset);\
+  writer.writeDoubleField(val);\
+  NumberOperandId resultId = reader.numberOperandId();\
   writer.newOperandId();\
   writer.writeOperandId(resultId);\
   writer.assertLengthMatches();\
@@ -12472,6 +14465,205 @@ void cloneBigIntAsUintNResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.assertLengthMatches();\
 }}\
 \
+void cloneSetHasResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetHasResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetHasNonGCThingResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetHasNonGCThingResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetHasStringResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetHasStringResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetHasSymbolResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetHasSymbolResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  writer.writeOperandId(symId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetHasBigIntResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetHasBigIntResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  writer.writeOperandId(bigIntId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetHasObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetHasObjectResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneSetSizeResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::SetSizeResult);\
+  ObjOperandId setId = reader.objOperandId();\
+  writer.writeOperandId(setId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapHasResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapHasResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapHasNonGCThingResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapHasNonGCThingResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapHasStringResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapHasStringResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapHasSymbolResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapHasSymbolResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  writer.writeOperandId(symId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapHasBigIntResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapHasBigIntResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  writer.writeOperandId(bigIntId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapHasObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapHasObjectResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapGetResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapGetResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapGetNonGCThingResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapGetNonGCThingResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ValOperandId valId = reader.valOperandId();\
+  writer.writeOperandId(valId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapGetStringResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapGetStringResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  StringOperandId strId = reader.stringOperandId();\
+  writer.writeOperandId(strId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapGetSymbolResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapGetSymbolResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  SymbolOperandId symId = reader.symbolOperandId();\
+  writer.writeOperandId(symId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapGetBigIntResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapGetBigIntResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  BigIntOperandId bigIntId = reader.bigIntOperandId();\
+  writer.writeOperandId(bigIntId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapGetObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapGetObjectResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneMapSizeResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::MapSizeResult);\
+  ObjOperandId mapId = reader.objOperandId();\
+  writer.writeOperandId(mapId);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneArrayFromArgumentsObjectResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::ArrayFromArgumentsObjectResult);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t shapeOffset = reader.stubOffset();\
+  Shape* shape = getShapeField(shapeOffset);\
+  writer.writeShapeField(shape);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneCloseIterScriptedResult(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::CloseIterScriptedResult);\
+  ObjOperandId iterId = reader.objOperandId();\
+  writer.writeOperandId(iterId);\
+  ObjOperandId calleeId = reader.objOperandId();\
+  writer.writeOperandId(calleeId);\
+  CompletionKind kind = reader.completionKind();\
+  writer.writeCompletionKindImm(kind);\
+  uint32_t targetNargs = reader.uint32Immediate();\
+  writer.writeUInt32Imm(targetNargs);\
+  writer.assertLengthMatches();\
+}}\
+\
 void cloneCallPrintString(CacheIRReader& reader, CacheIRWriter& writer) {{\
   writer.writeOp(CacheOp::CallPrintString);\
   const char* str = reinterpret_cast<char*>(reader.pointer());\
@@ -12500,6 +14692,19 @@ void cloneAssertRecoveredOnBailoutResult(CacheIRReader& reader, CacheIRWriter& w
   writer.writeOperandId(valId);\
   bool mustBeRecovered = reader.readBool();\
   writer.writeBoolImm(mustBeRecovered);\
+  writer.assertLengthMatches();\
+}}\
+\
+void cloneAssertPropertyLookup(CacheIRReader& reader, CacheIRWriter& writer) {{\
+  writer.writeOp(CacheOp::AssertPropertyLookup);\
+  ObjOperandId objId = reader.objOperandId();\
+  writer.writeOperandId(objId);\
+  uint32_t idOffset = reader.stubOffset();\
+  jsid id = getIdField(idOffset);\
+  writer.writeIdField(id);\
+  uint32_t slotOffset = reader.stubOffset();\
+  uint32_t slot = getRawInt32Field(slotOffset);\
+  writer.writeRawInt32Field(slot);\
   writer.assertLengthMatches();\
 }}\
 

@@ -96,8 +96,6 @@ class JS_PUBLIC_API ForwardingProxyHandler : public BaseProxyHandler {
   virtual bool nativeCall(JSContext* cx, JS::IsAcceptableThis test,
                           JS::NativeImpl impl,
                           const JS::CallArgs& args) const override;
-  virtual bool hasInstance(JSContext* cx, JS::HandleObject proxy,
-                           JS::MutableHandleValue v, bool* bp) const override;
   virtual bool getBuiltinClass(JSContext* cx, JS::HandleObject proxy,
                                ESClass* cls) const override;
   virtual bool isArray(JSContext* cx, JS::HandleObject proxy,
@@ -246,8 +244,6 @@ class JS_PUBLIC_API CrossCompartmentWrapper : public Wrapper {
   virtual bool nativeCall(JSContext* cx, JS::IsAcceptableThis test,
                           JS::NativeImpl impl,
                           const JS::CallArgs& args) const override;
-  virtual bool hasInstance(JSContext* cx, JS::HandleObject wrapper,
-                           JS::MutableHandleValue v, bool* bp) const override;
   virtual const char* className(JSContext* cx,
                                 JS::HandleObject proxy) const override;
   virtual JSString* fun_toString(JSContext* cx, JS::HandleObject wrapper,
@@ -322,8 +318,6 @@ class JS_PUBLIC_API OpaqueCrossCompartmentWrapper
                                ESClass* cls) const override;
   virtual bool isArray(JSContext* cx, JS::HandleObject obj,
                        JS::IsArrayAnswer* answer) const override;
-  virtual bool hasInstance(JSContext* cx, JS::HandleObject wrapper,
-                           JS::MutableHandleValue v, bool* bp) const override;
   virtual const char* className(JSContext* cx,
                                 JS::HandleObject wrapper) const override;
   virtual JSString* fun_toString(JSContext* cx, JS::HandleObject proxy,

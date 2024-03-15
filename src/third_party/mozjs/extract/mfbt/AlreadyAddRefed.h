@@ -38,7 +38,11 @@ struct unused_t;
  * Otherwise, use std::move(RefPtr/nsCOMPtr/etc).
  */
 template <class T>
-struct MOZ_MUST_USE_TYPE MOZ_NON_AUTOABLE already_AddRefed {
+struct
+#if !defined(MOZ_CLANG_PLUGIN) && !defined(XGILL_PLUGIN)
+    [[nodiscard]]
+#endif
+    MOZ_NON_AUTOABLE already_AddRefed {
   already_AddRefed() : mRawPtr(nullptr) {}
 
   // For simplicity, allow returning nullptr from functions returning
@@ -91,13 +95,13 @@ struct MOZ_MUST_USE_TYPE MOZ_NON_AUTOABLE already_AddRefed {
 
   already_AddRefed(already_AddRefed<T>&& aOther)
 #ifdef DEBUG
-      : mRawPtr(aOther.take()) {
-  }
+      : mRawPtr(aOther.take()){}
 #else
       = default;
 #endif
 
-  already_AddRefed<T>& operator=(already_AddRefed<T>&& aOther) {
+        already_AddRefed<T> &
+        operator=(already_AddRefed<T>&& aOther) {
     mRawPtr = aOther.take();
     return *this;
   }

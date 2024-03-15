@@ -11,17 +11,12 @@
 #  include "mozilla/Atomics.h"
 #  include "mozilla/Sprintf.h"
 
-#  include "jit/Ion.h"
 #  include "jit/MIR.h"
 #  include "jit/MIRGenerator.h"
 #  include "jit/MIRGraph.h"
 #  include "threading/LockGuard.h"
 #  include "util/GetPidProvider.h"  // getpid()
-#  include "util/Text.h"
-#  include "vm/HelperThreads.h"
 #  include "vm/MutexIDs.h"
-
-#  include "vm/Realm-inl.h"
 
 #  ifndef JIT_SPEW_DIR
 #    if defined(_WIN32)
@@ -38,7 +33,7 @@ using namespace js::jit;
 
 class IonSpewer {
  private:
-  Mutex outputLock_;
+  Mutex outputLock_ MOZ_UNANNOTATED;
   Fprinter jsonOutput_;
   bool firstFunction_;
   bool asyncLogging_;
@@ -76,7 +71,7 @@ static uint64_t LoggingBits = 0;
 static mozilla::Atomic<uint32_t, mozilla::Relaxed> filteredOutCompilations(0);
 
 static const char* const ChannelNames[] = {
-#  define JITSPEW_CHANNEL(name) #  name,
+#  define JITSPEW_CHANNEL(name) #name,
     JITSPEW_CHANNEL_LIST(JITSPEW_CHANNEL)
 #  undef JITSPEW_CHANNEL
 };
@@ -366,6 +361,8 @@ static void PrintHelpAndExit(int status = 0) {
       "  cacheflush    Instruction Cache flushes (ARM only for now)\n"
       "  range         Range Analysis\n"
       "  wasmbce       Wasm Bounds Check Elimination\n"
+      "  shapeguards   Redundant shape guard elimination\n"
+      "  gcbarriers    Redundant GC barrier elimination\n"
       "  logs          JSON visualization logging\n"
       "  logs-sync     Same as logs, but flushes between each pass (sync. "
       "compiled functions only).\n"
@@ -463,6 +460,10 @@ void jit::CheckLogging() {
       EnableChannel(JitSpew_Pools);
     } else if (IsFlag(found, "cacheflush")) {
       EnableChannel(JitSpew_CacheFlush);
+    } else if (IsFlag(found, "shapeguards")) {
+      EnableChannel(JitSpew_RedundantShapeGuards);
+    } else if (IsFlag(found, "gcbarriers")) {
+      EnableChannel(JitSpew_RedundantGCBarriers);
     } else if (IsFlag(found, "logs")) {
       EnableIonDebugAsyncLogging();
     } else if (IsFlag(found, "logs-sync")) {

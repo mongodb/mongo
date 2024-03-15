@@ -12,8 +12,7 @@
 #endif
 #include "jit/MIR.h"
 #include "jit/Recover.h"
-#include "vm/JSScript.h"
-#include "vm/Printer.h"
+#include "js/Printer.h"
 
 using namespace js;
 using namespace js::jit;
@@ -405,17 +404,6 @@ static const uint32_t SNAPSHOT_ROFFSET_SHIFT =
 static const uint32_t SNAPSHOT_ROFFSET_BITS = 32 - SNAPSHOT_ROFFSET_SHIFT;
 static const uint32_t SNAPSHOT_ROFFSET_MASK = COMPUTE_MASK_(SNAPSHOT_ROFFSET);
 
-// Details of recover header packing.
-static const uint32_t RECOVER_RESUMEAFTER_SHIFT = 0;
-static const uint32_t RECOVER_RESUMEAFTER_BITS = 1;
-static const uint32_t RECOVER_RESUMEAFTER_MASK =
-    COMPUTE_MASK_(RECOVER_RESUMEAFTER);
-
-static const uint32_t RECOVER_RINSCOUNT_SHIFT =
-    COMPUTE_SHIFT_AFTER_(RECOVER_RESUMEAFTER);
-static const uint32_t RECOVER_RINSCOUNT_BITS = 32 - RECOVER_RINSCOUNT_SHIFT;
-static const uint32_t RECOVER_RINSCOUNT_MASK = COMPUTE_MASK_(RECOVER_RINSCOUNT);
-
 #undef COMPUTE_MASK_
 #undef COMPUTE_SHIFT_AFTER_
 
@@ -479,10 +467,7 @@ SnapshotWriter::SnapshotWriter()
 
 RecoverReader::RecoverReader(SnapshotReader& snapshot, const uint8_t* recovers,
                              uint32_t size)
-    : reader_(nullptr, nullptr),
-      numInstructions_(0),
-      numInstructionsRead_(0),
-      resumeAfter_(false) {
+    : reader_(nullptr, nullptr), numInstructions_(0), numInstructionsRead_(0) {
   if (!recovers) {
     return;
   }
@@ -495,8 +480,7 @@ RecoverReader::RecoverReader(SnapshotReader& snapshot, const uint8_t* recovers,
 RecoverReader::RecoverReader(const RecoverReader& rr)
     : reader_(rr.reader_),
       numInstructions_(rr.numInstructions_),
-      numInstructionsRead_(rr.numInstructionsRead_),
-      resumeAfter_(rr.resumeAfter_) {
+      numInstructionsRead_(rr.numInstructionsRead_) {
   if (reader_.currentPosition()) {
     rr.instruction()->cloneInto(&rawData_);
   }
@@ -506,7 +490,6 @@ RecoverReader& RecoverReader::operator=(const RecoverReader& rr) {
   reader_ = rr.reader_;
   numInstructions_ = rr.numInstructions_;
   numInstructionsRead_ = rr.numInstructionsRead_;
-  resumeAfter_ = rr.resumeAfter_;
   if (reader_.currentPosition()) {
     rr.instruction()->cloneInto(&rawData_);
   }
@@ -514,15 +497,11 @@ RecoverReader& RecoverReader::operator=(const RecoverReader& rr) {
 }
 
 void RecoverReader::readRecoverHeader() {
-  uint32_t bits = reader_.readUnsigned();
-
-  numInstructions_ = (bits & RECOVER_RINSCOUNT_MASK) >> RECOVER_RINSCOUNT_SHIFT;
-  resumeAfter_ = (bits & RECOVER_RESUMEAFTER_MASK) >> RECOVER_RESUMEAFTER_SHIFT;
+  numInstructions_ = reader_.readUnsigned();
   MOZ_ASSERT(numInstructions_);
 
-  JitSpew(JitSpew_IonSnapshots,
-          "Read recover header with instructionCount %u (ra: %d)",
-          numInstructions_, resumeAfter_);
+  JitSpew(JitSpew_IonSnapshots, "Read recover header with instructionCount %u",
+          numInstructions_);
 }
 
 void RecoverReader::readInstruction() {
@@ -601,8 +580,7 @@ void SnapshotWriter::endSnapshot() {
           uint32_t(writer_.length() - lastStart_), lastStart_);
 }
 
-RecoverOffset RecoverWriter::startRecover(uint32_t instructionCount,
-                                          bool resumeAfter) {
+RecoverOffset RecoverWriter::startRecover(uint32_t instructionCount) {
   MOZ_ASSERT(instructionCount);
   instructionCount_ = instructionCount;
   instructionsWritten_ = 0;
@@ -610,13 +588,8 @@ RecoverOffset RecoverWriter::startRecover(uint32_t instructionCount,
   JitSpew(JitSpew_IonSnapshots, "starting recover with %u instruction(s)",
           instructionCount);
 
-  MOZ_ASSERT(!(uint32_t(resumeAfter) & ~RECOVER_RESUMEAFTER_MASK));
-  MOZ_ASSERT(instructionCount < uint32_t(1 << RECOVER_RINSCOUNT_BITS));
-  uint32_t bits = (uint32_t(resumeAfter) << RECOVER_RESUMEAFTER_SHIFT) |
-                  (instructionCount << RECOVER_RINSCOUNT_SHIFT);
-
   RecoverOffset recoverOffset = writer_.length();
-  writer_.writeUnsigned(bits);
+  writer_.writeUnsigned(instructionCount);
   return recoverOffset;
 }
 

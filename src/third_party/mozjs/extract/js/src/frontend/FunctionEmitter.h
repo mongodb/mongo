@@ -16,18 +16,16 @@
 #include "frontend/EmitterScope.h"        // EmitterScope
 #include "frontend/FunctionSyntaxKind.h"  // FunctionSyntaxKind
 #include "frontend/ParserAtom.h"          // TaggedParserAtomIndex
-#include "frontend/SharedContext.h"       // FunctionBox, TopLevelFunction
 #include "frontend/TDZCheckCache.h"       // TDZCheckCache
-#include "gc/Rooting.h"                   // JS::Rooted, JS::Handle
-#include "vm/BytecodeUtil.h"              // JSOp
-#include "vm/JSAtom.h"                    // JSAtom
-#include "vm/JSFunction.h"                // JSFunction
-#include "vm/SharedStencil.h"             // GCThingIndex
 
 namespace js {
+
+class GCThingIndex;
+
 namespace frontend {
 
 struct BytecodeEmitter;
+class FunctionBox;
 
 // Class for emitting function declaration, expression, or method etc.
 //
@@ -141,7 +139,6 @@ class MOZ_STACK_CLASS FunctionEmitter {
   [[nodiscard]] bool emitNonHoisted(GCThingIndex index);
   [[nodiscard]] bool emitHoisted(GCThingIndex index);
   [[nodiscard]] bool emitTopLevelFunction(GCThingIndex index);
-  [[nodiscard]] bool emitNewTargetForArrow();
 };
 
 // Class for emitting function script.
@@ -255,6 +252,7 @@ class MOZ_STACK_CLASS FunctionScriptEmitter {
 
  private:
   [[nodiscard]] bool emitExtraBodyVarScope();
+  [[nodiscard]] bool emitInitializeClosedOverArgumentBindings();
 };
 
 // Class for emitting function parameters.

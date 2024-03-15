@@ -8,6 +8,7 @@
 
 #include "mozilla/Maybe.h"
 
+#include <stdio.h>
 #include <utility>
 
 #include "util/Text.h"
@@ -33,6 +34,16 @@ JS_PUBLIC_API BackEdge::Ptr BackEdge::clone() const {
 
 #ifdef DEBUG
 
+static int32_t js_fputs(const char16_t* s, FILE* f) {
+  while (*s != 0) {
+    if (fputwc(wchar_t(*s), f) == static_cast<wint_t>(WEOF)) {
+      return WEOF;
+    }
+    s++;
+  }
+  return 1;
+}
+
 static void dumpNode(const JS::ubi::Node& node) {
   fprintf(stderr, "    %p ", (void*)node.identifier());
   js_fputs(node.typeName(), stderr);
@@ -46,16 +57,15 @@ static void dumpNode(const JS::ubi::Node& node) {
 
 JS_PUBLIC_API void dumpPaths(JSContext* cx, Node node,
                              uint32_t maxNumPaths /* = 10 */) {
-  mozilla::Maybe<AutoCheckCannotGC> nogc;
-
-  JS::ubi::RootList rootList(cx, nogc, true);
-  MOZ_ASSERT(rootList.init());
-
-  NodeSet targets;
-  bool ok = targets.putNew(node);
+  JS::ubi::RootList rootList(cx, true);
+  auto [ok, nogc] = rootList.init();
   MOZ_ASSERT(ok);
 
-  auto paths = ShortestPaths::Create(cx, nogc.ref(), maxNumPaths, &rootList,
+  NodeSet targets;
+  ok = targets.putNew(node);
+  MOZ_ASSERT(ok);
+
+  auto paths = ShortestPaths::Create(cx, nogc, maxNumPaths, &rootList,
                                      std::move(targets));
   MOZ_ASSERT(paths.isSome());
 

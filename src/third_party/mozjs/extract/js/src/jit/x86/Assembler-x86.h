@@ -43,6 +43,10 @@ static constexpr FloatRegister xmm6 =
 static constexpr FloatRegister xmm7 =
     FloatRegister(X86Encoding::xmm7, FloatRegisters::Double);
 
+// Vector registers fixed for use with some instructions, e.g. PBLENDVB.
+static constexpr FloatRegister vmm0 =
+    FloatRegister(X86Encoding::xmm0, FloatRegisters::Simd128);
+
 static constexpr Register InvalidReg{X86Encoding::invalid_reg};
 static constexpr FloatRegister InvalidFloatReg = FloatRegister();
 
@@ -51,7 +55,6 @@ static constexpr Register JSReturnReg_Data = edx;
 static constexpr Register StackPointer = esp;
 static constexpr Register FramePointer = ebp;
 static constexpr Register ReturnReg = eax;
-static constexpr Register64 ReturnReg64(edi, eax);
 static constexpr FloatRegister ReturnFloat32Reg =
     FloatRegister(X86Encoding::xmm0, FloatRegisters::Single);
 static constexpr FloatRegister ReturnDoubleReg =
@@ -64,6 +67,17 @@ static constexpr FloatRegister ScratchDoubleReg_ =
     FloatRegister(X86Encoding::xmm7, FloatRegisters::Double);
 static constexpr FloatRegister ScratchSimd128Reg =
     FloatRegister(X86Encoding::xmm7, FloatRegisters::Simd128);
+
+// Note, EDX:EAX is the system ABI 64-bit return register, and it is to our
+// advantage to keep the SpiderMonkey ABI in sync with the system ABI.
+//
+// However, using EDX here means that we have to use a register that does not
+// have a word or byte part (eg DX/DH/DL) in some other places; notably,
+// ABINonArgReturnReg1 is EDI.  If this becomes a problem and ReturnReg64 has to
+// be something other than EDX:EAX, then jitted code that calls directly to C++
+// will need to shuffle the return value from EDX:EAX into ReturnReg64 directly
+// after the call.  See bug 1730161 for discussion and a patch that does that.
+static constexpr Register64 ReturnReg64(edx, eax);
 
 // Avoid ebp, which is the FramePointer, which is unavailable in some modes.
 static constexpr Register CallTempReg0 = edi;
@@ -103,7 +117,7 @@ static constexpr FloatRegister ABINonArgDoubleReg =
 // These registers may be volatile or nonvolatile.
 // Note: these three registers are all guaranteed to be different
 static constexpr Register ABINonArgReturnReg0 = ecx;
-static constexpr Register ABINonArgReturnReg1 = edx;
+static constexpr Register ABINonArgReturnReg1 = edi;
 static constexpr Register ABINonVolatileReg = ebx;
 
 // This register is guaranteed to be clobberable during the prologue and
@@ -111,26 +125,27 @@ static constexpr Register ABINonVolatileReg = ebx;
 // and non-volatile registers.
 static constexpr Register ABINonArgReturnVolatileReg = ecx;
 
-// TLS pointer argument register for WebAssembly functions. This must not alias
-// any other register used for passing function arguments or return values.
-// Preserved by WebAssembly functions.
-static constexpr Register WasmTlsReg = esi;
+// Instance pointer argument register for WebAssembly functions. This must not
+// alias any other register used for passing function arguments or return
+// values. Preserved by WebAssembly functions.
+static constexpr Register InstanceReg = esi;
 
 // Registers used for asm.js/wasm table calls. These registers must be disjoint
-// from the ABI argument registers, WasmTlsReg and each other.
+// from the ABI argument registers, InstanceReg and each other.
 static constexpr Register WasmTableCallScratchReg0 = ABINonArgReg0;
 static constexpr Register WasmTableCallScratchReg1 = ABINonArgReg1;
 static constexpr Register WasmTableCallSigReg = ABINonArgReg2;
 static constexpr Register WasmTableCallIndexReg = ABINonArgReg3;
 
-// Register used as a scratch along the return path in the fast js -> wasm stub
-// code.  This must not overlap ReturnReg, JSReturnOperand, or WasmTlsReg. It
-// must be a volatile register.
-static constexpr Register WasmJitEntryReturnScratch = ebx;
+// Registers used for ref calls.
+static constexpr Register WasmCallRefCallScratchReg0 = ABINonArgReg0;
+static constexpr Register WasmCallRefCallScratchReg1 = ABINonArgReg1;
+static constexpr Register WasmCallRefReg = ABINonArgReg3;
 
-// Register used to store a reference to an exception thrown by Wasm to an
-// exception handling block. Should not overlap with WasmTlsReg.
-static constexpr Register WasmExceptionReg = ABINonArgReg0;
+// Register used as a scratch along the return path in the fast js -> wasm stub
+// code.  This must not overlap ReturnReg, JSReturnOperand, or InstanceReg.
+// It must be a volatile register.
+static constexpr Register WasmJitEntryReturnScratch = ebx;
 
 static constexpr Register OsrFrameReg = edx;
 static constexpr Register PreBarrierReg = edx;
@@ -138,15 +153,20 @@ static constexpr Register PreBarrierReg = edx;
 // Not enough registers for a PC register (R0-R2 use 2 registers each).
 static constexpr Register InterpreterPCReg = InvalidReg;
 
-// Registerd used in RegExpMatcher instruction (do not use JSReturnOperand).
+// Registers used by RegExpMatcher and RegExpExecMatch stubs (do not use
+// JSReturnOperand).
 static constexpr Register RegExpMatcherRegExpReg = CallTempReg0;
 static constexpr Register RegExpMatcherStringReg = CallTempReg1;
 static constexpr Register RegExpMatcherLastIndexReg = CallTempReg2;
 
-// Registerd used in RegExpTester instruction (do not use ReturnReg).
-static constexpr Register RegExpTesterRegExpReg = CallTempReg0;
-static constexpr Register RegExpTesterStringReg = CallTempReg2;
-static constexpr Register RegExpTesterLastIndexReg = CallTempReg3;
+// Registers used by RegExpExecTest stub (do not use ReturnReg).
+static constexpr Register RegExpExecTestRegExpReg = CallTempReg0;
+static constexpr Register RegExpExecTestStringReg = CallTempReg2;
+
+// Registers used by RegExpSearcher stub (do not use ReturnReg).
+static constexpr Register RegExpSearcherRegExpReg = CallTempReg0;
+static constexpr Register RegExpSearcherStringReg = CallTempReg2;
+static constexpr Register RegExpSearcherLastIndexReg = CallTempReg3;
 
 // GCC stack is aligned on 16 bytes. Ion does not maintain this for internal
 // calls. wasm code does.
@@ -187,7 +207,6 @@ static constexpr uint32_t WasmTrapInstructionLength = 2;
 // the tail offset 3, but I have opted for 4 as that results in a better-aligned
 // branch target.)
 static constexpr uint32_t WasmCheckedCallEntryOffset = 0u;
-static constexpr uint32_t WasmCheckedTailEntryOffset = 4u;
 
 struct ImmTag : public Imm32 {
   explicit ImmTag(JSValueTag mask) : Imm32(int32_t(mask)) {}
@@ -463,11 +482,11 @@ class Assembler : public AssemblerX86Shared {
     masm.shrdl_irr(imm.value, src.encoding(), dest.encoding());
   }
 
-  void vhaddpd(FloatRegister src, FloatRegister dest) {
+  void vhaddpd(FloatRegister rhs, FloatRegister lhsDest) {
     MOZ_ASSERT(HasSSE3());
-    MOZ_ASSERT(src.size() == 16);
-    MOZ_ASSERT(dest.size() == 16);
-    masm.vhaddpd_rr(src.encoding(), dest.encoding());
+    MOZ_ASSERT(rhs.size() == 16);
+    MOZ_ASSERT(lhsDest.size() == 16);
+    masm.vhaddpd_rr(rhs.encoding(), lhsDest.encoding(), lhsDest.encoding());
   }
 
   void fild(const Operand& src) {

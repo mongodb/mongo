@@ -11,8 +11,6 @@
 
 namespace js {
 
-class GlobalObject;
-
 class WeakSetObject : public WeakCollectionObject {
  public:
   static const JSClass class_;

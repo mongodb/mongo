@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/OffThreadPromiseRuntimeState.cpp"
+#include "vm/SymbolType.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/OffThreadPromiseRuntimeState.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SymbolType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/OffThreadPromiseRuntimeState.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SymbolType.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/OffThreadScriptCompilation.cpp"
+#include "vm/TaggedProto.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/OffThreadScriptCompilation.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/TaggedProto.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/OffThreadScriptCompilation.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/TaggedProto.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/PIC.cpp"
+#include "vm/ThrowMsgKind.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/PIC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ThrowMsgKind.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/PIC.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ThrowMsgKind.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/PlainObject.cpp"
+#include "vm/Time.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/PlainObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Time.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/PlainObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Time.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Printer.cpp"
+#include "vm/ToSource.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Printer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ToSource.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Printer.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ToSource.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/Probes.cpp"
+#include "vm/TypedArrayObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/Probes.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/TypedArrayObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/Probes.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/TypedArrayObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

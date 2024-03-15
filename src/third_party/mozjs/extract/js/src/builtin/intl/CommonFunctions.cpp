@@ -9,24 +9,23 @@
 #include "builtin/intl/CommonFunctions.h"
 
 #include "mozilla/Assertions.h"
-#include "mozilla/Casting.h"
-#include "mozilla/intl/ICU4CGlue.h"
+#include "mozilla/intl/ICUError.h"
 #include "mozilla/TextUtils.h"
 
 #include <algorithm>
 
 #include "gc/GCEnum.h"
-#include "gc/Zone.h"
 #include "gc/ZoneAllocator.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_INTERNAL_INTL_ERROR
 #include "js/Value.h"
-#include "unicode/uformattedvalue.h"
+#include "vm/JSAtomState.h"
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/SelfHosting.h"
 #include "vm/Stack.h"
+#include "vm/StringType.h"
 
-#include "vm/JSObject-inl.h"
+#include "gc/GCContext-inl.h"
 
 bool js::intl::InitializeObject(JSContext* cx, JS::Handle<JSObject*> obj,
                                 JS::Handle<PropertyName*> initializer,
@@ -97,10 +96,13 @@ void js::intl::ReportInternalError(JSContext* cx,
                                    mozilla::intl::ICUError error) {
   switch (error) {
     case mozilla::intl::ICUError::OutOfMemory:
-      MOZ_ASSERT(cx->isThrowingOutOfMemory());
+      ReportOutOfMemory(cx);
       return;
     case mozilla::intl::ICUError::InternalError:
       ReportInternalError(cx);
+      return;
+    case mozilla::intl::ICUError::OverflowError:
+      ReportAllocationOverflow(cx);
       return;
   }
   MOZ_CRASH("Unexpected ICU error");
@@ -141,21 +143,7 @@ void js::intl::AddICUCellMemory(JSObject* obj, size_t nbytes) {
   AddCellMemory(obj, nbytes, MemoryUse::ICUObject);
 }
 
-void js::intl::RemoveICUCellMemory(JSFreeOp* fop, JSObject* obj,
+void js::intl::RemoveICUCellMemory(JS::GCContext* gcx, JSObject* obj,
                                    size_t nbytes) {
-  fop->removeCellMemory(obj, nbytes, MemoryUse::ICUObject);
-}
-
-JSString* js::intl::FormattedValueToString(
-    JSContext* cx, const UFormattedValue* formattedValue) {
-  UErrorCode status = U_ZERO_ERROR;
-  int32_t strLength;
-  const char16_t* str = ufmtval_getString(formattedValue, &strLength, &status);
-  if (U_FAILURE(status)) {
-    ReportInternalError(cx);
-    return nullptr;
-  }
-
-  return NewStringCopyN<CanGC>(cx, str,
-                               mozilla::AssertedCast<uint32_t>(strLength));
+  gcx->removeCellMemory(obj, nbytes, MemoryUse::ICUObject);
 }

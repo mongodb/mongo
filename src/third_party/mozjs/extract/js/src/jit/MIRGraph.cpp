@@ -8,11 +8,10 @@
 
 #include "jit/CompileInfo.h"
 #include "jit/InlineScriptTree.h"
-#include "jit/Ion.h"
+#include "jit/IonOptimizationLevels.h"
 #include "jit/JitSpewer.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
-#include "wasm/WasmTypes.h"
 
 using namespace js;
 using namespace js::jit;
@@ -42,6 +41,11 @@ MIRGenerator::MIRGenerator(CompileRealm* realm,
       minWasmHeapLength_(0),
       options(options),
       gs_(alloc) {}
+
+bool MIRGenerator::licmEnabled() const {
+  return optimizationInfo().licmEnabled() && !disableLICM_ &&
+         !outerInfo().hadLICMInvalidation();
+}
 
 mozilla::GenericErrorResult<AbortReason> MIRGenerator::abort(AbortReason r) {
   if (JitSpewEnabled(JitSpew_IonAbort)) {
@@ -192,6 +196,9 @@ MBasicBlock* MBasicBlock::NewSplitEdge(MIRGraph& graph, MBasicBlock* pred,
     if (!split) {
       return nullptr;
     }
+
+    // Insert the split edge block in-between.
+    split->end(MGoto::New(graph.alloc(), succ));
   } else {
     // The predecessor has a PC, this is a Warp compilation.
     MResumePoint* succEntry = succ->entryResumePoint();
@@ -221,11 +228,14 @@ MBasicBlock* MBasicBlock::NewSplitEdge(MIRGraph& graph, MBasicBlock* pred,
 
     // Create a resume point using our initial stack position.
     MResumePoint* splitEntry = new (graph.alloc())
-        MResumePoint(split, succEntry->pc(), MResumePoint::ResumeAt);
+        MResumePoint(split, succEntry->pc(), ResumeMode::ResumeAt);
     if (!splitEntry->init(graph.alloc())) {
       return nullptr;
     }
     split->entryResumePoint_ = splitEntry;
+
+    // Insert the split edge block in-between.
+    split->end(MGoto::New(graph.alloc(), succ));
 
     // The target entry resume point might have phi operands, keep the
     // operands of the phi coming from our edge.
@@ -235,9 +245,16 @@ MBasicBlock* MBasicBlock::NewSplitEdge(MIRGraph& graph, MBasicBlock* pred,
       MDefinition* def = succEntry->getOperand(i);
       // This early in the pipeline, we have no recover instructions in
       // any entry resume point.
-      MOZ_ASSERT_IF(def->block() == succ, def->isPhi());
       if (def->block() == succ) {
-        def = def->toPhi()->getOperand(succEdgeIdx);
+        if (def->isPhi()) {
+          def = def->toPhi()->getOperand(succEdgeIdx);
+        } else {
+          // The phi-operand may already have been optimized out.
+          MOZ_ASSERT(def->isConstant());
+          MOZ_ASSERT(def->type() == MIRType::MagicOptimizedOut);
+
+          def = split->optimizedOutConstant(graph.alloc());
+        }
       }
 
       splitEntry->initOperand(i, def);
@@ -252,14 +269,162 @@ MBasicBlock* MBasicBlock::NewSplitEdge(MIRGraph& graph, MBasicBlock* pred,
 
   split->setLoopDepth(succ->loopDepth());
 
-  // Insert the split edge block in-between.
-  split->end(MGoto::New(graph.alloc(), succ));
-
   graph.insertBlockAfter(pred, split);
 
   pred->replaceSuccessor(predEdgeIdx, split);
   succ->replacePredecessor(pred, split);
   return split;
+}
+
+void MBasicBlock::moveToNewBlock(MInstruction* ins, MBasicBlock* dst) {
+  MOZ_ASSERT(ins->block() == this);
+  MOZ_ASSERT(!dst->hasLastIns());
+  instructions_.remove(ins);
+  ins->setInstructionBlock(dst, dst->trackedSite());
+  if (MResumePoint* rp = ins->resumePoint()) {
+    removeResumePoint(rp);
+    dst->addResumePoint(rp);
+    rp->setBlock(dst);
+  }
+  dst->instructions_.pushBack(ins);
+}
+
+void MBasicBlock::moveOuterResumePointTo(MBasicBlock* dest) {
+  if (MResumePoint* outer = outerResumePoint()) {
+    removeResumePoint(outer);
+    outerResumePoint_ = nullptr;
+    dest->setOuterResumePoint(outer);
+    dest->addResumePoint(outer);
+    outer->setBlock(dest);
+  }
+}
+
+bool MBasicBlock::wrapInstructionInFastpath(MInstruction* ins,
+                                            MInstruction* fastpath,
+                                            MInstruction* condition) {
+  MOZ_ASSERT(ins->block() == this);
+  MOZ_ASSERT(!ins->isControlInstruction());
+
+  MInstructionIterator rest(begin(ins));
+  rest++;
+
+  MResumePoint* resumeBeforeIns = activeResumePoint(ins);
+  MResumePoint* resumeAfterIns = activeResumePoint(*rest);
+
+  // Create the join block.
+  MBasicBlock* join = MBasicBlock::NewInternal(graph_, this, resumeAfterIns);
+  if (!join) {
+    return false;
+  }
+
+  // Update the successors of the current block.
+  for (uint32_t i = 0; i < numSuccessors(); i++) {
+    getSuccessor(i)->replacePredecessor(this, join);
+  }
+  if (successorWithPhis()) {
+    join->setSuccessorWithPhis(successorWithPhis(), positionInPhiSuccessor());
+    clearSuccessorWithPhis();
+  }
+
+  // Copy all instructions after |ins| into the join block.
+  while (rest != end()) {
+    MInstruction* ins = *rest++;
+    moveToNewBlock(ins, join);
+  }
+  MOZ_ASSERT(!hasLastIns());
+  MOZ_ASSERT(join->hasLastIns());
+
+  graph_.insertBlockAfter(this, join);
+
+  // Create the fast path block.
+  MBasicBlock* fastpathBlock =
+      MBasicBlock::NewInternal(graph_, this, resumeBeforeIns);
+  if (!fastpathBlock) {
+    return false;
+  }
+  graph_.insertBlockAfter(this, fastpathBlock);
+  fastpathBlock->add(fastpath);
+  fastpathBlock->end(MGoto::New(graph_.alloc(), join));
+
+  // Create the slowpath block.
+  MBasicBlock* slowpathBlock =
+      MBasicBlock::NewInternal(graph_, this, resumeBeforeIns);
+  if (!slowpathBlock) {
+    return false;
+  }
+  graph_.insertBlockAfter(fastpathBlock, slowpathBlock);
+  moveToNewBlock(ins, slowpathBlock);
+  slowpathBlock->end(MGoto::New(graph_.alloc(), join));
+
+  // Connect current block to fastpath and slowpath.
+  add(condition);
+  end(MTest::New(graph_.alloc(), condition, fastpathBlock, slowpathBlock));
+
+  // Update predecessors.
+  if (!fastpathBlock->addPredecessorWithoutPhis(this) ||
+      !slowpathBlock->addPredecessorWithoutPhis(this) ||
+      !join->addPredecessorWithoutPhis(fastpathBlock) ||
+      !join->addPredecessorWithoutPhis(slowpathBlock)) {
+    return false;
+  }
+
+  if (ins->hasUses()) {
+    // Insert phi.
+    MPhi* phi = MPhi::New(graph_.alloc());
+    if (!phi->reserveLength(2)) {
+      return false;
+    }
+    phi->addInput(fastpath);
+    fastpathBlock->setSuccessorWithPhis(join, 0);
+    phi->addInput(ins);
+    slowpathBlock->setSuccessorWithPhis(join, 1);
+    join->addPhi(phi);
+
+    for (MUseIterator i(ins->usesBegin()), e(ins->usesEnd()); i != e;) {
+      MUse* use = *i++;
+      if (use->consumer() != phi && use->consumer() != ins->resumePoint()) {
+        use->replaceProducer(phi);
+      }
+    }
+  }
+
+  moveOuterResumePointTo(join);
+
+  return true;
+}
+
+MBasicBlock* MBasicBlock::NewInternal(MIRGraph& graph, MBasicBlock* orig,
+                                      MResumePoint* resumePoint) {
+  jsbytecode* pc = IsResumeAfter(resumePoint->mode())
+                       ? GetNextPc(resumePoint->pc())
+                       : resumePoint->pc();
+
+  BytecodeSite* site =
+      new (graph.alloc()) BytecodeSite(orig->trackedTree(), pc);
+  MBasicBlock* block =
+      new (graph.alloc()) MBasicBlock(graph, orig->info(), site, INTERNAL);
+  if (!block->init()) {
+    return nullptr;
+  }
+
+  // Propagate the caller resume point from the original block.
+  block->callerResumePoint_ = orig->callerResumePoint();
+
+  // Copy the resume point.
+  block->stackPosition_ = resumePoint->stackDepth();
+  MResumePoint* entryResumePoint =
+      new (graph.alloc()) MResumePoint(block, pc, ResumeMode::ResumeAt);
+  if (!entryResumePoint->init(graph.alloc())) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < resumePoint->stackDepth(); i++) {
+    entryResumePoint->initOperand(i, resumePoint->getOperand(i));
+  }
+  block->entryResumePoint_ = entryResumePoint;
+
+  block->setLoopDepth(orig->loopDepth());
+
+  return block;
 }
 
 MBasicBlock* MBasicBlock::New(MIRGraph& graph, const CompileInfo& info,
@@ -346,6 +511,9 @@ MBasicBlock* MBasicBlock::NewFakeLoopPredecessor(MIRGraph& graph,
   // Create fake defs to use as inputs for any phis in |header|.
   for (MPhiIterator iter(header->phisBegin()), end(header->phisEnd());
        iter != end; ++iter) {
+    if (!graph.alloc().ensureBallast()) {
+      return nullptr;
+    }
     MPhi* phi = *iter;
     auto* fakeDef = MUnreachableResult::New(graph.alloc(), phi->type());
     fake->add(fakeDef);
@@ -407,13 +575,9 @@ MBasicBlock::MBasicBlock(MIRGraph& graph, const CompileInfo& info,
       mark_(false),
       immediatelyDominated_(graph.alloc()),
       immediateDominator_(nullptr),
-      trackedSite_(site)
-#if defined(JS_ION_PERF) || defined(DEBUG)
-      ,
+      trackedSite_(site),
       lineno_(0u),
-      columnIndex_(0u)
-#endif
-{
+      columnIndex_(0u) {
   MOZ_ASSERT(trackedSite_, "trackedSite_ is non-nullptr");
 }
 
@@ -464,7 +628,7 @@ bool MBasicBlock::inherit(TempAllocator& alloc, size_t stackDepth,
 
   // Create a resume point using our initial stack state.
   entryResumePoint_ =
-      new (alloc) MResumePoint(this, pc(), MResumePoint::ResumeAt);
+      new (alloc) MResumePoint(this, pc(), ResumeMode::ResumeAt);
   if (!entryResumePoint_->init(alloc)) {
     return false;
   }
@@ -514,7 +678,7 @@ bool MBasicBlock::initEntrySlots(TempAllocator& alloc) {
 
   // Create a resume point using our initial stack state.
   entryResumePoint_ =
-      MResumePoint::New(alloc, this, pc(), MResumePoint::ResumeAt);
+      MResumePoint::New(alloc, this, pc(), ResumeMode::ResumeAt);
   if (!entryResumePoint_) {
     return false;
   }
@@ -618,6 +782,11 @@ void MBasicBlock::discardResumePoint(
   if (refType & RefType_DiscardOperands) {
     rp->releaseUses();
   }
+  rp->setDiscarded();
+  removeResumePoint(rp);
+}
+
+void MBasicBlock::removeResumePoint(MResumePoint* rp) {
 #ifdef DEBUG
   MResumePointIterator iter = resumePointsBegin();
   while (*iter != rp) {
@@ -670,14 +839,6 @@ void MBasicBlock::discardIgnoreOperands(MInstruction* ins) {
 
   prepareForDiscard(ins, RefType_IgnoreOperands);
   instructions_.remove(ins);
-}
-
-void MBasicBlock::discardDef(MDefinition* at) {
-  if (at->isPhi()) {
-    at->block()->discardPhi(at->toPhi());
-  } else {
-    at->block()->discard(at->toInstruction());
-  }
 }
 
 void MBasicBlock::discardAllInstructions() {
@@ -779,20 +940,19 @@ void MBasicBlock::discardPhi(MPhi* phi) {
   }
 }
 
-void MBasicBlock::flagOperandsOfPrunedBranches(MInstruction* ins) {
-  // Find the previous resume point which would be used for bailing out.
-  MResumePoint* rp = nullptr;
+MResumePoint* MBasicBlock::activeResumePoint(MInstruction* ins) {
   for (MInstructionReverseIterator iter = rbegin(ins); iter != rend(); iter++) {
-    rp = iter->resumePoint();
-    if (rp) {
-      break;
+    if (iter->resumePoint() && *iter != ins) {
+      return iter->resumePoint();
     }
   }
 
   // If none, take the entry resume point.
-  if (!rp) {
-    rp = entryResumePoint();
-  }
+  return entryResumePoint();
+}
+
+void MBasicBlock::flagOperandsOfPrunedBranches(MInstruction* ins) {
+  MResumePoint* rp = activeResumePoint(ins);
 
   // The only blocks which do not have any entryResumePoint in Ion, are the
   // SplitEdge blocks.  SplitEdge blocks only have a Goto instruction before

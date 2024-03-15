@@ -9,7 +9,6 @@
 
 #include <type_traits>
 
-#include "gc/Zone.h"
 #include "vm/JSContext.h"
 
 namespace js {
@@ -27,7 +26,7 @@ struct DependentAddPtr {
   template <class Lookup>
   DependentAddPtr(const JSContext* cx, T& table, const Lookup& lookup)
       : addPtr(table.lookupForAdd(lookup)),
-        originalGcNumber(cx->zone()->gcNumber()) {}
+        originalGcNumber(cx->runtime()->gc.gcNumber()) {}
 
   DependentAddPtr(DependentAddPtr&& other)
       : addPtr(other.addPtr), originalGcNumber(other.originalGcNumber) {}
@@ -62,7 +61,7 @@ struct DependentAddPtr {
 
   template <class KeyInput>
   void refreshAddPtr(JSContext* cx, T& table, const KeyInput& key) {
-    bool gcHappened = originalGcNumber != cx->zone()->gcNumber();
+    bool gcHappened = originalGcNumber != cx->runtime()->gc.gcNumber();
     if (gcHappened) {
       addPtr = table.lookupForAdd(key);
     }

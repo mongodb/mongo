@@ -14,7 +14,6 @@
 #ifdef SOLARIS
 #  define _REENTRANT 1
 #endif
-#include <algorithm>
 #include <string.h>
 #include <time.h>
 
@@ -40,21 +39,8 @@ extern int gettimeofday(struct timeval* tv);
 
 using mozilla::DebugOnly;
 
-// Forward declare the function
-static int64_t PRMJ_NowImpl();
-
-int64_t PRMJ_Now() {
-  if (mozilla::TimeStamp::GetFuzzyfoxEnabled()) {
-    return mozilla::TimeStamp::NowFuzzyTime();
-  }
-
-  // We check the FuzzyFox clock in case it was recently disabled, to prevent
-  // time from going backwards.
-  return std::max(PRMJ_NowImpl(), mozilla::TimeStamp::NowFuzzyTime());
-}
-
 #if defined(XP_UNIX)
-static int64_t PRMJ_NowImpl() {
+int64_t PRMJ_Now() {
   struct timeval tv;
 
 #  ifdef _SVID_GETTOD /* Defined only on Solaris, see Solaris <sys/types.h> */
@@ -149,7 +135,7 @@ void PRMJ_NowShutdown() { DeleteCriticalSection(&calibration.data_lock); }
 #  define MUTEX_SETSPINCOUNT(m, c) SetCriticalSectionSpinCount((m), (c))
 
 // Please see bug 363258 for why the win32 timing code is so complex.
-static int64_t PRMJ_NowImpl() {
+int64_t PRMJ_Now() {
   if (pGetSystemTimePreciseAsFileTime) {
     // Windows 8 has a new API function that does all the work.
     FILETIME ft;
@@ -246,7 +232,7 @@ static int64_t PRMJ_NowImpl() {
 }
 #endif
 
-#if !JS_HAS_INTL_API || MOZ_SYSTEM_ICU
+#if !JS_HAS_INTL_API
 #  ifdef XP_WIN
 static void PRMJ_InvalidParameterHandler(const wchar_t* expression,
                                          const wchar_t* function,
@@ -394,4 +380,4 @@ size_t PRMJ_FormatTime(char* buf, size_t buflen, const char* fmt,
 #  endif
   return result;
 }
-#endif /* !JS_HAS_INTL_API || MOZ_SYSTEM_ICU */
+#endif /* !JS_HAS_INTL_API */

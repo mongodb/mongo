@@ -72,7 +72,8 @@ public:
 };
 
 NativeHolder* getHolder(JS::CallArgs args) {
-    return static_cast<NativeHolder*>(JS::GetPrivate(&args.callee()));
+    return JS::GetMaybePtrFromReservedSlot<NativeHolder>(&args.callee(),
+                                                         NativeFunctionInfo::NativeHolderSlot);
 }
 
 }  // namespace
@@ -96,11 +97,11 @@ void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSONElement(out.firstElement(), out, false);
 }
 
-void NativeFunctionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto holder = static_cast<NativeHolder*>(JS::GetPrivate(obj));
+void NativeFunctionInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto holder = JS::GetMaybePtrFromReservedSlot<NativeHolder>(obj, NativeHolderSlot);
 
     if (holder)
-        getScope(fop)->trackedDelete(holder);
+        getScope(gcCtx)->trackedDelete(holder);
 }
 
 void NativeFunctionInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
@@ -120,8 +121,8 @@ void NativeFunctionInfo::make(JSContext* cx,
     auto scope = getScope(cx);
 
     scope->getProto<NativeFunctionInfo>().newObject(obj);
-
-    JS::SetPrivate(obj, scope->trackedNew<NativeHolder>(function, data));
+    JS::SetReservedSlot(
+        obj, NativeHolderSlot, JS::PrivateValue(scope->trackedNew<NativeHolder>(function, data)));
 }
 
 }  // namespace mozjs

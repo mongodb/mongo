@@ -12,13 +12,13 @@
 #include "jsexn.h"
 #include "jsfriendapi.h"
 
-#include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "js/Printf.h"                // JS_vsmprintf
-#include "js/Warnings.h"              // JS::WarningReporter
+#include "frontend/FrontendContext.h"  // AutoReportFrontendContext
+#include "js/friend/ErrorMessages.h"   // js::GetErrorMessage, JSMSG_*
+#include "js/Printf.h"                 // JS_vsmprintf
+#include "js/Warnings.h"               // JS::WarningReporter
+#include "vm/FrameIter.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSContext.h"
-
-#include "vm/JSContext-inl.h"
 
 using namespace js;
 
@@ -34,109 +34,93 @@ void js::CallWarningReporter(JSContext* cx, JSErrorReport* reportp) {
   }
 }
 
-void js::CompileError::throwError(JSContext* cx) {
+bool js::CompileError::throwError(JSContext* cx) {
   if (isWarning()) {
     CallWarningReporter(cx, this);
-    return;
+    return true;
   }
 
   // If there's a runtime exception type associated with this error
-  // number, set that as the pending exception.  For errors occuring at
+  // number, set that as the pending exception.  For errors occurring at
   // compile time, this is very likely to be a JSEXN_SYNTAXERR.
-  ErrorToException(cx, this, nullptr, nullptr);
+  return ErrorToException(cx, this, nullptr, nullptr);
 }
 
 bool js::ReportExceptionClosure::operator()(JSContext* cx) {
-  cx->setPendingExceptionAndCaptureStack(exn_);
+  cx->setPendingException(exn_, ShouldCaptureStack::Always);
   return false;
 }
 
-bool js::ReportCompileWarning(JSContext* cx, ErrorMetadata&& metadata,
+bool js::ReportCompileWarning(FrontendContext* fc, ErrorMetadata&& metadata,
                               UniquePtr<JSErrorNotes> notes,
                               unsigned errorNumber, va_list* args) {
   // On the main thread, report the error immediately. When compiling off
   // thread, save the error so that the thread finishing the parse can report
   // it later.
-  CompileError tempErr;
-  CompileError* err = &tempErr;
-  if (cx->isHelperThreadContext() && !cx->addPendingCompileError(&err)) {
-    return false;
-  }
+  CompileError err;
 
-  err->notes = std::move(notes);
-  err->isWarning_ = true;
-  err->errorNumber = errorNumber;
+  err.notes = std::move(notes);
+  err.isWarning_ = true;
+  err.errorNumber = errorNumber;
 
-  err->filename = metadata.filename;
-  err->lineno = metadata.lineNumber;
-  err->column = metadata.columnNumber;
-  err->isMuted = metadata.isMuted;
+  err.filename = metadata.filename;
+  err.lineno = metadata.lineNumber;
+  err.column = metadata.columnNumber;
+  err.isMuted = metadata.isMuted;
 
   if (UniqueTwoByteChars lineOfContext = std::move(metadata.lineOfContext)) {
-    err->initOwnedLinebuf(lineOfContext.release(), metadata.lineLength,
-                          metadata.tokenOffset);
+    err.initOwnedLinebuf(lineOfContext.release(), metadata.lineLength,
+                         metadata.tokenOffset);
   }
 
-  if (!ExpandErrorArgumentsVA(cx, GetErrorMessage, nullptr, errorNumber,
-                              ArgumentsAreLatin1, err, *args)) {
+  if (!ExpandErrorArgumentsVA(fc, GetErrorMessage, nullptr, errorNumber,
+                              ArgumentsAreLatin1, &err, *args)) {
     return false;
   }
 
-  if (!cx->isHelperThreadContext()) {
-    err->throwError(cx);
-  }
-
-  return true;
+  return fc->reportWarning(std::move(err));
 }
 
-static void ReportCompileErrorImpl(JSContext* cx, js::ErrorMetadata&& metadata,
+static void ReportCompileErrorImpl(FrontendContext* fc,
+                                   js::ErrorMetadata&& metadata,
                                    js::UniquePtr<JSErrorNotes> notes,
                                    unsigned errorNumber, va_list* args,
                                    ErrorArgumentsType argumentsType) {
-  // On the main thread, report the error immediately. When compiling off
-  // thread, save the error so that the thread finishing the parse can report
-  // it later.
-  js::CompileError tempErr;
-  js::CompileError* err = &tempErr;
-  if (cx->isHelperThreadContext() && !cx->addPendingCompileError(&err)) {
-    return;
-  }
+  js::CompileError err;
 
-  err->notes = std::move(notes);
-  err->isWarning_ = false;
-  err->errorNumber = errorNumber;
+  err.notes = std::move(notes);
+  err.isWarning_ = false;
+  err.errorNumber = errorNumber;
 
-  err->filename = metadata.filename;
-  err->lineno = metadata.lineNumber;
-  err->column = metadata.columnNumber;
-  err->isMuted = metadata.isMuted;
+  err.filename = metadata.filename;
+  err.lineno = metadata.lineNumber;
+  err.column = metadata.columnNumber;
+  err.isMuted = metadata.isMuted;
 
   if (UniqueTwoByteChars lineOfContext = std::move(metadata.lineOfContext)) {
-    err->initOwnedLinebuf(lineOfContext.release(), metadata.lineLength,
-                          metadata.tokenOffset);
+    err.initOwnedLinebuf(lineOfContext.release(), metadata.lineLength,
+                         metadata.tokenOffset);
   }
 
-  if (!js::ExpandErrorArgumentsVA(cx, js::GetErrorMessage, nullptr, errorNumber,
-                                  argumentsType, err, *args)) {
+  if (!js::ExpandErrorArgumentsVA(fc, js::GetErrorMessage, nullptr, errorNumber,
+                                  argumentsType, &err, *args)) {
     return;
   }
 
-  if (!cx->isHelperThreadContext()) {
-    err->throwError(cx);
-  }
+  fc->reportError(std::move(err));
 }
 
-void js::ReportCompileErrorLatin1(JSContext* cx, ErrorMetadata&& metadata,
+void js::ReportCompileErrorLatin1(FrontendContext* fc, ErrorMetadata&& metadata,
                                   UniquePtr<JSErrorNotes> notes,
                                   unsigned errorNumber, va_list* args) {
-  ReportCompileErrorImpl(cx, std::move(metadata), std::move(notes), errorNumber,
+  ReportCompileErrorImpl(fc, std::move(metadata), std::move(notes), errorNumber,
                          args, ArgumentsAreLatin1);
 }
 
-void js::ReportCompileErrorUTF8(JSContext* cx, ErrorMetadata&& metadata,
+void js::ReportCompileErrorUTF8(FrontendContext* fc, ErrorMetadata&& metadata,
                                 UniquePtr<JSErrorNotes> notes,
                                 unsigned errorNumber, va_list* args) {
-  ReportCompileErrorImpl(cx, std::move(metadata), std::move(notes), errorNumber,
+  ReportCompileErrorImpl(fc, std::move(metadata), std::move(notes), errorNumber,
                          args, ArgumentsAreUTF8);
 }
 
@@ -153,16 +137,16 @@ void js::ReportErrorToGlobal(JSContext* cx, Handle<GlobalObject*> global,
   PrepareScriptEnvironmentAndInvoke(cx, global, report);
 }
 
-static void ReportError(JSContext* cx, JSErrorReport* reportp,
+static bool ReportError(JSContext* cx, JSErrorReport* reportp,
                         JSErrorCallback callback, void* userRef) {
   if (reportp->isWarning()) {
     CallWarningReporter(cx, reportp);
-    return;
+    return true;
   }
 
   // Check the error report, and set a JavaScript-catchable exception
   // if the error is defined to have an associated exception.
-  ErrorToException(cx, reportp, callback, userRef);
+  return ErrorToException(cx, reportp, callback, userRef);
 }
 
 /*
@@ -242,7 +226,8 @@ class MOZ_RAII AutoMessageArgs {
    * if argsArg were strongly typed we'd still need casting below for this to
    * compile, because typeArg is not known at compile-time here.
    */
-  bool init(JSContext* cx, void* argsArg, uint16_t countArg,
+  template <typename Allocator>
+  bool init(Allocator* alloc, void* argsArg, uint16_t countArg,
             ErrorArgumentsType typeArg, va_list ap) {
     MOZ_ASSERT(countArg > 0);
 
@@ -265,7 +250,7 @@ class MOZ_RAII AutoMessageArgs {
           const Latin1Char* latin1 = va_arg(ap, Latin1Char*);
           size_t len = strlen(reinterpret_cast<const char*>(latin1));
           mozilla::Range<const Latin1Char> range(latin1, len);
-          char* utf8 = JS::CharsToNewUTF8CharsZ(cx, range).c_str();
+          char* utf8 = JS::CharsToNewUTF8CharsZ(alloc, range).c_str();
           if (!utf8) {
             return false;
           }
@@ -281,7 +266,7 @@ class MOZ_RAII AutoMessageArgs {
                                    : va_arg(ap, const char16_t*);
           size_t len = js_strlen(uc);
           mozilla::Range<const char16_t> range(uc, len);
-          char* utf8 = JS::CharsToNewUTF8CharsZ(cx, range).c_str();
+          char* utf8 = JS::CharsToNewUTF8CharsZ(alloc, range).c_str();
           if (!utf8) {
             return false;
           }
@@ -314,8 +299,8 @@ class MOZ_RAII AutoMessageArgs {
  * using void* here simplifies our callers a bit.
  */
 template <typename T>
-static bool ExpandErrorArgumentsHelper(JSContext* cx, JSErrorCallback callback,
-                                       void* userRef,
+static bool ExpandErrorArgumentsHelper(FrontendContext* fc,
+                                       JSErrorCallback callback, void* userRef,
                                        const unsigned errorNumber,
                                        void* messageArgs,
                                        ErrorArgumentsType argumentsType,
@@ -326,10 +311,7 @@ static bool ExpandErrorArgumentsHelper(JSContext* cx, JSErrorCallback callback,
     callback = GetErrorMessage;
   }
 
-  {
-    gc::AutoSuppressGC suppressGC(cx);
-    efs = callback(userRef, errorNumber);
-  }
+  efs = fc->gcSafeCallback(callback, userRef, errorNumber);
 
   if (efs) {
     if constexpr (std::is_same_v<T, JSErrorReport>) {
@@ -359,7 +341,8 @@ static bool ExpandErrorArgumentsHelper(JSContext* cx, JSErrorCallback callback,
         size_t len = strlen(efs->format);
 
         AutoMessageArgs args;
-        if (!args.init(cx, messageArgs, argCount, argumentsType, ap)) {
+        if (!args.init(fc->getAllocator(), messageArgs, argCount, argumentsType,
+                       ap)) {
           return false;
         }
 
@@ -370,7 +353,8 @@ static bool ExpandErrorArgumentsHelper(JSContext* cx, JSErrorCallback callback,
          * Note - the above calculation assumes that each argument
          * is used once and only once in the expansion !!!
          */
-        char* utf8 = out = cx->pod_malloc<char>(expandedLength + 1);
+        char* utf8 = out =
+            fc->getAllocator()->pod_malloc<char>(expandedLength + 1);
         if (!out) {
           return false;
         }
@@ -414,7 +398,7 @@ static bool ExpandErrorArgumentsHelper(JSContext* cx, JSErrorCallback callback,
     const char* defaultErrorMessage =
         "No error message available for error number %d";
     size_t nbytes = strlen(defaultErrorMessage) + 16;
-    char* message = cx->pod_malloc<char>(nbytes);
+    char* message = fc->getAllocator()->pod_malloc<char>(nbytes);
     if (!message) {
       return false;
     }
@@ -424,40 +408,40 @@ static bool ExpandErrorArgumentsHelper(JSContext* cx, JSErrorCallback callback,
   return true;
 }
 
-bool js::ExpandErrorArgumentsVA(JSContext* cx, JSErrorCallback callback,
+bool js::ExpandErrorArgumentsVA(FrontendContext* fc, JSErrorCallback callback,
                                 void* userRef, const unsigned errorNumber,
                                 const char16_t** messageArgs,
                                 ErrorArgumentsType argumentsType,
                                 JSErrorReport* reportp, va_list ap) {
   MOZ_ASSERT(argumentsType == ArgumentsAreUnicode);
-  return ExpandErrorArgumentsHelper(cx, callback, userRef, errorNumber,
+  return ExpandErrorArgumentsHelper(fc, callback, userRef, errorNumber,
                                     messageArgs, argumentsType, reportp, ap);
 }
 
-bool js::ExpandErrorArgumentsVA(JSContext* cx, JSErrorCallback callback,
+bool js::ExpandErrorArgumentsVA(FrontendContext* fc, JSErrorCallback callback,
                                 void* userRef, const unsigned errorNumber,
                                 const char** messageArgs,
                                 ErrorArgumentsType argumentsType,
                                 JSErrorReport* reportp, va_list ap) {
   MOZ_ASSERT(argumentsType != ArgumentsAreUnicode);
-  return ExpandErrorArgumentsHelper(cx, callback, userRef, errorNumber,
+  return ExpandErrorArgumentsHelper(fc, callback, userRef, errorNumber,
                                     messageArgs, argumentsType, reportp, ap);
 }
 
-bool js::ExpandErrorArgumentsVA(JSContext* cx, JSErrorCallback callback,
+bool js::ExpandErrorArgumentsVA(FrontendContext* fc, JSErrorCallback callback,
                                 void* userRef, const unsigned errorNumber,
                                 ErrorArgumentsType argumentsType,
                                 JSErrorReport* reportp, va_list ap) {
-  return ExpandErrorArgumentsHelper(cx, callback, userRef, errorNumber, nullptr,
+  return ExpandErrorArgumentsHelper(fc, callback, userRef, errorNumber, nullptr,
                                     argumentsType, reportp, ap);
 }
 
-bool js::ExpandErrorArgumentsVA(JSContext* cx, JSErrorCallback callback,
+bool js::ExpandErrorArgumentsVA(FrontendContext* fc, JSErrorCallback callback,
                                 void* userRef, const unsigned errorNumber,
                                 const char16_t** messageArgs,
                                 ErrorArgumentsType argumentsType,
                                 JSErrorNotes::Note* notep, va_list ap) {
-  return ExpandErrorArgumentsHelper(cx, callback, userRef, errorNumber,
+  return ExpandErrorArgumentsHelper(fc, callback, userRef, errorNumber,
                                     messageArgs, argumentsType, notep, ap);
 }
 
@@ -470,18 +454,21 @@ bool js::ReportErrorNumberVA(JSContext* cx, IsWarning isWarning,
   report.errorNumber = errorNumber;
   PopulateReportBlame(cx, &report);
 
-  if (!ExpandErrorArgumentsVA(cx, callback, userRef, errorNumber, argumentsType,
-                              &report, ap)) {
+  AutoReportFrontendContext fc(cx);
+  if (!ExpandErrorArgumentsVA(&fc, callback, userRef, errorNumber,
+                              argumentsType, &report, ap)) {
     return false;
   }
 
-  ReportError(cx, &report, callback, userRef);
+  if (!ReportError(cx, &report, callback, userRef)) {
+    return false;
+  }
 
   return report.isWarning();
 }
 
 template <typename CharT>
-static bool ExpandErrorArguments(JSContext* cx, JSErrorCallback callback,
+static bool ExpandErrorArguments(FrontendContext* fc, JSErrorCallback callback,
                                  void* userRef, const unsigned errorNumber,
                                  const CharT** messageArgs,
                                  js::ErrorArgumentsType argumentsType,
@@ -489,7 +476,7 @@ static bool ExpandErrorArguments(JSContext* cx, JSErrorCallback callback,
   va_list ap;
   va_start(ap, reportp);
   bool expanded =
-      js::ExpandErrorArgumentsVA(cx, callback, userRef, errorNumber,
+      js::ExpandErrorArgumentsVA(fc, callback, userRef, errorNumber,
                                  messageArgs, argumentsType, reportp, ap);
   va_end(ap);
   return expanded;
@@ -510,12 +497,15 @@ static bool ReportErrorNumberArray(JSContext* cx, IsWarning isWarning,
   report.errorNumber = errorNumber;
   PopulateReportBlame(cx, &report);
 
-  if (!ExpandErrorArguments(cx, callback, userRef, errorNumber, args, argType,
+  AutoReportFrontendContext fc(cx);
+  if (!ExpandErrorArguments(&fc, callback, userRef, errorNumber, args, argType,
                             &report)) {
     return false;
   }
 
-  ReportError(cx, &report, callback, userRef);
+  if (!ReportError(cx, &report, callback, userRef)) {
+    return false;
+  }
 
   return report.isWarning();
 }
@@ -564,7 +554,9 @@ bool js::ReportErrorVA(JSContext* cx, IsWarning isWarning, const char* format,
   }
   PopulateReportBlame(cx, &report);
 
-  ReportError(cx, &report, nullptr, nullptr);
+  if (!ReportError(cx, &report, nullptr, nullptr)) {
+    return false;
+  }
 
   return report.isWarning();
 }

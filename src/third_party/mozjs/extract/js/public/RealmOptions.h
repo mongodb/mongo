@@ -48,9 +48,6 @@ enum class CompartmentSpecifier {
 
   // Create a new realm in an existing compartment.
   ExistingCompartment,
-
-  // Internal use only. Create the self-hosting compartment.
-  NewCompartmentInSelfHostingZone,
 };
 
 /**
@@ -98,7 +95,6 @@ class JS_PUBLIC_API RealmCreationOptions {
   RealmCreationOptions& setNewCompartmentAndZone();
   RealmCreationOptions& setExistingCompartment(JSObject* obj);
   RealmCreationOptions& setExistingCompartment(Compartment* compartment);
-  RealmCreationOptions& setNewCompartmentInSelfHostingZone();
 
   // Certain compartments are implementation details of the embedding, and
   // references to them should never leak out to script. This flag causes this
@@ -112,16 +108,6 @@ class JS_PUBLIC_API RealmCreationOptions {
   bool invisibleToDebugger() const { return invisibleToDebugger_; }
   RealmCreationOptions& setInvisibleToDebugger(bool flag) {
     invisibleToDebugger_ = flag;
-    return *this;
-  }
-
-  // Realms used for off-thread compilation have their contents merged into a
-  // target realm when the compilation is finished. This is only allowed if
-  // this flag is set. The invisibleToDebugger flag must also be set for such
-  // realms.
-  bool mergeable() const { return mergeable_; }
-  RealmCreationOptions& setMergeable(bool flag) {
-    mergeable_ = flag;
     return *this;
   }
 
@@ -186,36 +172,6 @@ class JS_PUBLIC_API RealmCreationOptions {
   bool getCoopAndCoepEnabled() const;
   RealmCreationOptions& setCoopAndCoepEnabled(bool flag);
 
-  bool getStreamsEnabled() const { return streams_; }
-  RealmCreationOptions& setStreamsEnabled(bool flag) {
-    streams_ = flag;
-    return *this;
-  }
-
-  bool getReadableByteStreamsEnabled() const { return readableByteStreams_; }
-  RealmCreationOptions& setReadableByteStreamsEnabled(bool flag) {
-    readableByteStreams_ = flag;
-    return *this;
-  }
-
-  bool getBYOBStreamReadersEnabled() const { return byobStreamReaders_; }
-  RealmCreationOptions& setBYOBStreamReadersEnabled(bool enabled) {
-    byobStreamReaders_ = enabled;
-    return *this;
-  }
-
-  bool getWritableStreamsEnabled() const { return writableStreams_; }
-  RealmCreationOptions& setWritableStreamsEnabled(bool enabled) {
-    writableStreams_ = enabled;
-    return *this;
-  }
-
-  bool getReadableStreamPipeToEnabled() const { return readableStreamPipeTo_; }
-  RealmCreationOptions& setReadableStreamPipeToEnabled(bool enabled) {
-    readableStreamPipeTo_ = enabled;
-    return *this;
-  }
-
   WeakRefSpecifier getWeakRefsEnabled() const { return weakRefs_; }
   RealmCreationOptions& setWeakRefsEnabled(WeakRefSpecifier spec) {
     weakRefs_ = spec;
@@ -242,6 +198,48 @@ class JS_PUBLIC_API RealmCreationOptions {
     return *this;
   }
 
+  bool getShadowRealmsEnabled() const { return shadowRealms_; }
+  RealmCreationOptions& setShadowRealmsEnabled(bool flag) {
+    shadowRealms_ = flag;
+    return *this;
+  }
+
+#ifdef NIGHTLY_BUILD
+  bool getArrayGroupingEnabled() const { return arrayGrouping_; }
+  RealmCreationOptions& setArrayGroupingEnabled(bool flag) {
+    arrayGrouping_ = flag;
+    return *this;
+  }
+
+  bool getWellFormedUnicodeStringsEnabled() const {
+    return wellFormedUnicodeStrings_;
+  }
+  RealmCreationOptions& setWellFormedUnicodeStringsEnabled(bool flag) {
+    wellFormedUnicodeStrings_ = flag;
+    return *this;
+  }
+#endif
+
+  bool getArrayFromAsyncEnabled() const { return arrayFromAsync_; }
+  RealmCreationOptions& setArrayFromAsyncEnabled(bool flag) {
+    arrayFromAsync_ = flag;
+    return *this;
+  }
+
+  bool getChangeArrayByCopyEnabled() const { return changeArrayByCopy_; }
+  RealmCreationOptions& setChangeArrayByCopyEnabled(bool flag) {
+    changeArrayByCopy_ = flag;
+    return *this;
+  }
+
+#ifdef ENABLE_NEW_SET_METHODS
+  bool getNewSetMethodsEnabled() const { return newSetMethods_; }
+  RealmCreationOptions& setNewSetMethodsEnabled(bool flag) {
+    newSetMethods_ = flag;
+    return *this;
+  }
+#endif
+
   // This flag doesn't affect JS engine behavior.  It is used by Gecko to
   // mark whether content windows and workers are "Secure Context"s. See
   // https://w3c.github.io/webappsec-secure-contexts/
@@ -249,6 +247,15 @@ class JS_PUBLIC_API RealmCreationOptions {
   bool secureContext() const { return secureContext_; }
   RealmCreationOptions& setSecureContext(bool flag) {
     secureContext_ = flag;
+    return *this;
+  }
+
+  // Non-standard option to freeze certain builtin constructors and seal their
+  // prototypes. Also defines these constructors on the global as non-writable
+  // and non-configurable.
+  bool freezeBuiltins() const { return freezeBuiltins_; }
+  RealmCreationOptions& setFreezeBuiltins(bool flag) {
+    freezeBuiltins_ = flag;
     return *this;
   }
 
@@ -268,20 +275,26 @@ class JS_PUBLIC_API RealmCreationOptions {
   uint64_t profilerRealmID_ = 0;
   WeakRefSpecifier weakRefs_ = WeakRefSpecifier::Disabled;
   bool invisibleToDebugger_ = false;
-  bool mergeable_ = false;
   bool preserveJitCode_ = false;
   bool sharedMemoryAndAtomics_ = false;
   bool defineSharedArrayBufferConstructor_ = true;
   bool coopAndCoep_ = false;
-  bool streams_ = false;
-  bool readableByteStreams_ = false;
-  bool byobStreamReaders_ = false;
-  bool writableStreams_ = false;
-  bool readableStreamPipeTo_ = false;
   bool toSource_ = false;
   bool propertyErrorMessageFix_ = false;
   bool iteratorHelpers_ = false;
+  bool shadowRealms_ = false;
+#ifdef NIGHTLY_BUILD
+  bool arrayGrouping_ = false;
+  // Pref for String.prototype.{is,to}WellFormed() methods.
+  bool wellFormedUnicodeStrings_ = false;
+#endif
+  bool arrayFromAsync_ = true;
+  bool changeArrayByCopy_ = false;
+#ifdef ENABLE_NEW_SET_METHODS
+  bool newSetMethods_ = false;
+#endif
   bool secureContext_ = false;
+  bool freezeBuiltins_ = false;
 };
 
 /**
@@ -303,6 +316,14 @@ class JS_PUBLIC_API RealmBehaviors {
   bool clampAndJitterTime() const { return clampAndJitterTime_; }
   RealmBehaviors& setClampAndJitterTime(bool flag) {
     clampAndJitterTime_ = flag;
+    return *this;
+  }
+
+  bool shouldResistFingerprinting() const {
+    return shouldResistFingerprinting_;
+  }
+  RealmBehaviors& setShouldResistFingerprinting(bool flag) {
+    shouldResistFingerprinting_ = flag;
     return *this;
   }
 
@@ -341,6 +362,7 @@ class JS_PUBLIC_API RealmBehaviors {
  private:
   bool discardSource_ = false;
   bool clampAndJitterTime_ = true;
+  bool shouldResistFingerprinting_ = false;
   bool isNonLive_ = false;
 };
 

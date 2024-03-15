@@ -121,7 +121,7 @@ SessionHolder::TransactionState transactionStateEnum(StringData name) {
 }
 
 SessionHolder* getHolder(JSObject* thisv) {
-    return static_cast<SessionHolder*>(JS::GetPrivate(thisv));
+    return JS::GetMaybePtrFromReservedSlot<SessionHolder>(thisv, SessionInfo::SessionHolderSlot);
 }
 
 SessionHolder* getHolder(JS::CallArgs& args) {
@@ -156,7 +156,7 @@ void endSession(SessionHolder* holder) {
 
 }  // namespace
 
-void SessionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void SessionInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto holder = getHolder(obj);
 
     if (holder) {
@@ -177,7 +177,7 @@ void SessionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
             }
         }
 
-        getScope(fop)->trackedDelete(holder);
+        getScope(gcCtx)->trackedDelete(holder);
     }
 }
 
@@ -249,7 +249,10 @@ void SessionInfo::make(JSContext* cx,
     auto scope = getScope(cx);
 
     scope->getProto<SessionInfo>().newObject(obj);
-    JS::SetPrivate(obj, scope->trackedNew<SessionHolder>(std::move(client), std::move(lsid)));
+    JS::SetReservedSlot(
+        obj,
+        SessionHolderSlot,
+        JS::PrivateValue(scope->trackedNew<SessionHolder>(std::move(client), std::move(lsid))));
 }
 
 }  // namespace mozjs

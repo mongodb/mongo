@@ -21,8 +21,11 @@ using JSONWriteCallback = bool (*)(const char16_t* buf, uint32_t len,
 
 /**
  * Performs the JSON.stringify operation, as specified by ECMAScript, except
- * writing stringified data by repeated calls of |callback|, with each such
- * call passed |data| as argument.
+ * writing stringified data by exactly one call of |callback|, passing |data| as
+ * argument.
+ *
+ * In cases where JSON.stringify would return undefined, this function calls
+ * |callback| with the string "null".
  */
 extern JS_PUBLIC_API bool JS_Stringify(JSContext* cx,
                                        JS::MutableHandle<JS::Value> value,
@@ -54,6 +57,19 @@ extern JS_PUBLIC_API bool ToJSONMaybeSafely(JSContext* cx,
                                             JSONWriteCallback callback,
                                             void* data);
 
+/**
+ * Performs the JSON.stringify operation, as specified by ECMAScript, except
+ * writing stringified data by one call of |callback|, passing |data| as
+ * argument.
+ *
+ * In cases where JSON.stringify would return undefined, this function does not
+ * call |callback| at all.
+ */
+extern JS_PUBLIC_API bool ToJSON(JSContext* cx, Handle<Value> value,
+                                 Handle<JSObject*> replacer,
+                                 Handle<Value> space,
+                                 JSONWriteCallback callback, void* data);
+
 } /* namespace JS */
 
 /**
@@ -67,6 +83,14 @@ extern JS_PUBLIC_API bool JS_ParseJSON(JSContext* cx, const char16_t* chars,
  * Performs the JSON.parse operation as specified by ECMAScript.
  */
 extern JS_PUBLIC_API bool JS_ParseJSON(JSContext* cx, JS::Handle<JSString*> str,
+                                       JS::MutableHandle<JS::Value> vp);
+
+/**
+ * Performs the JSON.parse operation as specified by ECMAScript.
+ */
+extern JS_PUBLIC_API bool JS_ParseJSON(JSContext* cx,
+                                       const JS::Latin1Char* chars,
+                                       uint32_t len,
                                        JS::MutableHandle<JS::Value> vp);
 
 /**
@@ -86,5 +110,16 @@ extern JS_PUBLIC_API bool JS_ParseJSONWithReviver(
 extern JS_PUBLIC_API bool JS_ParseJSONWithReviver(
     JSContext* cx, JS::Handle<JSString*> str, JS::Handle<JS::Value> reviver,
     JS::MutableHandle<JS::Value> vp);
+
+namespace JS {
+
+/**
+ * Returns true if the given text is valid JSON.
+ */
+extern JS_PUBLIC_API bool IsValidJSON(const JS::Latin1Char* chars,
+                                      uint32_t len);
+extern JS_PUBLIC_API bool IsValidJSON(const char16_t* chars, uint32_t len);
+
+}  // namespace JS
 
 #endif /* js_JSON_h */

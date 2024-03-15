@@ -10,8 +10,7 @@
 #include "vm/Probes.h"
 
 #include "vm/JSContext.h"
-
-#include "vm/JSScript-inl.h"
+#include "vm/JSScript.h"
 
 namespace js {
 
@@ -43,8 +42,7 @@ inline bool probes::EnterScript(JSContext* cx, JSScript* script,
     if (!cx->geckoProfiler().enter(cx, script)) {
       return false;
     }
-    MOZ_ASSERT_IF(!fp->script()->isGenerator() && !fp->script()->isAsync(),
-                  !fp->hasPushedGeckoProfilerFrame());
+    MOZ_ASSERT(!fp->hasPushedGeckoProfilerFrame());
     fp->setPushedGeckoProfilerFrame();
   }
 

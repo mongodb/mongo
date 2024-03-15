@@ -7,14 +7,17 @@
 #ifndef frontend_UsedNameTracker_h
 #define frontend_UsedNameTracker_h
 
+#include "mozilla/Assertions.h"
+#include "mozilla/Maybe.h"
+
+#include <stdint.h>
+
 #include "frontend/ParserAtom.h"                   // TaggedParserAtomIndex
 #include "frontend/TaggedParserAtomIndexHasher.h"  // TaggedParserAtomIndexHasher
 #include "frontend/Token.h"
 #include "js/AllocPolicy.h"
 #include "js/HashTable.h"
 #include "js/Vector.h"
-
-#include "vm/StringType.h"
 
 namespace js {
 namespace frontend {
@@ -125,9 +128,9 @@ class UsedNameTracker {
     mozilla::Maybe<TokenPos> firstUsePos_;
 
    public:
-    explicit UsedNameInfo(JSContext* cx, NameVisibility visibility,
+    explicit UsedNameInfo(FrontendContext* fc, NameVisibility visibility,
                           mozilla::Maybe<TokenPos> position)
-        : uses_(cx), visibility_(visibility), firstUsePos_(position) {}
+        : uses_(fc), visibility_(visibility), firstUsePos_(position) {}
 
     UsedNameInfo(UsedNameInfo&& other) = default;
 
@@ -163,6 +166,17 @@ class UsedNameTracker {
     bool empty() { return uses_.empty(); }
 
     mozilla::Maybe<TokenPos> pos() { return firstUsePos_; }
+
+    // When we leave a scope, and subsequently find a new private name
+    // reference, we don't want our error messages to be attributed to an old
+    // scope, so we update the position in that scenario.
+    void maybeUpdatePos(mozilla::Maybe<TokenPos> p) {
+      MOZ_ASSERT_IF(!isPublic(), p.isSome());
+
+      if (empty() && !isPublic()) {
+        firstUsePos_ = p;
+      }
+    }
   };
 
   using UsedNameMap =
@@ -183,8 +197,8 @@ class UsedNameTracker {
   bool hasPrivateNames_;
 
  public:
-  explicit UsedNameTracker(JSContext* cx)
-      : map_(cx),
+  explicit UsedNameTracker(FrontendContext* fc)
+      : map_(fc),
         scriptCounter_(0),
         scopeCounter_(0),
         hasPrivateNames_(false) {}
@@ -205,14 +219,15 @@ class UsedNameTracker {
   }
 
   [[nodiscard]] bool noteUse(
-      JSContext* cx, TaggedParserAtomIndex name, NameVisibility visibility,
-      uint32_t scriptId, uint32_t scopeId,
+      FrontendContext* fc, TaggedParserAtomIndex name,
+      NameVisibility visibility, uint32_t scriptId, uint32_t scopeId,
       mozilla::Maybe<TokenPos> tokenPosition = mozilla::Nothing());
 
   // Fill maybeUnboundName with the first (source order) unbound name, or
   // Nothing() if there are no unbound names.
   [[nodiscard]] bool hasUnboundPrivateNames(
-      JSContext* cx, mozilla::Maybe<UnboundPrivateName>& maybeUnboundName);
+      FrontendContext* fc,
+      mozilla::Maybe<UnboundPrivateName>& maybeUnboundName);
 
   // Return a list of unbound private names, sorted by increasing location in
   // the source.

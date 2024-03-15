@@ -8,29 +8,26 @@
 
 #include "mozilla/BinarySearch.h"
 #include "mozilla/CheckedInt.h"
-#include "mozilla/IntegerPrintfMacros.h"
-#include "mozilla/ScopeExit.h"
 
 #include <utility>
 
 #include "jit/BaselineIC.h"
+#include "jit/BaselineJIT.h"
 #include "jit/BytecodeAnalysis.h"
 #include "jit/IonScript.h"
 #include "jit/JitFrames.h"
+#include "jit/JitSpewer.h"
 #include "jit/ScriptFromCalleeToken.h"
-#include "util/Memory.h"
-#include "vm/BytecodeIterator.h"
-#include "vm/BytecodeLocation.h"
+#include "jit/TrialInlining.h"
 #include "vm/BytecodeUtil.h"
+#include "vm/Compartment.h"
 #include "vm/FrameIter.h"  // js::OnlyJSJitFrameIter
+#include "vm/JitActivation.h"
 #include "vm/JSScript.h"
-#include "vm/Stack.h"
-#include "wasm/WasmInstance.h"
 
-#include "gc/FreeOp-inl.h"
+#include "gc/GCContext-inl.h"
 #include "jit/JSJitFrameIter-inl.h"
-#include "vm/BytecodeIterator-inl.h"
-#include "vm/BytecodeLocation-inl.h"
+#include "vm/JSContext-inl.h"
 #include "vm/JSScript-inl.h"
 
 using namespace js;
@@ -55,6 +52,20 @@ JitScript::JitScript(JSScript* script, Offset fallbackStubsOffset,
     setIonScriptImpl(script, IonDisabledScriptPtr);
   }
 }
+
+#ifdef DEBUG
+JitScript::~JitScript() {
+  // The contents of the stub space are removed and freed separately after the
+  // next minor GC. See prepareForDestruction.
+  MOZ_ASSERT(jitScriptStubSpace_.isEmpty());
+
+  // BaselineScript and IonScript must have been destroyed at this point.
+  MOZ_ASSERT(!hasBaselineScript());
+  MOZ_ASSERT(!hasIonScript());
+}
+#else
+JitScript::~JitScript() = default;
+#endif
 
 bool JSScript::createJitScript(JSContext* cx) {
   MOZ_ASSERT(!hasJitScript());
@@ -119,7 +130,7 @@ bool JSScript::createJitScript(JSContext* cx) {
   return true;
 }
 
-void JSScript::maybeReleaseJitScript(JSFreeOp* fop) {
+void JSScript::maybeReleaseJitScript(JS::GCContext* gcx) {
   MOZ_ASSERT(hasJitScript());
 
   if (zone()->jitZone()->keepJitScripts() || jitScript()->hasBaselineScript() ||
@@ -127,39 +138,35 @@ void JSScript::maybeReleaseJitScript(JSFreeOp* fop) {
     return;
   }
 
-  releaseJitScript(fop);
+  releaseJitScript(gcx);
 }
 
-void JSScript::releaseJitScript(JSFreeOp* fop) {
+void JSScript::releaseJitScript(JS::GCContext* gcx) {
   MOZ_ASSERT(hasJitScript());
   MOZ_ASSERT(!hasBaselineScript());
   MOZ_ASSERT(!hasIonScript());
 
-  fop->removeCellMemory(this, jitScript()->allocBytes(), MemoryUse::JitScript);
+  gcx->removeCellMemory(this, jitScript()->allocBytes(), MemoryUse::JitScript);
 
   JitScript::Destroy(zone(), jitScript());
   warmUpData_.clearJitScript();
-  updateJitCodeRaw(fop->runtime());
+  updateJitCodeRaw(gcx->runtime());
 }
 
-void JSScript::releaseJitScriptOnFinalize(JSFreeOp* fop) {
+void JSScript::releaseJitScriptOnFinalize(JS::GCContext* gcx) {
   MOZ_ASSERT(hasJitScript());
 
   if (hasIonScript()) {
-    IonScript* ion = jitScript()->clearIonScript(fop, this);
-    jit::IonScript::Destroy(fop, ion);
+    IonScript* ion = jitScript()->clearIonScript(gcx, this);
+    jit::IonScript::Destroy(gcx, ion);
   }
 
   if (hasBaselineScript()) {
-    BaselineScript* baseline = jitScript()->clearBaselineScript(fop, this);
-    jit::BaselineScript::Destroy(fop, baseline);
+    BaselineScript* baseline = jitScript()->clearBaselineScript(gcx, this);
+    jit::BaselineScript::Destroy(gcx, baseline);
   }
 
-  releaseJitScript(fop);
-}
-
-void JitScript::CachedIonData::trace(JSTracer* trc) {
-  TraceNullableEdge(trc, &templateEnv, "jitscript-iondata-template-env");
+  releaseJitScript(gcx);
 }
 
 void JitScript::trace(JSTracer* trc) {
@@ -173,8 +180,8 @@ void JitScript::trace(JSTracer* trc) {
     ionScript()->trace(trc);
   }
 
-  if (hasCachedIonData()) {
-    cachedIonData().trace(trc);
+  if (templateEnv_.isSome()) {
+    TraceNullableEdge(trc, templateEnv_.ptr(), "jitscript-template-env");
   }
 
   if (hasInliningRoot()) {
@@ -270,6 +277,20 @@ void JitScript::Destroy(Zone* zone, JitScript* script) {
   js_delete(script);
 }
 
+void JitScript::prepareForDestruction(Zone* zone) {
+  // When the script contains pointers to nursery things, the store buffer can
+  // contain entries that point into the fallback stub space. Since we can
+  // destroy scripts outside the context of a GC, this situation could result
+  // in us trying to mark invalid store buffer entries.
+  //
+  // Defer freeing any allocated blocks until after the next minor GC.
+  jitScriptStubSpace_.freeAllAfterMinorGC(zone);
+
+  // Trigger write barriers.
+  baselineScript_.set(zone, nullptr);
+  ionScript_.set(zone, nullptr);
+}
+
 struct FallbackStubs {
   ICScript* const icScript_;
 
@@ -336,7 +357,7 @@ void JitScript::purgeOptimizedStubs(JSScript* script) {
   MOZ_ASSERT(script->jitScript() == this);
 
   Zone* zone = script->zone();
-  if (IsAboutToBeFinalizedUnbarriered(&script)) {
+  if (IsAboutToBeFinalizedUnbarriered(script)) {
     // We're sweeping and the script is dead. Don't purge optimized stubs
     // because (1) accessing CacheIRStubInfo pointers in ICStubs is invalid
     // because we may have swept them already when we started (incremental)
@@ -380,6 +401,8 @@ void ICScript::purgeOptimizedStubs(Zone* zone) {
       prev = stub->toCacheIRStub();
       stub = stub->toCacheIRStub()->next();
     }
+
+    lastStub->toFallbackStub()->clearHasFoldedStub();
   }
 
 #ifdef DEBUG
@@ -395,101 +418,104 @@ void ICScript::purgeOptimizedStubs(Zone* zone) {
 #endif
 }
 
-JitScript::CachedIonData::CachedIonData(EnvironmentObject* templateEnv,
-                                        IonBytecodeInfo bytecodeInfo)
-    : templateEnv(templateEnv), bytecodeInfo(bytecodeInfo) {}
+bool JitScript::ensureHasCachedBaselineJitData(JSContext* cx,
+                                               HandleScript script) {
+  if (templateEnv_.isSome()) {
+    return true;
+  }
 
-bool JitScript::ensureHasCachedIonData(JSContext* cx, HandleScript script) {
-  MOZ_ASSERT(script->jitScript() == this);
-
-  if (hasCachedIonData()) {
+  if (!script->function() ||
+      !script->function()->needsFunctionEnvironmentObjects()) {
+    templateEnv_.emplace();
     return true;
   }
 
   Rooted<EnvironmentObject*> templateEnv(cx);
-  if (script->function()) {
-    RootedFunction fun(cx, script->function());
+  Rooted<JSFunction*> fun(cx, script->function());
 
-    if (fun->needsNamedLambdaEnvironment()) {
-      templateEnv =
-          NamedLambdaObject::createTemplateObject(cx, fun, gc::TenuredHeap);
-      if (!templateEnv) {
-        return false;
-      }
-    }
-
-    if (fun->needsCallObject()) {
-      templateEnv = CallObject::createTemplateObject(cx, script, templateEnv,
-                                                     gc::TenuredHeap);
-      if (!templateEnv) {
-        return false;
-      }
+  if (fun->needsNamedLambdaEnvironment()) {
+    templateEnv = NamedLambdaObject::createTemplateObject(cx, fun);
+    if (!templateEnv) {
+      return false;
     }
   }
 
-  IonBytecodeInfo bytecodeInfo = AnalyzeBytecodeForIon(cx, script);
+  if (fun->needsCallObject()) {
+    templateEnv = CallObject::createTemplateObject(cx, script, templateEnv);
+    if (!templateEnv) {
+      return false;
+    }
+  }
 
-  UniquePtr<CachedIonData> data =
-      cx->make_unique<CachedIonData>(templateEnv, bytecodeInfo);
-  if (!data) {
+  templateEnv_.emplace(templateEnv);
+  return true;
+}
+
+bool JitScript::ensureHasCachedIonData(JSContext* cx, HandleScript script) {
+  MOZ_ASSERT(script->jitScript() == this);
+
+  if (usesEnvironmentChain_.isSome()) {
+    return true;
+  }
+
+  if (!ensureHasCachedBaselineJitData(cx, script)) {
     return false;
   }
 
-  cachedIonData_ = std::move(data);
+  usesEnvironmentChain_.emplace(ScriptUsesEnvironmentChain(script));
   return true;
 }
 
 void JitScript::setBaselineScriptImpl(JSScript* script,
                                       BaselineScript* baselineScript) {
   JSRuntime* rt = script->runtimeFromMainThread();
-  setBaselineScriptImpl(rt->defaultFreeOp(), script, baselineScript);
+  setBaselineScriptImpl(rt->gcContext(), script, baselineScript);
 }
 
-void JitScript::setBaselineScriptImpl(JSFreeOp* fop, JSScript* script,
+void JitScript::setBaselineScriptImpl(JS::GCContext* gcx, JSScript* script,
                                       BaselineScript* baselineScript) {
   if (hasBaselineScript()) {
-    BaselineScript::preWriteBarrier(script->zone(), baselineScript_);
-    fop->removeCellMemory(script, baselineScript_->allocBytes(),
+    gcx->removeCellMemory(script, baselineScript_->allocBytes(),
                           MemoryUse::BaselineScript);
-    baselineScript_ = nullptr;
+    baselineScript_.set(script->zone(), nullptr);
   }
 
   MOZ_ASSERT(ionScript_ == nullptr || ionScript_ == IonDisabledScriptPtr);
 
-  baselineScript_ = baselineScript;
+  baselineScript_.set(script->zone(), baselineScript);
   if (hasBaselineScript()) {
     AddCellMemory(script, baselineScript_->allocBytes(),
                   MemoryUse::BaselineScript);
   }
 
   script->resetWarmUpResetCounter();
-  script->updateJitCodeRaw(fop->runtime());
+  script->updateJitCodeRaw(gcx->runtime());
 }
 
 void JitScript::setIonScriptImpl(JSScript* script, IonScript* ionScript) {
   JSRuntime* rt = script->runtimeFromMainThread();
-  setIonScriptImpl(rt->defaultFreeOp(), script, ionScript);
+  setIonScriptImpl(rt->gcContext(), script, ionScript);
 }
 
-void JitScript::setIonScriptImpl(JSFreeOp* fop, JSScript* script,
+void JitScript::setIonScriptImpl(JS::GCContext* gcx, JSScript* script,
                                  IonScript* ionScript) {
   MOZ_ASSERT_IF(ionScript != IonDisabledScriptPtr,
                 !baselineScript()->hasPendingIonCompileTask());
 
+  JS::Zone* zone = script->zone();
   if (hasIonScript()) {
-    IonScript::preWriteBarrier(script->zone(), ionScript_);
-    fop->removeCellMemory(script, ionScript_->allocBytes(),
+    gcx->removeCellMemory(script, ionScript_->allocBytes(),
                           MemoryUse::IonScript);
-    ionScript_ = nullptr;
+    ionScript_.set(zone, nullptr);
   }
 
-  ionScript_ = ionScript;
+  ionScript_.set(zone, ionScript);
   MOZ_ASSERT_IF(hasIonScript(), hasBaselineScript());
   if (hasIonScript()) {
     AddCellMemory(script, ionScript_->allocBytes(), MemoryUse::IonScript);
   }
 
-  script->updateJitCodeRaw(fop->runtime());
+  script->updateJitCodeRaw(gcx->runtime());
 }
 
 #ifdef JS_STRUCTURED_SPEW
@@ -611,7 +637,7 @@ gc::AllocSite* JitScript::createAllocSite(JSScript* script) {
   if (!nursery.canCreateAllocSite()) {
     // Don't block attaching an optimized stub, but don't process allocations
     // for this site.
-    return script->zone()->unknownAllocSite();
+    return script->zone()->unknownAllocSite(JS::TraceKind::Object);
   }
 
   if (!allocSites_.reserve(allocSites_.length() + 1)) {
@@ -625,7 +651,7 @@ gc::AllocSite* JitScript::createAllocSite(JSScript* script) {
     return nullptr;
   }
 
-  new (site) gc::AllocSite(script->zone(), script);
+  new (site) gc::AllocSite(script->zone(), script, JS::TraceKind::Object);
 
   allocSites_.infallibleAppend(site);
 
@@ -641,8 +667,8 @@ bool JitScript::resetAllocSites(bool resetNurserySites,
   bool anyReset = false;
 
   for (gc::AllocSite* site : allocSites_) {
-    if ((resetNurserySites && site->initialHeap() == gc::DefaultHeap) ||
-        (resetPretenuredSites && site->initialHeap() == gc::TenuredHeap)) {
+    if ((resetNurserySites && site->initialHeap() == gc::Heap::Default) ||
+        (resetPretenuredSites && site->initialHeap() == gc::Heap::Tenured)) {
       if (site->maybeResetState()) {
         anyReset = true;
       }
@@ -701,11 +727,6 @@ HashNumber ICScript::hash() {
     h = mozilla::AddToHash(h, stub->enteredCount() == 0);
   }
 
-  if (inlinedChildren_) {
-    for (auto& callsite : *inlinedChildren_) {
-      h = mozilla::AddToHash(h, callsite.callee_->hash());
-    }
-  }
   return h;
 }
 #endif

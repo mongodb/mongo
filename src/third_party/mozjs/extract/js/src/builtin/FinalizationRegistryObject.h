@@ -20,23 +20,23 @@
  *   |  |     +----------+-----------+       |     +---------+--------+      |
  *   |  |                |                   |               |               |
  *   |  |                v                   |               v               |
- *   |  |  +-------------+-------------+     |  +------------+------------+  |
- *   |  |  |       Registrations       |     |  |  FinalizationRecordMap  |  |
- *   |  |  |         weak map          |     |  |           map           |  |
- *   |  |  +---------------------------+     |  +-------------------------+  |
- *   |  |  | Unregister  :   Records   |     |  |  Target  : Finalization |  |
- *   |  |  |   token     :   object    |     |  |  object  : RecordVector |  |
- *   |  |  +--------------------+------+     |  +----+-------------+------+  |
- *   |  |                       |            |       |             |         |
- *   |  |                       v            |       v             |         |
- *   |  |  +--------------------+------+     |  +----+-----+       |         |
- *   |  |  |       Finalization        |     |  |  Target  |       |         |
- *   |  |  |    RegistrationsObject    |     |  | JSObject |       |         |
- *   |  |  +---------------------------+     |  +----------+       |         |
- *   |  |  |       RecordVector        |     |                     |         |
- *   |  |  +-------------+-------------+     |                     |         |
- *   |  |                |                   |                     |         |
- *   |  |              * v                   |                     |         |
+ *   |  |  +-------------+-------------+     | +-------------+------------+  |
+ *   |  |  |       Registrations       |     | |  FinalizationObservers   |  |
+ *   |  |  |         weak map          |     | +-------------+------------+  |
+ *   |  |  +---------------------------+     |               |               |
+ *   |  |  | Unregister  :   Records   |     |               v               |
+ *   |  |  |   token     :   object    |     |  +------------+------------+  |
+ *   |  |  +--------------------+------+     |  |      RecordMap map      |  |
+ *   |  |                       |            |  +-------------------------+  |
+ *   |  |                       v            |  |  Target  : Finalization |  |
+ *   |  |  +--------------------+------+     |  |  object  : RecordVector |  |
+ *   |  |  |       Finalization        |     |  +----+-------------+------+  |
+ *   |  |  |    RegistrationsObject    |     |       |             |         |
+ *   |  |  +---------------------------+     |       v             v         |
+ *   |  |  |       RecordVector        |     |  +----+-----+  +----+-----+   |
+ *   |  |  +-------------+-------------+     |  |  Target  |  | (CCW if  |   |
+ *   |  |                |                   |  | JSObject |  |  needed) |   |
+ *   |  |              * v                   |  +----------+  +----+-----+   |
  *   |  |  +-------------+-------------+ *   |                     |         |
  *   |  |  | FinalizationRecordObject  +<--------------------------+         |
  *   |  |  +---------------------------+     |                               |
@@ -104,17 +104,23 @@ using RootedFinalizationRegistryObject = Rooted<FinalizationRegistryObject*>;
 using RootedFinalizationRecordObject = Rooted<FinalizationRecordObject*>;
 using RootedFinalizationQueueObject = Rooted<FinalizationQueueObject*>;
 
-// A finalization record: a pair of finalization registry and held value.
+// A finalization record: a pair of finalization queue and held value.
 //
 // A finalization record represents the registered interest of a finalization
 // registry in a target's finalization.
 //
-// Finalization records are initially 'active' but may be cleared and become
-// inactive. This happens when:
+// Finalization records created in the 'registered' state but may be
+// unregistered. This happens when:
 //  - the heldValue is passed to the registry's cleanup callback
 //  - the registry's unregister method removes the registration
+//
+// Finalization records are added to a per-zone record map. They are removed
+// when the record is queued for cleanup, or if the interest in finalization is
+// cancelled. See FinalizationObservers::shouldRemoveRecord for the possible
+// reasons.
+
 class FinalizationRecordObject : public NativeObject {
-  enum { QueueSlot = 0, HeldValueSlot, SlotCount };
+  enum { QueueSlot = 0, HeldValueSlot, InMapSlot, SlotCount };
 
  public:
   static const JSClass class_;
@@ -125,14 +131,16 @@ class FinalizationRecordObject : public NativeObject {
 
   FinalizationQueueObject* queue() const;
   Value heldValue() const;
-  bool isActive() const;
+  bool isRegistered() const;
+  bool isInRecordMap() const;
 
+  void setInRecordMap(bool newValue);
   void clear();
 };
 
 // A vector of weakly-held FinalizationRecordObjects.
 using WeakFinalizationRecordVector =
-    GCVector<WeakHeapPtr<FinalizationRecordObject*>, 1, js::ZoneAllocPolicy>;
+    GCVector<WeakHeapPtr<FinalizationRecordObject*>, 1, js::CellAllocPolicy>;
 
 // A JS object containing a vector of weakly-held FinalizationRecordObjects,
 // which holds the records corresponding to the registrations for a particular
@@ -155,7 +163,7 @@ class FinalizationRegistrationsObject : public NativeObject {
   bool append(HandleFinalizationRecordObject record);
   void remove(HandleFinalizationRecordObject record);
 
-  void sweep();
+  bool traceWeak(JSTracer* trc);
 
  private:
   static const JSClassOps classOps_;
@@ -163,11 +171,11 @@ class FinalizationRegistrationsObject : public NativeObject {
   void* privatePtr() const;
 
   static void trace(JSTracer* trc, JSObject* obj);
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 using FinalizationRecordVector =
-    GCVector<HeapPtr<FinalizationRecordObject*>, 1, js::ZoneAllocPolicy>;
+    GCVector<HeapPtr<FinalizationRecordObject*>, 1, js::CellAllocPolicy>;
 
 // The JS FinalizationRegistry object itself.
 class FinalizationRegistryObject : public NativeObject {
@@ -180,7 +188,7 @@ class FinalizationRegistryObject : public NativeObject {
   FinalizationQueueObject* queue() const;
   ObjectWeakMap* registrations() const;
 
-  void sweep();
+  void traceWeak(JSTracer* trc);
 
   static bool unregisterRecord(FinalizationRecordObject* record);
 
@@ -210,7 +218,7 @@ class FinalizationRegistryObject : public NativeObject {
   static bool preserveDOMWrapper(JSContext* cx, HandleObject obj);
 
   static void trace(JSTracer* trc, JSObject* obj);
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 // Contains information about the cleanup callback and the records queued to
@@ -258,7 +266,7 @@ class FinalizationQueueObject : public NativeObject {
   static bool doCleanup(JSContext* cx, unsigned argc, Value* vp);
 
   static void trace(JSTracer* trc, JSObject* obj);
-  static void finalize(JSFreeOp* fop, JSObject* obj);
+  static void finalize(JS::GCContext* gcx, JSObject* obj);
 };
 
 }  // namespace js

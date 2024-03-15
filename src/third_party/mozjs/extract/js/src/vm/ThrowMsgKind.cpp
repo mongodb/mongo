@@ -20,12 +20,16 @@ JSErrNum js::ThrowMsgKindToErrNum(ThrowMsgKind kind) {
       return JSMSG_CANT_DELETE_SUPER;
     case ThrowMsgKind::PrivateDoubleInit:
       return JSMSG_PRIVATE_FIELD_DOUBLE;
+    case ThrowMsgKind::PrivateBrandDoubleInit:
+      return JSMSG_PRIVATE_BRAND_DOUBLE;
     case ThrowMsgKind::MissingPrivateOnGet:
       return JSMSG_GET_MISSING_PRIVATE;
     case ThrowMsgKind::MissingPrivateOnSet:
       return JSMSG_SET_MISSING_PRIVATE;
     case ThrowMsgKind::AssignToPrivateMethod:
       return JSMSG_ASSIGN_TO_PRIVATE_METHOD;
+    case ThrowMsgKind::DecoratorInvalidReturnType:
+      return JSMSG_DECORATOR_INVALID_RETURN_TYPE;
   }
 
   MOZ_CRASH("Unexpected message kind");

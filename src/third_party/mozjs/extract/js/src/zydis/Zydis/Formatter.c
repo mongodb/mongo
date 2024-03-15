@@ -62,13 +62,18 @@ void ZydisFormatterBufferInit(ZydisFormatterBuffer* buffer, char* user_buffer,
     ZYAN_ASSERT(user_buffer);
     ZYAN_ASSERT(length);
 
-    buffer->is_token_list              = ZYAN_FALSE;
-    buffer->string.flags               = ZYAN_STRING_HAS_FIXED_CAPACITY;
-    buffer->string.vector.allocator    = ZYAN_NULL;
-    buffer->string.vector.element_size = sizeof(char);
-    buffer->string.vector.size         = 1;
-    buffer->string.vector.capacity     = length;
-    buffer->string.vector.data         = user_buffer;
+    buffer->is_token_list                   = ZYAN_FALSE;
+    buffer->capacity                        = 0;
+    buffer->string.flags                    = ZYAN_STRING_HAS_FIXED_CAPACITY;
+    buffer->string.vector.allocator         = ZYAN_NULL;
+    buffer->string.vector.growth_factor     = 1;
+    buffer->string.vector.shrink_threshold  = 0;
+    buffer->string.vector.destructor        = ZYAN_NULL;
+    buffer->string.vector.element_size      = sizeof(char);
+    buffer->string.vector.size              = 1;
+    buffer->string.vector.capacity          = length;
+    buffer->string.vector.data              = user_buffer;
+
     *user_buffer = '\0';
 }
 
@@ -87,14 +92,18 @@ void ZydisFormatterBufferInitTokenized(ZydisFormatterBuffer* buffer,
     user_buffer = (ZyanU8*)user_buffer + sizeof(ZydisFormatterToken);
     length -= sizeof(ZydisFormatterToken);
 
-    buffer->is_token_list              = ZYAN_TRUE;
-    buffer->capacity                   = length;
-    buffer->string.flags               = ZYAN_STRING_HAS_FIXED_CAPACITY;
-    buffer->string.vector.allocator    = ZYAN_NULL;
-    buffer->string.vector.element_size = sizeof(char);
-    buffer->string.vector.size         = 1;
-    buffer->string.vector.capacity     = length;
-    buffer->string.vector.data         = user_buffer;
+    buffer->is_token_list                  = ZYAN_TRUE;
+    buffer->capacity                       = length;
+    buffer->string.flags                   = ZYAN_STRING_HAS_FIXED_CAPACITY;
+    buffer->string.vector.allocator        = ZYAN_NULL;
+    buffer->string.vector.growth_factor    = 1;
+    buffer->string.vector.shrink_threshold = 0;
+    buffer->string.vector.destructor       = ZYAN_NULL;
+    buffer->string.vector.element_size     = sizeof(char);
+    buffer->string.vector.size             = 1;
+    buffer->string.vector.capacity         = length;
+    buffer->string.vector.data             = user_buffer;
+
     *(char*)user_buffer = '\0';
 }
 
@@ -110,7 +119,7 @@ void ZydisFormatterBufferInitTokenized(ZydisFormatterBuffer* buffer,
 
 ZyanStatus ZydisFormatterInit(ZydisFormatter* formatter, ZydisFormatterStyle style)
 {
-    if (!formatter || (style > ZYDIS_FORMATTER_STYLE_MAX_VALUE))
+    if (!formatter || ((ZyanUSize)style > ZYDIS_FORMATTER_STYLE_MAX_VALUE))
     {
         return ZYAN_STATUS_INVALID_ARGUMENT;
     }
@@ -147,6 +156,11 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
         formatter->force_memory_segment = (value) ? ZYAN_TRUE : ZYAN_FALSE;
         break;
     }
+    case ZYDIS_FORMATTER_PROP_FORCE_SCALE_ONE:
+    {
+        formatter->force_memory_scale = (value) ? ZYAN_TRUE : ZYAN_FALSE;
+        break;
+    }
     case ZYDIS_FORMATTER_PROP_FORCE_RELATIVE_BRANCHES:
     {
         formatter->force_relative_branches = (value) ? ZYAN_TRUE : ZYAN_FALSE;
@@ -169,7 +183,7 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     }
     case ZYDIS_FORMATTER_PROP_ADDR_BASE:
     {
-        if ((ZydisNumericBase)value > ZYDIS_NUMERIC_BASE_MAX_VALUE)
+        if (value > ZYDIS_NUMERIC_BASE_MAX_VALUE)
         {
             return ZYAN_STATUS_INVALID_ARGUMENT;
         }
@@ -178,7 +192,7 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     }
     case ZYDIS_FORMATTER_PROP_ADDR_SIGNEDNESS:
     {
-        if ((ZydisSignedness)value > ZYDIS_SIGNEDNESS_MAX_VALUE)
+        if (value > ZYDIS_SIGNEDNESS_MAX_VALUE)
         {
             return ZYAN_STATUS_INVALID_ARGUMENT;
         }
@@ -187,17 +201,27 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     }
     case ZYDIS_FORMATTER_PROP_ADDR_PADDING_ABSOLUTE:
     {
+        if (((ZydisPadding)value != ZYDIS_PADDING_AUTO) &&
+            (value > 0xFF))
+        {
+            return ZYAN_STATUS_INVALID_ARGUMENT;
+        }
         formatter->addr_padding_absolute = (ZydisPadding)value;
         break;
     }
     case ZYDIS_FORMATTER_PROP_ADDR_PADDING_RELATIVE:
     {
+        if (((ZydisPadding)value != ZYDIS_PADDING_AUTO) &&
+            (value > 0xFF))
+        {
+            return ZYAN_STATUS_INVALID_ARGUMENT;
+        }
         formatter->addr_padding_relative = (ZydisPadding)value;
         break;
     }
     case ZYDIS_FORMATTER_PROP_DISP_BASE:
     {
-        if ((ZydisNumericBase)value > ZYDIS_NUMERIC_BASE_MAX_VALUE)
+        if (value > ZYDIS_NUMERIC_BASE_MAX_VALUE)
         {
             return ZYAN_STATUS_INVALID_ARGUMENT;
         }
@@ -206,7 +230,7 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     }
     case ZYDIS_FORMATTER_PROP_DISP_SIGNEDNESS:
     {
-        if ((ZydisSignedness)value > ZYDIS_SIGNEDNESS_MAX_VALUE)
+        if (value > ZYDIS_SIGNEDNESS_MAX_VALUE)
         {
             return ZYAN_STATUS_INVALID_ARGUMENT;
         }
@@ -217,18 +241,22 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     {
         if ((ZydisPadding)value == ZYDIS_PADDING_AUTO)
         {
-            if (formatter->style > ZYDIS_FORMATTER_STYLE_MAX_VALUE)
+            if ((ZyanUSize)formatter->style > ZYDIS_FORMATTER_STYLE_MAX_VALUE)
             {
                 return ZYAN_STATUS_INVALID_ARGUMENT;
             }
             formatter->disp_padding = FORMATTER_PRESETS[formatter->style]->disp_padding;
+        }
+        else if (value > 0xFF)
+        {
+            return ZYAN_STATUS_INVALID_ARGUMENT;
         }
         formatter->disp_padding = (ZydisPadding)value;
         break;
     }
     case ZYDIS_FORMATTER_PROP_IMM_BASE:
     {
-        if ((ZydisNumericBase)value > ZYDIS_NUMERIC_BASE_MAX_VALUE)
+        if (value > ZYDIS_NUMERIC_BASE_MAX_VALUE)
         {
             return ZYAN_STATUS_INVALID_ARGUMENT;
         }
@@ -237,7 +265,7 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     }
     case ZYDIS_FORMATTER_PROP_IMM_SIGNEDNESS:
     {
-        if ((ZydisSignedness)value  > ZYDIS_SIGNEDNESS_MAX_VALUE)
+        if (value > ZYDIS_SIGNEDNESS_MAX_VALUE)
         {
             return ZYAN_STATUS_INVALID_ARGUMENT;
         }
@@ -248,11 +276,15 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     {
         if ((ZydisPadding)value == ZYDIS_PADDING_AUTO)
         {
-            if (formatter->style > ZYDIS_FORMATTER_STYLE_MAX_VALUE)
+            if ((ZyanUSize)formatter->style > ZYDIS_FORMATTER_STYLE_MAX_VALUE)
             {
                 return ZYAN_STATUS_INVALID_ARGUMENT;
             }
             formatter->imm_padding = FORMATTER_PRESETS[formatter->style]->imm_padding;
+        }
+        else if (value > 0xFF)
+        {
+            return ZYAN_STATUS_INVALID_ARGUMENT;
         }
         formatter->imm_padding = (ZydisPadding)value;
         break;
@@ -344,7 +376,7 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
 ZyanStatus ZydisFormatterSetHook(ZydisFormatter* formatter, ZydisFormatterFunction type,
     const void** callback)
 {
-    if (!formatter || !callback || (type > ZYDIS_FORMATTER_FUNC_MAX_VALUE))
+    if (!formatter || !callback || ((ZyanUSize)type > ZYDIS_FORMATTER_FUNC_MAX_VALUE))
     {
         return ZYAN_STATUS_INVALID_ARGUMENT;
     }
@@ -416,18 +448,12 @@ ZyanStatus ZydisFormatterSetHook(ZydisFormatter* formatter, ZydisFormatterFuncti
 /* ---------------------------------------------------------------------------------------------- */
 
 ZyanStatus ZydisFormatterFormatInstruction(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, char* buffer, ZyanUSize length,
-    ZyanU64 runtime_address)
+    const ZydisDecodedInstruction* instruction, const ZydisDecodedOperand* operands,
+    ZyanU8 operand_count, char* buffer, ZyanUSize length, ZyanU64 runtime_address, void* user_data)
 {
-     return ZydisFormatterFormatInstructionEx(formatter, instruction, buffer, length,
-         runtime_address, ZYAN_NULL);
-}
-
-ZyanStatus ZydisFormatterFormatInstructionEx(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, char* buffer, ZyanUSize length,
-    ZyanU64 runtime_address, void* user_data)
-{
-    if (!formatter || !instruction || !buffer || (length == 0))
+    if (!formatter || !instruction || (operand_count && !operands) ||
+        (operand_count > ZYDIS_MAX_OPERAND_COUNT) ||
+        (operand_count < instruction->operand_count_visible) || !buffer || (length == 0))
     {
         return ZYAN_STATUS_INVALID_ARGUMENT;
     }
@@ -437,6 +463,7 @@ ZyanStatus ZydisFormatterFormatInstructionEx(const ZydisFormatter* formatter,
 
     ZydisFormatterContext context;
     context.instruction     = instruction;
+    context.operands        = operands;
     context.runtime_address = runtime_address;
     context.operand         = ZYAN_NULL;
     context.user_data       = user_data;
@@ -457,19 +484,10 @@ ZyanStatus ZydisFormatterFormatInstructionEx(const ZydisFormatter* formatter,
 }
 
 ZyanStatus ZydisFormatterFormatOperand(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, ZyanU8 index, char* buffer, ZyanUSize length,
-    ZyanU64 runtime_address)
+    const ZydisDecodedInstruction* instruction, const ZydisDecodedOperand* operand,
+    char* buffer, ZyanUSize length, ZyanU64 runtime_address, void* user_data)
 {
-    return ZydisFormatterFormatOperandEx(formatter, instruction, index, buffer, length,
-        runtime_address, ZYAN_NULL);
-}
-
-ZyanStatus ZydisFormatterFormatOperandEx(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, ZyanU8 index, char* buffer, ZyanUSize length,
-    ZyanU64 runtime_address, void* user_data)
-{
-    if (!formatter || !instruction || index >= instruction->operand_count || !buffer ||
-        (length == 0))
+    if (!formatter || !instruction || !operand || !buffer || (length == 0))
     {
         return ZYAN_STATUS_INVALID_ARGUMENT;
     }
@@ -479,8 +497,9 @@ ZyanStatus ZydisFormatterFormatOperandEx(const ZydisFormatter* formatter,
 
     ZydisFormatterContext context;
     context.instruction     = instruction;
+    context.operands        = ZYAN_NULL;
     context.runtime_address = runtime_address;
-    context.operand         = &instruction->operands[index];
+    context.operand         = operand;
     context.user_data       = user_data;
 
     // We ignore `ZYDIS_STATUS_SKIP_TOKEN` for all operand-functions as it does not make any sense
@@ -522,18 +541,14 @@ ZyanStatus ZydisFormatterFormatOperandEx(const ZydisFormatter* formatter,
 /* ---------------------------------------------------------------------------------------------- */
 
 ZyanStatus ZydisFormatterTokenizeInstruction(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, void* buffer, ZyanUSize length,
-    ZyanU64 runtime_address, ZydisFormatterTokenConst** token)
+    const ZydisDecodedInstruction* instruction, const ZydisDecodedOperand* operands,
+    ZyanU8 operand_count, void* buffer, ZyanUSize length, ZyanU64 runtime_address,
+    ZydisFormatterTokenConst** token, void* user_data)
 {
-    return ZydisFormatterTokenizeInstructionEx(formatter, instruction, buffer, length,
-        runtime_address, token, ZYAN_NULL);
-}
-
-ZyanStatus ZydisFormatterTokenizeInstructionEx(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, void* buffer, ZyanUSize length,
-    ZyanU64 runtime_address, ZydisFormatterTokenConst** token, void* user_data)
-{
-    if (!formatter || !instruction || !buffer || (length <= sizeof(ZydisFormatterToken)) || !token)
+    if (!formatter || !instruction || (operand_count && !operands) ||
+        (operand_count > ZYDIS_MAX_OPERAND_COUNT) || 
+        (operand_count < instruction->operand_count_visible) || !buffer ||
+        (length <= sizeof(ZydisFormatterToken)) || !token)
     {
         return ZYAN_STATUS_INVALID_ARGUMENT;
     }
@@ -544,6 +559,7 @@ ZyanStatus ZydisFormatterTokenizeInstructionEx(const ZydisFormatter* formatter,
 
     ZydisFormatterContext context;
     context.instruction     = instruction;
+    context.operands        = operands;
     context.runtime_address = runtime_address;
     context.operand         = ZYAN_NULL;
     context.user_data       = user_data;
@@ -572,18 +588,11 @@ ZyanStatus ZydisFormatterTokenizeInstructionEx(const ZydisFormatter* formatter,
 }
 
 ZyanStatus ZydisFormatterTokenizeOperand(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, ZyanU8 index, void* buffer, ZyanUSize length,
-    ZyanU64 runtime_address, ZydisFormatterTokenConst** token)
+    const ZydisDecodedInstruction* instruction, const ZydisDecodedOperand* operand,
+    void* buffer, ZyanUSize length, ZyanU64 runtime_address, ZydisFormatterTokenConst** token,
+    void* user_data)
 {
-    return ZydisFormatterTokenizeOperandEx(formatter, instruction, index, buffer, length,
-        runtime_address, token, ZYAN_NULL);
-}
-
-ZyanStatus ZydisFormatterTokenizeOperandEx(const ZydisFormatter* formatter,
-    const ZydisDecodedInstruction* instruction, ZyanU8 index, void* buffer, ZyanUSize length,
-    ZyanU64 runtime_address, ZydisFormatterTokenConst** token, void* user_data)
-{
-    if (!formatter || !instruction || (index >= instruction->operand_count) || !buffer ||
+    if (!formatter || !instruction || !operand || !buffer ||
         (length <= sizeof(ZydisFormatterToken)) || !token)
     {
         return ZYAN_STATUS_INVALID_ARGUMENT;
@@ -595,8 +604,9 @@ ZyanStatus ZydisFormatterTokenizeOperandEx(const ZydisFormatter* formatter,
 
     ZydisFormatterContext context;
     context.instruction     = instruction;
+    context.operands        = ZYAN_NULL;
     context.runtime_address = runtime_address;
-    context.operand         = &instruction->operands[index];
+    context.operand         = operand;
     context.user_data       = user_data;
 
     // We ignore `ZYDIS_STATUS_SKIP_TOKEN` for all operand-functions as it does not make any sense

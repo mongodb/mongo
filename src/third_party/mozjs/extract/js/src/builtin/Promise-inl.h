@@ -32,6 +32,14 @@ inline void SetSettledPromiseIsHandled(
   cx->runtime()->removeUnhandledRejectedPromise(cx, unwrappedPromise);
 }
 
+inline void SetAnyPromiseIsHandled(
+    JSContext* cx, JS::Handle<PromiseObject*> unwrappedPromise) {
+  if (unwrappedPromise->state() != JS::PromiseState::Pending) {
+    cx->runtime()->removeUnhandledRejectedPromise(cx, unwrappedPromise);
+  }
+  unwrappedPromise->setHandled();
+}
+
 }  // namespace js
 
 #endif  // builtin_Promise_inl_h

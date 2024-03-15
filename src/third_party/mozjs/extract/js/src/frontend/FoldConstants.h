@@ -10,6 +10,9 @@
 #include "frontend/SyntaxParseHandler.h"
 
 namespace js {
+
+class FrontendContext;
+
 namespace frontend {
 
 class FullParseHandler;
@@ -29,15 +32,15 @@ class ParserAtomsTable;
 //    if (!pn) {
 //        return false;
 //    }
-//    if (!FoldConstants(cx, parserAtoms, &pn, parser)) {
+//    if (!FoldConstants(fc, parserAtoms, &pn, parser)) {
 //        return false;
 //    }
-[[nodiscard]] extern bool FoldConstants(JSContext* cx,
+[[nodiscard]] extern bool FoldConstants(FrontendContext* fc,
                                         ParserAtomsTable& parserAtoms,
                                         ParseNode** pnp,
                                         FullParseHandler* handler);
 
-[[nodiscard]] inline bool FoldConstants(JSContext* cx,
+[[nodiscard]] inline bool FoldConstants(FrontendContext* fc,
                                         ParserAtomsTable& parserAtoms,
                                         typename SyntaxParseHandler::Node* pnp,
                                         SyntaxParseHandler* handler) {

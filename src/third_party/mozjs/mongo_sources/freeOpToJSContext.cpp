@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#include "gc/FreeOp.h"
+#include "gc/GCContext.h"
 #include "jsapi.h"
 #include "vm/JSContext.h"
 #include "vm/Runtime.h"
@@ -38,8 +38,8 @@
 namespace mongo {
 namespace mozjs {
 
-JSContext* freeOpToJSContext(JSFreeOp* fop) {
-    return fop->runtime()->mainContextFromOwnThread();
+JSContext* freeOpToJSContext(JS::GCContext* gcCtx) {
+    return gcCtx->runtime()->mainContextFromOwnThread();
 }
 
 }  // namespace mozjs

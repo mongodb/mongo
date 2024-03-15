@@ -9,7 +9,7 @@
 #include <cstdlib>
 #include <type_traits>
 
-#include "vm/JSFunction.h"
+#include "vm/JSScript.h"
 
 using namespace js;
 using namespace js::jit;
@@ -96,6 +96,9 @@ DefaultJitOptions::DefaultJitOptions() {
   // Toggle whether branch pruning is globally disabled.
   SET_DEFAULT(disablePruning, false);
 
+  // Toggles whether the iterator indices optimization is globally disabled.
+  SET_DEFAULT(disableIteratorIndices, false);
+
   // Toggles whether instruction reordering is globally disabled.
   SET_DEFAULT(disableInstructionReordering, false);
 
@@ -114,23 +117,32 @@ DefaultJitOptions::DefaultJitOptions() {
   // Toggles whether sink code motion is globally disabled.
   SET_DEFAULT(disableSink, true);
 
+  // Toggles whether redundant shape guard elimination is globally disabled.
+  SET_DEFAULT(disableRedundantShapeGuards, false);
+
+  // Toggles whether redundant GC barrier elimination is globally disabled.
+  SET_DEFAULT(disableRedundantGCBarriers, false);
+
   // Toggles whether we verify that we don't recompile with the same CacheIR.
   SET_DEFAULT(disableBailoutLoopCheck, false);
 
   // Whether the Baseline Interpreter is enabled.
   SET_DEFAULT(baselineInterpreter, true);
 
+  // Emit baseline interpreter and interpreter entry frames to distinguish which
+  // JSScript is being interpreted by external profilers.
+  // Enabled by default under --enable-perf, otherwise disabled.
+#if defined(JS_ION_PERF)
+  SET_DEFAULT(emitInterpreterEntryTrampoline, true);
+#else
+  SET_DEFAULT(emitInterpreterEntryTrampoline, false);
+#endif
+
   // Whether the Baseline JIT is enabled.
   SET_DEFAULT(baselineJit, true);
 
   // Whether the IonMonkey JIT is enabled.
   SET_DEFAULT(ion, true);
-
-  // Warp compile Async functions
-  SET_DEFAULT(warpAsync, true);
-
-  // Warp compile Generator functions
-  SET_DEFAULT(warpGenerator, true);
 
   // Whether the IonMonkey and Baseline JITs are enabled for Trusted Principals.
   // (Ignored if ion or baselineJit is set to true.)
@@ -151,6 +163,10 @@ DefaultJitOptions::DefaultJitOptions() {
   // Toggles whether functions may be entered at loop headers.
   SET_DEFAULT(osr, true);
 
+  // Whether the JIT backend (used by JITs, Wasm, Baseline Interpreter) has been
+  // disabled for this process. See JS::DisableJitBackend.
+  SET_DEFAULT(disableJitBackend, false);
+
   // Whether to enable extra code to perform dynamic validations.
   SET_DEFAULT(runExtraChecks, false);
 
@@ -162,6 +178,9 @@ DefaultJitOptions::DefaultJitOptions() {
   // are compiled with the baseline compiler.
   // Duplicated in all.js - ensure both match.
   SET_DEFAULT(baselineJitWarmUpThreshold, 100);
+
+  // Disable eager baseline jit hints
+  SET_DEFAULT(disableJitHints, false);
 
   // How many invocations or loop iterations are needed before functions
   // are considered for trial inlining.
@@ -201,7 +220,7 @@ DefaultJitOptions::DefaultJitOptions() {
   SET_DEFAULT(fullDebugChecks, true);
 
   // How many actual arguments are accepted on the C stack.
-  SET_DEFAULT(maxStackArgs, 4096);
+  SET_DEFAULT(maxStackArgs, 20'000);
 
   // How many times we will try to enter a script via OSR before
   // invalidating the script.
@@ -246,7 +265,8 @@ DefaultJitOptions::DefaultJitOptions() {
     }
   }
 
-#if defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
+    defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_RISCV64)
   SET_DEFAULT(spectreIndexMasking, false);
   SET_DEFAULT(spectreObjectMitigations, false);
   SET_DEFAULT(spectreStringMitigations, false);
@@ -260,9 +280,27 @@ DefaultJitOptions::DefaultJitOptions() {
   SET_DEFAULT(spectreJitToCxxCalls, true);
 #endif
 
-  // These are set to their actual values in InitializeJit.
-  SET_DEFAULT(supportsFloatingPoint, false);
+  // This is set to its actual value in InitializeJit.
   SET_DEFAULT(supportsUnalignedAccesses, false);
+
+  // To access local (non-argument) slots, it's more efficient to use the frame
+  // pointer (FP) instead of the stack pointer (SP) as base register on x86 and
+  // x64 (because instructions are one byte shorter, for example).
+  //
+  // However, because this requires a negative offset from FP, on ARM64 it can
+  // be more efficient to use SP-relative addresses for larger stack frames
+  // because the range for load/store immediate offsets is [-256, 4095] and
+  // offsets outside this range will require an extra instruction.
+  //
+  // We default to FP-relative addresses on x86/x64 and SP-relative on other
+  // platforms, but to improve fuzzing we allow changing this in the shell:
+  //
+  //   setJitCompilerOption("base-reg-for-locals", N); // 0 for SP, 1 for FP
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+  baseRegForLocals = BaseRegForAddress::FP;
+#else
+  baseRegForLocals = BaseRegForAddress::SP;
+#endif
 
   // Toggles the optimization whereby offsets are folded into loads and not
   // included in the bounds check.
@@ -277,29 +315,17 @@ DefaultJitOptions::DefaultJitOptions() {
   // Until which wasm bytecode size should we accumulate functions, in order
   // to compile efficiently on helper threads. Baseline code compiles much
   // faster than Ion code so use scaled thresholds (see also bug 1320374).
-  // Cranelift compiles at about half the speed of Ion, but is much more
-  // affected by malloc/free costs, so set its threshold relatively high, in
-  // order to reduce overall allocation costs.  See bug 1586791.
   SET_DEFAULT(wasmBatchBaselineThreshold, 10000);
   SET_DEFAULT(wasmBatchIonThreshold, 1100);
-  SET_DEFAULT(wasmBatchCraneliftThreshold, 5000);
 
-#ifdef JS_TRACE_LOGGING
-  // Toggles whether the traceLogger should be on or off.  In either case,
-  // some data structures will always be created and initialized such as
-  // the traceLoggerState.  However, unless this option is set to true
-  // the traceLogger will not be recording any events.
-  SET_DEFAULT(enableTraceLogger, false);
-#endif
+  // Controls how much assertion checking code is emitted
+  SET_DEFAULT(lessDebugCode, false);
 
-  // Dumps a representation of parsed regexps to stderr
-  SET_DEFAULT(traceRegExpParser, false);
-  // Dumps the calls made to the regexp assembler to stderr
-  SET_DEFAULT(traceRegExpAssembler, false);
-  // Dumps the bytecodes interpreted by the regexp engine to stderr
-  SET_DEFAULT(traceRegExpInterpreter, false);
-  // Dumps the changes made by the regexp peephole optimizer to stderr
-  SET_DEFAULT(traceRegExpPeephole, false);
+  // Whether the MegamorphicCache is enabled.
+  SET_DEFAULT(enableWatchtowerMegamorphic, true);
+
+  SET_DEFAULT(onlyInlineSelfHosted, false);
+  SET_DEFAULT(enableICFramePointers, false);
 
   SET_DEFAULT(enableWasmJitExit, true);
   SET_DEFAULT(enableWasmJitEntry, true);
@@ -307,6 +333,43 @@ DefaultJitOptions::DefaultJitOptions() {
 #ifdef WASM_CODEGEN_DEBUG
   SET_DEFAULT(enableWasmImportCallSpew, false);
   SET_DEFAULT(enableWasmFuncCallSpew, false);
+#endif
+
+  // This is used to control whether regexps tier up from interpreted to
+  // compiled. We control this with --no-native-regexp and
+  // --regexp-warmup-threshold.
+  SET_DEFAULT(regexp_tier_up, true);
+
+  // Dumps a representation of parsed regexps to stderr
+  SET_DEFAULT(trace_regexp_parser, false);
+  // Dumps the calls made to the regexp assembler to stderr
+  SET_DEFAULT(trace_regexp_assembler, false);
+  // Dumps the bytecodes interpreted by the regexp engine to stderr
+  SET_DEFAULT(trace_regexp_bytecodes, false);
+  // Dumps the changes made by the regexp peephole optimizer to stderr
+  SET_DEFAULT(trace_regexp_peephole_optimization, false);
+
+  // ***** Irregexp shim flags *****
+
+  // V8 uses this for differential fuzzing to handle stack overflows.
+  // We address the same problem in StackLimitCheck::HasOverflowed.
+  SET_DEFAULT(correctness_fuzzer_suppressions, false);
+  // Instead of using a flag for this, we provide an implementation of
+  // CanReadUnaligned in SMRegExpMacroAssembler.
+  SET_DEFAULT(enable_regexp_unaligned_accesses, false);
+  // This is used to guard an old prototype implementation of possessive
+  // quantifiers, which never got past the point of adding parser support.
+  SET_DEFAULT(regexp_possessive_quantifier, false);
+  // These affect the default level of optimization. We can still turn
+  // optimization off on a case-by-case basis in CompilePattern - for
+  // example, if a regexp is too long - so we might as well turn these
+  // flags on unconditionally.
+  SET_DEFAULT(regexp_optimization, true);
+#if MOZ_BIG_ENDIAN()
+  // peephole optimization not supported on big endian
+  SET_DEFAULT(regexp_peephole_optimization, false);
+#else
+  SET_DEFAULT(regexp_peephole_optimization, true);
 #endif
 }
 

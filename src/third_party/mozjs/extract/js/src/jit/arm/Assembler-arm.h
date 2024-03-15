@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <type_traits>
 
 #include "jit/arm/Architecture-arm.h"
 #include "jit/arm/disasm/Disasm-arm.h"
@@ -20,7 +21,7 @@
 #include "jit/shared/Assembler-shared.h"
 #include "jit/shared/Disassembler-shared.h"
 #include "jit/shared/IonAssemblerBufferWithConstantPools.h"
-#include "wasm/WasmTypes.h"
+#include "wasm/WasmTypeDecls.h"
 
 union PoolHintPun;
 
@@ -179,26 +180,27 @@ static constexpr Register ABINonVolatileReg = r6;
 // and non-volatile registers.
 static constexpr Register ABINonArgReturnVolatileReg = lr;
 
-// TLS pointer argument register for WebAssembly functions. This must not alias
-// any other register used for passing function arguments or return values.
-// Preserved by WebAssembly functions.
-static constexpr Register WasmTlsReg = r9;
+// Instance pointer argument register for WebAssembly functions. This must not
+// alias any other register used for passing function arguments or return
+// values. Preserved by WebAssembly functions.
+static constexpr Register InstanceReg = r9;
 
 // Registers used for wasm table calls. These registers must be disjoint
-// from the ABI argument registers, WasmTlsReg and each other.
+// from the ABI argument registers, InstanceReg and each other.
 static constexpr Register WasmTableCallScratchReg0 = ABINonArgReg0;
 static constexpr Register WasmTableCallScratchReg1 = ABINonArgReg1;
 static constexpr Register WasmTableCallSigReg = ABINonArgReg2;
 static constexpr Register WasmTableCallIndexReg = ABINonArgReg3;
 
-// Register used as a scratch along the return path in the fast js -> wasm stub
-// code.  This must not overlap ReturnReg, JSReturnOperand, or WasmTlsReg.  It
-// must be a volatile register.
-static constexpr Register WasmJitEntryReturnScratch = r5;
+// Registers used for ref calls.
+static constexpr Register WasmCallRefCallScratchReg0 = ABINonArgReg0;
+static constexpr Register WasmCallRefCallScratchReg1 = ABINonArgReg1;
+static constexpr Register WasmCallRefReg = ABINonArgReg3;
 
-// Register used to store a reference to an exception thrown by Wasm to an
-// exception handling block. Should not overlap with WasmTlsReg.
-static constexpr Register WasmExceptionReg = ABINonArgReg2;
+// Register used as a scratch along the return path in the fast js -> wasm stub
+// code.  This must not overlap ReturnReg, JSReturnOperand, or InstanceReg.
+// It must be a volatile register.
+static constexpr Register WasmJitEntryReturnScratch = r5;
 
 static constexpr Register PreBarrierReg = r1;
 
@@ -250,15 +252,20 @@ struct ScratchDoubleScope : public AutoFloatRegisterScope {
       : AutoFloatRegisterScope(masm, ScratchDoubleReg_) {}
 };
 
-// Registerd used in RegExpMatcher instruction (do not use JSReturnOperand).
+// Registers used by RegExpMatcher and RegExpExecMatch stubs (do not use
+// JSReturnOperand).
 static constexpr Register RegExpMatcherRegExpReg = CallTempReg0;
 static constexpr Register RegExpMatcherStringReg = CallTempReg1;
 static constexpr Register RegExpMatcherLastIndexReg = CallTempReg2;
 
-// Registerd used in RegExpTester instruction (do not use ReturnReg).
-static constexpr Register RegExpTesterRegExpReg = CallTempReg0;
-static constexpr Register RegExpTesterStringReg = CallTempReg1;
-static constexpr Register RegExpTesterLastIndexReg = CallTempReg2;
+// Registers used by RegExpExecTest stub (do not use ReturnReg).
+static constexpr Register RegExpExecTestRegExpReg = CallTempReg0;
+static constexpr Register RegExpExecTestStringReg = CallTempReg1;
+
+// Registers used by RegExpSearcher stub (do not use ReturnReg).
+static constexpr Register RegExpSearcherRegExpReg = CallTempReg0;
+static constexpr Register RegExpSearcherStringReg = CallTempReg1;
+static constexpr Register RegExpSearcherLastIndexReg = CallTempReg2;
 
 static constexpr FloatRegister d0 = {FloatRegisters::d0, VFPRegister::Double};
 static constexpr FloatRegister d1 = {FloatRegisters::d1, VFPRegister::Double};
@@ -312,7 +319,6 @@ static const uint32_t WasmTrapInstructionLength = 4;
 // See comments in wasm::GenerateFunctionPrologue.  The difference between these
 // is the size of the largest callable prologue on the platform.
 static constexpr uint32_t WasmCheckedCallEntryOffset = 0u;
-static constexpr uint32_t WasmCheckedTailEntryOffset = 12u;
 
 static const Scale ScalePointer = TimesFour;
 
@@ -1257,10 +1263,6 @@ class Assembler : public AssemblerShared {
 #endif
   }
 
-  // We need to wait until an AutoJitContextAlloc is created by the
-  // MacroAssembler, before allocating any space.
-  void initWithAllocator() { m_buffer.initWithAllocator(); }
-
   void setUnlimitedBuffer() { m_buffer.setUnlimited(); }
 
   static Condition InvertCondition(Condition cond);
@@ -1338,6 +1340,7 @@ class Assembler : public AssemblerShared {
   // Write a single instruction into the instruction stream.  Very hot,
   // inlined for performance
   MOZ_ALWAYS_INLINE BufferOffset writeInst(uint32_t x) {
+    MOZ_ASSERT(hasCreator());
     BufferOffset offs = m_buffer.putInt(x);
 #ifdef JS_DISASM_ARM
     spew(m_buffer.getInstOrNull(offs));
@@ -1686,7 +1689,10 @@ class Assembler : public AssemblerShared {
 
   static bool SupportsFloatingPoint() { return HasVFP(); }
   static bool SupportsUnalignedAccesses() { return HasARMv7(); }
-  static bool SupportsFastUnalignedAccesses() { return false; }
+  // Note, returning false here is technically wrong, but one has to go via the
+  // as_vldr_unaligned and as_vstr_unaligned instructions to get proper behavior
+  // and those are NEON-specific and have to be asked for specifically.
+  static bool SupportsFastUnalignedFPAccesses() { return false; }
 
   static bool HasRoundInstruction(RoundingMode mode) { return false; }
 
@@ -1877,8 +1883,6 @@ class Assembler : public AssemblerShared {
   static void ToggleToJmp(CodeLocationLabel inst_);
   static void ToggleToCmp(CodeLocationLabel inst_);
 
-  static uint8_t* BailoutTableStart(uint8_t* code);
-
   static size_t ToggledCallSize(uint8_t* code);
   static void ToggleCall(CodeLocationLabel inst_, bool enabled);
 
@@ -1960,7 +1964,11 @@ class InstDTR : public Instruction {
   // TODO: Replace the initialization with something that is safer.
   InstDTR(LoadStore ls, IsByte_ ib, Index mode, Register rt, DTRAddr addr,
           Assembler::Condition c)
-      : Instruction(ls | ib | mode | RT(rt) | addr.encode() | IsDTR, c) {}
+      : Instruction(std::underlying_type_t<LoadStore>(ls) |
+                        std::underlying_type_t<IsByte_>(ib) |
+                        std::underlying_type_t<Index>(mode) | RT(rt) |
+                        addr.encode() | IsDTR,
+                    c) {}
 
   static bool IsTHIS(const Instruction& i);
   static InstDTR* AsTHIS(const Instruction& i);

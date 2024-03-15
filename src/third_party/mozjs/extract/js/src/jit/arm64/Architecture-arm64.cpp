@@ -114,13 +114,16 @@ FloatRegisterSet FloatRegister::BroadcastToAllSizes(const FloatRegisterSet& s) {
 
 uint32_t GetARM64Flags() { return 0; }
 
-void FlushICache(void* code, size_t size, bool codeIsThreadLocal) {
-  vixl::CPU::EnsureIAndDCacheCoherency(code, size, codeIsThreadLocal);
+// CPU flags handling on ARM64 is currently different from other platforms:
+// the flags are computed and stored per-assembler and are thus "always
+// computed".
+bool CPUFlagsHaveBeenComputed() { return true; }
+
+void FlushICache(void* code, size_t size) {
+  vixl::CPU::EnsureIAndDCacheCoherency(code, size);
 }
 
-bool CanFlushICacheFromBackgroundThreads() {
-  return vixl::CPU::CanFlushICacheFromBackgroundThreads();
-}
+void FlushExecutionContext() { vixl::CPU::FlushExecutionContext(); }
 
 }  // namespace jit
 }  // namespace js

@@ -11,14 +11,14 @@
 
 #include "ds/Nestable.h"
 #include "frontend/NameCollections.h"
-#include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
-#include "js/TypeDecls.h"
-#include "vm/Stack.h"
 
 namespace js {
 namespace frontend {
 
 struct BytecodeEmitter;
+class TaggedParserAtomIndex;
+
+enum MaybeCheckTDZ { CheckTDZ = true, DontCheckTDZ = false };
 
 using CheckTDZMap = RecyclableNameMap<MaybeCheckTDZ>;
 

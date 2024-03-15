@@ -60,10 +60,14 @@ class WeakCacheBase : public mozilla::LinkedListElement<WeakCacheBase> {
   WeakCacheBase(WeakCacheBase&& other) = default;
   virtual ~WeakCacheBase() = default;
 
-  virtual size_t sweep(js::gc::StoreBuffer* sbToLock) = 0;
-  virtual bool needsSweep() = 0;
+  virtual size_t traceWeak(JSTracer* trc, js::gc::StoreBuffer* sbToLock) = 0;
 
-  virtual bool setNeedsIncrementalBarrier(bool needs) {
+  // Sweeping will be skipped if the cache is empty already.
+  virtual bool empty() = 0;
+
+  // Enable/disable read barrier during incremental sweeping and set the tracer
+  // to use.
+  virtual bool setIncrementalBarrierTracer(JSTracer* trc) {
     // Derived classes do not support incremental barriers by default.
     return false;
   }
@@ -96,7 +100,7 @@ class WeakCache : protected detail::WeakCacheBase,
   const T& get() const { return cache; }
   T& get() { return cache; }
 
-  size_t sweep(js::gc::StoreBuffer* sbToLock) override {
+  size_t traceWeak(JSTracer* trc, js::gc::StoreBuffer* sbToLock) override {
     // Take the store buffer lock in case sweeping triggers any generational
     // post barriers. This is not always required and WeakCache specializations
     // may delay or skip taking the lock as appropriate.
@@ -105,11 +109,11 @@ class WeakCache : protected detail::WeakCacheBase,
       lock.emplace(sbToLock);
     }
 
-    GCPolicy<T>::sweep(&cache);
+    GCPolicy<T>::traceWeak(trc, &cache);
     return 0;
   }
 
-  bool needsSweep() override { return cache.needsSweep(); }
+  bool empty() override { return cache.empty(); }
 } JS_HAZ_NON_GC_POINTER;
 
 }  // namespace JS

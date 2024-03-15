@@ -49,6 +49,8 @@ class LIRGeneratorARM : public LIRGeneratorShared {
   void lowerForALU(LInstructionHelper<1, 2, 0>* ins, MDefinition* mir,
                    MDefinition* lhs, MDefinition* rhs);
 
+  void lowerForALUInt64(LInstructionHelper<INT64_PIECES, INT64_PIECES, 0>* ins,
+                        MDefinition* mir, MDefinition* input);
   void lowerForALUInt64(
       LInstructionHelper<INT64_PIECES, 2 * INT64_PIECES, 0>* ins,
       MDefinition* mir, MDefinition* lhs, MDefinition* rhs);

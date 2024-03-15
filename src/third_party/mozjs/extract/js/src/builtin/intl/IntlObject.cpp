@@ -9,39 +9,36 @@
 #include "builtin/intl/IntlObject.h"
 
 #include "mozilla/Assertions.h"
-#include "mozilla/Likely.h"
-#include "mozilla/Range.h"
+#include "mozilla/intl/Calendar.h"
+#include "mozilla/intl/Collator.h"
+#include "mozilla/intl/Currency.h"
+#include "mozilla/intl/Locale.h"
+#include "mozilla/intl/MeasureUnitGenerated.h"
+#include "mozilla/intl/TimeZone.h"
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <iterator>
-
-#include "jsapi.h"
+#include <string_view>
 
 #include "builtin/Array.h"
-#include "builtin/intl/Collator.h"
 #include "builtin/intl/CommonFunctions.h"
-#include "builtin/intl/DateTimeFormat.h"
-#include "builtin/intl/LanguageTag.h"
-#include "builtin/intl/NumberFormat.h"
-#include "builtin/intl/PluralRules.h"
-#include "builtin/intl/RelativeTimeFormat.h"
-#include "builtin/intl/ScopedICUObject.h"
+#include "builtin/intl/FormatBuffer.h"
+#include "builtin/intl/NumberingSystemsGenerated.h"
 #include "builtin/intl/SharedIntlData.h"
-#include "js/CharacterEncoding.h"
+#include "builtin/intl/StringAsciiChars.h"
+#include "ds/Sort.h"
 #include "js/Class.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
+#include "js/GCAPI.h"
+#include "js/GCVector.h"
 #include "js/PropertySpec.h"
 #include "js/Result.h"
 #include "js/StableStringChars.h"
-#include "unicode/ucal.h"
-#include "unicode/udat.h"
-#include "unicode/udatpg.h"
-#include "unicode/uloc.h"
-#include "unicode/utypes.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSAtom.h"
 #include "vm/JSContext.h"
-#include "vm/JSObject.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/StringType.h"
 #include "vm/WellKnownAtom.h"  // js_*_str
@@ -50,15 +47,6 @@
 #include "vm/NativeObject-inl.h"
 
 using namespace js;
-
-using mozilla::Range;
-using mozilla::RangedPtr;
-
-using JS::AutoStableStringChars;
-
-using js::intl::CallICU;
-using js::intl::DateTimeFormatOptions;
-using js::intl::IcuLocale;
 
 /******************** Intl ********************/
 
@@ -71,87 +59,50 @@ bool js::intl_GetCalendarInfo(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  UErrorCode status = U_ZERO_ERROR;
-  const UChar* uTimeZone = nullptr;
-  int32_t uTimeZoneLength = 0;
-  UCalendar* cal = ucal_open(uTimeZone, uTimeZoneLength, locale.get(),
-                             UCAL_DEFAULT, &status);
-  if (U_FAILURE(status)) {
-    intl::ReportInternalError(cx);
+  auto result = mozilla::intl::Calendar::TryCreate(locale.get());
+  if (result.isErr()) {
+    intl::ReportInternalError(cx, result.unwrapErr());
     return false;
   }
-  ScopedICUObject<UCalendar, ucal_close> toClose(cal);
+  auto calendar = result.unwrap();
 
-  RootedObject info(cx, NewBuiltinClassInstance<PlainObject>(cx));
+  RootedObject info(cx, NewPlainObject(cx));
   if (!info) {
     return false;
   }
 
   RootedValue v(cx);
-  int32_t firstDayOfWeek = ucal_getAttribute(cal, UCAL_FIRST_DAY_OF_WEEK);
-  v.setInt32(firstDayOfWeek);
 
+  v.setInt32(static_cast<int32_t>(calendar->GetFirstDayOfWeek()));
   if (!DefineDataProperty(cx, info, cx->names().firstDayOfWeek, v)) {
     return false;
   }
 
-  int32_t minDays = ucal_getAttribute(cal, UCAL_MINIMAL_DAYS_IN_FIRST_WEEK);
-  v.setInt32(minDays);
+  v.setInt32(calendar->GetMinimalDaysInFirstWeek());
   if (!DefineDataProperty(cx, info, cx->names().minDays, v)) {
     return false;
   }
 
-  UCalendarWeekdayType prevDayType =
-      ucal_getDayOfWeekType(cal, UCAL_SATURDAY, &status);
-  if (U_FAILURE(status)) {
-    intl::ReportInternalError(cx);
+  Rooted<ArrayObject*> weekendArray(cx, NewDenseEmptyArray(cx));
+  if (!weekendArray) {
     return false;
   }
 
-  RootedValue weekendStart(cx), weekendEnd(cx);
+  auto weekend = calendar->GetWeekend();
+  if (weekend.isErr()) {
+    intl::ReportInternalError(cx, weekend.unwrapErr());
+    return false;
+  }
 
-  for (int i = UCAL_SUNDAY; i <= UCAL_SATURDAY; i++) {
-    UCalendarDaysOfWeek dayOfWeek = static_cast<UCalendarDaysOfWeek>(i);
-    UCalendarWeekdayType type = ucal_getDayOfWeekType(cal, dayOfWeek, &status);
-    if (U_FAILURE(status)) {
-      intl::ReportInternalError(cx);
+  for (auto day : weekend.unwrap()) {
+    if (!NewbornArrayPush(cx, weekendArray,
+                          Int32Value(static_cast<int32_t>(day)))) {
       return false;
     }
-
-    if (prevDayType != type) {
-      switch (type) {
-        case UCAL_WEEKDAY:
-          // If the first Weekday after Weekend is Sunday (1),
-          // then the last Weekend day is Saturday (7).
-          // Otherwise we'll just take the previous days number.
-          weekendEnd.setInt32(i == 1 ? 7 : i - 1);
-          break;
-        case UCAL_WEEKEND:
-          weekendStart.setInt32(i);
-          break;
-        case UCAL_WEEKEND_ONSET:
-        case UCAL_WEEKEND_CEASE:
-          // At the time this code was added, ICU apparently never behaves this
-          // way, so just throw, so that users will report a bug and we can
-          // decide what to do.
-          intl::ReportInternalError(cx);
-          return false;
-        default:
-          break;
-      }
-    }
-
-    prevDayType = type;
   }
 
-  MOZ_ASSERT(weekendStart.isInt32());
-  MOZ_ASSERT(weekendEnd.isInt32());
-
-  if (!DefineDataProperty(cx, info, cx->names().weekendStart, weekendStart)) {
-    return false;
-  }
-
-  if (!DefineDataProperty(cx, info, cx->names().weekendEnd, weekendEnd)) {
+  v.setObject(*weekendArray);
+  if (!DefineDataProperty(cx, info, cx->names().weekend, v)) {
     return false;
   }
 
@@ -159,359 +110,11 @@ bool js::intl_GetCalendarInfo(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
-static void ReportBadKey(JSContext* cx, HandleString key) {
+static void ReportBadKey(JSContext* cx, JSString* key) {
   if (UniqueChars chars = QuoteString(cx, key, '"')) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INVALID_KEY,
                               chars.get());
   }
-}
-
-template <typename ConstChar>
-static bool MatchPart(RangedPtr<ConstChar> iter, const RangedPtr<ConstChar> end,
-                      const char* part, size_t partlen) {
-  for (size_t i = 0; i < partlen; iter++, i++) {
-    if (iter == end || *iter != part[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-template <typename ConstChar, size_t N>
-inline bool MatchPart(RangedPtr<ConstChar>* iter,
-                      const RangedPtr<ConstChar> end, const char (&part)[N]) {
-  if (!MatchPart(*iter, end, part, N - 1)) {
-    return false;
-  }
-
-  *iter += N - 1;
-  return true;
-}
-
-enum class DisplayNameStyle {
-  Narrow,
-  Short,
-  Long,
-};
-
-template <typename ConstChar>
-static JSString* ComputeSingleDisplayName(JSContext* cx, UDateFormat* fmt,
-                                          UDateTimePatternGenerator* dtpg,
-                                          DisplayNameStyle style,
-                                          const Range<ConstChar>& pattern,
-                                          HandleString patternString) {
-  RangedPtr<ConstChar> iter = pattern.begin();
-  const RangedPtr<ConstChar> end = pattern.end();
-
-  auto MatchSlash = [cx, patternString, &iter, end]() {
-    if (MOZ_LIKELY(iter != end && *iter == '/')) {
-      iter++;
-      return true;
-    }
-
-    ReportBadKey(cx, patternString);
-    return false;
-  };
-
-  if (!MatchPart(&iter, end, "dates")) {
-    ReportBadKey(cx, patternString);
-    return nullptr;
-  }
-
-  if (!MatchSlash()) {
-    return nullptr;
-  }
-
-  if (MatchPart(&iter, end, "fields")) {
-    if (!MatchSlash()) {
-      return nullptr;
-    }
-
-    UDateTimePatternField fieldType;
-
-    if (MatchPart(&iter, end, "year")) {
-      fieldType = UDATPG_YEAR_FIELD;
-    } else if (MatchPart(&iter, end, "month")) {
-      fieldType = UDATPG_MONTH_FIELD;
-    } else if (MatchPart(&iter, end, "week")) {
-      fieldType = UDATPG_WEEK_OF_YEAR_FIELD;
-    } else if (MatchPart(&iter, end, "day")) {
-      fieldType = UDATPG_DAY_FIELD;
-    } else {
-      ReportBadKey(cx, patternString);
-      return nullptr;
-    }
-
-    // This part must be the final part with no trailing data.
-    if (iter != end) {
-      ReportBadKey(cx, patternString);
-      return nullptr;
-    }
-
-    int32_t resultSize;
-    const UChar* value = udatpg_getAppendItemName(dtpg, fieldType, &resultSize);
-    MOZ_ASSERT(resultSize >= 0);
-
-    return NewStringCopyN<CanGC>(cx, value, size_t(resultSize));
-  }
-
-  if (MatchPart(&iter, end, "gregorian")) {
-    if (!MatchSlash()) {
-      return nullptr;
-    }
-
-    UDateFormatSymbolType symbolType;
-    int32_t index;
-
-    if (MatchPart(&iter, end, "months")) {
-      if (!MatchSlash()) {
-        return nullptr;
-      }
-
-      switch (style) {
-        case DisplayNameStyle::Narrow:
-          symbolType = UDAT_STANDALONE_NARROW_MONTHS;
-          break;
-
-        case DisplayNameStyle::Short:
-          symbolType = UDAT_STANDALONE_SHORT_MONTHS;
-          break;
-
-        case DisplayNameStyle::Long:
-          symbolType = UDAT_STANDALONE_MONTHS;
-          break;
-      }
-
-      if (MatchPart(&iter, end, "january")) {
-        index = UCAL_JANUARY;
-      } else if (MatchPart(&iter, end, "february")) {
-        index = UCAL_FEBRUARY;
-      } else if (MatchPart(&iter, end, "march")) {
-        index = UCAL_MARCH;
-      } else if (MatchPart(&iter, end, "april")) {
-        index = UCAL_APRIL;
-      } else if (MatchPart(&iter, end, "may")) {
-        index = UCAL_MAY;
-      } else if (MatchPart(&iter, end, "june")) {
-        index = UCAL_JUNE;
-      } else if (MatchPart(&iter, end, "july")) {
-        index = UCAL_JULY;
-      } else if (MatchPart(&iter, end, "august")) {
-        index = UCAL_AUGUST;
-      } else if (MatchPart(&iter, end, "september")) {
-        index = UCAL_SEPTEMBER;
-      } else if (MatchPart(&iter, end, "october")) {
-        index = UCAL_OCTOBER;
-      } else if (MatchPart(&iter, end, "november")) {
-        index = UCAL_NOVEMBER;
-      } else if (MatchPart(&iter, end, "december")) {
-        index = UCAL_DECEMBER;
-      } else {
-        ReportBadKey(cx, patternString);
-        return nullptr;
-      }
-    } else if (MatchPart(&iter, end, "weekdays")) {
-      if (!MatchSlash()) {
-        return nullptr;
-      }
-
-      switch (style) {
-        case DisplayNameStyle::Narrow:
-          symbolType = UDAT_STANDALONE_NARROW_WEEKDAYS;
-          break;
-
-        case DisplayNameStyle::Short:
-          symbolType = UDAT_STANDALONE_SHORT_WEEKDAYS;
-          break;
-
-        case DisplayNameStyle::Long:
-          symbolType = UDAT_STANDALONE_WEEKDAYS;
-          break;
-      }
-
-      if (MatchPart(&iter, end, "monday")) {
-        index = UCAL_MONDAY;
-      } else if (MatchPart(&iter, end, "tuesday")) {
-        index = UCAL_TUESDAY;
-      } else if (MatchPart(&iter, end, "wednesday")) {
-        index = UCAL_WEDNESDAY;
-      } else if (MatchPart(&iter, end, "thursday")) {
-        index = UCAL_THURSDAY;
-      } else if (MatchPart(&iter, end, "friday")) {
-        index = UCAL_FRIDAY;
-      } else if (MatchPart(&iter, end, "saturday")) {
-        index = UCAL_SATURDAY;
-      } else if (MatchPart(&iter, end, "sunday")) {
-        index = UCAL_SUNDAY;
-      } else {
-        ReportBadKey(cx, patternString);
-        return nullptr;
-      }
-    } else if (MatchPart(&iter, end, "dayperiods")) {
-      if (!MatchSlash()) {
-        return nullptr;
-      }
-
-      symbolType = UDAT_AM_PMS;
-
-      if (MatchPart(&iter, end, "am")) {
-        index = UCAL_AM;
-      } else if (MatchPart(&iter, end, "pm")) {
-        index = UCAL_PM;
-      } else {
-        ReportBadKey(cx, patternString);
-        return nullptr;
-      }
-    } else {
-      ReportBadKey(cx, patternString);
-      return nullptr;
-    }
-
-    // This part must be the final part with no trailing data.
-    if (iter != end) {
-      ReportBadKey(cx, patternString);
-      return nullptr;
-    }
-
-    return CallICU(cx, [fmt, symbolType, index](UChar* chars, int32_t size,
-                                                UErrorCode* status) {
-      return udat_getSymbols(fmt, symbolType, index, chars, size, status);
-    });
-  }
-
-  ReportBadKey(cx, patternString);
-  return nullptr;
-}
-
-bool js::intl_ComputeDisplayNames(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-  MOZ_ASSERT(args.length() == 3);
-
-  // 1. Assert: locale is a string.
-  UniqueChars locale = intl::EncodeLocale(cx, args[0].toString());
-  if (!locale) {
-    return false;
-  }
-
-  // 2. Assert: style is a string.
-  DisplayNameStyle dnStyle;
-  {
-    JSLinearString* style = args[1].toString()->ensureLinear(cx);
-    if (!style) {
-      return false;
-    }
-
-    if (StringEqualsLiteral(style, "narrow")) {
-      dnStyle = DisplayNameStyle::Narrow;
-    } else if (StringEqualsLiteral(style, "short")) {
-      dnStyle = DisplayNameStyle::Short;
-    } else {
-      MOZ_ASSERT(StringEqualsLiteral(style, "long"));
-      dnStyle = DisplayNameStyle::Long;
-    }
-  }
-
-  // 3. Assert: keys is an Array.
-  RootedArrayObject keys(cx, &args[2].toObject().as<ArrayObject>());
-  if (!keys) {
-    return false;
-  }
-
-  // 4. Let result be ArrayCreate(0).
-  RootedArrayObject result(cx, NewDenseFullyAllocatedArray(cx, keys->length()));
-  if (!result) {
-    return false;
-  }
-  result->ensureDenseInitializedLength(0, keys->length());
-
-  UErrorCode status = U_ZERO_ERROR;
-
-  UDateFormat* fmt =
-      udat_open(UDAT_DEFAULT, UDAT_DEFAULT, IcuLocale(locale.get()), nullptr, 0,
-                nullptr, 0, &status);
-  if (U_FAILURE(status)) {
-    intl::ReportInternalError(cx);
-    return false;
-  }
-  ScopedICUObject<UDateFormat, udat_close> datToClose(fmt);
-
-  // UDateTimePatternGenerator will be needed for translations of date and
-  // time fields like "month", "week", "day" etc.
-  UDateTimePatternGenerator* dtpg =
-      udatpg_open(IcuLocale(locale.get()), &status);
-  if (U_FAILURE(status)) {
-    intl::ReportInternalError(cx);
-    return false;
-  }
-  ScopedICUObject<UDateTimePatternGenerator, udatpg_close> datPgToClose(dtpg);
-
-  // 5. For each element of keys,
-  RootedString keyValStr(cx);
-  RootedValue v(cx);
-  for (uint32_t i = 0; i < keys->length(); i++) {
-    if (!GetElement(cx, keys, keys, i, &v)) {
-      return false;
-    }
-
-    keyValStr = v.toString();
-
-    AutoStableStringChars stablePatternChars(cx);
-    if (!stablePatternChars.init(cx, keyValStr)) {
-      return false;
-    }
-
-    // 5.a. Perform an implementation dependent algorithm to map a key to a
-    //      corresponding display name.
-    JSString* displayName =
-        stablePatternChars.isLatin1()
-            ? ComputeSingleDisplayName(cx, fmt, dtpg, dnStyle,
-                                       stablePatternChars.latin1Range(),
-                                       keyValStr)
-            : ComputeSingleDisplayName(cx, fmt, dtpg, dnStyle,
-                                       stablePatternChars.twoByteRange(),
-                                       keyValStr);
-    if (!displayName) {
-      return false;
-    }
-
-    // 5.b. Append the result string to result.
-    result->setDenseElement(i, StringValue(displayName));
-  }
-
-  // 6. Return result.
-  args.rval().setObject(*result);
-  return true;
-}
-
-bool js::intl_GetLocaleInfo(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-  MOZ_ASSERT(args.length() == 1);
-
-  UniqueChars locale = intl::EncodeLocale(cx, args[0].toString());
-  if (!locale) {
-    return false;
-  }
-
-  RootedObject info(cx, NewBuiltinClassInstance<PlainObject>(cx));
-  if (!info) {
-    return false;
-  }
-
-  if (!DefineDataProperty(cx, info, cx->names().locale, args[0])) {
-    return false;
-  }
-
-  bool rtl = uloc_isRightToLeft(IcuLocale(locale.get()));
-
-  RootedValue dir(cx, StringValue(rtl ? cx->names().rtl : cx->names().ltr));
-
-  if (!DefineDataProperty(cx, info, cx->names().direction, dir)) {
-    return false;
-  }
-
-  args.rval().setObject(*info);
-  return true;
 }
 
 static bool SameOrParentLocale(JSLinearString* locale,
@@ -534,8 +137,8 @@ using SupportedLocaleKind = js::intl::SharedIntlData::SupportedLocaleKind;
 
 // 9.2.2 BestAvailableLocale ( availableLocales, locale )
 static JS::Result<JSLinearString*> BestAvailableLocale(
-    JSContext* cx, SupportedLocaleKind kind, HandleLinearString locale,
-    HandleLinearString defaultLocale) {
+    JSContext* cx, SupportedLocaleKind kind, Handle<JSLinearString*> locale,
+    Handle<JSLinearString*> defaultLocale) {
   // In the spec, [[availableLocales]] is formally a list of all available
   // locales. But in our implementation, it's an *incomplete* list, not
   // necessarily including the default locale (and all locales implied by it,
@@ -566,7 +169,7 @@ static JS::Result<JSLinearString*> BestAvailableLocale(
   };
 
   // Step 1.
-  RootedLinearString candidate(cx, locale);
+  Rooted<JSLinearString*> candidate(cx, locale);
 
   // Step 2.
   while (true) {
@@ -644,42 +247,67 @@ bool js::intl_BestAvailableLocale(JSContext* cx, unsigned argc, Value* vp) {
     }
   }
 
-  RootedLinearString locale(cx, args[1].toString()->ensureLinear(cx));
+  Rooted<JSLinearString*> locale(cx, args[1].toString()->ensureLinear(cx));
   if (!locale) {
     return false;
   }
 
 #ifdef DEBUG
   {
-    intl::LanguageTag tag(cx);
-    bool ok;
-    JS_TRY_VAR_OR_RETURN_FALSE(
-        cx, ok, intl::LanguageTagParser::tryParse(cx, locale, tag));
-    MOZ_ASSERT(ok, "locale is a structurally valid language tag");
+    MOZ_ASSERT(StringIsAscii(locale), "language tags are ASCII-only");
 
-    MOZ_ASSERT(!tag.unicodeExtension(),
-               "locale must contain no Unicode extensions");
+    // |locale| is a structurally valid language tag.
+    mozilla::intl::Locale tag;
 
-    if (!tag.canonicalize(cx)) {
+    using ParserError = mozilla::intl::LocaleParser::ParserError;
+    mozilla::Result<mozilla::Ok, ParserError> parse_result = Ok();
+    {
+      intl::StringAsciiChars chars(locale);
+      if (!chars.init(cx)) {
+        return false;
+      }
+
+      parse_result = mozilla::intl::LocaleParser::TryParse(chars, tag);
+    }
+
+    if (parse_result.isErr()) {
+      MOZ_ASSERT(parse_result.unwrapErr() == ParserError::OutOfMemory,
+                 "locale is a structurally valid language tag");
+
+      intl::ReportInternalError(cx);
       return false;
     }
 
-    JSString* tagStr = tag.toString(cx);
+    MOZ_ASSERT(!tag.GetUnicodeExtension(),
+               "locale must contain no Unicode extensions");
+
+    if (auto result = tag.Canonicalize(); result.isErr()) {
+      MOZ_ASSERT(
+          result.unwrapErr() !=
+          mozilla::intl::Locale::CanonicalizationError::DuplicateVariant);
+      intl::ReportInternalError(cx);
+      return false;
+    }
+
+    intl::FormatBuffer<char, intl::INITIAL_CHAR_BUFFER_SIZE> buffer(cx);
+    if (auto result = tag.ToString(buffer); result.isErr()) {
+      intl::ReportInternalError(cx, result.unwrapErr());
+      return false;
+    }
+
+    JSLinearString* tagStr = buffer.toString(cx);
     if (!tagStr) {
       return false;
     }
 
-    bool canonical;
-    if (!EqualStrings(cx, locale, tagStr, &canonical)) {
-      return false;
-    }
-    MOZ_ASSERT(canonical, "locale is a canonicalized language tag");
+    MOZ_ASSERT(EqualStrings(locale, tagStr),
+               "locale is a canonicalized language tag");
   }
 #endif
 
   MOZ_ASSERT(args[2].isNull() || args[2].isString());
 
-  RootedLinearString defaultLocale(cx);
+  Rooted<JSLinearString*> defaultLocale(cx);
   if (args[2].isString()) {
     defaultLocale = args[2].toString()->ensureLinear(cx);
     if (!defaultLocale) {
@@ -704,44 +332,52 @@ bool js::intl_supportedLocaleOrFallback(JSContext* cx, unsigned argc,
   CallArgs args = CallArgsFromVp(argc, vp);
   MOZ_ASSERT(args.length() == 1);
 
-  RootedLinearString locale(cx, args[0].toString()->ensureLinear(cx));
+  Rooted<JSLinearString*> locale(cx, args[0].toString()->ensureLinear(cx));
   if (!locale) {
     return false;
   }
 
-  intl::LanguageTag tag(cx);
-  bool ok;
-  JS_TRY_VAR_OR_RETURN_FALSE(
-      cx, ok, intl::LanguageTagParser::tryParse(cx, locale, tag));
+  mozilla::intl::Locale tag;
+  bool canParseLocale = false;
+  if (StringIsAscii(locale)) {
+    intl::StringAsciiChars chars(locale);
+    if (!chars.init(cx)) {
+      return false;
+    }
 
-  RootedLinearString candidate(cx);
-  if (!ok) {
+    // Tell the analysis the |tag.canonicalize()| method can't GC.
+    JS::AutoSuppressGCAnalysis nogc;
+
+    canParseLocale = mozilla::intl::LocaleParser::TryParse(chars, tag).isOk() &&
+                     tag.Canonicalize().isOk();
+  }
+
+  Rooted<JSLinearString*> candidate(cx);
+  if (!canParseLocale) {
     candidate = NewStringCopyZ<CanGC>(cx, intl::LastDitchLocale());
     if (!candidate) {
       return false;
     }
   } else {
-    if (!tag.canonicalize(cx)) {
-      return false;
-    }
-
     // The default locale must be in [[AvailableLocales]], and that list must
     // not contain any locales with Unicode extension sequences, so remove any
     // present in the candidate.
-    tag.clearUnicodeExtension();
+    tag.ClearUnicodeExtension();
 
-    JSString* canonical = tag.toString(cx);
-    if (!canonical) {
+    intl::FormatBuffer<char, intl::INITIAL_CHAR_BUFFER_SIZE> buffer(cx);
+    if (auto result = tag.ToString(buffer); result.isErr()) {
+      intl::ReportInternalError(cx, result.unwrapErr());
       return false;
     }
 
-    candidate = canonical->ensureLinear(cx);
+    candidate = buffer.toAsciiString(cx);
     if (!candidate) {
       return false;
     }
 
-    // Certain old-style language tags lack a script code, but in current usage
-    // they *would* include a script code. Map these over to modern forms.
+    // Certain old-style language tags lack a script code, but in current
+    // usage they *would* include a script code. Map these over to modern
+    // forms.
     for (const auto& mapping : js::intl::oldStyleLanguageTagMappings) {
       const char* oldStyle = mapping.oldStyle;
       const char* modernStyle = mapping.modernStyle;
@@ -761,16 +397,16 @@ bool js::intl_supportedLocaleOrFallback(JSContext* cx, unsigned argc,
   // - [[AvailableLocales]] is a List [...]. The list must include the value
   //   returned by the DefaultLocale abstract operation (6.2.4), [...].
   //
-  // That implies we must ignore any candidate which isn't supported by all Intl
-  // service constructors.
+  // That implies we must ignore any candidate which isn't supported by all
+  // Intl service constructors.
 
-  RootedLinearString supportedCollator(cx);
+  Rooted<JSLinearString*> supportedCollator(cx);
   JS_TRY_VAR_OR_RETURN_FALSE(
       cx, supportedCollator,
       BestAvailableLocale(cx, SupportedLocaleKind::Collator, candidate,
                           nullptr));
 
-  RootedLinearString supportedDateTimeFormat(cx);
+  Rooted<JSLinearString*> supportedDateTimeFormat(cx);
   JS_TRY_VAR_OR_RETURN_FALSE(
       cx, supportedDateTimeFormat,
       BestAvailableLocale(cx, SupportedLocaleKind::DateTimeFormat, candidate,
@@ -778,8 +414,8 @@ bool js::intl_supportedLocaleOrFallback(JSContext* cx, unsigned argc,
 
 #ifdef DEBUG
   // Note: We don't test the supported locales of the remaining Intl service
-  // constructors, because the set of supported locales is exactly equal to the
-  // set of supported locales of Intl.DateTimeFormat.
+  // constructors, because the set of supported locales is exactly equal to
+  // the set of supported locales of Intl.DateTimeFormat.
   for (auto kind :
        {SupportedLocaleKind::DisplayNames, SupportedLocaleKind::ListFormat,
         SupportedLocaleKind::NumberFormat, SupportedLocaleKind::PluralRules,
@@ -819,6 +455,402 @@ bool js::intl_supportedLocaleOrFallback(JSContext* cx, unsigned argc,
   return true;
 }
 
+using StringList = GCVector<JSLinearString*>;
+
+/**
+ * Create a sorted array from a list of strings.
+ */
+static ArrayObject* CreateArrayFromList(JSContext* cx,
+                                        MutableHandle<StringList> list) {
+  // Reserve scratch space for MergeSort().
+  size_t initialLength = list.length();
+  if (!list.growBy(initialLength)) {
+    return nullptr;
+  }
+
+  // Sort all strings in alphabetical order.
+  MOZ_ALWAYS_TRUE(
+      MergeSort(list.begin(), initialLength, list.begin() + initialLength,
+                [](const auto* a, const auto* b, bool* lessOrEqual) {
+                  *lessOrEqual = CompareStrings(a, b) <= 0;
+                  return true;
+                }));
+
+  // Ensure we don't add duplicate entries to the array.
+  auto* end = std::unique(
+      list.begin(), list.begin() + initialLength,
+      [](const auto* a, const auto* b) { return EqualStrings(a, b); });
+
+  // std::unique leaves the elements after |end| with an unspecified value, so
+  // remove them first. And also delete the elements in the scratch space.
+  list.shrinkBy(std::distance(end, list.end()));
+
+  // And finally copy the strings into the result array.
+  auto* array = NewDenseFullyAllocatedArray(cx, list.length());
+  if (!array) {
+    return nullptr;
+  }
+  array->setDenseInitializedLength(list.length());
+
+  for (size_t i = 0; i < list.length(); ++i) {
+    array->initDenseElement(i, StringValue(list[i]));
+  }
+
+  return array;
+}
+
+/**
+ * Create an array from a sorted list of strings.
+ */
+template <size_t N>
+static ArrayObject* CreateArrayFromSortedList(
+    JSContext* cx, const std::array<const char*, N>& list) {
+  // Ensure the list is sorted and doesn't contain duplicates.
+#ifdef DEBUG
+  // See bug 1583449 for why the lambda can't be in the MOZ_ASSERT.
+  auto isLargerThanOrEqual = [](const auto& a, const auto& b) {
+    return std::strcmp(a, b) >= 0;
+  };
+#endif
+  MOZ_ASSERT(std::adjacent_find(std::begin(list), std::end(list),
+                                isLargerThanOrEqual) == std::end(list));
+
+  size_t length = std::size(list);
+
+  Rooted<ArrayObject*> array(cx, NewDenseFullyAllocatedArray(cx, length));
+  if (!array) {
+    return nullptr;
+  }
+  array->ensureDenseInitializedLength(0, length);
+
+  for (size_t i = 0; i < length; ++i) {
+    auto* str = NewStringCopyZ<CanGC>(cx, list[i]);
+    if (!str) {
+      return nullptr;
+    }
+    array->initDenseElement(i, StringValue(str));
+  }
+  return array;
+}
+
+/**
+ * Create an array from an intl::Enumeration.
+ */
+template <const auto& unsupported, class Enumeration>
+static bool EnumerationIntoList(JSContext* cx, Enumeration values,
+                                MutableHandle<StringList> list) {
+  for (auto value : values) {
+    if (value.isErr()) {
+      intl::ReportInternalError(cx);
+      return false;
+    }
+    auto span = value.unwrap();
+
+    // Skip over known, unsupported values.
+    std::string_view sv(span.data(), span.size());
+    if (std::any_of(std::begin(unsupported), std::end(unsupported),
+                    [sv](const auto& e) { return sv == e; })) {
+      continue;
+    }
+
+    auto* string = NewStringCopy<CanGC>(cx, span);
+    if (!string) {
+      return false;
+    }
+    if (!list.append(string)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Returns the list of calendar types which mustn't be returned by
+ * |Intl.supportedValuesOf()|.
+ */
+static constexpr auto UnsupportedCalendars() {
+  // No calendar values are currently unsupported.
+  return std::array<const char*, 0>{};
+}
+
+// Defined outside of the function to workaround bugs in GCC<9.
+// Also see <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85589>.
+static constexpr auto UnsupportedCalendarsArray = UnsupportedCalendars();
+
+/**
+ * AvailableCalendars ( )
+ */
+static ArrayObject* AvailableCalendars(JSContext* cx) {
+  Rooted<StringList> list(cx, StringList(cx));
+
+  {
+    // Hazard analysis complains that the mozilla::Result destructor calls a
+    // GC function, which is unsound when returning an unrooted value. Work
+    // around this issue by restricting the lifetime of |keywords| to a
+    // separate block.
+    auto keywords = mozilla::intl::Calendar::GetBcp47KeywordValuesForLocale("");
+    if (keywords.isErr()) {
+      intl::ReportInternalError(cx, keywords.unwrapErr());
+      return nullptr;
+    }
+
+    static constexpr auto& unsupported = UnsupportedCalendarsArray;
+
+    if (!EnumerationIntoList<unsupported>(cx, keywords.unwrap(), &list)) {
+      return nullptr;
+    }
+  }
+
+  return CreateArrayFromList(cx, &list);
+}
+
+/**
+ * Returns the list of collation types which mustn't be returned by
+ * |Intl.supportedValuesOf()|.
+ */
+static constexpr auto UnsupportedCollations() {
+  return std::array{
+      "search",
+      "standard",
+  };
+}
+
+// Defined outside of the function to workaround bugs in GCC<9.
+// Also see <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85589>.
+static constexpr auto UnsupportedCollationsArray = UnsupportedCollations();
+
+/**
+ * AvailableCollations ( )
+ */
+static ArrayObject* AvailableCollations(JSContext* cx) {
+  Rooted<StringList> list(cx, StringList(cx));
+
+  {
+    // Hazard analysis complains that the mozilla::Result destructor calls a
+    // GC function, which is unsound when returning an unrooted value. Work
+    // around this issue by restricting the lifetime of |keywords| to a
+    // separate block.
+    auto keywords = mozilla::intl::Collator::GetBcp47KeywordValues();
+    if (keywords.isErr()) {
+      intl::ReportInternalError(cx, keywords.unwrapErr());
+      return nullptr;
+    }
+
+    static constexpr auto& unsupported = UnsupportedCollationsArray;
+
+    if (!EnumerationIntoList<unsupported>(cx, keywords.unwrap(), &list)) {
+      return nullptr;
+    }
+  }
+
+  return CreateArrayFromList(cx, &list);
+}
+
+/**
+ * Returns a list of known, unsupported currencies which are returned by
+ * |Currency::GetISOCurrencies()|.
+ */
+static constexpr auto UnsupportedCurrencies() {
+  // "MVP" is also marked with "questionable, remove?" in ucurr.cpp, but only
+  // this single currency code isn't supported by |Intl.DisplayNames| and
+  // therefore must be excluded by |Intl.supportedValuesOf|.
+  return std::array{
+      "LSM",  // https://unicode-org.atlassian.net/browse/ICU-21687
+  };
+}
+
+/**
+ * Return a list of known, missing currencies which aren't returned by
+ * |Currency::GetISOCurrencies()|.
+ */
+static constexpr auto MissingCurrencies() {
+  return std::array{
+      "SLE",  // https://unicode-org.atlassian.net/browse/ICU-21989
+      "VED",  // https://unicode-org.atlassian.net/browse/ICU-21989
+  };
+}
+
+// Defined outside of the function to workaround bugs in GCC<9.
+// Also see <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85589>.
+static constexpr auto UnsupportedCurrenciesArray = UnsupportedCurrencies();
+static constexpr auto MissingCurrenciesArray = MissingCurrencies();
+
+/**
+ * AvailableCurrencies ( )
+ */
+static ArrayObject* AvailableCurrencies(JSContext* cx) {
+  Rooted<StringList> list(cx, StringList(cx));
+
+  {
+    // Hazard analysis complains that the mozilla::Result destructor calls a
+    // GC function, which is unsound when returning an unrooted value. Work
+    // around this issue by restricting the lifetime of |currencies| to a
+    // separate block.
+    auto currencies = mozilla::intl::Currency::GetISOCurrencies();
+    if (currencies.isErr()) {
+      intl::ReportInternalError(cx, currencies.unwrapErr());
+      return nullptr;
+    }
+
+    static constexpr auto& unsupported = UnsupportedCurrenciesArray;
+
+    if (!EnumerationIntoList<unsupported>(cx, currencies.unwrap(), &list)) {
+      return nullptr;
+    }
+  }
+
+  // Add known missing values.
+  for (const char* value : MissingCurrenciesArray) {
+    auto* string = NewStringCopyZ<CanGC>(cx, value);
+    if (!string) {
+      return nullptr;
+    }
+    if (!list.append(string)) {
+      return nullptr;
+    }
+  }
+
+  return CreateArrayFromList(cx, &list);
+}
+
+/**
+ * AvailableNumberingSystems ( )
+ */
+static ArrayObject* AvailableNumberingSystems(JSContext* cx) {
+  static constexpr std::array numberingSystems = {
+      NUMBERING_SYSTEMS_WITH_SIMPLE_DIGIT_MAPPINGS};
+
+  return CreateArrayFromSortedList(cx, numberingSystems);
+}
+
+/**
+ * AvailableTimeZones ( )
+ */
+static ArrayObject* AvailableTimeZones(JSContext* cx) {
+  // Unsorted list of canonical time zone names, possibly containing
+  // duplicates.
+  Rooted<StringList> timeZones(cx, StringList(cx));
+
+  intl::SharedIntlData& sharedIntlData = cx->runtime()->sharedIntlData.ref();
+  auto iterResult = sharedIntlData.availableTimeZonesIteration(cx);
+  if (iterResult.isErr()) {
+    return nullptr;
+  }
+  auto iter = iterResult.unwrap();
+
+  Rooted<JSAtom*> validatedTimeZone(cx);
+  Rooted<JSAtom*> ianaTimeZone(cx);
+  for (; !iter.done(); iter.next()) {
+    validatedTimeZone = iter.get();
+
+    // Canonicalize the time zone before adding it to the result array.
+
+    // Some time zone names are canonicalized differently by ICU -- handle
+    // those first.
+    ianaTimeZone.set(nullptr);
+    if (!sharedIntlData.tryCanonicalizeTimeZoneConsistentWithIANA(
+            cx, validatedTimeZone, &ianaTimeZone)) {
+      return nullptr;
+    }
+
+    JSLinearString* timeZone;
+    if (ianaTimeZone) {
+      cx->markAtom(ianaTimeZone);
+
+      timeZone = ianaTimeZone;
+    } else {
+      // Call into ICU to canonicalize the time zone.
+
+      JS::AutoStableStringChars stableChars(cx);
+      if (!stableChars.initTwoByte(cx, validatedTimeZone)) {
+        return nullptr;
+      }
+
+      intl::FormatBuffer<char16_t, intl::INITIAL_CHAR_BUFFER_SIZE>
+          canonicalTimeZone(cx);
+      auto result = mozilla::intl::TimeZone::GetCanonicalTimeZoneID(
+          stableChars.twoByteRange(), canonicalTimeZone);
+      if (result.isErr()) {
+        intl::ReportInternalError(cx, result.unwrapErr());
+        return nullptr;
+      }
+
+      timeZone = canonicalTimeZone.toString(cx);
+      if (!timeZone) {
+        return nullptr;
+      }
+
+      // Canonicalize both to "UTC" per CanonicalizeTimeZoneName().
+      if (StringEqualsLiteral(timeZone, "Etc/UTC") ||
+          StringEqualsLiteral(timeZone, "Etc/GMT")) {
+        timeZone = cx->names().UTC;
+      }
+    }
+
+    if (!timeZones.append(timeZone)) {
+      return nullptr;
+    }
+  }
+
+  return CreateArrayFromList(cx, &timeZones);
+}
+
+template <size_t N>
+constexpr auto MeasurementUnitNames(
+    const mozilla::intl::SimpleMeasureUnit (&units)[N]) {
+  std::array<const char*, N> array = {};
+  for (size_t i = 0; i < N; ++i) {
+    array[i] = units[i].name;
+  }
+  return array;
+}
+
+/**
+ * AvailableUnits ( )
+ */
+static ArrayObject* AvailableUnits(JSContext* cx) {
+  static constexpr auto simpleMeasureUnitNames =
+      MeasurementUnitNames(mozilla::intl::simpleMeasureUnits);
+
+  return CreateArrayFromSortedList(cx, simpleMeasureUnitNames);
+}
+
+bool js::intl_SupportedValuesOf(JSContext* cx, unsigned argc, JS::Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  MOZ_ASSERT(args.length() == 1);
+  MOZ_ASSERT(args[0].isString());
+
+  JSLinearString* key = args[0].toString()->ensureLinear(cx);
+  if (!key) {
+    return false;
+  }
+
+  ArrayObject* list;
+  if (StringEqualsLiteral(key, "calendar")) {
+    list = AvailableCalendars(cx);
+  } else if (StringEqualsLiteral(key, "collation")) {
+    list = AvailableCollations(cx);
+  } else if (StringEqualsLiteral(key, "currency")) {
+    list = AvailableCurrencies(cx);
+  } else if (StringEqualsLiteral(key, "numberingSystem")) {
+    list = AvailableNumberingSystems(cx);
+  } else if (StringEqualsLiteral(key, "timeZone")) {
+    list = AvailableTimeZones(cx);
+  } else if (StringEqualsLiteral(key, "unit")) {
+    list = AvailableUnits(cx);
+  } else {
+    ReportBadKey(cx, key);
+    return false;
+  }
+  if (!list) {
+    return false;
+  }
+
+  args.rval().setObject(*list);
+  return true;
+}
+
 static bool intl_toSource(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   args.rval().setString(cx->names().Intl);
@@ -828,17 +860,14 @@ static bool intl_toSource(JSContext* cx, unsigned argc, Value* vp) {
 static const JSFunctionSpec intl_static_methods[] = {
     JS_FN(js_toSource_str, intl_toSource, 0, 0),
     JS_SELF_HOSTED_FN("getCanonicalLocales", "Intl_getCanonicalLocales", 1, 0),
+    JS_SELF_HOSTED_FN("supportedValuesOf", "Intl_supportedValuesOf", 1, 0),
     JS_FS_END};
 
 static const JSPropertySpec intl_static_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl", JSPROP_READONLY), JS_PS_END};
 
 static JSObject* CreateIntlObject(JSContext* cx, JSProtoKey key) {
-  Handle<GlobalObject*> global = cx->global();
-  RootedObject proto(cx, GlobalObject::getOrCreateObjectPrototype(cx, global));
-  if (!proto) {
-    return nullptr;
-  }
+  RootedObject proto(cx, &cx->global()->getObjectPrototype());
 
   // The |Intl| object is just a plain object with some "static" function
   // properties and some constructor properties.

@@ -14,11 +14,19 @@ void GC() {
   asm("");
 }
 
+// Special-cased function -- code that can run JS has an artificial edge to
+// js::RunScript.
+namespace js {
+void RunScript() { GC(); }
+}  // namespace js
+
 struct Cell {
   int f;
 } ANNOTATE("GC Thing");
 
 extern void foo();
+
+void bar() { GC(); }
 
 typedef void (*func_t)();
 
@@ -26,6 +34,9 @@ class Base {
  public:
   int ANNOTATE("field annotation") dummy;
   virtual void someGC() ANNOTATE("Base pure virtual method") = 0;
+  virtual void someGC(int) ANNOTATE("overloaded Base pure virtual method") = 0;
+  virtual void sibGC() = 0;
+  virtual void onBase() { bar(); }
   func_t functionField;
 
   // For now, this is just to verify that the plugin doesn't crash. The
@@ -51,11 +62,11 @@ double Base::testParamAnnotations(Cell& cell) {
 
 class Super : public Base {
  public:
-  virtual void noneGC() = 0;
+  virtual void ANNOTATE("Super pure virtual") noneGC() = 0;
   virtual void allGC() = 0;
+  virtual void onSuper() { asm(""); }
+  void nonVirtualFunc() { asm(""); }
 };
-
-void bar() { GC(); }
 
 class Sub1 : public Super {
  public:
@@ -63,10 +74,15 @@ class Sub1 : public Super {
   void someGC() override ANNOTATE("Sub1 override") ANNOTATE("second attr") {
     foo();
   }
+  void someGC(int) override ANNOTATE("Sub1 override for int overload") {
+    foo();
+  }
   void allGC() override {
     foo();
     bar();
   }
+  void sibGC() override { foo(); }
+  void onBase() override { foo(); }
 } ANNOTATE("CSU1") ANNOTATE("CSU2");
 
 class Sub2 : public Super {
@@ -76,10 +92,15 @@ class Sub2 : public Super {
     foo();
     bar();
   }
+  void someGC(int) override {
+    foo();
+    bar();
+  }
   void allGC() override {
     foo();
     bar();
   }
+  void sibGC() override { foo(); }
 };
 
 class Sibling : public Base {
@@ -89,10 +110,15 @@ class Sibling : public Base {
     foo();
     bar();
   }
+  void someGC(int) override {
+    foo();
+    bar();
+  }
   virtual void allGC() {
     foo();
     bar();
   }
+  void sibGC() override { bar(); }
 };
 
 class AutoSuppressGC {
@@ -103,11 +129,39 @@ class AutoSuppressGC {
 
 void use(Cell*) { asm(""); }
 
+class nsISupports {
+ public:
+  virtual ANNOTATE("Can run script") void danger() { asm(""); }
+
+  virtual ~nsISupports() = 0;
+};
+
+class nsIPrincipal : public nsISupports {
+ public:
+  ~nsIPrincipal() override{};
+};
+
+struct JSPrincipals {
+  int debugToken;
+  JSPrincipals() = default;
+  virtual ~JSPrincipals() { GC(); }
+};
+
+class nsJSPrincipals : public nsIPrincipal, public JSPrincipals {
+ public:
+  void Release() { delete this; }
+};
+
+class SafePrincipals : public nsIPrincipal {
+ public:
+  ~SafePrincipals() { foo(); }
+};
+
 void f() {
   Sub1 s1;
   Sub2 s2;
 
-  Cell cell;
+  static Cell cell;
   {
     Cell* c1 = &cell;
     s1.noneGC();
@@ -165,5 +219,74 @@ void f() {
     Cell* c11 = &cell;
     super->functionField();
     use(c11);
+  }
+  {
+    Cell* c12 = &cell;
+    super->sibGC();
+    use(c12);
+  }
+
+  Base* base = &s2;
+  {
+    Cell* c13 = &cell;
+    base->sibGC();
+    use(c13);
+  }
+
+  nsJSPrincipals pals;
+  {
+    Cell* c14 = &cell;
+    nsISupports* p = &pals;
+    p->danger();
+    use(c14);
+  }
+
+  // Base defines, Sub1 overrides, static Super can call either.
+  {
+    Cell* c15 = &cell;
+    super->onBase();
+    use(c15);
+  }
+
+  {
+    Cell* c16 = &cell;
+    s2.someGC(7);
+    use(c16);
+  }
+
+  {
+    Cell* c17 = &cell;
+    super->someGC(7);
+    use(c17);
+  }
+
+  {
+    nsJSPrincipals* princ = new nsJSPrincipals();
+    Cell* c18 = &cell;
+    delete princ;  // Can GC
+    use(c18);
+  }
+
+  {
+    nsJSPrincipals* princ = new nsJSPrincipals();
+    nsISupports* supp = static_cast<nsISupports*>(princ);
+    Cell* c19 = &cell;
+    delete supp;  // Can GC
+    use(c19);
+  }
+
+  {
+    auto* safe = new SafePrincipals();
+    Cell* c20 = &cell;
+    delete safe;  // Cannot GC
+    use(c20);
+  }
+
+  {
+    auto* safe = new SafePrincipals();
+    nsISupports* supp = static_cast<nsISupports*>(safe);
+    Cell* c21 = &cell;
+    delete supp;  // Compiler thinks destructor can GC.
+    use(c21);
   }
 }

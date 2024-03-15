@@ -26,7 +26,7 @@
 
 /**
  * @file
- * @brief   Defines prototypes of general-purpose comparison functions.
+ * Defines prototypes of general-purpose comparison functions.
  */
 
 #ifndef ZYCORE_COMPARISON_H
@@ -44,7 +44,7 @@ extern "C" {
 /* ============================================================================================== */
 
 /**
- * @brief   Defines the `ZyanEqualityComparison` function prototype.
+ * Defines the `ZyanEqualityComparison` function prototype.
  *
  * @param   left    A pointer to the first element.
  * @param   right   A pointer to the second element.
@@ -55,7 +55,7 @@ extern "C" {
 typedef ZyanBool (*ZyanEqualityComparison)(const void* left, const void* right);
 
 /**
- * @brief   Defines the `ZyanComparison` function prototype.
+ * Defines the `ZyanComparison` function prototype.
  *
  * @param   left    A pointer to the first element.
  * @param   right   A pointer to the second element.
@@ -76,10 +76,10 @@ typedef ZyanI32 (*ZyanComparison)(const void* left, const void* right);
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Declares a generic equality comparison function for an integral datatype.
+ * Declares a generic equality comparison function for an integral data-type.
  *
  * @param   name    The name of the function.
- * @param   type    The name of the integral datatype.
+ * @param   type    The name of the integral data-type.
  */
 #define ZYAN_DECLARE_EQUALITY_COMPARISON(name, type) \
     ZyanBool name(const type* left, const type* right) \
@@ -91,11 +91,11 @@ typedef ZyanI32 (*ZyanComparison)(const void* left, const void* right);
     }
 
 /**
- * @brief   Declares a generic equality comparison function that compares a single integral
- *          datatype field of a struct.
+ * Declares a generic equality comparison function that compares a single integral
+ *          data-type field of a struct.
  *
  * @param   name        The name of the function.
- * @param   type        The name of the integral datatype.
+ * @param   type        The name of the integral data-type.
  * @param   field_name  The name of the struct field.
  */
 #define ZYAN_DECLARE_EQUALITY_COMPARISON_FOR_FIELD(name, type, field_name) \
@@ -112,10 +112,10 @@ typedef ZyanI32 (*ZyanComparison)(const void* left, const void* right);
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Declares a generic comparison function for an integral datatype.
+ * Declares a generic comparison function for an integral data-type.
  *
  * @param   name    The name of the function.
- * @param   type    The name of the integral datatype.
+ * @param   type    The name of the integral data-type.
  */
 #define ZYAN_DECLARE_COMPARISON(name, type) \
     ZyanI32 name(const type* left, const type* right) \
@@ -135,11 +135,11 @@ typedef ZyanI32 (*ZyanComparison)(const void* left, const void* right);
     }
 
 /**
- * @brief   Declares a generic comparison function that compares a single integral datatype field
+ * Declares a generic comparison function that compares a single integral data-type field
  *          of a struct.
  *
  * @param   name        The name of the function.
- * @param   type        The name of the integral datatype.
+ * @param   type        The name of the integral data-type.
  * @param   field_name  The name of the struct field.
  */
 #define ZYAN_DECLARE_COMPARISON_FOR_FIELD(name, type, field_name) \
@@ -170,7 +170,7 @@ typedef ZyanI32 (*ZyanComparison)(const void* left, const void* right);
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines a default equality comparison function for pointer values.
+ * Defines a default equality comparison function for pointer values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -181,7 +181,7 @@ typedef ZyanI32 (*ZyanComparison)(const void* left, const void* right);
 ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsPointer, void* const)
 
 /**
- * @brief   Defines a default equality comparison function for `ZyanBool` values.
+ * Defines a default equality comparison function for `ZyanBool` values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -192,7 +192,7 @@ ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsPointer, void* const)
 ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsBool, ZyanBool)
 
 /**
- * @brief   Defines a default equality comparison function for 8-bit numeric values.
+ * Defines a default equality comparison function for 8-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -203,7 +203,7 @@ ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsBool, ZyanBool)
 ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric8, ZyanU8)
 
 /**
- * @brief   Defines a default equality comparison function for 16-bit numeric values.
+ * Defines a default equality comparison function for 16-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -214,7 +214,7 @@ ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric8, ZyanU8)
 ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric16, ZyanU16)
 
 /**
- * @brief   Defines a default equality comparison function for 32-bit numeric values.
+ * Defines a default equality comparison function for 32-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -225,7 +225,7 @@ ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric16, ZyanU16)
 ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric32, ZyanU32)
 
 /**
- * @brief   Defines a default equality comparison function for 64-bit numeric values.
+ * Defines a default equality comparison function for 64-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -240,7 +240,7 @@ ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric64, ZyanU64)
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines a default comparison function for pointer values.
+ * Defines a default comparison function for pointer values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -251,7 +251,7 @@ ZYAN_INLINE ZYAN_DECLARE_EQUALITY_COMPARISON(ZyanEqualsNumeric64, ZyanU64)
 ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanComparePointer, void* const)
 
 /**
- * @brief   Defines a default comparison function for `ZyanBool` values.
+ * Defines a default comparison function for `ZyanBool` values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -262,7 +262,7 @@ ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanComparePointer, void* const)
 ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareBool, ZyanBool)
 
 /**
- * @brief   Defines a default comparison function for 8-bit numeric values.
+ * Defines a default comparison function for 8-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -273,7 +273,7 @@ ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareBool, ZyanBool)
 ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareNumeric8, ZyanU8)
 
 /**
- * @brief   Defines a default comparison function for 16-bit numeric values.
+ * Defines a default comparison function for 16-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -284,7 +284,7 @@ ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareNumeric8, ZyanU8)
 ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareNumeric16, ZyanU16)
 
 /**
- * @brief   Defines a default comparison function for 32-bit numeric values.
+ * Defines a default comparison function for 32-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.
@@ -295,7 +295,7 @@ ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareNumeric16, ZyanU16)
 ZYAN_INLINE ZYAN_DECLARE_COMPARISON(ZyanCompareNumeric32, ZyanU32)
 
 /**
- * @brief   Defines a default comparison function for 64-bit numeric values.
+ * Defines a default comparison function for 64-bit numeric values.
  *
  * @param   left    A pointer to the first value.
  * @param   right   A pointer to the second value.

@@ -19,10 +19,6 @@
 #include "vm/PlainObject.h"  // js::PlainObject
 
 #include "debugger/DebugAPI-inl.h"
-#include "vm/ArrayObject-inl.h"
-#include "vm/JSAtom-inl.h"
-#include "vm/JSScript-inl.h"
-#include "vm/NativeObject-inl.h"
 #include "vm/Stack-inl.h"
 
 using namespace js;
@@ -100,7 +96,7 @@ JSObject* AbstractGeneratorObject::createModuleGenerator(
 
   // Create a handler function to wrap the module's script. This way
   // we can access it later and restore the state.
-  HandlePropertyName funName = cx->names().empty;
+  Handle<PropertyName*> funName = cx->names().empty;
   RootedFunction handlerFun(
       cx, NewFunctionWithProto(cx, nullptr, 0,
                                FunctionFlags::INTERPRETED_GENERATOR_OR_ASYNC,
@@ -134,8 +130,8 @@ void AbstractGeneratorObject::trace(JSTracer* trc) {
 }
 
 bool AbstractGeneratorObject::suspend(JSContext* cx, HandleObject obj,
-                                      AbstractFramePtr frame, jsbytecode* pc,
-                                      unsigned nvalues) {
+                                      AbstractFramePtr frame,
+                                      const jsbytecode* pc, unsigned nvalues) {
   MOZ_ASSERT(JSOp(*pc) == JSOp::InitialYield || JSOp(*pc) == JSOp::Yield ||
              JSOp(*pc) == JSOp::Await);
 
@@ -255,7 +251,7 @@ bool js::GeneratorThrowOrReturn(JSContext* cx, AbstractFramePtr frame,
                                 GeneratorResumeKind resumeKind) {
   MOZ_ASSERT(genObj->isRunning());
   if (resumeKind == GeneratorResumeKind::Throw) {
-    cx->setPendingExceptionAndCaptureStack(arg);
+    cx->setPendingException(arg, ShouldCaptureStack::Maybe);
   } else {
     MOZ_ASSERT(resumeKind == GeneratorResumeKind::Return);
 
@@ -343,7 +339,6 @@ const JSClassOps GeneratorObject::classOps_ = {
     nullptr,                                   // mayResolve
     nullptr,                                   // finalize
     nullptr,                                   // call
-    nullptr,                                   // hasInstance
     nullptr,                                   // construct
     CallTraceMethod<AbstractGeneratorObject>,  // trace
 };
@@ -355,22 +350,13 @@ static const JSFunctionSpec generator_methods[] = {
 
 JSObject* js::NewTenuredObjectWithFunctionPrototype(
     JSContext* cx, Handle<GlobalObject*> global) {
-  RootedObject proto(cx,
-                     GlobalObject::getOrCreateFunctionPrototype(cx, global));
-  if (!proto) {
-    return nullptr;
-  }
-  return NewTenuredObjectWithGivenProto<PlainObject>(cx, proto);
+  RootedObject proto(cx, &cx->global()->getFunctionPrototype());
+  return NewPlainObjectWithProto(cx, proto, TenuredObject);
 }
 
 static JSObject* CreateGeneratorFunction(JSContext* cx, JSProtoKey key) {
-  RootedObject proto(
-      cx, GlobalObject::getOrCreateFunctionConstructor(cx, cx->global()));
-  if (!proto) {
-    return nullptr;
-  }
-
-  HandlePropertyName name = cx->names().GeneratorFunction;
+  RootedObject proto(cx, &cx->global()->getFunctionConstructor());
+  Handle<PropertyName*> name = cx->names().GeneratorFunction;
   return NewFunctionWithProto(cx, Generator, 1, FunctionFlags::NATIVE_CTOR,
                               nullptr, name, proto, gc::AllocKind::FUNCTION,
                               TenuredObject);
@@ -496,7 +482,7 @@ bool JSObject::is<js::AbstractGeneratorObject>() const {
 }
 
 GeneratorResumeKind js::ParserAtomToResumeKind(
-    JSContext* cx, frontend::TaggedParserAtomIndex atom) {
+    frontend::TaggedParserAtomIndex atom) {
   if (atom == frontend::TaggedParserAtomIndex::WellKnown::next()) {
     return GeneratorResumeKind::Next;
   }

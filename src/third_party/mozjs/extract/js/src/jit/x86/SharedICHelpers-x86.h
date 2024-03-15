@@ -36,29 +36,18 @@ inline void EmitCallIC(MacroAssembler& masm, CodeOffset* callOffset) {
 
 inline void EmitReturnFromIC(MacroAssembler& masm) { masm.ret(); }
 
-inline void EmitBaselineLeaveStubFrame(MacroAssembler& masm,
-                                       bool calledIntoIon = false) {
-  // Ion frames do not save and restore the frame pointer. If we called
-  // into Ion, we have to restore the stack pointer from the frame descriptor.
-  // If we performed a VM call, the descriptor has been popped already so
-  // in that case we use the frame pointer.
-  if (calledIntoIon) {
-    Register scratch = ICStubReg;
-    masm.Pop(scratch);
-    masm.shrl(Imm32(FRAMESIZE_SHIFT), scratch);
-    masm.addl(scratch, BaselineStackReg);
-  } else {
-    masm.mov(BaselineFrameReg, BaselineStackReg);
-  }
+inline void EmitBaselineLeaveStubFrame(MacroAssembler& masm) {
+  Address stubAddr(FramePointer, BaselineStubFrameLayout::ICStubOffsetFromFP);
+  masm.loadPtr(stubAddr, ICStubReg);
 
-  masm.Pop(BaselineFrameReg);
-  masm.Pop(ICStubReg);
+  masm.mov(FramePointer, StackPointer);
+  masm.Pop(FramePointer);
 
   // The return address is on top of the stack, followed by the frame
   // descriptor. Use a pop instruction to overwrite the frame descriptor
   // with the return address. Note that pop increments the stack pointer
   // before computing the address.
-  masm.Pop(Operand(BaselineStackReg, 0));
+  masm.Pop(Operand(StackPointer, 0));
 }
 
 template <typename AddrType>

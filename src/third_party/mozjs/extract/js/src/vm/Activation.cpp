@@ -8,11 +8,7 @@
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
 
-#include <stddef.h>  // size_t
-#include <stdint.h>  // uint8_t, uint32_t
-
-#include "debugger/DebugAPI.h"  // js::DebugAPI
-#include "gc/GC.h"              // js::gc::AutoSuppressGC
+#include "gc/GC.h"            // js::gc::AutoSuppressGC
 #include "jit/CalleeToken.h"  // js::jit::CalleeToken{IsFunction,To{Function,Script}}
 #include "js/RootingAPI.h"  // JS::Rooted
 #include "js/Value.h"       // JS::Value

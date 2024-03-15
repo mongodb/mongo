@@ -11,31 +11,34 @@
 
 #include <stdint.h>  // int32_t, uint32_t
 
-#include "jsapi.h"  // CompletionKind
-
 #include "frontend/BytecodeControlStructures.h"  // NestableControl, LoopControl
-#include "frontend/BytecodeOffset.h"             // BytecodeOffset
 #include "frontend/IteratorKind.h"               // IteratorKind
+#include "frontend/SelfHostedIter.h"             // SelfHostedIter
 #include "frontend/TryEmitter.h"                 // TryEmitter
+#include "vm/CompletionKind.h"                   // CompletionKind
 
 namespace js {
 namespace frontend {
 
 struct BytecodeEmitter;
+class BytecodeOffset;
 class EmitterScope;
 
 class ForOfLoopControl : public LoopControl {
   // The stack depth of the iterator.
   int32_t iterDepth_;
 
-  // for-of loops, when throwing from non-iterator code (i.e. from the body
+  // For-of loops, when throwing from non-iterator code (i.e. from the body
   // or from evaluating the LHS of the loop condition), need to call
-  // IteratorClose.  This is done by enclosing non-iterator code with
-  // try-catch and call IteratorClose in `catch` block.
-  // If IteratorClose itself throws, we must not re-call IteratorClose. Since
-  // non-local jumps like break and return call IteratorClose, whenever a
-  // non-local jump is emitted, we must tell catch block not to perform
-  // IteratorClose.
+  // IteratorClose.  This is done by enclosing the body of the loop with
+  // try-catch and calling IteratorClose in the `catch` block.
+  //
+  // If IteratorClose itself throws, we must not re-call
+  // IteratorClose. Since non-local jumps like break and return call
+  // IteratorClose, whenever a non-local jump is emitted, we must
+  // prevent the catch block from catching any exception thrown from
+  // IteratorClose. We do this by wrapping the non-local jump in a
+  // ForOfIterClose try-note.
   //
   //   for (x of y) {
   //     // Operations for iterator (IteratorNext etc) are outside of
@@ -43,19 +46,16 @@ class ForOfLoopControl : public LoopControl {
   //     try {
   //       ...
   //       if (...) {
-  //         // Before non-local jump, clear iterator on the stack to tell
-  //         // catch block not to perform IteratorClose.
-  //         tmpIterator = iterator;
-  //         iterator = undefined;
-  //         IteratorClose(tmpIterator, { break });
-  //         break;
+  //         // Before non-local jump, close iterator.
+  //         CloseIter(iter, CompletionKind::Return); // Covered by
+  //         return;                                  // trynote
   //       }
   //       ...
   //     } catch (e) {
-  //       // Just throw again when iterator is cleared by non-local jump.
-  //       if (iterator === undefined)
-  //         throw e;
-  //       IteratorClose(iterator, { throw, e });
+  //       // When propagating an exception, we swallow any exceptions
+  //       // thrown while closing the iterator.
+  //       CloseIter(iter, CompletionKind::Throw);
+  //       throw e;
   //     }
   //   }
   mozilla::Maybe<TryEmitter> tryCatch_;
@@ -64,13 +64,13 @@ class ForOfLoopControl : public LoopControl {
   // emitBeginCodeNeedingIteratorClose and emitEndCodeNeedingIteratorClose.
   uint32_t numYieldsAtBeginCodeNeedingIterClose_;
 
-  bool allowSelfHosted_;
+  SelfHostedIter selfHostedIter_;
 
   IteratorKind iterKind_;
 
  public:
   ForOfLoopControl(BytecodeEmitter* bce, int32_t iterDepth,
-                   bool allowSelfHosted, IteratorKind iterKind);
+                   SelfHostedIter selfHostedIter, IteratorKind iterKind);
 
   [[nodiscard]] bool emitBeginCodeNeedingIteratorClose(BytecodeEmitter* bce);
   [[nodiscard]] bool emitEndCodeNeedingIteratorClose(BytecodeEmitter* bce);

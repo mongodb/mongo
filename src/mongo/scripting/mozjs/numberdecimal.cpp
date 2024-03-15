@@ -60,21 +60,21 @@ const JSFunctionSpec NumberDecimalInfo::methods[3] = {
 
 const char* const NumberDecimalInfo::className = "NumberDecimal";
 
-void NumberDecimalInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto x = static_cast<Decimal128*>(JS::GetPrivate(obj));
+void NumberDecimalInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
+    auto x = JS::GetMaybePtrFromReservedSlot<Decimal128>(obj, Decimal128Slot);
 
     if (x)
-        getScope(fop)->trackedDelete(x);
+        getScope(gcCtx)->trackedDelete(x);
 }
 
 Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleValue thisv) {
-    auto x = static_cast<Decimal128*>(JS::GetPrivate(thisv.toObjectOrNull()));
+    auto x = JS::GetMaybePtrFromReservedSlot<Decimal128>(thisv.toObjectOrNull(), Decimal128Slot);
 
     return x ? *x : Decimal128(0);
 }
 
 Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleObject thisv) {
-    auto x = static_cast<Decimal128*>(JS::GetPrivate(thisv));
+    auto x = JS::GetMaybePtrFromReservedSlot<Decimal128>(thisv, Decimal128Slot);
 
     return x ? *x : Decimal128(0);
 }
@@ -110,8 +110,7 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
     } else {
         uasserted(ErrorCodes::BadValue, "NumberDecimal takes 0 or 1 arguments");
     }
-
-    JS::SetPrivate(thisv, scope->trackedNew<Decimal128>(x));
+    JS::SetReservedSlot(thisv, Decimal128Slot, JS::PrivateValue(scope->trackedNew<Decimal128>(x)));
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -120,7 +119,9 @@ void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decima
     auto scope = getScope(cx);
 
     scope->getProto<NumberDecimalInfo>().newObject(thisv);
-    JS::SetPrivate(thisv.toObjectOrNull(), scope->trackedNew<Decimal128>(decimal));
+    JS::SetReservedSlot(thisv.toObjectOrNull(),
+                        Decimal128Slot,
+                        JS::PrivateValue(scope->trackedNew<Decimal128>(decimal)));
 }
 
 }  // namespace mozjs

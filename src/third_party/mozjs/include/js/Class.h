@@ -33,9 +33,9 @@ namespace js {
 
 class PropertyResult;
 
-// This is equal to JSFunction::class_.  Use it in places where you don't want
-// to #include jsfun.h.
+// These are equal to js::FunctionClass / js::ExtendedFunctionClass.
 extern JS_PUBLIC_DATA const JSClass* const FunctionClassPtr;
+extern JS_PUBLIC_DATA const JSClass* const FunctionExtendedClassPtr;
 
 }  // namespace js
 
@@ -141,9 +141,13 @@ class ObjectOpResult {
   JS_PUBLIC_API bool failNoNamedSetter();
   JS_PUBLIC_API bool failNoIndexedSetter();
   JS_PUBLIC_API bool failNotDataDescriptor();
+  JS_PUBLIC_API bool failInvalidDescriptor();
 
   // Careful: This case has special handling in Object.defineProperty.
   JS_PUBLIC_API bool failCantDefineWindowNonConfigurable();
+
+  JS_PUBLIC_API bool failBadArrayLength();
+  JS_PUBLIC_API bool failBadIndex();
 
   uint32_t failureCode() const {
     MOZ_ASSERT(!ok());
@@ -291,15 +295,7 @@ typedef bool (*JSMayResolveOp)(const JSAtomState& names, jsid id,
  * from other live objects or from GC roots.  Obviously, finalizers must never
  * store a reference to obj.
  */
-typedef void (*JSFinalizeOp)(JSFreeOp* fop, JSObject* obj);
-
-/**
- * Check whether v is an instance of obj.  Return false on error or exception,
- * true on success with true in *bp if v is an instance of obj, false in
- * *bp otherwise.
- */
-typedef bool (*JSHasInstanceOp)(JSContext* cx, JS::HandleObject obj,
-                                JS::MutableHandleValue vp, bool* bp);
+typedef void (*JSFinalizeOp)(JS::GCContext* gcx, JSObject* obj);
 
 /**
  * Function type for trace operation of the class called to enumerate all
@@ -490,8 +486,7 @@ static constexpr const js::ObjectOps* JS_NULL_OBJECT_OPS = nullptr;
 
 // Classes, objects, and properties.
 
-// Objects have private slot.
-static const uint32_t JSCLASS_HAS_PRIVATE = 1 << 0;
+// (1 << 0 is unused)
 
 // Class's initialization code will call `SetNewObjectMetadata` itself.
 static const uint32_t JSCLASS_DELAY_METADATA_BUILDER = 1 << 1;
@@ -500,8 +495,8 @@ static const uint32_t JSCLASS_DELAY_METADATA_BUILDER = 1 << 1;
 // disposal mechanism.
 static const uint32_t JSCLASS_IS_WRAPPED_NATIVE = 1 << 2;
 
-// Private is `nsISupports*`.
-static const uint32_t JSCLASS_PRIVATE_IS_NSISUPPORTS = 1 << 3;
+// First reserved slot is `PrivateValue(nsISupports*)` or `UndefinedValue`.
+static constexpr uint32_t JSCLASS_SLOT0_IS_NSISUPPORTS = 1 << 3;
 
 // Objects are DOM.
 static const uint32_t JSCLASS_IS_DOMJSCLASS = 1 << 4;
@@ -573,7 +568,7 @@ static const uint32_t JSCLASS_FOREGROUND_FINALIZE =
 // application.
 static const uint32_t JSCLASS_GLOBAL_APPLICATION_SLOTS = 5;
 static const uint32_t JSCLASS_GLOBAL_SLOT_COUNT =
-    JSCLASS_GLOBAL_APPLICATION_SLOTS + JSProto_LIMIT * 2 + 30;
+    JSCLASS_GLOBAL_APPLICATION_SLOTS + 1;
 
 static constexpr uint32_t JSCLASS_GLOBAL_FLAGS_WITH_SLOTS(uint32_t n) {
   return JSCLASS_IS_GLOBAL |
@@ -605,7 +600,6 @@ struct MOZ_STATIC_CLASS JSClassOps {
   JSMayResolveOp mayResolve;
   JSFinalizeOp finalize;
   JSNative call;
-  JSHasInstanceOp hasInstance;
   JSNative construct;
   JSTraceOp trace;
 };
@@ -640,9 +634,6 @@ struct alignas(js::gc::JSClassAlignBytes) JSClass {
     return cOps ? cOps->mayResolve : nullptr;
   }
   JSNative getCall() const { return cOps ? cOps->call : nullptr; }
-  JSHasInstanceOp getHasInstance() const {
-    return cOps ? cOps->hasInstance : nullptr;
-  }
   JSNative getConstruct() const { return cOps ? cOps->construct : nullptr; }
 
   bool hasFinalize() const { return cOps && cOps->finalize; }
@@ -653,9 +644,9 @@ struct alignas(js::gc::JSClassAlignBytes) JSClass {
   // The special treatment of |finalize| and |trace| is necessary because if we
   // assign either of those hooks to a local variable and then call it -- as is
   // done with the other hooks -- the GC hazard analysis gets confused.
-  void doFinalize(JSFreeOp* fop, JSObject* obj) const {
+  void doFinalize(JS::GCContext* gcx, JSObject* obj) const {
     MOZ_ASSERT(cOps && cOps->finalize);
-    cOps->finalize(fop, obj);
+    cOps->finalize(gcx, obj);
   }
   void doTrace(JSTracer* trc, JSObject* obj) const {
     MOZ_ASSERT(cOps && cOps->trace);
@@ -685,11 +676,11 @@ struct alignas(js::gc::JSClassAlignBytes) JSClass {
   bool isNativeObject() const { return !(flags & NON_NATIVE); }
   bool isProxyObject() const { return flags & JSCLASS_IS_PROXY; }
 
-  bool hasPrivate() const { return !!(flags & JSCLASS_HAS_PRIVATE); }
-
   bool emulatesUndefined() const { return flags & JSCLASS_EMULATES_UNDEFINED; }
 
-  bool isJSFunction() const { return this == js::FunctionClassPtr; }
+  bool isJSFunction() const {
+    return this == js::FunctionClassPtr || this == js::FunctionExtendedClassPtr;
+  }
 
   bool nonProxyCallable() const {
     MOZ_ASSERT(!isProxyObject());
@@ -705,6 +696,8 @@ struct alignas(js::gc::JSClassAlignBytes) JSClass {
   }
 
   bool isWrappedNative() const { return flags & JSCLASS_IS_WRAPPED_NATIVE; }
+
+  bool slot0IsISupports() const { return flags & JSCLASS_SLOT0_IS_NSISUPPORTS; }
 
   static size_t offsetOfFlags() { return offsetof(JSClass, flags); }
 
@@ -813,12 +806,27 @@ enum class ESClass {
   BigInt,
   Function,  // Note: Only JSFunction objects.
 
+#ifdef ENABLE_RECORD_TUPLE
+  Record,
+  Tuple,
+#endif
+
   /** None of the above. */
   Other
 };
 
 /* Fills |vp| with the unboxed value for boxed types, or undefined otherwise. */
 bool Unbox(JSContext* cx, JS::HandleObject obj, JS::MutableHandleValue vp);
+
+// Classes with JSCLASS_SKIP_NURSERY_FINALIZE or Wrapper classes with
+// CROSS_COMPARTMENT flags will not have their finalizer called if they are
+// nursery allocated and not promoted to the tenured heap. The finalizers for
+// these classes must do nothing except free data which was allocated via
+// Nursery::allocateBuffer.
+inline bool CanNurseryAllocateFinalizedClass(const JSClass* const clasp) {
+  MOZ_ASSERT(clasp->hasFinalize());
+  return clasp->flags & JSCLASS_SKIP_NURSERY_FINALIZE;
+}
 
 #ifdef DEBUG
 JS_PUBLIC_API bool HasObjectMovedOp(JSObject* obj);

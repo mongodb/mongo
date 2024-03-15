@@ -7,12 +7,15 @@
 #include "jit/IonIC.h"
 
 #include "jit/CacheIRCompiler.h"
+#include "jit/CacheIRGenerator.h"
+#include "jit/IonScript.h"
 #include "jit/VMFunctions.h"
 #include "util/DiagnosticAssertions.h"
 #include "vm/EqualityOperations.h"
+#include "vm/Iteration.h"
 
-#include "jit/MacroAssembler-inl.h"
 #include "vm/Interpreter-inl.h"
+#include "vm/JSScript-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -64,6 +67,8 @@ Register IonIC::scratchRegisterForEntryJump() {
       return asBinaryArithIC()->output().scratchReg();
     case CacheKind::Compare:
       return asCompareIC()->output();
+    case CacheKind::CloseIter:
+      return asCloseIterIC()->temp();
     case CacheKind::Call:
     case CacheKind::TypeOf:
     case CacheKind::ToBool:
@@ -167,7 +172,7 @@ bool IonGetPropertyIC::update(JSContext* cx, HandleScript outerScript,
                                        idVal);
 
   if (ic->kind() == CacheKind::GetProp) {
-    RootedPropertyName name(cx, idVal.toString()->asAtom().asPropertyName());
+    Rooted<PropertyName*> name(cx, idVal.toString()->asAtom().asPropertyName());
     if (!GetProperty(cx, val, name, res)) {
       return false;
     }
@@ -198,7 +203,7 @@ bool IonGetPropSuperIC::update(JSContext* cx, HandleScript outerScript,
                                        idVal);
 
   if (ic->kind() == CacheKind::GetPropSuper) {
-    RootedPropertyName name(cx, idVal.toString()->asAtom().asPropertyName());
+    Rooted<PropertyName*> name(cx, idVal.toString()->asAtom().asPropertyName());
     if (!GetProperty(cx, obj, receiver, name, res)) {
       return false;
     }
@@ -222,7 +227,7 @@ bool IonSetPropertyIC::update(JSContext* cx, HandleScript outerScript,
                               HandleValue idVal, HandleValue rhs) {
   using DeferType = SetPropIRGenerator::DeferType;
 
-  RootedShape oldShape(cx);
+  Rooted<Shape*> oldShape(cx);
   IonScript* ionScript = outerScript->ionScript();
 
   bool attached = false;
@@ -284,16 +289,15 @@ bool IonSetPropertyIC::update(JSContext* cx, HandleScript outerScript,
       InitGlobalLexicalOperation(cx, &cx->global()->lexicalEnvironment(),
                                  script, pc, rhs);
     } else if (IsPropertyInitOp(JSOp(*pc))) {
-      // This might be a JSOp::InitElem op with a constant string id. We
-      // can't call InitPropertyOperation here as that function is
-      // specialized for JSOp::Init*Prop (it does not support arbitrary
-      // objects that might show up here).
-      if (!InitElemOperation(cx, pc, obj, idVal, rhs)) {
+      Rooted<PropertyName*> name(cx,
+                                 idVal.toString()->asAtom().asPropertyName());
+      if (!InitPropertyOperation(cx, pc, obj, name, rhs)) {
         return false;
       }
     } else {
       MOZ_ASSERT(IsPropertySetOp(JSOp(*pc)));
-      RootedPropertyName name(cx, idVal.toString()->asAtom().asPropertyName());
+      Rooted<PropertyName*> name(cx,
+                                 idVal.toString()->asAtom().asPropertyName());
       if (!SetProperty(cx, obj, name, rhs, ic->strict(), pc)) {
         return false;
       }
@@ -347,7 +351,7 @@ bool IonGetNameIC::update(JSContext* cx, HandleScript outerScript,
                           MutableHandleValue res) {
   IonScript* ionScript = outerScript->ionScript();
   jsbytecode* pc = ic->pc();
-  RootedPropertyName name(cx, ic->script()->getName(pc));
+  Rooted<PropertyName*> name(cx, ic->script()->getName(pc));
 
   TryAttachIonStub<GetNameIRGenerator>(cx, ic, ionScript, envChain, name);
 
@@ -370,7 +374,7 @@ JSObject* IonBindNameIC::update(JSContext* cx, HandleScript outerScript,
                                 IonBindNameIC* ic, HandleObject envChain) {
   IonScript* ionScript = outerScript->ionScript();
   jsbytecode* pc = ic->pc();
-  RootedPropertyName name(cx, ic->script()->getName(pc));
+  Rooted<PropertyName*> name(cx, ic->script()->getName(pc));
 
   TryAttachIonStub<BindNameIRGenerator>(cx, ic, ionScript, envChain, name);
 
@@ -389,13 +393,19 @@ JSObject* IonGetIteratorIC::update(JSContext* cx, HandleScript outerScript,
 
   TryAttachIonStub<GetIteratorIRGenerator>(cx, ic, ionScript, value);
 
-  return ValueToIterator(cx, value);
+  PropertyIteratorObject* iterObj = ValueToIterator(cx, value);
+  if (!iterObj) {
+    return nullptr;
+  }
+
+  return iterObj;
 }
 
 /* static */
 bool IonOptimizeSpreadCallIC::update(JSContext* cx, HandleScript outerScript,
                                      IonOptimizeSpreadCallIC* ic,
-                                     HandleValue value, bool* result) {
+                                     HandleValue value,
+                                     MutableHandleValue result) {
   IonScript* ionScript = outerScript->ionScript();
 
   TryAttachIonStub<OptimizeSpreadCallIRGenerator>(cx, ic, ionScript, value);
@@ -453,7 +463,7 @@ bool IonInstanceOfIC::update(JSContext* cx, HandleScript outerScript,
 
   TryAttachIonStub<InstanceOfIRGenerator>(cx, ic, ionScript, lhs, rhs);
 
-  return HasInstance(cx, rhs, lhs, res);
+  return InstanceofOperator(cx, rhs, lhs, res);
 }
 
 /*  static */
@@ -465,6 +475,17 @@ bool IonToPropertyKeyIC::update(JSContext* cx, HandleScript outerScript,
   TryAttachIonStub<ToPropertyKeyIRGenerator>(cx, ic, ionScript, val);
 
   return ToPropertyKeyOperation(cx, val, res);
+}
+
+/* static */
+bool IonCloseIterIC::update(JSContext* cx, HandleScript outerScript,
+                            IonCloseIterIC* ic, HandleObject iter) {
+  IonScript* ionScript = outerScript->ionScript();
+  CompletionKind kind = ic->completionKind();
+
+  TryAttachIonStub<CloseIterIRGenerator>(cx, ic, ionScript, iter, kind);
+
+  return CloseIterOperation(cx, iter, kind);
 }
 
 /*  static */

@@ -26,13 +26,12 @@
 
 /**
  * @file
- * @brief   Provides helper functions for performant number to string conversion.
+ * Provides helper functions for performant number to string conversion.
  */
 
 #ifndef ZYCORE_FORMAT_H
 #define ZYCORE_FORMAT_H
 
-#include "zydis/ZycoreExportConfig.h"
 #include "zydis/Zycore/Status.h"
 #include "zydis/Zycore/String.h"
 #include "zydis/Zycore/Types.h"
@@ -46,11 +45,36 @@ extern "C" {
 /* ============================================================================================== */
 
 /* ---------------------------------------------------------------------------------------------- */
+/* Helpers                                                                                        */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * Get the absolute value of a 64 bit int.
+ *
+ * @param x The value to process.
+ * @return  The absolute, unsigned value.
+ *
+ * This gracefully deals with the special case of `x` being `INT_MAX`.
+ */
+ZYAN_INLINE ZyanU64 ZyanAbsI64(ZyanI64 x)
+{
+    // INT_MIN special case. Can't use the value directly because GCC thinks
+    // it's too big for an INT64 literal, however is perfectly happy to accept
+    // this expression. This is also hit INT64_MIN is defined in `stdint.h`.
+    if (x == (-0x7fffffffffffffff - 1))
+    {
+        return 0x8000000000000000u;
+    }
+
+    return (ZyanU64)(x < 0 ? -x : x);
+}
+
+/* ---------------------------------------------------------------------------------------------- */
 /* Insertion                                                                                      */
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Inserts formatted text in the destination string at the given `index`.
+ * Inserts formatted text in the destination string at the given `index`.
  *
  * @param   string  The destination string.
  * @param   index   The insert index.
@@ -69,8 +93,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringInsertFormat(ZyanString* string, ZyanUSize in
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Formats the given unsigned ordinal `value` to its decimal text-representation and
- *          inserts it to the `string`.
+ * Formats the given unsigned ordinal `value` to its decimal text-representation and
+ * inserts it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   index           The insert index.
@@ -87,8 +111,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringInsertDecU(ZyanString* string, ZyanUSize inde
     ZyanU8 padding_length);
 
 /**
- * @brief   Formats the given signed ordinal `value` to its decimal text-representation and
- *          inserts it to the `string`.
+ * Formats the given signed ordinal `value` to its decimal text-representation and
+ * inserts it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   index           The insert index.
@@ -107,8 +131,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringInsertDecS(ZyanString* string, ZyanUSize inde
     ZyanU8 padding_length, ZyanBool force_sign, const ZyanString* prefix);
 
 /**
- * @brief   Formats the given unsigned ordinal `value` to its hexadecimal text-representation and
- *          inserts it to the `string`.
+ * Formats the given unsigned ordinal `value` to its hexadecimal text-representation and
+ * inserts it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   index           The insert index.
@@ -127,8 +151,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringInsertHexU(ZyanString* string, ZyanUSize inde
     ZyanU8 padding_length, ZyanBool uppercase);
 
 /**
- * @brief   Formats the given signed ordinal `value` to its hexadecimal text-representation and
- *          inserts it to the `string`.
+ * Formats the given signed ordinal `value` to its hexadecimal text-representation and
+ * inserts it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   index           The insert index.
@@ -155,7 +179,7 @@ ZYCORE_EXPORT ZyanStatus ZyanStringInsertHexS(ZyanString* string, ZyanUSize inde
 #ifndef ZYAN_NO_LIBC
 
 /**
- * @brief   Appends formatted text to the destination string.
+ * Appends formatted text to the destination string.
  *
  * @param   string  The destination string.
  * @param   format  The format string.
@@ -175,8 +199,8 @@ ZYCORE_EXPORT ZYAN_REQUIRES_LIBC ZyanStatus ZyanStringAppendFormat(
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Formats the given unsigned ordinal `value` to its decimal text-representation and
- *          appends it to the `string`.
+ * Formats the given unsigned ordinal `value` to its decimal text-representation and
+ * appends it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   value           The value.
@@ -192,8 +216,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringAppendDecU(ZyanString* string, ZyanU64 value,
     ZyanU8 padding_length);
 
 /**
- * @brief   Formats the given signed ordinal `value` to its decimal text-representation and
- *          appends it to the `string`.
+ * Formats the given signed ordinal `value` to its decimal text-representation and
+ * appends it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   value           The value.
@@ -211,8 +235,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringAppendDecS(ZyanString* string, ZyanI64 value,
     ZyanU8 padding_length, ZyanBool force_sign, const ZyanStringView* prefix);
 
 /**
- * @brief   Formats the given unsigned ordinal `value` to its hexadecimal text-representation and
- *          appends it to the `string`.
+ * Formats the given unsigned ordinal `value` to its hexadecimal text-representation and
+ * appends it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   value           The value.
@@ -230,8 +254,8 @@ ZYCORE_EXPORT ZyanStatus ZyanStringAppendHexU(ZyanString* string, ZyanU64 value,
     ZyanU8 padding_length, ZyanBool uppercase);
 
 /**
- * @brief   Formats the given signed ordinal `value` to its hexadecimal text-representation and
- *          appends it to the `string`.
+ * Formats the given signed ordinal `value` to its hexadecimal text-representation and
+ * appends it to the `string`.
  *
  * @param   string          A pointer to the `ZyanString` instance.
  * @param   value           The value.

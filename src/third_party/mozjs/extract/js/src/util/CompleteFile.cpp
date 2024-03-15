@@ -14,8 +14,8 @@
 #  include "js/Vector.h"
 #endif  // __wasi__
 
-#include "jsapi.h"  // JS_ReportErrorNumberLatin1
-
+#include "js/CharacterEncoding.h"     // EncodeUtf8ToWide, EncodeUtf8ToNarrow
+#include "js/ErrorReport.h"           // JS_ReportErrorNumberUTF8
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_CANT_OPEN
 
 bool js::ReadCompleteFile(JSContext* cx, FILE* fp, FileContents& buffer) {
@@ -104,6 +104,22 @@ static bool NormalizeWASIPath(const char* filename,
 }
 #endif
 
+static FILE* OpenFile(JSContext* cx, const char* filename) {
+#ifdef XP_WIN
+  JS::UniqueWideChars wideFilename = JS::EncodeUtf8ToWide(cx, filename);
+  if (!wideFilename) {
+    return nullptr;
+  }
+  return _wfopen(wideFilename.get(), L"r");
+#else
+  JS::UniqueChars narrowFilename = JS::EncodeUtf8ToNarrow(cx, filename);
+  if (!narrowFilename) {
+    return nullptr;
+  }
+  return fopen(narrowFilename.get(), "r");
+#endif
+}
+
 /*
  * Open a source file for reading. Supports "-" and nullptr to mean stdin. The
  * return value must be fclosed unless it is stdin.
@@ -117,17 +133,13 @@ bool js::AutoFile::open(JSContext* cx, const char* filename) {
     if (!NormalizeWASIPath(filename, &normalized, cx)) {
       return false;
     }
-    fp_ = fopen(normalized.begin(), "r");
+    fp_ = OpenFile(cx, normalized.begin());
 #else
-    fp_ = fopen(filename, "r");
+    fp_ = OpenFile(cx, filename);
 #endif
     if (!fp_) {
-      /*
-       * Use Latin1 variant here because the encoding of filename is
-       * platform dependent.
-       */
-      JS_ReportErrorNumberLatin1(cx, GetErrorMessage, nullptr, JSMSG_CANT_OPEN,
-                                 filename, "No such file or directory");
+      JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr, JSMSG_CANT_OPEN,
+                               filename, "No such file or directory");
       return false;
     }
   }

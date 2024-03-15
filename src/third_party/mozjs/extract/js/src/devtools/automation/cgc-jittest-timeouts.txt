@@ -13,7 +13,7 @@ basic/bug677957-2.js
 basic/bug753283.js
 basic/bug867946.js
 basic/destructuring-iterator.js
-basic/offThreadCompileScript-01.js
+basic/offThreadCompileToStencil-01.js
 basic/testAtomize.js
 basic/testBug614653.js
 basic/testBug686274.js

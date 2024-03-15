@@ -44,8 +44,10 @@
 #include <js/CompileOptions.h>
 #include <js/Context.h>
 #include <js/ErrorReport.h>
+#include <js/GlobalObject.h>
 #include <js/MapAndSet.h>
 #include <js/Object.h>
+#include <js/PropertyAndElement.h>
 #include <js/PropertyDescriptor.h>
 #include <js/String.h>
 #include <js/Utility.h>
@@ -167,7 +169,7 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
             return false;
         }
 
-        if (!JS::ModuleInstantiate(cx, module)) {
+        if (!JS::ModuleLink(cx, module)) {
             return false;
         }
 

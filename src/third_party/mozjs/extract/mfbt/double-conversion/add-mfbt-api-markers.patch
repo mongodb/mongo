@@ -1,5 +1,4 @@
 diff --git a/mfbt/double-conversion/double-conversion/double-to-string.h b/mfbt/double-conversion/double-conversion/double-to-string.h
-index 6317a08a72aeb..6b7d30a63138c 100644
 --- a/mfbt/double-conversion/double-conversion/double-to-string.h
 +++ b/mfbt/double-conversion/double-conversion/double-to-string.h
 @@ -23,16 +23,17 @@
@@ -20,7 +19,7 @@ index 6317a08a72aeb..6b7d30a63138c 100644
   public:
    // When calling ToFixed with a double > 10^kMaxFixedDigitsBeforePoint
    // or a requested_digits parameter > kMaxFixedDigitsAfterPoint then the
-@@ -167,17 +168,17 @@ class DoubleToStringConverter {
+@@ -192,17 +193,17 @@ class DoubleToStringConverter {
    //
    // Flags: UNIQUE_ZERO and EMIT_POSITIVE_EXPONENT_SIGN.
    // Special values: "Infinity" and "NaN".
@@ -39,7 +38,7 @@ index 6317a08a72aeb..6b7d30a63138c 100644
    // Example with decimal_in_shortest_low = -6,
    //              decimal_in_shortest_high = 21,
    //              EMIT_POSITIVE_EXPONENT_SIGN activated, and
-@@ -252,17 +253,17 @@ class DoubleToStringConverter {
+@@ -277,17 +278,17 @@ class DoubleToStringConverter {
    //     been provided to the constructor,
    //   - 'value' > 10^kMaxFixedDigitsBeforePoint, or
    //   - 'requested_digits' > kMaxFixedDigitsAfterPoint.
@@ -58,7 +57,7 @@ index 6317a08a72aeb..6b7d30a63138c 100644
    // If requested_digits equals -1, then the shortest exponential representation
    // is computed.
    //
-@@ -286,17 +287,17 @@ class DoubleToStringConverter {
+@@ -311,17 +312,17 @@ class DoubleToStringConverter {
    //     been provided to the constructor,
    //   - 'requested_digits' > kMaxExponentialDigits.
    //
@@ -77,7 +76,7 @@ index 6317a08a72aeb..6b7d30a63138c 100644
    // either in exponential or decimal format, depending on
    // max_{leading|trailing}_padding_zeroes_in_precision_mode (given to the
    // constructor).
-@@ -327,17 +328,17 @@ class DoubleToStringConverter {
+@@ -352,17 +353,17 @@ class DoubleToStringConverter {
    //     been provided to the constructor,
    //   - precision < kMinPericisionDigits
    //   - precision > kMaxPrecisionDigits
@@ -96,7 +95,7 @@ index 6317a08a72aeb..6b7d30a63138c 100644
      // For example the output of 0.299999999999999988897 is (the less accurate
      // but correct) 0.3.
      SHORTEST,
-@@ -389,44 +390,44 @@ class DoubleToStringConverter {
+@@ -414,44 +415,44 @@ class DoubleToStringConverter {
    // DoubleToAscii expects the given buffer to be big enough to hold all
    // digits and a terminating null-character. In SHORTEST-mode it expects a
    // buffer of at least kBase10MaximalLength + 1. In all other modes the
@@ -146,3 +145,63 @@ index 6317a08a72aeb..6b7d30a63138c 100644
    const int flags_;
    const char* const infinity_symbol_;
    const char* const nan_symbol_;
+diff --git a/mfbt/double-conversion/double-conversion/string-to-double.h b/mfbt/double-conversion/double-conversion/string-to-double.h
+--- a/mfbt/double-conversion/double-conversion/string-to-double.h
++++ b/mfbt/double-conversion/double-conversion/string-to-double.h
+@@ -23,16 +23,17 @@
+ // DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #ifndef DOUBLE_CONVERSION_STRING_TO_DOUBLE_H_
+ #define DOUBLE_CONVERSION_STRING_TO_DOUBLE_H_
+ 
++#include "mozilla/Types.h"
+ #include "utils.h"
+ 
+ namespace double_conversion {
+ 
+ class StringToDoubleConverter {
+  public:
+   // Enumeration for allowing octals and ignoring junk when converting
+   // strings to numbers.
+@@ -178,34 +179,34 @@ class StringToDoubleConverter {
+         separator_(separator) {
+   }
+ 
+   // Performs the conversion.
+   // The output parameter 'processed_characters_count' is set to the number
+   // of characters that have been processed to read the number.
+   // Spaces than are processed with ALLOW_{LEADING|TRAILING}_SPACES are included
+   // in the 'processed_characters_count'. Trailing junk is never included.
+-  double StringToDouble(const char* buffer,
++  MFBT_API double StringToDouble(const char* buffer,
+                         int length,
+                         int* processed_characters_count) const;
+ 
+   // Same as StringToDouble above but for 16 bit characters.
+-  double StringToDouble(const uc16* buffer,
++  MFBT_API double StringToDouble(const uc16* buffer,
+                         int length,
+                         int* processed_characters_count) const;
+ 
+   // Same as StringToDouble but reads a float.
+   // Note that this is not equivalent to static_cast<float>(StringToDouble(...))
+   // due to potential double-rounding.
+-  float StringToFloat(const char* buffer,
++  MFBT_API float StringToFloat(const char* buffer,
+                       int length,
+                       int* processed_characters_count) const;
+ 
+   // Same as StringToFloat above but for 16 bit characters.
+-  float StringToFloat(const uc16* buffer,
++  MFBT_API float StringToFloat(const uc16* buffer,
+                       int length,
+                       int* processed_characters_count) const;
+ 
+   // Same as StringToDouble for T = double, and StringToFloat for T = float.
+   template <typename T>
+   T StringTo(const char* buffer,
+              int length,
+              int* processed_characters_count) const;

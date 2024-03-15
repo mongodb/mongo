@@ -21,8 +21,6 @@
 
 #include "threading/ExclusiveData.h"
 
-#include "vm/MutexIDs.h"
-
 namespace js {
 
 class SharedImmutableString;
@@ -39,6 +37,8 @@ class SharedImmutableTwoByteString;
  * data stored within the cache when this lock is acquired.
  */
 class SharedImmutableStringsCache {
+  static SharedImmutableStringsCache singleton_;
+
   friend class SharedImmutableString;
   friend class SharedImmutableTwoByteString;
   struct Hasher;
@@ -154,69 +154,38 @@ class SharedImmutableStringsCache {
     return n;
   }
 
-  /**
-   * Construct a new cache of shared, immutable strings. Returns
-   * `mozilla::Nothing` on out of memory failure.
-   */
-  static mozilla::Maybe<SharedImmutableStringsCache> Create() {
-    auto inner =
-        js_new<ExclusiveData<Inner>>(mutexid::SharedImmutableStringsCache);
-    if (!inner) {
-      return mozilla::Nothing();
-    }
+ private:
+  bool init();
+  void free();
 
-    auto locked = inner->lock();
-    return mozilla::Some(SharedImmutableStringsCache(locked));
+ public:
+  static bool initSingleton();
+  static void freeSingleton();
+
+  static SharedImmutableStringsCache& getSingleton() {
+    MOZ_ASSERT(singleton_.inner_);
+    return singleton_;
   }
 
-  SharedImmutableStringsCache(SharedImmutableStringsCache&& rhs)
-      : inner_(rhs.inner_) {
-    MOZ_ASSERT(inner_);
-    rhs.inner_ = nullptr;
-  }
+ private:
+  SharedImmutableStringsCache() = default;
+  ~SharedImmutableStringsCache() = default;
 
-  SharedImmutableStringsCache& operator=(SharedImmutableStringsCache&& rhs) {
-    MOZ_ASSERT(this != &rhs, "self move not allowed");
-    new (this) SharedImmutableStringsCache(std::move(rhs));
-    return *this;
-  }
+ public:
+  SharedImmutableStringsCache(const SharedImmutableStringsCache& rhs) = delete;
+  SharedImmutableStringsCache(SharedImmutableStringsCache&& rhs) = delete;
+
+  SharedImmutableStringsCache& operator=(SharedImmutableStringsCache&& rhs) =
+      delete;
 
   SharedImmutableStringsCache& operator=(const SharedImmutableStringsCache&) =
       delete;
-
-  SharedImmutableStringsCache clone() {
-    MOZ_ASSERT(inner_);
-    auto locked = inner_->lock();
-    return SharedImmutableStringsCache(locked);
-  }
-
-  ~SharedImmutableStringsCache() {
-    if (!inner_) {
-      return;
-    }
-
-    bool shouldDestroy = false;
-    {
-      // ~ExclusiveData takes the lock, so be sure to drop the lock before
-      // attempting to destroy the inner.
-      auto locked = inner_->lock();
-      MOZ_ASSERT(locked->refcount > 0);
-      locked->refcount--;
-      if (locked->refcount == 0) {
-        shouldDestroy = true;
-      }
-    }
-    if (shouldDestroy) {
-      js_delete(inner_);
-    }
-  }
 
   /**
    * Purge the cache of all refcount == 0 entries.
    */
   void purge() {
     auto locked = inner_->lock();
-    MOZ_ASSERT(locked->refcount > 0);
 
     for (Inner::Set::Enum e(locked->set); !e.empty(); e.popFront()) {
       if (e.front()->refcount == 0) {
@@ -331,29 +300,21 @@ class SharedImmutableStringsCache {
     }
   };
 
-  // The `Inner` struct contains the actual cached contents, and is reference
-  // counted and shared between all `SharedImmutableStringsCache` and
+  // The `Inner` struct contains the actual cached contents and shared between
+  // the `SharedImmutableStringsCache` singleton and all
   // `SharedImmutable[TwoByte]String` holders.
   struct Inner {
     using Set = HashSet<StringBox::Ptr, Hasher, SystemAllocPolicy>;
 
-    size_t refcount;
     Set set;
 
-    Inner() : refcount(0), set() {}
+    Inner() : set() {}
 
     Inner(const Inner&) = delete;
     Inner& operator=(const Inner&) = delete;
-
-    ~Inner() { MOZ_ASSERT(refcount == 0); }
   };
 
-  const ExclusiveData<Inner>* inner_;
-
-  explicit SharedImmutableStringsCache(ExclusiveData<Inner>::Guard& locked)
-      : inner_(locked.parent()) {
-    locked->refcount++;
-  }
+  const ExclusiveData<Inner>* inner_ = nullptr;
 };
 
 /**

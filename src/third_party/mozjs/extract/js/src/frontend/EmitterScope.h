@@ -15,20 +15,19 @@
 #include "frontend/AbstractScopePtr.h"
 #include "frontend/NameAnalysisTypes.h"
 #include "frontend/NameCollections.h"
-#include "frontend/ParseContext.h"
-#include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
-#include "frontend/SharedContext.h"
-#include "js/TypeDecls.h"
-#include "vm/BytecodeUtil.h"   // JSOp
+#include "frontend/Stencil.h"
+#include "vm/Opcodes.h"        // JSOp
 #include "vm/SharedStencil.h"  // GCThingIndex
 
 namespace js {
-
-class Scope;
-
 namespace frontend {
 
 struct BytecodeEmitter;
+class EvalSharedContext;
+class FunctionBox;
+class GlobalSharedContext;
+class ModuleSharedContext;
+class TaggedParserAtomIndex;
 
 // A scope that introduces bindings.
 class EmitterScope : public Nestable<EmitterScope> {
@@ -192,10 +191,7 @@ class EmitterScope : public Nestable<EmitterScope> {
   // shadowing. If `name` refers to a name that is actually stamped onto the
   // target object (anything other than a non-static private method), then
   // `brandLoc` is set to Nothing.
-  //
-  // To handle cases where it's not possible to find the private brand, this
-  // method has to be fallible.
-  bool lookupPrivate(BytecodeEmitter* bce, TaggedParserAtomIndex name,
+  void lookupPrivate(BytecodeEmitter* bce, TaggedParserAtomIndex name,
                      NameLocation& loc, mozilla::Maybe<NameLocation>& brandLoc);
 
   mozilla::Maybe<NameLocation> locationBoundInScope(TaggedParserAtomIndex name,

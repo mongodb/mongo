@@ -25,6 +25,9 @@ class MoveEmitterARM64 {
   bool inCycle_;
   MacroAssembler& masm;
 
+  // A scratch general register used to break cycles.
+  ARMRegister cycleGeneralReg_;
+
   // Original stack push value.
   uint32_t pushedAtStart_;
 

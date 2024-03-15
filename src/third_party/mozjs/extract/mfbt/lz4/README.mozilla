@@ -1,0 +1,18 @@
+This directory contains the LZ4 source from the upstream repo:
+https://github.com/lz4/lz4/
+
+Current version: 1.9.4 [5ff839680134437dbf4678f3d0c7b371d84f4964]
+
+Our in-tree copy of LZ4 does not depend on any generated files from the
+upstream build system, only the lz4*.{c,h} files found in the lib
+sub-directory. Therefore, it should be sufficient to simply overwrite
+the in-tree files with the updated ones from upstream.
+
+If the collection of source files changes, manual updates to moz.build may be
+needed as we don't use the upstream makefiles.
+
+Note that we do NOT use the copy of xxhash.{c,h} from the LZ4 repo. We
+instead use the newer release from that project's upstream repo:
+https://github.com/Cyan4973/xxHash
+
+Current version: 0.8.1 [35b0373c697b5f160d3db26b1cbb45a0d5ba788c]
