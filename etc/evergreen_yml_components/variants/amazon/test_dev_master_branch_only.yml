@@ -217,13 +217,12 @@ buildvariants:
   - name: disk_wiredtiger
   - name: aggregation_embedded_router_jscore_passthrough_gen
   - name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
-# TODO SERVER-85770 reenable these tests
-#  - name: concurrency_embedded_router_causal_consistency_gen
-#  - name: concurrency_embedded_router_clusterwide_ops_add_remove_shards_gen
-#  - name: concurrency_embedded_router_local_read_write_multi_stmt_txn_gen
-#  - name: concurrency_embedded_router_multi_stmt_txn_gen
-#  - name: concurrency_embedded_router_replication_gen
-#  - name: concurrency_embedded_router_replication_bulk_write_gen
+  - name: concurrency_embedded_router_causal_consistency_gen
+  - name: concurrency_embedded_router_clusterwide_ops_add_remove_shards_gen
+  - name: concurrency_embedded_router_local_read_write_multi_stmt_txn_gen
+  - name: concurrency_embedded_router_multi_stmt_txn_gen
+  - name: concurrency_embedded_router_replication_gen
+  - name: concurrency_embedded_router_replication_bulk_write_gen
   - name: embedded_router_jscore_passthrough_gen
   - name: embedded_router_jscore_passthrough_with_config_shard_gen
   - name: embedded_router_jscore_txns_gen
