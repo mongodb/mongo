@@ -133,6 +133,8 @@ protected:
           _subPipeline(std::move(subpipeline)),
           _variableID(varID) {}
 
+    void doDispose() final;
+
 
 private:
     GetNextResult doGetNext() final;

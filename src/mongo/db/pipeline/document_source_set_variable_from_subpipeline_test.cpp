@@ -188,5 +188,26 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
         })",
         redact(*setVariableFromSubPipeline));
 }
+
+TEST_F(DocumentSourceSetVariableFromSubPipelineTest, ShouldPropagateDisposeThroughToSubpipeline) {
+    auto expCtx = getExpCtx();
+
+    const auto mockSourceForSetVarStage = DocumentSourceMock::createForTest(expCtx);
+
+    auto ctxForSubPipeline = expCtx->copyForSubPipeline(expCtx->ns);
+    const auto mockSourceForSubPipeline = DocumentSourceMock::createForTest(ctxForSubPipeline);
+
+    auto setVariableFromSubPipeline = DocumentSourceSetVariableFromSubPipeline::create(
+        expCtx,
+        Pipeline::create({mockSourceForSubPipeline}, ctxForSubPipeline),
+        Variables::kSearchMetaId);
+
+    setVariableFromSubPipeline->setSource(mockSourceForSetVarStage.get());
+
+    // Make sure that if we call dispose on the outer pipeline, which includes
+    // $setVariableFromSubPipeline, the subpipeline will also be properly disposed.
+    setVariableFromSubPipeline->dispose();
+    ASSERT_TRUE(mockSourceForSetVarStage->isDisposed);
+}
 }  // namespace
 }  // namespace mongo

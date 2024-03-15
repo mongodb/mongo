@@ -117,6 +117,14 @@ DocumentSourceSetVariableFromSubPipeline::create(
         new DocumentSourceSetVariableFromSubPipeline(expCtx, std::move(subpipeline), varID));
 };
 
+void DocumentSourceSetVariableFromSubPipeline::doDispose() {
+    if (_subPipeline) {
+        _subPipeline.get_deleter().dismissDisposal();
+        _subPipeline->dispose(pExpCtx->opCtx);
+        _subPipeline.reset();
+    }
+}
+
 DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNext() {
     if (_firstCallForInput) {
         tassert(6448002,
@@ -142,7 +150,9 @@ void DocumentSourceSetVariableFromSubPipeline::addSubPipelineInitialSource(
 }
 
 void DocumentSourceSetVariableFromSubPipeline::detachFromOperationContext() {
-    _subPipeline->detachFromOperationContext();
+    if (_subPipeline) {
+        _subPipeline->detachFromOperationContext();
+    }
 }
 
 void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(OperationContext* opCtx) {
@@ -151,7 +161,8 @@ void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(Operat
 
 bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
     const OperationContext* opCtx) const {
-    return getContext()->opCtx == opCtx && _subPipeline->validateOperationContext(opCtx);
+    return getContext()->opCtx == opCtx &&
+        (!_subPipeline || _subPipeline->validateOperationContext(opCtx));
 }
 
 }  // namespace mongo
