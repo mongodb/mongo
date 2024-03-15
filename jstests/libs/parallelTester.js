@@ -14,7 +14,7 @@ if (typeof _threadInject != "undefined") {
         function evalCodeArgs(arg) {
             if (arg instanceof Code) {
                 return eval("(" + arg.code + ")");
-            } else if (arg !== null && isObject(arg)) {
+            } else if (arg !== null && isObject(arg) && !(arg instanceof Date)) {
                 var newArg = arg instanceof Array ? [] : {};
                 for (var prop in arg) {
                     if (arg.hasOwnProperty(prop)) {
