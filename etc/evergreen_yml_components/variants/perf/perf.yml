@@ -1472,8 +1472,8 @@ buildvariants:
     infrastructure_provisioning_release: 2023-09
     infrastructure_provisioning: initialsync-logkeeper
     workload_setup: 2022-11
-    # EBS logkeeper snapshot with FCV set to 7.2
-    snapshotId: snap-042ca2a003313ebc2
+    # EBS logkeeper snapshot with FCV set to 7.3
+    snapshotId: snap-0651d6a7d0adfe68b
     platform: linux
     authentication: disabled
     storageEngine: wiredTiger
@@ -1489,28 +1489,26 @@ buildvariants:
 
 # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
 # patch builds.
-# - name: linux-replSet-initialsync-logkeeper-snapshot-update
+# - <<: *amazon_linux2_arm64_compile_variant_dependency
+#   name: linux-replSet-initialsync-logkeeper-snapshot-update
 #   display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
 #   cron: "0 0 * * 4"  # 00:00 on Thursday
-#   modules: *modules
+#   modules: *perf_modules
 #   expansions:
 #     mongodb_setup_release: 2022-11
 #     mongodb_setup: initialsync-logkeeper-snapshot-update
 #     infrastructure_provisioning_release: 2022-11
 #     infrastructure_provisioning: initialsync-logkeeper-snapshot-update
 #     # Update this to latest snapshot after each LTS release.
-#     snapshotId: snap-042ca2a003313ebc2
+#     snapshotId: snap-0651d6a7d0adfe68b
 #     platform: linux
 #     authentication: disabled
 #     storageEngine: wiredTiger
 #     project_dir: *perf_project_dir
-#     compile_variant: "-arm64"
+#     compile_variant: "amazon2-arm64-compile"
 #   run_on:
 #     - "rhel70-perf-initialsync-logkeeper"
-#   depends_on: *_compile_amazon_linux2_arm64
 #   tasks:
-#     - *schedule_patch_auto_tasks_task
-#     - *schedule_variant_auto_tasks_task
 #     - name: initialsync-logkeeper-snapshot-update
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
