@@ -118,11 +118,9 @@ void prepareWriteBatchForCommit(TrackingContext& trackingContext,
     // Move BSONColumnBuilders from Bucket to WriteBatch.
     // See corollary in finish().
     batch.measurementMap = std::move(bucket.measurementMap);
-    batch.uncompressedBucketDoc = std::move(bucket.uncompressedBucketDoc);
     batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
     batch.size = bucket.size;
-    batch.generateCompressedDiff =
-        bucket.usingAlwaysCompressedBuckets && batch.uncompressedBucketDoc.get().get().isEmpty();
+    batch.generateCompressedDiff = bucket.usingAlwaysCompressedBuckets;
 }
 
 /**

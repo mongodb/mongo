@@ -437,10 +437,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         return {ErrorCodes::BadValue, "Bucket is compressed and cannot be reopened"};
     }
 
-    if (!isCompressed && usingAlwaysCompressed) {
-        bucket->uncompressedBucketDoc = makeTrackedBson(catalog.trackingContext, bucketDoc);
-    }
-
     // Populate the top-level data field names.
     const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
     for (const BSONElement& dataElem : dataObj) {

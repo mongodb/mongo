@@ -546,7 +546,9 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
                                                              *_sideBucketCatalog,
                                                              bucketFromMigrate,
                                                              _params.stmtId,
-                                                             &_insertedBucketIds);
+                                                             &_insertedBucketIds,
+                                                             /*compressAndWriteBucketFunc=*/
+                                                             nullptr);
                 } else {
                     timeseries::performAtomicWritesForDelete(opCtx(),
                                                              collectionPtr(),

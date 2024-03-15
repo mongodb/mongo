@@ -197,7 +197,9 @@ void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
                                                  *_sideBucketCatalog,
                                                  _params.fromMigrate,
                                                  _params.stmtId,
-                                                 &_insertedBucketIds);
+                                                 &_insertedBucketIds,
+                                                 /*compressAndWriteBucketFunc=*/
+                                                 nullptr);
     });
 }
 

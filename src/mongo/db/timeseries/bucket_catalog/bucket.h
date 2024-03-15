@@ -170,15 +170,6 @@ public:
     using IdleList = tracked_list<Bucket*>;
     boost::optional<IdleList::iterator> idleListEntry = boost::none;
 
-    /**
-     * The uncompressed bucket.
-     *
-     * Only set when reopening uncompressed buckets and the always compressed feature flag is
-     * enabled. Used to convert an uncompressed bucket to a compressed bucket on the next insert,
-     * and will be cleared when finished.
-     */
-    TrackedBSONObj uncompressedBucketDoc;
-
     // Whether the bucket was created while the always used compressed buckets feature flag was
     // enabled.
     // TODO SERVER-70605: remove this boolean.

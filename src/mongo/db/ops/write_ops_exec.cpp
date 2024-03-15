@@ -1696,6 +1696,10 @@ WriteResult performUpdates(OperationContext* opCtx,
             if (source == OperationSource::kTimeseriesBucketCompression) {
                 out.results.emplace_back(ex.toStatus());
                 break;
+            } else if (source == OperationSource::kTimeseriesInsert &&
+                       ex.code() == ErrorCodes::TimeseriesBucketCompressionFailed) {
+                // Special case for failed attempt to compress a reopened bucket.
+                throw;
             }
 
             out.canContinue = handleError(opCtx,
@@ -1948,7 +1952,7 @@ WriteResult performDeletes(OperationContext* opCtx,
     }
 
     return out;
-}  // namespace mongo::write_ops_exec
+}
 
 Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,
@@ -2325,6 +2329,51 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(opCtx, op, OperationSource::kTimeseriesInsert), request);
 }
+
+/**
+ * Throws if compression fails for any reason.
+ */
+void compressUncompressedBucketOnReopen(OperationContext* opCtx,
+                                        const OID& bucketId,
+                                        const NamespaceString& nss,
+                                        const UUID& uuid,
+                                        StringData timeFieldName) {
+    bool validateCompression = gValidateTimeseriesCompression.load();
+
+    auto bucketCompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+        auto compressed =
+            timeseries::compressBucket(bucketDoc, timeFieldName, nss, validateCompression);
+
+        if (!compressed.compressedBucket) {
+            uassert(timeseries::BucketCompressionFailure(uuid, bucketId),
+                    "Time-series compression failed on reopened bucket",
+                    compressed.compressedBucket);
+        }
+
+        return compressed.compressedBucket;
+    };
+
+    write_ops::UpdateModification u(std::move(bucketCompressionFunc));
+    write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
+    invariant(!update.getMulti(), bucketId.toString());
+    invariant(!update.getUpsert(), bucketId.toString());
+
+    write_ops::UpdateCommandRequest compressionOp(nss, {update});
+    write_ops::WriteCommandRequestBase base;
+    // The schema validation configured in the bucket collection is intended for direct
+    // operations by end users and is not applicable here.
+    base.setBypassDocumentValidation(true);
+    // Timeseries compression operation is not a user operation and should not use a
+    // statement id from any user op. Set to Uninitialized to bypass.
+    base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
+    compressionOp.setWriteCommandRequestBase(std::move(base));
+    auto result = performUpdates(opCtx, compressionOp, OperationSource::kTimeseriesInsert);
+    invariant(result.results.size() == 1,
+              str::stream() << "Unexpected number of results (" << result.results.size()
+                            << ") for update on time-series collection "
+                            << nss.toStringForErrorMsg());
+}
+
 
 /**
  * Attempts to perform bucket compression on time-series bucket. It will surpress any error caused
@@ -2815,6 +2864,15 @@ insertIntoBucketCatalog(OperationContext* opCtx,
             : ns(request);
         auto& measurementDoc = request.getDocuments()[start + index];
 
+        // It is a layering violation to have the bucket catalog be privy to the details of writing
+        // out buckets with write_ops_exec functions. This callable function is a workaround in the
+        // case of an uncompressed bucket that gets reopened. The bucket catalog can blindly call
+        // this function handed down from write_ops_exec to write out the bucket as compressed.
+        // Another option considered was to throw a write error and catch at this layer, but that
+        // approach has performance implications.
+        timeseries::CompressAndWriteBucketFunc compressAndWriteBucketFunc =
+            compressUncompressedBucketOnReopen;
+
         auto swResult = timeseries::attemptInsertIntoBucket(
             opCtx,
             bucketCatalog,
@@ -2822,7 +2880,8 @@ insertIntoBucketCatalog(OperationContext* opCtx,
             timeSeriesOptions,
             measurementDoc,
             timeseries::BucketReopeningPermittance::kAllowed,
-            canCombineTimeseriesInsertWithOtherClients(opCtx, request));
+            canCombineTimeseriesInsertWithOtherClients(opCtx, request),
+            compressAndWriteBucketFunc);
 
         if (auto error = write_ops_exec::generateError(
                 opCtx, swResult.getStatus(), start + index, errors->size())) {

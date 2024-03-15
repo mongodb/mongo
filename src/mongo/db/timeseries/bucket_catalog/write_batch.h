@@ -99,7 +99,6 @@ struct WriteBatch {
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
     uint32_t numPreviouslyCommittedMeasurements = 0;
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
-    TrackedBSONObj uncompressedBucketDoc;
     bool generateCompressedDiff = false;
 
     /**

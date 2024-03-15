@@ -187,6 +187,9 @@ enum class BucketReopeningPermittance {
     kDisallowed,
 };
 
+using CompressAndWriteBucketFunc = std::function<void(
+    OperationContext*, const OID&, const NamespaceString&, const UUID&, StringData)>;
+
 /**
  * Attempts to insert a measurement doc into a bucket in the bucket catalog and retries
  * automatically on certain errors. Only reopens existing buckets if the insert was initiated from a
@@ -201,7 +204,8 @@ StatusWith<timeseries::bucket_catalog::InsertResult> attemptInsertIntoBucket(
     TimeseriesOptions& timeSeriesOptions,
     const BSONObj& measurementDoc,
     BucketReopeningPermittance,
-    bucket_catalog::CombineWithInsertsFromOtherClients combine);
+    bucket_catalog::CombineWithInsertsFromOtherClients combine,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
 
 /**
  * Prepares the final write batches needed for performing the writes to storage.
@@ -281,7 +285,8 @@ void performAtomicWritesForUpdate(
     bucket_catalog::BucketCatalog& sideBucketCatalog,
     bool fromMigrate,
     StmtId stmtId,
-    std::set<OID>* bucketIds);
+    std::set<OID>* bucketIds,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
 
 /**
  * Change the bucket namespace to time-series view namespace for time-series command.

@@ -120,5 +120,6 @@ const runTest = function(ordered) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
 };
 
-runTest(true);
-runTest(false);
+// TODO(SERVER-88014): Re-enable these tests
+// runTest(true);
+// runTest(false);

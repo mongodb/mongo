@@ -57,7 +57,6 @@ WriteBatch::WriteBatch(TrackingContext& tc,
       opId(o),
       stats(s),
       timeField(timeField),
-      uncompressedBucketDoc(makeTrackedBson(tc, {})),
       measurementMap(trackingContext) {}
 
 BSONObj WriteBatch::toBSON() const {
@@ -71,15 +70,6 @@ BSONObj WriteBatch::toBSON() const {
                                                     newFieldNamesToBeInserted.begin(), toFieldName),
                                                 boost::make_transform_iterator(
                                                     newFieldNamesToBeInserted.end(), toFieldName)));
-}
-
-const BSONObj& getUncompressedBucketDoc(const WriteBatch& batch) {
-    return batch.uncompressedBucketDoc.get().get();
-}
-
-void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc) {
-    batch.uncompressedBucketDoc =
-        makeTrackedBson(batch.trackingContext, std::move(uncompressedBucketDoc));
 }
 
 bool claimWriteBatchCommitRights(WriteBatch& batch) {

@@ -77,6 +77,10 @@ Uncompressed bucket (version 1):
 }
 ```
 
+The number of elements in "data.\<time field\>" indicates the number of measurements in the bucket.
+A non-time-field data field can have missing values, also referred to as skips, but it cannot
+have more elements than the timefield.
+
 There are two types of compressed buckets, version 2 and version 3. They differ only in that the
 entries in the data field of version 2 buckets are sorted on the time field, whereas this is not
 enforced for version 3 buckets.

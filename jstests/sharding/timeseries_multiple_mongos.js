@@ -17,6 +17,7 @@ const collName = 'testColl';
 const bucketsCollName = 'system.buckets.' + collName;
 const timeField = 'time';
 const metaField = 'hostid';
+const testTimestamp = ISODate();
 
 // Connections.
 const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 2}});
@@ -290,11 +291,11 @@ runTest({
         documents: [{
             _id: ObjectId(),
             control: {
-                min: {time: ISODate()},
-                max: {time: ISODate()},
+                min: {time: testTimestamp},
+                max: {time: testTimestamp},
                 version: TimeseriesTest.BucketVersion.kUncompressed
             },
-            data: {}
+            data: {[timeField]: {0: testTimestamp}},
         }]
     },
     numProfilerEntries: {sharded: 1, unsharded: 1},
