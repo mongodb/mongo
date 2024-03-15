@@ -50,7 +50,7 @@ class InternalSessionPoolTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         _pool = InternalSessionPool::get(getServiceContext());
         _opCtx = makeOperationContext();
     }

@@ -41,14 +41,16 @@ namespace service_context_test {
  * "Literal" and "structural" type to stand-in for a `ClusterRole` value.
  * Necessary until `ClusterRole` can be used as a NTTP.
  */
-enum class ServerRoleIndex { shard, router };
+enum class ServerRoleIndex { shard, router, shardRouter };
 
 inline ClusterRole getClusterRole(ServerRoleIndex i) {
     switch (i) {
         case ServerRoleIndex::shard:
-            return {ClusterRole::ShardServer, ClusterRole::RouterServer};
+            return ClusterRole::ShardServer;
         case ServerRoleIndex::router:
             return ClusterRole::RouterServer;
+        case ServerRoleIndex::shardRouter:
+            return {ClusterRole::ShardServer, ClusterRole::RouterServer};
     }
     MONGO_UNREACHABLE;
 }
@@ -71,6 +73,7 @@ private:
 
 using ShardRoleOverride = RoleOverride<ServerRoleIndex::shard>;
 using RouterRoleOverride = RoleOverride<ServerRoleIndex::router>;
+using ShardRouterRoleOverride = RoleOverride<ServerRoleIndex::shardRouter>;
 
 class ScopedGlobalServiceContextForTest {
 public:

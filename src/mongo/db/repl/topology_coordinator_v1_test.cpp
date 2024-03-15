@@ -3869,11 +3869,9 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
 
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSupport) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     TopologyCoordinator::Options options;
-    options.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    options.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(false);
 
@@ -3893,8 +3891,7 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSuppor
 
 TEST_F(TopoCoordTest, NodeBecomesSecondaryAsNormalWhenReadCommittedSupportedAndCSRS) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     TopologyCoordinator::Options options;
     options.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     setOptions(options);

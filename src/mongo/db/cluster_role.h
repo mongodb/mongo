@@ -45,13 +45,6 @@ namespace mongo {
 /**
  * Represents the role this node plays in a sharded cluster, based on its startup arguments. Roles
  * are not mutually exclusive since a node can play different roles at the same time.
- *
- * Every node in a sharded cluster will have by default the RouterServer role. As a consequence, the
- * only possible combinations are:
- *  - { ShardServer, RouterServer }
- *  - { ShardServer, ConfigServer, RouterServer }
- *  - { RouterServer }
- * For a cluster that is not sharded, the cluster role of each node is { None }.
  */
 class ClusterRole {
 public:
@@ -74,7 +67,7 @@ public:
         ConfigServer = 0x02,
 
         /**
-         * By default, all shard and config server nodes act as router servers.
+         * The node acts as a router server (the process was started with --routerPort argument).
          */
         RouterServer = 0x04
     };
@@ -116,13 +109,6 @@ public:
      */
     bool hasExclusively(const ClusterRole& role) const {
         return _roleMask == role._roleMask;
-    }
-
-    /**
-     * Returns `true` if this node has the shard role and not the config role.
-     */
-    bool isShardOnly() const {
-        return has(ShardServer) && !has(ConfigServer);
     }
 
 private:

@@ -129,6 +129,18 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint) {
     ASSERT(shardingState->supportsReplicaSetEndpoint());
 }
 
+TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotRouterServer) {
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    setHasTwoOrShardsClusterParameter(false);
+    ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
+
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+    shardingState->setIsConfigShard(true);
+
+    ASSERT(shardingState->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+}
+
 TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotConfigShard) {
     serverGlobalParams.clusterRole = {
         ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};

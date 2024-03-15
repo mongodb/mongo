@@ -223,7 +223,7 @@ private:
 void ShardRoleTest::setUp() {
     ServiceContextMongoDTest::setUp();
     changeOpCtx();
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     const repl::ReplSettings replSettings = {};
     repl::ReplicationCoordinator::set(

@@ -214,8 +214,7 @@ private:
 };
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest, ConfigShardsOnInserts_NotConfigShard) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -228,8 +227,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest, ConfigShardsOnInserts_NotCon
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnInserts_ConfigShard_OnConfigServer_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -242,8 +240,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnInserts_ConfigShard_OnConfigServer_FeatureFlagDisabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     RAIIServerParameterControllerForTest replicaSetEndpointController{
         "featureFlagReplicaSetEndpoint", false};
 
@@ -260,7 +257,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnInserts_ConfigShard_NotOnConfigServer_FeatureFlagEnabled) {
     // The config.shards collection should only exist on the config server but testing here for
     // completion.
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -273,8 +270,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardOnDelete_ConfigShard_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -288,8 +284,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardOnDelete_ConfigShard_FeatureFlagDisabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     RAIIServerParameterControllerForTest replicaSetEndpointController{
         "featureFlagReplicaSetEndpoint", false};
 
@@ -305,8 +300,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnDelete_NotConfigShard_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -320,8 +314,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnUpdate_DoesNotUnsetIsConfigShard_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -335,9 +328,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnUpdate_DoesNotSetIsConfigShard_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -350,8 +341,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnInserts_InvalidDoc_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -364,8 +354,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnDelete_InvalidDoc_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -379,8 +368,7 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
        ConfigShardsOnUpdate_InvalidDoc_FeatureFlagEnabled) {
-    serverGlobalParams.clusterRole = {
-        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();

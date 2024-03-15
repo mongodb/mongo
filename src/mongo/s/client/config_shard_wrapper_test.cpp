@@ -139,8 +139,7 @@ protected:
     std::unique_ptr<ConfigShardWrapper> _configShardWrapper;
 
     void setUp() override {
-        serverGlobalParams.clusterRole = {
-            ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
         ShardingTestFixture::setUp();
 
