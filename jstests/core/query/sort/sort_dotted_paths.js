@@ -17,18 +17,18 @@ assert.commandWorked(coll.insert([
     {_id: 3, a: null},
     {_id: 4, a: {}},
     {_id: 5, a: []},
-    {_id: 6, a: [1]},
-    {_id: 7, a: [[1]]},
+    {_id: 6, a: [0, 1, 2]},
+    {_id: 7, a: [[1, 2], [3, 4]]},
     {_id: 8},
     {_id: 9, a: [undefined]}
 ]));
 
 testSortAndSortWithLimit(
     {a: 1, _id: 1},
-    [{_id: 2}, {_id: 5}, {_id: 9}, {_id: 3}, {_id: 8}, {_id: 1}, {_id: 6}, {_id: 4}, {_id: 7}]);
+    [{_id: 2}, {_id: 5}, {_id: 9}, {_id: 3}, {_id: 8}, {_id: 6}, {_id: 1}, {_id: 4}, {_id: 7}]);
 testSortAndSortWithLimit(
     {a: -1, _id: 1},
-    [{_id: 7}, {_id: 4}, {_id: 1}, {_id: 6}, {_id: 3}, {_id: 8}, {_id: 2}, {_id: 5}, {_id: 9}]);
+    [{_id: 7}, {_id: 4}, {_id: 6}, {_id: 1}, {_id: 3}, {_id: 8}, {_id: 2}, {_id: 5}, {_id: 9}]);
 
 // Test out sort({a:1,b:1}) on a collection where a is an array for some documents and b is an array
 // for other documents.
@@ -84,21 +84,63 @@ assert.commandWorked(coll.insert([
     {_id: 6, a: [{b: [5]}]},
     {_id: 7, a: [{b: [4, 5]}, {b: 7}]},
     {_id: 8, a: [{b: [1, 3]}, {b: [2, 5]}]},
-    {_id: 9, a: [{b: []}, {b: [1, 3]}]}
+    {_id: 9, a: [{b: []}, {b: [1, 3]}]},
+    {_id: 10, a: {b: [[1, 2], [3, 4]]}},
+    {_id: 11, a: [{b: [[1, 2], [3, 4]]}, {b: [[5, 6], [7, 8]]}]}
 ]));
 
-testSortAndSortWithLimit(
-    {"a.b": 1, _id: 1},
-    [{_id: 2}, {_id: 9}, {_id: 4}, {_id: 5}, {_id: 8}, {_id: 1}, {_id: 3}, {_id: 7}, {_id: 6}]);
-testSortAndSortWithLimit(
-    {"a.b": 1, _id: -1},
-    [{_id: 9}, {_id: 2}, {_id: 5}, {_id: 4}, {_id: 8}, {_id: 3}, {_id: 1}, {_id: 7}, {_id: 6}]);
-testSortAndSortWithLimit(
-    {"a.b": -1, _id: 1},
-    [{_id: 7}, {_id: 6}, {_id: 8}, {_id: 3}, {_id: 9}, {_id: 1}, {_id: 4}, {_id: 5}, {_id: 2}]);
-testSortAndSortWithLimit(
-    {"a.b": -1, _id: -1},
-    [{_id: 7}, {_id: 8}, {_id: 6}, {_id: 9}, {_id: 3}, {_id: 1}, {_id: 5}, {_id: 4}, {_id: 2}]);
+testSortAndSortWithLimit({"a.b": 1, _id: 1}, [
+    {_id: 2},
+    {_id: 9},
+    {_id: 4},
+    {_id: 5},
+    {_id: 8},
+    {_id: 1},
+    {_id: 3},
+    {_id: 7},
+    {_id: 6},
+    {_id: 10},
+    {_id: 11}
+]);
+testSortAndSortWithLimit({"a.b": 1, _id: -1}, [
+    {_id: 9},
+    {_id: 2},
+    {_id: 5},
+    {_id: 4},
+    {_id: 8},
+    {_id: 3},
+    {_id: 1},
+    {_id: 7},
+    {_id: 6},
+    {_id: 11},
+    {_id: 10}
+]);
+testSortAndSortWithLimit({"a.b": -1, _id: 1}, [
+    {_id: 11},
+    {_id: 10},
+    {_id: 7},
+    {_id: 6},
+    {_id: 8},
+    {_id: 3},
+    {_id: 9},
+    {_id: 1},
+    {_id: 4},
+    {_id: 5},
+    {_id: 2}
+]);
+testSortAndSortWithLimit({"a.b": -1, _id: -1}, [
+    {_id: 11},
+    {_id: 10},
+    {_id: 7},
+    {_id: 8},
+    {_id: 6},
+    {_id: 9},
+    {_id: 3},
+    {_id: 1},
+    {_id: 5},
+    {_id: 4},
+    {_id: 2}
+]);
 
 // Basic tests for a sort pattern that contains two paths of length 2 with a common prefix.
 assert(coll.drop());

@@ -273,6 +273,68 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForCompoundMetaSort) {
         (Value{std::vector<Value>{Value{4}, Value{0.3}, Value{1.5}, Value{5}, Value{1.5}}}));
 }
 
+TEST(SortKeyGeneratorTest, SortKeyComponentVectorTopLevelFieldTest) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
+    std::vector<BSONElement> elemOut(1);
+    auto inputObj = BSON("a" << 5);
+    sortKeyGen->generateSortKeyComponentVector(inputObj, &elemOut);
+    auto expectedObj = BSON("a" << 5);
+    std::vector<BSONElement> expected{expectedObj["a"]};
+    ASSERT_BSONELT_EQ(elemOut[0], expected[0]);
+}
+
+TEST(SortKeyGeneratorTest, SortKeyComponentVectorNestedFieldTest) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a.b" << 1), nullptr);
+    std::vector<BSONElement> elemOut(1);
+    auto inputObj = BSON("a" << BSON("b" << 5));
+    sortKeyGen->generateSortKeyComponentVector(inputObj, &elemOut);
+    auto expectedObj = BSON("a" << BSON("b" << 5));
+    std::vector<BSONElement> expected{expectedObj["a"]["b"]};
+    ASSERT_BSONELT_EQ(elemOut[0], expected[0]);
+}
+
+TEST(SortKeyGeneratorTest, SortKeyComponentVectorArrayTest) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
+    std::vector<BSONElement> elemOut(1);
+    auto inputObj = BSON("a" << BSON_ARRAY(1 << 2 << 3));
+    sortKeyGen->generateSortKeyComponentVector(inputObj, &elemOut);
+    auto expectedObj = BSON("" << 1);
+    std::vector<BSONElement> expected{expectedObj[""]};
+    ASSERT_BSONELT_EQ(elemOut[0], expected[0]);
+}
+
+TEST(SortKeyGeneratorTest, SortKeyComponentVectorNestedArrayTest) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << 1), nullptr);
+    std::vector<BSONElement> elemOut(1);
+    auto inputObj = BSON("a" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << BSON_ARRAY(2 << 3 << 4)));
+    sortKeyGen->generateSortKeyComponentVector(inputObj, &elemOut);
+    auto expectedObj = BSON("" << BSON_ARRAY(1 << 2 << 3));
+    std::vector<BSONElement> expected{expectedObj[""]};
+    ASSERT_BSONELT_EQ(elemOut[0], expected[0]);
+}
+
+TEST(SortKeyGeneratorTest, SortKeyComponentVectorCompoundSortPatternTest) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a" << 1 << "b" << 1), nullptr);
+    std::vector<BSONElement> elemOut(2);
+    auto inputObj = BSON("a" << 5 << "b" << 3);
+    sortKeyGen->generateSortKeyComponentVector(inputObj, &elemOut);
+    BSONObj expectedObj = BSON("a" << 5 << "b" << 3);
+    std::vector<BSONElement> expected{expectedObj["a"], expectedObj["b"]};
+    for (size_t i = 0; i < elemOut.size(); ++i) {
+        ASSERT_BSONELT_EQ(elemOut[i], expected[i]);
+    }
+}
+
+TEST(SortKeyGeneratorTest, SortKeyComponentVectorArrayWithNestedPathsTest) {
+    auto sortKeyGen = makeSortKeyGen(BSON("a.b" << 1), nullptr);
+    std::vector<BSONElement> elemOut(1);
+    auto inputObj = BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b" << 2) << BSON("b" << 3)));
+    sortKeyGen->generateSortKeyComponentVector(inputObj, &elemOut);
+    BSONObj expectedObj = BSON("" << 1);
+    std::vector<BSONElement> expected{expectedObj[""]};
+    ASSERT_BSONELT_EQ(elemOut[0], expected[0]);
+}
+
 // A test fixture which creates a WorkingSet and allocates a WorkingSetMember inside of it. Used for
 // testing sort key generation against a working set member.
 class SortKeyGeneratorWorkingSetTest : public mongo::unittest::Test {
