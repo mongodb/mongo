@@ -47,6 +47,7 @@
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/db/s/balancer/move_unsharded_policy.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -116,6 +117,10 @@ protected:
 
 
 TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTrackUnshardedCollectionsUponCreation", true);
+
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);
 
@@ -152,6 +157,10 @@ TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
 
 
 TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTrackUnshardedCollectionsUponCreation", true);
+
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);
 
