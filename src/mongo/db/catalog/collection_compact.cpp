@@ -91,7 +91,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx, const NamespaceSt
 }  // namespace
 
 StatusWith<int64_t> compactCollection(OperationContext* opCtx,
-                                      boost::optional<int64_t> freeSpaceTargetMB,
+                                      const CompactOptions& options,
                                       const NamespaceString& collectionNss) {
     AutoGetDb autoDb(opCtx, collectionNss.dbName(), MODE_IX);
     Database* database = autoDb.getDb();
@@ -136,30 +136,40 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     pauseCompactCommandBeforeWTCompact.pauseWhileSet();
 
-    Status status = recordStore->compact(opCtx, freeSpaceTargetMB);
-    if (!status.isOK())
-        return status;
+    auto compactCollectionStatus = recordStore->compact(opCtx, options);
+    if (!compactCollectionStatus.isOK())
+        return compactCollectionStatus;
 
     // Compact all indexes (not including unfinished indexes)
-    status = indexCatalog->compactIndexes(opCtx, freeSpaceTargetMB);
-    if (!status.isOK())
-        return status;
-
-    auto bytesAfter = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
-    auto bytesDiff = static_cast<int64_t>(bytesBefore) - static_cast<int64_t>(bytesAfter);
+    auto compactIndexesStatus = indexCatalog->compactIndexes(opCtx, options);
+    if (!compactIndexesStatus.isOK())
+        return compactIndexesStatus;
 
     // The compact operation might grow the file size if there is little free space left, because
     // running a compact also triggers a checkpoint, which requires some space. Additionally, it is
     // possible for concurrent writes and index builds to cause the size to grow while compact is
     // running. So it is possible for the size after a compact to be larger than before it.
-    LOGV2(7386700,
-          "Compact end",
-          logAttrs(collectionNss),
-          "bytesBefore"_attr = bytesBefore,
-          "bytesAfter"_attr = bytesAfter,
-          "bytesDiff"_attr = bytesDiff);
-
-    return bytesDiff;
+    if (options.dryRun) {
+        // When a dry run is triggered, each compact call returns an estimated number of bytes that
+        // can be reclaimed.
+        int64_t estimatedBytes =
+            compactCollectionStatus.getValue() + compactIndexesStatus.getValue();
+        LOGV2(8352600,
+              "Compact end",
+              logAttrs(collectionNss),
+              "estimatedBytes"_attr = estimatedBytes);
+        return estimatedBytes;
+    } else {
+        auto bytesAfter = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
+        auto bytesDiff = static_cast<int64_t>(bytesBefore) - static_cast<int64_t>(bytesAfter);
+        LOGV2(7386700,
+              "Compact end",
+              logAttrs(collectionNss),
+              "bytesBefore"_attr = bytesBefore,
+              "bytesAfter"_attr = bytesAfter,
+              "bytesDiff"_attr = bytesDiff);
+        return bytesDiff;
+    }
 }
 
 }  // namespace mongo

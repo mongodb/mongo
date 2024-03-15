@@ -51,6 +51,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
@@ -637,13 +638,11 @@ public:
     }
 
     /**
-     * Attempt to reduce the storage space used by this RecordStore. If the freeSpaceTargetMB is
-     * provided, compaction will only proceed if the free storage space available is greater than
-     * the provided value.
-     *
+     * Attempt to reduce the storage space used by this RecordStore.
      * Only called if compactSupported() returns true.
+     * Returns an estimated number of bytes when doing a dry run.
      */
-    Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB);
+    StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options);
 
     /**
      * Performs record store specific validation to ensure consistency of underlying data
@@ -811,7 +810,8 @@ protected:
                                        const RecordId& end,
                                        bool inclusive,
                                        const AboutToDeleteRecordCallback& aboutToDelete) = 0;
-    virtual Status doCompact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) {
+
+    virtual StatusWith<int64_t> doCompact(OperationContext* opCtx, const CompactOptions& options) {
         MONGO_UNREACHABLE;
     }
 

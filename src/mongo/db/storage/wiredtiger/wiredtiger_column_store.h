@@ -106,7 +106,7 @@ public:
     //
     // Whole ColumnStore ops
     //
-    Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) override;
+    StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) override;
     IndexValidateResults validate(OperationContext* opCtx, bool full) const override;
 
     bool appendCustomStats(OperationContext* opCtx,

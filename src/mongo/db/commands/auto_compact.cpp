@@ -147,8 +147,7 @@ Status autoCompact(OperationContext* opCtx,
             excludedIdents.push_back(collection->getSharedIdent()->getIdent());
     }
 
-    StorageEngine::AutoCompactOptions options{
-        enable, runOnce, freeSpaceTargetMB, std::move(excludedIdents)};
+    AutoCompactOptions options{enable, runOnce, freeSpaceTargetMB, std::move(excludedIdents)};
 
     Status status = storageEngine->autoCompact(opCtx, options);
     if (!status.isOK())

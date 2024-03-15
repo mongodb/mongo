@@ -101,43 +101,49 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     return true;
 }
 
-Status WiredTigerIndexUtil::compact(Interruptible& interruptible,
-                                    WiredTigerRecoveryUnit& ru,
-                                    const std::string& uri,
-                                    boost::optional<int64_t> freeSpaceTargetMB) {
+StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
+                                                 WiredTigerRecoveryUnit& ru,
+                                                 const std::string& uri,
+                                                 const CompactOptions& options) {
     WiredTigerSessionCache* cache = ru.getSessionCache();
-    if (!cache->isEphemeral()) {
-        WT_SESSION* s = ru.getSession()->getSession();
-        ru.abandonSnapshot();
-
-        // Set a pointer on the WT_SESSION to the interruptible, so that WT::compact can use a
-        // callback to check for interrupts.
-        SessionDataRAII sessionRaii(s, &interruptible);
-
-        StringBuilder config;
-        config << "timeout=0";
-        if (freeSpaceTargetMB) {
-            config << ",free_space_target=" + std::to_string(*freeSpaceTargetMB) + "MB";
-        }
-        int ret = s->compact(s, uri.c_str(), config.str().c_str());
-        if (ret == WT_ERROR && !interruptible.checkForInterruptNoAssert().isOK()) {
-            return Status(ErrorCodes::Interrupted,
-                          str::stream() << "Storage compaction interrupted on " << uri.c_str());
-        }
-
-        if (MONGO_unlikely(WTCompactIndexEBUSY.shouldFail())) {
-            ret = EBUSY;
-        }
-
-        if (ret == EBUSY) {
-            return Status(ErrorCodes::Interrupted,
-                          str::stream() << "Compaction interrupted on " << uri.c_str()
-                                        << " due to cache eviction pressure");
-        }
-
-        invariantWTOK(ret, s);
+    if (cache->isEphemeral()) {
+        return 0;
     }
-    return Status::OK();
+
+    WT_SESSION* s = ru.getSession()->getSession();
+    ru.abandonSnapshot();
+
+    // Set a pointer on the WT_SESSION to the interruptible, so that WT::compact can use a
+    // callback to check for interrupts.
+    SessionDataRAII sessionRaii(s, &interruptible);
+
+    StringBuilder config;
+    config << "timeout=0";
+    if (options.dryRun) {
+        config << ",dryrun=true";
+    }
+    if (options.freeSpaceTargetMB) {
+        config << ",free_space_target=" + std::to_string(*options.freeSpaceTargetMB) + "MB";
+    }
+    int ret = s->compact(s, uri.c_str(), config.str().c_str());
+    if (ret == WT_ERROR && !interruptible.checkForInterruptNoAssert().isOK()) {
+        return Status(ErrorCodes::Interrupted,
+                      str::stream() << "Storage compaction interrupted on " << uri.c_str());
+    }
+
+    if (MONGO_unlikely(WTCompactIndexEBUSY.shouldFail())) {
+        ret = EBUSY;
+    }
+
+    if (ret == EBUSY) {
+        return Status(ErrorCodes::Interrupted,
+                      str::stream() << "Compaction interrupted on " << uri.c_str()
+                                    << " due to cache eviction pressure");
+    }
+
+    invariantWTOK(ret, s);
+
+    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(s, uri) : 0;
 }
 
 bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,

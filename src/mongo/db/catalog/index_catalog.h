@@ -548,11 +548,11 @@ public:
 
     /*
      * Attempt compaction on all ready indexes to regain disk space, if the storage engine's index
-     * supports compaction in-place. If the freeSpaceTargetMB is provided, compaction will only
-     * proceed if the free storage space available is greater than the provided value.
+     * supports compaction in-place.
+     * Returns an estimated number of bytes when doing a dry run.
      */
-    virtual Status compactIndexes(OperationContext* opCtx,
-                                  boost::optional<int64_t> freeSpaceTargetMB) const = 0;
+    virtual StatusWith<int64_t> compactIndexes(OperationContext* opCtx,
+                                               const CompactOptions& options) const = 0;
 
     virtual std::string getAccessMethodName(const BSONObj& keyPattern) = 0;
 

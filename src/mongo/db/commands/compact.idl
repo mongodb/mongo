@@ -40,6 +40,10 @@ commands:
         cpp_name: CompactCommand
         description: "Parser for the 'compact' command."
         fields:
+            dryRun:
+                description: "Runs only the estimation phase of the compact operation"
+                default: false
+                type: bool
             force:
                 description: "Allows to run on a replica set primary"
                 optional: true

@@ -323,7 +323,7 @@ public:
     //
     // Whole ColumnStore ops
     //
-    virtual Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) = 0;
+    virtual StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) = 0;
     virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,

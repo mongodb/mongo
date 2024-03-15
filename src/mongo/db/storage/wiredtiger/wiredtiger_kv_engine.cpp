@@ -657,10 +657,10 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
     }
 
     // TODO SERVER-84357: exclude the oplog table.
-    StorageEngine::AutoCompactOptions options{/*enable=*/true,
-                                              /*runOnce=*/false,
-                                              /*freeSpaceTargetMB=*/boost::none,
-                                              /*excludedIdents*/ std::vector<StringData>()};
+    AutoCompactOptions options{/*enable=*/true,
+                               /*runOnce=*/false,
+                               /*freeSpaceTargetMB=*/boost::none,
+                               /*excludedIdents*/ std::vector<StringData>()};
 
     // Holding the global lock to prevent racing with storage shutdown. However, no need to hold the
     // RSTL nor acquire a flow control ticket. This doesn't care about the replica state of the node
@@ -2806,8 +2806,7 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
     }
 }
 
-Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
-                                       const StorageEngine::AutoCompactOptions& options) {
+Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) {
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
 
     auto status = WiredTigerUtil::canRunAutoCompact(opCtx, isEphemeral());
@@ -2824,7 +2823,7 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
             // Create WiredTiger URIs from the idents.
             config << ",exclude=[";
             for (const auto& ident : options.excludedIdents) {
-                config << "\"" << _uri(ident) + ".wt\",";
+                config << "\"" << _uri(ident) << ".wt\",";
             }
             config << "]";
         }

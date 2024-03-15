@@ -131,11 +131,10 @@ public:
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
-     * indexed record store supports compaction-in-place.  If the freeSpaceTargetMB is provided,
-     * compaction will only proceed if the free storage space available is greater than the provided
-     * value.
+     * indexed record store supports compaction-in-place.
+     * Returns an estimated number of bytes when doing a dry run.
      */
-    virtual Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) {
+    virtual StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) {
         return Status::OK();
     }
 

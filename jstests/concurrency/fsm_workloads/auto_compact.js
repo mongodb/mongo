@@ -15,6 +15,7 @@
  *  does_not_support_transactions,
  *  featureFlagAutoCompact,
  *  incompatible_with_macos,
+ *  # Requires all nodes to be running the latest binary.
  *  multiversion_incompatible,
  *  requires_compact,
  *  # Compact is not supported for in memory databases.

@@ -87,7 +87,9 @@ public:
         return "compact collection\n"
                "warning: this operation has blocking behaviour and is slow. You can cancel with "
                "killOp()\n"
-               "{ compact : <collection_name>, [force:<bool>], [freeSpaceTargetMB:<int64_t>] }\n"
+               "{ compact : <collection_name>, [dryRun:<bool>], [force:<bool>], "
+               "[freeSpaceTargetMB:<int64_t>] }\n"
+               "  dryRun - runs only the estimation phase of the compact operation\n"
                "  force - allows to run on a replica set primary\n"
                "  freeSpaceTargetMB - minimum amount of space recoverable for compaction to "
                "proceed\n";
@@ -111,7 +113,9 @@ public:
 
         _assertCanRunCompact(opCtx, params);
 
-        StatusWith<int64_t> status = compactCollection(opCtx, params.getFreeSpaceTargetMB(), nss);
+        CompactOptions options{.dryRun = params.getDryRun(),
+                               .freeSpaceTargetMB = params.getFreeSpaceTargetMB()};
+        StatusWith<int64_t> status = compactCollection(opCtx, options, nss);
         uassertStatusOK(status.getStatus());
 
         int64_t bytesFreed = status.getValue();
@@ -137,9 +141,9 @@ private:
 
         uassert(ErrorCodes::IllegalOperation,
                 "Compact command with extra options requires its feature flag to be enabled",
-                !params.getFreeSpaceTargetMB() ||
-                    gFeatureFlagCompactOptions.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+                gFeatureFlagCompactOptions.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+                    (!params.getFreeSpaceTargetMB() && !params.getDryRun()));
     }
 };
 

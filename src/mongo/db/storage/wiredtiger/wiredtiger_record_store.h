@@ -207,7 +207,7 @@ public:
         return true;
     }
 
-    Status doCompact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) override;
+    StatusWith<int64_t> doCompact(OperationContext* opCtx, const CompactOptions& options) final;
 
     void validate(OperationContext* opCtx, bool full, ValidateResults* results) override;
 

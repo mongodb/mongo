@@ -114,9 +114,9 @@ void RecordStore::notifyCappedWaitersIfNeeded() {
         _cappedInsertNotifier->notifyAll();
 }
 
-Status RecordStore::compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) {
+StatusWith<int64_t> RecordStore::compact(OperationContext* opCtx, const CompactOptions& options) {
     validateWriteAllowed(opCtx);
-    return doCompact(opCtx, freeSpaceTargetMB);
+    return doCompact(opCtx, options);
 }
 
 

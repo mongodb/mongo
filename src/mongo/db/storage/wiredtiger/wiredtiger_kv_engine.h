@@ -479,8 +479,7 @@ public:
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) override;
 
-    Status autoCompact(OperationContext* opCtx,
-                       const StorageEngine::AutoCompactOptions& options) override;
+    Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) override;
 
 private:
     StatusWith<Timestamp> _pinOldestTimestamp(WithLock,

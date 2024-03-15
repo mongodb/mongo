@@ -738,20 +738,8 @@ public:
     virtual void dump() const = 0;
 
     /**
-     * Represents the options for background compaction.
-     */
-    struct AutoCompactOptions {
-        bool enable = false;
-        bool runOnce = false;
-        boost::optional<int64_t> freeSpaceTargetMB;
-        std::vector<StringData> excludedIdents;
-    };
-
-    /**
      * Toggles auto compact for a database. Auto compact periodically iterates through all of
-     * the files available and runs compaction if they are eligible. If the freeSpaceTargetMB is
-     * provided, compaction only proceeds if the free storage space available is greater than
-     * the provided value.
+     * the files available and runs compaction if they are eligible.
      */
     virtual Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) = 0;
 };

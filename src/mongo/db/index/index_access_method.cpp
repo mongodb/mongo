@@ -733,9 +733,9 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status SortedDataIndexAccessMethod::compact(OperationContext* opCtx,
-                                            boost::optional<int64_t> freeSpaceTargetMB) {
-    return this->_newInterface->compact(opCtx, freeSpaceTargetMB);
+StatusWith<int64_t> SortedDataIndexAccessMethod::compact(OperationContext* opCtx,
+                                                         const CompactOptions& options) {
+    return this->_newInterface->compact(opCtx, options);
 }
 
 std::shared_ptr<Ident> SortedDataIndexAccessMethod::getSharedIdent() const {

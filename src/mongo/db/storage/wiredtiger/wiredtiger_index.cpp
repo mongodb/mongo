@@ -509,10 +509,9 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status WiredTigerIndex::compact(OperationContext* opCtx,
-                                boost::optional<int64_t> freeSpaceTargetMB) {
-    return WiredTigerIndexUtil::compact(
-        *opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, freeSpaceTargetMB);
+StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
+                                             const CompactOptions& options) {
+    return WiredTigerIndexUtil::compact(*opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, options);
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,

@@ -141,7 +141,7 @@ public:
 
     long long getFreeStorageBytes(OperationContext* opCtx) const final;
 
-    Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) final;
+    StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) final;
 
     std::unique_ptr<IndexAccessMethod::BulkBuilder> initiateBulk(
         const IndexCatalogEntry* entry,

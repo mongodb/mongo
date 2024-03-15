@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/import_options.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -502,8 +503,7 @@ public:
     /**
      * See StorageEngine::autoCompact for details
      */
-    virtual Status autoCompact(OperationContext* opCtx,
-                               const StorageEngine::AutoCompactOptions& options) {
+    virtual Status autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support auto compact");
     }

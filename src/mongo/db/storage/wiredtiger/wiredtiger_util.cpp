@@ -626,6 +626,17 @@ int64_t WiredTigerUtil::getIdentReuseSize(WT_SESSION* s, const std::string& uri)
     return result.getValue();
 }
 
+int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WT_SESSION* s,
+                                                             const std::string& uri) {
+    auto result =
+        WiredTigerUtil::getStatisticsValue(s,
+                                           "statistics:" + uri,
+                                           "statistics=(fast)",
+                                           WT_STAT_DSRC_BTREE_COMPACT_BYTES_REWRITTEN_EXPECTED);
+    uassertStatusOK(result.getStatus());
+    return result.getValue();
+}
+
 size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     double cacheSizeMB;
     const double kMaxSizeCacheMB = 10 * 1000 * 1000;

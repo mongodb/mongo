@@ -5,12 +5,7 @@
  * collection and verifying the number of documents and indexes. Operates on a separate collection
  * for each thread.
  *
- * There is a known hang during concurrent FSM workloads with the compact command used
- * with wiredTiger LSM variants. Bypass this command for the wiredTiger LSM variant
- * until a fix is available for WT-2523.
- *
  * @tags: [
- *  does_not_support_wiredtiger_lsm,
  *  incompatible_with_macos,
  *  requires_compact,
  *  # The config fuzzer may try to stress wiredtiger which can cause this test to timeout.
@@ -26,7 +21,6 @@
 import {
     assertWorkedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
-import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
@@ -41,6 +35,13 @@ export const $config = (function() {
         nIndexes: 1 + 1,   // The number of indexes created in createIndexes + 1 for { _id: 1 }
         prefix: 'compact'  // Use filename for prefix because filename is assumed unique
     };
+
+    function runCompact(db, config) {
+        let res = db.runCommand(config);
+
+        // The compact command can be successful or interrupted because of cache pressure.
+        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
+    }
 
     var states = (function() {
         function insertDocuments(db, collName) {
@@ -83,21 +84,21 @@ export const $config = (function() {
         }
 
         function compact(db, collName) {
-            let res;
+            let config;
             if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'CompactOptions')) {
-                res = db.runCommand(
-                    {compact: this.threadCollName, force: true, freeSpaceTargetMB: 1});
+                config = {compact: this.threadCollName, force: true, freeSpaceTargetMB: 1};
             } else {
-                res = db.runCommand({compact: this.threadCollName, force: true});
+                config = {compact: this.threadCollName, force: true};
             }
+            runCompact(db, config);
+        }
 
-            // The compact command can be successful or interrupted because of cache pressure.
-            if (!isEphemeral(db)) {
-                assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
-            } else {
-                assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+        function dryCompact(db, collName) {
+            if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'CompactOptions'))
                 return;
-            }
+            const config =
+                {compact: this.threadCollName, force: true, dryRun: true, freeSpaceTargetMB: 1};
+            runCompact(db, config);
         }
 
         function query(db, collName) {
@@ -113,6 +114,7 @@ export const $config = (function() {
         return {
             init: init,
             collectionSetup: collectionSetup,
+            dryCompact: dryCompact,
             compact: compact,
             query: query,
             removeDocuments: removeDocuments,
@@ -123,7 +125,8 @@ export const $config = (function() {
     var transitions = {
         init: {collectionSetup: 1},
         collectionSetup: {removeDocuments: 1},
-        removeDocuments: {compact: 1},
+        removeDocuments: {dryCompact: 1},
+        dryCompact: {compact: 1},
         compact: {query: 1},
         query: {insertDocuments: 1},
         insertDocuments: {removeDocuments: 1}

@@ -1966,8 +1966,10 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
     }
 }
 
-Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx,
-                                        boost::optional<int64_t> freeSpaceTargetMB) const {
+StatusWith<int64_t> IndexCatalogImpl::compactIndexes(OperationContext* opCtx,
+                                                     const CompactOptions& options) const {
+
+    int64_t estimatedBytes = 0;
     for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
          it != _readyIndexes.end();
          ++it) {
@@ -1977,16 +1979,17 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx,
                     1,
                     "compacting index: {entry_descriptor}",
                     "entry_descriptor"_attr = *(entry->descriptor()));
-        Status status = entry->accessMethod()->compact(opCtx, freeSpaceTargetMB);
+        auto status = entry->accessMethod()->compact(opCtx, options);
         if (!status.isOK()) {
             LOGV2_ERROR(20377,
                         "Failed to compact index",
                         "index"_attr = *(entry->descriptor()),
-                        "error"_attr = redact(status));
+                        "error"_attr = redact(status.getStatus()));
             return status;
         }
+        estimatedBytes += status.getValue();
     }
-    return Status::OK();
+    return estimatedBytes;
 }
 
 std::string::size_type IndexCatalogImpl::getLongestIndexNameLength(OperationContext* opCtx) const {

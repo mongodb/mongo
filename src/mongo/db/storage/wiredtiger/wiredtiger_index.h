@@ -180,7 +180,7 @@ public:
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
                                          const key_string::Value& keyString) const;
 
-    Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) override;
+    StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) override;
 
     const std::string& uri() const {
         return _uri;

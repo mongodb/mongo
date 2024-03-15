@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,41 +29,34 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/validate_results.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/util/interruptible.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-class WiredTigerIndexUtil {
-    WiredTigerIndexUtil(const WiredTigerIndexUtil&) = delete;
-    WiredTigerIndexUtil& operator=(const WiredTigerIndexUtil&) = delete;
+/**
+ * Represents the options for auto compaction.
+ */
+struct AutoCompactOptions {
+    // Toggle to enable/disable the service.
+    bool enable = false;
+    // Whether background compaction should run once on the database and stop.
+    bool runOnce = false;
+    // Minimum amount of MB to reclaim for compaction to proceed.
+    boost::optional<int64_t> freeSpaceTargetMB;
+    // Idents that are skipped by background compaction.
+    std::vector<StringData> excludedIdents;
+};
 
-private:
-    WiredTigerIndexUtil();
-
-public:
-    static bool appendCustomStats(WiredTigerRecoveryUnit&,
-                                  BSONObjBuilder* output,
-                                  double scale,
-                                  const std::string& uri);
-
-    static StatusWith<int64_t> compact(Interruptible&,
-                                       WiredTigerRecoveryUnit&,
-                                       const std::string& uri,
-                                       const CompactOptions& options);
-
-    static bool isEmpty(OperationContext* opCtx, const std::string& uri, uint64_t tableId);
-
-    static void validateStructure(WiredTigerRecoveryUnit&,
-                                  const std::string& uri,
-                                  IndexValidateResults& results);
+/**
+ * Represents the options for compaction.
+ */
+struct CompactOptions {
+    // When enabled, estimate the work compaction can do.
+    bool dryRun = false;
+    // Minimum amount of MB to reclaim for compaction to proceed.
+    boost::optional<int64_t> freeSpaceTargetMB;
 };
 
 }  // namespace mongo

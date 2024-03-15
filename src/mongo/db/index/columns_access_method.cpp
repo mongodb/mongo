@@ -509,9 +509,9 @@ long long ColumnStoreAccessMethod::getFreeStorageBytes(OperationContext* opCtx) 
     return _store->getFreeStorageBytes(opCtx);
 }
 
-Status ColumnStoreAccessMethod::compact(OperationContext* opCtx,
-                                        boost::optional<int64_t> freeSpaceTargetMB) {
-    return _store->compact(opCtx, freeSpaceTargetMB);
+StatusWith<int64_t> ColumnStoreAccessMethod::compact(OperationContext* opCtx,
+                                                     const CompactOptions& options) {
+    return _store->compact(opCtx, options);
 }
 
 

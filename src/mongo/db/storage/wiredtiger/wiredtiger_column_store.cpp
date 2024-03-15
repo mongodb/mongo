@@ -561,10 +561,9 @@ long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) co
     return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
 }
 
-Status WiredTigerColumnStore::compact(OperationContext* opCtx,
-                                      boost::optional<int64_t> freeSpaceTargetMB) {
-    return WiredTigerIndexUtil::compact(
-        *opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, freeSpaceTargetMB);
+StatusWith<int64_t> WiredTigerColumnStore::compact(OperationContext* opCtx,
+                                                   const CompactOptions& options) {
+    return WiredTigerIndexUtil::compact(*opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, options);
 }
 
 bool WiredTigerColumnStore::appendCustomStats(OperationContext* opCtx,

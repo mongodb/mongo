@@ -257,7 +257,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status compactIndexes(OperationContext*, boost::optional<int64_t>) const override {
+    StatusWith<int64_t> compactIndexes(OperationContext*, const CompactOptions&) const override {
         MONGO_UNREACHABLE;
     }
 

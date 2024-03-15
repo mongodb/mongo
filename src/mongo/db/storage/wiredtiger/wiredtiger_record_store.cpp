@@ -1561,42 +1561,49 @@ Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerRecordStore::doCompact(OperationContext* opCtx,
-                                        boost::optional<int64_t> freeSpaceTargetMB) {
+StatusWith<int64_t> WiredTigerRecordStore::doCompact(OperationContext* opCtx,
+                                                     const CompactOptions& options) {
     dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    if (!cache->isEphemeral()) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
-        // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
-        // check for interrupts.
-        SessionDataRAII sessionRaii(s, opCtx);
-
-        std::string config = "timeout=0";
-        if (freeSpaceTargetMB) {
-            config += ",free_space_target=" + std::to_string(*freeSpaceTargetMB) + "MB";
-        }
-        int ret = s->compact(s, getURI().c_str(), config.c_str());
-        if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
-            return Status(ErrorCodes::Interrupted,
-                          str::stream()
-                              << "Storage compaction interrupted on " << getURI().c_str());
-        }
-
-        if (MONGO_unlikely(WTCompactRecordStoreEBUSY.shouldFail())) {
-            ret = EBUSY;
-        }
-
-        if (ret == EBUSY) {
-            return Status(ErrorCodes::Interrupted,
-                          str::stream() << "Compaction interrupted on " << getURI().c_str()
-                                        << " due to cache eviction pressure");
-        }
-        invariantWTOK(ret, s);
+    if (cache->isEphemeral()) {
+        return 0;
     }
-    return Status::OK();
+
+    WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
+    // check for interrupts.
+    SessionDataRAII sessionRaii(s, opCtx);
+
+    StringBuilder config;
+    config << "timeout=0";
+    if (options.dryRun) {
+        config << ",dryrun=true";
+    }
+    if (options.freeSpaceTargetMB) {
+        config << ",free_space_target=" << std::to_string(*options.freeSpaceTargetMB) << "MB";
+    }
+    const std::string uri(getURI());
+    int ret = s->compact(s, uri.c_str(), config.str().c_str());
+    if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
+        return Status(ErrorCodes::Interrupted,
+                      str::stream() << "Storage compaction interrupted on " << uri);
+    }
+
+    if (MONGO_unlikely(WTCompactRecordStoreEBUSY.shouldFail())) {
+        ret = EBUSY;
+    }
+
+    if (ret == EBUSY) {
+        return Status(ErrorCodes::Interrupted,
+                      str::stream() << "Compaction interrupted on " << getURI()
+                                    << " due to cache eviction pressure");
+    }
+    invariantWTOK(ret, s);
+
+    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(s, uri) : 0;
 }
 
 void WiredTigerRecordStore::validate(OperationContext* opCtx, bool full, ValidateResults* results) {
