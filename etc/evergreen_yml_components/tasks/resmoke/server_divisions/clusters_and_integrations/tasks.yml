@@ -1291,12 +1291,11 @@ tasks:
       suite: sharded_jscore_txns
       resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
 
-- <<: *task_template
-  name: sharded_multi_stmt_txn_jscore_passthrough
+- <<: *gen_task_template
+  name: sharded_multi_stmt_txn_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "sharding", "jscore", "multi_stmt"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: sharded_retryable_writes_downgrade_gen

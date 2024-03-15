@@ -398,7 +398,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: sharded_multi_stmt_txn_jscore_passthrough_gen
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .unsplittable_collections
@@ -553,7 +553,7 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
-  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: sharded_multi_stmt_txn_jscore_passthrough_gen
     distros:
     - rhel80-medium
 
@@ -1136,7 +1136,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: sharded_multi_stmt_txn_jscore_passthrough_gen
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: secondary_reads_passthrough_gen

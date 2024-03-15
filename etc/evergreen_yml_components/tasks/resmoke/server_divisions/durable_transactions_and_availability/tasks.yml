@@ -801,12 +801,11 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- <<: *task_template
-  name: replica_sets_multi_stmt_txn_jscore_passthrough
+- <<: *gen_task_template
+  name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_repl", "default", "replica_sets", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough_gen
@@ -868,12 +867,11 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- <<: *task_template
-  name: replica_sets_terminate_primary_jscore_passthrough
+- <<: *gen_task_template
+  name: replica_sets_terminate_primary_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_repl", "default", "replica_sets", "large", "non_maj_read"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: replica_sets_uninitialized_fcv_jscore_passthrough_gen

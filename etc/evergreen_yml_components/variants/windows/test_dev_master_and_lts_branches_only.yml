@@ -54,7 +54,7 @@ buildvariants:
   - name: .read_write_concern .linearize !.durable_history
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
-  - name: replica_sets_multi_stmt_txn_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
   - name: sasl
   - name: .sharding .txns
   - name: sharding_auth_audit_gen

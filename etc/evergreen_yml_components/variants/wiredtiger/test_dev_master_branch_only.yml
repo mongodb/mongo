@@ -122,7 +122,7 @@ buildvariants:
   - name: .retry
   - name: .read_only
   - name: session_jscore_passthrough
-  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: sharded_multi_stmt_txn_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
   - name: sharding_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
