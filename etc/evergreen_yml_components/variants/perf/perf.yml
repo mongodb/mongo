@@ -1638,6 +1638,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
+    - name: agg-query-comparison_read_commands_high_value
       cron: "0 0 * * 0,2,3,4,5" # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
@@ -1688,6 +1689,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
+    - name: agg-query-comparison_read_commands_high_value
       cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting to correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
@@ -1741,6 +1743,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
+    - name: agg-query-comparison_read_commands_high_value
       cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting to correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
@@ -1890,6 +1893,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
+    - name: agg-query-comparison_read_commands_high_value
       cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
@@ -1934,6 +1938,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
+    - name: agg-query-comparison_read_commands_high_value
       cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset

@@ -484,6 +484,7 @@ buildvariants:
       - name: aggregation_read_commands
       - name: aggregation_read_commands_large_dataset
       - name: agg-query-comparison_read_commands
+      - name: agg-query-comparison_read_commands_high_value
         cron: *high-value-workload-cron
       - name: query_read_commands
       - name: query_read_commands_large_dataset
@@ -527,6 +528,7 @@ buildvariants:
       - name: aggregation_read_commands
       - name: aggregation_read_commands_large_dataset
       - name: agg-query-comparison_read_commands
+      - name: agg-query-comparison_read_commands_high_value
       - name: query_read_commands
       - name: query_read_commands_large_dataset
       - name: views-aggregation

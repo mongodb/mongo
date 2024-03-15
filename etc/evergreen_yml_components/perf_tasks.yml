@@ -1264,6 +1264,18 @@ tasks:
              threads: "1 2 4 8",
              read_cmd: 'true'}
 
+  - name: agg-query-comparison_read_commands_high_value
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: agg_query_comparison,
+             include_filter_2: high_value,
+             exclude_filter: none,
+             threads: "1",
+             read_cmd: 'true'}
+
   - name: pipeline-updates
     commands:
       - func: f_dsi_run_workload
