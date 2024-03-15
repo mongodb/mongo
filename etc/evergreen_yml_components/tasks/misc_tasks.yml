@@ -55,7 +55,7 @@ variables:
 tasks:
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_multi_stmt_txn_kill_primary
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -67,7 +67,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -79,7 +79,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -94,7 +94,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -109,7 +109,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_core
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -121,7 +121,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -133,7 +133,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_jstestfuzz_sharded
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -145,7 +145,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_replica_sets_jscore_passthrough
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -226,7 +226,7 @@ tasks:
       - "./src/evergreen/todos_check.sh"
 
 - name: daily_task_scanner
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - func: "f_expansions_write"
   - command: manifest.load
@@ -246,7 +246,7 @@ tasks:
         - "-f=task_errors.txt"
 
 - name: determine_patch_tests
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - func: "f_expansions_write"
   - command: subprocess.exec
@@ -300,7 +300,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-config_fuzzer_smoke
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -316,7 +316,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-smoke
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -329,7 +329,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_list-append
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen_docker"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen_docker"]
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
@@ -338,7 +338,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_read-concern-majority
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -352,7 +352,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_read-concern-majority_w1
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -367,7 +367,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_register_findAndModify
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -382,7 +382,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_register_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -397,7 +397,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_set_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -412,7 +412,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_list-append
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen_docker"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen_docker"]
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
@@ -420,7 +420,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -432,7 +432,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority_w1
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -445,7 +445,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -458,7 +458,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_register_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -471,7 +471,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_set_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -588,7 +588,7 @@ tasks:
 
 # Check that the mutational fuzzer can parse all JS filess.
 - name: lint_fuzzer_sanity_all
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -764,7 +764,7 @@ tasks:
       - "src/evergreen/lint_yaml.sh"
 
 - name: monitor_mongo_fork_10gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -952,7 +952,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: selinux_rhel7_enterprise
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -971,7 +971,7 @@ tasks:
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel7_org
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -990,7 +990,7 @@ tasks:
       test_list: jstests/selinux/*.js
 
 - name: selinux_rhel8_enterprise
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1008,7 +1008,7 @@ tasks:
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel8_org
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1026,7 +1026,7 @@ tasks:
       test_list: jstests/selinux/*.js
 
 - name: selinux_rhel9_enterprise
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1044,7 +1044,7 @@ tasks:
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel9_org
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1062,7 +1062,7 @@ tasks:
       test_list: jstests/selinux/*.js
 
 - name: sync_repo_with_copybara
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -1095,7 +1095,7 @@ tasks:
       - "src/evergreen/check_idl_compat.sh"
 
 - name: test_packages
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   depends_on:
   - name: package
   commands:
@@ -1111,7 +1111,7 @@ tasks:
       docker_password: ${dockerhub_password}
 
 - name: test_packages_release
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version

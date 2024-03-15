@@ -272,7 +272,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_expression
-  tags: ["assigned_to_jira_team_server_query_execution", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_execution", "experimental", "benchmarks"]
   commands:
     - func: "do benchmark setup"
     - func: "run tests"
@@ -284,7 +284,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_expression_sbe
-  tags: ["assigned_to_jira_team_server_query_execution", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_execution", "experimental", "benchmarks"]
   commands:
     - func: "do benchmark setup"
     - func: "run tests"
@@ -742,7 +742,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_abt
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -754,7 +754,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_abt_lowering
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -766,7 +766,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_abt_path_lowering
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -779,7 +779,7 @@ tasks:
 # Disabled under SERVER-64949.
 # - <<: *benchmark_template
 #   name: benchmarks_cst
-#   tags: ["assigned_to_jira_team_server_query_optimization", "default", "benchmarks"]
+#   tags: ["assigned_to_jira_team_server_query_optimization", "experimental, "benchmarks"]
 #   commands:
 #   - func: "do benchmark setup"
 #   - func: "run tests"
@@ -900,7 +900,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_query
-  tags: ["assigned_to_jira_team_server_query_integration", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_integration", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"

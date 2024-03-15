@@ -117,7 +117,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_replication
-  tags: ["assigned_to_jira_team_server_repl", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "benchmarks"]
   commands:
     - func: "do benchmark setup"
     - func: "run tests"
@@ -657,7 +657,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_future_git_tag_gen
-  tags: ["assigned_to_jira_team_server_repl", "default", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -672,7 +672,7 @@ tasks:
 # Only run hot_backups tests for hot_backups variant.
 - <<: *gen_task_template
   name: noPassthroughHotBackups_gen
-  tags: ["assigned_to_jira_team_server_repl", "default"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1022,7 +1022,7 @@ tasks:
       use_large_distro: "true"
 
 - name: tla_plus
-  tags: ["assigned_to_jira_team_server_repl", "default"]
+  tags: ["assigned_to_jira_team_server_repl", "experimental"]
   commands:
   - func: "f_expansions_write"
   - func: "do non-compile setup"

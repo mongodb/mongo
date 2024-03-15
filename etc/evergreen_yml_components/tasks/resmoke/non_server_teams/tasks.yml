@@ -141,21 +141,21 @@ tasks:
 
 - <<: *gen_burn_in_task_template
   name: burn_in_tags_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   patch_only: true
   commands:
   - func: "generate resmoke tasks"
 
 - <<: *gen_burn_in_task_template
   name: burn_in_tasks_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   patch_only: true
   commands:
   - func: "generate resmoke tasks"
 
 - <<: *gen_burn_in_task_template
   name: burn_in_tests_gen
-  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   patch_only: true
   commands:
   - func: "generate resmoke tasks"
@@ -216,7 +216,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_streams
-  tags: ["assigned_to_jira_team_streams", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_streams", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -235,7 +235,7 @@ tasks:
 
 - <<: *task_template
   name: streams_kafka
-  tags: ["assigned_to_jira_team_streams", "default", "incompatible_community"]
+  tags: ["assigned_to_jira_team_streams", "experimental", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"

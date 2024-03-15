@@ -199,7 +199,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_namespace
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -210,7 +210,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_orphaned_first_half
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -224,7 +224,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_orphaned_second_half
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -238,7 +238,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_sep
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks_sep"]
+  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "benchmarks_sep"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -664,7 +664,7 @@ tasks:
 # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
 - <<: *task_template
   name: watchdog_inmemory
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "watchdog"]
+  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
   commands:
   - func: "do setup"
   - func: "do watchdog setup"
@@ -676,7 +676,7 @@ tasks:
 
 - <<: *task_template
   name: watchdog_wiredtiger
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "watchdog"]
+  tags: ["assigned_to_jira_team_server_servicearch", "experimental", "watchdog"]
   commands:
   - func: "do setup"
   - func: "do watchdog setup"
@@ -910,7 +910,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_auth_future_git_tag_gen
-  tags: ["assigned_to_jira_team_server_security", "default", "auth", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
+  tags: ["assigned_to_jira_team_server_security", "experimental", "auth", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1031,7 +1031,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_sharding
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -1042,7 +1042,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_bsoncolumn
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "experimental", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
