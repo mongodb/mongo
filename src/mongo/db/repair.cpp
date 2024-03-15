@@ -277,6 +277,11 @@ Status repairCollection(OperationContext* opCtx,
                                                SerializationContext::CallerType::Reply,
                                                SerializationContext::Prefix::IncludePrefix);
 
+    // Close the open transaction to allow enabling pre-fetching in validation.
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    }
+
     // Exclude full record store validation because we have already validated the underlying
     // record store in the call to repairRecordStore above.
     status =

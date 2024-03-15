@@ -121,6 +121,12 @@ public:
 
     bool getRoundUpPreparedTimestamps() override;
 
+    /**
+     * Set pre-fetching capabilities for this session. This allows pre-loading of a set of pages
+     * into the cache and is an optional optimization.
+     */
+    void setPrefetching(bool enable) override;
+
     void allowOneUntimestampedWrite() override {
         invariant(!_isActive());
         _untimestampedWriteAssertionLevel =
@@ -257,6 +263,7 @@ private:
     WiredTigerOplogManager* _oplogManager;  // not owned
     UniqueWiredTigerSession _session;
     bool _isTimestamped = false;
+    bool _prefetchingSet = false;
 
     // Helpers used to keep track of multi timestamp constraint violations on the transaction.
     struct MultiTimestampConstraintTracker {

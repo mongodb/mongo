@@ -114,6 +114,11 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
         auto wtSession = getSessionNoTxn()->getSession();
         invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=0"), wtSession);
     }
+
+    if (_prefetchingSet) {
+        auto wtSession = getSessionNoTxn()->getSession();
+        invariantWTOK(wtSession->reconfigure(wtSession, "prefetch=(enabled=false)"), wtSession);
+    }
 }
 
 void WiredTigerRecoveryUnit::_commit() {
@@ -191,6 +196,19 @@ void WiredTigerRecoveryUnit::_ensureSession() {
     if (!_session) {
         _session = _sessionCache->getSession();
     }
+}
+
+void WiredTigerRecoveryUnit::setPrefetching(bool enable) {
+    invariant(!_inUnitOfWork(), toString(_getState()));
+    invariant(getSessionNoTxn()->cursorsOut() == 0);
+
+    auto wtSession = getSessionNoTxn()->getSession();
+
+    _prefetchingSet = enable;
+
+    StringBuilder config;
+    config << "prefetch=(enabled=" << (enable ? "true" : "false") << ")";
+    invariantWTOK(wtSession->reconfigure(wtSession, config.str().c_str()), wtSession);
 }
 
 bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {

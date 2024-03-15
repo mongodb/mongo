@@ -74,6 +74,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -587,6 +588,12 @@ Status validate(OperationContext* opCtx,
     } else {
         // isBackground().
         invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
+    }
+
+    // TODO SERVER-86914: Enable pre-fetching.
+    if (gFeatureFlagPrefetch.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(false);
     }
 
     Status status = validateState.initializeCollection(opCtx);
