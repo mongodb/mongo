@@ -1211,7 +1211,7 @@ selects.config_setting_group(
     name = "sanitize_thread_required_settings",
     match_all = [
         ":tsan_enabled",
-        ":use_libunwind_disabled",
+        ":libunwind_disabled",
         ":linkdynamic_required_settings",
     ],
 )
