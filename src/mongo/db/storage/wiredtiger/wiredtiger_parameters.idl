@@ -203,3 +203,23 @@ server_parameters:
       cpp_vartype: bool
       cpp_varname: gWiredTigerStressConfig
       default: false
+
+    wiredTigerSizeStorerPeriodicSyncHits:
+      description: >-
+        The number of hits after which the size storer will perform a flush.
+      set_at: startup
+      cpp_vartype: int32_t
+      cpp_varname: gWiredTigerSizeStorerPeriodicSyncHits
+      default: 100000
+      validator:
+        gte: 1
+
+    wiredTigerSizeStorerPeriodicSyncPeriodMillis:
+      description: >-
+        The period in milliseconds after which the size storer will perform a flush.
+      set_at: startup
+      cpp_vartype: int32_t
+      cpp_varname: gWiredTigerSizeStorerPeriodicSyncPeriodMillis
+      default: 60000
+      validator:
+        gte: 1

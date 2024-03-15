@@ -146,6 +146,8 @@ def generate_mongod_parameters(rng, mode):
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
     ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
+    ret["wiredTigerSizeStorerPeriodicSyncHits"] = rng.randint(1, 100000)
+    ret["wiredTigerSizeStorerPeriodicSyncPeriodMillis"] = rng.randint(1, 60000)
 
     ret["oplogFetcherUsesExhaust"] = rng.choice([True, False])
     ret["replWriterThreadCount"] = rng.randint(1, 256)
