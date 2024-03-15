@@ -1152,7 +1152,8 @@ tasks:
         JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
 
 - name: version_burn_in_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  run_on: ubuntu2004-medium
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -1166,7 +1167,7 @@ tasks:
 
 - &version_expansions_gen
   name: version_expansions_gen
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "experimental"]
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -1183,7 +1184,8 @@ tasks:
   name: version_expansions_future_git_tag_multiversion_gen
 
 - name: version_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  run_on: ubuntu2004-medium
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -1196,6 +1198,7 @@ tasks:
   - func: "generate version"
 
 - name: version_gen_validation
+  run_on: ubuntu2004-medium
   tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   commands:
   - command: manifest.load

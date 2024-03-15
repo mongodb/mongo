@@ -132,5 +132,3 @@ buildvariants:
   - name: check_feature_flag_tags
   - name: resmoke_validation_tests
   - name: version_gen_validation
-    distros:
-    - ubuntu2004-small
