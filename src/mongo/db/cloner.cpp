@@ -435,13 +435,13 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                                   << existingOpts.uuid << " and new UUID is " << clonedUUID);
             }
 
-            // If the collection does not already exist and is sharded, we create a new
-            // collection on the target shard with the UUID of the original collection and
-            // copy the options and secondary indexes. If the collection does not already
-            // exist and is unsharded, we create a new collection with its own UUID and
-            // copy the options and secondary indexes of the original collection.
+            // If the collection does not already exist and is tracked, we create a new collection
+            // on the target shard with the UUID of the original collection and copy the options and
+            // secondary indexes. If the collection does not already exist and is untracked, we
+            // create a new collection with its own UUID and copy the options and secondary indexes
+            // of the original collection.
 
-            if (params.trackedColls || params.forceSameUUIDAsSource) {
+            if (params.trackedColls) {
                 optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
             }
 
@@ -541,7 +541,6 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const std::string& masterHost,
                                  const std::vector<NamespaceString>& trackedColls,
-                                 bool forceSameUUIDAsSource,
                                  std::set<std::string>* clonedColls) {
     invariant(clonedColls && clonedColls->empty(),
               str::stream() << masterHost << ":" << dbName.toStringForErrorMsg());
@@ -568,7 +567,6 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
         if (std::find(trackedColls.begin(), trackedColls.end(), nss) != trackedColls.end()) {
             params.trackedColls = true;
         }
-        params.forceSameUUIDAsSource = forceSameUUIDAsSource;
         createCollectionParams.push_back(params);
     }
 
@@ -652,10 +650,8 @@ Status Cloner::copyDb(OperationContext* opCtx,
                       const DatabaseName& dbName,
                       const std::string& masterHost,
                       const std::vector<NamespaceString>& trackedColls,
-                      bool forceSameUUIDAsSource,
                       std::set<std::string>* clonedColls) {
-    return _clonerImpl->copyDb(
-        opCtx, dbName, masterHost, trackedColls, forceSameUUIDAsSource, clonedColls);
+    return _clonerImpl->copyDb(opCtx, dbName, masterHost, trackedColls, clonedColls);
 }
 
 StatusWith<std::vector<BSONObj>> Cloner::getListOfCollections(OperationContext* opCtx,

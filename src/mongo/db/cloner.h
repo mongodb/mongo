@@ -61,7 +61,6 @@ public:
                           const DatabaseName& dbName,
                           const std::string& masterHost,
                           const std::vector<NamespaceString>& trackedColls,
-                          bool forceSameUUIDAsSource,
                           std::set<std::string>* clonedColls) = 0;
 
     virtual Status setupConn(OperationContext* opCtx, const std::string& masterHost) = 0;
@@ -84,7 +83,6 @@ public:
                   const DatabaseName& dbName,
                   const std::string& masterHost,
                   const std::vector<NamespaceString>& trackedColls,
-                  bool forceSameUUIDAsSource,
                   std::set<std::string>* clonedColls) override;
 
     Status setupConn(OperationContext* opCtx, const std::string& masterHost) override;
@@ -105,7 +103,6 @@ private:
         BSONObj collectionInfo;
         BSONObj idIndexSpec;
         bool trackedColls = false;
-        bool forceSameUUIDAsSource = false;
     };
 
     // Executes 'createCollection' for each collection described in 'createCollectionParams', in
@@ -153,7 +150,6 @@ public:
                   const DatabaseName& dbName,
                   const std::string& masterHost,
                   const std::vector<NamespaceString>& trackedColls,
-                  bool forceSameUUIDAsSource,
                   std::set<std::string>* clonedColls);
 
     StatusWith<std::vector<BSONObj>> getListOfCollections(OperationContext* opCtx,

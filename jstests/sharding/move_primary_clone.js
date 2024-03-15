@@ -137,7 +137,7 @@ function createCollections(sharded) {
     }
 }
 
-function movePrimaryWithFailpoint(sharded, sameUUID = false) {
+function movePrimaryWithFailpoint(sharded) {
     var db = st.getDB('test1');
     createCollections(sharded);
     let tracked = [
