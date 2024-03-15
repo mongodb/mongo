@@ -98,6 +98,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -218,7 +219,8 @@ write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>
 write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    bool changedToUnsorted) {
+    bool changedToUnsorted,
+    const std::vector<details::Measurement>& sortedMeasurements) {
     BSONObjBuilder updateBuilder;
     {
         // Control builder.
@@ -241,6 +243,88 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
                 controlBuilder.append(kMaxFieldNameDocDiff, batch->max);
             }
         }
+    }
+
+    // Verifier function that will be called when we apply the diff to our bucket and verify that
+    // the measurements we inserted appear correctly in the resulting bucket's BSONColumns.
+    doc_diff::VerifierFunc verifierFunction = nullptr;
+
+    if (TestingProctor::instance().isEnabled()) {
+        verifierFunction = [sortedMeasurements = std::move(sortedMeasurements),
+                            numPreviouslyCommittedMeasurements =
+                                batch->numPreviouslyCommittedMeasurements](
+                               const BSONObj& docToWrite) {
+            // Get the data
+            auto data = docToWrite.getObjectField(kBucketDataFieldName);
+            // Iterate through each key-value pair in the data. This is a mapping
+            // from String keys representing data field names to a tuple of an iterator
+            // on a BSONColumn, the column itself, and a size_t type counter.
+            // The iterator allows us to iterate across the BSONColumn as we inspect
+            // each element and compare it to the expected value in the actual measurement
+            // we inserted. The column is stored to prevent the iterator on it from going out
+            // of scope. The size_t counter represents how many times the iterator has been
+            // advanced - this allows us to detect when we didn't have a value set for a field
+            // in a particular measurement, so that we can check the corresponding BSONColumn
+            // for a skip value.
+            StringMap<std::tuple<BSONColumn::Iterator, BSONColumn, size_t>>
+                fieldsToDataAndNextCountMap;
+            // First, populate our map.
+            for (auto&& [key, columnValue] : data) {
+                int binLength = 0;
+                const char* binData = columnValue.binData(binLength);
+                // Decompress the binary data for this field.
+                try {
+                    BSONColumn c(binData, binLength);
+                    auto it = c.begin();
+                    std::advance(it, numPreviouslyCommittedMeasurements);
+                    fieldsToDataAndNextCountMap.emplace(key, std::make_tuple(it, std::move(c), 0));
+                } catch (const DBException& e) {
+                    invariant(false,
+                              str::stream() << "Encountered exception " << e.toString()
+                                            << " when iterating over BSONColumn binary "
+                                            << StringData(binData, binLength));
+                };
+            }
+            // Now, iterate through each measurement, and check if the value
+            // for each field of the measurement matches with what was compressed.
+            // numIterations will keep track of how many measurements we've gone through
+            // so far - this is useful because not every measurement necessarily has a value
+            // for each field, as this counter allows us to identify when a measurement skipped
+            // a value for a field.
+            size_t numIterations = 0;
+            for (const auto& measurement : sortedMeasurements) {
+                for (const BSONElement& elem : measurement.dataFields) {
+                    auto measurementKey = elem.fieldNameStringData();
+                    invariant(fieldsToDataAndNextCountMap.contains(measurementKey),
+                              str::stream() << "BSONColumn was missing key " << measurementKey);
+                    auto& [iterator, column, nextCount] =
+                        fieldsToDataAndNextCountMap.at(measurementKey);
+                    BSONElement columnValue = *iterator;
+                    invariant(columnValue.binaryEqualValues(elem),
+                              str::stream() << "BSONColumn value " << columnValue
+                                            << "was not equal to expected measurement value "
+                                            << elem << "for key " << measurementKey);
+                    ++nextCount;
+                    ++iterator;
+                }
+                ++numIterations;
+                // Advance the iterators for fields not present in this measurement. Check
+                // that the iterator sees a skip value.
+                for (auto& [key, value] : fieldsToDataAndNextCountMap) {
+                    auto& [iterator, column, nextCount] = value;
+                    if (nextCount < numIterations) {
+                        invariant(numIterations - 1 == nextCount);
+                        // If there was no value for a field in a measurement,
+                        // the column should have a skip value.
+                        BSONElement val = *iterator;
+                        invariant(val.eoo(),
+                                  str::stream() << "Column value" << val << "was not equal to EOO");
+                        ++iterator;
+                        ++nextCount;
+                    }
+                }
+            }
+        };
     }
 
     {
@@ -280,6 +364,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
         static_cast<bool>(repl::tenantMigrationInfo(opCtx));
     write_ops::UpdateModification u(
         updateBuilder.obj(), write_ops::UpdateModification::DeltaTag{}, options);
+    u.verifierFunction = std::move(verifierFunction);
     auto oid = batch->bucketHandle.bucketId.oid;
     write_ops::UpdateOpEntry update(BSON("_id" << oid), std::move(u));
     invariant(!update.getMulti(), oid.toString());
@@ -382,8 +467,10 @@ void updateTimeseriesDocument(OperationContext* opCtx,
         collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
     if (update.getU().type() == write_ops::UpdateModification::Type::kDelta) {
         diffFromUpdate = update.getU().getDiff();
-        updated = doc_diff::applyDiff(
-            original.value(), diffFromUpdate, static_cast<bool>(repl::tenantMigrationInfo(opCtx)));
+        updated = doc_diff::applyDiff(original.value(),
+                                      diffFromUpdate,
+                                      static_cast<bool>(repl::tenantMigrationInfo(opCtx)),
+                                      update.getU().verifierFunction);
         diffOnIndexes = &diffFromUpdate;
         args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
     } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {
@@ -827,7 +914,8 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     // Generates a delta update request using the before and after compressed bucket documents' data
     // fields. The only other items that will be different are the min, max, and count fields in the
     // control block, and the version field if it was promoted to a v3 bucket.
-    const auto updateEntry = makeTimeseriesCompressedDiffEntry(opCtx, batch, changedToUnsorted);
+    const auto updateEntry =
+        makeTimeseriesCompressedDiffEntry(opCtx, batch, changedToUnsorted, sortedMeasurements);
     write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;

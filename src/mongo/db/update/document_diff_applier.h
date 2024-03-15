@@ -53,8 +53,15 @@ struct DamagesOutput {
  * field already exists within a (sub)document. This should generally be set to true, unless the
  * caller has knowledge of the pre-image and the diff, and can guarantee that we will not re-insert
  * anything.
+ *
+ * 'verifierFunction' is an optional parameter that, if set, will perform a check on the BSONObj
+ * that is created as a result of the application of 'diff' onto 'pre'.
  */
-BSONObj applyDiff(const BSONObj& pre, const Diff& diff, bool mustCheckExistenceForInsertOperations);
+using VerifierFunc = std::function<void(const BSONObj&)>;
+BSONObj applyDiff(const BSONObj& pre,
+                  const Diff& diff,
+                  bool mustCheckExistenceForInsertOperations,
+                  VerifierFunc verifierFunction = nullptr);
 
 /**
  * Computes the damage events from the diff for 'pre' and return the pre-image, damage source, and

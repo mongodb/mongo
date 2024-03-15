@@ -2061,7 +2061,8 @@ Status performAtomicTimeseriesWrites(
             diffFromUpdate = update.getU().getDiff();
             updated = doc_diff::applyDiff(original.value(),
                                           diffFromUpdate,
-                                          update.getU().mustCheckExistenceForInsertOperations());
+                                          update.getU().mustCheckExistenceForInsertOperations(),
+                                          update.getU().verifierFunction);
             diffOnIndexes = &diffFromUpdate;
             args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
         } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {

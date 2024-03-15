@@ -47,6 +47,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -135,6 +136,10 @@ public:
     // while we are parsing a user request, we infer this by checking whether the first element is a
     // $-field to distinguish modifier style updates.
     UpdateModification(const BSONObj& update);
+
+    // 'verifierFunction' is an optional field that can be set to perform a check during diff
+    // application.
+    doc_diff::VerifierFunc verifierFunction = nullptr;
 
     /**
      * These methods support IDL parsing of the "u" field from the update command and OP_UPDATE.

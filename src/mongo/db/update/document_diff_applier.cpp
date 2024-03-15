@@ -734,7 +734,8 @@ private:
 
 BSONObj applyDiff(const BSONObj& pre,
                   const Diff& diff,
-                  bool mustCheckExistenceForInsertOperations) {
+                  bool mustCheckExistenceForInsertOperations,
+                  VerifierFunc verifierFunction) {
     DocumentDiffReader reader(diff);
     BSONObjBuilder out;
     DiffApplier applier(mustCheckExistenceForInsertOperations);
@@ -749,7 +750,11 @@ BSONObj applyDiff(const BSONObj& pre,
     out.bb().reserveBytes(estimatedSize);
     out.bb().claimReservedBytes(estimatedSize);
     applier.applyDiffToObject(pre, &path, &reader, &out);
-    return out.obj();
+    auto obj = out.obj();
+    if (verifierFunction) {
+        verifierFunction(obj);
+    }
+    return obj;
 }
 
 DamagesOutput computeDamages(const BSONObj& pre,
