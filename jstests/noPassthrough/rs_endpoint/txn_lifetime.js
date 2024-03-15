@@ -157,13 +157,7 @@ function runTest(hasDirectShardOperationPrivilege) {
 
     // Continue txn1 (router transaction).
     const txn1FindRes1 = shard0TestDB.runCommand(txn1FindCmdObj);
-    if (hasDirectShardOperationPrivilege) {
-        assert.commandWorked(txn1FindRes1);
-    } else {
-        // The Unauthorized error above should cause the transaction to be implicitly aborted. So
-        // the retry should fail with NoSuchTransaction.
-        assert.commandFailedWithCode(txn1FindRes1, ErrorCodes.NoSuchTransaction);
-    }
+    assert.commandWorked(txn1FindRes1);
 
     // Continue txn2 (non-router transaction).
     if (txn2DeleteRes.ok) {
