@@ -563,7 +563,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                       "Shut down full-time data capture",
                                                       &shutdownTimeElapsedBuilder);
-            stopMongoSFTDC(serviceContext);
+            stopMongoSFTDC();
         }
     }
 

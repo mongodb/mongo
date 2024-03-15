@@ -51,8 +51,13 @@
 #include "mongo/util/clock_source.h"
 
 namespace mongo {
+namespace {
 
-class FTDCControllerTest : public FTDCTest {};
+class FTDCControllerTest : public FTDCTest {
+protected:
+    void testFull(UseMultiserviceSchema multiserviceSchema);
+    void testStartAsDisabled(UseMultiserviceSchema multiserviceSchema);
+};
 
 class FTDCMetricsCollectorMockTee : public FTDCCollectorInterface {
 public:
@@ -160,8 +165,21 @@ public:
     }
 };
 
+void insertNewSchemaDocuments(std::vector<BSONObj>& allDocs,
+                              const std::vector<BSONObj>& docs,
+                              StringData role) {
+    for (const auto& doc : docs) {
+        constexpr static auto dummyTs = Date_t::fromMillisSinceEpoch(1);
+        allDocs.push_back(BSONObjBuilder{}
+                              .append("start", dummyTs)
+                              .append(role, doc)
+                              .append("end", dummyTs)
+                              .obj());
+    }
+}
+
 // Test a run of the controller and the data it logs to log file
-TEST_F(FTDCControllerTest, TestFull) {
+void FTDCControllerTest::testFull(UseMultiserviceSchema multiserviceSchema) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
@@ -173,7 +191,7 @@ TEST_F(FTDCControllerTest, TestFull) {
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    FTDCController c(dir, config);
+    FTDCController c(dir, config, multiserviceSchema);
 
     auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
     auto c2 = std::make_unique<FTDCMetricsCollectorMockRotate>();
@@ -185,7 +203,7 @@ TEST_F(FTDCControllerTest, TestFull) {
 
     c.addPeriodicCollector(std::move(c1), ClusterRole::None);
 
-    c.addOnRotateCollector(std::move(c2), ClusterRole::None);
+    c.addOnRotateCollector(std::move(c2), ClusterRole::ShardServer);
 
     c.start(getClient()->getService());
 
@@ -200,8 +218,14 @@ TEST_F(FTDCControllerTest, TestFull) {
     auto docsRotate = c2Ptr->getDocs();
     ASSERT_EQUALS(docsRotate.size(), 1UL);
 
-    std::vector<BSONObj> allDocs(docsRotate.begin(), docsRotate.end());
-    allDocs.insert(allDocs.end(), docsPeriodic.begin(), docsPeriodic.end());
+    std::vector<BSONObj> allDocs;
+    if (multiserviceSchema) {
+        insertNewSchemaDocuments(allDocs, docsRotate, "shard");
+        insertNewSchemaDocuments(allDocs, docsPeriodic, "common");
+    } else {
+        allDocs.insert(allDocs.end(), docsRotate.cbegin(), docsRotate.cend());
+        allDocs.insert(allDocs.end(), docsPeriodic.cbegin(), docsPeriodic.cend());
+    }
 
     auto files = scanDirectory(dir);
 
@@ -210,6 +234,14 @@ TEST_F(FTDCControllerTest, TestFull) {
     auto alog = files[0];
 
     ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
+}
+
+TEST_F(FTDCControllerTest, TestFullSingleServiceSchema) {
+    testFull(UseMultiserviceSchema{false});
+}
+
+TEST_F(FTDCControllerTest, TestFullMultiserviceSchema) {
+    testFull(UseMultiserviceSchema{true});
 }
 
 // Test we can start and stop the controller in quick succession, make sure it succeeds without
@@ -226,7 +258,7 @@ TEST_F(FTDCControllerTest, TestStartStop) {
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    FTDCController c(dir, config);
+    FTDCController c(dir, config, UseMultiserviceSchema{true});
 
     c.start(getClient()->getService());
 
@@ -235,7 +267,7 @@ TEST_F(FTDCControllerTest, TestStartStop) {
 
 // Test we can start the controller as disabled, the directory is empty, and then we can succesfully
 // enable it
-TEST_F(FTDCControllerTest, TestStartAsDisabled) {
+void FTDCControllerTest::testStartAsDisabled(UseMultiserviceSchema multiserviceSchema) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
@@ -251,9 +283,9 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
 
     auto c1Ptr = c1.get();
 
-    FTDCController c(dir, config);
+    FTDCController c(dir, config, multiserviceSchema);
 
-    c.addPeriodicCollector(std::move(c1), ClusterRole::None);
+    c.addPeriodicCollector(std::move(c1), ClusterRole::ShardServer);
 
     c.start(getClient()->getService());
 
@@ -273,7 +305,12 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
     auto docsPeriodic = c1Ptr->getDocs();
     ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodic.size(), 50UL);
 
-    std::vector<BSONObj> allDocs(docsPeriodic.begin(), docsPeriodic.end());
+    std::vector<BSONObj> allDocs;
+    if (multiserviceSchema) {
+        insertNewSchemaDocuments(allDocs, docsPeriodic, "shard");
+    } else {
+        allDocs.insert(allDocs.end(), docsPeriodic.cbegin(), docsPeriodic.cend());
+    }
 
     auto files = scanDirectory(dir);
 
@@ -284,4 +321,13 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
     ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
 }
 
+TEST_F(FTDCControllerTest, TestStartAsDisabledSingleServiceSchema) {
+    testStartAsDisabled(UseMultiserviceSchema{false});
+}
+
+TEST_F(FTDCControllerTest, TestStartAsDisabledMultiserviceSchema) {
+    testStartAsDisabled(UseMultiserviceSchema{true});
+}
+
+}  // namespace
 }  // namespace mongo

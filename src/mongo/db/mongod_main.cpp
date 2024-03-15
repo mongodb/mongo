@@ -2070,7 +2070,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Shut down full-time data capture",
                                                   &shutdownTimeElapsedBuilder);
-        stopMongoDFTDC(serviceContext);
+        stopMongoDFTDC();
     }
 
     LOGV2(20565, "Now exiting");

@@ -55,6 +55,12 @@ feature_flags:
     cpp_varname: feature_flags::gEmbeddedRouter
     default: false
     shouldBeFCVGated: false
+  # TODO (SERVER-87249): Remove after the internal router is enabled by default.
+  featureFlagMultiserviceFTDCSchema:
+    description: "Feature flag to enable the new format of the FTDC output files"
+    cpp_varname: feature_flags::gMultiserviceFTDCSchema
+    default: false
+    shouldBeFCVGated: false
   # TODO SERVER-79064: Remove once 8.0 becomes last LTS.
   featureFlagAuthoritativeRefineCollectionShardKey:
     description: "Feature flag for enabling the authoritative version of the refine collection shard key."

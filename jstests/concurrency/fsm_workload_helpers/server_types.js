@@ -31,6 +31,20 @@ export function isMongodConfigsvr(db) {
 }
 
 /**
+ * Returns true if the process is a mongod and is part of a sharded cluster (either a config server,
+ * a shard, or both)
+ */
+export function isClusterNode(db) {
+    if (!isMongod(db)) {
+        return false;
+    }
+    var res = db.adminCommand('getCmdLineOpts');
+    assert.commandWorked(res);
+
+    return res.parsed && res.parsed.hasOwnProperty('sharding');
+}
+
+/**
  * Returns the name of the current storage engine.
  *
  * Throws an error if db is connected to a mongos, or if there is no reported storage engine.

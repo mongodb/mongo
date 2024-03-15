@@ -77,7 +77,7 @@ TEST_F(FTDCFileManagerTest, TestFull) {
     createDirectoryClean(dir);
 
     FTDCCollectorCollection rotate;
-    auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
+    auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
     ASSERT_OK(swMgr.getStatus());
     auto mgr = std::move(swMgr.getValue());
 
@@ -166,7 +166,8 @@ TEST_F(FTDCFileManagerTest, TestNormalRestart) {
     for (int i = 0; i < 3; i++) {
         // Do a few cases of stop and start to ensure it works as expected
         FTDCCollectorCollection rotate;
-        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
+        auto swMgr =
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
 
@@ -226,7 +227,8 @@ TEST_F(FTDCFileManagerTest, TestCorruptCrashRestart) {
     for (int i = 0; i < 2; i++) {
         // Do a few cases of stop and start to ensure it works as expected
         FTDCCollectorCollection rotate;
-        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
+        auto swMgr =
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
 
@@ -304,7 +306,8 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
 
     {
         FTDCCollectorCollection rotate;
-        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
+        auto swMgr =
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto swFile = swMgr.getValue()->generateArchiveFileName(dir, "0test-crash");
         ASSERT_OK(swFile);
@@ -338,7 +341,8 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     // Let the manager run the recovery over the interim file
     {
         FTDCCollectorCollection rotate;
-        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
+        auto swMgr =
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
         ASSERT_OK(mgr->close());

@@ -42,7 +42,6 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/ftdc/collector.h"
-#include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/ftdc/util.h"
@@ -54,6 +53,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/transport/transport_layer_ftdc_collector.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
@@ -115,6 +115,8 @@ public:
 };
 
 void registerMongoSCollectors(FTDCController* controller) {
+    registerServerCollectorsForRole(controller, ClusterRole::RouterServer);
+
     // PoolStats
     controller->addPeriodicCollector(std::make_unique<ConnPoolStatsCollector>(),
                                      ClusterRole::RouterServer);
@@ -124,14 +126,6 @@ void registerMongoSCollectors(FTDCController* controller) {
 
     controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>(),
                                      ClusterRole::RouterServer);
-
-    // GetDefaultRWConcern
-    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-                                         "getDefaultRWConcern",
-                                         "getDefaultRWConcern",
-                                         DatabaseName::kEmpty,
-                                         BSON("getDefaultRWConcern" << 1 << "inMemory" << true)),
-                                     ClusterRole::None);
 }
 
 void startMongoSFTDC(ServiceContext* serviceContext) {
@@ -160,14 +154,18 @@ void startMongoSFTDC(ServiceContext* serviceContext) {
         }
     }
 
-    startFTDC(serviceContext->getService(ClusterRole::RouterServer),
-              directory,
-              startMode,
-              registerMongoSCollectors);
+    // TODO (SERVER-87249): remove after the internal router is enabled by default (hardcode to
+    // `true`).
+    // (Ignore FCV check): This code is only executed in mongoS, and they're not FCV-gated anyway.
+    const UseMultiserviceSchema multiserviceSchema{
+        feature_flags::gMultiserviceFTDCSchema.isEnabledAndIgnoreFCVUnsafe() &&
+        feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafe()};
+
+    startFTDC(serviceContext, directory, startMode, {registerMongoSCollectors}, multiserviceSchema);
 }
 
-void stopMongoSFTDC(ServiceContext* serviceContext) {
-    stopFTDC(serviceContext->getService(ClusterRole::RouterServer));
+void stopMongoSFTDC() {
+    stopFTDC();
 }
 
 }  // namespace mongo

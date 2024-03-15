@@ -2,6 +2,7 @@
  * Utility test functions for FTDC
  */
 
+import {isClusterNode, isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -19,9 +20,18 @@ export function setParameter(adminDb, obj) {
 }
 
 /**
+ * Returns whether the FTDC file format should follow the new format or not.
+ */
+export function hasMultiserviceFTDCSchema(adminDb) {
+    return FeatureFlagUtil.isEnabled(adminDb, "EmbeddedRouter") &&
+        FeatureFlagUtil.isEnabled(adminDb, "MultiserviceFTDCSchema") &&
+        (isMongos(adminDb) || isClusterNode(adminDb));
+}
+
+/**
  * Verify that getDiagnosticData is working correctly.
  */
-export function verifyGetDiagnosticData(adminDb, logData = true) {
+export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserviceSchema = false) {
     // We need to retry a few times if run this test immediately after mongod is started as FTDC may
     // not have run yet.
     var foundGoodDocument = false;
@@ -39,8 +49,18 @@ export function verifyGetDiagnosticData(adminDb, logData = true) {
             sleep(500);
         } else {
             // Check for a few common properties to ensure we got data
-            assert(data.hasOwnProperty("serverStatus"),
-                   "does not have 'serverStatus' in '" + tojson(data) + "'");
+            if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema) {
+                const hasKnownData =
+                    (data.hasOwnProperty("shard") && data.shard.hasOwnProperty("serverStatus")) ||
+                    (data.hasOwnProperty("router") && data.router.hasOwnProperty("serverStatus"))
+                assert(hasKnownData,
+                       "does not have 'shard.serverStatus' nor 'router.serverStatus' in '" +
+                           tojson(data) + "'");
+            } else {
+                assert(data.hasOwnProperty("serverStatus"),
+                       "does not have 'serverStatus' in '" + tojson(data) + "'");
+            }
+
             assert(data.hasOwnProperty("end"), "does not have 'end' in '" + tojson(data) + "'");
 
             foundGoodDocument = true;

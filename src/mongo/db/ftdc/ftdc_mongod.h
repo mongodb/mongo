@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 
 namespace mongo {
@@ -48,7 +49,7 @@ void startMongoDFTDC(ServiceContext* serviceContext);
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoDFTDC(ServiceContext* serviceContext);
+void stopMongoDFTDC();
 
 /**
  * Validation callback for setParameter

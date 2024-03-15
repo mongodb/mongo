@@ -36,6 +36,7 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
@@ -52,16 +53,18 @@ void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collec
     _collectors[role].emplace_back(std::move(collector));
 }
 
-std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
-    static constexpr std::array roles{
-        ClusterRole::ShardServer,
-        ClusterRole::RouterServer,
-        ClusterRole::None,
-    };
+std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
+    Client* client, UseMultiserviceSchema multiserviceSchema) {
+    static constexpr auto roles = std::to_array<std::pair<ClusterRole::Value, StringData>>({
+        {ClusterRole::ShardServer, "shard"_sd},
+        {ClusterRole::RouterServer, "router"_sd},
+        {ClusterRole::None, "common"_sd},
+    });
 
     // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
     // not collect anything
-    if (std::all_of(roles.begin(), roles.end(), [&](auto r) { return _collectors[r].empty(); })) {
+    if (std::all_of(
+            roles.begin(), roles.end(), [&](auto r) { return _collectors[r.first].empty(); })) {
         return std::tuple<BSONObj, Date_t>(BSONObj(), Date_t());
     }
 
@@ -71,7 +74,14 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     Date_t end;
     bool firstLoop = true;
 
-    builder.appendDate(kFTDCCollectStartField, start);
+    const auto getStartDate = [&] {
+        if (!firstLoop) {
+            return client->getServiceContext()->getPreciseClockSource()->now();
+        }
+        return start;
+    };
+
+    builder.appendDate(kFTDCCollectStartField, getStartDate());
 
     // All collectors should be ok seeing the inconsistent states in the middle of replication
     // batches. This is desirable because we want to be able to collect data in the middle of
@@ -81,26 +91,40 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
 
     ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kExempt);
 
-    for (auto r : roles) {
-        for (auto& collector : _collectors[r]) {
+    for (auto&& role : roles) {
+        auto& collectorVector = _collectors[role.first];
+        if (collectorVector.empty()) {
+            continue;
+        }
+
+        boost::optional<BSONObjBuilder> sectionBuilder;
+        BSONObjBuilder* parent = &builder;
+
+        if (multiserviceSchema) {
+            sectionBuilder.emplace(builder.subobjStart(role.second));
+            sectionBuilder->appendDate(kFTDCCollectStartField, getStartDate());
+            parent = &(*sectionBuilder);
+        }
+
+        // If we are running router collectors, we need to make sure that the opCtx points to the
+        // router service.
+        boost::optional<replica_set_endpoint::ScopedSetRouterService> scopedRouterService;
+        if (role.first == ClusterRole::RouterServer &&
+            !opCtx->getService()->role().has(ClusterRole::RouterServer)) {
+            scopedRouterService.emplace(opCtx.get());
+        }
+
+        for (auto& collector : collectorVector) {
             // Skip collection if this collector has no data to return
             if (!collector->hasData()) {
                 continue;
             }
 
-            BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
+            BSONObjBuilder subObjBuilder(parent->subobjStart(collector->name()));
 
             // Add a Date_t before and after each BSON is collected so that we can track timing of
             // the collector.
-            Date_t now = start;
-
-            if (!firstLoop) {
-                now = client->getServiceContext()->getPreciseClockSource()->now();
-            }
-
-            firstLoop = false;
-
-            subObjBuilder.appendDate(kFTDCCollectStartField, now);
+            subObjBuilder.appendDate(kFTDCCollectStartField, getStartDate());
 
             collector->collect(opCtx.get(), subObjBuilder);
 
@@ -110,6 +134,12 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
             // Ensure the collector did not set a read timestamp.
             invariant(shard_role_details::getRecoveryUnit(opCtx.get())->getTimestampReadSource() ==
                       RecoveryUnit::ReadSource::kNoTimestamp);
+
+            firstLoop = false;
+        }
+
+        if (multiserviceSchema) {
+            sectionBuilder->appendDate(kFTDCCollectEndField, end);
         }
     }
 

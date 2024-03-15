@@ -32,6 +32,7 @@ ftdcEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
@@ -57,6 +58,8 @@ env.Library(
         'ftdc',
     ] + platform_libs,
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/message',
@@ -82,7 +85,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/rpc/message',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'ftdc_mongos',
         'ftdc_server',
     ],
 )
@@ -96,6 +101,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/grid',
         'ftdc_server',
     ],

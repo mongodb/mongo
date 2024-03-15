@@ -41,7 +41,6 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -60,8 +59,13 @@ class FTDCController {
     FTDCController& operator=(const FTDCController&) = delete;
 
 public:
-    FTDCController(const boost::filesystem::path path, FTDCConfig config)
-        : _path(path), _config(std::move(config)), _configTemp(_config) {}
+    FTDCController(boost::filesystem::path path,
+                   FTDCConfig config,
+                   UseMultiserviceSchema multiserviceSchema)
+        : _path(std::move(path)),
+          _config(std::move(config)),
+          _configTemp(_config),
+          _multiserviceSchema(multiserviceSchema) {}
 
     ~FTDCController() = default;
 
@@ -143,9 +147,9 @@ public:
     void stop();
 
     /**
-     * Get the FTDCController from Service.
+     * Get the FTDCController from ServiceContext.
      */
-    static FTDCController* get(Service* service);
+    static FTDCController* get(ServiceContext* serviceContext);
 
     /**
      * Get a reference to most recent document from the periodic collectors.
@@ -222,6 +226,9 @@ private:
 
     // Background collection and writing thread
     stdx::thread _thread;
+
+    // Whether or not to use the multiversion schema for FTDC files.
+    UseMultiserviceSchema _multiserviceSchema;
 };
 
 }  // namespace mongo

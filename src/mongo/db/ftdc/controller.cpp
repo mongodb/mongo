@@ -254,12 +254,13 @@ void FTDCController::doLoop(Service* service) noexcept {
             // Delay initialization of FTDCFileManager until we are sure the user has enabled
             // FTDC
             if (!_mgr) {
-                auto swMgr = FTDCFileManager::create(&_config, _path, &_rotateCollectors, client);
+                auto swMgr = FTDCFileManager::create(
+                    &_config, _path, &_rotateCollectors, client, _multiserviceSchema);
 
                 _mgr = uassertStatusOK(std::move(swMgr));
             }
 
-            auto collectSample = _periodicCollectors.collect(client);
+            auto collectSample = _periodicCollectors.collect(client, _multiserviceSchema);
 
             Status s = _mgr->writeSampleAndRotateIfNeeded(
                 client, std::get<0>(collectSample), std::get<1>(collectSample));
