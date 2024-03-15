@@ -7,9 +7,10 @@
  *   requires_fcv_70,
  * ]
  */
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+
 const collName = jsTestName();
-const coll = db[collName];
-coll.drop();
+const coll = assertDropAndRecreateCollection(db, collName);
 
 const badNaturals = [
     0,

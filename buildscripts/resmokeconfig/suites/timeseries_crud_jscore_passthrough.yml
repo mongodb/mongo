@@ -42,6 +42,7 @@ selector:
   # Column store indexes.
   - jstests/core/query/project/projection_semantics.js
   # findAndModify sort.
+  - jstests/core/query/natural_validation.js
   - jstests/core/write/crud_api.js
   - jstests/core/write/find_and_modify/find_and_modify.js
   - jstests/core/write/find_and_modify/find_and_modify3.js

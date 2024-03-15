@@ -234,7 +234,9 @@ if (!isShardedColl && !FixtureHelpers.isStandalone(db) &&
     const query = qsutils.makeFindQueryInstance({filter: {a: 1}, limit: 1});
 
     // The express path will only choose an index allowed by the query settings for the query.
-    const allowedIndex = {indexHints: {allowedIndexes: ["a_1_b_1_c_1"]}};
+    const allowedIndex = {
+        indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1_b_1_c_1"]}
+    };
     qsutils.withQuerySettings(query, allowedIndex, () => {
         explain = assert.commandWorked(
             db.runCommand({explain: {find: coll.getName(), filter: {a: 1}, limit: 1}}));

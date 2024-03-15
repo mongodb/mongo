@@ -30,8 +30,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/sharding_state.h"
@@ -51,100 +49,31 @@ protected:
     boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 
-
 /*
  * Checks that query settings commands fail the validation with the 'errorCode' code.
  */
-void checkQuerySettingsAreValid(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void assertInvalidQueryInstance(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const BSONObj& representativeQuery,
-                                const QuerySettings& querySettings,
                                 size_t errorCode) {
     auto representativeQueryInfo =
         createRepresentativeInfo(representativeQuery, expCtx->opCtx, boost::none);
-    QueryShapeConfiguration queryShapeConfiguration(representativeQueryInfo.queryShapeHash,
-                                                    querySettings);
-    queryShapeConfiguration.setRepresentativeQuery(representativeQuery);
     ASSERT_THROWS_CODE(
-        utils::validateQuerySettings(queryShapeConfiguration, representativeQueryInfo, boost::none),
-        DBException,
-        errorCode);
+        utils::validateRepresentativeQuery(representativeQueryInfo), DBException, errorCode);
+}
+
+NamespaceSpec makeNamespace(StringData dbName, StringData collName) {
+    NamespaceSpec ns;
+    ns.setDb(
+        DatabaseNameUtil::deserialize(boost::none, dbName, SerializationContext::stateDefault()));
+    ns.setColl(collName);
+    return ns;
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnIdHack) {
     const BSONObj representativeQ =
         fromjson("{find: 'someColl', filter: {_id: 123}, $db: 'testDb'}");
     QuerySettings querySettings;
-    querySettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746606);
-}
-
-TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedWhenNamespaceNotInferable) {
-    const BSONObj representativeQ = fromjson(R"({
-                  aggregate: "order",
-                  $db: "testDB",
-                  pipeline: [{
-                    $lookup: {
-                      from: "inventory",
-                      localField: "item",
-                      foreignField: "sku",
-                      as: "inventory_docs"
-                    }
-                  }]
-                })");
-    QuerySettings querySettings;
-    querySettings.setIndexHints({{IndexHintSpec({IndexHint("sku")})}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746602);
-}
-
-TEST_F(QuerySettingsValidationTestFixture,
-       QuerySettingsCannotBeAppliedWhenNamespaceNotInferableNestedPipeline) {
-    const BSONObj representativeQ = fromjson(R"(
-        {
-            aggregate: "order",
-            $db: "testDB",
-            pipeline: [
-                {
-                    $lookup:
-                        {
-                            from: "warehouses",
-                            let: { order_item: "$item", order_qty: "$ordered" },
-                            pipeline: [
-                                { $match:
-                                    {
-                                        $expr:
-                                        {
-                                            $and:
-                                                [
-                                                    { $eq: [ "$stock_item",  "$$order_item" ] },
-                                                    { $gte: [ "$instock", "$$order_qty" ] }
-                                                ]
-                                        }
-                                    }
-                                },
-                                { $project: { stock_item: 0, _id: 0 } }
-                            ],
-                            as: "stockdata"
-                        }
-                }
-            ]
-        }
-    )");
-    QuerySettings querySettings;
-    querySettings.setIndexHints({{IndexHintSpec({IndexHint("sku")})}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746602);
-}
-
-TEST_F(QuerySettingsValidationTestFixture,
-       QuerySettingsCannotBeAppliedWhenIndexDoesntReferAnInvolvedCollection) {
-    const BSONObj representativeQ = fromjson(R"(
-        {find: "someColl", $db: "testDB"}
-    )");
-    QuerySettings querySettings;
-    // Index hints should be: {"ns": {"db": "testDB", "coll": "otherColl"}, "allowedIndexes": []}.
-    auto indexSpec = IndexHintSpec({IndexHint("sku")});
-    indexSpec.setNs(Namespace("testDB", "otherColl"));
-    querySettings.setIndexHints({{indexSpec}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746603);
+    assertInvalidQueryInstance(expCtx, representativeQ, 7746606);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedWithEncryptionInfo) {
@@ -165,44 +94,14 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedWithEncry
             }
         }
     )");
-    QuerySettings querySettings;
-    querySettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-    querySettings.setIndexHints({{IndexHintSpec({IndexHint("sku")})}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746600);
+    assertInvalidQueryInstance(expCtx, representativeQ, 7746600);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeAppliedOnEncryptedColl) {
     const BSONObj representativeQ = fromjson(R"(
         {find: "enxcol_.basic.esc", $db: "testDB"}
     )");
-    QuerySettings querySettings;
-    querySettings.setIndexHints({{IndexHintSpec({IndexHint("sku")})}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746601);
-}
-
-TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSameColl) {
-    const BSONObj representativeQ = fromjson(R"(
-        {find: "testColl", $db: "testDB"}
-    )");
-    QuerySettings querySettings;
-    querySettings.setIndexHints(
-        {{std::vector{{IndexHintSpec({IndexHint("sku")}), IndexHintSpec({IndexHint("sku2")})}}}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746608);
-}
-
-TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSameCollExplicitNs) {
-    const BSONObj representativeQ = fromjson(R"(
-        {find: "testColl", $db: "testDB"}
-    )");
-    QuerySettings querySettings;
-    auto indexSpecA = IndexHintSpec({IndexHint("sku")});
-    indexSpecA.setNs(Namespace("testDB", "testColl"));
-
-    auto indexSpecB = IndexHintSpec({IndexHint("uks")});
-    indexSpecB.setNs(Namespace("testDB", "testColl"));
-
-    querySettings.setIndexHints({{std::vector{indexSpecA, indexSpecB}}});
-    checkQuerySettingsAreValid(expCtx, representativeQ, querySettings, 7746608);
+    assertInvalidQueryInstance(expCtx, representativeQ, 7746601);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotUseUuidAsNs) {
@@ -216,6 +115,46 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotUseUuidAsNs) {
     ASSERT_THROWS_CODE(createRepresentativeInfo(representativeQ, expCtx->opCtx, boost::none),
                        DBException,
                        7746605);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSameColl) {
+    const BSONObj representativeQ = fromjson(R"(
+        {find: "testColl", $db: "testDB"}
+    )");
+    auto ns = makeNamespace("testDB", "testColl");
+    QuerySettings querySettings;
+    auto indexSpecA = IndexHintSpec(ns, {IndexHint("sku")});
+    auto indexSpecB = IndexHintSpec(ns, {IndexHint("uks")});
+    querySettings.setIndexHints({{std::vector{indexSpecA, indexSpecB}}});
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746608);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeEmpty) {
+    QuerySettings querySettings;
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746604);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotHaveDefaultValues) {
+    QuerySettings querySettings;
+    querySettings.setReject(false);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746604);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoDbSpecified) {
+    QuerySettings querySettings;
+    NamespaceSpec ns;
+    ns.setColl("collName"_sd);
+    querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 8727500);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoCollSpecified) {
+    QuerySettings querySettings;
+    NamespaceSpec ns;
+    ns.setDb(DatabaseNameUtil::deserialize(
+        boost::none /* tenantId */, "dbName"_sd, SerializationContext::stateDefault()));
+    querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 8727501);
 }
 }  // namespace
 }  // namespace mongo::query_settings

@@ -67,8 +67,15 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     const allowedIndexes = [innerCmd.hint, {$natural: 1}, {$natural: -1}];
     delete innerCmd.hint;
     const commandType = getCommandType(innerCmd);
-    const collectionName = innerCmd[commandType];
-    const settings = {indexHints: {allowedIndexes}};
+
+    // If the collection used is a view, determine the underyling collection.
+    const collInfos = db.getCollectionInfos({name: innerCmd[commandType]});
+    if (!collInfos) {
+        return originalResponse;
+    }
+    const collectionName = collInfos[0].options.viewOn || innerCmd[commandType];
+
+    const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
     const representativeQuery = (function() {
         switch (commandType) {
