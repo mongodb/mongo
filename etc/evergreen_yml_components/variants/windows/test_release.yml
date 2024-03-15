@@ -77,6 +77,7 @@ buildvariants:
     push_arch: x86_64-enterprise
     test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
     exec_timeout_secs: 14400 # 3 hour timeout
+    external_auth_jobs_max: 1
     compile_variant: enterprise-windows
   tasks:
   - name: compile_test_and_package_serial_TG

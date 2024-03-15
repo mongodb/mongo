@@ -96,6 +96,8 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: debian12-large
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-debian12-64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG

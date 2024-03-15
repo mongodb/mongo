@@ -37,6 +37,8 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2-openssl111
     core_analyzer_distro_name: amazon2-openssl111-large
   tasks:
@@ -81,6 +83,8 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2-arm64-openssl111
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -159,6 +163,8 @@ buildvariants:
     packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2023
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -200,6 +206,8 @@ buildvariants:
     multiversion_architecture: x86_64
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2023-lto
     large_distro_name: amazon2023.0-large
   tasks:
@@ -280,6 +288,8 @@ buildvariants:
     packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2023-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -321,6 +331,8 @@ buildvariants:
     packager_distro: amazon2023
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2023-arm64-lto
     large_distro_name: amazon2023.0-arm64-large
   tasks:
@@ -360,6 +372,8 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2-streams
     large_distro_name: amazon2-large
   tasks:

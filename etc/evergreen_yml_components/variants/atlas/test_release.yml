@@ -34,6 +34,8 @@ buildvariants:
     packager_distro: rhel79
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-rhel-79-64-bit
     core_analyzer_distro_name: rhel7.9-large
   tasks:

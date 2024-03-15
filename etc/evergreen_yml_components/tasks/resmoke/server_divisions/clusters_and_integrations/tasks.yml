@@ -743,7 +743,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_ibm"]
   commands:
   - func: "f_expansions_write"
   - func: "do setup"
@@ -755,7 +755,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_aws
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_ibm"]
   commands:
   - func: "f_expansions_write"
   - func: "do setup"
@@ -770,7 +770,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_oidc
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   commands:
   - func: "f_expansions_write"
   - func: "do setup"
@@ -786,7 +786,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_oidc_azure
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   commands:
   - func: "f_expansions_write"
   - func: "do setup"
@@ -805,7 +805,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_oidc_gcp
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   commands:
   - func: "f_expansions_write"
   - func: "do setup"
@@ -819,7 +819,7 @@ tasks:
 
 - <<: *task_template
   name: external_auth_windows
-  tags: ["assigned_to_jira_team_server_security", "default"]
+  tags: ["assigned_to_jira_team_server_security", "experimental"]
   commands:
   - func: "do setup"
   - func: "run tests"

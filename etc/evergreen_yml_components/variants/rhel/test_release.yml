@@ -70,6 +70,8 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 3
     large_distro_name: rhel80-medium
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-rhel-80-64-bit
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -149,6 +151,8 @@ buildvariants:
     packager_distro: rhel82
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-rhel-82-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
@@ -221,6 +225,8 @@ buildvariants:
     packager_distro: rhel90
     repo_edition: enterprise
     scons_cache_scope: shared
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-rhel-90-64-bit
     core_analyzer_distro_name: rhel90-large
   tasks:
@@ -302,6 +308,8 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel90-arm64-large
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
     compile_variant: enterprise-rhel-90-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG

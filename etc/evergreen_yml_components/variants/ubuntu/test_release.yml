@@ -108,7 +108,8 @@ buildvariants:
   - name: .development_critical !.incompatible_community
   - name: .release_critical !.incompatible_community
 
-- name: enterprise-ubuntu2004-64
+- &enterprise-ubuntu2004-64-template
+  name: &enterprise-ubuntu2004-64 enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -151,6 +152,19 @@ buildvariants:
     - ubuntu2204-large
   - name: .development_critical
   - name: .release_critical
+
+# This variant is owned by the security team and is special
+# because these tests require headless support to run
+- <<: *enterprise-ubuntu2004-64-template
+  name: enterprise-ubuntu2004-64-security
+  display_name: Enterprise Ubuntu 20.04 Security
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: *enterprise-ubuntu2004-64
+  tasks:
+  - name: external_auth_oidc
+  - name: external_auth_oidc_azure
+  - name: external_auth_oidc_gcp
 
 - name: enterprise-ubuntu2204-64
   display_name: Enterprise Ubuntu 22.04
