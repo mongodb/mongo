@@ -19,7 +19,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         '$BUILD_DIR/mongo/db/server_options_servers',
         '$BUILD_DIR/mongo/db/serverinit',
         '$BUILD_DIR/mongo/db/service_context_non_d',

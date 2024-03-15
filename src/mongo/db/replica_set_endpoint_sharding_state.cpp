@@ -29,8 +29,8 @@
 
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

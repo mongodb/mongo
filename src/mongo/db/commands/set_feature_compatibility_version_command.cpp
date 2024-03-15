@@ -101,7 +101,6 @@
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"

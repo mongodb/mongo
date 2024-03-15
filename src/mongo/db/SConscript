@@ -985,7 +985,6 @@ env.Library(
         'transaction_resources.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
         'concurrency/lock_manager',
@@ -1206,7 +1205,6 @@ env.Library(
         'storage/storage_engine_common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         '$BUILD_DIR/mongo/s/startup_initialization',
         'auth/auth',
         'command_can_run_here',
