@@ -300,7 +300,14 @@ SbStage makePathExprsAvailableInSlots(
         stage = projectFieldPathsToPathExprSlots(
             state, groupNode, std::move(stage), outputs, nonBlockFieldPathExprs);
 
+        if (blockFieldPathExprs.empty()) {
+            // If there are no block field path exprs, we actually don't need to close the block
+            // pipeline.
+            return stage;
+        }
+
         stage = buildBlockToRow(std::move(stage), state, outputs);
+
 
         // Now that we've done the block to row, evaluate the path
         // expressions for the slots that were blocks, and are now scalars.

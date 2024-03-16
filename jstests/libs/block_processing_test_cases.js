@@ -1271,7 +1271,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$meta.region", a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMetaSubFields",
@@ -1279,15 +1279,15 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {region: "$meta.region", series: "$meta.series"}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
-            name: "GroupByMetaSubFields",
+            name: "GroupByMetaMultipleSubFields",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {region: "$meta.region", series: "$meta.series"}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMetaSubFieldExpression",
@@ -1300,7 +1300,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 },
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMetaNonExistent",
@@ -1308,7 +1308,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$meta.NON_EXISTENT", a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByExpressionOnMetaNonExistent",
@@ -1316,7 +1316,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {$toLower: "$meta.NON_EXISTENT"}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMetaAndMeasurement",
@@ -1324,10 +1324,10 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {region: "$meta.region", y: "$y"}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
-            name: "GroupByMetaAndTime",
+            name: "GroupByMetaSubFieldAndTime",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {
@@ -1341,13 +1341,45 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 },
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXMinOfMeta",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$x", a: {$min: "$meta"}}},
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXMinOfMetaSubField",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$min: "$meta.series"}}},
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXMinOfExpressionOfMeta",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$x", a: {$min: {$toLower: "$meta.series"}}}},
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAvgOfMeta",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$x", a: {$avg: "$meta"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByXAvgOfMetaSubField",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$x", a: {$avg: "$meta.series"}}},
             ],
             usesBlockProcessing: false
         },
