@@ -437,10 +437,11 @@ void Simple8bBuilder<T, Allocator>::_appendRleEncoding(F&& writeFn) {
     // This encodes a value using rle. The selector is set as 15 and the count is added in the next
     // 4 bits. The value is the previous value stored by simple8b or 0 if no previous value was
     // stored.
-    auto createRleEncoding = [&writeFn](uint8_t count) {
+    auto createRleEncoding = [this, &writeFn](uint8_t count) {
         uint64_t rleEncoding = kRleSelector;
         // We will store (count - 1) during encoding and execute (count + 1) during decoding.
         rleEncoding |= (count - 1) << kSelectorBits;
+        _rleCount -= kRleMultiplier * count;
         writeFn(rleEncoding);
     };
 
@@ -453,7 +454,6 @@ void Simple8bBuilder<T, Allocator>::_appendRleEncoding(F&& writeFn) {
             count -= kMaxRleCount;
         }
         createRleEncoding(count);
-        _rleCount %= kRleMultiplier;
     }
 }
 

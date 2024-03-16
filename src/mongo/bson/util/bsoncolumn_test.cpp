@@ -817,64 +817,67 @@ public:
             }
         }
 
-        // Verify operator[] when accessing in order
-        {
-            BSONColumn col(columnElement);
+        // Only run tests with quadratic complexity if size is limited
+        if (expected.size() <= 2000) {
+            // Verify operator[] when accessing in order
+            {
+                BSONColumn col(columnElement);
 
-            for (size_t i = 0; i < expected.size(); ++i) {
-                ASSERT(expected[i].binaryEqualValues(*col[i]));
-            }
-        }
-
-        // Verify operator[] when accessing in reverse order
-        {
-            BSONColumn col(columnElement);
-
-            for (int i = (int)expected.size() - 1; i >= 0; --i) {
-                ASSERT(expected[i].binaryEqualValues(*col[i]));
-            }
-        }
-
-        // Verify that we can continue traverse with new iterators when we stop before end
-        {
-            BSONColumn col(columnElement);
-
-            for (size_t e = 0; e < expected.size(); ++e) {
-                auto it = col.begin();
-                for (size_t i = 0; i < e; ++i, ++it) {
-                    ASSERT(expected[i].binaryEqualValues(*it));
+                for (size_t i = 0; i < expected.size(); ++i) {
+                    ASSERT(expected[i].binaryEqualValues(*col[i]));
                 }
-                ASSERT_EQ(col.size(), expected.size());
-            }
-        }
-
-        // Verify that we can have multiple iterators on the same thread
-        {
-            BSONColumn col(columnElement);
-
-            auto it1 = col.begin();
-            auto it2 = col.begin();
-            auto itEnd = col.end();
-
-            for (; it1 != itEnd && it2 != itEnd; ++it1, ++it2) {
-                ASSERT(it1->binaryEqualValues(*it2));
             }
 
-            ASSERT(it1 == it2);
-        }
+            // Verify operator[] when accessing in reverse order
+            {
+                BSONColumn col(columnElement);
 
-        // Verify iterator equality operator
-        {
-            BSONColumn col(columnElement);
+                for (int i = static_cast<int>(expected.size()) - 1; i >= 0; --i) {
+                    ASSERT(expected[i].binaryEqualValues(*col[i]));
+                }
+            }
 
-            auto iIt = col.begin();
-            for (size_t i = 0; i < expected.size(); ++i, ++iIt) {
-                auto jIt = col.begin();
-                for (size_t j = 0; j < expected.size(); ++j, ++jIt) {
-                    if (i == j) {
-                        ASSERT(iIt == jIt);
-                    } else {
-                        ASSERT(iIt != jIt);
+            // Verify that we can continue traverse with new iterators when we stop before end
+            {
+                BSONColumn col(columnElement);
+
+                for (size_t e = 0; e < expected.size(); ++e) {
+                    auto it = col.begin();
+                    for (size_t i = 0; i < e; ++i, ++it) {
+                        ASSERT(expected[i].binaryEqualValues(*it));
+                    }
+                    ASSERT_EQ(col.size(), expected.size());
+                }
+            }
+
+            // Verify that we can have multiple iterators on the same thread
+            {
+                BSONColumn col(columnElement);
+
+                auto it1 = col.begin();
+                auto it2 = col.begin();
+                auto itEnd = col.end();
+
+                for (; it1 != itEnd && it2 != itEnd; ++it1, ++it2) {
+                    ASSERT(it1->binaryEqualValues(*it2));
+                }
+
+                ASSERT(it1 == it2);
+            }
+
+            // Verify iterator equality operator
+            {
+                BSONColumn col(columnElement);
+
+                auto iIt = col.begin();
+                for (size_t i = 0; i < expected.size(); ++i, ++iIt) {
+                    auto jIt = col.begin();
+                    for (size_t j = 0; j < expected.size(); ++j, ++jIt) {
+                        if (i == j) {
+                            ASSERT(iIt == jIt);
+                        } else {
+                            ASSERT(iIt != jIt);
+                        }
                     }
                 }
             }
@@ -2209,6 +2212,31 @@ TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, {d1, d2});
+}
+
+TEST_F(BSONColumnTest, DoubleRle) {
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems;
+
+    // This test uses RLE in doubles and make sure we can track lastValueInPrevBlock properly
+    for (int i = 0; i < 250; ++i) {
+        elems.push_back(createElementDouble(i % 124));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1001, 0b0110);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 1.0), 7);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, Decimal128Base) {
@@ -3604,8 +3632,10 @@ TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     // control bytes.
     size_t num =
         /*uncompressed*/ 1 + /*first non-RLE*/ 30 + /*RLE*/ 1920 * 12 + /*non-RLE at end*/ 59;
+    std::vector<BSONElement> elems;
     for (size_t i = 0; i < num; ++i) {
-        cb.append(createElementInt32(i));
+        elems.push_back(createElementInt32(i));
+        cb.append(elems.back());
     }
 
     BufBuilder expected;
@@ -3622,6 +3652,7 @@ TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, false);
+    verifyDecompression(binData, elems);
     verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
 }
 
@@ -3797,6 +3828,234 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
     verifyDecompression(binData, elems, true);
+}
+
+TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreIdentical) {
+    // This test produces an RLE block after a simple8b block with different values. The RLE block
+    // is located as the first block after a control byte. In addition there are identical values to
+    // the RLE block after that got written during finalize. We test that we can properly handle
+    // when we have not yet overflowed in the RLE and must continue to search in the previous
+    // control.
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFF),
+                                      createElementInt64(64),
+                                      createElementInt64(128)};
+
+    for (size_t i = 0; i < 130; ++i) {
+        elems.push_back(createElementInt64(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + 1, elems.begin() + elems.size() - 121, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlock64(expected, deltaInt64(elems.back(), *(elems.begin() + elems.size() - 2)));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreIdentical128) {
+    // This test produces an RLE block after a simple8b block with different values. The RLE block
+    // is located as the first block after a control byte. In addition there are identical values to
+    // the RLE block after that got written during finalize. We test that we can properly handle
+    // when we have not yet overflowed in the RLE and must continue to search in the previous
+    // control.
+    BSONColumnBuilder cb;
+
+    // Generate strings from integer to make it easier to control the delta values
+    auto createStringFromInt = [&](int64_t val) {
+        auto str = Simple8bTypeUtil::decodeString(val);
+        return createElementString(StringData(str.str.data(), str.size));
+    };
+
+    std::vector<BSONElement> elems = {createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFF),
+                                      createStringFromInt(64),
+                                      createStringFromInt(128)};
+
+    for (size_t i = 0; i < 130; ++i) {
+        elems.push_back(createStringFromInt(256));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks128(
+        expected,
+        deltaString(elems.begin() + 1, elems.begin() + elems.size() - 121, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlock128(expected,
+                           deltaString(elems.back(), *(elems.begin() + elems.size() - 2)));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
+    verifyDecompression(binData, elems, false);
+}
+
+TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent) {
+    // This test produces an RLE block after a simple8b block with different values. The RLE block
+    // is located as the first block after a control byte. In addition there are identical values to
+    // the RLE block after that got written during finalize. We test that we can properly handle
+    // when we have not yet overflowed in the RLE and must continue to search in the previous
+    // control.
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFFFFFFFFFFFF),
+                                      createElementInt64(0),
+                                      createElementInt64(0xFFFF),
+                                      createElementInt64(64),
+                                      createElementInt64(128)};
+
+    for (size_t i = 0; i < 129; ++i) {
+        elems.push_back(createElementInt64(256));
+    }
+
+    elems.push_back(createElementInt64(0));
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks64(
+        expected,
+        deltaInt64(elems.begin() + 1, elems.begin() + elems.size() - 121, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlock64(expected, deltaInt64(elems.back(), *(elems.begin() + elems.size() - 2)));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent128) {
+    // This test produces an RLE block after a simple8b block with different values. The RLE block
+    // is located as the first block after a control byte. In addition there are identical values to
+    // the RLE block after that got written during finalize. We test that we can properly handle
+    // when we have not yet overflowed in the RLE and must continue to search in the previous
+    // control.
+    BSONColumnBuilder cb;
+
+    // Generate strings from integer to make it easier to control the delta values
+    auto createStringFromInt = [&](int64_t val) {
+        auto str = Simple8bTypeUtil::decodeString(val);
+        return createElementString(StringData(str.str.data(), str.size));
+    };
+
+    std::vector<BSONElement> elems = {createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFFFFFFFFFFFF),
+                                      createStringFromInt(0),
+                                      createStringFromInt(0xFFFF),
+                                      createStringFromInt(64),
+                                      createStringFromInt(128)};
+
+    for (size_t i = 0; i < 129; ++i) {
+        elems.push_back(createStringFromInt(256));
+    }
+
+    elems.push_back(createStringFromInt(0));
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b1111);
+    appendSimple8bBlocks128(
+        expected,
+        deltaString(elems.begin() + 1, elems.begin() + elems.size() - 121, elems.front()),
+        16);
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlock128(expected,
+                           deltaString(elems.back(), *(elems.begin() + elems.size() - 2)));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected, true);
+    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
+    verifyDecompression(binData, elems, false);
 }
 
 TEST_F(BSONColumnTest, Interleaved) {

@@ -407,14 +407,15 @@ private:
      * simple8b block that caused the overflow and sets the proper RLE state in the provided main
      * Simple8bBuilder to be the last value in the block that caused the overflow. This function
      * expects 'overflow' to be set to true when an overflow has occured.
+     * The second return value is an index to an RLE block if we have not overflowed yet.
      */
     template <typename T>
-    static int _appendUntilOverflow(Simple8bBuilder<T>& overflowDetector,
-                                    Simple8bBuilder<T, Allocator>& mainBuilder,
-                                    bool& overflow,
-                                    const boost::optional<T>& lastValForRLE,
-                                    const char* s8bBlock,
-                                    int index);
+    static std::pair<int, int> _appendUntilOverflow(Simple8bBuilder<T>& overflowDetector,
+                                                    Simple8bBuilder<T, Allocator>& mainBuilder,
+                                                    bool& overflow,
+                                                    const boost::optional<T>& lastValForRLE,
+                                                    const char* s8bBlock,
+                                                    int index);
     /*
      * Special case of _appendUntilOverflow when we know that the last simple8b block is RLE. It is
      * trivial to calculate the overflow point as it will be inside the first discovered non-RLE
@@ -618,7 +619,10 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
                 simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
 
     boost::optional<uint64_t> lastForS8b;
+    // Current overflow point
     int currIndex;
+    // Pending RLE block in current control when overflow has not happened yet.
+    int pendingRle;
     if (rle) {
         // If the last block ends with RLE we just need to look for the last non-RLE block to
         // discover the overflow point. The last value for RLE will be the actual last in this block
@@ -633,30 +637,46 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         lastForS8b = _setupRLEForOverflowDetector(s8bBuilder, control, currNumBlocks - 1);
 
         // When RLE is setup we append as many values as we can to detect when we overflow
-        currIndex = _appendUntilOverflow(
+        std::tie(currIndex, pendingRle) = _appendUntilOverflow(
             s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
     }
 
     // If we have not yet overflowed then continue the same operation from the previous
     // simple8b block
     if (!overflow && last.control) {
-
         auto blocks = numSimple8bBlocksForControlByte(*last.control);
         // Append values from control block to detect overflow. If the scale indices are
         // different we can skip this as we know we will not find a useful overflow point
         // here.
         int overflowIndex;
+        // Flag to back out of processing last control if we determined that overflow happened in
+        // RLE in current.
+        bool resumeCurrent = false;
         if (current.scaleIndex == last.scaleIndex) {
             if (rle) {
                 std::tie(lastForS8b, overflowIndex) = _appendUntilOverflowForRLE(
                     encoder.simple8bBuilder, overflow, last.control, blocks - 1);
+            } else if (pendingRle != -1) {
+                // Pending RLE block from current control we need to find overflow where we had our
+                // overflow.
+                auto [lastForRLE, rleIndexOverflow] = _appendUntilOverflowForRLE(
+                    encoder.simple8bBuilder, overflow, last.control, blocks - 1);
+                if (lastForRLE == lastForS8b) {
+                    // Last value prior to RLE matches our RLE state after RLE. We then overflow in
+                    // the block prior to RLE.
+                    overflowIndex = rleIndexOverflow;
+                } else {
+                    // Values to not match, so the overflow happened in the pending RLE block.
+                    currIndex = pendingRle;
+                    resumeCurrent = true;
+                }
             } else {
-                overflowIndex = _appendUntilOverflow(s8bBuilder,
-                                                     encoder.simple8bBuilder,
-                                                     overflow,
-                                                     lastForS8b,
-                                                     last.control,
-                                                     blocks - 1);
+                std::tie(overflowIndex, pendingRle) = _appendUntilOverflow(s8bBuilder,
+                                                                           encoder.simple8bBuilder,
+                                                                           overflow,
+                                                                           lastForS8b,
+                                                                           last.control,
+                                                                           blocks - 1);
             }
         } else {
             overflowIndex = blocks - 1;
@@ -674,39 +694,41 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
             encoder.simple8bBuilder.setLastForRLE(last);
         }
 
-        // Check if we overflowed in the first simple8b in this second control block. We can
-        // then disregard this control block and proceed as-if we didn't overflow in the
-        // first as there's nothing to re-write in the second control block.
-        if (overflowIndex == blocks - 1) {
-            // If the previous control block was not full, and we scaled down then append it to the
-            // buffer we did not overflow with the current control. This is needed for the double
-            // type where we might not fill the control block with simple8b due to scaling. This
-            // will setup the builder as-if we can re-use it in the scale down case with the values
-            // in the current control block that will all be in pending (because no overflow yet).
-            // If we scaled up, it is not possible to re-use this control block because if that
-            // would have been the case we'd scale up the previous control instead and would have
-            // never observed different scale here.
-            if (blocks != 16 && current.scaleIndex < last.scaleIndex) {
-                buffer.appendBuf(last.control, sizeof(uint64_t) * blocks + 1);
+        if (!resumeCurrent) {
+            // Check if we overflowed in the first simple8b in this second control block. We can
+            // then disregard this control block and proceed as-if we didn't overflow in the
+            // first as there's nothing to re-write in the second control block.
+            if (overflowIndex == blocks - 1) {
+                // If the previous control block was not full, and we scaled down then append it to
+                // the buffer we did not overflow with the current control. This is needed for the
+                // double type where we might not fill the control block with simple8b due to
+                // scaling. This will setup the builder as-if we can re-use it in the scale down
+                // case with the values in the current control block that will all be in pending
+                // (because no overflow yet). If we scaled up, it is not possible to re-use this
+                // control block because if that would have been the case we'd scale up the previous
+                // control instead and would have never observed different scale here.
+                if (blocks != 16 && current.scaleIndex < last.scaleIndex) {
+                    buffer.appendBuf(last.control, sizeof(uint64_t) * blocks + 1);
 
-                // offset will temporarily set to a negative value to compensate for the buffer we
-                // wrote above even when there's no overflow. Later on we will add a larger value
-                // which will make it positive again.
-                offset -= sizeof(uint64_t) * blocks + 1;
+                    // offset will temporarily set to a negative value to compensate for the buffer
+                    // we wrote above even when there's no overflow. Later on we will add a larger
+                    // value which will make it positive again.
+                    offset -= sizeof(uint64_t) * blocks + 1;
 
-                regular._controlByteOffset = 0;
-                lastControl = *last.control;
+                    regular._controlByteOffset = 0;
+                    lastControl = *last.control;
+                }
+
+                overflow = false;
+            } else {
+                // If overflow happens later, we switch to this control byte as our new
+                // 'current'. The previous current is remembered so we can add its values to
+                // pending later.
+                extraS8b = control;
+                control = last.control;
+                currNumBlocks = blocks;
+                currIndex = overflowIndex;
             }
-
-            overflow = false;
-        } else {
-            // If overflow happens later, we switch to this control byte as our new
-            // 'current'. The previous current is remembered so we can add its values to
-            // pending later.
-            extraS8b = control;
-            control = last.control;
-            currNumBlocks = blocks;
-            currIndex = overflowIndex;
         }
     }
 
@@ -859,6 +881,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
 
     boost::optional<uint128_t> lastForS8b;
     int currIndex;
+    int pendingRle;
     if (rle) {
         // If the last block ends with RLE we just need to look for the last non-RLE block to
         // discover the overflow point. The last value for RLE will be the actual last in this block
@@ -873,7 +896,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         lastForS8b = _setupRLEForOverflowDetector(s8bBuilder, control, currNumBlocks - 1);
 
         // When RLE is setup we append as many values as we can to detect when we overflow
-        currIndex = _appendUntilOverflow(
+        std::tie(currIndex, pendingRle) = _appendUntilOverflow(
             s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
     }
 
@@ -884,31 +907,50 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         auto blocks = numSimple8bBlocksForControlByte(*last.control);
         // Append values from control block to detect overflow.
         int overflowIndex;
+        // Flag to back out of processing last control if we determined that overflow happened in
+        // RLE in current.
+        bool resumeCurrent = false;
         if (rle) {
             std::tie(lastForS8b, overflowIndex) = _appendUntilOverflowForRLE(
                 encoder.simple8bBuilder, overflow, last.control, blocks - 1);
+        } else if (pendingRle != -1) {
+            // Pending RLE block from current control we need to find overflow where we had our
+            // overflow.
+            auto [lastForRLE, rleIndexOverflow] = _appendUntilOverflowForRLE(
+                encoder.simple8bBuilder, overflow, last.control, blocks - 1);
+            if (lastForRLE == lastForS8b) {
+                // Last value prior to RLE matches our RLE state after RLE. We then overflow in
+                // the block prior to RLE.
+                overflowIndex = rleIndexOverflow;
+            } else {
+                // Values to not match, so the overflow happened in the pending RLE block.
+                currIndex = pendingRle;
+                resumeCurrent = true;
+            }
         } else {
-            overflowIndex = _appendUntilOverflow(s8bBuilder,
-                                                 encoder.simple8bBuilder,
-                                                 overflow,
-                                                 lastForS8b,
-                                                 last.control,
-                                                 blocks - 1);
+            std::tie(overflowIndex, pendingRle) = _appendUntilOverflow(s8bBuilder,
+                                                                       encoder.simple8bBuilder,
+                                                                       overflow,
+                                                                       lastForS8b,
+                                                                       last.control,
+                                                                       blocks - 1);
         }
 
-        // Check if we overflowed in the first simple8b in this second control block. We can
-        // then disregard this control block and proceed as-if we didn't overflow in the
-        // first as there's nothing to re-write in the second control block.
-        if (overflowIndex == blocks - 1) {
-            overflow = false;
-        } else {
-            // If overflow happens later, we switch to this control byte as our new
-            // 'current'. The previous current is remembered so we can add its values to
-            // pending later.
-            extraS8b = control;
-            control = last.control;
-            currNumBlocks = blocks;
-            currIndex = overflowIndex;
+        if (!resumeCurrent) {
+            // Check if we overflowed in the first simple8b in this second control block. We can
+            // then disregard this control block and proceed as-if we didn't overflow in the
+            // first as there's nothing to re-write in the second control block.
+            if (overflowIndex == blocks - 1) {
+                overflow = false;
+            } else {
+                // If overflow happens later, we switch to this control byte as our new
+                // 'current'. The previous current is remembered so we can add its values to
+                // pending later.
+                extraS8b = control;
+                control = last.control;
+                currNumBlocks = blocks;
+                currIndex = overflowIndex;
+            }
         }
     }
 
@@ -1030,7 +1072,8 @@ boost::optional<T> BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::Bi
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
 template <typename T>
-int BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_appendUntilOverflow(
+std::pair<int, int>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_appendUntilOverflow(
     Simple8bBuilder<T>& overflowDetector,
     Simple8bBuilder<T, Allocator>& mainBuilder,
     bool& overflow,
@@ -1041,9 +1084,34 @@ int BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_ap
         overflow = true;
     };
     for (; index >= 0; --index) {
-        Simple8b<T> s8b(s8bBlock +
-                            /* offset to block at index */ index * sizeof(uint64_t) +
-                            /* control byte*/ 1,
+        const char* block = s8bBlock +
+            /* offset to block at index */ index * sizeof(uint64_t) +
+            /* control byte*/
+            1;
+        bool rle = (ConstDataView(block).read<LittleEndian<uint64_t>>() &
+                    simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
+        if (rle) {
+            // RLE detected, we need to continue to detect overflow. Depending on if the last value
+            // before the RLE block matches or current last we overflowed in this RLE block or in
+            // the first non-RLE block prior.
+            auto [lastForRLE, rleIndexOverflow] =
+                _appendUntilOverflowForRLE(mainBuilder, overflow, s8bBlock, index - 1);
+            if (lastForRLE == lastValForRLE) {
+                // Last value prior to RLE matches our RLE state after RLE. We then overflow in the
+                // block prior to RLE.
+                return std::pair(rleIndexOverflow, -1);
+            } else if (rleIndexOverflow == -1) {
+                // We exhausted this control block without determining where the overflow point is.
+                // Return pending RLE index so we can continue this operation in the prior control
+                // block.
+                return std::pair(-1, index);
+            }
+
+            // Overflow inside the RLE block, we're done.
+            break;
+        }
+
+        Simple8b<T> s8b(block,
                         /* one block at a time */ sizeof(uint64_t),
                         lastValForRLE);
         boost::optional<T> last;
@@ -1064,7 +1132,7 @@ int BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_ap
             break;
         }
     }
-    return index;
+    return std::pair(index, -1);
 }
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
@@ -1087,9 +1155,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_append
 
         boost::optional<T> last;
         for (auto&& elem : s8b) {
-            if (elem) {
-                last = elem;
-            }
+            last = elem;
         }
 
         // Overflow point detected, record the last value in last Simple8b block
