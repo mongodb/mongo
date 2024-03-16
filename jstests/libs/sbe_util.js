@@ -7,9 +7,9 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Constants representing different states of SBE enablement.
-const kSbeFullyEnabled = "sbeFull";
-const kSbeRestricted = "sbeRestricted";
-const kSbeDisabled = "sbeDisabled";
+export const kSbeFullyEnabled = "sbeFull";
+export const kSbeRestricted = "sbeRestricted";
+export const kSbeDisabled = "sbeDisabled";
 
 /**
  * Discover nodes in the cluster and call 'checkFunction' on any one mongod node. Returns the value
@@ -61,7 +61,7 @@ function discoverNodesAndCheck(theDB, checkFunction) {
  * featureFlagSbeFull is off. This reflects the expected SBE behavior when we cannot use Bonsai and
  * instead fall back to SBE without Bonsai.
  */
-function checkSbeStatus(theDB) {
+export function checkSbeStatus(theDB) {
     return discoverNodesAndCheck(theDB, (conn) => {
         const getParam = conn.adminCommand({
             getParameter: 1,

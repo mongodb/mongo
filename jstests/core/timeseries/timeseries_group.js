@@ -21,7 +21,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {blockProcessingTestCases} from "jstests/libs/block_processing_test_cases.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeStatus, kSbeDisabled, kSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
@@ -76,9 +76,16 @@ TimeseriesTest.run((insert) => {
         // All fields missing.
     });
 
-    // Block-based $group requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
-    const sbeFullEnabled = checkSbeFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
+    // Block based $group is guarded behind (SbeFull || SbeBlockHashAgg) && TimeSeriesInSbe.
+    const sbeStatus = checkSbeStatus(db);
+    const featureFlagsAllowBlockHashAgg =
+        // SBE can't be disabled altogether.
+        (sbeStatus != kSbeDisabled) &&
+        // We have to allow time series queries to run in SBE.
+        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe') &&
+        // Either we have SBE full or the SBE BlockHashAgg flag.
+        (sbeStatus == kSbeFullyEnabled ||
+         FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SbeBlockHashAgg'));
 
     function runTests(allowDiskUse, forceIncreasedSpilling) {
         assert.commandWorked(db.adminCommand({
@@ -102,7 +109,7 @@ TimeseriesTest.run((insert) => {
                                                    datePrefix,
                                                    dateUpperBound,
                                                    dateLowerBound,
-                                                   sbeFullEnabled);
+                                                   featureFlagsAllowBlockHashAgg);
 
         const expectedResults = {
             GroupByNull: [{_id: null}],

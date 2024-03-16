@@ -1062,8 +1062,11 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                       const PlanStageReqs& reqs,
                                       PlanStageSlots childOutputs,
                                       const GroupNode* groupNode) {
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
+    const bool sbeBlockHashAggEnabled =
+        feature_flags::gFeatureFlagSbeBlockHashAgg.isEnabled(fcvSnapshot);
+    const bool featureFlagsAllowBlockHashAgg = sbeFullEnabled || sbeBlockHashAggEnabled;
 
     auto collatorSlot = _state.getCollatorSlot();
     const auto& idExpr = groupNode->groupByExpression;
@@ -1163,8 +1166,9 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     // 'useBlockHashAgg' flag to true and we will use BlockHashAggStage. Otherwise, we use the
     // normal HashAggStage.
 
-    const bool tryToUseBlockHashAgg = sbeFullEnabled && childOutputs.hasBlockOutput() &&
-        idIsSingleKey && !hasVariableGroupInit && !collatorSlot && canBuildBlockExprsAndBlockAggs();
+    const bool tryToUseBlockHashAgg = featureFlagsAllowBlockHashAgg &&
+        childOutputs.hasBlockOutput() && idIsSingleKey && !hasVariableGroupInit && !collatorSlot &&
+        canBuildBlockExprsAndBlockAggs();
 
     bool useBlockHashAgg = false;
 
