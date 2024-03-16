@@ -467,7 +467,7 @@ public:
         if (_currFrame != _frames.begin()) {
             // We know that type was kObject or kArray, so size is fieldname, type,
             // and a stored int
-            int size = 2 + ConstDataView(_data + 2).read<LittleEndian<int32_t>>();
+            int64_t size = 2 + ConstDataView(_data + 2).read<LittleEndian<int32_t>>();
             uassert(InvalidBSON,
                     "BSON literal content exceeds buffer size",
                     (size_t)size <= _maxLength);
