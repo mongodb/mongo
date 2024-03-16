@@ -115,8 +115,7 @@ function testBinaryUpgrade(initConfig, altCanAuthBefore, newConfig, altCanAuthAf
     runAuthTest(conn.host, altCanAuthBefore);
 
     jsTestLog("Starting binary upgrade to latest");
-    const cfgWithFeatureFlag = Object.assign({featureFlagOIDCMultipurposeIDP: true}, newConfig)
-    rst.upgradeSet({binVersion: 'latest', setParameter: cfgWithFeatureFlag});
+    rst.upgradeSet({binVersion: 'latest', setParameter: newConfig});
     jsTestLog("Finished binary upgrade to latest");
 
     conn = rst.getPrimary();
@@ -127,8 +126,7 @@ function testBinaryUpgrade(initConfig, altCanAuthBefore, newConfig, altCanAuthAf
 
 function testBinaryDowngrade(initConfig, altCanAuthBefore, newConfig, altCanAuthAfter) {
     jsTestLog("Testing downgrade from latest to last-lts");
-    const cfgWithFeatureFlag = Object.assign({featureFlagOIDCMultipurposeIDP: true}, initConfig)
-    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: cfgWithFeatureFlag}});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: initConfig}});
     rst.startSet();
     rst.initiate();
 

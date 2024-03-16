@@ -59,13 +59,6 @@ public:
     JWSValidatedToken(JWKManager* keyMgr, StringData token);
 
     /**
-     * Extract just the Issuer name ('iss') from the token.
-     */
-    static StatusWith<std::string> extractIssuerFromCompactSerialization(StringData token);
-    // TODO: SERVER-85968 remove extractIssuerFromCompactSerialization when
-    // featureFlagOIDCMultipurposeIDP defaults to enabled
-
-    /**
      * Extract the Issuer name ('iss') and the audience list ('aud') from the token.
      */
     static StatusWith<IssuerAudiencePair> extractIssuerAndAudienceFromCompactSerialization(

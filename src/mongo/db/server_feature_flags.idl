@@ -163,11 +163,6 @@ feature_flags:
         cpp_varname: gFeatureFlagIngressAdmissionControl
         default: false
         shouldBeFCVGated: false
-    featureFlagOIDCMultipurposeIDP:
-        description: "Feature flag for OIDC multi-purpose IdPs"
-        cpp_varname: gFeatureFlagOIDCMultipurposeIDP
-        default: false
-        shouldBeFCVGated: false
     featureFlagPrefetch:
         description: "Feature flag to make pre-fetching available"
         cpp_varname: gFeatureFlagPrefetch
