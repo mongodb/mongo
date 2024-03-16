@@ -227,42 +227,50 @@ TEST(ThreadPoolTest, LivePoolCleanedByDestructor) {
 DEATH_TEST_REGEX(ThreadPoolTest,
                  DestructionDuringJoinDies,
                  "Attempted to join pool.*more than once.*DoubleJoinPool") {
-    // This test is a little complicated. We need to ensure that the ThreadPool destructor runs
-    // while some thread is blocked running ThreadPool::join, to see that double-join is fatal in
-    // the pool destructor. To do this, we first wait for minThreads threads to have started. Then,
-    // we create and lock a mutex in the test thread, schedule a work item in the pool to lock that
-    // mutex, schedule an independent thread to call join, and wait for numIdleThreads to hit 0
-    // inside the test thread. When that happens, we know that the thread in the pool executing our
-    // mutex-lock is blocked waiting for the mutex, so the independent thread must be blocked inside
-    // of join(), until the pool thread finishes. At this point, if we destroy the pool, its
-    // destructor should trigger a fatal error due to double-join.
+    // This test ensures that the ThreadPool destructor runs while some thread is blocked
+    // running ThreadPool::join, to see that double-join is fatal in the pool destructor.
     auto mutex = MONGO_MAKE_LATCH();
     ThreadPool::Options options;
     options.minThreads = 1;
+    options.maxThreads = 1;
     options.poolName = "DoubleJoinPool";
     boost::optional<ThreadPool> pool;
     pool.emplace(options);
     pool->startup();
-    while (pool->getStats().numThreads < 1U) {
-        sleepmillis(50);
-    }
+    ASSERT_EQ(1U, pool->getStats().numThreads);
+
     stdx::unique_lock<Latch> lk(mutex);
+    // Schedule 2 tasks to ensure that independent thread join() is blocked draining the tasks and
+    // causing the ThreadPool destructor join to fail due to double-join.
     pool->schedule([&mutex](auto status) {
         ASSERT_OK(status);
         stdx::lock_guard<Latch> lk(mutex);
     });
-    stdx::thread t([&pool] {
+    pool->schedule([&mutex](auto status) {
+        ASSERT_OK(status);
+        stdx::lock_guard<Latch> lk(mutex);
+    });
+
+    stdx::thread t;
+    ScopeGuard onExitGuard([&] {
+        lk.unlock();
+        if (t.joinable()) {
+            t.join();
+        }
+    });
+    t = stdx::thread([&pool] {
         pool->shutdown();
         pool->join();
     });
     ThreadPool::Stats stats;
-    while ((stats = pool->getStats()).numIdleThreads != 0U) {
-        sleepmillis(50);
+    while ((stats = pool->getStats()).numPendingTasks != 0U) {
+        sleepmillis(10);
     }
-    ASSERT_EQ(0U, stats.numPendingTasks);
+    // Accounts for cleanup and regular worker thread.
+    ASSERT_EQ(2U, stats.numThreads);
+    ASSERT_EQ(0U, stats.numIdleThreads);
     pool.reset();
-    lk.unlock();
-    t.join();
+    MONGO_UNREACHABLE;
 }
 
 TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks) {
