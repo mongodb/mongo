@@ -129,9 +129,26 @@ constexpr std::array<uint8_t, 15> kBaseSelectorToShiftSize = {
 // Transfer from a selector to a specific extension type
 // This is for selector 7 and 8 extensions where the selector value is passed along with
 // selector index.
+constexpr uint8_t kInvalidSelector = 0xff;
 constexpr std::array<std::array<uint8_t, 16>, 2> kSelectorToExtension = {
-    std::array<uint8_t, 16>{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
-    std::array<uint8_t, 16>{0, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 0, 0}};
+    std::array<uint8_t, 16>{0,
+                            1,
+                            1,
+                            1,
+                            1,
+                            1,
+                            1,
+                            1,
+                            1,
+                            1,
+                            kInvalidSelector,
+                            kInvalidSelector,
+                            kInvalidSelector,
+                            kInvalidSelector,
+                            kInvalidSelector,
+                            kInvalidSelector},
+    std::array<uint8_t, 16>{
+        0, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, kInvalidSelector, kInvalidSelector}};
 
 // Transfer from a extensionType and selectorIdx to the selector value to be held in the 4 lsb (base
 // selector)

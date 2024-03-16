@@ -7216,39 +7216,20 @@ TEST_F(BSONColumnTest, EmptyBuffer) {
 }
 
 TEST_F(BSONColumnTest, InvalidSimple8b) {
-    // A Simple8b block with an invalid selector doesn't throw an error, but make sure we can handle
-    // it gracefully. Check so we don't read out of bounds and can iterate.
+    // A Simple8b block with an invalid selector throws an error when iterating.
 
-    auto elem = createElementInt32(0);
+    std::vector<uint8_t> invalidSelectors = {0, 0xA7, 0xB7, 0xC7, 0xD7, 0xE7, 0xF7, 0xE8, 0xF8};
 
-    BufBuilder expected;
-    appendLiteral(expected, elem);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    uint64_t invalidSimple8b = 0;
-    expected.appendNum(invalidSimple8b);
-    appendEOO(expected);
+    for (auto&& selector : invalidSelectors) {
+        auto elem = createElementInt32(0);
+        BufBuilder expected;
+        appendLiteral(expected, elem);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        expected.appendNum(static_cast<uint64_t>(selector));
+        appendEOO(expected);
 
-    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
-    for (auto it = col.begin(), e = col.end(); it != e; ++it) {
-    }
-}
-
-TEST_F(BSONColumnTest, NoLiteralStart) {
-    // Starting the stream with a delta block doesn't throw an error. Make sure we handle it
-    // gracefully even if the values we extracted may not be meaningful. Check so we don't read out
-    // of bounds and can iterate.
-
-    auto elem = createElementInt32(0);
-
-    BufBuilder expected;
-    appendLiteral(expected, elem);
-    appendSimple8bControl(expected, 0b1000, 0b0000);
-    uint64_t invalidSimple8b = 0;
-    expected.appendNum(invalidSimple8b);
-    appendEOO(expected);
-
-    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
-    for (auto it = col.begin(), e = col.end(); it != e; ++it) {
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
     }
 }
 
