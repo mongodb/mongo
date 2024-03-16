@@ -1059,17 +1059,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         args = ", ".join(base_class_args)
         self._writer.write_line('%s(): %s(%s) {}' % (class_name, base_class, args))
 
-    def gen_derived_class_destructor(self, command_name, api_version):
-        # type: (str, str) -> None
-        """Generate a derived class destructor."""
-        class_name = common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
-        self._writer.write_line('virtual ~%s() = default;' % (class_name))
-
     def gen_api_version_fn(self, is_api_versions, api_version):
         # type: (bool, Union[str, bool]) -> None
         """Generate an apiVersions or deprecatedApiVersions function for a command's base class."""
         fn_name = "apiVersions" if is_api_versions else "deprecatedApiVersions"
-        fn_def = 'virtual const std::set<std::string>& %s() const final' % fn_name
+        fn_def = 'const std::set<std::string>& %s() const final' % fn_name
         value = "kApiVersions1" if api_version else "kNoApiVersions"
         with self._block('%s {' % (fn_def), '}'):
             self._writer.write_line('return %s;' % value)
@@ -1122,11 +1116,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.gen_derived_class_constructor(command.command_name, command.api_version,
                                                    'TypedCommand<Derived>', 'Request::kCommandName',
                                                    'Request::kCommandAlias')
-
-            self.write_empty_line()
-
-            # Generate a destructor for generated derived class.
-            self.gen_derived_class_destructor(command.command_name, command.api_version)
 
             self.write_empty_line()
 
@@ -1819,10 +1808,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         If the structure is not a top-level struct (ie. not a command or is_command_reply resolves
         to false), we want to grab the context from the incoming argument. If we set the structure
         to use a catalog context through the `is_catalog_ctxt` IDL flag, serialze for catalog instead.
-        If the incoming argument isn't set we want to use the default constructor. Once we have our 
-        expression, we need to put it at the beginning of the list.  This is important because we 
-        will be consuming the local copy of the _serializationContext in the same initializer list 
-        when we are passing it into the constructor of a nested struct.  In C++, initializer lists 
+        If the incoming argument isn't set we want to use the default constructor. Once we have our
+        expression, we need to put it at the beginning of the list.  This is important because we
+        will be consuming the local copy of the _serializationContext in the same initializer list
+        when we are passing it into the constructor of a nested struct.  In C++, initializer lists
         are ordered by declaration order, which also identifies the order of initialization.
         """
 
