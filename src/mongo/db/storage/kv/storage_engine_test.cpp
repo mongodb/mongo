@@ -739,15 +739,17 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     _storageEngine->getTimestampMonitor()->addListener(&fourth);
 
     // Wait until all 4 listeners get notified at least once.
-    stdx::unique_lock<Latch> lk(mutex);
-    cv.wait(lk, [&] {
-        for (auto const& change : changes) {
-            if (!change) {
-                return false;
+    {
+        stdx::unique_lock<Latch> lk(mutex);
+        cv.wait(lk, [&] {
+            for (auto const& change : changes) {
+                if (!change) {
+                    return false;
+                }
             }
-        }
-        return true;
-    });
+            return true;
+        });
+    };
 
     _storageEngine->getTimestampMonitor()->clearListeners();
 }
