@@ -397,6 +397,10 @@ public:
 
     boost::optional<Record> seekExact(const RecordId& id) override;
 
+    boost::optional<Record> seekNear(const RecordId& start) override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     void save() override;
 
     void saveUnpositioned() override;
@@ -495,6 +499,8 @@ public:
 
     boost::optional<Record> seekExact(const RecordId& id) override;
 
+    boost::optional<Record> seekNear(const RecordId& start) override;
+
     void save() override;
 
     bool restore(bool tolerateCappedRepositioning = true) override;
@@ -514,6 +520,12 @@ protected:
      * Reset any visibility state on the cursor.
      */
     virtual void resetVisibility() = 0;
+
+    /**
+     * Given a requested start RecordId for seekNear, returns a modified RecordId that fits within
+     * any visibility constraints.
+     */
+    virtual RecordId getStartForSeekNear(const RecordId& id) const = 0;
 };
 
 /**
@@ -531,6 +543,7 @@ protected:
     void initVisibility(OperationContext* opCtx) override;
     bool isVisible(const RecordId& id) override;
     void resetVisibility() override;
+    RecordId getStartForSeekNear(const RecordId& id) const override;
 
 private:
     boost::optional<CappedVisibilitySnapshot> _cappedSnapshot;
@@ -552,6 +565,7 @@ protected:
     void initVisibility(OperationContext* opCtx) override;
     bool isVisible(const RecordId& id) override;
     void resetVisibility() override;
+    RecordId getStartForSeekNear(const RecordId& id) const override;
 
 private:
     /**

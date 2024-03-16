@@ -77,6 +77,12 @@ public:
     }
 
     // Seeking is not currently supported.
+    boost::optional<Record> seekNear(const RecordId& start) {
+        tasserted(6968301, "MultiBsonStreamCursor::seekNear is not supported");
+        return boost::none;
+    }
+
+    // Seeking is not currently supported.
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
         tasserted(6968320, "MultiBsonStreamCursor::seek is not supported");
         return {};

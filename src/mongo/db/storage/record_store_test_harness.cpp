@@ -787,7 +787,7 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreCreation) {
     invariant(rs->keyFormat() == KeyFormat::String);
 }
 
-TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
+TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeekNear) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
@@ -827,7 +827,7 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
         records.push_back(record);
     }
 
-    for (int i = 0; i < numRecords - 1; i++) {
+    for (int i = 0; i < numRecords; i++) {
         // Generate an OID RecordId with a timestamp part and high bits elsewhere such that it
         // always compares greater than or equal to the OIDs we inserted.
 
@@ -837,12 +837,12 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
 
         auto rid = record_id_helpers::keyForOID(oid);
         auto cur = rs->getCursor(opCtx.get());
-        auto rec = cur->seek(rid, SeekableRecordCursor::BoundInclusion::kInclude);
+        auto rec = cur->seekNear(rid);
         ASSERT(rec);
-        ASSERT_GT(rec->id, rid);
+        ASSERT_EQ(records[i].id, rec->id);
     }
 
-    for (int i = 1; i < numRecords; i++) {
+    for (int i = 0; i < numRecords; i++) {
         // Generate an OID RecordId with only a timestamp part and zeroes elsewhere such that it
         // always compares less than or equal to the OIDs we inserted.
 
@@ -851,9 +851,9 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
 
         auto rid = record_id_helpers::keyForOID(oid);
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
-        auto rec = cur->seek(rid, SeekableRecordCursor::BoundInclusion::kInclude);
+        auto rec = cur->seekNear(rid);
         ASSERT(rec);
-        ASSERT_LT(rec->id, rid);
+        ASSERT_EQ(records[i].id, rec->id);
     }
 }
 

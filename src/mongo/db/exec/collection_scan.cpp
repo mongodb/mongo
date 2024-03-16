@@ -111,9 +111,12 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         // applies only to forwards scans of the oplog and scans on clustered collections.
         invariant(!params.resumeAfterRecordId);
         if (collPtr->ns().isOplogOrChangeCollection()) {
+            // TODO SERVER-86216 Oplog/change collections may require examining the record previous
+            // to the one we are seeking, which is not compatible with the bounded seek() API.
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
             invariant(collPtr->isClustered());
+            _useSeek = true;
         }
     }
 
@@ -161,105 +164,6 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     }
 }
 
-namespace {
-
-/*
- * Returns the first entry in the collection assuming that the cursor has not been used and is
- * unpositioned.
- */
-repl::OplogEntry getFirstEntry(SeekableRecordCursor* newCursor) {
-    auto firstRecord = newCursor->next();
-    uassert(ErrorCodes::CollectionIsEmpty,
-            "Found collection empty when checking that the first record has not rolled over",
-            firstRecord);
-    auto entry = uassertStatusOK(repl::OplogEntry::parse(firstRecord->data.toBson()));
-
-    // If we use the cursor, unposition it so that it is ready for use by future callers.
-    newCursor->saveUnpositioned();
-    newCursor->restore();
-    return entry;
-};
-
-/**
- * Asserts that the timestamp has not already fallen off the oplog or change collection and then
- * returns an unpositioned cursor.
- *
- * Throws OplogQueryMinTsMissing if tsToCheck no longer exists in the oplog.
- * Throws CollectionIsEmpty if the collection has no documents.
- */
-std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
-    OperationContext* opCtx, const CollectionPtr& coll, Timestamp tsToCheck) {
-    auto cursor = coll->getCursor(opCtx);
-
-    boost::optional<repl::OplogEntry> firstEntry;
-
-    const Timestamp earliestTimestamp = [&]() {
-        // For the oplog, we avoid looking at the first entry unless we have to. Change collections
-        // do not make an optimization to retrieve the oldest entry, so we will always use the
-        // cursor.
-        if (coll->ns().isOplog()) {
-            auto swEarliestOplogTimestamp =
-                coll->getRecordStore()->getEarliestOplogTimestamp(opCtx);
-            if (swEarliestOplogTimestamp.isOK()) {
-                return swEarliestOplogTimestamp.getValue();
-            }
-            if (swEarliestOplogTimestamp.getStatus().code() !=
-                ErrorCodes::OplogOperationUnsupported) {
-                uassertStatusOK(swEarliestOplogTimestamp);
-            }
-            // Fall through to use the cursor if the storage engine does not support this
-            // optimization.
-        }
-
-        firstEntry.emplace(getFirstEntry(cursor.get()));
-        return firstEntry->getTimestamp();
-    }();
-
-    // Verify that the timestamp of the first observed oplog entry is earlier than or equal to
-    // timestamp that should not have fallen off the oplog.
-    if (earliestTimestamp <= tsToCheck) {
-        return cursor;
-    }
-
-    // At this point we have to use the cursor to look at the first entry.
-    if (!firstEntry) {
-        firstEntry.emplace(getFirstEntry(cursor.get()));
-    }
-
-    // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
-    // if its timestamp is later than the timestamp that should not have fallen off the oplog; no
-    // events earlier can have fallen off this oplog.
-    // NOTE: A change collection can be created at any moment as such it might not have replset
-    // initialization message, as such this case is not fully applicable for the change collection.
-    const bool isNewRS =
-        firstEntry->getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
-        firstEntry->getOpType() == repl::OpTypeEnum::kNoop;
-
-    uassert(ErrorCodes::OplogQueryMinTsMissing,
-            str::stream()
-                << "Specified timestamp has already fallen off the oplog for the input timestamp: "
-                << tsToCheck << ", first oplog entry: " << firstEntry->getEntry().toString(),
-            isNewRS);
-
-    return cursor;
-}
-}  // namespace
-
-void CollectionScan::initCursor(OperationContext* opCtx,
-                                const CollectionPtr& collPtr,
-                                bool forward) {
-    if (_params.assertTsHasNotFallenOff) {
-        invariant(forward);
-        _cursor =
-            initCursorAndAssertTsHasNotFallenOff(opCtx, collPtr, *_params.assertTsHasNotFallenOff);
-
-        // We don't need to check this assertion again after we've confirmed the first oplog event.
-        _params.assertTsHasNotFallenOff = boost::none;
-    } else {
-        _cursor = collPtr->getCursor(opCtx, forward);
-    }
-}
-
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF) {
         _priority.reset();
@@ -275,6 +179,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     boost::optional<Record> record;
     const bool needToMakeCursor = !_cursor;
     const auto& collPtr = collectionPtr();
+    bool calledSeek = false;
 
     const auto ret = handlePlanStageYield(
         expCtx(),
@@ -301,12 +206,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     collPtr->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx());
                 }
 
-                try {
-                    initCursor(opCtx(), collPtr, forward);
-                } catch (const ExceptionFor<ErrorCodes::CollectionIsEmpty>&) {
-                    _commonStats.isEOF = true;
-                    return PlanStage::IS_EOF;
-                }
+                _cursor = collPtr->getCursor(opCtx(), forward);
 
                 if (!_lastSeenId.isNull()) {
                     invariant(_params.tailable);
@@ -344,28 +244,42 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                                       << recordIdToSeek);
                     }
                 }
+            }
 
-                if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::FORWARD &&
-                    _params.minRecord) {
-                    // Seek to the start location and return it.
+            if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::FORWARD &&
+                _params.minRecord) {
+                if (_useSeek) {
+                    // Seek to the start location.
                     record = _cursor->seek(_params.minRecord->recordId(),
                                            shouldIncludeStartRecord(_params)
                                                ? SeekableRecordCursor::BoundInclusion::kInclude
                                                : SeekableRecordCursor::BoundInclusion::kExclude);
-                    return PlanStage::ADVANCED;
-                } else if (_lastSeenId.isNull() &&
-                           _params.direction == CollectionScanParams::BACKWARD &&
-                           _params.maxRecord) {
-                    // Seek to the start location and return it.
+                    calledSeek = true;
+                } else {
+                    // Seek to the approximate start location.
+                    record = _cursor->seekNear(_params.minRecord->recordId());
+                }
+            }
+
+            if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::BACKWARD &&
+                _params.maxRecord) {
+                if (_useSeek) {
+                    // Seek to the start location.
                     record = _cursor->seek(_params.maxRecord->recordId(),
                                            shouldIncludeStartRecord(_params)
                                                ? SeekableRecordCursor::BoundInclusion::kInclude
                                                : SeekableRecordCursor::BoundInclusion::kExclude);
-                    return PlanStage::ADVANCED;
+                    calledSeek = true;
+                } else {
+                    // Seek to the approximate start location (at the end).
+                    record = _cursor->seekNear(_params.maxRecord->recordId());
                 }
             }
 
-            record = _cursor->next();
+            if (!calledSeek && !record) {
+                record = _cursor->next();
+            }
+
             return PlanStage::ADVANCED;
         },
         [&] {
@@ -381,9 +295,9 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     }
 
     if (!record) {
-        // We hit EOF. If we are tailable, leave us in a state to pick up where we left off on the
-        // next call to work(). Otherwise, the EOF is permanent.
-        if (_params.tailable) {
+        // We hit EOF. If we are tailable and have already seen data, leave us in a state to pick up
+        // where we left off on the next call to work(). Otherwise, the EOF is permanent.
+        if (_params.tailable && !_lastSeenId.isNull()) {
             _cursor.reset();
         } else {
             _commonStats.isEOF = true;
@@ -399,6 +313,9 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     }
 
     _lastSeenId = record->id;
+    if (_params.assertTsHasNotFallenOff) {
+        assertTsHasNotFallenOff(*record);
+    }
     if (_params.shouldTrackLatestOplogTimestamp) {
         setLatestOplogEntryTimestamp(*record);
     }
@@ -410,7 +327,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                           record->data.releaseToBson());
     _workingSet->transitionToRecordIdAndObj(id);
 
-    return returnIfMatches(member, id, out);
+    return returnIfMatches(member, id, out, !calledSeek /* needsStartBoundCheck */);
 }
 
 void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
@@ -452,6 +369,33 @@ void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
                 "latestOplogEntryTimestamp"_attr = _latestOplogEntryTimestamp,
                 "currentRecordTimestamp"_attr = tsElem.timestamp());
     _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
+}
+
+void CollectionScan::assertTsHasNotFallenOff(const Record& record) {
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(record.data.toBson()));
+    invariant(_specificStats.docsTested == 0);
+
+    // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
+    // if its timestamp is later than the timestamp that should not have fallen off the oplog; no
+    // events earlier can have fallen off this oplog.
+    // NOTE: A change collection can be created at any moment as such it might not have replset
+    // initialization message, as such this case is not fully applicable for the change collection.
+    const bool isNewRS =
+        oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
+        oplogEntry.getOpType() == repl::OpTypeEnum::kNoop;
+
+    // Verify that the timestamp of the first observed oplog entry is earlier than or equal to
+    // timestamp that should not have fallen off the oplog.
+    const bool tsHasNotFallenOff = oplogEntry.getTimestamp() <= *_params.assertTsHasNotFallenOff;
+
+    uassert(ErrorCodes::OplogQueryMinTsMissing,
+            str::stream()
+                << "Specified timestamp has already fallen off the oplog for the input timestamp: "
+                << *_params.assertTsHasNotFallenOff
+                << ", oplog entry: " << oplogEntry.getEntry().toString(),
+            isNewRS || tsHasNotFallenOff);
+    // We don't need to check this assertion again after we've confirmed the first oplog event.
+    _params.assertTsHasNotFallenOff = boost::none;
 }
 
 BSONObj CollectionScan::getPostBatchResumeToken() const {
@@ -530,7 +474,8 @@ bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMemb
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
-                                                      WorkingSetID* out) {
+                                                      WorkingSetID* out,
+                                                      bool needsStartBoundCheck) {
     ++_specificStats.docsTested;
 
     // The 'maxRecord' bound is always inclusive, even if the query predicate is
@@ -540,6 +485,17 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
         _workingSet->free(memberID);
         _commonStats.isEOF = true;
         return PlanStage::IS_EOF;
+    }
+
+    // For clustered collections, seekNear() is allowed to return a record prior to the
+    // requested minRecord for a forward scan or after the requested maxRecord for a reverse
+    // scan. Ensure that we do not return a record out of the requested range. Require that the
+    // caller advance our cursor until it is positioned within the correct range.
+    //
+    // Because bounded seek does not have this problem, only perform this check for seekNear().
+    if (needsStartBoundCheck && beforeStartOfRange(_params, *member)) {
+        _workingSet->free(memberID);
+        return PlanStage::NEED_TIME;
     }
 
     if (!Filter::passes(member, _filter)) {
