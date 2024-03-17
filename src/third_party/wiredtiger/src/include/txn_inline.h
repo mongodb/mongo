@@ -705,11 +705,11 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
 }
 
 /*
- * __wt_txn_visible --
- *     Can the current transaction see the given ID / timestamp?
+ * __wt_txn_timestamp_visible --
+ *     Can the current transaction see the given timestamp?
  */
 static inline bool
-__wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
+__wt_txn_timestamp_visible(WT_SESSION_IMPL *session, wt_timestamp_t timestamp)
 {
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
@@ -717,6 +717,45 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp
     txn = session->txn;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
+    /* Timestamp check. */
+    if (!F_ISSET(txn, WT_TXN_SHARED_TS_READ) || timestamp == WT_TS_NONE)
+        return (true);
+
+    return (timestamp <= txn_shared->read_timestamp);
+}
+
+/*
+ * __wt_txn_snap_min_visible --
+ *     Can the current transaction snapshot minimum/read timestamp see the given ID/timestamp? This
+ *     visibility check should only be used when assessing broader visibility based on aggregated
+ *     time window. It does not reflect whether a specific update is visible to a transaction.
+ */
+static inline bool
+__wt_txn_snap_min_visible(
+  WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
+{
+    /* Not needed since 6.0 doesn't support checkpoint cursors. */
+    WT_UNUSED(durable_timestamp);
+
+    /* Transaction snapshot minimum check. */
+    if (!WT_TXNID_LT(id, session->txn->snap_min))
+        return (false);
+
+    /* Transactions read their writes, regardless of timestamps. */
+    if (F_ISSET(session->txn, WT_TXN_HAS_ID) && id == session->txn->id)
+        return (true);
+
+    /* Timestamp check. */
+    return (__wt_txn_timestamp_visible(session, timestamp));
+}
+
+/*
+ * __wt_txn_visible --
+ *     Can the current transaction see the given ID/timestamp?
+ */
+static inline bool
+__wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
+{
     if (!__txn_visible_id(session, id))
         return (false);
 
@@ -725,10 +764,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp
         return (true);
 
     /* Timestamp check. */
-    if (!F_ISSET(txn, WT_TXN_SHARED_TS_READ) || timestamp == WT_TS_NONE)
-        return (true);
-
-    return (timestamp <= txn_shared->read_timestamp);
+    return (__wt_txn_timestamp_visible(session, timestamp));
 }
 
 /*
