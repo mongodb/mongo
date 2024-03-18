@@ -1796,7 +1796,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
 DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                    ApplyOplogEntriesForRestoreNoOplog,
-                   "Fatal assertion.*8290700") {
+                   "Fatal assertion.*8290703") {
     storageGlobalParams.magicRestore = true;
     auto opCtx = getOperationContext();
     getStorageInterface()->setInitialDataTimestamp(opCtx->getServiceContext(),

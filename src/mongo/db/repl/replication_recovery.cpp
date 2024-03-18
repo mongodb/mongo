@@ -552,7 +552,7 @@ void ReplicationRecoveryImpl::applyOplogEntriesForRestore(OperationContext* opCt
 
     auto topOfOplogSW = _getTopOfOplog(opCtx);
     // The oplog must exist and contain entries.
-    fassert(8290700, topOfOplogSW);
+    fassert(8290703, topOfOplogSW);
     const auto topOfOplog = topOfOplogSW.getValue();
 
     // Note that this function skips setting the initial data timestamp at the end of oplog
