@@ -83,6 +83,8 @@ def setup_task_limiter(env, name, concurrency_ratio=0.75, builders=None, source_
             new_emitter = SCons.Builder.ListEmitter([base_emitter, task_limiter_emitter])
             builder.emitter = new_emitter
 
+    return max_concurrency
+
 
 def exists(env):
     return True

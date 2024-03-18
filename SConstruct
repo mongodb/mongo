@@ -220,8 +220,12 @@ add_option(
 
 add_option(
     'release',
+    choices=['on', 'off'],
+    const='on',
+    default=build_profile.release,
     help='release build',
-    nargs=0,
+    nargs='?',
+    type='choice',
 )
 
 add_option(
@@ -330,7 +334,7 @@ add_option(
     'separate-debug',
     choices=['on', 'off'],
     const='on',
-    default='off',
+    default="off",
     help='Produce separate debug files',
     nargs='?',
     type='choice',
@@ -753,7 +757,7 @@ add_option(
     " jlink value."
     "\n\nExample: --jlink=0.75 --jobs 8 will result in a jlink value of 6",
     const=0.5,
-    default=None,
+    default=build_profile.jlink,
     nargs='?',
     type=float,
 )
@@ -2040,7 +2044,7 @@ def is_toolchain(self, *args):
 env.AddMethod(get_toolchain_name, 'ToolchainName')
 env.AddMethod(is_toolchain, 'ToolchainIs')
 
-releaseBuild = has_option("release")
+releaseBuild = get_option("release") == "on"
 debugBuild = get_option('dbg') == "on"
 optBuild = mongo_generators.get_opt_options(env)
 
@@ -5853,7 +5857,7 @@ if get_option('ninja') != 'disabled':
             "$env$WINLINK @$out.rsp",
             description="Linked $out",
             deps=None,
-            pool="local_pool",
+            pool="link_pool",
             use_depfile=False,
             use_response_file=True,
             response_file_content="$rspc $in_newline",
@@ -6584,11 +6588,13 @@ env.Alias("distsrc", "distsrc-tgz")
 env.Tool('task_limiter')
 if has_option('jlink'):
 
-    env.SetupTaskLimiter(
+    link_jobs = env.SetupTaskLimiter(
         name='jlink',
         concurrency_ratio=get_option('jlink'),
         builders=['Program', 'SharedLibrary', 'LoadableModule'],
     )
+    if get_option("ninja") != "disabled":
+        env['NINJA_LINK_JOBS'] = link_jobs
 
 if env.get('UNITTESTS_COMPILE_CONCURRENCY'):
 

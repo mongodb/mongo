@@ -12,6 +12,7 @@ class BuildProfileType(str, enum.Enum):
     OPT = "opt"
     SAN = "san"
     COMPILE_DB = "compiledb"
+    RELEASE = "release"
 
 
 class BuildProfileNotSupported(Exception):
@@ -32,6 +33,8 @@ class BuildProfile:
     NINJA_PREFIX: str
     VARIANT_DIR: Any
     disable_warnings_as_errors: Optional[List]
+    release: str
+    jlink: float
 
 
 def get_build_profile(type):
@@ -73,6 +76,8 @@ LINUX_BUILD_PROFILES = {
             NINJA_PREFIX="build",
             VARIANT_DIR=mongo_generators.default_variant_dir_generator,
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST:
@@ -92,6 +97,8 @@ LINUX_BUILD_PROFILES = {
             NINJA_PREFIX="fast",
             VARIANT_DIR="fast",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT:
@@ -111,6 +118,8 @@ LINUX_BUILD_PROFILES = {
             NINJA_PREFIX="opt",
             VARIANT_DIR="opt",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN:
@@ -130,6 +139,8 @@ LINUX_BUILD_PROFILES = {
             NINJA_PREFIX="san",
             VARIANT_DIR="san",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
 
     #These options are the preferred settings for compiledb to generating compile_commands.json
@@ -150,6 +161,28 @@ LINUX_BUILD_PROFILES = {
             NINJA_PREFIX="compiledb",
             VARIANT_DIR="compiledb",
             disable_warnings_as_errors=['source'],
+            release="off",
+            jlink=0.99,
+        ),
+    # These options were the default settings before implementing build profiles.
+    BuildProfileType.RELEASE:
+        BuildProfile(
+            ninja="enabled",
+            variables_files=[
+                './etc/scons/mongodbtoolchain_stable_gcc.vars',
+            ],
+            allocator="auto",
+            sanitize=None,
+            link_model="static",
+            dbg="off",
+            opt="on",
+            ICECC="icecc",
+            CCACHE="ccache",
+            NINJA_PREFIX="release",
+            VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+            disable_warnings_as_errors=[],
+            release="on",
+            jlink=0.01,
         ),
 }
 
@@ -169,6 +202,8 @@ WINDOWS_BUILD_PROFILES = {
             NINJA_PREFIX="build",
             VARIANT_DIR=mongo_generators.default_variant_dir_generator,
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST:
@@ -187,6 +222,8 @@ WINDOWS_BUILD_PROFILES = {
             NINJA_PREFIX="fast",
             VARIANT_DIR="fast",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT:
@@ -205,6 +242,8 @@ WINDOWS_BUILD_PROFILES = {
             NINJA_PREFIX="opt",
             VARIANT_DIR="opt",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN:
@@ -227,6 +266,26 @@ WINDOWS_BUILD_PROFILES = {
             NINJA_PREFIX="compiledb",
             VARIANT_DIR="compiledb",
             disable_warnings_as_errors=['source'],
+            release="off",
+            jlink=0.99,
+        ),
+    # These options were the default settings before implementing build profiles.
+    BuildProfileType.RELEASE:
+        BuildProfile(
+            ninja="enabled",
+            variables_files=[],
+            allocator="auto",
+            sanitize=None,
+            link_model="static",
+            dbg="off",
+            opt="on",
+            ICECC=None,
+            CCACHE=None,
+            NINJA_PREFIX="release",
+            VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+            disable_warnings_as_errors=[],
+            release="on",
+            jlink=0.01,
         ),
 }
 
@@ -246,6 +305,8 @@ MACOS_BUILD_PROFILES = {
             NINJA_PREFIX="build",
             VARIANT_DIR=mongo_generators.default_variant_dir_generator,
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST:
@@ -265,6 +326,8 @@ MACOS_BUILD_PROFILES = {
             NINJA_PREFIX="fast",
             VARIANT_DIR="fast",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT:
@@ -284,6 +347,8 @@ MACOS_BUILD_PROFILES = {
             NINJA_PREFIX="opt",
             VARIANT_DIR="opt",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN:
@@ -307,6 +372,28 @@ MACOS_BUILD_PROFILES = {
             NINJA_PREFIX="compiledb",
             VARIANT_DIR="compiledb",
             disable_warnings_as_errors=['source'],
+            release="off",
+            jlink=0.99,
+        ),
+    # These options were the default settings before implementing build profiles.
+    BuildProfileType.RELEASE:
+        BuildProfile(
+            ninja="enabled",
+            variables_files=[
+                './etc/scons/xcode_macosx.vars',
+            ],
+            allocator="auto",
+            sanitize=None,
+            link_model="static",
+            dbg="off",
+            opt="on",
+            ICECC=None,
+            CCACHE=None,
+            NINJA_PREFIX="release",
+            VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+            disable_warnings_as_errors=[],
+            release="on",
+            jlink=0.01,
         ),
 }
 
@@ -326,6 +413,8 @@ MACOS_ARM_BUILD_PROFILES = {
             NINJA_PREFIX="build",
             VARIANT_DIR=mongo_generators.default_variant_dir_generator,
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & fast build time at the cost of debuggability.
     BuildProfileType.FAST:
@@ -345,6 +434,8 @@ MACOS_ARM_BUILD_PROFILES = {
             NINJA_PREFIX="fast",
             VARIANT_DIR="fast",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build has fast runtime speed & debuggability at the cost of build time.
     BuildProfileType.OPT:
@@ -364,6 +455,8 @@ MACOS_ARM_BUILD_PROFILES = {
             NINJA_PREFIX="opt",
             VARIANT_DIR="opt",
             disable_warnings_as_errors=[],
+            release="off",
+            jlink=0.99,
         ),
     # This build leverages santizers & is the suggested build profile to use for development.
     BuildProfileType.SAN:
@@ -387,5 +480,27 @@ MACOS_ARM_BUILD_PROFILES = {
             NINJA_PREFIX="compiledb",
             VARIANT_DIR="compiledb",
             disable_warnings_as_errors=['source'],
+            release="off",
+            jlink=0.99,
+        ),
+    # These options were the default settings before implementing build profiles.
+    BuildProfileType.RELEASE:
+        BuildProfile(
+            ninja="enabled",
+            variables_files=[
+                './etc/scons/xcode_macosx_arm.vars',
+            ],
+            allocator="auto",
+            sanitize=None,
+            link_model="static",
+            dbg="off",
+            opt="on",
+            ICECC=None,
+            CCACHE=None,
+            NINJA_PREFIX="release",
+            VARIANT_DIR=mongo_generators.default_variant_dir_generator,
+            disable_warnings_as_errors=[],
+            release="on",
+            jlink=0.01,
         ),
 }

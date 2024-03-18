@@ -567,14 +567,14 @@ class NinjaState:
                 "description": "Linked $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
-                "pool": "local_pool",
+                "pool": "link_pool",
             },
             "LINK_CHAINED_CMD": {
                 "command": "$env$LINK @$out.rsp && $cmd",
                 "description": "Linked $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
-                "pool": "local_pool",
+                "pool": "link_pool",
             },
             "AR": {
                 "command": "$env$AR @$out.rsp",
@@ -734,6 +734,9 @@ class NinjaState:
         ninja.variable("ninja_required_version", "1.10")
         ninja.variable("builddir", get_path(self.env['NINJA_BUILDDIR']))
         ninja.variable("artifact_dir", self.env.Dir('$BUILD_DIR'))
+
+        link_jobs = self.env.get('NINJA_LINK_JOBS', self.env.GetOption("num_jobs"))
+        self.pools.update({"link_pool": link_jobs})
 
         for pool_name, size in self.pools.items():
             ninja.pool(pool_name, min(self.env.get('NINJA_MAX_JOBS', size), size))
