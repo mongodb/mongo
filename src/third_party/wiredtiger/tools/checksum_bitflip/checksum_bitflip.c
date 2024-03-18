@@ -81,6 +81,7 @@ main(int argc, char *argv[])
 
     io_bytes = read(fd, buffer, size);
     testutil_assert(io_bytes == (ssize_t)size);
+    testutil_check(close(fd));
 
     /* See if the checksum matches the file contents. */
     if (__wt_checksum_sw(buffer, size) == cksum_target) {
