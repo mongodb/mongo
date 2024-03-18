@@ -112,7 +112,7 @@ public:
         return result.obj();
     }
 };
-auto& security = *ServerStatusSectionBuilder<Security>("security");
+auto& security = *ServerStatusSectionBuilder<Security>("security").forShard().forRouter();
 
 #ifdef MONGO_CONFIG_SSL
 /**
@@ -142,7 +142,8 @@ public:
         return builder.obj();
     }
 };
-auto& tlsVersionStatus = *ServerStatusSectionBuilder<TLSVersionStatus>("transportSecurity");
+auto& tlsVersionStatus =
+    *ServerStatusSectionBuilder<TLSVersionStatus>("transportSecurity").forShard().forRouter();
 #endif
 
 class AdvisoryHostFQDNs final : public ServerStatusSection {

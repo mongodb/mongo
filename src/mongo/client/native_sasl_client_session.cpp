@@ -100,7 +100,8 @@ public:
     }
 };
 
-auto& scramCacheSection = *ServerStatusSectionBuilder<ScramCacheStatsStatusSection>("scramCache");
+auto& scramCacheSection =
+    *ServerStatusSectionBuilder<ScramCacheStatsStatusSection>("scramCache").forShard().forRouter();
 
 }  // namespace
 
