@@ -698,30 +698,6 @@ MigrateInfosWithReason BalancerPolicy::balance(
     return std::make_pair(std::move(migrations), firstReason);
 }
 
-boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
-    const ChunkType& chunk,
-    const ShardStatisticsVector& shardStats,
-    const DistributionStatus& distribution,
-    const CollectionDataSizeInfoForBalancing& collDataSizeInfo) {
-    const auto& zone = distribution.getZoneInfo().getZoneForRange(chunk.getRange());
-
-    stdx::unordered_set<ShardId> availableShards;
-    std::transform(shardStats.begin(),
-                   shardStats.end(),
-                   std::inserter(availableShards, availableShards.end()),
-                   [](const ClusterStatistics::ShardStatistics& shardStatistics) -> ShardId {
-                       return shardStatistics.shardId;
-                   });
-
-    const auto [newShardId, _] = _getLeastLoadedReceiverShard(
-        shardStats, collDataSizeInfo, zone, stdx::unordered_set<ShardId>());
-    if (!newShardId.isValid() || newShardId == chunk.getShard()) {
-        return boost::optional<MigrateInfo>();
-    }
-
-    return MigrateInfo(newShardId, distribution.nss(), chunk, ForceJumbo::kDoNotForce);
-}
-
 bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
     const ShardStatisticsVector& shardStats,
     const DistributionStatus& distribution,

@@ -573,36 +573,6 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicy::selectChunksToM
     return candidatesStatus;
 }
 
-StatusWith<boost::optional<MigrateInfo>> BalancerChunkSelectionPolicy::selectSpecificChunkToMove(
-    OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) {
-    auto shardStatsStatus = _clusterStats->getStats(opCtx);
-    if (!shardStatsStatus.isOK()) {
-        return shardStatsStatus.getStatus();
-    }
-
-    const auto& shardStats = shardStatsStatus.getValue();
-
-    auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss);
-    if (!routingInfoStatus.isOK()) {
-        return routingInfoStatus.getStatus();
-    }
-
-    const auto& [cm, _] = routingInfoStatus.getValue();
-
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, nss, shardStats, cm);
-    if (!collInfoStatus.isOK()) {
-        return collInfoStatus.getStatus();
-    }
-
-    const DistributionStatus& distribution = collInfoStatus.getValue();
-
-    const auto dataSizeInfo = getDataSizeInfoForCollection(opCtx, nss);
-
-    return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution, dataSizeInfo);
-}
-
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::_getSplitCandidatesForCollection(
     OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
     auto routingInfoStatus =

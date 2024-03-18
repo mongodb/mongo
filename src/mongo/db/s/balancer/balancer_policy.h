@@ -467,16 +467,6 @@ public:
         stdx::unordered_set<ShardId>* availableShards,
         bool forceJumbo);
 
-    /**
-     * Using the specified distribution information, returns a suggested better location for the
-     * specified chunk if one is available.
-     */
-    static boost::optional<MigrateInfo> balanceSingleChunk(
-        const ChunkType& chunk,
-        const ShardStatisticsVector& shardStats,
-        const DistributionStatus& distribution,
-        const CollectionDataSizeInfoForBalancing& collDataSizeInfo);
-
 private:
     /*
      * Only considers shards with the specified zone, all shards in case the zone is empty.

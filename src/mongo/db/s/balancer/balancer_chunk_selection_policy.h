@@ -87,16 +87,6 @@ public:
     StatusWith<MigrateInfosWithReason> selectChunksToMove(OperationContext* opCtx,
                                                           const NamespaceString& ns);
 
-    /**
-     * Requests a single chunk to be relocated to a different shard, if possible. If some error
-     * occurs while trying to determine the best location for the chunk, a failed status is
-     * returned. If the chunk is already at the best shard that it can be, returns `boost::none`.
-     * Otherwise returns migration information for where the chunk should be moved.
-     */
-    StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(OperationContext* opCtx,
-                                                                       const NamespaceString& nss,
-                                                                       const ChunkType& chunk);
-
 private:
     /**
      * Synchronous method, which iterates the collection's chunks and uses the zones information to
