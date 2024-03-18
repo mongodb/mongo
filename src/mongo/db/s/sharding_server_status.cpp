@@ -127,7 +127,8 @@ public:
 private:
     ClusterServerParameterServerStatus _clusterParameterStatus;
 };
-auto& shardingServerStatus = *ServerStatusSectionBuilder<ShardingServerStatus>("sharding");
+auto& shardingServerStatus =
+    *ServerStatusSectionBuilder<ShardingServerStatus>("sharding").forShard();
 
 class ShardingStatisticsServerStatus final : public ServerStatusSection {
 public:
@@ -193,7 +194,7 @@ public:
     }
 };
 auto& shardingStatisticsServerStatus =
-    *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics");
+    *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics").forShard();
 
 }  // namespace
 }  // namespace mongo

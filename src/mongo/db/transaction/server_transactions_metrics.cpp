@@ -213,7 +213,7 @@ public:
         return stats.toBSON();
     }
 };
-auto& transactionsSSS = *ServerStatusSectionBuilder<TransactionsSSS>("transactions");
+auto& transactionsSSS = *ServerStatusSectionBuilder<TransactionsSSS>("transactions").forShard();
 }  // namespace
 
 }  // namespace mongo

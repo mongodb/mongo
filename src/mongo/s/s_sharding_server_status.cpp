@@ -96,7 +96,8 @@ public:
 private:
     ClusterServerParameterServerStatus _clusterParameterStatus;
 };
-auto& shardingServerStatus = *ServerStatusSectionBuilder<ShardingServerStatus>("sharding");
+auto& shardingServerStatus =
+    *ServerStatusSectionBuilder<ShardingServerStatus>("sharding").forRouter();
 
 class ShardingStatisticsServerStatus final : public ServerStatusSection {
 public:
@@ -120,7 +121,7 @@ public:
     }
 };
 auto& shardingStatisitcsServerStatus =
-    *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics");
+    *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics").forRouter();
 
 class HedgingMetricsServerStatus : public ServerStatusSection {
 public:
@@ -138,7 +139,7 @@ public:
     }
 };
 auto& hedgingMetricsServerStatus =
-    *ServerStatusSectionBuilder<HedgingMetricsServerStatus>("hedgingMetrics");
+    *ServerStatusSectionBuilder<HedgingMetricsServerStatus>("hedgingMetrics").forRouter();
 
 }  // namespace
 }  // namespace mongo

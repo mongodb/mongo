@@ -68,6 +68,6 @@ public:
     }
 };
 auto& healthMonitoringServerStatus =
-    *ServerStatusSectionBuilder<HealthMonitoringServerStatus>("health");
+    *ServerStatusSectionBuilder<HealthMonitoringServerStatus>("health").forRouter();
 
 }  // namespace mongo

@@ -54,7 +54,8 @@ public:
         return stats.toBSON();
     }
 };
-auto& routerTransactionsSSS = *ServerStatusSectionBuilder<RouterTransactionsSSS>("transactions");
+auto& routerTransactionsSSS =
+    *ServerStatusSectionBuilder<RouterTransactionsSSS>("transactions").forRouter();
 
 }  // namespace
 }  // namespace mongo
