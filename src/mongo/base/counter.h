@@ -45,12 +45,22 @@ class Counter64 {
 public:
     /** Atomically increment. */
     void increment(uint64_t n = 1) {
-        _counter.addAndFetch(n);
+        _counter.fetchAndAdd(n);
+    }
+
+    /** Atomically increment with a relaxed memory order. */
+    void incrementRelaxed(uint64_t n = 1) {
+        _counter.fetchAndAddRelaxed(n);
     }
 
     /** Atomically decrement. */
     void decrement(uint64_t n = 1) {
-        _counter.subtractAndFetch(n);
+        _counter.fetchAndSubtract(n);
+    }
+
+    /** Atomically decrement with a relaxed memory order. */
+    void decrementRelaxed(uint64_t n = 1) {
+        _counter.fetchAndSubtractRelaxed(n);
     }
 
     /** Return the current value */
