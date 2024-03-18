@@ -538,6 +538,8 @@ static void
 cursor_statistics(WT_SESSION *session)
 {
     WT_CURSOR *cursor;
+    uint64_t stat_value;
+    int ret, stat_key;
 
     /*! [Statistics cursor database] */
     error_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
@@ -565,6 +567,18 @@ cursor_statistics(WT_SESSION *session)
     /*! [Statistics cursor session] */
     error_check(session->open_cursor(session, "statistics:session", NULL, NULL, &cursor));
     /*! [Statistics cursor session] */
+
+    /*! [Statistics cursor ignore column] */
+    error_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        error_check(cursor->get_key(cursor, &stat_key));
+
+        /* Ignore the first two columns, only retrieve the statistics value. */
+        error_check(cursor->get_value(cursor, NULL, NULL, &stat_value));
+    }
+    scan_end_check(ret == WT_NOTFOUND);
+    error_check(cursor->close(cursor));
+    /*! [Statistics cursor ignore column] */
 }
 
 static void

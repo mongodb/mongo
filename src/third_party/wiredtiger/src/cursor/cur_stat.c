@@ -95,6 +95,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
     WT_ERR(cst->stats_desc(cst, WT_STAT_KEY_OFFSET(cst), &desc));
     if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+        /* The printed value is currently null. Create it now, it's needed for the packed result. */
+        WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
         WT_ERR(__wt_struct_size(session, &size, cursor->value_format, desc, cst->pv.data, cst->v));
         WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
         WT_ERR(__wt_struct_pack(
@@ -113,8 +115,11 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
         va_start(ap, cursor);
         if ((p = va_arg(ap, const char **)) != NULL)
             *p = desc;
-        if ((p = va_arg(ap, const char **)) != NULL)
+        if ((p = va_arg(ap, const char **)) != NULL) {
+            /* Create the printed value only when needed. */
+            WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
             *p = cst->pv.data;
+        }
         if ((v = va_arg(ap, uint64_t *)) != NULL)
             *v = cst->v;
         va_end(ap);
@@ -211,7 +216,6 @@ __curstat_next(WT_CURSOR *cursor)
         WT_ERR(WT_NOTFOUND);
 
     cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
-    WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
     F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
     if (0) {
@@ -255,7 +259,6 @@ __curstat_prev(WT_CURSOR *cursor)
         WT_ERR(WT_NOTFOUND);
 
     cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
-    WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
     F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
     if (0) {
@@ -317,7 +320,6 @@ __curstat_search(WT_CURSOR *cursor)
         WT_ERR(WT_NOTFOUND);
 
     cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
-    WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
     F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:

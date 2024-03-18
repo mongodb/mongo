@@ -96,6 +96,11 @@ A reset call on this cursor would reset the session statistics values to zero,
 with or without the statistics configuration \c clear being specified to the
 WT_SESSION::open_cursor method.
 
+The following example shows that the application can indicate columns
+that will not be needed:
+
+@snippet ex_all.c Statistics cursor ignore column
+
 @section statistics_log Statistics logging
 
 WiredTiger will optionally log database statistics into files when the
