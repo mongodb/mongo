@@ -2,8 +2,13 @@
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
  */
 import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    checkSbeFullyEnabled,
+    checkSbeRestrictedOrFullyEnabled
+} from "jstests/libs/sbe_util.js";
 
+const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
 
@@ -91,8 +96,11 @@ pipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-if (isSbeEnabled) {
+if (isFeatureFlagSbeFullEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"]);
+} else if (isSbeEnabled) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
@@ -110,11 +118,16 @@ pipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-if (isSbeEnabled) {
+if (isFeatureFlagSbeFullEnabled) {
     checkResults(
         pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
     checkResults(
         pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
+} else if (isSbeEnabled) {
+    checkResults(
+        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$limit"]);
+    checkResults(
+        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$limit"]);
@@ -132,8 +145,12 @@ pipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-if (isSbeEnabled) {
+
+if (isFeatureFlagSbeFullEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "SORT", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"]);
+} else if (isSbeEnabled) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
@@ -152,12 +169,19 @@ pipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-if (isSbeEnabled) {
+if (isFeatureFlagSbeFullEnabled) {
     checkResults(pipeline,
                  false,
                  ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "SORT", "LIMIT"]);
     checkResults(
         pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "UNWIND", "LIMIT"]);
+} else if (isSbeEnabled) {
+    checkResults(pipeline,
+                 false,
+                 ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline,
+                 true,
+                 ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "$unwind", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(
         pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$sort", "$limit"]);

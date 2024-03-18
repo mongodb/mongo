@@ -8,6 +8,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Constants representing different states of SBE enablement.
 export const kSbeFullyEnabled = "sbeFull";
+export const kFeatureFlagSbeFullEnabled = "featureFlagSbeFull";
 export const kSbeRestricted = "sbeRestricted";
 export const kSbeDisabled = "sbeDisabled";
 
@@ -73,7 +74,7 @@ export function checkSbeStatus(theDB) {
         } else if (getParam.internalQueryFrameworkControl === "forceClassicEngine") {
             return kSbeDisabled;
         } else if (FeatureFlagUtil.isPresentAndEnabled(conn, "SbeFull")) {
-            return kSbeFullyEnabled;
+            return kFeatureFlagSbeFullEnabled;
         } else if (getParam.internalQueryFrameworkControl === "trySbeRestricted" ||
                    getParam.internalQueryFrameworkControl === "tryBonsai" ||
                    getParam.internalQueryFrameworkControl === "tryBonsaiExperimental") {
@@ -86,10 +87,19 @@ export function checkSbeStatus(theDB) {
 }
 
 /**
- * Check if SBE is fully enabled in the cluster.
+ * Check if featureFlagSbeFull is enabled in the cluster.
+ */
+export function checkSbeFullFeatureFlagEnabled(theDB) {
+    return checkSbeStatus(theDB) === kFeatureFlagSbeFullEnabled;
+}
+
+/**
+ * Check if SBE is fully enabled in the cluster. This implies that either 'featureFlagSbeFull' is
+ * enabled, or the internalQueryFrameworkControl knob is set to 'trySbeEngine'.
  */
 export function checkSbeFullyEnabled(theDB) {
-    return checkSbeStatus(theDB) === kSbeFullyEnabled;
+    const status = checkSbeStatus(theDB);
+    return status === kSbeFullyEnabled || status === kFeatureFlagSbeFullEnabled;
 }
 
 /**
@@ -98,7 +108,8 @@ export function checkSbeFullyEnabled(theDB) {
  */
 export function checkSbeRestrictedOrFullyEnabled(theDB) {
     const status = checkSbeStatus(theDB);
-    return status === kSbeRestricted || status === kSbeFullyEnabled;
+    return status === kSbeRestricted || status === kSbeFullyEnabled ||
+        status == kFeatureFlagSbeFullEnabled;
 }
 
 /**

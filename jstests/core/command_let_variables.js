@@ -12,7 +12,7 @@ import {
     planHasStage
 } from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;
@@ -98,7 +98,7 @@ let explain = assert.commandWorked(testDB.runCommand({
 
 // TODO SERVER-77719: Extend the testing for unwind operator to CQF optimizer.
 if (!isMongos && getOptimizer(explain) == "classic") {
-    if (checkSbeFullyEnabled(testDB)) {
+    if (checkSbeFullFeatureFlagEnabled(testDB)) {
         // $unwind should be pushed down to SBE.
         assert(planHasStage(testDB, explain, "UNWIND"), explain);
     } else {
