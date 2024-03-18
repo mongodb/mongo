@@ -1165,6 +1165,37 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
     o(lk).atClusterTimeForSnapshotReadConcern.emplace();
 }
 
+void TransactionRouter::Router::setAtClusterTimeForStartOrContinue(OperationContext* opCtx) {
+    if (o().atClusterTimeForSnapshotReadConcern) {
+        if (o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            auto candidateTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+            uassert(
+                8676400, "Missing atClusterTime in readConcernArgs", candidateTime != boost::none);
+            setAtClusterTime(_sessionId(),
+                             o(lk).txnNumberAndRetryCounter,
+                             p().latestStmtId,
+                             o(lk).atClusterTimeForSnapshotReadConcern.get_ptr(),
+                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             candidateTime.value());
+        }
+    } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
+        if (o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId)) {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            auto candidateTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
+            uassert(8676401,
+                    "Missing afterClusterTime in readConcernArgs",
+                    candidateTime != boost::none);
+            setAtClusterTime(_sessionId(),
+                             o(lk).txnNumberAndRetryCounter,
+                             p().latestStmtId,
+                             o(lk).placementConflictTimeForNonSnapshotReadConcern.get_ptr(),
+                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             candidateTime.value());
+        }
+    }
+}
+
 void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx) {
     const auto defaultTime = VectorClock::get(opCtx)->getTime();
 
@@ -1258,16 +1289,23 @@ void TransactionRouter::Router::_beginTxn(OperationContext* opCtx,
               o().txnNumberAndRetryCounter.getTxnNumber());
 
     switch (action) {
-        case TransactionActions::kStartOrContinue:
+        case TransactionActions::kStartOrContinue: {
+            if (repl::ReadConcernArgs::get(opCtx).isEmpty()) {
+                uasserted(ErrorCodes::IllegalOperation,
+                          str::stream()
+                              << "readConcern must be present when beginning a transaction with a "
+                                 "sub-router");
+            }
+            _resetRouterStateForStartTransaction(opCtx, txnNumberAndRetryCounter);
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                o(lk).subRouter = true;
+            }
+            setAtClusterTimeForStartOrContinue(opCtx);
+            break;
+        }
         case TransactionActions::kStart: {
             _resetRouterStateForStartTransaction(opCtx, txnNumberAndRetryCounter);
-            if (action == TransactionActions::kStartOrContinue) {
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    o(lk).subRouter = true;
-                }
-                setDefaultAtClusterTime(opCtx);
-            }
             break;
         }
         case TransactionActions::kContinue: {

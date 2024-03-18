@@ -821,7 +821,8 @@ bool TransactionParticipant::Participant::_shouldRestartTransactionOnReuseActive
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Only servers in a sharded cluster can start a new transaction at the active "
                 "transaction number",
-                action != TransactionActions::kStart);
+                action != TransactionActions::kStart &&
+                    action != TransactionActions::kStartOrContinue);
 
         return false;
     }
@@ -967,9 +968,7 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
 
     // A shard acting as a transaction router will generally include readConcern in the request, as
     // the shard cannot know whether this shard is already a participant in the transaction. The
-    // readConcern sent must match the readConcern this shard has for the transaction. A shard will
-    // not generally send readConcern with getMores, as it's guaranteed the shard already started
-    // the transaction on the cursor-opening request.
+    // readConcern sent must match the readConcern this shard has for the transaction.
     if (action == TransactionParticipant::TransactionActions::kStartOrContinue &&
         o().txnResourceStash) {
         uassert(ErrorCodes::IllegalOperation,

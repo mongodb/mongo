@@ -1003,13 +1003,18 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             }
         }
 
+        if (opCtx->isStartingMultiDocumentTransaction()) {
+            execContext.behaviors.waitForReadConcern(
+                opCtx, _ecd->getInvocation(), execContext.getRequest());
+        }
+
         // Release the transaction lock resources and abort storage transaction for unprepared
-        // transactions on failure to unstash the transaction resources to opCtx. We don't want to
-        // have this error guard for beginOrContinue as it can abort the transaction for any
+        // transactions on failure to unstash the transaction resources to opCtx. We don't want
+        // to have this error guard for beginOrContinue as it can abort the transaction for any
         // accidental invalid statements in the transaction.
         //
-        // Unstashing resources can't yield the session so it's safe to capture a reference to the
-        // TransactionParticipant in this scope guard.
+        // Unstashing resources can't yield the session so it's safe to capture a reference to
+        // the TransactionParticipant in this scope guard.
         ScopeGuard abortOnError([&] {
             if (txnParticipant.transactionIsInProgress()) {
                 txnParticipant.abortTransaction(opCtx);
@@ -1935,7 +1940,12 @@ void ExecCommandDatabase::_commandExec() {
     auto opCtx = _execContext.getOpCtx();
     auto& request = _execContext.getRequest();
 
-    _execContext.behaviors.waitForReadConcern(opCtx, getInvocation(), request);
+    // If this command should start a new transaction, waitForReadConcern will be invoked
+    // after invoking the TransactionParticipant, which will determine whether a transaction
+    // is being started or continued.
+    if (!opCtx->inMultiDocumentTransaction()) {
+        _execContext.behaviors.waitForReadConcern(opCtx, getInvocation(), request);
+    }
     _execContext.behaviors.setPrepareConflictBehaviorForReadConcern(opCtx, getInvocation());
 
     _execContext.getReplyBuilder()->reset();

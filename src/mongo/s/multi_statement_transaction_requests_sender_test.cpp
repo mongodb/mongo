@@ -191,7 +191,20 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfSubTx
     operationContext()->setTxnNumber(TxnNumber(0));
     operationContext()->setInMultiDocumentTransaction();
     operationContext()->setActiveTransactionParticipant();
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                << LogicalTime(Timestamp(1, 0)).asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
     RouterOperationContextSession rocs(operationContext());
+    TransactionRouter::get(operationContext())
+        .beginOrContinueTxn(operationContext(),
+                            TxnNumber(0),
+                            TransactionRouter::TransactionActions::kStartOrContinue);
 
     auto cmdName = "find";
     std::vector<AsyncRequestsSender::Request> requests{{_remoteShardId,

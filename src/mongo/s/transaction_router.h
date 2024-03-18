@@ -501,6 +501,12 @@ public:
         void setDefaultAtClusterTime(OperationContext* opCtx);
 
         /**
+         * Sets the atClusterTime for starting a transaction in a sub-router using opCtx
+         * atClusterTime. This should only be called when the TransactionAction is kStartOrContinue.
+         */
+        void setAtClusterTimeForStartOrContinue(OperationContext* opCtx);
+
+        /**
          * If the transaction has specified a placementConflictTime returns the value, otherwise
          * returns boost::none.
          */

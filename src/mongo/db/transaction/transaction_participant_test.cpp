@@ -544,37 +544,6 @@ TEST_F(TxnParticipantTest, IsStartingMultiDocumentTransactionSetCorrectly) {
     runFunctionFromDifferentOpCtx(continueTxn);
 }
 
-TEST_F(TxnParticipantTest, IsStartingMultiDocumentTransactionSetCorrectlyUsingStartOrContinue) {
-    auto sessionCheckout =
-        checkOutSession(TransactionParticipant::TransactionActions::kStartOrContinue);
-    ASSERT(TransactionParticipant::get(opCtx()));
-    ASSERT(opCtx()->isStartingMultiDocumentTransaction());
-    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
-
-    // Now swap out the opCtx to represent a new op coming in to continue the transaction
-    auto continueTxn = [&](OperationContext* newOpCtx) {
-        newOpCtx->setLogicalSessionId(*opCtx()->getLogicalSessionId());
-        newOpCtx->setTxnNumber(*opCtx()->getTxnNumber());
-        newOpCtx->setInMultiDocumentTransaction();
-
-        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
-        auto newOpCtxSession = mongoDSessionCatalog->checkOutSession(newOpCtx);
-        auto txnParticipant = TransactionParticipant::get(newOpCtx);
-
-        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
-        txnParticipant.stashTransactionResources(newOpCtx);
-
-        txnParticipant.beginOrContinue(
-            newOpCtx,
-            {*newOpCtx->getTxnNumber()},
-            false /* autocommit */,
-            TransactionParticipant::TransactionActions::kStartOrContinue);
-        ASSERT(!newOpCtx->isStartingMultiDocumentTransaction());
-    };
-
-    runFunctionFromDifferentOpCtx(continueTxn);
-}
-
 // Test that transaction lock acquisition times out in `maxTransactionLockRequestTimeoutMillis`
 // milliseconds.
 TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
@@ -2168,6 +2137,38 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
     }
 }
 
+TEST_F(ShardTxnParticipantTest,
+       IsStartingMultiDocumentTransactionSetCorrectlyUsingStartOrContinue) {
+    auto sessionCheckout =
+        checkOutSession(TransactionParticipant::TransactionActions::kStartOrContinue);
+    ASSERT(TransactionParticipant::get(opCtx()));
+    ASSERT(opCtx()->isStartingMultiDocumentTransaction());
+    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+
+    // Now swap out the opCtx to represent a new op coming in to continue the transaction
+    auto continueTxn = [&](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(*opCtx()->getLogicalSessionId());
+        newOpCtx->setTxnNumber(*opCtx()->getTxnNumber());
+        newOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto newOpCtxSession = mongoDSessionCatalog->checkOutSession(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+        txnParticipant.stashTransactionResources(newOpCtx);
+
+        txnParticipant.beginOrContinue(
+            newOpCtx,
+            {*newOpCtx->getTxnNumber()},
+            false /* autocommit */,
+            TransactionParticipant::TransactionActions::kStartOrContinue);
+        ASSERT(!newOpCtx->isStartingMultiDocumentTransaction());
+    };
+
+    runFunctionFromDifferentOpCtx(continueTxn);
+}
+
 TEST_F(TxnParticipantTest, StartOrContinueTxnWithGreaterTxnNumShouldStartTxn) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -2201,7 +2202,7 @@ TEST_F(TxnParticipantTest, StartOrContinueTxnWithLesserTxnNumShouldError) {
                        ErrorCodes::TransactionTooOld);
 }
 
-TEST_F(TxnParticipantTest, StartOrContinueTxnWithEqualTxnNumsShouldContinue) {
+TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithEqualTxnNumsShouldContinue) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
@@ -2610,7 +2611,6 @@ TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithMatchingReadConcernShouldC
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
 }
 
-
 TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithDifferentReadConcernShouldError) {
     repl::ReadConcernArgs originalReadConcernArgs;
     ASSERT_OK(originalReadConcernArgs.initialize(
@@ -2658,6 +2658,35 @@ TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithDifferentReadConcernShould
                            TransactionParticipant::TransactionActions::kStartOrContinue),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
+}
+
+TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithEmptyReadConcernShouldContinue) {
+    repl::ReadConcernArgs originalReadConcernArgs;
+    ASSERT_OK(originalReadConcernArgs.initialize(BSON("find"
+                                                      << "test")));
+    repl::ReadConcernArgs::get(opCtx()) = originalReadConcernArgs;
+
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsInProgress());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    // Stash the resources to mimic that an op with readConern has already executed.
+    txnParticipant.stashTransactionResources(opCtx());
+
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getLevel(),
+              originalReadConcernArgs.getLevel());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getArgsAtClusterTime(),
+              originalReadConcernArgs.getArgsAtClusterTime());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getArgsAfterClusterTime(),
+              originalReadConcernArgs.getArgsAfterClusterTime());
+
+    // Assert that continuing the transaction succeeds because the opCtx readConcern is empty.
+    ASSERT_DOES_NOT_THROW(txnParticipant.beginOrContinue(
+        opCtx(),
+        {*opCtx()->getTxnNumber()},
+        false /* autocommit */,
+        TransactionParticipant::TransactionActions::kStartOrContinue));
 }
 
 /**
