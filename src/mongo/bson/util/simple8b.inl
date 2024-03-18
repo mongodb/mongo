@@ -440,8 +440,13 @@ struct ExtendedDecoder {
             if ((encoded & mask) != mask) {
                 uint64_t count = encoded & countMask;
                 make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+                auto numZeroes = count * countScale;
+                // UBSAN will complain if shift values are greater than bit length
+                if constexpr (std::is_same<make_unsigned_t<T>, uint64_t>::value) {
+                    numZeroes %= 64;
+                }
 
-                visit(Simple8bTypeUtil::decodeInt(value << (count * countScale)));
+                visit(Simple8bTypeUtil::decodeInt(value << numZeroes));
             } else {
                 visitMissing();
             }
@@ -458,8 +463,13 @@ struct ExtendedDecoder {
             if ((encoded & mask) != mask) {
                 uint64_t count = encoded & countMask;
                 make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+                auto numZeroes = count * countScale;
+                // UBSAN will complain if shift values are greater than bit length
+                if constexpr (std::is_same<make_unsigned_t<T>, uint64_t>::value) {
+                    numZeroes %= 64;
+                }
 
-                decoded = add(decoded, Simple8bTypeUtil::decodeInt(value << (count * countScale)));
+                decoded = add(decoded, Simple8bTypeUtil::decodeInt(value << numZeroes));
             }
 
             encoded >>= bits;
@@ -475,8 +485,13 @@ struct ExtendedDecoder {
             if ((encoded & mask) != mask) {
                 uint64_t count = encoded & countMask;
                 make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+                auto numZeroes = count * countScale;
+                // UBSAN will complain if shift values are greater than bit length
+                if constexpr (std::is_same<make_unsigned_t<T>, uint64_t>::value) {
+                    numZeroes %= 64;
+                }
 
-                prefix = add(prefix, Simple8bTypeUtil::decodeInt(value << (count * countScale)));
+                prefix = add(prefix, Simple8bTypeUtil::decodeInt(value << numZeroes));
                 decoded = add(decoded, prefix);
             }
 
@@ -494,8 +509,13 @@ struct ExtendedDecoder {
 
         uint64_t count = encoded & countMask;
         make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+        auto numZeroes = count * countScale;
+        // UBSAN will complain if shift values are greater than bit length
+        if constexpr (std::is_same<make_unsigned_t<T>, uint64_t>::value) {
+            numZeroes %= 64;
+        }
 
-        return Simple8bTypeUtil::decodeInt(value << (count * countScale));
+        return Simple8bTypeUtil::decodeInt(value << numZeroes);
     }
 
     // Returns value of last slot. 'kMissing' is returned for missing.
@@ -507,8 +527,13 @@ struct ExtendedDecoder {
 
         uint64_t count = encoded & countMask;
         make_unsigned_t<T> value = (encoded >> countBits) & valueMask;
+        auto numZeroes = count * countScale;
+        // UBSAN will complain if shift values are greater than bit length
+        if constexpr (std::is_same<make_unsigned_t<T>, uint64_t>::value) {
+            numZeroes %= 64;
+        }
 
-        return Simple8bTypeUtil::decodeInt(value << (count * countScale));
+        return Simple8bTypeUtil::decodeInt(value << numZeroes);
     }
 };
 
