@@ -177,12 +177,8 @@ public:
                     bool isTrackUnshardedUponCreationDisabled =
                         !feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
                             (*optFixedFcvRegion)->acquireFCVSnapshot());
-                    if (isTrackUnshardedUponCreationDisabled) {
-                        auto cmd = create_collection_util::makeCreateCommand(
-                            opCtx, ns(), request().getShardsvrCreateCollectionRequest());
-                        runCreateCommandDirectClient(opCtx, ns(), cmd);
-                        return CreateCollectionResponse{ShardVersion::UNSHARDED()};
-                    } else if (isAlwaysUntracked(opCtx, ns(), request())) {
+                    if (isTrackUnshardedUponCreationDisabled ||
+                        isAlwaysUntracked(opCtx, ns(), request())) {
                         // Acquire the DDL lock to serialize with other DDL operations.
                         // A parallel coordinator for an unsplittable collection will attempt to
                         // access the collection outside of the critical section on the local

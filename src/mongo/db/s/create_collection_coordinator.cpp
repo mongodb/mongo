@@ -1143,7 +1143,7 @@ boost::optional<UUID> createCollectionAndIndexes(
         allowCollectionCreation;
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (!fcvSnapshot.isVersionInitialized() ||
-        feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot)) {
+        feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot)) {
         allowCollectionCreation.emplace(opCtx);
     }
 

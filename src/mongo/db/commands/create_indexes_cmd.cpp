@@ -418,7 +418,7 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
             allowCollectionCreation;
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         if (!fcvSnapshot.isVersionInitialized() ||
-            !feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(fcvSnapshot) ||
+            !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
             !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
             opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite()) {
             allowCollectionCreation.emplace(opCtx);

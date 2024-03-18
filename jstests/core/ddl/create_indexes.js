@@ -48,7 +48,7 @@ const checkImplicitCreate = function(admin, createIndexResult) {
     const isMultiversion = jsTest.options().shardMixedBinVersions ||
         jsTest.options().useRandomBinVersionsWithinReplicaSet;
     if (!isMultiversion &&
-        !FeatureFlagUtil.isPresentAndEnabled(admin, "TrackUnshardedCollectionsUponCreation")) {
+        !FeatureFlagUtil.isPresentAndEnabled(admin, "80CollectionCreationPath")) {
         assert.eq(true, createIndexResult.createdCollectionAutomatically);
     }
 };
