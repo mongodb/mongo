@@ -589,10 +589,9 @@ Status validate(OperationContext* opCtx,
         invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
     }
 
-    // TODO SERVER-86914: Enable pre-fetching.
     if (gFeatureFlagPrefetch.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(false);
+        shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(true);
     }
 
     Status status = validateState.initializeCollection(opCtx);

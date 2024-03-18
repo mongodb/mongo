@@ -1985,6 +1985,13 @@ standalone nodes by passing `{ repair: true }` to the validate command.
 
 See [RepairMode](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/catalog/collection_validation.h#L71).
 
+## Pre-fetching
+
+Pre-fetching is an optimisation feature used in validate. When a page has been read from disk, prefetch workers pre-emptively
+read neighbouring leaf pages into the cache in an attempt to avoid waiting on I/O.
+
+It is currently enabled by default across all variants. See PM-3292 for more details.
+
 # Fast Truncation on Internal Collections
 
 Logical deletes aren't always performant enough to keep up with inserts. To solve this, several internal collections use `CollectionTruncateMarkers` for fast, unreplicated and untimestamped [truncation](http://source.wiredtiger.com/1.4.2/classwiredtiger_1_1_session.html#a80a9ee8697a61a1ad13d893d67d981bb) of expired data, in lieu of logical document deletions.

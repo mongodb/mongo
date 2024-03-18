@@ -950,7 +950,15 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = ru.getSessionCache()->conn();
     WT_SESSION* session;
-    invariantWTOK(conn->open_session(conn, &eventHandler, nullptr, &session), nullptr);
+
+    if (gFeatureFlagPrefetch.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        invariantWTOK(conn->open_session(conn, &eventHandler, "prefetch=(enabled=true)", &session),
+                      nullptr);
+    } else {
+        invariantWTOK(conn->open_session(conn, &eventHandler, nullptr, &session), nullptr);
+    }
+
     ON_BLOCK_EXIT([&] { session->close(session, ""); });
 
     // Do the verify. Weird parens prevent treating "verify" as a macro.
