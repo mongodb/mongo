@@ -14,15 +14,19 @@
 // ]
 //
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
-const qsutils = new QuerySettingsUtils(db, coll.getName());
-const qstests = new QuerySettingsIndexHintsTests(qsutils);
+const viewName = "identityView";
+assertDropCollection(db, viewName);
+assert.commandWorked(db.createView(viewName, coll.getName(), []));
 const ns = {
     db: db.getName(),
     coll: coll.getName()
@@ -37,16 +41,20 @@ assert.commandWorked(coll.insertMany([
     {a: 5, b: 1},
 ]));
 
-// Ensure that query settings cluster parameter is empty.
-qsutils.assertQueryShapeConfiguration([]);
-
 function setIndexes(coll, indexList) {
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.createIndexes(indexList));
 }
 
-(function testFindQuerySettingsApplication() {
+function testFindQuerySettingsApplication(collOrViewName) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
     setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+
+    // Ensure that query settings cluster parameter is empty.
+    qsutils.assertQueryShapeConfiguration([]);
+
     const querySettingsFindQuery = qsutils.makeFindQueryInstance({
         filter: {a: 1, b: 1},
         // The skip-clause is a part of the query shape, however, it is not propagated to the shards
@@ -61,4 +69,7 @@ function setIndexes(coll, indexList) {
     // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
     // qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsCommandValidation(querySettingsFindQuery, ns);
-})();
+}
+
+testFindQuerySettingsApplication(coll.getName());
+testFindQuerySettingsApplication(viewName);

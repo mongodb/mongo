@@ -20,23 +20,30 @@
 // ]
 //
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
+const viewName = "identityView";
+assertDropCollection(db, viewName);
+assert.commandWorked(db.createView(viewName, coll.getName(), []));
 const mainNs = {
     db: db.getName(),
     coll: coll.getName()
 };
 const secondaryColl = assertDropAndRecreateCollection(db, "secondary");
+const secondaryViewName = "secondaryIdentityView";
+assertDropCollection(db, secondaryViewName);
+assert.commandWorked(db.createView(secondaryViewName, secondaryColl.getName(), []));
 const secondaryNs = {
     db: db.getName(),
     coll: secondaryColl.getName()
 };
-const qsutils = new QuerySettingsUtils(db, coll.getName());
-const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
 // Insert data into the collection.
 assert.commandWorked(coll.insertMany([
@@ -53,17 +60,20 @@ assert.commandWorked(secondaryColl.insertMany([
     {a: 3, b: 1},
 ]));
 
-// Ensure that query settings cluster parameter is empty.
-qsutils.assertQueryShapeConfiguration([]);
-
 function setIndexes(coll, indexList) {
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.createIndexes(indexList));
 }
-setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
-setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
-(function testAggregateQuerySettingsApplicationWithoutSecondaryCollections() {
+function testAggregateQuerySettingsApplicationWithoutSecondaryCollections(collOrViewName) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+
+    // Ensure that query settings cluster parameter is empty.
+    qsutils.assertQueryShapeConfiguration([]);
+
     const aggregateCmd = qsutils.makeAggregateQueryInstance({
         pipeline: [{$match: {a: 1, b: 5}}],
         cursor: {},
@@ -73,15 +83,26 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
     // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
     // qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
-})();
+}
 
-(function testAggregateQuerySettingsApplicationWithLookupEquiJoin() {
+function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
+    collOrViewName, secondaryCollOrViewName, isSecondaryCollAView) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
+    // Set indexes on both collections.
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+
+    // Ensure that query settings cluster parameter is empty.
+    qsutils.assertQueryShapeConfiguration([]);
+
     const aggregateCmd = qsutils.makeAggregateQueryInstance({
     pipeline: [
       { $match: { a: 1, b: 5 } },
       {
         $lookup:
-          { from: secondaryColl.getName(), localField: "a", foreignField: "a", as: "output" }
+          { from: secondaryCollOrViewName, localField: "a", foreignField: "a", as: "output" }
       }
     ],
     cursor: {},
@@ -89,12 +110,14 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
-    qstests.assertQuerySettingsLookupJoinIndexApplication(aggregateCmd, secondaryNs);
-    qstests.assertQuerySettingsIndexAndLookupJoinApplications(aggregateCmd, mainNs, secondaryNs);
+    qstests.assertQuerySettingsLookupJoinIndexApplication(
+        aggregateCmd, secondaryNs, isSecondaryCollAView);
+    qstests.assertQuerySettingsIndexAndLookupJoinApplications(
+        aggregateCmd, mainNs, secondaryNs, isSecondaryCollAView);
 
-    // Ensure query settings ignore cursor hints when being set on main or secondary collection.
+    // Ensure query settings ignore cursor hints when being set on main collection.
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
-    if (checkSbeRestrictedOrFullyEnabled(db)) {
+    if (checkSbeRestrictedOrFullyEnabled(db) && !isSecondaryCollAView) {
         // The aggregation stage will get pushed down to SBE, and index hints will get applied to
         // secondary collections. This prevents cursor hints from also being applied.
         qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, secondaryNs);
@@ -115,16 +138,26 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
-})();
+}
 
-(function testAggregateQuerySettingsApplicationWithLookupPipeline() {
+function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
+                                                                 secondaryCollOrViewName) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
+    // Set indexes on both collections.
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+
+    // Ensure that query settings cluster parameter is empty.
+    qsutils.assertQueryShapeConfiguration([]);
+
     const aggregateCmd = qsutils.makeAggregateQueryInstance({
-    aggregate: coll.getName(),
     pipeline: [
       { $match: { a: 1, b: 5 } },
       {
         $lookup:
-          { from: secondaryColl.getName(), pipeline: [{ $match: { a: 1, b: 5 } }], as: "output" }
+          { from: secondaryCollOrViewName, pipeline: [{ $match: { a: 1, b: 5 } }], as: "output" }
       }
     ],
     cursor: {},
@@ -149,4 +182,18 @@ setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
-})();
+}
+
+testAggregateQuerySettingsApplicationWithoutSecondaryCollections(coll.getName());
+testAggregateQuerySettingsApplicationWithoutSecondaryCollections(viewName);
+
+testAggregateQuerySettingsApplicationWithLookupEquiJoin(
+    coll.getName(), secondaryColl.getName(), false);
+testAggregateQuerySettingsApplicationWithLookupEquiJoin(viewName, secondaryColl.getName(), false);
+testAggregateQuerySettingsApplicationWithLookupEquiJoin(coll.getName(), secondaryViewName, true);
+testAggregateQuerySettingsApplicationWithLookupEquiJoin(viewName, secondaryViewName, true);
+
+testAggregateQuerySettingsApplicationWithLookupPipeline(coll.getName(), secondaryColl.getName());
+testAggregateQuerySettingsApplicationWithLookupPipeline(viewName, secondaryColl.getName());
+testAggregateQuerySettingsApplicationWithLookupPipeline(coll.getName(), secondaryViewName);
+testAggregateQuerySettingsApplicationWithLookupPipeline(viewName, secondaryViewName);

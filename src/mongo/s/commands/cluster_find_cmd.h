@@ -32,20 +32,14 @@
 #include <boost/optional.hpp>
 
 #include "mongo/client/read_preference.h"
-#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
-#include "mongo/db/query/query_utils.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
@@ -160,13 +154,10 @@ public:
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
             findCommand = std::move(parsedFind->findCommandRequest);
-            if (!query_settings::utils::isDefault(querySettings)) {
-                findCommand->setQuerySettings(std::move(querySettings));
-            }
 
             try {
-                const auto explainCmd =
-                    ClusterExplain::wrapAsExplain(findCommand->toBSON(BSONObj()), verbosity);
+                const auto explainCmd = ClusterExplain::wrapAsExplain(
+                    findCommand->toBSON(BSONObj()), verbosity, querySettings.toBSON());
 
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
@@ -205,6 +196,7 @@ public:
                 retryOnViewError(opCtx,
                                  result,
                                  *findCommand,
+                                 querySettings,
                                  *ex.extraInfo<ResolvedView>(),
                                  // An empty PrivilegeVector is acceptable because these privileges
                                  // are only checked on getMore and explain will not open a cursor.
@@ -243,8 +235,9 @@ public:
             registerRequestForQueryStats(expCtx, *parsedFind);
 
             // Perform the query settings lookup and attach it to 'expCtx'.
-            expCtx->setQuerySettings(
-                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns()));
+            auto querySettings =
+                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
+            expCtx->setQuerySettings(querySettings);
 
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
@@ -275,6 +268,7 @@ public:
                     opCtx,
                     result,
                     cq->getFindCommandRequest(),
+                    querySettings,
                     *ex.extraInfo<ResolvedView>(),
                     {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::find)});
             }
@@ -345,6 +339,7 @@ public:
             OperationContext* opCtx,
             rpc::ReplyBuilderInterface* result,
             const FindCommandRequest& findCommand,
+            const query_settings::QuerySettings& querySettings,
             const ResolvedView& resolvedView,
             const PrivilegeVector& privileges,
             boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
@@ -354,6 +349,9 @@ public:
             auto aggRequestOnView =
                 query_request_conversion::asAggregateCommandRequest(findCommand);
             aggRequestOnView.setExplain(verbosity);
+            if (!query_settings::utils::isDefault(querySettings)) {
+                aggRequestOnView.setQuerySettings(querySettings);
+            }
 
             uassertStatusOK(ClusterAggregate::retryOnViewError(
                 opCtx, aggRequestOnView, resolvedView, ns(), privileges, &bodyBuilder));

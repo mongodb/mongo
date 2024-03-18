@@ -15,22 +15,26 @@
 // ]
 //
 
-import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 // Create the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
-const qsutils = new QuerySettingsUtils(db, coll.getName());
-const qstests = new QuerySettingsIndexHintsTests(qsutils);
+const viewName = "identityView";
+assertDropCollection(db, viewName);
+assert.commandWorked(db.createView(viewName, coll.getName(), []));
 const ns = {
     db: db.getName(),
     coll: coll.getName()
 };
 
 // Ensure query settings are applied as expected in a straightforward scenario for distinct.
-function assertQuerySettingsDistinctIndexApplication(querySettingsQuery) {
+function assertQuerySettingsDistinctIndexApplication(qsutils, qstests, querySettingsQuery) {
     const query = qsutils.withoutDollarDB(querySettingsQuery);
     for (const index of [qstests.indexA, qstests.indexAB]) {
         const settings = {indexHints: {ns, allowedIndexes: [index]}};
@@ -44,7 +48,7 @@ function assertQuerySettingsDistinctIndexApplication(querySettingsQuery) {
 
 // Ensure that the hint gets ignored when query settings for the particular 'distinct' query are
 // set.
-function assertQuerySettingsDistinctScanIgnoreCursorHints(querySettingsQuery) {
+function assertQuerySettingsDistinctScanIgnoreCursorHints(qsutils, qstests, querySettingsQuery) {
     const query = qsutils.withoutDollarDB(querySettingsQuery);
     const settings = {indexHints: {ns, allowedIndexes: [qstests.indexAB]}};
     const queryWithHint = {...query, hint: qstests.indexA};
@@ -58,7 +62,7 @@ function assertQuerySettingsDistinctScanIgnoreCursorHints(querySettingsQuery) {
 // Ensure that distinct queries fall back to running distinct scan without query settings
 // when
 // the provided settings don't generate any viable plans.
-function assertQuerySettingsDistinctFallback(querySettingsQuery) {
+function assertQuerySettingsDistinctFallback(qsutils, qstests, querySettingsQuery) {
     // DISTINCT_SCAN has priority over query settings, i.e. if applying query settings falls
     // query planner back to IXSCAN or COLLSCAN but ignoring query settings would keep
     // DISTINCT_SCAN plan generated then query settings should be ignored.
@@ -81,15 +85,15 @@ assert.commandWorked(coll.insertMany([
     {a: 5, b: 1},
 ]));
 
-// Ensure that query settings cluster parameter is empty.
-qsutils.assertQueryShapeConfiguration([]);
-
 function setIndexes(coll, indexList) {
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.createIndexes(indexList));
 }
 
-(function testDistinctQuerySettingsApplication() {
+function testDistinctQuerySettingsApplication(collOrViewName) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
     // This query has the key that doesn't match any provided index which guarantees that there
     // would be no DISTINCT_SCAN plan and the query planner will fall back to the `find`. In case
     // multiplanner is involved it is expected that the query will end up in query plan cache.
@@ -106,9 +110,12 @@ function setIndexes(coll, indexList) {
     // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
     // qstests.assertQuerySettingsFallback(querySettingsDistinctQuery, ns);
     qstests.assertQuerySettingsCommandValidation(querySettingsDistinctQuery, ns);
-})();
+}
 
-(function testDistinctWithDistinctScanQuerySettingsApplication() {
+function testDistinctWithDistinctScanQuerySettingsApplication(collOrViewName) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
     // Here query planner is expected to produce DISTINCT_SCAN plans no matter which index is
     // hinted/set in query settings.
     // Only use those indexes that can be used in DISTINCT_SCAN.
@@ -118,7 +125,14 @@ function setIndexes(coll, indexList) {
 
     const querySettingsDistinctQuery = qsutils.makeDistinctQueryInstance({key: 'a'});
 
-    assertQuerySettingsDistinctIndexApplication(querySettingsDistinctQuery);
-    assertQuerySettingsDistinctScanIgnoreCursorHints(querySettingsDistinctQuery);
-    assertQuerySettingsDistinctFallback(querySettingsDistinctQuery);
-})();
+    assertQuerySettingsDistinctIndexApplication(qsutils, qstests, querySettingsDistinctQuery);
+    assertQuerySettingsDistinctScanIgnoreCursorHints(qsutils, qstests, querySettingsDistinctQuery);
+    assertQuerySettingsDistinctFallback(qsutils, qstests, querySettingsDistinctQuery);
+}
+
+testDistinctQuerySettingsApplication(coll.getName());
+testDistinctQuerySettingsApplication(viewName);
+testDistinctWithDistinctScanQuerySettingsApplication(coll.getName());
+
+// TODO: SERVER-87741: Make distinct command on views use DISTINCT_SCAN.
+// testDistinctWithDistinctScanQuerySettingsApplication(viewName);

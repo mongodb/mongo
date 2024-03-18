@@ -33,13 +33,17 @@ export class QuerySettingsIndexHintsTests {
         }
 
         // Checking plan cache for query settings doesn't work reliably if collections are moved
-        // between shards randomly because that causes plan cache drops.
+        // between shards randomly because that causes plan cache invalidation.
         if (TestData.runningWithBalancer) {
             return;
         }
 
+        // If the collection used is a view, determine the underlying collection being used.
+        const collInfo = db.getCollectionInfos({name: this.qsutils.collName})[0];
+        const collName = collInfo.options.viewOn ? collInfo.options.viewOn : this.qsutils.collName;
+
         // Clear the plan cache before running any queries.
-        db[this.qsutils.collName].getPlanCache().clear();
+        db[collName].getPlanCache().clear();
 
         // Take the newest plan cache entry (based on 'timeOfCreation' sorting) and ensure that it
         // contains the 'settings'.
@@ -50,7 +54,7 @@ export class QuerySettingsIndexHintsTests {
                    1,
                    "Expecting at least 1 entry in query plan cache");
         planCacheStatsAfterRunningCmd.forEach(
-            plan => assert.docEq(plan.querySettings, querySettings, plan));
+            plan => assert.docEq(querySettings, plan.querySettings, plan));
     }
 
     assertIndexUse(cmd, expectedIndex, stagesExtractor) {
@@ -74,10 +78,12 @@ export class QuerySettingsIndexHintsTests {
         });
     }
 
-    assertLookupJoinStage(cmd, expectedIndex) {
-        // $lookup stage is only pushed down to find in SBE and not in classic.
+    assertLookupJoinStage(cmd, expectedIndex, isSecondaryCollAView) {
+        // $lookup stage is only pushed down to find in SBE and not in classic and only for
+        // collections (not views).
         const db = this.qsutils.db;
-        if (!checkSbeRestrictedOrFullyEnabled(db)) {
+        const expectPushDown = checkSbeRestrictedOrFullyEnabled(db) && !isSecondaryCollAView;
+        if (!expectPushDown) {
             return this.assertLookupPipelineStage(cmd, expectedIndex);
         }
 
@@ -140,12 +146,12 @@ export class QuerySettingsIndexHintsTests {
     /**
      * Ensure query settings are applied in a situation of the equi-join over namespace 'ns'.
      */
-    assertQuerySettingsLookupJoinIndexApplication(querySettingsQuery, ns) {
+    assertQuerySettingsLookupJoinIndexApplication(querySettingsQuery, ns, isSecondaryCollAView) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         for (const index of [this.indexA, this.indexAB]) {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-                this.assertLookupJoinStage(query, index);
+                this.assertLookupJoinStage(query, index, isSecondaryCollAView);
                 this.assertQuerySettingsInCacheForCommand(query, settings);
             });
         }
@@ -154,7 +160,10 @@ export class QuerySettingsIndexHintsTests {
     /**
      * Ensure query settings are applied in a situation of $lookup equi-join for both collections.
      */
-    assertQuerySettingsIndexAndLookupJoinApplications(querySettingsQuery, mainNs, secondaryNs) {
+    assertQuerySettingsIndexAndLookupJoinApplications(querySettingsQuery,
+                                                      mainNs,
+                                                      secondaryNs,
+                                                      isSecondaryCollAView) {
         const query = this.qsutils.withoutDollarDB(querySettingsQuery);
         for (const [mainCollIndex, secondaryCollIndex] of crossProduct(
                  [this.indexA, this.indexAB])) {
@@ -167,7 +176,7 @@ export class QuerySettingsIndexHintsTests {
 
             this.qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, mainCollIndex);
-                this.assertLookupJoinStage(query, secondaryCollIndex);
+                this.assertLookupJoinStage(query, secondaryCollIndex, isSecondaryCollAView);
                 this.assertQuerySettingsInCacheForCommand(query, settings);
             });
         }
