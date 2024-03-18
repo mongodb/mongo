@@ -41,9 +41,8 @@ const datePrefix = 1680912440;
 const dateUpperBound = new Date(datePrefix + 500);
 const dateLowerBound = new Date(datePrefix);
 
-// TODO SERVER-85404 allow Min/MaxKey to be inserted once compression works.
 let leafsMinusUndefined = leafs().filter(function(e) {
-    return e !== MinKey && e !== MaxKey && typeof e !== "function" && e !== undefined;
+    return typeof e !== "function" && e !== undefined;
 });
 // leafs has no long strings.
 leafsMinusUndefined.push("a very long string");

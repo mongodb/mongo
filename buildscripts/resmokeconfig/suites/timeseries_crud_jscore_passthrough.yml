@@ -239,12 +239,7 @@ selector:
   - jstests/core/system_js_access.js
   - jstests/core/system_js_drop.js
   - jstests/core/write/find_and_modify/find_and_modify_where.js
-  # TODO(SERVER-85404): Try to include this test.
-  - jstests/core/query/array/array_comparison_correctness.js
-  - jstests/core/query/array/array_index_and_nonIndex_consistent.js
-  - jstests/core/query/min_max_key.js
-  - jstests/core/query/type/type8.js
-  - jstests/core/return_bson_scalar_from_js_function.js
+  # TODO (SERVER-88078): Remove this exclusion.
   - jstests/core/type_bracket.js
   # TODO(SERVER-85322): Try to include this test(s).
   - jstests/core/resume_query.js
