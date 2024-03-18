@@ -111,16 +111,16 @@ assert.commandFailedWithCode(mongos.adminCommand({
 }),
                              ErrorCodes.BadValue);
 
-// TODO SERVER-77915 remove or adapt this test case since a user-created unsharded collection is
-// now always tracked. A temporary db.system.resharding.collection must now exist as unsplittable as
-// well to support moveCollection
+// TODO SERVER-87189 remove this test case since a user-created unsharded collection is now always
+// tracked. A temporary db.system.resharding.collection must now exist as unsplittable as well to
+// support moveCollection.
 const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 if (!isTrackUnshardedUponCreationEnabled) {
     jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
     assert.commandFailedWithCode(
         mongos.getDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
-        ErrorCodes.NamespaceNotSharded);
+        [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
 }
 
 /**
