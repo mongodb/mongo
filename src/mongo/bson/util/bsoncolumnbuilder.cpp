@@ -1181,7 +1181,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_append
             continue;
         }
 
-        Simple8b<T> s8b(block, sizeof(uint64_t), boost::none);
+        Simple8b<T> s8b(block, sizeof(uint64_t), T{});
 
         boost::optional<T> last;
         for (auto&& elem : s8b) {
@@ -1196,7 +1196,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_append
         return std::make_pair(last, index);
     }
 
-    return std::make_pair(boost::none, index);
+    return std::make_pair(T{}, index);
 }
 
 template <class BufBuilderType, class BSONObjType, class Allocator>

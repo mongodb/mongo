@@ -3644,10 +3644,30 @@ TEST_F(BSONColumnTest, SimpleOneValueRLE) {
 
     auto binData = cb.finalize();
 
-    // TODO: investigate; currently fails verifyColumnReopenFromBinary(), this is likely a bug
-    // elsewhere
-    // verifyBinary(binData, expected, true);
+    verifyBinary(binData, expected, true);
     verifyDecompression(binData, elems, true);
+}
+
+TEST_F(BSONColumnTest, DateAllIdenticalRLENoOverflow) {
+    BSONColumnBuilder cb;
+
+    // All identical values using date. Encoded as RLE that never overflow.
+    std::vector<BSONElement> elems(simple8b_internal::kRleMultiplier + 1,
+                                   createDate(Date_t::fromMillisSinceEpoch(1709224256429)));
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bRLE(expected, elems.size() - 1);
+    appendEOO(expected);
+
+    BSONBinData binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
 }
 
 
