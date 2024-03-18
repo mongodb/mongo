@@ -56,27 +56,27 @@ REGISTER_DOCUMENT_SOURCE(documents,
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceDocuments::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    // genField is a temporary field to hold docs to wire $project,
-    // $unwind, and $replaceRoot together.
-    auto genField = UUID::gen().toString();
-    auto projectContent = BSON(genField << elem);
+    // kGenFieldName is a temporary field to hold docs to wire $project, $unwind, and $replaceRoot
+    // together. This may show up in explain, but it will not possibly overlap with user data, since
+    // the user data is nested a level below, within an array or object.
+    auto projectContent = BSON(kGenFieldName << elem);
     auto queue = DocumentSourceQueue::create(expCtx, DocumentSourceDocuments::kStageName);
     queue->emplace_back(Document{});
     /* Create the following pipeline from $documents: [...]
-     *  => [ queue([{}]),
-     *       project: {tempDocumentsField: [...]},
-     *       unwind: "$tempDocumentsField",
-     *       replaceWith: "$tempDocumentsField" ]
+     *  => [ {$queue: [{}] },
+     *       {$project: {[kGenFieldName]: [...]}},
+     *       {$unwind: "$" + kGenFieldName},
+     *       {$replaceWith: "$" + kGenFieldName} ]
      */
-    return {
-        queue,
-        DocumentSourceProject::create(projectContent, expCtx, elem.fieldNameStringData()),
-        DocumentSourceUnwind::create(expCtx, genField, false, {}, true),
-        DocumentSourceReplaceRoot::create(expCtx,
-                                          ExpressionFieldPath::createPathFromString(
-                                              expCtx.get(), genField, expCtx->variablesParseState),
-                                          "elements within the array passed to $documents",
-                                          SbeCompatibility::noRequirements)};
+    return {queue,
+            DocumentSourceProject::create(projectContent, expCtx, elem.fieldNameStringData()),
+            DocumentSourceUnwind::create(expCtx, kGenFieldName, false, {}, true),
+            DocumentSourceReplaceRoot::create(
+                expCtx,
+                ExpressionFieldPath::createPathFromString(
+                    expCtx.get(), kGenFieldName, expCtx->variablesParseState),
+                "elements within the array passed to $documents",
+                SbeCompatibility::noRequirements)};
 }
 
 }  // namespace mongo

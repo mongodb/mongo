@@ -58,7 +58,6 @@ TEST_F(DocumentSourceDocumentsTest, DocumentsStageRedactsCorrectly) {
                                                                     docSourcesList.end());
     auto unwindStage = static_cast<DocumentSourceUnwind*>(docSourcesVec[2].get());
     ASSERT(unwindStage);
-    auto generatedField = unwindStage->getUnwindPath();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$queue":"?array<?object>"})",
         redact(*docSourcesVec[0]));
@@ -69,7 +68,8 @@ TEST_F(DocumentSourceDocumentsTest, DocumentsStageRedactsCorrectly) {
             "$project": {
                 "HASH<_id>": true,
                 "HASH<)" +
-                 generatedField +
+                 // SERVER-87666 ensure that the generated field is consistent.
+                 DocumentSourceDocuments::kGenFieldName +
                  R"(>": "?array<?object>"
             }
         })"),
@@ -77,12 +77,12 @@ TEST_F(DocumentSourceDocumentsTest, DocumentsStageRedactsCorrectly) {
 
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        "{'$unwind': {'path' : '$HASH<" + generatedField + ">' } }",
+        "{'$unwind': {'path' : '$HASH<" + DocumentSourceDocuments::kGenFieldName + ">' } }",
         redact(*docSourcesVec[2]));
 
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        "{$replaceRoot: {newRoot: '$HASH<" + generatedField + ">'}}",
+        "{$replaceRoot: {newRoot: '$HASH<" + DocumentSourceDocuments::kGenFieldName + ">'}}",
         redact(*docSourcesVec[3]));
 }
 
