@@ -235,7 +235,7 @@ tasks:
 ## Standalone fuzzer for checking timeseries optimizations correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_timeseries_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ibm", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -258,7 +258,7 @@ tasks:
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
   # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "no_debug_mode" tag.
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ibm", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -495,7 +495,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ibm", "concurrency", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "concurrency", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -541,7 +541,7 @@ tasks:
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ibm", "jstestfuzz", "common", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -606,7 +606,7 @@ tasks:
 
 - <<: *task_template
   name: search
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -615,7 +615,7 @@ tasks:
 
 - <<: *task_template
   name: search_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -624,7 +624,7 @@ tasks:
 
 - <<: *task_template
   name: search_ssl
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -708,7 +708,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
 - <<: *jstestfuzz_template
   name: aggregation_expression_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "incompatible_ibm", "aggfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "aggfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -723,7 +723,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines
 - <<: *jstestfuzz_template
   name: aggregation_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "incompatible_ibm", "aggfuzzer", "require_npm", "random_name", "optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "incompatible_mac", "incompatible_ppc", "incompatible_s390x", "aggfuzzer", "require_npm", "random_name", "optimization"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -956,7 +956,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -965,7 +965,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_auth
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -974,7 +974,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_ssl
-  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ibm"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community", "incompatible_mac", "incompatible_windows", "incompatible_ppc", "incompatible_s390x"]
   commands:
   - func: "do setup"
   - func: "run tests"
