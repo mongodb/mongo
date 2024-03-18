@@ -1776,6 +1776,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         } else if (inStableRecovery) {
                             repl::OplogApplication::checkOnOplogFailureForRecovery(
                                 opCtx, op.getNss(), redact(op.toBSONForLogging()), redact(status));
+                        } else if (mode == OplogApplication::Mode::kInitialSync) {
+                            // TODO (SERVER-87994): Revisit the verbosity of the logging.
+                            LOGV2_DEBUG(8776800,
+                                        1,
+                                        "INFO: Error applying operation while initialSync.",
+                                        "oplogEntry"_attr = redact(op.toBSONForLogging()),
+                                        "error"_attr = redact(status));
                         }
                         // Continue to the next block to retry the operation as an upsert.
                         needToDoUpsert = true;
@@ -1987,23 +1994,37 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                               << msg << ": " << redact(op.toBSONForLogging()));
                         }
                     }
-                } else if (mode == OplogApplication::Mode::kSecondary && !upsertOplogEntry &&
-                           !ur.upsertedId.isEmpty() && !(collection && collection->isCapped())) {
+                } else if (!upsertOplogEntry && !ur.upsertedId.isEmpty() &&
+                           !(collection && collection->isCapped())) {
                     // This indicates we upconverted an update to an upsert, and it did indeed
                     // upsert.  In steady state mode this is unexpected.
-                    const auto& opObj = redact(op.toBSONForLogging());
+                    if (mode == OplogApplication::Mode::kSecondary) {
+                        opCounters->gotUpdateOnMissingDoc();
+                        logOplogConstraintViolation(
+                            opCtx,
+                            op.getNss(),
+                            OplogConstraintViolationEnum::kUpdateOnMissingDoc,
+                            "update",
+                            redact(op.toBSONForLogging()),
+                            boost::none /* status */);
 
-                    opCounters->gotUpdateOnMissingDoc();
-                    logOplogConstraintViolation(opCtx,
-                                                op.getNss(),
-                                                OplogConstraintViolationEnum::kUpdateOnMissingDoc,
-                                                "update",
-                                                opObj,
-                                                boost::none /* status */);
-
-                    // We shouldn't be doing upserts in secondary mode when enforcing steady
-                    // state constraints.
-                    invariant(!oplogApplicationEnforcesSteadyStateConstraints);
+                        // We shouldn't be doing upserts in secondary mode when enforcing steady
+                        // state constraints.
+                        invariant(!oplogApplicationEnforcesSteadyStateConstraints);
+                    } else if (inStableRecovery) {
+                        repl::OplogApplication::checkOnOplogFailureForRecovery(
+                            opCtx,
+                            op.getNss(),
+                            redact(op.toBSONForLogging()),
+                            repl::kUpdateOnMissingDocMsg.toString());
+                    } else if (mode == OplogApplication::Mode::kInitialSync) {
+                        // TODO (SERVER-87994): Revisit the verbosity of the logging.
+                        LOGV2_DEBUG(8776803,
+                                    1,
+                                    "INFO: InitialSync oplog application upconverted an update to "
+                                    "an upsert.",
+                                    "oplogEntry"_attr = redact(op.toBSONForLogging()));
+                    }
                 }
 
                 if (op.getNeedsRetryImage()) {
@@ -2038,6 +2059,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 if (inStableRecovery) {
                     repl::OplogApplication::checkOnOplogFailureForRecovery(
                         opCtx, op.getNss(), redact(op.toBSONForLogging()), redact(status));
+                } else if (mode == OplogApplication::Mode::kInitialSync) {
+                    // TODO (SERVER-87994): Revisit the verbosity of the logging.
+                    LOGV2_DEBUG(8776801,
+                                1,
+                                "INFO: Error applying operation while initialSync.",
+                                "oplogEntry"_attr = redact(op.toBSONForLogging()),
+                                "error"_attr = redact(status));
                 }
                 return status;
             }
@@ -2119,16 +2147,23 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     writeChangeStreamPreImage(opCtx, collection, op, *(result.requestedPreImage));
                 }
 
-                if (result.nDeleted == 0 && inStableRecovery) {
-                    repl::OplogApplication::checkOnOplogFailureForRecovery(
-                        opCtx,
-                        op.getNss(),
-                        redact(op.toBSONForLogging()),
-                        !collection ? str::stream()
-                                << "(NamespaceNotFound): Failed to apply operation due "
-                                   "to missing collection ("
-                                << requestNss.toStringForErrorMsg() << ")"
-                                    : "Applied a delete which did not delete anything."s);
+                if (result.nDeleted == 0) {
+                    const auto errMsg = !collection
+                        ? str::stream() << "(NamespaceNotFound): Failed to apply operation due "
+                                           "to missing collection ("
+                                        << requestNss.toStringForErrorMsg() << ")"
+                        : "Applied a delete which did not delete anything."s;
+                    if (inStableRecovery) {
+                        repl::OplogApplication::checkOnOplogFailureForRecovery(
+                            opCtx, op.getNss(), redact(op.toBSONForLogging()), errMsg);
+                    } else if (mode == OplogApplication::Mode::kInitialSync) {
+                        // TODO (SERVER-87994): Revisit the verbosity of the logging.
+                        LOGV2_DEBUG(8776802,
+                                    1,
+                                    "INFO: Error applying operation while initialSync.",
+                                    "oplogEntry"_attr = redact(op.toBSONForLogging()),
+                                    "error"_attr = errMsg);
+                    }
                 }
                 // It is legal for a delete operation on the pre-images collection to delete
                 // zero documents - pre-image collections are not guaranteed to contain the same
