@@ -79,7 +79,7 @@ std::unique_ptr<PlanStage> TsBucketToCellBlockStage::clone() const {
                                                       _bitmapOutSlotId,
                                                       _timeField,
                                                       _commonStats.nodeId,
-                                                      _participateInTrialRunTracking);
+                                                      participateInTrialRunTracking());
 }
 
 void TsBucketToCellBlockStage::prepare(CompileCtx& ctx) {

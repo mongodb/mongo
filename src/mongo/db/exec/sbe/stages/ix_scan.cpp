@@ -43,7 +43,6 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
-#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -72,7 +71,11 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
                                        PlanNodeId nodeId,
                                        bool lowPriority,
                                        bool participateInTrialRunTracking)
-    : PlanStage(stageType, yieldPolicy, nodeId, participateInTrialRunTracking),
+    : PlanStage(stageType,
+                yieldPolicy,
+                nodeId,
+                participateInTrialRunTracking,
+                TrialRunTrackingType::TrackReads),
       _collUuid(collUuid),
       _indexName(indexName),
       _forward(forward),
@@ -235,16 +238,6 @@ void IndexScanStageBase::doAttachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-void IndexScanStageBase::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-PlanStage::TrialRunTrackerAttachResultMask IndexScanStageBase::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    _tracker = tracker;
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
-}
-
 void IndexScanStageBase::openImpl(bool reOpen) {
     _commonStats.opens++;
 
@@ -274,17 +267,9 @@ void IndexScanStageBase::openImpl(bool reOpen) {
     _scanState = ScanState::kNeedSeek;
 }
 
-void IndexScanStageBase::trackRead() {
+void IndexScanStageBase::trackIndexRead() {
     ++_specificStats.numReads;
-    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
-        // If we're collecting execution stats during multi-planning and reached the end of the
-        // trial period because we've performed enough physical reads, bail out from the trial run
-        // by raising a special exception to signal a runtime planner that this candidate plan has
-        // completed its trial run early. Note that a trial period is executed only once per a
-        // PlanStage tree, and once completed never run again on the same tree.
-        _tracker = nullptr;
-        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in ixscan");
-    }
+    trackRead();
 }
 
 PlanState IndexScanStageBase::getNext() {
@@ -306,12 +291,12 @@ PlanState IndexScanStageBase::getNext() {
         switch (_scanState) {
             case ScanState::kNeedSeek:
                 ++_specificStats.seeks;
-                trackRead();
+                trackIndexRead();
                 // Seek for key and establish the cursor position.
                 _nextRecord = seek();
                 break;
             case ScanState::kScanning:
-                trackRead();
+                trackIndexRead();
                 _nextRecord = _cursor->nextKeyString();
                 break;
             case ScanState::kFinished:
@@ -510,7 +495,7 @@ std::unique_ptr<PlanStage> SimpleIndexScanStage::clone() const {
                                                   _yieldPolicy,
                                                   _commonStats.nodeId,
                                                   _lowPriority,
-                                                  _participateInTrialRunTracking);
+                                                  participateInTrialRunTracking());
 }
 
 void SimpleIndexScanStage::prepare(CompileCtx& ctx) {
@@ -723,7 +708,7 @@ std::unique_ptr<PlanStage> GenericIndexScanStage::clone() const {
                                                    _vars,
                                                    _yieldPolicy,
                                                    _commonStats.nodeId,
-                                                   _participateInTrialRunTracking);
+                                                   participateInTrialRunTracking());
 }
 
 void GenericIndexScanStage::prepare(CompileCtx& ctx) {

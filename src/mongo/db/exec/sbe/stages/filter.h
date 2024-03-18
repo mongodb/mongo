@@ -79,7 +79,7 @@ public:
         return std::make_unique<FilterStage<IsConst, IsEof>>(_children[0]->clone(),
                                                              _filter->clone(),
                                                              _commonStats.nodeId,
-                                                             _participateInTrialRunTracking);
+                                                             participateInTrialRunTracking());
     }
 
     void prepare(CompileCtx& ctx) final {

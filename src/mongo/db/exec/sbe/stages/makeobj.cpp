@@ -109,7 +109,7 @@ std::unique_ptr<PlanStage> MakeObjStageBase<O>::clone() const {
                                                  _forceNewObject,
                                                  _returnOldObject,
                                                  _commonStats.nodeId,
-                                                 _participateInTrialRunTracking);
+                                                 participateInTrialRunTracking());
 }
 
 template <typename O>

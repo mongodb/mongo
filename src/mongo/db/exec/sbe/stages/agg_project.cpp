@@ -52,7 +52,7 @@ std::unique_ptr<PlanStage> AggProjectStage::clone() const {
     return std::make_unique<AggProjectStage>(_children[0]->clone(),
                                              std::move(projects),
                                              _commonStats.nodeId,
-                                             _participateInTrialRunTracking);
+                                             participateInTrialRunTracking());
 }
 
 void AggProjectStage::prepare(CompileCtx& ctx) {

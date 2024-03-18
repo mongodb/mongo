@@ -77,7 +77,7 @@ std::unique_ptr<PlanStage> HashLookupStage::clone() const {
                                              std::move(innerAgg),
                                              _collatorSlot,
                                              _commonStats.nodeId,
-                                             _participateInTrialRunTracking);
+                                             participateInTrialRunTracking());
 }
 
 void HashLookupStage::prepare(CompileCtx& ctx) {

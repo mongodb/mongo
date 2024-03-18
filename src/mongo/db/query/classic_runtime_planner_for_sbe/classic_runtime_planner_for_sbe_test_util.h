@@ -73,13 +73,7 @@ public:
 
     PlanState getNext() final;
 
-    void doDetachFromTrialRunTracker();
-
-    PlanStage::TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult);
-
 private:
-    TrialRunTracker* _tracker;
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
 };
 

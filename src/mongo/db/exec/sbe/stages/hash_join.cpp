@@ -81,7 +81,7 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _collatorSlot,
                                            _yieldPolicy,
                                            _commonStats.nodeId,
-                                           _participateInTrialRunTracking);
+                                           participateInTrialRunTracking());
 }
 
 void HashJoinStage::prepare(CompileCtx& ctx) {

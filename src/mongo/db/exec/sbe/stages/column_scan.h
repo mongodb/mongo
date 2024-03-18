@@ -53,7 +53,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -129,9 +128,6 @@ protected:
     void doRestoreState(bool relinquishCursor) override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
-    void doDetachFromTrialRunTracker() override;
-    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
     /**
@@ -383,10 +379,6 @@ private:
     } _scanTracker;
 
     bool _open{false};
-
-    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
-    // run is complete, this pointer is reset to nullptr.
-    TrialRunTracker* _tracker{nullptr};
 
     ColumnScanStats _specificStats;
 };

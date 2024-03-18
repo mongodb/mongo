@@ -49,7 +49,6 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -92,7 +91,8 @@ ScanStage::ScanStage(UUID collUuid,
     : PlanStage(seekRecordIdSlot ? "seek"_sd : "scan"_sd,
                 yieldPolicy,
                 nodeId,
-                participateInTrialRunTracking),
+                participateInTrialRunTracking,
+                TrialRunTrackingType::TrackReads),
       _state(std::make_shared<ScanStageState>(collUuid,
                                               recordSlot,
                                               recordIdSlot,
@@ -130,7 +130,8 @@ ScanStage::ScanStage(const std::shared_ptr<ScanStageState>& state,
     : PlanStage(state->seekRecordIdSlot ? "seek"_sd : "scan"_sd,
                 yieldPolicy,
                 nodeId,
-                participateInTrialRunTracking),
+                participateInTrialRunTracking,
+                TrialRunTrackingType::TrackReads),
       _state(state),
       _includeScanStartRecordId(includeScanStartRecordId),
       _includeScanEndRecordId(includeScanEndRecordId),
@@ -141,7 +142,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _yieldPolicy,
                                        _commonStats.nodeId,
                                        _lowPriority,
-                                       _participateInTrialRunTracking,
+                                       participateInTrialRunTracking(),
                                        _includeScanStartRecordId,
                                        _includeScanEndRecordId);
 }
@@ -339,16 +340,6 @@ void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (auto cursor = getActiveCursor()) {
         cursor->reattachToOperationContext(opCtx);
     }
-}
-
-void ScanStage::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-PlanStage::TrialRunTrackerAttachResultMask ScanStage::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    _tracker = tracker;
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
 }
 
 RecordCursor* ScanStage::getActiveCursor() const {
@@ -655,15 +646,7 @@ PlanState ScanStage::getNext() {
     }
 
     ++_specificStats.numReads;
-    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
-        // If we're collecting execution stats during multi-planning and reached the end of the
-        // trial period because we've performed enough physical reads, bail out from the trial run
-        // by raising a special exception to signal a runtime planner that this candidate plan has
-        // completed its trial run early. Note that a trial period is executed only once per a
-        // PlanStage tree, and once completed never run again on the same tree.
-        _tracker = nullptr;
-        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in scan");
-    }
+    trackRead();
     return trackPlanState(PlanState::ADVANCED);
 }
 
@@ -893,7 +876,7 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
                                                _yieldPolicy,
                                                _commonStats.nodeId,
                                                _scanCallbacks,
-                                               _participateInTrialRunTracking);
+                                               participateInTrialRunTracking());
 }
 
 void ParallelScanStage::prepare(CompileCtx& ctx) {

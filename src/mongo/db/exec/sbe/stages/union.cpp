@@ -72,7 +72,7 @@ std::unique_ptr<PlanStage> UnionStage::clone() const {
                                         _inputVals,
                                         _outputVals,
                                         _commonStats.nodeId,
-                                        _participateInTrialRunTracking);
+                                        participateInTrialRunTracking());
 }
 
 void UnionStage::prepare(CompileCtx& ctx) {

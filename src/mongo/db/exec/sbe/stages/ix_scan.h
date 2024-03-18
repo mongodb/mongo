@@ -53,7 +53,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -135,17 +134,15 @@ protected:
     void doRestoreState(bool relinquishCursor) final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
-    void doDetachFromTrialRunTracker() final;
-    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) final;
+
     /**
      * When this stage is re-opened after being closed, or during yield recovery, called to verify
      * that the index (and the index's collection) remain valid. If any validity check fails, throws
      * a UserException that terminates execution of the query.
      */
     void restoreCollectionAndIndex();
-    // Bumps '_specificStats.numReads' and calls trackProgress() if '_tracker' is non-null.
-    void trackRead();
+    // Bumps '_specificStats.numReads' and calls base class trackRead().
+    void trackIndexRead();
     // Shares the common code for PlanStage::prepare() implementation.
     void prepareImpl(CompileCtx& ctx);
     // Shares the common code for PlanStage::open() implementation.
@@ -202,10 +199,6 @@ protected:
 
     bool _lowPriority;
     boost::optional<ScopedAdmissionPriority> _priority;
-
-    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
-    // run is complete, this pointer is reset to nullptr.
-    TrialRunTracker* _tracker{nullptr};
 };
 
 /**

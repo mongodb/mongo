@@ -39,7 +39,7 @@ CoScanStage::CoScanStage(PlanNodeId planNodeId,
 
 std::unique_ptr<PlanStage> CoScanStage::clone() const {
     return std::make_unique<CoScanStage>(
-        _commonStats.nodeId, _yieldPolicy, _participateInTrialRunTracking);
+        _commonStats.nodeId, _yieldPolicy, participateInTrialRunTracking());
 }
 void CoScanStage::prepare(CompileCtx& ctx) {}
 value::SlotAccessor* CoScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {

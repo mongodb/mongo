@@ -226,7 +226,7 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
                                                std::move(mergingExprs),
                                                _yieldPolicy,
                                                _commonStats.nodeId,
-                                               _participateInTrialRunTracking,
+                                               participateInTrialRunTracking(),
                                                _forceIncreasedSpilling);
 }
 
@@ -628,15 +628,7 @@ void BlockHashAggStage::open(bool reOpen) {
             }
         }
 
-        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
-            // During trial runs, we want to limit the amount of work done by opening a blocking
-            // stage, like this one. The blocking stage tracks the number of documents it has
-            // read from its child, and if the TrialRunTracker ends the trial, a special
-            // exception returns control back to the planner.
-            _tracker = nullptr;
-            _children[0]->close();
-            uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in group");
-        }
+        trackResult();
     }
 
     // If we spilled at any point while consuming the input, then do one final spill to write

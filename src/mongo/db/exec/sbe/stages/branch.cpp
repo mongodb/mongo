@@ -75,7 +75,7 @@ std::unique_ptr<PlanStage> BranchStage::clone() const {
                                          _inputElseVals,
                                          _outputVals,
                                          _commonStats.nodeId,
-                                         _participateInTrialRunTracking);
+                                         participateInTrialRunTracking());
 }
 
 void BranchStage::prepare(CompileCtx& ctx) {

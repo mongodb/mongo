@@ -64,11 +64,6 @@ protected:
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
 
-    void doDetachFromTrialRunTracker() override;
-    PlanStage::TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker,
-        PlanStage::TrialRunTrackerAttachResultMask childrenAttachResult) override;
-
     using SpilledRow = std::pair<value::MaterializedRow, value::MaterializedRow>;
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,
@@ -154,10 +149,6 @@ protected:
 
     // Only set if collator slot provided on construction.
     value::SlotAccessor* _collatorAccessor = nullptr;
-
-    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
-    // run is complete, this pointer is reset to nullptr.
-    TrialRunTracker* _tracker{nullptr};
 
     const bool _allowDiskUse;
     // When true, we spill frequently without reaching the memory limit. This allows us to exercise

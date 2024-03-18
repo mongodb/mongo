@@ -35,11 +35,15 @@ namespace mongo::sbe {
 BaseMockStage::BaseMockStage(PlanNodeId planNodeId,
                              PlanYieldPolicy* yieldPolicy,
                              bool participateInTrialRunTracking)
-    : PlanStage("mock"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking) {}
+    : PlanStage("mock"_sd,
+                yieldPolicy,
+                planNodeId,
+                participateInTrialRunTracking,
+                TrialRunTrackingType::TrackReads) {}
 
 std::unique_ptr<PlanStage> BaseMockStage::clone() const {
     return std::make_unique<MockExceededMemoryLimitStage>(
-        _commonStats.nodeId, _yieldPolicy, _participateInTrialRunTracking);
+        _commonStats.nodeId, _yieldPolicy, participateInTrialRunTracking());
 }
 void BaseMockStage::prepare(CompileCtx& ctx) {}
 
@@ -100,24 +104,12 @@ PlanState MockExceededMaxReadsStage::getNext() {
 
     checkForInterruptAndYield(_opCtx);
 
-    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(100)) {
-        _tracker = nullptr;
-        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in scan");
+    for (size_t i = 0; i < 100; ++i) {
+        trackRead();
     }
 
     // Run forever.
     return trackPlanState(PlanState::ADVANCED);
 }
-
-void MockExceededMaxReadsStage::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-PlanStage::TrialRunTrackerAttachResultMask MockExceededMaxReadsStage::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    _tracker = tracker;
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
-}
-
 
 }  // namespace mongo::sbe

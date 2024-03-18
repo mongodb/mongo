@@ -205,7 +205,7 @@ public:
 
     std::unique_ptr<PlanStage> clone() const {
         return std::make_unique<SpoolConsumerStage<IsStack>>(
-            _spoolId, _vals, _yieldPolicy, _commonStats.nodeId, _participateInTrialRunTracking);
+            _spoolId, _vals, _yieldPolicy, _commonStats.nodeId, participateInTrialRunTracking());
     }
 
     void prepare(CompileCtx& ctx) {

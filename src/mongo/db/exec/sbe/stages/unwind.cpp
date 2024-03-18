@@ -70,7 +70,7 @@ std::unique_ptr<PlanStage> UnwindStage::clone() const {
                                          _preserveNullAndEmptyArrays,
                                          _commonStats.nodeId,
                                          _yieldPolicy,
-                                         _participateInTrialRunTracking);
+                                         participateInTrialRunTracking());
 }
 
 void UnwindStage::prepare(CompileCtx& ctx) {

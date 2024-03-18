@@ -52,7 +52,11 @@ HashAggBaseStage<Derived>::HashAggBaseStage(StringData stageName,
                                             bool participateInTrialRunTracking,
                                             bool allowDiskUse,
                                             bool forceIncreasedSpilling)
-    : PlanStage(stageName, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage(stageName,
+                yieldPolicy,
+                planNodeId,
+                participateInTrialRunTracking,
+                TrialRunTrackingType::TrackResults),
       _collatorAccessor(collatorAccessor),
       _allowDiskUse(allowDiskUse),
       _forceIncreasedSpilling(forceIncreasedSpilling) {
@@ -254,25 +258,6 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
         mcd.memoryCheckFrequency =
             std::min<long>(mcd.memoryCheckFrequency * 2, mcd.atLeastMemoryCheckFrequency);
     }
-}
-
-template <class Derived>
-void HashAggBaseStage<Derived>::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-template <class Derived>
-PlanStage::TrialRunTrackerAttachResultMask HashAggBaseStage<Derived>::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    // The BlockHashAggStage only tracks the "numResults" metric when it is the most deeply nested
-    // blocking stage.
-    if (!(childrenAttachResult & TrialRunTrackerAttachResultFlags::AttachedToBlockingStage)) {
-        _tracker = tracker;
-    }
-
-    // Return true to indicate that the tracker is attached to a blocking stage: either this stage
-    // or one of its descendent stages.
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToBlockingStage;
 }
 
 template class HashAggBaseStage<HashAggStage>;

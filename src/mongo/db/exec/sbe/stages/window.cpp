@@ -113,7 +113,7 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
                                          _collatorSlot,
                                          _allowDiskUse,
                                          _commonStats.nodeId,
-                                         _participateInTrialRunTracking);
+                                         participateInTrialRunTracking());
 }
 
 void WindowStage::doSaveState(bool relinquishCursor) {

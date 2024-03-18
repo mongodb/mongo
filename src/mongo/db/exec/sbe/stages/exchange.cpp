@@ -212,7 +212,7 @@ ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state,
 }
 std::unique_ptr<PlanStage> ExchangeConsumer::clone() const {
     return std::make_unique<ExchangeConsumer>(
-        _state, _commonStats.nodeId, _participateInTrialRunTracking);
+        _state, _commonStats.nodeId, participateInTrialRunTracking());
 }
 void ExchangeConsumer::prepare(CompileCtx& ctx) {
     for (size_t idx = 0; idx < _state->fields().size(); ++idx) {

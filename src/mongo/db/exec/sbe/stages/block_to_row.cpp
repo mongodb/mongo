@@ -76,7 +76,7 @@ std::unique_ptr<PlanStage> BlockToRowStage::clone() const {
                                              _bitmapSlotId,
                                              _commonStats.nodeId,
                                              _yieldPolicy,
-                                             _participateInTrialRunTracking);
+                                             participateInTrialRunTracking());
 }
 
 void BlockToRowStage::prepare(CompileCtx& ctx) {

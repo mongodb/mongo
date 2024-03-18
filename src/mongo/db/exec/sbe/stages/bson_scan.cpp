@@ -68,7 +68,7 @@ std::unique_ptr<PlanStage> BSONScanStage::clone() const {
                                            _commonStats.nodeId,
                                            _scanFieldNames,
                                            _scanFieldSlots,
-                                           _participateInTrialRunTracking);
+                                           participateInTrialRunTracking());
 }
 
 void BSONScanStage::prepare(CompileCtx& ctx) {

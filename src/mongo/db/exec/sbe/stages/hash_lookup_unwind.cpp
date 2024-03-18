@@ -75,7 +75,7 @@ std::unique_ptr<PlanStage> HashLookupUnwindStage::clone() const {
                                                    _lookupStageOutputSlot,
                                                    _collatorSlot,
                                                    _commonStats.nodeId,
-                                                   _participateInTrialRunTracking);
+                                                   participateInTrialRunTracking());
 }
 
 void HashLookupUnwindStage::prepare(CompileCtx& ctx) {

@@ -113,7 +113,7 @@ std::unique_ptr<PlanStage> MergeJoinStage::clone() const {
                                             _innerProjects,
                                             _dirs,
                                             _commonStats.nodeId,
-                                            _participateInTrialRunTracking);
+                                            participateInTrialRunTracking());
 }
 
 void MergeJoinStage::prepare(CompileCtx& ctx) {

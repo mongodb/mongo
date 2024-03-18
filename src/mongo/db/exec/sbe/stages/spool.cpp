@@ -55,7 +55,7 @@ std::unique_ptr<PlanStage> SpoolEagerProducerStage::clone() const {
                                                      _vals,
                                                      _yieldPolicy,
                                                      _commonStats.nodeId,
-                                                     _participateInTrialRunTracking);
+                                                     participateInTrialRunTracking());
 }
 
 void SpoolEagerProducerStage::prepare(CompileCtx& ctx) {
@@ -200,7 +200,7 @@ std::unique_ptr<PlanStage> SpoolLazyProducerStage::clone() const {
                                                     _vals,
                                                     _predicate->clone(),
                                                     _commonStats.nodeId,
-                                                    _participateInTrialRunTracking);
+                                                    participateInTrialRunTracking());
 }
 
 void SpoolLazyProducerStage::prepare(CompileCtx& ctx) {

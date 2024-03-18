@@ -92,7 +92,7 @@ std::unique_ptr<PlanStage> LoopJoinStage::clone() const {
                                            _predicate ? _predicate->clone() : nullptr,
                                            _joinType,
                                            _commonStats.nodeId,
-                                           _participateInTrialRunTracking);
+                                           participateInTrialRunTracking());
 }
 
 void LoopJoinStage::prepare(CompileCtx& ctx) {

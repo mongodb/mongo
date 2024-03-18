@@ -63,7 +63,7 @@ std::unique_ptr<PlanStage> LimitSkipStage::clone() const {
                                             _limitExpr ? _limitExpr->clone() : nullptr,
                                             _skipExpr ? _skipExpr->clone() : nullptr,
                                             _commonStats.nodeId,
-                                            _participateInTrialRunTracking);
+                                            participateInTrialRunTracking());
 }
 
 void LimitSkipStage::prepare(CompileCtx& ctx) {

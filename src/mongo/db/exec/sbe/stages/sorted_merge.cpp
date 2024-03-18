@@ -85,7 +85,7 @@ std::unique_ptr<PlanStage> SortedMergeStage::clone() const {
                                               _inputVals,
                                               _outputVals,
                                               _commonStats.nodeId,
-                                              _participateInTrialRunTracking);
+                                              participateInTrialRunTracking());
 }
 
 void SortedMergeStage::prepare(CompileCtx& ctx) {

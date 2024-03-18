@@ -94,7 +94,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
     ON_BLOCK_EXIT([&]() { scanStage->detachFromTrialRunTracker(); });
 
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToStreamingStage);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackReads);
 }
 
 TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
@@ -116,7 +116,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
     ON_BLOCK_EXIT([&]() { sortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 }
 
 TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
@@ -154,8 +154,8 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
     ASSERT_EQ(attachResult,
-              PlanStage::TrialRunTrackerAttachResultFlags::AttachedToStreamingStage |
-                  PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+              PlanStage::TrialRunTrackingType::TrackReads |
+                  PlanStage::TrialRunTrackingType::TrackResults);
 }
 
 TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
@@ -193,7 +193,7 @@ TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
 
     // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
     // tracker.
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 
     // The 'prepareTree()' function opens the HashAggStage, causing it to read documents from its
     // child. Because the child provides more documents than the 'numResults' limit, we expect the
@@ -273,8 +273,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
 
         // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to
         // the tracker.
-        ASSERT_EQ(attachResult,
-                  PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+        ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 
         // In this scenario, the HashAggStage will see 10+ documents (the 10 documents from the
         // "upperScan" plus the documents from the SortStage), which exceeds the 'numResults'
@@ -291,8 +290,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
         ON_BLOCK_EXIT([&]() { hashAggStage->detachFromTrialRunTracker(); });
         auto attachResult = hashAggStage->attachToTrialRunTracker(tracker.get());
 
-        ASSERT_EQ(attachResult,
-                  PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+        ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 
         // In this scenario, the SortStage will see more documents than the 2 permitted by the
         // 'numResults' requirement of the TrialRunTracker. The 'open()' call will _fail_, because
@@ -366,7 +364,7 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
 
     // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
     // tracker.
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 
     // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
     // child. If only one of the HashAgg stages were attached to the TrialRunTracker, it would not
@@ -401,7 +399,7 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
     scanStage->disableTrialRunTracking();
     auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::NoAttachment);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 }
 
 TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForParent) {
@@ -442,7 +440,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 }
 
 TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
@@ -507,7 +505,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
 
     // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
     // tracker.
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackerAttachResultFlags::AttachedToBlockingStage);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 
     // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
     // child. Because only one of the HashAgg stages is attached to the TrialRunTracker, the

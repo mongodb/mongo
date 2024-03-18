@@ -311,9 +311,20 @@ protected:
 template <typename T>
 class CanTrackStats {
 public:
-    CanTrackStats(StringData stageType, PlanNodeId nodeId, bool participateInTrialRunTracking)
+    // Bit flags to indicate what the stage tracks when a TrialRunTracker is attached.
+    enum TrialRunTrackingType : uint32_t {
+        NoTracking = 0x0,
+        TrackReads = 1 << 0,
+        TrackResults = 1 << 1,
+    };
+
+    CanTrackStats(StringData stageType,
+                  PlanNodeId nodeId,
+                  bool participateInTrialRunTracking,
+                  TrialRunTrackingType trackingType)
         : _commonStats(stageType, nodeId),
-          _participateInTrialRunTracking(participateInTrialRunTracking) {}
+          _participateInTrialRunTracking(participateInTrialRunTracking),
+          _trackingType(trackingType) {}
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
@@ -376,26 +387,22 @@ public:
     }
 
     void detachFromTrialRunTracker() {
+        _tracker = nullptr;
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
             child->detachFromTrialRunTracker();
         }
-
-        stage->doDetachFromTrialRunTracker();
     }
 
-    // Bit flags to indicate what kinds of stages a TrialRunTracker was attached to by a call to the
-    // 'attachToTrialRunTracker()' method.
-    enum TrialRunTrackerAttachResultFlags : uint32_t {
-        NoAttachment = 0x0,
-        AttachedToStreamingStage = 1 << 0,
-        AttachedToBlockingStage = 1 << 1,
-    };
-
+    // Bit mask to indicate to what kind of stages we have already attached a TrialRunTracker.
     using TrialRunTrackerAttachResultMask = uint32_t;
 
+    /**
+     * Recursively traverses the plan tree and attaches the trial run tracker to nodes that do the
+     * tracking.
+     */
     TrialRunTrackerAttachResultMask attachToTrialRunTracker(TrialRunTracker* tracker) {
-        TrialRunTrackerAttachResultMask result = TrialRunTrackerAttachResultFlags::NoAttachment;
+        TrialRunTrackerAttachResultMask result = TrialRunTrackingType::NoTracking;
         if (!_participateInTrialRunTracking) {
             return result;
         }
@@ -405,7 +412,7 @@ public:
             result |= child->attachToTrialRunTracker(tracker);
         }
 
-        return result | stage->doAttachToTrialRunTracker(tracker, result);
+        return result | doAttachToTrialRunTracker(tracker, result);
     }
 
     /**
@@ -447,6 +454,40 @@ public:
     }
 
 protected:
+    bool participateInTrialRunTracking() const {
+        return _participateInTrialRunTracking;
+    }
+
+    /**
+     * If trial run tracker is attached, increments the read metric and terminates the trial run
+     * with a special exception if metric has reached the limit.
+     */
+    void trackRead() {
+        tassert(8796901,
+                str::stream() << "Stage " << _commonStats.stageType
+                              << " tracks reads but tracking type is " << _trackingType,
+                _trackingType == TrialRunTrackingType::TrackReads);
+        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
+            uasserted(ErrorCodes::QueryTrialRunCompleted,
+                      str::stream() << "Trial run early exit in " << _commonStats.stageType);
+        }
+    }
+
+    /**
+     * If trial run tracker is attached, increments the result metric and terminates the trial run
+     * with a special exception if metric has reached the limit.
+     */
+    void trackResult() {
+        tassert(8796902,
+                str::stream() << "Stage " << _commonStats.stageType
+                              << " tracks results but tracking type is " << _trackingType,
+                _trackingType == TrialRunTrackingType::TrackResults);
+        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
+            uasserted(ErrorCodes::QueryTrialRunCompleted,
+                      str::stream() << "Trial run early exit in " << _commonStats.stageType);
+        }
+    }
+
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
             _commonStats.isEOF = true;
@@ -489,13 +530,30 @@ protected:
 
     CommonStats _commonStats;
 
-    // Flag which determines whether this node and its children can participate in trial run
-    // tracking. A stage and its children are not eligible for trial run tracking when they are
-    // planned deterministically (that is, the amount of work they perform is independent of
-    // other parts of the tree which are multiplanned).
-    bool _participateInTrialRunTracking{true};
-
 private:
+    // Attaches the trial run tracker to this specific node if needed.
+    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
+        switch (_trackingType) {
+            case TrialRunTrackingType::NoTracking:
+                return _trackingType;
+            case TrialRunTrackingType::TrackReads:
+                _tracker = tracker;
+                return _trackingType;
+            case TrialRunTrackingType::TrackResults: {
+                // If there are nested result tracking stages, we should only attach to the
+                // most deeply nested one.
+                if ((childrenAttachResult & TrialRunTrackingType::TrackResults) == 0) {
+                    _tracker = tracker;
+                    return TrialRunTrackingType::TrackResults;
+                } else {
+                    return TrialRunTrackingType::NoTracking;
+                }
+            }
+        }
+        MONGO_UNREACHABLE_TASSERT(8796900);
+    }
+
     /**
      * In general, accessors can be accessed only after getNext returns a row. It is most definitely
      * not OK to access accessors in ANY other state; e.g. closed, not yet opened, after EOF. We
@@ -503,6 +561,19 @@ private:
      * that feature is retired we can then simply revisit all stages and simplify them.
      */
     bool _slotsAccessible{false};
+
+    // Flag which determines whether this node and its children can participate in trial run
+    // tracking. A stage and its children are not eligible for trial run tracking when they are
+    // planned deterministically (that is, the amount of work they perform is independent of
+    // other parts of the tree which are multiplanned).
+    bool _participateInTrialRunTracking{true};
+
+    // Determines what stats are tracked during trial by this specific node.
+    const TrialRunTrackingType _trackingType{TrialRunTrackingType::NoTracking};
+
+    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
+    // run is complete, this pointer is reset to nullptr.
+    TrialRunTracker* _tracker{nullptr};
 };
 
 /**
@@ -585,8 +656,9 @@ public:
     PlanStage(StringData stageType,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
-              bool participateInTrialRunTracking)
-        : CanTrackStats{stageType, nodeId, participateInTrialRunTracking},
+              bool participateInTrialRunTracking,
+              TrialRunTrackingType trackingType = TrialRunTrackingType::NoTracking)
+        : CanTrackStats{stageType, nodeId, participateInTrialRunTracking, trackingType},
           CanInterrupt{yieldPolicy} {}
 
     virtual ~PlanStage() = default;
@@ -656,11 +728,6 @@ protected:
     virtual void doRestoreState(bool relinquishCursor) {}
     virtual void doDetachFromOperationContext() {}
     virtual void doAttachToOperationContext(OperationContext* opCtx) {}
-    virtual void doDetachFromTrialRunTracker() {}
-    virtual TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
-        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-        return TrialRunTrackerAttachResultFlags::NoAttachment;
-    }
 
     Vector _children;
 };

@@ -51,7 +51,7 @@ UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
 
 std::unique_ptr<PlanStage> UniqueStage::clone() const {
     return std::make_unique<UniqueStage>(
-        _children[0]->clone(), _keySlots, _commonStats.nodeId, _participateInTrialRunTracking);
+        _children[0]->clone(), _keySlots, _commonStats.nodeId, participateInTrialRunTracking());
 }
 
 void UniqueStage::prepare(CompileCtx& ctx) {

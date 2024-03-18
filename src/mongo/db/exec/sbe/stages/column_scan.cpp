@@ -71,7 +71,11 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage("columnscan"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
+    : PlanStage("columnscan"_sd,
+                yieldPolicy,
+                nodeId,
+                participateInTrialRunTracking,
+                TrialRunTrackingType::TrackReads),
       _collUuid(collectionUuid),
       _columnIndexName(columnIndexName),
       _paths(std::move(paths)),
@@ -104,7 +108,7 @@ std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
                                              std::move(filteredPaths),
                                              _yieldPolicy,
                                              _commonStats.nodeId,
-                                             _participateInTrialRunTracking);
+                                             participateInTrialRunTracking());
 }
 
 void ColumnScanStage::prepare(CompileCtx& ctx) {
@@ -253,16 +257,6 @@ void ColumnScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     for (auto& [path, cursor] : _parentPathCursors) {
         cursor->cursor().reattachToOperationContext(opCtx);
     }
-}
-
-void ColumnScanStage::doDetachFromTrialRunTracker() {
-    _tracker = nullptr;
-}
-
-PlanStage::TrialRunTrackerAttachResultMask ColumnScanStage::doAttachToTrialRunTracker(
-    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
-    _tracker = tracker;
-    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
 }
 
 void ColumnScanStage::open(bool reOpen) {
@@ -656,15 +650,7 @@ PlanState ColumnScanStage::getNext() {
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
     }
 
-    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
-        // If we're collecting execution stats during multi-planning and reached the end of the
-        // trial period because we've performed enough physical reads, bail out from the trial
-        // run by raising a special exception to signal a runtime planner that this candidate
-        // plan has completed its trial run early. Note that a trial period is executed only
-        // once per a PlanStage tree, and once completed never run again on the same tree.
-        _tracker = nullptr;
-        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in scan");
-    }
+    trackRead();
 
     return trackPlanState(PlanState::ADVANCED);
 }

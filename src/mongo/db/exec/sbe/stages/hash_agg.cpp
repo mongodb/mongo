@@ -131,7 +131,7 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
                                           std::move(mergingExprsClone),
                                           _yieldPolicy,
                                           _commonStats.nodeId,
-                                          _participateInTrialRunTracking,
+                                          participateInTrialRunTracking(),
                                           _forceIncreasedSpilling);
 }
 
@@ -349,15 +349,7 @@ void HashAggStage::open(bool reOpen) {
                 checkMemoryUsageAndSpillIfNecessary(memoryCheckData, _inKeyAccessors.empty());
             }
 
-            if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
-                // During trial runs, we want to limit the amount of work done by opening a blocking
-                // stage, like this one. The blocking stage tracks the number of documents it has
-                // read from its child, and if the TrialRunTracker ends the trial, a special
-                // exception returns control back to the planner.
-                _tracker = nullptr;
-                _children[0]->close();
-                uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in group");
-            }
+            trackResult();
         }
 
         if (_optimizedClose) {

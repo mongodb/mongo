@@ -81,7 +81,7 @@ std::unique_ptr<PlanStage> TraverseStage::clone() const {
                                            _final ? _final->clone() : nullptr,
                                            _commonStats.nodeId,
                                            _nestedArraysDepth,
-                                           _participateInTrialRunTracking);
+                                           participateInTrialRunTracking());
 }
 
 void TraverseStage::prepare(CompileCtx& ctx) {
