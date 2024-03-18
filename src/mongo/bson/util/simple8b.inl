@@ -867,6 +867,7 @@ inline void decodeAndVisit(uint64_t encoded,
                         encoded, visit, visitMissing);
                     break;
                 default:
+                    uasserted(8806200, "Bad extended selector");
                     break;
             }
             break;
@@ -931,6 +932,7 @@ inline void decodeAndVisit(uint64_t encoded,
                         encoded, visit, visitMissing);
                     break;
                 default:
+                    uasserted(8806201, "Bad extended selector");
                     break;
             }
             break;
@@ -968,7 +970,7 @@ inline void decodeAndVisit(uint64_t encoded,
             break;
         }
         default:
-            fassertFailed(8586000);
+            uasserted(8586000, "Bad selector");
             break;
     }
 }
@@ -1079,7 +1081,7 @@ T decodeAndSum(uint64_t encoded, uint64_t* prevNonRLE) {
         default:
             break;
     }
-    fassertFailed(8297100);
+    uasserted(8297100, "Bad selector");
     return 0;
 }
 
@@ -1199,7 +1201,7 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
         default:
             break;
     }
-    fassertFailed(8297300);
+    uasserted(8297300, "Bad selector");
     return 0;
 }
 
