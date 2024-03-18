@@ -21,7 +21,7 @@ var st = new ShardingTest({
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
     other: {
         mongosOptions:
-            {setParameter: {["failpoint.disableShardingUptimeReporting"]: "{mode: 'alwaysOn'}"}}
+            {setParameter: {"failpoint.disableShardingUptimeReporting": "{mode: 'alwaysOn'}"}}
     }
 });
 

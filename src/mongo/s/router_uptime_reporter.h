@@ -31,31 +31,32 @@
 
 #include <string>
 
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
-class OperationContext;
-
 /**
- * Utility class, which is used to periodically record in the config server's metadata the mongos
+ * Utility class, which is used to periodically record in the config server's metadata the router
  * instances, which are connected to the given config server and their uptime.
  *
  * NOTE: Not thread-safe, so it should not be used from more than one thread at a time.
  */
-class ShardingUptimeReporter {
-    ShardingUptimeReporter(const ShardingUptimeReporter&) = delete;
-    ShardingUptimeReporter& operator=(const ShardingUptimeReporter&) = delete;
+class RouterUptimeReporter {
+    RouterUptimeReporter(const RouterUptimeReporter&) = delete;
+    RouterUptimeReporter& operator=(const RouterUptimeReporter&) = delete;
 
 public:
-    ShardingUptimeReporter();
-    ~ShardingUptimeReporter();
+    RouterUptimeReporter() = default;
+    ~RouterUptimeReporter() = default;
+
+    static RouterUptimeReporter& get(ServiceContext* serviceContext);
 
     /**
      * Optional call, which would start a thread to periodically invoke reportStatus.
      */
-    void startPeriodicThread();
+    void startPeriodicThread(ServiceContext* serviceContext);
 
 private:
     // The background uptime reporter thread (if started)

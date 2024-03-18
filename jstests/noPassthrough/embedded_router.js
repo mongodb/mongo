@@ -1,5 +1,6 @@
 /*
- * Tests to validate set up of the ShardingTest enabling the embedded router.
+ * Tests to validate set up of the ShardingTest enabling the embedded router and that it does report
+ * the router port to `config.mongos`.
  *
  * @tags: [
  *    featureFlagEmbeddedRouter,
@@ -42,5 +43,12 @@ let primaryRouterHelloResponse =
 // And that it acts like a router
 assert.eq(primaryRouterHelloResponse.msg, "isdbgrid");
 assert(!primaryRouterHelloResponse.hasOwnProperty("setName"));
+
+// Check that the shard is reporting the router port to config.mongos as embedded.
+const configMongosDB = routerConn.getDB("config").mongos;
+assert.soon(() => configMongosDB.exists());
+const res = configMongosDB.find().toArray();
+assert.eq(1, res.length);
+assert(res[0].embeddedRouter);
 
 st.stop();

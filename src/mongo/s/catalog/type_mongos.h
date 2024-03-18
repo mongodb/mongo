@@ -64,6 +64,7 @@ public:
     static const BSONField<std::string> mongoVersion;
     static const BSONField<long long> configVersion;
     static const BSONField<BSONArray> advisoryHostFQDNs;
+    static const BSONField<bool> embeddedRouter;
 
     /**
      * Returns the BSON representation of the entry.
@@ -133,6 +134,14 @@ public:
     }
     void setAdvisoryHostFQDNs(const std::vector<std::string>& advisoryHostFQDNs);
 
+    /**
+     * True if this instance is defined by a router port of a mongod. Otherwise, false.
+     */
+    bool isEmbeddedRouter() const {
+        return _embeddedRouter;
+    }
+    void setEmbeddedRouter(bool embeddedRouter);
+
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
@@ -146,6 +155,8 @@ private:
     boost::optional<long long> _uptime;
     // (M) used to indicate if we are going to sleep after ping. For testing purposes
     boost::optional<bool> _waiting;
+    // (O) used to indicate if this router is part of a mongod. Default to false.
+    bool _embeddedRouter = false;
     // (O) the mongodb version of the pinging mongos
     boost::optional<std::string> _mongoVersion;
     // (O) the config version of the pinging mongos

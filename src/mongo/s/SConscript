@@ -359,6 +359,7 @@ env.Library(
         'cluster_identity_loader.cpp',
         'config_server_catalog_cache_loader.cpp',
         'grid.cpp',
+        'router_uptime_reporter.cpp',
         'shard_util.cpp',
         'sharding_index_catalog_cache.cpp',
         'sharding_state.cpp',
@@ -377,6 +378,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
@@ -428,13 +430,11 @@ env.Library(
     source=[
         'client_transport_observer_mongos.cpp',
         'service_entry_point_mongos.cpp',
-        'sharding_uptime_reporter.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
-        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/transport/session_manager',

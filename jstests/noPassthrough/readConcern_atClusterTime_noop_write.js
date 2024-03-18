@@ -18,19 +18,12 @@ if (!assert.commandWorked(conn.getDB("test").serverStatus())
 }
 MongoRunner.stopMongod(conn);
 
-// The ShardingUptimeReporter only exists on mongos.
-const shardingUptimeFailpointName = jsTestOptions().mongosBinVersion == 'last-lts'
-    ? "failpoint.disableShardingUptimeReporterPeriodicThread"
-    : "failpoint.disableShardingUptimeReporting";
-const mongosFailpointParams = {
-    setParameter: {[shardingUptimeFailpointName]: "{mode: 'alwaysOn'}"}
-};
-
 const st = new ShardingTest({
     shards: 2,
     rs: {nodes: 1},
     other: {
-        mongosOptions: mongosFailpointParams,
+        mongosOptions:
+            {setParameter: {"failpoint.disableShardingUptimeReporting": "{mode: 'alwaysOn'}"}}
     }
 });
 

@@ -53,7 +53,8 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_uptime_reporter.h"
+#include "mongo/s/router_uptime_reporter.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
@@ -74,11 +75,9 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(disableShardingUptimeReporting);
 
-const Seconds kUptimeReportInterval(10);
+const auto getRouterUptimeReporter = ServiceContext::declareDecoration<RouterUptimeReporter>();
 
-std::string constructInstanceIdString(const std::string& hostName) {
-    return str::stream() << hostName << ":" << serverGlobalParams.port;
-}
+const Seconds kUptimeReportInterval(10);
 
 /**
  * Reports the uptime status of the current instance to the config.pings collection. This method
@@ -88,19 +87,26 @@ void reportStatus(OperationContext* opCtx,
                   const std::string& instanceId,
                   const std::string& hostName,
                   const Date_t& created,
-                  const Timer& upTimeTimer) {
+                  const Timer& upTimeTimer,
+                  bool isEmbeddedRouter) {
+    if (MONGO_unlikely(disableShardingUptimeReporting.shouldFail())) {
+        LOGV2(426322, "Disabling the reporting of the uptime status for the current instance.");
+        return;
+    }
+
     MongosType mType;
     mType.setName(instanceId);
     mType.setCreated(created);
     mType.setPing(jsTime());
     mType.setUptime(upTimeTimer.seconds());
-    // balancer is never active in mongos. Here for backwards compatibility only.
+    // balancer is never active in the router. Here for backwards compatibility only.
     mType.setWaiting(true);
     mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
     auto statusWith = getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse);
     if (statusWith.isOK()) {
         mType.setAdvisoryHostFQDNs(statusWith.getValue());
     }
+    mType.setEmbeddedRouter(isEmbeddedRouter);
 
     try {
         // Field "created" should not be updated every time.
@@ -123,21 +129,18 @@ void reportStatus(OperationContext* opCtx,
 
 }  // namespace
 
-ShardingUptimeReporter::ShardingUptimeReporter() = default;
-
-ShardingUptimeReporter::~ShardingUptimeReporter() {
-    // The thread must not be running when this object is destroyed
-    invariant(!_thread.joinable());
+RouterUptimeReporter& RouterUptimeReporter::get(ServiceContext* serviceContext) {
+    return getRouterUptimeReporter(serviceContext);
 }
 
-void ShardingUptimeReporter::startPeriodicThread() {
+void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
     invariant(!_thread.joinable());
 
     Date_t created = jsTime();
 
-    _thread = stdx::thread([created] {
+    _thread = stdx::thread([serviceContext, created] {
         Client::initThread("Uptime-reporter",
-                           getGlobalServiceContext()->getService(ClusterRole::RouterServer));
+                           serviceContext->getService(ClusterRole::RouterServer));
 
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
         {
@@ -145,21 +148,19 @@ void ShardingUptimeReporter::startPeriodicThread() {
             cc().setSystemOperationUnkillableByStepdown(lk);
         }
 
+        auto opCtx = cc().makeOperationContext();
         const std::string hostName(getHostNameCached());
-        const std::string instanceId(constructInstanceIdString(hostName));
+        const std::string instanceId(prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
         const Timer upTimeTimer;
+        bool isEmbeddedRouter =
+            feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
 
         while (!globalInShutdownDeprecated()) {
-            {
-                auto opCtx = cc().makeOperationContext();
+            reportStatus(opCtx.get(), instanceId, hostName, created, upTimeTimer, isEmbeddedRouter);
 
-                if (MONGO_unlikely(disableShardingUptimeReporting.shouldFail())) {
-                    LOGV2(426322,
-                          "Disabling the reporting of the uptime status for the current instance.");
-                } else {
-                    reportStatus(opCtx.get(), instanceId, hostName, created, upTimeTimer);
-                }
-
+            if (!isEmbeddedRouter) {
                 auto status = Grid::get(opCtx.get())
                                   ->getBalancerConfiguration()
                                   ->refreshAndCheck(opCtx.get());
@@ -170,8 +171,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
                 }
 
                 try {
-                    ReadWriteConcernDefaults::get(opCtx.get()->getServiceContext())
-                        .refreshIfNecessary(opCtx.get());
+                    ReadWriteConcernDefaults::get(serviceContext).refreshIfNecessary(opCtx.get());
                 } catch (const DBException& ex) {
                     LOGV2_WARNING(
                         22877,

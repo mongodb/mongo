@@ -111,6 +111,7 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/router_uptime_reporter.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_state.h"
@@ -712,6 +713,10 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
             uassertStatusOK(AuthorizationManager::get(routerService)->initialize(opCtx));
             UserCacheInvalidator::start(service, opCtx);
         }
+    }
+    // Start reporting statistics from the router port uptime if opened.
+    if (serverGlobalParams.routerPort) {
+        RouterUptimeReporter::get(service).startPeriodicThread(service);
     }
 
     // Start transaction coordinator service only if the node is the primary of a replica set.

@@ -191,7 +191,8 @@ TEST(Validity, Valid) {
                        << MongosType::mongoVersion("x.x.x") << MongosType::configVersion(0)
                        << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo"
                                                                    << "bar"
-                                                                   << "baz")));
+                                                                   << "baz"))
+                       << MongosType::embeddedRouter(false));
 
     auto mongosTypeResult = MongosType::fromBSON(obj);
     ASSERT_OK(mongosTypeResult.getStatus());
@@ -209,6 +210,7 @@ TEST(Validity, Valid) {
     ASSERT_EQUALS(mType.getAdvisoryHostFQDNs()[0], "foo");
     ASSERT_EQUALS(mType.getAdvisoryHostFQDNs()[1], "bar");
     ASSERT_EQUALS(mType.getAdvisoryHostFQDNs()[2], "baz");
+    ASSERT_EQUALS(mType.isEmbeddedRouter(), false);
 }
 
 TEST(Validity, BadType) {

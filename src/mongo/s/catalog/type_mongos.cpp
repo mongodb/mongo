@@ -53,6 +53,7 @@ const BSONField<bool> MongosType::waiting("waiting");
 const BSONField<std::string> MongosType::mongoVersion("mongoVersion");
 const BSONField<long long> MongosType::configVersion("configVersion");
 const BSONField<BSONArray> MongosType::advisoryHostFQDNs("advisoryHostFQDNs");
+const BSONField<bool> MongosType::embeddedRouter("embeddedRouter");
 
 StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
     MongosType mt;
@@ -134,6 +135,14 @@ StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
         }
     }
 
+    if (source.hasField(embeddedRouter.name())) {
+        bool mtEmbeddedRouter;
+        Status status = bsonExtractBooleanField(source, embeddedRouter.name(), &mtEmbeddedRouter);
+        if (!status.isOK())
+            return status;
+        mt._embeddedRouter = mtEmbeddedRouter;
+    }
+
     return mt;
 }
 
@@ -176,6 +185,8 @@ BSONObj MongosType::toBSON() const {
         builder.append(configVersion.name(), getConfigVersion());
     if (_advisoryHostFQDNs)
         builder.append(advisoryHostFQDNs.name(), getAdvisoryHostFQDNs());
+    if (_embeddedRouter)
+        builder.append(embeddedRouter.name(), isEmbeddedRouter());
 
     return builder.obj();
 }
@@ -212,6 +223,10 @@ void MongosType::setConfigVersion(const long long configVersion) {
 
 void MongosType::setAdvisoryHostFQDNs(const std::vector<std::string>& advisoryHostFQDNs) {
     _advisoryHostFQDNs = advisoryHostFQDNs;
+}
+
+void MongosType::setEmbeddedRouter(bool embeddedRouter) {
+    _embeddedRouter = embeddedRouter;
 }
 
 std::string MongosType::toString() const {

@@ -84,7 +84,7 @@ var testListConfigCollections = function(st) {
     configDB.createCollection(userAddedColl.getName());
     configCollList.push(userAddedColl.getName());
 
-    // wait for config.mongos to be created by ShardingUptimeReporter
+    // wait for config.mongos to be created by RouterUptimeReporter
     assert.soon(() => configDB.mongos.exists());
 
     cursor = getListCollectionsCursor(configDB);
