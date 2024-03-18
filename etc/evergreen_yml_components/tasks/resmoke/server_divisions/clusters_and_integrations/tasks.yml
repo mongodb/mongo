@@ -797,11 +797,6 @@ tasks:
       args:
       - "src/evergreen/external_auth_azure_setup.sh"
   - func: "run tests"
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/external_auth_azure_teardown.sh"
 
 - <<: *task_template
   name: external_auth_oidc_gcp

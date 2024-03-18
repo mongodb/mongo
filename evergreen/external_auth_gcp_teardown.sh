@@ -10,6 +10,8 @@ if [ "${task_name}" != "external_auth_oidc_gcp" ]; then
   exit 0
 fi
 
+echo "Cleaning up OIDC GCP test artifacts"
+
 # Delete the GCP VM specified in gce_vm_info.json if GOOGLE_APPLICATION_CREDENTIALS is set, points
 # to a file, and the GCE config and VM info files exist.
 if [ ! -z "${GOOGLE_APPLICATION_CREDENTIALS}" ] \
