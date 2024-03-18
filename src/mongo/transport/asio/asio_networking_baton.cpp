@@ -75,7 +75,14 @@ struct EventFDHolder {
         ::close(fd);
     }
 
+    void initIfNeeded() {
+        if (!isFdValid()) {
+            fd = _initFd();
+        }
+    }
+
     void notify() {
+        invariant(isFdValid());
         while (::eventfd_write(fd, 1) != 0) {
             const auto savedErrno = errno;
             if (savedErrno == EINTR)
@@ -86,6 +93,7 @@ struct EventFDHolder {
 
     void wait() {
         // If we have activity on the `eventfd`, pull the count out.
+        invariant(isFdValid());
         ::eventfd_t u;
         while (::eventfd_read(fd, &u) != 0) {
             const auto savedErrno = errno;
@@ -96,6 +104,10 @@ struct EventFDHolder {
     }
 
 private:
+    bool isFdValid() {
+        return fd >= 0;
+    }
+
     static int _initFd() {
         int fd = ::eventfd(0, EFD_CLOEXEC);
         // On error, -1 is returned and `errno` is set
@@ -115,7 +127,8 @@ private:
     }
 
 public:
-    const int fd = _initFd();
+    // fd is lazy-initialized.
+    int fd = -1;
 };
 
 const auto getEventFDForClient = Client::declareDecoration<EventFDHolder>();
@@ -469,9 +482,16 @@ std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBato
             return {};
         }
     } else {
+        // Lazily initialize the eventfd if needed. The notifying thread is guaranteed to see
+        // the eventfd when it reads _notificationState == kInPoll because the write of kInPoll
+        // below is at least release (it's seq_cst) and the read of _notificationState in notify()
+        // is at least acquire (it's also seq_cst).
+        auto& efdHolder = efd(_opCtx);
+        efdHolder.initIfNeeded();
+
         _pollSet.clear();
         _pollSet.reserve(_sessions.size() + 1);
-        _pollSet.push_back({efd(_opCtx).fd, POLLIN, 0});
+        _pollSet.push_back({efdHolder.fd, POLLIN, 0});
 
         _pollSessions.clear();
         _pollSessions.reserve(_sessions.size());
