@@ -1850,6 +1850,37 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleNotPossible) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, DoubleIncreaseScaleWithoutOverflow) {
+    BSONColumnBuilder cb;
+
+    // This test needs to rescale doubles but can do so where there's no overflow in the new control
+    std::vector<BSONElement> elems = {createElementDouble(314159264193.46228),
+                                      createElementDouble(314159265898.77252),
+                                      createElementDouble(314159265702.07281),
+                                      createElementDouble(314159264022.27118),
+                                      createElementDouble(314159264047.43854)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1100, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.begin() + 3, elems.front(), 10000), 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected,
+        {deltaDoubleMemory(elems[3], elems[2]), deltaDoubleMemory(elems[4], elems[3])},
+        1);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
     BSONColumnBuilder cb;
 

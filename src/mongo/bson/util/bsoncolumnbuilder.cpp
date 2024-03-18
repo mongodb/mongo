@@ -643,6 +643,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
 
     // If we have not yet overflowed then continue the same operation from the previous
     // simple8b block
+    bool doubleRescale = false;
     if (!overflow && last.control) {
         auto blocks = numSimple8bBlocksForControlByte(*last.control);
         // Append values from control block to detect overflow. If the scale indices are
@@ -687,11 +688,11 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
                                            sizeof(uint64_t) +
                                        /* control byte*/ 1,
                                    /* one block at a time */ sizeof(uint64_t));
-            boost::optional<uint64_t> last;
+            boost::optional<uint64_t> lastValue;
             for (auto&& elem : s8b) {
-                last = elem;
+                lastValue = elem;
             }
-            encoder.simple8bBuilder.setLastForRLE(last);
+            encoder.simple8bBuilder.setLastForRLE(lastValue);
         }
 
         if (!resumeCurrent) {
@@ -699,24 +700,53 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
             // then disregard this control block and proceed as-if we didn't overflow in the
             // first as there's nothing to re-write in the second control block.
             if (overflowIndex == blocks - 1) {
-                // If the previous control block was not full, and we scaled down then append it to
-                // the buffer we did not overflow with the current control. This is needed for the
-                // double type where we might not fill the control block with simple8b due to
-                // scaling. This will setup the builder as-if we can re-use it in the scale down
-                // case with the values in the current control block that will all be in pending
-                // (because no overflow yet). If we scaled up, it is not possible to re-use this
-                // control block because if that would have been the case we'd scale up the previous
-                // control instead and would have never observed different scale here.
-                if (blocks != 16 && current.scaleIndex < last.scaleIndex) {
-                    buffer.appendBuf(last.control, sizeof(uint64_t) * blocks + 1);
+                // If the previous control block was not full, and we scaled then we need to
+                // determine if we should consider the overflow happening in this block or not. This
+                // can happen for the double type where we might not fill the control block with
+                // values due to scaling. To determine if we overflowed here we will check if at
+                // least one value can be re-scaled into the new scale factor as that represent a
+                // "soft" boundary between the control blocks. If re-scaling was not possible there
+                // is nothing from the previous control that should be kept for the following
+                // values.
+                if (blocks != 16 && current.scaleIndex != last.scaleIndex) {
+                    // Encode last using new scale factor
+                    auto encoded =
+                        Simple8bTypeUtil::encodeDouble(last.lastAtEndOfBlock, current.scaleIndex);
+                    Simple8b<uint64_t> rescale(
+                        control + 1, currNumBlocks * sizeof(uint64_t), lastForS8b);
+                    bool possible = true;
+                    // Iterate until we find a non-skipped value
+                    for (auto&& elem : rescale) {
+                        if (elem) {
+                            // See if this value is possible to scale using the old scale factor
+                            encoded = expandDelta(*encoded, Simple8bTypeUtil::decodeInt64(*elem));
+                            if (!Simple8bTypeUtil::encodeDouble(
+                                    Simple8bTypeUtil::decodeDouble(*encoded, current.scaleIndex),
+                                    last.scaleIndex)) {
+                                possible = false;
+                            }
+                            break;
+                        }
+                    }
 
-                    // offset will temporarily set to a negative value to compensate for the buffer
-                    // we wrote above even when there's no overflow. Later on we will add a larger
-                    // value which will make it positive again.
-                    offset -= sizeof(uint64_t) * blocks + 1;
+                    if (possible) {
+                        // We could re-scale. Treat this as a special overflow where we append the
+                        // necessary overflow data but mark the state as no overflow. We will then
+                        // append all remaining values and the state will be setup accordingly
+                        buffer.appendBuf(last.control, sizeof(uint64_t) * blocks + 1);
 
-                    regular._controlByteOffset = 0;
-                    lastControl = *last.control;
+                        // offset will temporarily set to a negative value to compensate for the
+                        // buffer we wrote above even when there's no overflow. Later on we will add
+                        // a larger value which will make it positive again.
+                        offset -= sizeof(uint64_t) * blocks + 1;
+
+                        regular._controlByteOffset = 0;
+                        lastControl = *last.control;
+
+                        // Record that this code path was taken, this will prevent code later from
+                        // overwriting some state we've just set.
+                        doubleRescale = true;
+                    }
                 }
 
                 overflow = false;
@@ -778,9 +808,9 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
     }
 
     // If we did not overflow earlier we might have written a control byte when appending all
-    // pending values, if this was the case make sure it is recorded. If we have scaled down, skip
+    // pending values, if this was the case make sure it is recorded. If we have rescaled, skip
     // this step as the correct control byte has already been recorded.
-    if (regular._controlByteOffset != kNoSimple8bControl && current.scaleIndex >= last.scaleIndex) {
+    if (regular._controlByteOffset != kNoSimple8bControl && !doubleRescale) {
         lastControl = *control;
     }
 
