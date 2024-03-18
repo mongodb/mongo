@@ -181,13 +181,6 @@ selector:
   # command cannot be used on a sharded collection.
   - jstests/core/**/mr_sort.js
 
-  # This test expects a function stored in the system.js collection to be available for an operation
-  # which may not be the case if it is implicitly sharded in a passthrough.
-  - jstests/core/**/mr_stored.js
-  - jstests/core/**/where_system_js.js
-  - jstests/core/**/system_js_access.js
-  - jstests/core/**/system_js_drop.js
-
   # Test expects failure, but two phase write protocol exits early with OK status if there are no
   # matching documents.
   - jstests/core/**/rename_operator.js
@@ -284,6 +277,9 @@ selector:
   - requires_capped
   # Prepare is not a command on mongos.
   - uses_prepare_transaction
+  # Tests with this tag use system.js stored functions and expect that collection to be available
+  # for an operation, which may not be the case if it is implicitly sharded in a passthrough.
+  - requires_system_dot_js_stored_functions
 
 executor:
   archive:

@@ -13,9 +13,10 @@
  *  requires_non_retryable_writes,
  *  uses_map_reduce_with_temp_collections,
  *  requires_scripting,
- *  # TODO SERVER-82802: re-enable this test in suites with random migrations
- *  # "system.js" collection is not preserved when data is migrated
- *  # to other shards (e.g. moveRange, moveCollection)
+ *  requires_system_dot_js_stored_functions,
+ *  # system.js stored functions only work for collections located on the db-primary shard (see
+ *  # SERVER-83269). Therefore, this test would fail if ran on suites that migrate data to other
+ *  # shards (e.g. moveChunk, moveCollection).
  *  assumes_balancer_off,
  * ]
  */

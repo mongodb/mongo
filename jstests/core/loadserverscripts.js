@@ -7,7 +7,8 @@
 //   does_not_support_causal_consistency,
 //   # DB.prototype.loadServerScripts does not behave as expected in module mode, and the SELinux
 //   # test runner loads scripts with dynamic load.
-//   no_selinux
+//   no_selinux,
+//   requires_system_dot_js_stored_functions,
 // ]
 
 // Test db.loadServerScripts()

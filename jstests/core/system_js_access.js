@@ -4,6 +4,7 @@
 //   requires_non_retryable_writes,
 //   # Uses $function operator.
 //   requires_scripting,
+//   requires_system_dot_js_stored_functions,
 // ]
 
 const testDB = db.getSiblingDB('system_js_access');

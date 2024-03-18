@@ -24,11 +24,9 @@ selector:
   - featureFlagColumnstoreIndexes
   # Server side javascript not allowed in Serverless.
   - requires_scripting
-  exclude_files:
   # server-side javascript is not supported in serverless mode.
-  - jstests/core/**/system_js_drop.js
-  - jstests/core/**/system_js_access.js
-  - jstests/core/**/where_system_js.js
+  - requires_system_dot_js_stored_functions
+  exclude_files:
   # setLogLevel calls setParameter command which is not allowed with security token.
   - jstests/core/**/list_all_local_sessions.js
   - jstests/core/**/list_all_sessions.js
