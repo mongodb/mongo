@@ -68,4 +68,6 @@ assert.soon(() => {
     return findChunksUtil.findChunksByNs(configDB, nss, {shard: st.shard1.shardName}).itcount() > 0;
 });
 
+st.awaitMigrations();
+
 st.stop();

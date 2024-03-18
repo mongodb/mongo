@@ -514,6 +514,14 @@ var ShardingTest = function ShardingTest(params) {
         }
     };
 
+    ShardingTest.prototype.awaitMigrations = function() {
+        this.stopBalancer();
+
+        for (let i = 0; i < numShards; i++) {
+            assert.commandWorked(this["shard" + i].adminCommand({"_shardsvrJoinMigrations": 1}));
+        }
+    };
+
     ShardingTest.prototype.stop = function(opts = {}) {
         this.checkMetadataConsistency();
         this.checkUUIDsConsistentAcrossCluster();
