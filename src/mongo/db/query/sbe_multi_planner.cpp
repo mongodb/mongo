@@ -344,9 +344,10 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     }
 
     // Extend the winning candidate with the agg pipeline and rebuild the execution tree. Because
-    // the trial was done with find-only part of the query, we cannot reuse the results. The
-    // non-winning plans are only used in 'explain()' so, to save on unnecessary work, we extend
-    // them only if this is an 'explain()' request.
+    // the trial was done with find-only part of the query, we cannot reuse the results. We do not
+    // extend the rejected plans because doing so erases execution statistics. The agg pipeline does
+    // not affect plan selection anyway. This is consistent with the classic runtime planner for
+    // SBE.
     if (!_cq.cqPipeline().empty()) {
         winner.root->close();
         _yieldPolicy->clearRegisteredPlans();
@@ -375,20 +376,6 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
                                             plan_ranker::CandidatePlanData{std::move(data)}};
         candidates[winnerIdx].clonedPlan.emplace(std::move(clonedPlan));
         candidates[winnerIdx].root->open(false);
-
-        if (_cq.getExplain()) {
-            for (size_t i = 0; i < candidates.size(); ++i) {
-                if (i == winnerIdx)
-                    continue;  // have already done the winner
-
-                auto solution = QueryPlanner::extendWithAggPipeline(
-                    _cq, std::move(candidates[i].solution), plannerParams.secondaryCollectionsInfo);
-                auto&& [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
-                    _opCtx, _collections, _cq, *solution, _yieldPolicy);
-                candidates[i] = sbe::plan_ranker::CandidatePlan{
-                    std::move(solution), std::move(rootStage), std::move(data)};
-            }
-        }
     }
 
     // Writes a cache entry for the winning plan to the plan cache if possible.
