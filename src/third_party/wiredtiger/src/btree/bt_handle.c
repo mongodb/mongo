@@ -492,7 +492,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * and compression always gives us more than 4x).
      *	Don't do compression adjustment for fixed-size column store, the
      * leaf page sizes don't change. (We could adjust internal pages but not
-     * internal pages, but that seems an unlikely use case.)
+     * leaf pages, but that seems an unlikely use case.)
      */
     btree->intlpage_compadjust = false;
     btree->maxintlpage_precomp = btree->maxintlpage;
