@@ -359,7 +359,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
         WT_ASSERT(session, othercb == NULL);
         if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
-            WT_RET_MSG(session, EINVAL, "Incremental backup is not configured");
+            WT_ERR_MSG(session, EINVAL, "Incremental backup is not configured");
         F_SET(cb, WT_CURBACKUP_QUERYID);
     } else if (WT_STRING_MATCH("backup:export", uri, strlen(uri)))
         /* Special backup cursor for export operation. */
@@ -370,7 +370,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
      * use on the connection and it isn't an export cursor.
      */
     if (WT_CONN_TIERED_STORAGE_ENABLED(S2C(session)) && !F_ISSET(cb, WT_CURBACKUP_EXPORT))
-        return (ENOTSUP);
+        WT_ERR(ENOTSUP);
 
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
