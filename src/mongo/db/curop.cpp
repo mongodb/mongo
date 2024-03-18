@@ -818,9 +818,15 @@ void CurOp::reportState(BSONObjBuilder* builder,
     // truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
 
-    auto opDescription =
-        serializeDollarDbInOpDescription(_nss.tenantId(), _opDescription, serializationContext);
-    auto obj = appendCommentField(opCtx, opDescription);
+    auto obj = [&]() {
+        if (!gMultitenancySupport) {
+            return appendCommentField(opCtx, _opDescription);
+        } else {
+            return appendCommentField(opCtx,
+                                      serializeDollarDbInOpDescription(
+                                          _nss.tenantId(), _opDescription, serializationContext));
+        }
+    }();
 
     // If flag is true, add command field to builder without sensitive information.
     if (omitAndRedactInformation) {
