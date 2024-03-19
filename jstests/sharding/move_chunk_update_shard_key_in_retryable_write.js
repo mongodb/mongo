@@ -6,7 +6,11 @@
  * error saying that the write can't be retried since it was upgraded to a transaction as part of
  * the update. This should be true whether or not a migration occurs on the chunk containing the
  * original value of the document's shard key. This file tests that behavior.
- * @tags: [uses_transactions, uses_multi_shard_transaction,]
+ * @tags: [
+ *    uses_transactions,
+ *    uses_multi_shard_transaction,
+ *    temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {
     moveChunkParallel,

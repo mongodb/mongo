@@ -4,10 +4,10 @@
  * stream events - ones that happened before, during, and after resharding of the collection.
  *
  * @tags: [
+ *   assumes_read_preference_unchanged,
+ *   assumes_unsharded_collection,
  *   requires_fcv_60,
  *   uses_change_streams,
- *   assumes_unsharded_collection,
- *   assumes_read_preference_unchanged,
  * ]
  */
 

@@ -1,8 +1,13 @@
-/*
+/**
  * Confirm that retryable writes written with stmtId = -1 do not store stmtId information and that
  * this behavior is preserved through the restart of the primary shard & mongos.
  *
- * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
+ * @tags: [
+ *   requires_fcv_60,
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_known_issues,
+ *   uses_transactions,
+ * ]
  */
 import {getOplogEntriesForTxn} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 

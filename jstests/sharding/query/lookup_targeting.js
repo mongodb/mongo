@@ -1,4 +1,4 @@
-/*
+/**
  * Test that the targeting of $lookup queries and any sub-queries works correctly.
  *
  * @tags: [
@@ -10,7 +10,8 @@
  *   requires_profiling,
  *   # Needed to run createUnsplittableCollection
  *   featureFlagAuthoritativeShardCollection,
- *   requires_fcv_80
+ *   temp_disabled_embedded_router_uncategorized,
+ *   requires_fcv_80,
  * ]
  */
 

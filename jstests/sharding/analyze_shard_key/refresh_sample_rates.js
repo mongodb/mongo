@@ -7,7 +7,7 @@
  *   requires_fcv_70,
  *   requires_persistence,
  *   # Test doesn't start enough mongods to have num_mongos routers
- *   temp_disabled_embedded_router,
+ *   temp_disabled_embedded_router_num_routers,
  * ]
  */
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";

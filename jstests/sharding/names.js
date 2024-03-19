@@ -1,7 +1,7 @@
 // Test that having replica set names the same as the names of other shards works fine
 // @tags: [
 //   # Test doesn't start enough mongods to have num_mongos routers
-//   temp_disabled_embedded_router,
+//   temp_disabled_embedded_router_num_routers,
 // ]
 var st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
 

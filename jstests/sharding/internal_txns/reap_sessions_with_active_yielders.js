@@ -2,7 +2,11 @@
  * Test that the logical session cache reaper does not reap sessions with active TransactionRouter
  * yielders.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [
+ *    requires_fcv_60,
+ *    uses_transactions,
+ *    temp_disabled_embedded_router_known_issues,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";

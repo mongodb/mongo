@@ -1,6 +1,7 @@
 /**
  * @tags: [
  *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_test_issue,
  * ]
  */
 

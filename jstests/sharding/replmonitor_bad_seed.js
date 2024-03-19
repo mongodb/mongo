@@ -16,7 +16,10 @@
  * the shard use an in-memory storage engine, since the shardIdentity document will be lost after
  * restart.
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_test_issue,
+ * ]
  */
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 

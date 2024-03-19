@@ -5,6 +5,7 @@
  * @tags: [
  *    requires_sharding,
  *    requires_fcv_71,
+ *    temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

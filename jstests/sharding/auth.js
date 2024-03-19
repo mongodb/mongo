@@ -7,7 +7,7 @@
  * @tags: [
  *   resource_intensive,
  *   # Test doesn't start enough mongods to have num_mongos routers
- *   temp_disabled_embedded_router,
+ *   temp_disabled_embedded_router_num_routers,
  * ]
  */
 import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";

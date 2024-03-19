@@ -1,6 +1,7 @@
 // Tests the basic API of the getDefaultRWConcern and setDefaultRWConcern commands and their
 // associated persisted state against different topologies.
 // @tags: [
+//    temp_disabled_embedded_router_uncategorized,
 // ]
 // Asserts a set/get default RWC command response or persisted document contains the expected
 // fields. Assumes a default read or write concern has been set previously and the response was not

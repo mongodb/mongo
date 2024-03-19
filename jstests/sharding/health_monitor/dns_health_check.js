@@ -1,7 +1,11 @@
 /**
  * Tests successful dns health check.
  *
- *  @tags: [multiversion_incompatible]
+ *  @tags: [
+ *    multiversion_incompatible,
+ *    temp_disabled_embedded_router_health_monitor,
+ *    temp_disabled_embedded_router_metrics,
+ * ]
  */
 const kWaitForCompletedChecksCount = 30;
 const kWaitForPassedChecksCount = 10;

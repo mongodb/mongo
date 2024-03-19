@@ -7,7 +7,8 @@
  * expect it to still have all the previous data.
  *
  * @tags: [
- *  requires_persistence,
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_uncategorized,
  * ]
  *
  */

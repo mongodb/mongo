@@ -2,11 +2,12 @@
  * Tests two-phase write commands on a timeseries collection when the sharding state is stale.
  *
  * @tags: [
- *   # We need a timeseries collection.
- *   requires_timeseries,
+ *   featureFlagTimeseriesUpdatesSupport,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   featureFlagTimeseriesUpdatesSupport,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
+ *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

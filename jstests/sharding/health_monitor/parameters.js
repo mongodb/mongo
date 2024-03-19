@@ -1,5 +1,8 @@
-/*
- *  @tags: [multiversion_incompatible]
+/**
+ * @tags: [
+ *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 
 let CUSTOM_INTERVAL = 1337;

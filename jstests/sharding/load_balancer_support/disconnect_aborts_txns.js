@@ -1,6 +1,10 @@
 /**
- * @tags: [uses_transactions, uses_multi_shard_transaction,
- * requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   temp_disabled_embedded_router_uncategorized,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
+ * ]
  *
  * Tests that when a load-balanced client disconnects, its in-progress transactions are aborted
  */

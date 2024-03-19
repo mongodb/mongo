@@ -1,5 +1,8 @@
 /**
  * Test of complex sharding initialization
+ * @tags: [
+ *   temp_disabled_embedded_router_test_issue,
+ * ]
  */
 
 function shardingTestUsingObjects() {

@@ -1,7 +1,11 @@
-/*
+/**
  * Tests that bulk write operations succeed on a two shard cluster with both
  * sharded and unsharded data.
- * @tags: [multiversion_incompatible, requires_fcv_80]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   requires_fcv_80,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

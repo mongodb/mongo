@@ -3,6 +3,7 @@
 // @tags: [
 //   multiversion_incompatible,
 //   uses_transactions,
+//   uses_change_streams,
 // ]
 
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";

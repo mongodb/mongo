@@ -1,7 +1,10 @@
 /**
  * Tests the basics of the "directShardConnections" serverStatus metrics.
  *
- * @tags: [requires_fcv_73]
+ * @tags: [
+ *   requires_fcv_73,
+ *   temp_disabled_embedded_router_metrics,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

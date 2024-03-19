@@ -1,7 +1,10 @@
 /**
  * Tests the Config server observer.
  *
- *  @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 const kWaitForCompletedChecksCount = 20;
 const kWaitForPassedChecksCount = 10;

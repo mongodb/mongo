@@ -4,7 +4,10 @@
  * config server.
  *
  * This test restarts shard replica sets, so it requires a persistent storage engine.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_test_issue,
+ * ]
  */
 // This test uses authentication and runs commands without authenticating, which is not
 // compatible with implicit sessions.

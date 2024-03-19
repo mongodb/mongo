@@ -1,6 +1,9 @@
 // Tests for sharded limit + batchSize. Make sure that various combinations
 // of limit and batchSize with sort return the correct results, and do not issue
 // unnecessary getmores (see SERVER-14299).
+// @tags: [
+//   temp_disabled_embedded_router_metrics,
+// ]
 /**
  * Test the correctness of queries with sort and batchSize on a sharded cluster,
  * running the queries against collection 'coll'.

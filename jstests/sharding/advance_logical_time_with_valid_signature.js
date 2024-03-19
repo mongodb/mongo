@@ -1,6 +1,9 @@
 /**
  * Tests that the mongo shell can use a cluster time with a valid signature to advance a server's
  * cluster time.
+ * @tags: [
+ *   temp_disabled_embedded_router_mongo_bridge,
+ * ]
  */
 // Setup 2 mongos processes with mongobridge.
 let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true});

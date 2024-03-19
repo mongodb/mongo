@@ -3,7 +3,7 @@
  * This test fails when run with authentication due to SERVER-6327
  * @tags: [
  *   # Test doesn't start enough mongods to have num_mongos routers
- *   temp_disabled_embedded_router,
+ *   temp_disabled_embedded_router_num_routers,
  * ]
  */
 

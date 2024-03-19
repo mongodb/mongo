@@ -15,6 +15,9 @@
  *                 *when the range has been deleted on the donor.*
  * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
  * "versioned". Determines what system profiler checks are performed.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {
     buildCommandProfile,

@@ -1,4 +1,7 @@
 // create
+// @tags: [
+//   temp_disabled_embedded_router_test_issue,
+// ]
 var s = new ShardingTest({
     shards: 2,
     other: {

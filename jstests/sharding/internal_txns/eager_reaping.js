@@ -2,7 +2,11 @@
  * Tests that transaction records for retryable internal sessions are reaped eagerly when they are
  * reaped early from memory.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [
+ *    requires_fcv_60,
+ *    uses_transactions,
+ *    temp_disabled_embedded_router_known_issues,
+ * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 

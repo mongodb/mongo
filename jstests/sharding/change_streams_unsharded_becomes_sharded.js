@@ -4,11 +4,11 @@
 // shardCollection command can be used to resume the stream even after the collection has been
 // sharded.
 // @tags: [
-//   requires_majority_read_concern,
-//   uses_change_streams,
 //   # TODO SERVER-30784: Remove 'multiversion_incompatible' tag and
 //   # 'throwChangeStreamTopologyChangeExceptionToClient'.
-//   multiversion_incompatible
+//   multiversion_incompatible,
+//   requires_majority_read_concern,
+//   uses_change_streams,
 // ]
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 

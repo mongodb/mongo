@@ -2,7 +2,10 @@
  * Turning off health observer during transient fault removes the associated fault facet and
  * transitions back to Ok.
  *
- *  @tags: [multiversion_incompatible]
+ *  @tags: [
+ *    multiversion_incompatible,
+ *    temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 const params = {
     setParameter: {

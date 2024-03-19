@@ -1,6 +1,9 @@
 /**
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {
     moveDatabaseAndUnshardedColls

@@ -1,6 +1,9 @@
 /**
  * Tests the setShardVersion logic on the this shard side, specifically when comparing
  * against a major version of zero or incompatible epochs.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 

@@ -1,6 +1,9 @@
 /**
  * Tests hedging metrics in the serverStatus output.
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   requires_fcv_70,
+ *   temp_disabled_embedded_router_metrics,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 

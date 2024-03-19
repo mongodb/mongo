@@ -1,6 +1,7 @@
 // Tests metadata notifications of change streams on sharded collections.
 // @tags: [
 //   requires_majority_read_concern,
+//   uses_change_streams,
 // ]
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 

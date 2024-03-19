@@ -3,9 +3,10 @@
  * then after failover the result is available to retries.
  *
  * @tags: [
- *   uses_atclustertime,
- *   requires_fcv_72,
  *   featureFlagReshardingImprovements,
+ *   requires_fcv_72,
+ *   temp_disabled_embedded_router_uncategorized,
+ *   uses_atclustertime,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";

@@ -8,9 +8,10 @@
  * resharding test fixture, which doesn't work when the first shard is the config server. This only
  * tests the testing fixture, so it wouldn't add meaningful coverage for a config shard.
  * @tags: [
- *   requires_persistence,
- *   uses_atclustertime,
  *   config_shard_incompatible,
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_uncategorized,
+ *   uses_atclustertime,
  * ]
  */
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";

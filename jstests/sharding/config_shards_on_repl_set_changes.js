@@ -1,6 +1,9 @@
 /**
  * Tests that the connection string in the config.shards document is correctly updated when a node
  * is added or removed from the replica set.
+ * @tags: [
+ *    temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});

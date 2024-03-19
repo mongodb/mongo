@@ -10,6 +10,9 @@
  * This behavior can be overridden by adding the bool `allowRewriteStateChange`
  * to the failpoint's configuration object.
  *
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 var st = new ShardingTest({shards: 1, mongos: 1});

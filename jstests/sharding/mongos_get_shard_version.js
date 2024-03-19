@@ -1,5 +1,8 @@
 /**
  * Test that mongos getShardVersion returns the correct version and chunks.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 // If the server has been compiled with the code coverage flag, then the splitChunk command can take
 // significantly longer than the 8-second interval for the continuous stepdown thread. This causes

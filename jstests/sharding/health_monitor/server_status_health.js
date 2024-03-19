@@ -1,7 +1,10 @@
 /**
  * Tests server status has correct fault/facet information.
  *
- *  @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 function changeObserverIntensity(observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};

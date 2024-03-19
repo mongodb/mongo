@@ -1,4 +1,8 @@
 // Tests user queries over the config servers.
+// @tags: [
+//    temp_disabled_embedded_router_known_issues,
+// ]
+
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var getListCollectionsCursor = function(database, options, subsequentBatchSize) {

@@ -1,5 +1,8 @@
-/*
- *  @tags: [multiversion_incompatible]
+/**
+ * @tags: [
+ *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 const PROGRESS_TIMEOUT_SECONDS = 5;
 const monitoringIntervalMs = 500;

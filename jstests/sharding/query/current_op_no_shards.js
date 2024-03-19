@@ -3,7 +3,10 @@
  * set, and does not cause the mongoS floating point failure described in SERVER-30084.
  *
  * Requires no shards so there can't be a config shard.
- * @tags: [config_shard_incompatible]
+ * @tags: [
+ *   config_shard_incompatible,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 const st = new ShardingTest({shards: 0});
 

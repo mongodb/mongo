@@ -2,7 +2,10 @@
  * Ensures that if the primary config server is blackholed from the point of view of mongos, CRUD
  * and read-only config operations continue to work.
  *
- * @tags: [config_shard_incompatible]
+ * @tags: [
+ *    config_shard_incompatible,
+ *    temp_disabled_embedded_router_mongo_bridge,
+ * ]
  */
 
 import {reconfig} from "jstests/replsets/rslib.js";

@@ -1,6 +1,9 @@
 // This test requires persistence because it assumes standalone shards will still have their data
 // after restarting.
-// @tags: [requires_persistence]
+// @tags: [
+//   requires_persistence,
+//   temp_disabled_embedded_router_uncategorized,
+// ]
 
 var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 

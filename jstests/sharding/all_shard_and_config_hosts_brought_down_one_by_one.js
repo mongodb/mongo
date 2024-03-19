@@ -3,7 +3,10 @@
  *
  * Restarts the config server, which requires persistence so restarted nodes can rejoin their
  * original replica set and run shutdown hooks.
- * @tags: [requires_persistence]
+ * @tags: [
+ *    requires_persistence,
+ *    temp_disabled_embedded_router_test_issue,
+ * ]
  */
 
 // The following checks involve talking to the config server, which is shut down in this test

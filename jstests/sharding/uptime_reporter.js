@@ -1,7 +1,10 @@
 /**
  * Test that mongos creation time is reported once and only once.
  *
- * @tags: [requires_fcv_52]
+ * @tags: [
+ *   requires_fcv_52,
+ *   temp_disabled_embedded_router_known_issues,
+ * ]
  */
 
 const st = new ShardingTest({shards: 1});

@@ -5,7 +5,8 @@
  * bumps the collection version.
  *
  * @tags: [
- *   does_not_support_stepdowns,
+ *    does_not_support_stepdowns,
+ *    temp_disabled_embedded_router_uncategorized,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

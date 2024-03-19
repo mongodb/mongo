@@ -3,7 +3,10 @@
  * distribution metrics, but on replica sets it does not since query sampling is only supported on
  * sharded clusters at this point.
  *
- * @tags: [requires_fcv_71]
+ * @tags: [
+ *   requires_fcv_71,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {

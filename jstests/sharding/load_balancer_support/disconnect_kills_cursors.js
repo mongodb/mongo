@@ -1,5 +1,8 @@
 /**
  * Tests that when a load-balanced client disconnects, its cursors are killed.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
 

@@ -12,6 +12,7 @@
  *   multiversion_incompatible,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
+ *   uses_change_streams,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

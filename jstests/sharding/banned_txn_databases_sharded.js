@@ -8,6 +8,7 @@
  *
  * @tags: [
  *   uses_transactions,
+ *   temp_disabled_embedded_router_known_issues,
  * ]
  */
 

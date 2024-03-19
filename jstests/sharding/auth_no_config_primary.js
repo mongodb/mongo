@@ -3,7 +3,10 @@
  *
  * This test cannot be run on ephemeral storage engines because it requires the users to persist
  * across a restart.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_test_issue,
+ * ]
  */
 
 // The following checks involve talking to the config server primary, which is shut down in this

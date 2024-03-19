@@ -3,6 +3,7 @@
  * @tags: [
  *   config_shard_incompatible,
  *   requires_fcv_70,
+ *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 import {validateSessionsCollection} from "jstests/libs/sessions_collection.js";

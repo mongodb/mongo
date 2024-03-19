@@ -2,7 +2,10 @@
  * Tests that if the primary config server is blackholed from the point of view of mongos,
  * the Config server health checker will eventually crash the server.
  *
- *  @tags: [multiversion_incompatible]
+ *  @tags: [
+ *    multiversion_incompatible,
+ *    temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 import {reconfig} from "jstests/replsets/rslib.js";
 

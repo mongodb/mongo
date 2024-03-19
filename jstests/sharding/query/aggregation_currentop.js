@@ -13,7 +13,13 @@
  * applicable.
  *
  * This test requires replica set configuration and user credentials to persist across a restart.
- * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction, requires_fcv_70]
+ * @tags: [
+ *   requires_fcv_70,
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_metrics,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 // Restarts cause issues with authentication for awaiting replication.

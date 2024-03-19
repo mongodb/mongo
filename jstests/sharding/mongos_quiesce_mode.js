@@ -3,6 +3,10 @@
  * During quiesce mode, existing operations are allowed to continue and new operations are
  * accepted. However, hello requests return a ShutdownInProgress error, so that clients can
  * begin re-routing operations.
+ *
+ * @tags: [
+ *    temp_disabled_embedded_router_test_issue,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

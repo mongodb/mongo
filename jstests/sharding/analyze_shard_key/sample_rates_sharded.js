@@ -3,7 +3,10 @@
  * command, and that the number of queries sampled by each mongos or shardsvr mongod in a sharded
  * cluster is proportional to the number of queries it executes.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   requires_fcv_70,
+ *   temp_disabled_embedded_router_known_issues,
+ * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
 import {

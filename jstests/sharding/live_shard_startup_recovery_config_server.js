@@ -2,7 +2,10 @@
  * Tests that sharding state is properly initialized on config servers that undergo startup
  * recovery.
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -2,7 +2,10 @@
  * Tests that $_internalOwningShard expression correctly computes the shard id the document belongs
  * to, while executing on mongod.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [
+ *   requires_fcv_63,
+ *   temp_disabled_embedded_router_known_issues,
+ * ]
  */
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 

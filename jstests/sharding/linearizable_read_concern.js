@@ -1,4 +1,4 @@
-/*
+/**
  * This test exercises the "linearizable" readConcern option on a simple sharded cluster.
  * Note that a full linearizable read concern test exists in
  * "replsets/linearizable_read_concern.js". This test exists mainly to affirm that a
@@ -19,6 +19,9 @@
  * document. This test is mainly trying to ensure that system behavior is
  * reasonable when executing linearizable reads in a sharded cluster, so as to
  * exercise possible (invalid) user behavior.
+ * @tags: [
+ *   temp_disabled_embedded_router_mongo_bridge,
+ * ]
  */
 
 import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";

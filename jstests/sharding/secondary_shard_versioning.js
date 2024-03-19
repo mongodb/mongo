@@ -1,5 +1,8 @@
 /**
  * Tests that secondaries participate in the shard versioning protocol.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 

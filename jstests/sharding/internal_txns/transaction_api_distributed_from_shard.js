@@ -1,7 +1,10 @@
 /**
  * Tests that the transaction API can be used for distributed transactions initiated from a shard.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [
+ *   requires_fcv_60,
+ *   temp_disabled_embedded_router_known_issues,
+ * ]
  */
 // The test command is meant to test the "no session" transaction API case.
 TestData.disableImplicitSessions = true;

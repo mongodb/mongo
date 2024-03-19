@@ -2,6 +2,7 @@
  * Test RetryableWriteError label in retryable writes and in transactions.
  *
  * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
  *   uses_transactions,
  * ]
  */

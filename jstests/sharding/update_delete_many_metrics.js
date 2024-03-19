@@ -1,7 +1,10 @@
 /**
  * Tests for the 'metrics.query' section of the mongos and mongod serverStatus response verifying
  * counters for updateMany and deleteMany
- * @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_metrics,
+ * ]
  */
 
 {

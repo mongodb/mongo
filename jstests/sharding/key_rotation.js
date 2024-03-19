@@ -5,7 +5,10 @@
  * - manual key rotation is possible by deleting existing keys and restarting the cluster.
  *
  * Manual key rotation requires restarting a shard, so a persistent storage engine is necessary.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   temp_disabled_embedded_router_test_issue,
+ * ]
  */
 
 // This test restarts a shard replica set, potentially changing the primary node, while

@@ -1,5 +1,8 @@
 // cursor1.js
 // checks that cursors survive a chunk's move
+// @tags: [
+//   temp_disabled_embedded_router_uncategorized,
+// ]
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "sharding_cursor1", shards: 2});

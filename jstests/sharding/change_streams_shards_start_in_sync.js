@@ -9,6 +9,7 @@
 //   does_not_support_stepdowns,
 //   requires_majority_read_concern,
 //   uses_change_streams,
+//   temp_disabled_embedded_router_mongo_bridge,
 // ]
 
 // Check the build flags to determine whether we are running in a code-coverage variant. These

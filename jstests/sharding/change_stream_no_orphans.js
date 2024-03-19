@@ -7,6 +7,9 @@
  *   - Test case 2: Broadcasted operations (from router) on orphaned documents
  *   - Test case 3: Transaction from router updating both orphaned and owned documents
  *   - Test case 4: Transaction to shard updating both orphaned and owned documents
+ * @tags: [
+ *   uses_change_streams,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 

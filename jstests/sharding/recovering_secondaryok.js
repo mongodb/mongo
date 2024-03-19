@@ -1,6 +1,9 @@
 /**
  * This tests that secondaryOk'd queries in sharded setups get correctly routed when a secondary
  * goes into RECOVERING state, and don't break
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 // Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does

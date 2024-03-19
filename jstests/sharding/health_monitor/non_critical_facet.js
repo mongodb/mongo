@@ -1,7 +1,11 @@
 /**
  * Tests behavior of non-critical fault facet.
  *
- *  @tags: [multiversion_incompatible]
+ *  @tags: [
+ *    multiversion_incompatible,
+ *    temp_disabled_embedded_router_health_monitor,
+ *    temp_disabled_embedded_router_metrics,
+ * ]
  */
 const ACTIVE_FAULT_DURATION_SECS = 1;
 

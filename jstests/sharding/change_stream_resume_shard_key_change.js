@@ -1,9 +1,9 @@
 // Tests resuming change streams when shard key is changed.
 //
 // @tags: [
+//   requires_fcv_53,
 //   requires_majority_read_concern,
 //   uses_change_streams,
-//   requires_fcv_53,
 // ]
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.

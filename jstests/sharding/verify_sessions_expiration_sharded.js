@@ -12,6 +12,10 @@
 //    expiring from the config.system.sessions collection. If the expiration date has been reached
 //    during a currently running operation, the logical session cache should vivify the session and
 //    replace it in the config.system.sessions collection.
+//
+// @tags: [
+//    temp_disabled_embedded_router_metrics,
+// ]
 
 // This test makes assertions about the number of logical session records.
 TestData.disableImplicitSessions = true;

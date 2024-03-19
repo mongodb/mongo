@@ -3,7 +3,11 @@
  *
  * Incompatible because it makes assertions about the specific number of connections used, which
  * don't account for background activity on a config server.
- * @tags: [requires_fcv_63, config_shard_incompatible]
+ * @tags: [
+ *   config_shard_incompatible,
+ *   requires_fcv_63,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {
     assertHasConnPoolStats,

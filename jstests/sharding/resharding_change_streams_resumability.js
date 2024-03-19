@@ -3,7 +3,7 @@
 //
 // @tags: [
 //   requires_majority_read_concern,
-//   uses_atclustertime
+//   uses_atclustertime,
 // ]
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";

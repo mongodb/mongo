@@ -4,6 +4,7 @@
  * @tags: [
  *  # Requires all nodes to be running the latest binary.
  *  multiversion_incompatible,
+ *  uses_change_streams,
  * ]
  */
 function assertNoDrop(changeStream) {

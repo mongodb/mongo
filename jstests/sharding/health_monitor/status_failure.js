@@ -1,7 +1,10 @@
 /**
  * Tests behavior of fault manager when health observer returns status failure.
  *
- *  @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   temp_disabled_embedded_router_health_monitor,
+ * ]
  */
 const kWaitForCompletedChecksCount = 12;
 const kWaitForPassedChecksCount = 8;

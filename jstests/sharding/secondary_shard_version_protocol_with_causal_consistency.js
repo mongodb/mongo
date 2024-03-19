@@ -3,6 +3,9 @@
  * read concern level 'available' and afterClusterTime specified should error because they ensure
  * contradictory things. A secondary request with afterClusterTime specified and no read concern
  * level should default to 'local' read concern level, using the shard version protocol.
+ * @tags: [
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 

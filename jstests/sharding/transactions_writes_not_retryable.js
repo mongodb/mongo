@@ -1,7 +1,11 @@
 /**
  * Verify writes inside a transaction are not interpreted as retryable writes in a sharded cluster.
  *
- * @tags: [requires_sharding, uses_transactions]
+ * @tags: [
+ *   requires_sharding,
+ *   temp_disabled_embedded_router_known_issues,
+ *   uses_transactions,
+ * ]
  */
 const dbName = "test";
 const collName = "foo";

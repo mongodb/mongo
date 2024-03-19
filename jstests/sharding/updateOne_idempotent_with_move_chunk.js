@@ -3,7 +3,11 @@
  * migration for the chunk being updated doesn't cause zero updates when
  * featureFlagUpdateOneWithIdWithoutShardKey is enabled.
  *
- * @tags: [featureFlagUpdateOneWithIdWithoutShardKey, requires_fcv_73]
+ * @tags: [
+ *   featureFlagUpdateOneWithIdWithoutShardKey,
+ *   requires_fcv_73,
+ *   temp_disabled_embedded_router_mongo_bridge,
+ * ]
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 

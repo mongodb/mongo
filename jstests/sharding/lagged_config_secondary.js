@@ -1,7 +1,10 @@
 /**
  * Test that mongos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
- * @tags: [config_shard_incompatible]
+ * @tags: [
+ *   config_shard_incompatible,
+ *   temp_disabled_embedded_router_known_issues,
+ * ]
  */
 
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";

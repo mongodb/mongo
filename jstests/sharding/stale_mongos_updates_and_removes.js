@@ -14,7 +14,10 @@
  * This test is labeled resource intensive because its total io_write is 31MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
  *
- * @tags: [resource_intensive]
+ * @tags: [
+ *   resource_intensive,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
 import {
