@@ -261,24 +261,44 @@ public:
         count.decrement(cnt);
         size.decrement(sz);
     }
+};
+
+class OplogBufferMetrics {
+public:
+    OplogBuffer::Counters* getWriteBufferCounter() {
+        return &_writeBufferCounter;
+    }
+
+    OplogBuffer::Counters* getApplyBufferCounter() {
+        return &_applyBufferCounter;
+    }
 
     BSONObj getReport() const {
-        BSONObjBuilder subBuilder;
-        subBuilder.append("count", count.get());
-        subBuilder.append("sizeBytes", size.get());
-        subBuilder.append("maxSizeBytes", maxSize.get());
+        BSONObjBuilder applierSubBuilder;
+        applierSubBuilder.append("count", _applyBufferCounter.count.get());
+        applierSubBuilder.append("sizeBytes", _applyBufferCounter.size.get());
+        applierSubBuilder.append("maxSizeBytes", _applyBufferCounter.maxSize.get());
         if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             BSONObjBuilder builder;
-            builder.append("apply", subBuilder.obj());
+            BSONObjBuilder writerSubBuilder;
+            writerSubBuilder.append("count", _writeBufferCounter.count.get());
+            writerSubBuilder.append("sizeBytes", _writeBufferCounter.size.get());
+            writerSubBuilder.append("maxSizeBytes", _writeBufferCounter.maxSize.get());
+            builder.append("write", writerSubBuilder.obj());
+            builder.append("apply", applierSubBuilder.obj());
             return builder.obj();
         }
-        return subBuilder.obj();
+        return applierSubBuilder.obj();
     }
 
     operator BSONObj() const {
         return getReport();
     }
+
+private:
+    OplogBuffer::Counters _writeBufferCounter;
+    OplogBuffer::Counters _applyBufferCounter;
 };
 
 /**

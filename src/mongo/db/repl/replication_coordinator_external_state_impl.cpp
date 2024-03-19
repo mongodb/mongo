@@ -177,7 +177,7 @@ constexpr std::size_t kOplogApplyBufferSizeLegacy = 256 * 1024 * 1024;
 
 
 // The count of items in the oplog application buffer
-OplogBuffer::Counters& applyBufferGauge = *MetricBuilder<OplogBuffer::Counters>("repl.buffer");
+OplogBufferMetrics& oplogBufferMetrics = *MetricBuilder<OplogBufferMetrics>("repl.buffer");
 
 /**
  * Returns new thread pool for thread pool task executor.
@@ -271,8 +271,8 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         useOplogWriter ? kOplogApplyBufferSize : kOplogApplyBufferSizeLegacy;
 
     if (useOplogWriter) {
-        // TODO (SERVER-85720): Add write buffer metrics to serverStatus.
-        _oplogWriteBuffer = std::make_unique<OplogBufferBatchedQueue>(kOplogWriteBufferSize);
+        _oplogWriteBuffer = std::make_unique<OplogBufferBatchedQueue>(
+            kOplogWriteBufferSize, oplogBufferMetrics.getWriteBufferCounter());
     }
 
     // When featureFlagReduceMajorityWriteLatency is enabled, we must drain the apply buffer on
@@ -282,7 +282,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OplogBufferBlockingQueue::Options bufferOptions;
     bufferOptions.clearOnShutdown = !useOplogWriter;
     _oplogApplyBuffer = std::make_unique<OplogBufferBlockingQueue>(
-        applyBufferSize, &applyBufferGauge, bufferOptions);
+        applyBufferSize, oplogBufferMetrics.getApplyBufferCounter(), bufferOptions);
 
     // No need to log OplogBuffer::startup because the blocking queue and batched queue
     // implementations does not start any threads or access the storage layer.

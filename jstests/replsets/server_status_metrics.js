@@ -49,13 +49,21 @@ function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOps
     assert.gt(ss.metrics.repl.syncSource.numTimesChoseDifferent, 0, "no new sync source chosen");
 
     if (FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")) {
-        assert(ss.metrics.repl.buffer.apply.count >= 0, "buffer count missing");
-        assert(ss.metrics.repl.buffer.apply.sizeBytes >= 0, "size (bytes)] missing");
-        assert(ss.metrics.repl.buffer.apply.maxSizeBytes >= 0, "maxSize (bytes) missing");
+        assert(ss.metrics.repl.buffer.write.count >= 0, "write buffer count missing");
+        assert(ss.metrics.repl.buffer.write.sizeBytes >= 0, "write buffer size (bytes)] missing");
+        assert(ss.metrics.repl.buffer.write.maxSizeBytes >= 0,
+               "write buffer maxSize (bytes) missing");
+        assert(ss.metrics.repl.buffer.apply.count >= 0, "apply buffer count missing");
+        assert(ss.metrics.repl.buffer.apply.sizeBytes >= 0, "apply buffer size (bytes)] missing");
+        assert(ss.metrics.repl.buffer.apply.maxSizeBytes >= 0,
+               "apply buffer maxSize (bytes) missing");
+        assert(!ss.metrics.repl.buffer.count, "repl.buffer.count shoud not exist");
     } else {
         assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
         assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
         assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
+        assert(!ss.metrics.repl.buffer.write, "repl.buffer.write should not exist");
+        assert(!ss.metrics.repl.buffer.apply, "repl.buffer.apply should not exist");
     }
 
     assert.eq(ss.metrics.repl.apply.batchSize,
