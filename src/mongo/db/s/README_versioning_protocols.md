@@ -6,11 +6,13 @@ This process is implemented via the shard versioning protocol and it is what pre
 
 ## Shard Versioning Protocol
 
-When a router uses its cached information to send a request to a shard, it attaches a token describing the information it used. This token is the [database version](#database-version) for unsharded collections and the [shard version](#shard-version) for sharded collections.
+Some operations are always to be executed by the _db-primary_ shard for a given database. Each database in a sharded cluster has a primary shard. This shard is responsible for coordinating DDL operations and reads/writes to _untracked_ unsharded collections (which have no metadata stored on the config server). For these types of operations the router uses its database placement cache to decide what shard to send the request to, and will attach a [`databaseVersion`](#database-version) token to the request that signifies the version of its cached database placement information.
+
+Other operations are to be targeted to whichever shard(s) own data (or relevant chunk ranges) for a particular tracked/sharded collection. For these the router will use its cached _routing table_ for that collection to decide what shards to target. Later, when sending the requests to them, it will attach the [`shardVersion`](#shard-version) token that represents the routing table version it considered.
 
 When a shard receives the request, it will check this token to make sure that it matches the shard's local information. If it matches, then the request will proceed. If the version does not match, the shard will throw [an exception](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_exception.h).
 
-When the router recieves this exception, it knows that the routing information must have changed, and so it will [perform a refresh](#routing-information-refreshes) to get more recent information before sending the request again.
+When the router receives this exception, it knows that the routing information must have changed, and so it will [perform a refresh](#routing-information-refreshes) to get more recent information before sending the request again.
 
 The following diagram depicts a simple example of the shard versioning protocol in action. It assumes that the router is a shard server primary, thus the refresh is simply fetching newer information from the config server.
 
@@ -43,7 +45,7 @@ sequenceDiagram
     S2->>S: OK
 ```
 
-The protocol is the same when using a DBVersion, the only difference is that StaleDbRoutingVersion is returned to the router instead of StaleConfig. In practice, both the Database Version and Shard Version are more complicated than an increasing integer, and their components are described below.
+The protocol is the same when using a `databaseVersion`, the only difference is that StaleDbRoutingVersion is returned to the router instead of StaleConfig. In practice, both the Database Version and Shard Version are more complicated than an increasing integer, and their components are described below.
 
 ## Database Version
 
