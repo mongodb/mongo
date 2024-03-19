@@ -529,5 +529,41 @@ void validateQuerySettings(const QuerySettings& querySettings) {
     validateQuerySettingsIndexHints(querySettings.getIndexHints());
 }
 
+void simplifyQuerySettings(QuerySettings& settings) {
+    // If reject is present, but is false, set to an empty optional.
+    if (settings.getReject().has_value() && !settings.getReject()) {
+        settings.setReject({});
+    }
+
+    const auto& indexes = settings.getIndexHints();
+    if (!indexes) {
+        return;
+    }
+
+    // Remove index hints where list of allowed indexes is empty.
+    std::visit(OverloadedVisitor{
+                   [&](const IndexHintSpec& indexHintSpec) {
+                       if (indexHintSpec.getAllowedIndexes().empty()) {
+                           settings.setIndexHints(boost::none);
+                       }
+                   },
+                   [&](const std::vector<IndexHintSpec>& indexHints) {
+                       std::vector<IndexHintSpec> simplifiedIndexHints;
+                       std::copy_if(
+                           indexHints.begin(),
+                           indexHints.end(),
+                           std::back_inserter(simplifiedIndexHints),
+                           [](const auto& spec) { return !spec.getAllowedIndexes().empty(); });
+
+                       if (simplifiedIndexHints.empty()) {
+                           settings.setIndexHints(boost::none);
+                       } else {
+                           settings.setIndexHints({{std::move(simplifiedIndexHints)}});
+                       }
+                   },
+               },
+               *indexes);
+}
+
 }  // namespace utils
 }  // namespace mongo::query_settings

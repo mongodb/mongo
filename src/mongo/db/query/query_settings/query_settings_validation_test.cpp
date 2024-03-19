@@ -126,17 +126,20 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSame
     auto indexSpecA = IndexHintSpec(ns, {IndexHint("sku")});
     auto indexSpecB = IndexHintSpec(ns, {IndexHint("uks")});
     querySettings.setIndexHints({{std::vector{indexSpecA, indexSpecB}}});
+    utils::simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746608);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeEmpty) {
     QuerySettings querySettings;
+    utils::simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746604);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotHaveDefaultValues) {
     QuerySettings querySettings;
     querySettings.setReject(false);
+    utils::simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746604);
 }
 
@@ -145,6 +148,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoDbSpecif
     NamespaceSpec ns;
     ns.setColl("collName"_sd);
     querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
+    utils::simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 8727500);
 }
 
@@ -154,7 +158,50 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoCollSpec
     ns.setDb(DatabaseNameUtil::deserialize(
         boost::none /* tenantId */, "dbName"_sd, SerializationContext::stateDefault()));
     querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
+    utils::simplifyQuerySettings(querySettings);
     ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 8727501);
 }
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithEmptyAllowedIndexes) {
+    QuerySettings querySettings;
+    auto ns = makeNamespace("testDB", "testColl");
+    querySettings.setIndexHints({{IndexHintSpec(ns, {})}});
+    utils::simplifyQuerySettings(querySettings);
+    ASSERT_EQUALS(querySettings.getIndexHints(), boost::none);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746604);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithAllEmptyAllowedIndexes) {
+    QuerySettings querySettings;
+    querySettings.setIndexHints({{std::vector{
+        IndexHintSpec(makeNamespace("testDB", "testColl1"), {}),
+        IndexHintSpec(makeNamespace("testDB", "testColl2"), {}),
+        IndexHintSpec(makeNamespace("testDB", "testColl3"), {}),
+    }}});
+    utils::simplifyQuerySettings(querySettings);
+    ASSERT_EQUALS(querySettings.getIndexHints(), boost::none);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 7746604);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithSomeEmptyAllowedIndexes) {
+    QuerySettings querySettings;
+    querySettings.setIndexHints({{std::vector{
+        IndexHintSpec(makeNamespace("testDB", "testColl1"), {}),
+        IndexHintSpec(makeNamespace("testDB", "testColl2"), {IndexHint("a")}),
+    }}});
+    const auto expectedIndexHintSpec =
+        IndexHintSpec(makeNamespace("testDB", "testColl2"), {IndexHint("a")});
+    utils::simplifyQuerySettings(querySettings);
+    const auto simplifiedIndexHints = querySettings.getIndexHints();
+
+    ASSERT_NE(simplifiedIndexHints, boost::none);
+    const auto& indexHintsList =
+        std::get<std::vector<mongo::query_settings::IndexHintSpec>>(*simplifiedIndexHints);
+    ASSERT_EQ(indexHintsList.size(), 1);
+    const auto& actualIndexHintSpec = indexHintsList[0];
+    ASSERT_BSONOBJ_EQ(expectedIndexHintSpec.toBSON(), actualIndexHintSpec.toBSON());
+    ASSERT_DOES_NOT_THROW(utils::validateQuerySettings(querySettings));
+}
+
 }  // namespace
 }  // namespace mongo::query_settings

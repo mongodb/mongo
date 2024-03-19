@@ -87,6 +87,7 @@ bool isDefault(const QuerySettings& settings);
 
 void validateRepresentativeQuery(const RepresentativeQueryInfo& representativeQueryInfo);
 void validateQuerySettings(const QuerySettings& settings);
+void simplifyQuerySettings(QuerySettings& settings);
 
 }  // namespace utils
 }  // namespace mongo::query_settings
