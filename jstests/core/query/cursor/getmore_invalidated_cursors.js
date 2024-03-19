@@ -22,6 +22,7 @@ const nDocs = 100;
 // Possible error codes that a query can return when killed due to a collection drop.
 const kKilledByDropErrorCodes = [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound];
 
+let batchSize;
 function setupCollection() {
     coll.drop();
     const bulk = coll.initializeUnorderedBulkOp();
@@ -30,18 +31,14 @@ function setupCollection() {
     }
     assert.commandWorked(bulk.execute());
     assert.commandWorked(coll.createIndex({x: 1}));
+    // Make sure the batch size is small enough to ensure a getMore will need to be sent to at
+    // least one shard.
+    batchSize = (nDocs / FixtureHelpers.numberOfShardsForCollection(coll)) - 1;
 }
 
 // Test that dropping the database between a find and a getMore will return an appropriate error
 // code and message.
 setupCollection();
-
-// Make sure the batch size is small enough to ensure a getMore will need to be sent to at least
-// one shard.
-const batchSize = (nDocs / FixtureHelpers.numberOfShardsForCollection(coll)) - 1;
-
-const isShardedCollection = coll.stats().sharded;
-
 let cursor = coll.find().batchSize(batchSize);
 cursor.next();  // Send the query to the server.
 
@@ -103,6 +100,7 @@ assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: c
 
 // Test that all cursors on collections to be renamed get invalidated. Note that we can't do
 // renames on sharded collections.
+const isShardedCollection = coll.stats().sharded;
 if (!isShardedCollection) {
     setupCollection();
     const collRenamed = testDB.test_rename;
