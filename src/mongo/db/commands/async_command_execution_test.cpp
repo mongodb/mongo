@@ -144,7 +144,7 @@ void killAsyncCommand(AsyncCommandExecutionTest::TestState& state) {
         future = state.invocation->runAsync(state.rec);
 
         auto opCtx = state.rec->getOpCtx();
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        ClientLock lk(opCtx->getClient());
         opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Interrupted);
     }
 

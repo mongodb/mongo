@@ -56,10 +56,10 @@ bool OperationKiller::isGenerallyAuthorizedToKill() const {
         ResourcePattern::forClusterResource(authzSession->getUserTenantId()), ActionType::killop);
 }
 
-bool OperationKiller::isAuthorizedToKill(const LockedClient& target) const {
+bool OperationKiller::isAuthorizedToKill(const ClientLock& target) const {
     AuthorizationSession* authzSession = AuthorizationSession::get(_myClient);
 
-    if (target && authzSession->isCoauthorizedWithClient(target.client(), target)) {
+    if (target && authzSession->isCoauthorizedWithClient(&*target, target)) {
         return true;
     }
 

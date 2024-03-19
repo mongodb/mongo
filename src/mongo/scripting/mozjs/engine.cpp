@@ -27,20 +27,16 @@
  *    it in the license file.
  */
 
-
-#include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <fmt/format.h>
 #include <js-config.h>
 #include <js/Initialization.h>
-#include <mutex>
 #include <utility>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,7 +46,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/scripting/mozjs/engine_gen.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -59,12 +55,15 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace js {
 void DisableExtraThreads();
 }
 
 namespace mongo {
+
+namespace {
+auto operationMozJSScopeDecoration = OperationContext::declareDecoration<mozjs::MozJSImplScope*>();
+}
 
 void ScriptEngine::setup(ExecutionEnvironment environment) {
     if (getGlobalScriptEngine()) {
@@ -103,46 +102,24 @@ mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread(boost::optional<int
     return new MozJSImplScope(this, jsHeapLimitMB);
 }
 
-void MozJSScriptEngine::interrupt(unsigned opId) {
-    stdx::lock_guard<Latch> intLock(_globalInterruptLock);
-    auto knownOps = [&]() {
-        std::vector<unsigned> ret;
-        for (auto&& iSc : _opToScopeMap) {
-            ret.push_back(iSc.first);
-        }
-        return ret;
-    };
-    OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
-    if (iScope == _opToScopeMap.end()) {
-        // got interrupt request for a scope that no longer exists
-        if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
-            // This log record gets extra attributes when the log severity is at Debug(3)
-            // but we still log the record at log severity Debug(2). Simplify this if SERVER-48671
-            // gets done
-            LOGV2_DEBUG(22783,
-                        2,
-                        "Received interrupt request for unknown op",
-                        "opId"_attr = opId,
-                        "knownOps"_attr = knownOps());
-        } else {
-            LOGV2_DEBUG(22790, 2, "Received interrupt request for unknown op", "opId"_attr = opId);
-        }
-        return;
-    }
-    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
-        // Like above, this log record gets extra attributes when the log severity is at Debug(3)
-        LOGV2_DEBUG(22809, 2, "Interrupting op", "opId"_attr = opId, "knownOps"_attr = knownOps());
+void MozJSScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
+    if (opCtx && (*opCtx)[operationMozJSScopeDecoration]) {
+        (*opCtx)[operationMozJSScopeDecoration]->kill();
+        LOGV2_DEBUG(22808, 2, "Interrupting op", "opId"_attr = opCtx->getOpID());
     } else {
-        LOGV2_DEBUG(22808, 2, "Interrupting op", "opId"_attr = opId);
+        LOGV2_DEBUG(
+            22790, 2, "Received interrupt request for unknown op", "opId"_attr = opCtx->getOpID());
     }
-    iScope->second->kill();
 }
 
-void MozJSScriptEngine::interruptAll() {
-    stdx::lock_guard<Latch> interruptLock(_globalInterruptLock);
-
-    for (auto&& iScope : _opToScopeMap) {
-        iScope.second->kill();
+void MozJSScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
+    ServiceContext::LockedClientsCursor cursor(svcCtxLock);
+    while (auto client = cursor.next()) {
+        stdx::lock_guard lk(*client);
+        if (auto opCtx = client->getOperationContext();
+            opCtx && (*opCtx)[operationMozJSScopeDecoration]) {
+            (*opCtx)[operationMozJSScopeDecoration]->kill();
+        }
     }
 }
 
@@ -179,38 +156,29 @@ void MozJSScriptEngine::setLoadPath(const std::string& loadPath) {
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScope* scope) {
-    stdx::lock_guard<Latch> giLock(_globalInterruptLock);
-
-    auto opId = opCtx->getOpID();
-
-    _opToScopeMap[opId] = scope;
-
     LOGV2_DEBUG(22785,
                 2,
                 "scope registered for op",
                 "scope"_attr = reinterpret_cast<uint64_t>(scope),
-                "opId"_attr = opId);
-    Status status = opCtx->checkForInterruptNoAssert();
-    if (!status.isOK()) {
+                "opId"_attr = opCtx->getOpID());
+
+    stdx::lock_guard lk(*opCtx->getClient());
+    (*opCtx)[operationMozJSScopeDecoration] = scope;
+
+    if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
         scope->kill();
     }
 }
 
-void MozJSScriptEngine::unregisterOperation(unsigned int opId) {
-    stdx::lock_guard<Latch> giLock(_globalInterruptLock);
-
+void MozJSScriptEngine::unregisterOperation(OperationContext* opCtx) {
     LOGV2_DEBUG(22786,
                 2,
                 "scope unregistered for op",
                 "scope"_attr = reinterpret_cast<uint64_t>(this),
-                "opId"_attr = opId);
+                "opId"_attr = opCtx->getOpID());
 
-    if (opId != 0) {
-        // scope is currently associated with an operation id
-        auto it = _opToScopeMap.find(opId);
-        if (it != _opToScopeMap.end())
-            _opToScopeMap.erase(it);
-    }
+    stdx::lock_guard lk(*opCtx->getClient());
+    (*opCtx)[operationMozJSScopeDecoration] = nullptr;
 }
 
 }  // namespace mozjs

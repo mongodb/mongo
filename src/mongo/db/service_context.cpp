@@ -71,7 +71,7 @@ ServiceContext* globalServiceContext = nullptr;
 
 }  // namespace
 
-LockedClient::LockedClient(Client* client) : _lk{*client}, _client{client} {}
+ClientLock::ClientLock(Client* client) : service_context_detail::ObjectLock<Client>(client) {}
 
 bool hasGlobalServiceContext() {
     return globalServiceContext;
@@ -311,7 +311,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     ScopeGuard batonGuard([&] { opCtx->getBaton()->detach(); });
 
     {
-        stdx::lock_guard<Client> lk(*client);
+        ClientLock lk(client);
 
         // If we have a previous operation context, it's not worth crashing the process in
         // production. However, we do want to prevent it from doing more work and complain
@@ -347,7 +347,7 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
     delete opCtx;
 }
 
-LockedClient ServiceContext::getLockedClient(OperationId id) {
+ClientLock ServiceContext::getLockedClient(OperationId id) {
     return OperationIdManager::get(this).findAndLockClient(id);
 }
 
@@ -355,8 +355,10 @@ void ServiceContext::registerClientObserver(std::unique_ptr<ClientObserver> obse
     _clientObservers.emplace_back(std::move(observer));
 }
 
-ServiceContext::LockedClientsCursor::LockedClientsCursor(ServiceContext* service)
-    : _lock(service->_mutex), _curr(service->_clients.cbegin()), _end(service->_clients.cend()) {}
+void ServiceContext::LockedClientsCursor::_setup(ServiceContextLock& lockedSvcCtx) {
+    _curr = lockedSvcCtx->_clients.cbegin();
+    _end = lockedSvcCtx->_clients.cend();
+}
 
 Client* ServiceContext::LockedClientsCursor::next() {
     if (_curr == _end)
@@ -373,9 +375,9 @@ Client* ServiceContext::LockedClientsCursor::next() {
 Service::LockedClientsCursor::LockedClientsCursor(Service* service)
     : _serviceCtxCursor(service->getServiceContext()), _service(service) {}
 
-LockedClient Service::LockedClientsCursor::next() {
+ClientLock Service::LockedClientsCursor::next() {
     for (Client* client; (client = _serviceCtxCursor.next());) {
-        LockedClient lc(client);
+        ClientLock lc(client);
         if (lc->getService() == _service)
             return lc;
     }
@@ -383,7 +385,7 @@ LockedClient Service::LockedClientsCursor::next() {
 }
 
 void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedClients) {
-    stdx::lock_guard<Latch> clientLock(_mutex);
+    ServiceContextLock svcCtxLock(this);
 
     // Ensure that all newly created operation contexts will immediately be in the interrupted state
     _globalKill.store(true);
@@ -391,7 +393,7 @@ void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedC
 
     // Interrupt all active operations
     for (auto&& client : _clients) {
-        stdx::lock_guard<Client> lk(*client);
+        ClientLock lk(client);
 
         // Do not kill operations from the excluded clients.
         if (excludedClients.find(client->desc()) != excludedClients.end()) {
@@ -411,19 +413,21 @@ void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedC
     // Notify any listeners who need to reach to the server shutting down
     for (const auto listener : _killOpListeners) {
         try {
-            listener->interruptAll();
+            listener->interruptAll(svcCtxLock);
         } catch (...) {
             std::terminate();
         }
     }
 }
 
-void ServiceContext::killOperation(WithLock, OperationContext* opCtx, ErrorCodes::Error killCode) {
+void ServiceContext::killOperation(ClientLock& clientLock,
+                                   OperationContext* opCtx,
+                                   ErrorCodes::Error killCode) {
     opCtx->markKilled(killCode);
 
     for (const auto listener : _killOpListeners) {
         try {
-            listener->interrupt(opCtx->getOpID());
+            listener->interrupt(clientLock, opCtx);
         } catch (...) {
             std::terminate();
         }
@@ -467,7 +471,7 @@ void ServiceContext::killAndDelistOperation(OperationContext* opCtx,
 
     _delistOperation(opCtx);
 
-    stdx::lock_guard clientLock(*client);
+    ClientLock clientLock(client);
     killOperation(clientLock, opCtx, killCode);
 }
 

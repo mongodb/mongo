@@ -472,7 +472,6 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MozJSImplScope::_mutex");
     stdx::condition_variable _sleepCondition;
     std::string _error;
-    unsigned int _opId;               // op id for this scope
     OperationContext* _opCtx;         // Op context for DbEval
     stdx::thread::id _opCtxThreadId;  // Id of the thread that owns '_opCtx'
     std::size_t _inOp;

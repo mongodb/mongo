@@ -268,7 +268,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
         });
     }
 } catch (const DBException& e) {
-    stdx::lock_guard<Client> lk(*_innerOpCtx->getClient());
+    ClientLock lk(_innerOpCtx->getClient());
     _innerOpCtx->getServiceContext()->killOperation(lk, _innerOpCtx, ErrorCodes::Error(6718400));
     LOGV2_ERROR(6718413,
                 "Chunk migration failure fetching data",

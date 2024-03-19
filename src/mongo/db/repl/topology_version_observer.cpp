@@ -100,7 +100,7 @@ void TopologyVersionObserver::shutdown() noexcept {
 
         // If we are still running, attempt to kill any opCtx
         if (_workerOpCtx) {
-            stdx::lock_guard clientLk(*_workerOpCtx->getClient());
+            ClientLock clientLk(_workerOpCtx->getClient());
             _serviceContext->killOperation(clientLk, _workerOpCtx, ErrorCodes::ShutdownInProgress);
         }
 

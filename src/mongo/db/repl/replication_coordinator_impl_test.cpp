@@ -139,8 +139,8 @@ OpTimeAndWallTime makeOpTimeAndWallTime(OpTime opTime, Date_t wallTime = Date_t(
  * Helper that kills an operation, taking the necessary locks.
  */
 void killOperation(OperationContext* opCtx) {
-    stdx::lock_guard<Client> lkClient(*opCtx->getClient());
-    opCtx->getServiceContext()->killOperation(lkClient, opCtx);
+    ClientLock lk(opCtx->getClient());
+    opCtx->getServiceContext()->killOperation(lk, opCtx);
 }
 
 std::shared_ptr<const repl::HelloResponse> awaitHelloWithNewOpCtx(

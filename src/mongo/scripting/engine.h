@@ -302,8 +302,8 @@ public:
 
     // engine implementation may either respond to interrupt events or
     // poll for interrupts.  the interrupt functions must not wait indefinitely on a lock.
-    virtual void interrupt(unsigned opId) {}
-    virtual void interruptAll() {}
+    void interrupt(ClientLock&, OperationContext*) override {}
+    void interruptAll(ServiceContextLock&) override {}
 
     static std::string getInterpreterVersionString();
 

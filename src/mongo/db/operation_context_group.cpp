@@ -51,7 +51,7 @@ auto find(ContextTable& contexts, OperationContext* cp) {
 }
 
 void interruptOne(OperationContext* opCtx, ErrorCodes::Error code) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    ClientLock lk(opCtx->getClient());
     opCtx->getServiceContext()->killOperation(lk, opCtx, code);
 }
 

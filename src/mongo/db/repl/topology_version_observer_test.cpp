@@ -190,7 +190,7 @@ TEST_F(TopologyVersionObserverTest, HandleDBException) {
     ASSERT(observerClient);
 
     auto tryKillOperation = [&] {
-        stdx::lock_guard clientLock(*observerClient);
+        ClientLock clientLock(observerClient);
 
         if (auto opCtx = observerClient->getOperationContext()) {
             observerClient->getServiceContext()->killOperation(clientLock, opCtx);

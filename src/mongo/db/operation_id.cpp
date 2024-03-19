@@ -146,14 +146,14 @@ void OperationIdManager::eraseClientFromMap(Client* client) {
     }
 }
 
-LockedClient OperationIdManager::findAndLockClient(OperationId id) const {
+ClientLock OperationIdManager::findAndLockClient(OperationId id) const {
     stdx::lock_guard lk(_mutex);
     auto it = _clientByOperationId.find(id & _leaseStartBitMask);
     if (it == _clientByOperationId.end()) {
         return {};
     }
 
-    LockedClient lc(it->second);
+    ClientLock lc(it->second);
 
     // Confirm that the provided id matches that of the client's active opCtx.
     if (auto opCtx = lc->getOperationContext(); opCtx && opCtx->getOpID() == id) {

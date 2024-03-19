@@ -438,7 +438,6 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     ++_sri->killsRequested;
 
     if (firstKiller && hasCurrentOperation()) {
-        invariant(_clientLock.owns_lock());
         const auto serviceContext = _sri->checkoutOpCtx->getServiceContext();
         serviceContext->killOperation(_clientLock, _sri->checkoutOpCtx, reason);
     }

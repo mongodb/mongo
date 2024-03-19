@@ -231,7 +231,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilInterrupt) {
         auto after = Date_t::now();
         ASSERT_GTE(after - before, Milliseconds(25));
 
-        stdx::lock_guard<Client> lk(clientToInterrupt);
+        ClientLock lk(&clientToInterrupt);
         getServiceContext()->killOperation(
             lk, clientToInterrupt.getOperationContext(), ErrorCodes::Interrupted);
     });

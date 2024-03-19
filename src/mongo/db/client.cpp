@@ -175,7 +175,7 @@ bool Client::hasAnyActiveCurrentOp() const {
 }
 
 void Client::setKilled() noexcept {
-    stdx::lock_guard<Client> lk(*this);
+    ClientLock lk(this);
     _killed.store(true);
     if (_opCtx) {
         getServiceContext()->killOperation(lk, _opCtx, ErrorCodes::ClientMarkedKilled);

@@ -65,7 +65,7 @@ void ReadThroughCacheBase::CancelToken::tryCancel() {
     _info->cancelStatus =
         Status(ErrorCodes::ReadThroughCacheLookupCanceled, "Internal only: task canceled");
     if (_info->opCtxToCancel) {
-        stdx::lock_guard clientLock(*_info->opCtxToCancel->getClient());
+        ClientLock clientLock(_info->opCtxToCancel->getClient());
         _info->service->getServiceContext()->killOperation(
             clientLock, _info->opCtxToCancel, _info->cancelStatus.code());
     }

@@ -750,10 +750,10 @@ TEST_F(CursorManagerTestCustomOpCtx, CursorsMarkedAsKilledAreReturnedForOpKeyLoo
 
     // Mark the OperationContext as killed.
     {
-        stdx::lock_guard<Client> lkClient(*opCtx->getClient());
+        ClientLock clientLk(opCtx->getClient());
         // A cursor will stay alive, but be marked as killed, if it is interrupted with a code other
         // than ErrorCodes::Interrupted or ErrorCodes::CursorKilled and then unpinned.
-        opCtx->getServiceContext()->killOperation(lkClient, opCtx.get(), ErrorCodes::InternalError);
+        opCtx->getServiceContext()->killOperation(clientLk, opCtx.get(), ErrorCodes::InternalError);
     }
     cursor.release();
 

@@ -320,7 +320,7 @@ void ClusterCursorManager::killOperationUsingCursor(WithLock, CursorEntry* entry
     invariant(entry->getOperationUsingCursor());
     // Interrupt any operation currently using the cursor.
     OperationContext* opUsingCursor = entry->getOperationUsingCursor();
-    stdx::lock_guard<Client> lk(*opUsingCursor->getClient());
+    ClientLock lk(opUsingCursor->getClient());
     opUsingCursor->getServiceContext()->killOperation(lk, opUsingCursor, ErrorCodes::CursorKilled);
 
     // Don't delete the cursor, as an operation is using it. It will be cleaned up when the

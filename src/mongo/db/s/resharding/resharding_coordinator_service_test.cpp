@@ -509,7 +509,7 @@ public:
         auto serviceCtx = opCtx->getServiceContext();
         for (ServiceContext::LockedClientsCursor cursor(serviceCtx);
              Client* client = cursor.next();) {
-            stdx::lock_guard<Client> lk(*client);
+            ClientLock lk(client);
             if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk)) {
                 continue;
             }
@@ -531,7 +531,7 @@ public:
              Client* client = cursor.next();) {
             invariant(client);
 
-            stdx::lock_guard<Client> lk(*client);
+            ClientLock lk(client);
             if (auto opCtx = client->getOperationContext()) {
                 StringData desc(client->desc());
 

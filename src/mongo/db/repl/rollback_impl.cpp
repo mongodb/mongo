@@ -347,7 +347,7 @@ void RollbackImpl::_killAllUserOperations(OperationContext* opCtx) {
     int numOpsRunning = 0;
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        stdx::lock_guard<Client> lk(*client);
+        ClientLock lk(client);
         if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk)) {
             continue;
         }

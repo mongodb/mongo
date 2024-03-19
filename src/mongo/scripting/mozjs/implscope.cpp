@@ -198,7 +198,6 @@ void MozJSImplScope::registerOperation(OperationContext* opCtx) {
         return;
 
     _opCtx = opCtx;
-    _opId = opCtx->getOpID();
     _opCtxThreadId = stdx::this_thread::get_id();
 
     _engine->registerOperation(opCtx, this);
@@ -206,7 +205,7 @@ void MozJSImplScope::registerOperation(OperationContext* opCtx) {
 
 void MozJSImplScope::unregisterOperation() {
     if (_opCtx) {
-        _engine->unregisterOperation(_opId);
+        _engine->unregisterOperation(_opCtx);
         _opCtx = nullptr;
     }
 }
@@ -466,7 +465,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _funcs(),
       _internedStrings(_context),
       _killStatus(Status::OK()),
-      _opId(0),
       _opCtx(nullptr),
       _inOp(0),
       _pendingGC(false),

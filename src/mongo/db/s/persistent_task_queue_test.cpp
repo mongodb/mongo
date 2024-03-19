@@ -83,7 +83,7 @@ void killOps(ServiceContext* serviceCtx) {
     ServiceContext::LockedClientsCursor cursor(serviceCtx);
 
     for (Client* client = cursor.next(); client != nullptr; client = cursor.next()) {
-        stdx::lock_guard<Client> lk(*client);
+        ClientLock lk(client);
         if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk))
             continue;
 

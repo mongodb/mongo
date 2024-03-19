@@ -59,7 +59,7 @@ SessionKiller::Result killSessionsLocalKillOps(OperationContext* opCtx,
     for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
          Client* client = cursor.next();) {
         invariant(client);
-        stdx::unique_lock<Client> lk(*client);
+        ClientLock lk(client);
 
         OperationContext* opCtxToKill = client->getOperationContext();
         if (opCtxToKill) {

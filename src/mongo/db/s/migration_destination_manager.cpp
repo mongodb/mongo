@@ -660,7 +660,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
                 }
             }
         } catch (...) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            ClientLock lk(opCtx->getClient());
             opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Error(51008));
             LOGV2(21999, "Batch application failed", "error"_attr = redact(exceptionToStatus()));
         }

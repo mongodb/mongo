@@ -52,6 +52,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
@@ -69,70 +70,14 @@ namespace mongo {
 class AbstractMessagingPort;
 class Client;
 class OperationContext;
-
 class OpObserver;
+class Service;
+class ServiceContext;
 class ServiceEntryPoint;
 
 namespace transport {
 class TransportLayerManager;
 }  // namespace transport
-
-/**
- * Classes that implement this interface can receive notification on killOp.
- *
- * See registerKillOpListener() for more information,
- * including limitations on the lifetime of registered listeners.
- */
-class KillOpListenerInterface {
-    KillOpListenerInterface(const KillOpListenerInterface&) = delete;
-    KillOpListenerInterface& operator=(const KillOpListenerInterface&) = delete;
-
-public:
-    /**
-     * Will be called *after* ops have been told they should die.
-     * Callback must not fail.
-     */
-    virtual void interrupt(unsigned opId) = 0;
-    virtual void interruptAll() = 0;
-
-protected:
-    KillOpListenerInterface() = default;
-
-    // Should not delete through a pointer of this type
-    virtual ~KillOpListenerInterface() = default;
-};
-
-/**
- * A simple container type to pass around a client and a lock on said client
- */
-class LockedClient {
-public:
-    LockedClient() = default;
-    explicit LockedClient(Client* client);
-
-    Client* client() const noexcept {
-        return _client;
-    }
-
-    Client* operator->() const noexcept {
-        return client();
-    }
-
-    explicit operator bool() const noexcept {
-        return client();
-    }
-
-    operator WithLock() const noexcept {
-        return WithLock(_lk);
-    }
-
-private:
-    // Technically speaking, _lk holds a Client* and _client is a superfluous variable. That said,
-    // LockedClients will likely be optimized away and the extra variable is a cheap price to pay
-    // for better developer comprehension.
-    stdx::unique_lock<Client> _lk;
-    Client* _client = nullptr;
-};
 
 /**
  * Users may provide an OperationKey when sending a command request as a stable token by which to
@@ -142,7 +87,6 @@ private:
  */
 using OperationKey = UUID;
 
-class Service;
 namespace service_context_detail {
 /**
  * A synchronized owning pointer to avoid setters racing with getters.
@@ -191,7 +135,86 @@ public:
 private:
     AtomicWord<T*> _ptr{nullptr};
 };
+
+template <typename T>
+auto makeLockHandleForObjectLock(T* object) {
+    return stdx::unique_lock(*object);
+}
+
+/**
+ * Wraps a lockable object of type `T`, locking it at construction and releasing the lock when
+ * destroyed.
+ */
+template <typename T, typename MutexType = T>
+class ObjectLock {
+public:
+    ObjectLock() = default;
+    explicit ObjectLock(T* obj) : _lk(makeLockHandleForObjectLock(obj)), _object(obj) {}
+
+    T& operator*() const noexcept {
+        invariant(_object);
+        return *_object;
+    }
+
+    T* operator->() const noexcept {
+        return _object;
+    }
+
+    explicit operator bool() const noexcept {
+        return !!_object;
+    }
+
+    explicit(false) operator WithLock() const noexcept {
+        return WithLock(_lk);
+    }
+
+private:
+    stdx::unique_lock<MutexType> _lk;
+    T* _object{};
+};
 }  // namespace service_context_detail
+
+class ClientLock : public service_context_detail::ObjectLock<Client> {
+public:
+    ClientLock() = default;
+    explicit ClientLock(Client* client);
+};
+
+/**
+ * This is for internal use by `ServiceContext`. Avoid using it to lock `ServiceContext` as it will
+ * block normal server operations.
+ */
+using ServiceContextLock = service_context_detail::ObjectLock<ServiceContext, Mutex>;
+
+/**
+ * Classes that implement this interface can receive notification on killOp.
+ *
+ * See registerKillOpListener() for more information,
+ * including limitations on the lifetime of registered listeners.
+ */
+class KillOpListenerInterface {
+public:
+    KillOpListenerInterface(const KillOpListenerInterface&) = delete;
+    KillOpListenerInterface& operator=(const KillOpListenerInterface&) = delete;
+
+    /**
+     * Will be called *after* the operation (i.e. `opCtx`) has been killed, while holding its client
+     * lock. Must not fail.
+     */
+    virtual void interrupt(ClientLock&, OperationContext*) = 0;
+
+    /**
+     * Will be called *after* all operations have been killed and provided with an error code, while
+     * holding the lock for `ServiceContext`. Must not fail.
+     */
+    virtual void interruptAll(ServiceContextLock&) = 0;
+
+protected:
+    KillOpListenerInterface() = default;
+
+    // Should not delete through a pointer of this type
+    virtual ~KillOpListenerInterface() = default;
+};
 
 /**
  * Registers a function to execute on new ServiceContexts or Services when they are
@@ -358,7 +381,18 @@ public:
          * Constructs a cursor for enumerating the clients of "service", blocking "service" from
          * creating or destroying Client objects until this instance is destroyed.
          */
-        explicit LockedClientsCursor(ServiceContext* service);
+        explicit LockedClientsCursor(ServiceContext* service) : _svcCtxLock(service) {
+            _setup(_svcCtxLock);
+        }
+
+        /**
+         * Allows constructing a cursor while holding the service context mutex. Always use the
+         * other constructor, unless constructing the cursor in a scope where service context mutex
+         * is already being held (e.g. by the caller).
+         */
+        explicit LockedClientsCursor(ServiceContextLock& svcCtxLock) {
+            _setup(svcCtxLock);
+        }
 
         /**
          * Returns the next client in the enumeration, or nullptr if there are no more clients.
@@ -366,7 +400,9 @@ public:
         Client* next();
 
     private:
-        stdx::unique_lock<Latch> _lock;
+        void _setup(ServiceContextLock&);
+
+        ServiceContextLock _svcCtxLock;
         ClientSet::const_iterator _curr;
         ClientSet::const_iterator _end;
     };
@@ -538,7 +574,7 @@ public:
      * Caller must own the lock on opCtx->getClient, and opCtx->getServiceContext() must be the same
      * as this service context. WithLock expects that the client lock be passed in.
      **/
-    void killOperation(WithLock,
+    void killOperation(ClientLock& clientLock,
                        OperationContext* opCtx,
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
@@ -711,7 +747,7 @@ public:
         return _userWritesAllowed.load();
     }
 
-    LockedClient getLockedClient(OperationId id);
+    ClientLock getLockedClient(OperationId id);
 
     /** The `role` must be ShardServer or RouterServer exactly. */
     Service* getService(ClusterRole role) const;
@@ -725,6 +761,14 @@ public:
      * Service they get.
      */
     Service* getService() const;
+
+    /**
+     * This is for internal use by `ServiceContextLock`. Avoid using it directly to lock
+     * `ServiceContext` as it will block normal server operations.
+     */
+    friend auto makeLockHandleForObjectLock(ServiceContext* svcCtx) {
+        return stdx::unique_lock(svcCtx->_mutex);
+    }
 
 private:
     class ClientObserverHolder {
@@ -900,7 +944,7 @@ public:
         /**
          * Returns the next client in the enumeration, or nullptr if there are no more clients.
          */
-        LockedClient next();
+        ClientLock next();
 
     private:
         ServiceContext::LockedClientsCursor _serviceCtxCursor;

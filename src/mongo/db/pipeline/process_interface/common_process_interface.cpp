@@ -95,8 +95,8 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 #endif
 
     auto reportCurrentOpForService = [&](Service* service) {
-        for (Service::LockedClientsCursor cursor(service); LockedClient lc = cursor.next();) {
-            Client* client = lc.client();
+        for (Service::LockedClientsCursor cursor(service); ClientLock lc = cursor.next();) {
+            Client* client = &*lc;
             if (ctxAuth->getAuthorizationManager().isAuthEnabled()) {
                 // If auth is disabled, ignore the allUsers parameter.
                 if (userMode == CurrentOpUserMode::kExcludeOthers &&

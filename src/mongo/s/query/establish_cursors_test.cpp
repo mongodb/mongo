@@ -276,7 +276,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
         // Now that our "remote" has received the request, interrupt the opCtx which the cursor is
         // running under.
         {
-            stdx::lock_guard<Client> lk(*operationContext()->getClient());
+            ClientLock lk(operationContext()->getClient());
             operationContext()->getServiceContext()->killOperation(
                 lk, operationContext(), ErrorCodes::CursorKilled);
         }
@@ -952,7 +952,7 @@ TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
     // Now we're processing the request for the second remote. Kill the opCtx
     // instead of responding.
     onCommand([&](auto&&) {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        ClientLock lk(operationContext()->getClient());
         operationContext()->getServiceContext()->killOperation(
             lk, operationContext(), ErrorCodes::CursorKilled);
         CursorResponse cursorResponse(_nss, CursorId(123), {});

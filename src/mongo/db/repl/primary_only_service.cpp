@@ -501,7 +501,7 @@ void PrimaryOnlyService::_interruptInstances(WithLock, Status status) {
     }
 
     for (auto opCtx : _opCtxs) {
-        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        ClientLock clientLock(opCtx->getClient());
         _serviceContext->killOperation(clientLock, opCtx, status.code());
     }
 }

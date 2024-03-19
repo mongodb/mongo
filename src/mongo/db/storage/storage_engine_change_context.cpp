@@ -110,7 +110,7 @@ StorageEngineChangeContext::killOpsForStorageEngineChange(ServiceContext* servic
                 continue;
             OperationId killedOperationId;
             {
-                stdx::lock_guard<Client> lk(*client);
+                ClientLock lk(client);
                 auto opCtxToKill = client->getOperationContext();
                 if (!opCtxToKill || !shard_role_details::getRecoveryUnit(opCtxToKill) ||
                     shard_role_details::getRecoveryUnit(opCtxToKill)->isNoop())

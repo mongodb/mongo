@@ -451,7 +451,7 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
         // cursor. It will stop on its own (and remove the cursor) when it sees that it's been
         // interrupted.
         {
-            stdx::unique_lock<Client> lk(*cursor->_operationUsingCursor->getClient());
+            ClientLock lk(cursor->_operationUsingCursor->getClient());
             cursor->_operationUsingCursor->getServiceContext()->killOperation(
                 lk, cursor->_operationUsingCursor, ErrorCodes::CursorKilled);
         }

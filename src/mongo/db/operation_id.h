@@ -37,7 +37,7 @@
 namespace mongo {
 class ServiceContext;
 class Client;
-class LockedClient;
+class ClientLock;
 
 /**
  * Every OperationContext is expected to have a unique OperationId within the scope of its
@@ -73,7 +73,7 @@ public:
      * Finds the client that holds the lease containing the OperationId -- the id itself will not
      * necessarily be in the map, but the leaseStart that contains the id will be.
      */
-    LockedClient findAndLockClient(OperationId id) const;
+    ClientLock findAndLockClient(OperationId id) const;
 
     /**
      * Removes the client from the _clientByOperationId map. This must be called before the Client

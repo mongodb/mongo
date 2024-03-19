@@ -199,10 +199,10 @@ SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
     if (!wasEmpty && opTime < _queuedOpTimes.begin()->first) {
         // Background thread could already be actively waiting on a later time, so tell it to stop
         // and wait for the newly requested opTime instead.
-        stdx::lock_guard scopedClientLock(*_waitForMajorityClient->getClientPointer());
+        ClientLock clientLock(_waitForMajorityClient->getClientPointer());
         if (auto opCtx = _waitForMajorityClient->getClientPointer()->getOperationContext())
             opCtx->getServiceContext()->killOperation(
-                scopedClientLock, opCtx, ErrorCodes::WaitForMajorityServiceEarlierOpTimeAvailable);
+                clientLock, opCtx, ErrorCodes::WaitForMajorityServiceEarlierOpTimeAvailable);
     }
 
     _queuedOpTimes.emplace(

@@ -161,7 +161,7 @@ void killClientOpCtx(ServiceContext* service,
         for (ServiceContext::LockedClientsCursor cursor(service); auto client = cursor.next();) {
             invariant(client);
 
-            stdx::lock_guard lk(*client);
+            ClientLock lk(client);
             if (client->desc() == clientName) {
                 if (auto opCtx = client->getOperationContext()) {
                     opCtx->getServiceContext()->killOperation(lk, opCtx, error);
