@@ -86,18 +86,13 @@ private:
      * Inserts skips where needed to all builders. Must be called after inserting one measurement.
      * Cannot call this after multiple measurements have been inserted.
      */
-    void _fillSkipsInMissingFields();
+    void _fillSkipsInMissingFields(const std::set<StringData>& fieldsSeen);
 
-    friend class MeasurementMapTest;
-    void _assertInternalStateIdentical_forTest();
-    void _insertNewKey(StringData key,
-                       const BSONElement& elem,
-                       TrackedBSONColumnBuilder builder,
-                       size_t numMeasurements = 1);
+    void _insertNewKey(StringData key, const BSONElement& elem, TrackedBSONColumnBuilder builder);
 
     std::reference_wrapper<TrackingContext> _trackingContext;
 
-    TrackedStringMap<std::tuple<size_t, TrackedBSONColumnBuilder>> _builders;
+    TrackedStringMap<TrackedBSONColumnBuilder> _builders;
     size_t _measurementCount{0};
 
     // The size of the compressed binary data across all builders since the last call to

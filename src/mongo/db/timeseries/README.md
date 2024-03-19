@@ -144,7 +144,7 @@ measurements are inserted into them.
 
 ### BSONColumnBuilder
 
-Each V2 and V3 bucket has a InsertionOrderedColumnMap, which is a map from each data field (excluding the meta field) in a bucket
+Each V2 and V3 bucket has a MeasurementMap, which is a map from each data field (excluding the meta field) in a bucket
 to a corresponding BSONColumnBuilder for that field. For example, if a bucket has a timefield `time`,
 there will be a mapping (`time` -> BSONColumnnBuilder for the BSONColumn of time data).
 

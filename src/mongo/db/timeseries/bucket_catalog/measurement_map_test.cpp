@@ -51,10 +51,6 @@ public:
     MeasurementMapTest() : measurementMap(trackingContext) {}
 
 protected:
-    void tearDown() override {
-        measurementMap._assertInternalStateIdentical_forTest();
-    }
-
     TrackingContext trackingContext;
     MeasurementMap measurementMap;
 };
