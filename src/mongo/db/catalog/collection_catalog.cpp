@@ -1430,6 +1430,18 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
         return dropPendingColl;
     }
 
+    // Protect against an edge case where the same namespace / UUID combination is used to create a
+    // collection after a drop. In this case, using the shared state in the latest instance would be
+    // an error, because the collection at the requested timestamp is not actually the same as the
+    // latest, it just happens to have the same namespace and UUID. Even if it were the same
+    // "logical" collection, this would still be incorrect because the 'ident' would be different,
+    // and the PIT read would be accessing an incorrect ident. The 'ident' is guaranteed to be
+    // unique across collection re-creation, and can be used to determine if the shared state is
+    // incompatible.
+    if (latestCollection && latestCollection->getRecordStore()->getIdent() != catalogEntry.ident) {
+        return nullptr;
+    }
+
     // If either the latest or drop pending collection exists, instantiate a new collection using
     // the shared state.
     if (latestCollection || dropPendingColl) {

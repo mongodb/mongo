@@ -889,6 +889,16 @@ public:
         return uuid;
     }
 
+    void createCollectionWithUUID(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  Timestamp timestamp,
+                                  UUID uuid) {
+        _setupDDLOperation(opCtx, timestamp);
+        WriteUnitOfWork wuow(opCtx);
+        _createCollection(opCtx, nss, uuid, false);
+        wuow.commit();
+    }
+
     void dropCollection(OperationContext* opCtx, const NamespaceString& nss, Timestamp timestamp) {
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
@@ -3398,6 +3408,60 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
     ASSERT_EQ(0, latestColl->getIndexCatalog()->numIndexesReady());
     ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesInProgress());
     ASSERT(!entry->isReady());
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenCollectionAfterDropAndCreateWithSameNsAndUUID) {
+    // Simulates a scenario where a collection was dropped and later recreated using the same
+    // NS and UUID. This can be the case when moving collections to another replica set / shard and
+    // then back to the original owner.
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    auto collUUID = UUID::gen();
+
+    // Create and drop collection.
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp firstCollectionDropTs = Timestamp(20, 20);
+    createCollectionWithUUID(opCtx.get(), nss, createCollectionTs, collUUID);
+
+    const auto firstIdent = CollectionCatalog::get(opCtx.get())
+                                ->lookupCollectionByNamespace(opCtx.get(), nss)
+                                ->getRecordStore()
+                                ->getIdent();
+
+    dropCollection(opCtx.get(), nss, firstCollectionDropTs);
+
+    // Recreate collection with same NS and UUID, at a later timestamp.
+    const Timestamp createCollectionSecondTs = Timestamp(30, 30);
+    createCollectionWithUUID(opCtx.get(), nss, createCollectionSecondTs, collUUID);
+
+    auto latestCatalog = CollectionCatalog::get(opCtx.get());
+    auto latestCollection = latestCatalog->lookupCollectionByNamespace(opCtx.get(), nss);
+    const auto secondIdent = latestCollection->getRecordStore()->getIdent();
+
+    // Open the collection at a point in-time before the drop.
+    const Timestamp readTimestamp = Timestamp(15, 15);
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    auto coll = CollectionCatalog::get(opCtx.get())
+                    ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
+
+    // The two collection idents are different, thus the RecordStore pointers must be different.
+    ASSERT_NE(firstIdent, secondIdent);
+    ASSERT_NE(coll->getRecordStore(), latestCollection->getRecordStore());
+
+    // Open the PIT collection in another client.
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("alternativeClient");
+    auto newOpCtx = newClient->makeOperationContext();
+    Lock::GlobalLock globalLockAlt(newOpCtx.get(), MODE_IS);
+    OneOffRead oorAlt(newOpCtx.get(), readTimestamp);
+    auto collAlt = CollectionCatalog::get(newOpCtx.get())
+                       ->establishConsistentCollection(newOpCtx.get(), nss, readTimestamp);
+
+    // Both PIT reads at the same timestamp should point to the same ident, but the RecordStore
+    // pointer will be different. This is expected, as PIT created collections are local to the
+    // operation. This is fine because the RecordStore is only ever used to read (it is not possible
+    // to write in the past).
+    ASSERT_EQ(coll->getRecordStore()->getIdent(), collAlt->getRecordStore()->getIdent());
+    ASSERT_NE(coll->getRecordStore(), collAlt->getRecordStore());
 }
 
 TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
