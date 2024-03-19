@@ -639,7 +639,7 @@ void executeTwoPhaseOrTimeSeriesWriteChildBatches(OperationContext* opCtx,
 
             // If there is only 1 targetable shard, we can skip using the two phase write
             // protocol.
-            if (targeter.getNShardsOwningChunks() == 1) {
+            if (childBatches.size() == 1) {
                 executeChildBatches(opCtx,
                                     targeter,
                                     clientRequest,

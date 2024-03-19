@@ -546,13 +546,6 @@ boost::optional<ShardId> targetPotentiallySingleShard(
     const BSONObj& query,
     const BSONObj& collation,
     bool isTimeseriesViewRequest) {
-    // Special case: there's only one shard owning all the chunks.
-    if (cm.getNShardsOwningChunks() == 1) {
-        std::set<ShardId> shardIds;
-        cm.getAllShardIds(&shardIds);
-        return *shardIds.begin();
-    }
-
     std::set<ShardId> shardIds;
     getShardIdsForQuery(expCtx,
                         getQueryForShardKey(expCtx, cm, query, isTimeseriesViewRequest),

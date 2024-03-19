@@ -583,6 +583,8 @@ last-continuous:
     ticket: SERVER-86667
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-86419
+  - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+    ticket: SERVER-87191
   suites: null
 last-lts:
   all:

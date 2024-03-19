@@ -269,7 +269,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
 
     const retryCount = 3;
     for (const bulkWrite of [false, true]) {
-        for (const timeseries of [false, true]) {
+        // TODO: SERVER-88153 Check metrics for timeseries writes. This test may need to be adjusted
+        // since it's possible a timeseries write may only target a single shard.
+        for (const timeseries of [false]) {
             runTest(true /* isMongos */, st, bulkWrite, retryCount, timeseries);
         }
     }
