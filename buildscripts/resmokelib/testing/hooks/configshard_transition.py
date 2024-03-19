@@ -3,6 +3,7 @@
 import time
 import threading
 import random
+import pymongo.errors
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import interface
@@ -63,6 +64,11 @@ class ContinuousConfigShardTransition(interface.Hook):
 class _TransitionThread(threading.Thread):
     CONFIG_SHARD = "config shard mode"
     DEDICATED = "dedicated config server mode"
+    # The possible number of seconds to wait before initiating a transition.
+    TRANSITION_INTERVALS = [0, 1, 1, 1, 1, 3, 5, 10]
+    TRANSITION_TIMEOUT_SECS = float(300)
+    # Error codes, taken from mongo/base/error_codes.yml.
+    _NAMESPACE_NOT_FOUND = 26
 
     def __init__(self, logger, stepdown_lifecycle, fixture, auth_options):
         threading.Thread.__init__(self, name="TransitionThread")
@@ -72,8 +78,9 @@ class _TransitionThread(threading.Thread):
         self._auth_options = auth_options
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_mode = self._current_fixture_mode()
+        self._should_wait_for_balancer_round = False
+        self._initial_balancer_round = None
 
-        self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
         self._is_stopped_evt = threading.Event()
         # Event set when the thread is not performing stepdowns.
@@ -99,19 +106,28 @@ class _TransitionThread(threading.Thread):
                     break
 
                 self._is_idle_evt.clear()
-                secs = float(10)
-                now = time.time()
-                if now - self._last_exec > secs:
-                    self.logger.info("Starting transition from " + self._current_mode)
-                    if self._current_mode is self.CONFIG_SHARD:
-                        self._transition_to_dedicated()
-                        self._current_mode = self.DEDICATED
-                    else:
-                        self._transition_to_config_shard()
-                        self._current_mode = self.CONFIG_SHARD
-                    self._last_exec = time.time()
-                    self.logger.info("Completed transition to %s in %0d ms", self._current_mode,
-                                     (self._last_exec - now) * 1000)
+
+                wait_secs = random.choice(self.TRANSITION_INTERVALS)
+                self.logger.info(f"Waiting {wait_secs} seconds before transition to dedicated.")
+                self.__lifecycle.wait_for_action_interval(wait_secs)
+
+                succeeded = self._transition_to_dedicated()
+                if not succeeded:
+                    # The thread was paused during the transition, so loop around and the
+                    # transition will continue when the thread is resumed.
+                    continue
+
+                self._current_mode = self.DEDICATED
+
+                wait_secs = random.choice(self.TRANSITION_INTERVALS)
+                self.logger.info(f"Waiting {wait_secs} seconds before transition to config shard.")
+                self.__lifecycle.wait_for_action_interval(wait_secs)
+
+                # Always end in config shard mode so the shard list at test startup is the
+                # same at the end.
+                self._transition_to_config_shard()
+                self._current_mode = self.CONFIG_SHARD
+
         except Exception:  # pylint: disable=W0703
             # Proactively log the exception when it happens so it will be
             # flushed immediately.
@@ -131,7 +147,7 @@ class _TransitionThread(threading.Thread):
         """Pause the thread."""
         self.__lifecycle.mark_test_finished()
 
-        # Wait until we are no longer executing stepdowns.
+        # Wait until we are no longer executing transitions.
         self._is_idle_evt.wait()
         # Check if the thread is alive in case it has thrown an exception while running.
         self._check_thread()
@@ -146,30 +162,74 @@ class _TransitionThread(threading.Thread):
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
+    def _move_from_config(self, dbs_to_move):
+        non_config_shard_id = self._get_non_config_shard_id()
+        for db in dbs_to_move:
+            try:
+                colls_in_db = list(self._client.config.collections.find())
+                for coll in colls_in_db:
+                    if "unsplittable" in coll:
+                        coll_ns = coll["_id"]
+                        msg = "running moveCollection for: " + str(coll_ns)
+                        self.logger.info(msg)
+                        self._client.admin.command(
+                            {"moveCollection": coll_ns, "toShard": non_config_shard_id})
+                self._client.admin.command({"movePrimary": db, "to": non_config_shard_id})
+            except pymongo.errors.OperationFailure as err:
+                # A concurrent dropDatabase could have removed the database before we run movePrimary/moveCollection.
+                if err.code not in [self._NAMESPACE_NOT_FOUND]:
+                    raise err
+
     def _transition_to_dedicated(self):
+        self.logger.info("Starting transition from " + self._current_mode)
         res = None
         start_time = time.time()
         while True:
+            if self._should_wait_for_balancer_round:
+                # TODO SERVER-77768: Remove.
+                #
+                # Wait for one balancer round after starting to drain if the config server owned no
+                # chunks to avoid a race where the migration of the first chunk to the config server
+                # can leave the collection orphaned on it after it's been removed as a shard.
+                if self._initial_balancer_round is None:
+                    initial_status = self._client.admin.command({"balancerStatus": 1})
+                    self._initial_balancer_round = initial_status["numBalancerRounds"]
+
+                latest_status = self._client.admin.command({"balancerStatus": 1})
+                if self._initial_balancer_round >= latest_status["numBalancerRounds"]:
+                    self.logger.info(
+                        "Waiting for a balancer round before transition to dedicated. "
+                        "Initial round: %d, latest round: %d", self._initial_balancer_round,
+                        latest_status["numBalancerRounds"])
+                    time.sleep(1)
+                    continue
+
+                self.logger.info("Done waiting for a balancer round before transition to dedicated")
+                self._should_wait_for_balancer_round = False
+                self._initial_balancer_round = None
+
             res = self._client.admin.command({"transitionToDedicatedConfigServer": 1})
 
             if res["state"] == "completed":
-                break
+                self.logger.info("Completed transition to %s in %0d ms", self.DEDICATED,
+                                 (time.time() - start_time) * 1000)
+                return True
+            elif res["state"] == "started":
+                if self._client.config.chunks.count_documents({"shard": "config"}) == 0:
+                    self._should_wait_for_balancer_round = True
             elif res["state"] == "ongoing" and res["dbsToMove"]:
-                non_config_shard_id = self._get_non_config_shard_id()
-                for db in res["dbsToMove"]:
-                    msg = "running movePrimary for: " + str(db)
-                    self.logger.info(msg)
-                    self._client.admin.command({"movePrimary": db, "to": non_config_shard_id})
+                self._move_from_config(res["dbsToMove"])
 
             time.sleep(1)
 
-            if time.time() - start_time > float(300):
+            if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
                 msg = "Could not transition to dedicated config server. with last response: " + str(
                     res)
                 self.logger.error(msg)
                 raise errors.ServerFailure(msg)
 
     def _transition_to_config_shard(self):
+        self.logger.info("Starting transition from " + self._current_mode)
         self._client.admin.command({"transitionFromDedicatedConfigServer": 1})
 
     def _get_non_config_shard_id(self):
