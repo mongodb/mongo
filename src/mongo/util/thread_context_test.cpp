@@ -70,33 +70,21 @@ struct Counters {
 };
 
 synchronized_value gCounters{Counters{0, 0, 0}};
-AtomicWord<bool> gTestDecorationEnabled{false};
 
 /**
  * This decoration increments a set of global counters on creation and destruction.
  */
 class TestDecoration {
 public:
-    TestDecoration() : _enabled(gTestDecorationEnabled.load()) {
+    TestDecoration() {
         invariant(!ThreadContext::get());
-
-        if (_enabled) {
-            // Thread name is not available here, so log the ID for diagnostic purposes.
-            LOGV2_INFO(6173200,
-                       "Incrementing creation counter",
-                       "threadId"_attr = ProcessId::getCurrentThreadId());
-            ++gCounters->created;
-        }
     }
 
     ~TestDecoration() {
-        if (_enabled) {
+        if (_enabled.load()) {
+            _enabled.store(false);
             // Thread name might not be available here, so log the ID for diagnostic purposes.
-            LOGV2_INFO(6173201,
-                       "Incrementing destruction counter(s)",
-                       "threadId"_attr = ProcessId::getCurrentThreadId());
             ++gCounters->destroyed;
-
             if (ThreadContext::get()) {
                 // We should only be able to reference a ThreadContext in our destructor if our
                 // lifetime was extended to be off thread.
@@ -104,9 +92,12 @@ public:
             }
         }
     }
+    void setEnabled(bool enabled) {
+        _enabled.store(enabled);
+    }
 
 private:
-    bool _enabled;
+    AtomicWord<bool> _enabled{false};
 };
 
 const auto getThreadTestDecoration = ThreadContext::declareDecoration<TestDecoration>();
@@ -117,13 +108,11 @@ public:
         ThreadContext::get();  // Ensure a ThreadContext for the main thread.
         _monitor.emplace();
         *gCounters = {0, 0, 0};
-        gTestDecorationEnabled.store(true);
     }
 
     void tearDown() override {
         _monitor->notifyDone();
         _monitor.reset();
-        gTestDecorationEnabled.store(false);
         auto endCount = gCounters.get();
         ASSERT_EQ(endCount.created, endCount.destroyed);
         ASSERT_GTE(endCount.destroyed, endCount.destroyedOffThread);
@@ -134,9 +123,10 @@ public:
      */
     auto getThreadContext() {
         auto context = ThreadContext::get();
-
         ASSERT(context);
         ASSERT(context->isAlive());
+        // only allows context thread counter to be incremented.
+        getThreadTestDecoration(context.get()).setEnabled(true);
 
         // Log the thread ID for diagnostic purposes, so it can be associated with
         // the thread name and cross-referenced with other logging statements here.
@@ -160,6 +150,10 @@ public:
      */
     template <typename F>
     void launchAndJoinThread(F&& f) {
+        ++gCounters->created;
+        LOGV2_INFO(6173200,
+                   "Incrementing creation counter",
+                   "threadId"_attr = ProcessId::getCurrentThreadId());
         _monitor->spawn(std::forward<F>(f)).join();
     }
 
