@@ -223,16 +223,29 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    const oid = ObjectId("65f9972047423af45aeafc67");
+    const timestamp = oid.getTimestamp();
     assert.commandWorked(bucketsColl.insert({
         control: {
             version: TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
                 ? TimeseriesTest.BucketVersion.kCompressedSorted
                 : TimeseriesTest.BucketVersion.kUncompressed,
-            min: {time: ISODate()},
-            max: {time: ISODate()}
+            min: {time: timestamp, "_id": oid, "a": 1},
+            max: {time: timestamp, "_id": oid, "a": 1}
         },
-        data: {}
+        data: {
+            "time": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
+                ? BinData(7, "CQAAVfZWjgEAAAA=")
+                : {"0": timestamp},
+            "_id": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
+                ? BinData(7, "BwBl+ZcgR0I69Frq/GcA")
+                : {"0": oid},
+            "a": TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
+                ? BinData(7, "AQAAAAAAAADwPwA=")
+                : {"0": 1},
+        }
     }));
+
     assert.commandFailedWithCode(bucketsColl.insert({
         control: {version: 'not a number', min: {time: ISODate()}, max: {time: ISODate()}},
         data: {}
