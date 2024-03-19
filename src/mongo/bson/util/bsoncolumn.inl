@@ -190,8 +190,7 @@ template <class Buffer>
 requires Appendable<Buffer>
 const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
                                                        const char* end,
-                                                       Buffer& buffer,
-                                                       const BSONElement& reference) {
+                                                       Buffer& buffer) {
     uint64_t prev = simple8b::kSingleZero;
     while (ptr < end) {
         const uint8_t control = *ptr;
@@ -205,9 +204,9 @@ const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
                 bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
 
         simple8b::visitAll<int64_t>(ptr + 1, size, prev,
-            [&buffer, &reference](int64_t v) {
+            [&buffer](int64_t v) {
                 uassert(8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
-                buffer.template append<BSONElement>(reference);
+                buffer.appendLast();
             },
             [&buffer]() {
                 buffer.appendMissing();
@@ -405,7 +404,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                 case MaxKey:
                     // Non-delta types, deltas should only contain skip or 0
                     buffer.template append<BSONElement>(literal);
-                    ptr = decompressAllLiteral(ptr, end, buffer, literal);
+                    ptr = decompressAllLiteral(ptr, end, buffer);
                     break;
                 default:
                     uasserted(8295704, "Type not implemented");
@@ -416,6 +415,7 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
             using PathBufferPair = std::pair<RootPath, Buffer&>;
             std::array<PathBufferPair, 1> path{{{RootPath{}, buffer}}};
             ptr = decompressor.decompress(std::span<PathBufferPair, 1>{path});
+            ptr = decompressAllLiteral(ptr, end, buffer);
         } else {
             uasserted(8295706, "Unexpected control");
         }

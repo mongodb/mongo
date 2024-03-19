@@ -7005,8 +7005,7 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObj) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87304): "unexpected control" when turning on block based testing here
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObjLegacyDecompression) {
@@ -7026,8 +7025,7 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObjLegacyDecompression) {
     appendSimple8bBlock64(expected, boost::none);
     appendEOO(expected);
 
-    // TODO(SERVER-87304): "unexpected control" when turning on block based testing here
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubArray) {
@@ -7056,8 +7054,7 @@ TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubArray) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    // TODO(SERVER-87304): "unexpected control" when turning on block based testing here
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, ObjectEmpty) {
@@ -7434,8 +7431,7 @@ TEST_F(BSONColumnTest, ZeroDeltaAfterInterleaved) {
     appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
     appendEOO(expected);
 
-    // TODO(SERVER-87304): "unexpected control" when turning on block based testing here
-    verifyDecompression(expected, elems, false);
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, InvalidControlByte) {

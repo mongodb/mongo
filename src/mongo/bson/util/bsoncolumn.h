@@ -742,10 +742,7 @@ private:
 
     template <class Buffer>
     requires Appendable<Buffer>
-    static const char* decompressAllLiteral(const char* ptr,
-                                            const char* end,
-                                            Buffer& buffer,
-                                            const BSONElement& reference);
+    static const char* decompressAllLiteral(const char* ptr, const char* end, Buffer& buffer);
 };
 
 /**
