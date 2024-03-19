@@ -72,10 +72,11 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
             }
             [[fallthrough]];
         case SerializationContext::Source::Storage:
-        case SerializationContext::Source::Catalog:
         case SerializationContext::Source::Default:
             // Use forStorage as the default serializing rule
             return serializeForStorage(ns, context);
+        case SerializationContext::Source::Catalog:
+            return serializeForCatalog(ns);
         default:
             MONGO_UNREACHABLE;
     }
@@ -93,11 +94,6 @@ std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) 
 
 std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
                                                      const SerializationContext& context) {
-    if (context.getSource() == SerializationContext::Source::Catalog) {
-        // always return prefixed namespace for catalog.
-        return ns.toStringWithTenantId();
-    }
-
     // TODO SERVER-84275: Change to use isEnabled again.
     // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
     // this could run during startup while the FCV is still uninitialized.
@@ -145,10 +141,15 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         case SerializationContext::Source::Catalog:
         case SerializationContext::Source::Default:
             // Use forStorage as the default deserializing rule
-            return deserializeForStorage(std::move(tenantId), ns, context);
+            return deserializeForStorage(std::move(tenantId), ns);
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+NamespaceString NamespaceStringUtil::deserializeForCatalog(
+    const boost::optional<TenantId>& tenantId, StringData ns) {
+    return deserializeForStorage(tenantId, ns);
 }
 
 NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, StringData coll) {
@@ -156,8 +157,7 @@ NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, Str
 }
 
 NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
-                                                           StringData ns,
-                                                           const SerializationContext& context) {
+                                                           StringData ns) {
     // TODO SERVER-84275: Change to use isEnabled again.
     // We need to use isEnabledUseLastLTSFCVWhenUninitialized instead of isEnabled because
     // this could run during startup while the FCV is still uninitialized.

@@ -137,6 +137,17 @@ public:
                                        const SerializationContext& context);
 
     /**
+     * Deserializes StringData ns to a NamespaceString object for catalog code.
+     *
+     * Always includes the tenantId prefix for the catalog deserialization.
+     * eg. deserializeForCatalog(tenantID, "foo.bar") -> "tenantID_foo.bar"
+     *
+     * MUST only be used for deserializing a NamespaceString object for catalog.
+     */
+    static NamespaceString deserializeForCatalog(const boost::optional<TenantId>& tenantId,
+                                                 StringData ns);
+
+    /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
      * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
      */
@@ -161,9 +172,7 @@ private:
     static std::string serializeForCommands(const NamespaceString& ns,
                                             const SerializationContext& context);
 
-    static NamespaceString deserializeForStorage(boost::optional<TenantId> tenantId,
-                                                 StringData ns,
-                                                 const SerializationContext& context);
+    static NamespaceString deserializeForStorage(boost::optional<TenantId> tenantId, StringData ns);
 
     static NamespaceString deserializeForCommands(boost::optional<TenantId> tenantId,
                                                   StringData ns,

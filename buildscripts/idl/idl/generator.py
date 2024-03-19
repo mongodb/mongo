@@ -1402,8 +1402,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             self._writer, 's', 'onMatch(adaptMatch({}))', 'onFail()',
                             [f.name for f in selected_fields])
 
-    def _gen_field_deserializer_expression(self, element_name, field, ast_type, tenant):
-        # type: (str, ast.Field, ast.Type, str) -> str
+    def _gen_field_deserializer_expression(self, element_name, field, ast_type, tenant,
+                                           is_catalog_ctxt):
+        # type: (str, ast.Field, ast.Type, str, bool) -> str
         """
         Generate the C++ deserializer piece for a field.
 
@@ -1452,10 +1453,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                                 method_name=method_name, expression=expression)
 
                 if ast_type.deserialize_with_tenant:
-                    return common.template_args(
-                        "${method_name}(${tenant}, ${expression}, ${context})",
-                        method_name=method_name, tenant=tenant, expression=expression,
-                        context=serialization_context)
+                    arguments = "${method_name}(${tenant}, ${expression}, ${context})"
+                    if is_catalog_ctxt:  # serializeForCatalog doesn't need a serializationContext
+                        arguments = "${method_name}(${tenant}, ${expression})"
+                        method_name = method_name.replace("serialize", "serializeForCatalog")
+                    return common.template_args(arguments, method_name=method_name, tenant=tenant,
+                                                expression=expression,
+                                                context=serialization_context)
                 else:
                     return common.template_args("${method_name}(${expression})",
                                                 method_name=method_name, expression=expression)
@@ -1473,8 +1477,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             return '%s(%s)' % (method_name, element_name)
 
-    def _gen_array_deserializer(self, field, bson_element, ast_type, tenant):
-        # type: (ast.Field, str, ast.Type, str) -> None
+    def _gen_array_deserializer(self, field, bson_element, ast_type, tenant, is_catalog_ctxt):
+        # type: (ast.Field, str, ast.Type, str, bool) -> None
         """Generate the C++ deserializer piece for an array field."""
         assert ast_type.is_array
         cpp_type_info = cpp_types.get_cpp_type_from_cpp_type_name(field, ast_type.cpp_type, True)
@@ -1509,12 +1513,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_line('%s _tmp;' % ast_type.cpp_type)
                         cpp_name = field.cpp_name
                         field.cpp_name = 'tmp'
-                        array_value = self._gen_variant_deserializer(field, 'arrayElement', tenant)
+                        array_value = self._gen_variant_deserializer(field, 'arrayElement', tenant,
+                                                                     is_catalog_ctxt)
                         field.cpp_name = cpp_name
                         self._writer.write_line('values.push_back(std::move(%s));' % (array_value))
                     else:
                         array_value = self._gen_field_deserializer_expression(
-                            'arrayElement', field, ast_type, tenant)
+                            'arrayElement', field, ast_type, tenant, is_catalog_ctxt)
                         self._writer.write_line('values.push_back(%s);' % (array_value))
 
             with self._block('else {', '}'):
@@ -1538,8 +1543,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
-    def _gen_variant_deserializer(self, field, bson_element, tenant):
-        # type: (ast.Field, str, str) -> str
+    def _gen_variant_deserializer(self, field, bson_element, tenant, is_catalog_ctxt):
+        # type: (ast.Field, str, str, bool) -> str
         """Generate the C++ deserializer piece for a variant field."""
         self._writer.write_empty_line()
         self._writer.write_line('const BSONType variantType = %s.type();' % (bson_element, ))
@@ -1567,7 +1572,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_line('case %s:' % (bson.cpp_bson_type_name(bson_type), ))
                     # Each copy of the array deserialization code gets an anonymous block.
                     with self._block('{', '}'):
-                        self._gen_array_deserializer(field, bson_element, array_type, tenant)
+                        self._gen_array_deserializer(field, bson_element, array_type, tenant,
+                                                     is_catalog_ctxt)
                         self._writer.write_line('break;')
 
                 self._writer.write_line('default:')
@@ -1591,7 +1597,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('case %s:' % (bson.cpp_bson_type_name(bson_type), ))
                 with self._block('{', '}'):
                     self.gen_field_deserializer(field, scalar_type, "bsonObject", bson_element,
-                                                None, tenant, check_type=False)
+                                                None, tenant, False, check_type=False,
+                                                is_catalog_ctxt=is_catalog_ctxt)
                     self._writer.write_line('break;')
 
         if field.type.variant_struct_types:
@@ -1656,8 +1663,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line(_gen_mark_present(field.cpp_name))
 
     def gen_field_deserializer(self, field, field_type, bson_object, bson_element,
-                               field_usage_check, tenant, is_command_field=False, check_type=True):
-        # type: (ast.Field, ast.Type, str, str, _FieldUsageCheckerBase, str, bool, bool) -> None
+                               field_usage_check, tenant, is_command_field=False, check_type=True,
+                               is_catalog_ctxt=False):
+        # type: (ast.Field, ast.Type, str, str, _FieldUsageCheckerBase, str, bool, bool, bool) -> None
         """Generate the C++ deserializer piece for a field.
 
         If field_type is scalar and check_type is True (the default), generate type-checking code.
@@ -1672,12 +1680,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
             with self._predicate(predicate):
                 self._gen_usage_check(field, bson_element, field_usage_check)
-                self._gen_array_deserializer(field, bson_element, field_type, tenant)
+                self._gen_array_deserializer(field, bson_element, field_type, tenant,
+                                             is_catalog_ctxt)
             return
 
         elif field_type.is_variant:
             self._gen_usage_check(field, bson_element, field_usage_check)
-            self._gen_variant_deserializer(field, bson_element, tenant)
+            self._gen_variant_deserializer(field, bson_element, tenant, is_catalog_ctxt)
             return
 
         def validate_and_assign_or_uassert(field, expression):
@@ -1718,7 +1727,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._gen_usage_check(field, bson_element, field_usage_check)
 
                 object_value = self._gen_field_deserializer_expression(
-                    bson_element, field, field_type, tenant)
+                    bson_element, field, field_type, tenant, is_catalog_ctxt)
                 if field.chained_struct_field:
                     if field.optional:
                         # We must invoke the boost::optional constructor when setting optional view
@@ -1825,9 +1834,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # For now, _serializationContext is the only internal_only type, so additional work
             # around this will be deferred.
             if arg.name == 'serializationContext':
-                if is_catalog_ctxt:
-                    sc_conditional = 'SerializationContext::stateCatalog()'
-                elif is_command:
+                if is_command:
                     sc_conditional = 'SerializationContext::stateCommandRequest()'
                 else:
                     sc_conditional = '_isCommandReply ? SerializationContext::stateCommandReply() : SerializationContext::stateDefault()'
@@ -1938,7 +1945,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._block('{', '}'):
                 self.gen_field_deserializer(struct.command_field, struct.command_field.type,
                                             bson_object, "commandElement", None, tenant,
-                                            is_command_field=True, check_type=True)
+                                            is_command_field=True, check_type=True,
+                                            is_catalog_ctxt=struct.is_catalog_ctxt)
         else:
             struct_type_info = struct_types.get_struct_info(struct)
 
@@ -1978,15 +1986,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         'setSerializationContext(SerializationContext::stateCommandRequest());')
 
         else:
-            if struct.is_catalog_ctxt:
-                self._writer.write_line(
-                    'setSerializationContext(ctxt.getSerializationContext() == SerializationContext::stateDefault() ? SerializationContext::stateCatalog() : ctxt.getSerializationContext());'
-                )
-            else:
-                # set the local serializer flags according to the constexpr set by is_command_reply
-                self._writer.write_line(
-                    'setSerializationContext(_isCommandReply ? SerializationContext::stateCommandReply() : ctxt.getSerializationContext());'
-                )
+            self._writer.write_line(
+                'setSerializationContext(_isCommandReply ? SerializationContext::stateCommandReply() : ctxt.getSerializationContext());'
+            )
 
         self._writer.write_empty_line()
 
@@ -2000,7 +2002,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('// ignore field')
             else:
                 self.gen_field_deserializer(field, field.type, bson_object, "element",
-                                            field_usage_check, tenant)
+                                            field_usage_check, tenant, False, True,
+                                            struct.is_catalog_ctxt)
             self._writer.write_line('return true;')
 
         with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
@@ -2061,7 +2064,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 continue
 
             # Simply generate deserializers since these are all 'any' types
-            self.gen_field_deserializer(field, field.type, bson_object, "element", None, tenant)
+            self.gen_field_deserializer(field, field.type, bson_object, "element", None, tenant,
+                                        False, True, struct.is_catalog_ctxt)
             self._writer.write_empty_line()
 
         self._writer.write_empty_line()
@@ -2282,8 +2286,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._gen_command_deserializer(struct, "request.body", "request.getValidatedTenantId()")
 
-    def _gen_serializer_method_custom(self, field):
-        # type: (ast.Field) -> None
+    def _gen_serializer_method_custom(self, field, is_catalog_ctxt):
+        # type: (ast.Field, bool) -> None
         """Generate the serialize method definition for a custom type."""
 
         # Generate custom serialization
@@ -2306,13 +2310,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     with self._block('for (const auto& item : ${access_member}) {', '}'):
                         expression = bson_cpp_type.gen_serializer_expression(
                             self._writer, 'item',
-                            field.query_shape == ast.QueryShapeFieldType.CUSTOM)
+                            field.query_shape == ast.QueryShapeFieldType.CUSTOM, is_catalog_ctxt)
                         template_params['expression'] = expression
                         self._writer.write_template('arrayBuilder.append(${expression});')
                 else:
                     expression = bson_cpp_type.gen_serializer_expression(
                         self._writer, _access_member(field),
-                        field.query_shape == ast.QueryShapeFieldType.CUSTOM)
+                        field.query_shape == ast.QueryShapeFieldType.CUSTOM, is_catalog_ctxt)
                     template_params['expression'] = expression
                     if not field.should_serialize_with_options:
                         self._writer.write_template(
@@ -2479,7 +2483,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         assert not field.type.is_array
                         expression = bson_cpp_type.gen_serializer_expression(
                             self._writer, 'value',
-                            field.query_shape == ast.QueryShapeFieldType.CUSTOM)
+                            field.query_shape == ast.QueryShapeFieldType.CUSTOM, False)
                         template_params['expression'] = expression
                         if not field.should_serialize_with_options:
                             self._writer.write_template(
@@ -2509,8 +2513,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         else:
                             assert False
 
-    def _gen_serializer_method_common(self, field):
-        # type: (ast.Field) -> None
+    def _gen_serializer_method_common(self, field, is_catalog_ctxt):
+        # type: (ast.Field, bool) -> None
         """Generate the serialize method definition."""
 
         member_name = _get_field_member_name(field)
@@ -2531,7 +2535,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._block(optional_block_start, '}'):
             if not field.type.is_struct:
                 if needs_custom_serializer:
-                    self._gen_serializer_method_custom(field)
+                    self._gen_serializer_method_custom(field, is_catalog_ctxt)
                 elif field.type.is_variant:
                     if field.type.is_array:
                         # For array of variants, is_variant == is_array == True.
@@ -2591,7 +2595,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if struct.command_field:
                 # Internal-only types aren't serialized or deserialized.
                 if not (struct.command_field.type and struct.command_field.type.internal_only):
-                    self._gen_serializer_method_common(struct.command_field)
+                    self._gen_serializer_method_common(struct.command_field, struct.is_catalog_ctxt)
             else:
                 struct_type_info = struct_types.get_struct_info(struct)
                 struct_type_info.gen_serializer(self._writer)
@@ -2619,7 +2623,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field.type and field.type.internal_only:
                 continue
 
-            self._gen_serializer_method_common(field)
+            self._gen_serializer_method_common(field, struct.is_catalog_ctxt)
 
             # Add a blank line after each block
             self._writer.write_empty_line()
