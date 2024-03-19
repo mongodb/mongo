@@ -80,7 +80,7 @@ public:
                   bool dupsAllowed,
                   int32_t yieldIterations,
                   const KeyHandlerFn& onDuplicateKeyInserted,
-                  const RecordIdHandlerFn& onDuplicateRecord) {
+                  const RecordIdHandlerFn& onDuplicateRecord) override {
 
         Timer timer;
 

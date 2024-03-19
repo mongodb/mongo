@@ -64,7 +64,7 @@ public:
     using Phase = MovePrimaryCoordinatorPhaseEnum;
 
     MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
-    virtual ~MovePrimaryCoordinator() = default;
+    ~MovePrimaryCoordinator() override = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
     bool canAlwaysStartWhenUserWritesAreDisabled() const override;

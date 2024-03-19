@@ -43,12 +43,12 @@ protected:
     static int _num_set_ups;
     static int _num_tear_downs;
 
-    void setUp() {
+    void setUp() override {
         _num_set_ups++;
         _myVar = 10;
     }
 
-    void tearDown() {
+    void tearDown() override {
         _num_tear_downs++;
         _myVar = 0;
     }

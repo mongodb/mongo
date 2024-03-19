@@ -591,7 +591,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_update") {}
 
-    void setupTests() {
+    void setupTests() override {
         // Stage-specific tests below.
         add<QueryStageUpdateUpsertEmptyColl>();
         add<QueryStageUpdateSkipDeletedDoc>();

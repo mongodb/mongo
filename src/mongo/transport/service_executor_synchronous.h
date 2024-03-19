@@ -56,7 +56,7 @@ namespace service_executor_synchronous_detail {
  */
 class ServiceExecutorSyncImpl : public ServiceExecutor {
 public:
-    ~ServiceExecutorSyncImpl();
+    ~ServiceExecutorSyncImpl() override;
 
     void start() override;
     Status shutdown(Milliseconds timeout) override;

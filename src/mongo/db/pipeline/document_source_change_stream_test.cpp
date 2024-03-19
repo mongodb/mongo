@@ -167,7 +167,7 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
 
     // For tests of transactions that involve multiple oplog entries.
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
-        repl::OpTime time) const {
+        repl::OpTime time) const override {
         auto iterator = std::make_unique<MockTransactionHistoryIterator>();
 
         // Simulate a lookup on the oplog timestamp by manually advancing the iterator until we
@@ -185,7 +185,7 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
 
     // Called by DocumentSourceAddPreImage to obtain the UUID of the oplog. Since that's the only
     // piece of collection info we need for now, just return a BSONObj with the mock oplog UUID.
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
         return BSON("uuid" << oplogUuid());
     }
 

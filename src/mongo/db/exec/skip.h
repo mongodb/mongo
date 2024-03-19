@@ -54,7 +54,7 @@ public:
               long long toSkip,
               WorkingSet* ws,
               std::unique_ptr<PlanStage> child);
-    ~SkipStage();
+    ~SkipStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;

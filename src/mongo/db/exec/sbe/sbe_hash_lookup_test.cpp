@@ -43,7 +43,7 @@ public:
                       const BSONArray& outer,
                       const BSONArray& inner,
                       bool outerKeyOnly = true,
-                      CollatorInterface* collator = nullptr) {
+                      CollatorInterface* collator = nullptr) override {
         auto& stream = gctx.outStream();
         if (stream.tellp()) {
             stream << std::endl;

@@ -84,7 +84,7 @@ public:
      * Before each test case:
      * - Creates a sharded collection with shard key `_id`
      */
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
@@ -135,7 +135,7 @@ class AutoSplitVectorTest10MB : public AutoSplitVectorTest {
      * - Creates a sharded collection with shard key `_id`
      * - Inserts `10` documents of ~1MB size (shard keys [0...9])
      */
-    void setUp() {
+    void setUp() override {
         AutoSplitVectorTest::setUp();
 
         auto opCtx = operationContext();

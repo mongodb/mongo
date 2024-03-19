@@ -74,7 +74,7 @@ class CancellationState : public RefCountable {
 public:
     CancellationState() = default;
 
-    ~CancellationState() {
+    ~CancellationState() override {
         auto state = _state.load();
         invariant(state == State::kCanceled || state == State::kDismissed);
         invariant(_cancellationPromise.getFuture().isReady());
@@ -138,7 +138,7 @@ class CancellationStateHolder : public RefCountable {
 public:
     CancellationStateHolder() = default;
 
-    ~CancellationStateHolder() {
+    ~CancellationStateHolder() override {
         _state->dismiss();
     }
 

@@ -47,7 +47,7 @@ class KillOpCmdBase : public BasicCommand {
 public:
     KillOpCmdBase() : BasicCommand("killOp") {}
 
-    virtual ~KillOpCmdBase() = default;
+    ~KillOpCmdBase() override = default;
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

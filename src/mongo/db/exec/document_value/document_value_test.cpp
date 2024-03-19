@@ -1617,118 +1617,118 @@ protected:
 };
 
 class ToBoolTrue : public ToBoolBase {
-    bool expected() {
+    bool expected() override {
         return true;
     }
 };
 
 class ToBoolFalse : public ToBoolBase {
-    bool expected() {
+    bool expected() override {
         return false;
     }
 };
 
 /** Coerce 0 to bool. */
 class ZeroIntToBool : public ToBoolFalse {
-    Value value() {
+    Value value() override {
         return Value(0);
     }
 };
 
 /** Coerce -1 to bool. */
 class NonZeroIntToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(-1);
     }
 };
 
 /** Coerce 0LL to bool. */
 class ZeroLongToBool : public ToBoolFalse {
-    Value value() {
+    Value value() override {
         return Value(0LL);
     }
 };
 
 /** Coerce 5LL to bool. */
 class NonZeroLongToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(5LL);
     }
 };
 
 /** Coerce 0.0 to bool. */
 class ZeroDoubleToBool : public ToBoolFalse {
-    Value value() {
+    Value value() override {
         return Value(0);
     }
 };
 
 /** Coerce -1.3 to bool. */
 class NonZeroDoubleToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(-1.3);
     }
 };
 
 /** Coerce "" to bool. */
 class StringToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(StringData());
     }
 };
 
 /** Coerce {} to bool. */
 class ObjectToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(mongo::Document());
     }
 };
 
 /** Coerce [] to bool. */
 class ArrayToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(std::vector<Value>());
     }
 };
 
 /** Coerce Date(0) to bool. */
 class DateToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return Value(Date_t{});
     }
 };
 
 /** Coerce js literal regex to bool. */
 class RegexToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return fromBson(fromjson("{''://}"));
     }
 };
 
 /** Coerce true to bool. */
 class TrueToBool : public ToBoolTrue {
-    Value value() {
+    Value value() override {
         return fromBson(BSON("" << true));
     }
 };
 
 /** Coerce false to bool. */
 class FalseToBool : public ToBoolFalse {
-    Value value() {
+    Value value() override {
         return fromBson(BSON("" << false));
     }
 };
 
 /** Coerce null to bool. */
 class NullToBool : public ToBoolFalse {
-    Value value() {
+    Value value() override {
         return Value(BSONNULL);
     }
 };
 
 /** Coerce undefined to bool. */
 class UndefinedToBool : public ToBoolFalse {
-    Value value() {
+    Value value() override {
         return Value(BSONUndefined);
     }
 };
@@ -1755,50 +1755,50 @@ protected:
 
 /** Coerce -5 to int. */
 class IntToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value(-5);
     }
-    int expected() {
+    int expected() override {
         return -5;
     }
 };
 
 /** Coerce long to int. */
 class LongToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value(0xff00000007LL);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce 9.8 to int. */
 class DoubleToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value(9.8);
     }
-    int expected() {
+    int expected() override {
         return 9;
     }
 };
 
 /** Coerce null to int. */
 class NullToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value(BSONNULL);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce undefined to int. */
 class UndefinedToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value(BSONUndefined);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
@@ -1813,40 +1813,40 @@ public:
 
 /** Coerce maxInt to int */
 class MaxIntToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value((double)std::numeric_limits<int>::max());
     }
-    int expected() {
+    int expected() override {
         return std::numeric_limits<int>::max();
     }
 };
 
 /** Coerce minInt to int */
 class MinIntToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value((double)std::numeric_limits<int>::min());
     }
-    int expected() {
+    int expected() override {
         return std::numeric_limits<int>::min();
     }
 };
 
 /** Coerce maxInt + 1 to int */
 class TooLargeToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value((double)std::numeric_limits<int>::max() + 1);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce minInt - 1 to int */
 class TooLargeNegativeToInt : public ToIntBase {
-    Value value() {
+    Value value() override {
         return Value((double)std::numeric_limits<int>::min() - 1);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
@@ -1873,101 +1873,101 @@ protected:
 
 /** Coerce -5 to long. */
 class IntToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(-5);
     }
-    long long expected() {
+    long long expected() override {
         return -5;
     }
 };
 
 /** Coerce long to long. */
 class LongToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(0xff00000007LL);
     }
-    long long expected() {
+    long long expected() override {
         return 0xff00000007LL;
     }
 };
 
 /** Coerce 9.8 to long. */
 class DoubleToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(9.8);
     }
-    long long expected() {
+    long long expected() override {
         return 9;
     }
 };
 
 /** Coerce infinity to long. */
 class InfToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(std::numeric_limits<double>::infinity());
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce negative infinity to long. **/
 class NegInfToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(std::numeric_limits<double>::infinity() * -1);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce large to long. **/
 class InvalidLargeToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(pow(2, 63));
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce lowest double to long. **/
 class LowestDoubleToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(static_cast<double>(std::numeric_limits<long long>::lowest()));
     }
-    long long expected() {
+    long long expected() override {
         return std::numeric_limits<long long>::lowest();
     }
 };
 
 /** Coerce 'towards infinity' to long **/
 class TowardsInfinityToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(static_cast<double>(std::nextafter(std::numeric_limits<long long>::lowest(),
                                                         std::numeric_limits<double>::lowest())));
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce null to long. */
 class NullToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(BSONNULL);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce undefined to long. */
 class UndefinedToLong : public ToLongBase {
-    Value value() {
+    Value value() override {
         return Value(BSONUndefined);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
@@ -2002,51 +2002,51 @@ protected:
 
 /** Coerce -5 to double. */
 class IntToDouble : public ToDoubleBase {
-    Value value() {
+    Value value() override {
         return Value(-5);
     }
-    double expected() {
+    double expected() override {
         return -5;
     }
 };
 
 /** Coerce long to double. */
 class LongToDouble : public ToDoubleBase {
-    Value value() {
+    Value value() override {
         // A long that cannot be exactly represented as a double.
         return Value(static_cast<double>(0x8fffffffffffffffLL));
     }
-    double expected() {
+    double expected() override {
         return static_cast<double>(0x8fffffffffffffffLL);
     }
 };
 
 /** Coerce double to double. */
 class DoubleToDouble : public ToDoubleBase {
-    Value value() {
+    Value value() override {
         return Value(9.8);
     }
-    double expected() {
+    double expected() override {
         return 9.8;
     }
 };
 
 /** Coerce null to double. */
 class NullToDouble : public ToDoubleBase {
-    Value value() {
+    Value value() override {
         return Value(BSONNULL);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
 
 /** Coerce undefined to double. */
 class UndefinedToDouble : public ToDoubleBase {
-    Value value() {
+    Value value() override {
         return Value(BSONUndefined);
     }
-    bool asserts() {
+    bool asserts() override {
         return true;
     }
 };
@@ -2073,10 +2073,10 @@ protected:
 
 /** Coerce date to date. */
 class DateToDate : public ToDateBase {
-    Value value() {
+    Value value() override {
         return Value(Date_t::fromMillisSinceEpoch(888));
     }
-    long long expected() {
+    long long expected() override {
         return 888;
     }
 };
@@ -2086,10 +2086,10 @@ class DateToDate : public ToDateBase {
  * is different from BSON behavior of interpreting all bytes as a date.
  */
 class TimestampToDate : public ToDateBase {
-    Value value() {
+    Value value() override {
         return Value(Timestamp(777, 666));
     }
-    long long expected() {
+    long long expected() override {
         return 777 * 1000;
     }
 };
@@ -2118,74 +2118,74 @@ protected:
 
 /** Coerce -0.2 to string. */
 class DoubleToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(-0.2);
     }
-    std::string expected() {
+    std::string expected() override {
         return "-0.2";
     }
 };
 
 /** Coerce -4 to string. */
 class IntToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(-4);
     }
-    std::string expected() {
+    std::string expected() override {
         return "-4";
     }
 };
 
 /** Coerce 10000LL to string. */
 class LongToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(10000LL);
     }
-    std::string expected() {
+    std::string expected() override {
         return "10000";
     }
 };
 
 /** Coerce string to string. */
 class StringToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value("fO_o"_sd);
     }
-    std::string expected() {
+    std::string expected() override {
         return "fO_o";
     }
 };
 
 /** Coerce timestamp to string. */
 class TimestampToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(Timestamp(1, 2));
     }
-    std::string expected() {
+    std::string expected() override {
         return Timestamp(1, 2).toStringPretty();
     }
 };
 
 /** Coerce date to string. */
 class DateToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(Date_t::fromMillisSinceEpoch(1234567890123LL));
     }
-    std::string expected() {
+    std::string expected() override {
         return "2009-02-13T23:31:30.123Z";
     }  // from js
 };
 
 /** Coerce null to string. */
 class NullToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(BSONNULL);
     }
 };
 
 /** Coerce undefined to string. */
 class UndefinedToString : public ToStringBase {
-    Value value() {
+    Value value() override {
         return Value(BSONUndefined);
     }
 };
@@ -2587,7 +2587,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("document") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Document::AddField>();
         add<Document::GetValue>();
         add<Document::SetField>();

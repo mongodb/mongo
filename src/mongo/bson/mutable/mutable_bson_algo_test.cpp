@@ -70,7 +70,7 @@ TEST_F(DocumentTest, FindInEmptyObject) {
 }
 
 class OneChildTest : public DocumentTest {
-    virtual void setUp() {
+    void setUp() override {
         ASSERT_EQUALS(Status::OK(), doc().root().appendBool("t", true));
     }
 };
@@ -96,7 +96,7 @@ TEST_F(OneChildTest, FindMatch) {
 }
 
 class ManyChildrenTest : public DocumentTest {
-    virtual void setUp() {
+    void setUp() override {
         ASSERT_EQUALS(Status::OK(), doc().root().appendString("begin", "a"));
         ASSERT_EQUALS(Status::OK(), doc().root().appendString("repeated_sparse", "b"));
         ASSERT_EQUALS(Status::OK(), doc().root().appendString("repeated_dense", "c"));
@@ -237,7 +237,7 @@ TEST_F(ManyChildrenTest, getNthSibling) {
 }
 
 class CountTest : public DocumentTest {
-    virtual void setUp() {
+    void setUp() override {
         Element root = doc().root();
 
         ASSERT_OK(root.appendInt("leaf", 0));

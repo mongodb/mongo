@@ -43,7 +43,7 @@ class FindAndModifyImagesOpObserver final : public OpObserverNoop {
 
 public:
     FindAndModifyImagesOpObserver() = default;
-    ~FindAndModifyImagesOpObserver() = default;
+    ~FindAndModifyImagesOpObserver() override = default;
 
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,

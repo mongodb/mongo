@@ -87,7 +87,7 @@ protected:
         return true;
     }
 
-    std::vector<PrfBlock> generateTags(BSONValue payload) const {
+    std::vector<PrfBlock> generateTags(BSONValue payload) const override {
         return visit(OverloadedVisitor{
                          [&](BSONElement p) {
                              ASSERT(p.isNumber());  // Only accept numbers as mock FFPs.

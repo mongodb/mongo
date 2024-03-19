@@ -61,7 +61,7 @@ protected:
 
 class FTDCMetricsCollectorMockTee : public FTDCCollectorInterface {
 public:
-    ~FTDCMetricsCollectorMockTee() {
+    ~FTDCMetricsCollectorMockTee() override {
         ASSERT_TRUE(_state == State::kStarted);
     }
 

@@ -57,10 +57,10 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
@@ -78,7 +78,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
             uasserted(ErrorCodes::CommandNotSupported, "");
@@ -102,10 +102,10 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
@@ -123,7 +123,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
             uasserted(ErrorCodes::CommandNotSupported, "");

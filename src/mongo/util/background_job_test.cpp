@@ -110,11 +110,11 @@ TEST(BackgroundJobLifeCycle, Go) {
     public:
         Job() : _hasRun(false) {}
 
-        virtual std::string name() const {
+        std::string name() const override {
             return "BackgroundLifeCycle::CannotCallGoAgain";
         }
 
-        virtual void run() {
+        void run() override {
             {
                 stdx::lock_guard<Latch> lock(_mutex);
                 ASSERT_FALSE(_hasRun);

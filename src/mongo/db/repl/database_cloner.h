@@ -74,7 +74,7 @@ public:
                    StorageInterface* storageInterface,
                    ThreadPool* dbPool);
 
-    virtual ~DatabaseCloner() = default;
+    ~DatabaseCloner() override = default;
 
     Stats getStats() const;
 

@@ -102,7 +102,7 @@ public:
     PinnedConnectionTaskExecutor(const std::shared_ptr<TaskExecutor>& executor,
                                  NetworkInterface* net);
 
-    ~PinnedConnectionTaskExecutor();
+    ~PinnedConnectionTaskExecutor() override;
     // Startup is illegal to call, as the provided executor should already be started-up.
     void startup() override;
     void shutdown() override;

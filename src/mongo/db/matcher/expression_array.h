@@ -92,9 +92,9 @@ public:
                                    std::unique_ptr<MatchExpression> sub,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
+    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const override;
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<ElemMatchObjectMatchExpression> e =
             std::make_unique<ElemMatchObjectMatchExpression>(
                 path(), _sub->clone(), _errorAnnotation);
@@ -104,7 +104,7 @@ public:
         return e;
     }
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
@@ -114,16 +114,16 @@ public:
         return nullptr;
     }
 
-    virtual size_t numChildren() const {
+    size_t numChildren() const override {
         return 1;
     }
 
-    virtual MatchExpression* getChild(size_t i) const {
+    MatchExpression* getChild(size_t i) const override {
         tassert(6400204, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         return _sub.get();
     }
 
-    virtual void resetChild(size_t i, MatchExpression* other) {
+    void resetChild(size_t i, MatchExpression* other) override {
         tassert(6329401, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         _sub.reset(other);
     }
@@ -160,9 +160,9 @@ public:
 
     void add(std::unique_ptr<MatchExpression> sub);
 
-    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
+    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const override;
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<ElemMatchValueMatchExpression> e =
             std::make_unique<ElemMatchValueMatchExpression>(path(), _errorAnnotation);
         for (size_t i = 0; i < _subs.size(); ++i) {
@@ -174,7 +174,7 @@ public:
         return e;
     }
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
@@ -184,16 +184,16 @@ public:
         return &_subs;
     }
 
-    virtual size_t numChildren() const {
+    size_t numChildren() const override {
         return _subs.size();
     }
 
-    virtual MatchExpression* getChild(size_t i) const {
+    MatchExpression* getChild(size_t i) const override {
         tassert(6400205, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         return _subs[i].get();
     }
 
-    virtual void resetChild(size_t i, MatchExpression* other) override {
+    void resetChild(size_t i, MatchExpression* other) override {
         tassert(6329402, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         _subs[i].reset(other);
     }
@@ -249,15 +249,15 @@ public:
         return nullptr;
     }
 
-    virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
+    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const override;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     int getData() const {
         return _size;
@@ -280,7 +280,7 @@ public:
     }
 
 private:
-    virtual ExpressionOptimizerFunc getOptimizer() const final {
+    ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {
             return expression;
         };

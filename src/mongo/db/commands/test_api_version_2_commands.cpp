@@ -50,7 +50,7 @@ class TestVersion2Cmd : public BasicCommand {
 public:
     TestVersion2Cmd() : BasicCommand("testVersion2") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersion2;
     }
 
@@ -82,7 +82,7 @@ class TestVersions1And2Cmd : public BasicCommand {
 public:
     TestVersions1And2Cmd() : BasicCommand("testVersions1And2") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersion1And2;
     }
 
@@ -114,11 +114,11 @@ class TestDeprecationInVersion2Cmd : public BasicCommand {
 public:
     TestDeprecationInVersion2Cmd() : BasicCommand("testDeprecationInVersion2") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersion1And2;
     }
 
-    const std::set<std::string>& deprecatedApiVersions() const {
+    const std::set<std::string>& deprecatedApiVersions() const override {
         return kApiVersion2;
     }
 
@@ -150,7 +150,7 @@ class TestRemovalCmd : public BasicCommand {
 public:
     TestRemovalCmd() : BasicCommand("testRemoval") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 

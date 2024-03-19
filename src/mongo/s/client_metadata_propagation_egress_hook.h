@@ -44,7 +44,7 @@ namespace rpc {
  */
 class ClientMetadataPropagationEgressHook : public rpc::EgressMetadataHook {
 public:
-    virtual ~ClientMetadataPropagationEgressHook() = default;
+    ~ClientMetadataPropagationEgressHook() override = default;
 
     Status readReplyMetadata(OperationContext* opCtx,
                              StringData replySource,

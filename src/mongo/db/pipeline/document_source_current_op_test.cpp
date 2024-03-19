@@ -84,11 +84,11 @@ public:
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
                                        CurrentOpCursorMode cursorMode,
-                                       CurrentOpBacktraceMode backtraceMode) const {
+                                       CurrentOpBacktraceMode backtraceMode) const override {
         return _ops;
     }
 
-    std::string getShardName(OperationContext* opCtx) const {
+    std::string getShardName(OperationContext* opCtx) const override {
         if (_hasShardName) {
             return kMockShardName;
         }

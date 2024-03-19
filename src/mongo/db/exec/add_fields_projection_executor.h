@@ -162,7 +162,7 @@ public:
      */
     Document applyProjection(const Document& inputDoc) const final;
 
-    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const {
+    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const override {
         return boost::none;
     }
 

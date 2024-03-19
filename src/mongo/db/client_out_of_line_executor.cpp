@@ -147,12 +147,12 @@ namespace {
  * before the client decorations are destroyed. See SERVER-48901 for more details.
  */
 class ClientOutOfLineExecutorClientObserver final : public ServiceContext::ClientObserver {
-    void onCreateClient(Client*) {}
-    void onDestroyClient(Client* client) {
+    void onCreateClient(Client*) override {}
+    void onDestroyClient(Client* client) override {
         ClientOutOfLineExecutor::get(client)->shutdown();
     }
-    void onCreateOperationContext(OperationContext*) {}
-    void onDestroyOperationContext(OperationContext*) {}
+    void onCreateOperationContext(OperationContext*) override {}
+    void onDestroyOperationContext(OperationContext*) override {}
 };
 
 ServiceContext::ConstructorActionRegisterer

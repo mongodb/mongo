@@ -45,11 +45,11 @@ public:
         : PlanYieldPolicy(opCtx, policy, clockSource, 0, Milliseconds{0}, nullptr, nullptr) {}
 
 private:
-    void saveState(OperationContext* opCtx) override final {
+    void saveState(OperationContext* opCtx) final {
         MONGO_UNREACHABLE;
     }
 
-    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override final {
+    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) final {
         MONGO_UNREACHABLE;
     }
 };

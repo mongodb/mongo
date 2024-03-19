@@ -173,7 +173,7 @@ public:
         return true;
     }
 
-    void validateResult(const BSONObj& resultObj) override final {}
+    void validateResult(const BSONObj& resultObj) final {}
 };
 MONGO_REGISTER_COMMAND(ConfigSvrRemoveShardCommand).forShard();
 

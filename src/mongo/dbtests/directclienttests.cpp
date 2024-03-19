@@ -179,7 +179,7 @@ public:
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("directclient") {}
-    void setupTests() {
+    void setupTests() override {
         add<InsertMany>();
         add<BadNSCmd>();
         add<BadNSQuery>();

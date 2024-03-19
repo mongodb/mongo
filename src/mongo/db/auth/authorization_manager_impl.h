@@ -78,7 +78,7 @@ public:
 
     AuthorizationManagerImpl(Service* service,
                              std::unique_ptr<AuthzManagerExternalState> externalState);
-    ~AuthorizationManagerImpl();
+    ~AuthorizationManagerImpl() override;
 
 
     std::unique_ptr<AuthorizationSession> makeAuthorizationSession() override;

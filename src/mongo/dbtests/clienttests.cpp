@@ -408,7 +408,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("client") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<DropIndex>();
         add<BuildIndex>();
         add<CS_10>();

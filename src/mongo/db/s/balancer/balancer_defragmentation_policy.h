@@ -101,7 +101,7 @@ public:
                                   const std::function<void()>& onStateUpdated)
         : _clusterStats(clusterStats), _onStateUpdated(onStateUpdated) {}
 
-    ~BalancerDefragmentationPolicy() {}
+    ~BalancerDefragmentationPolicy() override {}
 
     StringData getName() const override;
 

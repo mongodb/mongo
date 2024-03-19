@@ -67,7 +67,7 @@ public:
 
     Status readReplyMetadata(OperationContext* opCtx,
                              StringData replySource,
-                             const BSONObj& metadataObj) {
+                             const BSONObj& metadataObj) override {
         invariant(_arg != nullptr);
         _arg->replySource = replySource;
         _arg->metadataObj = metadataObj;
@@ -89,7 +89,7 @@ public:
 
     Status readReplyMetadata(OperationContext* opCtx,
                              StringData replySource,
-                             const BSONObj& metadataObj) {
+                             const BSONObj& metadataObj) override {
         return _toRet;
     }
 

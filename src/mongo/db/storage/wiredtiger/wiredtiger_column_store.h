@@ -90,7 +90,7 @@ public:
                           StringData ident,
                           const IndexDescriptor* desc,
                           bool isLogged);
-    ~WiredTigerColumnStore() = default;
+    ~WiredTigerColumnStore() override = default;
 
     //
     // CRUD

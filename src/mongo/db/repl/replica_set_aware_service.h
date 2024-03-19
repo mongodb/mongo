@@ -255,7 +255,7 @@ public:
     void onStepDown() final;
     void onRollback() final;
     void onBecomeArbiter() final;
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "ReplicaSetAwareServiceRegistry";
     }
 
@@ -310,7 +310,7 @@ private:
 template <class ActualService>
 class ReplicaSetAwareServiceConfigSvr : public ReplicaSetAwareService<ActualService> {
 private:
-    virtual bool shouldRegisterReplicaSetAwareService() const final {
+    bool shouldRegisterReplicaSetAwareService() const final {
         return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer);
     }
 };
@@ -322,7 +322,7 @@ private:
 template <class ActualService>
 class ReplicaSetAwareServiceShardSvr : public ReplicaSetAwareService<ActualService> {
 private:
-    virtual bool shouldRegisterReplicaSetAwareService() const final {
+    bool shouldRegisterReplicaSetAwareService() const final {
         return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
     }
 };

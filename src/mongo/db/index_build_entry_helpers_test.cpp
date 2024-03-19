@@ -106,7 +106,7 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
 
 class IndexBuildEntryHelpersTest : public CatalogTestFixture {
 public:
-    void setUp() {
+    void setUp() override {
         CatalogTestFixture::setUp();
 
         const UUID collectionUUID = UUID::gen();

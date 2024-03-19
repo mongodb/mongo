@@ -373,7 +373,7 @@ public:
           _bsonHasMetadata(bsonHasMetadata),
           _modified(modified) {}
 
-    ~DocumentStorage();
+    ~DocumentStorage() override;
 
     void reset(const BSONObj& bson, bool bsonHasMetadata);
 

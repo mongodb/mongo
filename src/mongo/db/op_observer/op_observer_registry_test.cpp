@@ -51,13 +51,13 @@ struct TestObserver : public OpObserverNoop {
     TestObserver() {
         testObservers++;
     }
-    virtual ~TestObserver() {
+    ~TestObserver() override {
         testObservers--;
     }
     int drops = 0;
     repl::OpTime opTime;
 
-    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {
         drops++;
     }
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -77,7 +77,7 @@ struct TestObserver : public OpObserverNoop {
                             const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
-                            bool markFromMigrate) {
+                            bool markFromMigrate) override {
         preRenameCollection(opCtx,
                             fromCollection,
                             toCollection,

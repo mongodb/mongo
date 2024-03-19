@@ -96,8 +96,7 @@ public:
 
     DocumentSourceMock(std::deque<GetNextResult>, const boost::intrusive_ptr<ExpressionContext>&);
 
-    Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override {
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
         // Unlike the queue, it's okay to serialize this stage for testing purposes.
         return Value(Document{{getSourceName(), Document()}});
     }
@@ -106,11 +105,11 @@ public:
 
     size_t size() const;
 
-    void reattachToOperationContext(OperationContext* opCtx) {
+    void reattachToOperationContext(OperationContext* opCtx) override {
         isDetachedFromOpCtx = false;
     }
 
-    void detachFromOperationContext() {
+    void detachFromOperationContext() override {
         isDetachedFromOpCtx = true;
     }
 

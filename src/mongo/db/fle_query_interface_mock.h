@@ -53,7 +53,7 @@ class FLEQueryInterfaceMock : public FLEQueryInterface {
 public:
     FLEQueryInterfaceMock(OperationContext* opCtx, repl::StorageInterface* storage)
         : _opCtx(opCtx), _storage(storage) {}
-    ~FLEQueryInterfaceMock() = default;
+    ~FLEQueryInterfaceMock() override = default;
 
     BSONObj getById(const NamespaceString& nss, BSONElement element) final;
 

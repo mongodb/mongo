@@ -48,7 +48,7 @@ public:
     // Same construction API as the parent class.
     using DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemote;
 
-    const char* getSourceName() const {
+    const char* getSourceName() const override {
         return kStageName.rawData();
     }
 
@@ -83,8 +83,7 @@ public:
     }
 
 protected:
-    virtual Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     executor::TaskExecutorCursor establishCursor() override;
 

@@ -45,7 +45,7 @@ public:
                        bool provideResumeToken = false,
                        unsigned long batchSize = 0);
 
-    virtual ~DBClientMockCursor() {}
+    ~DBClientMockCursor() override {}
 
     bool more() override;
 

@@ -67,7 +67,7 @@ struct AggCmdComponents : public SpecificKeyComponents {
 
     void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
 
-    size_t size() const;
+    size_t size() const override;
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
     bool _bypassDocumentValidation;
@@ -113,7 +113,7 @@ public:
 
 protected:
     void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const final override;
+                                         const SerializationOptions& opts) const final;
 
 private:
     const AggCmdComponents _components;

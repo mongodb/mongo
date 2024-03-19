@@ -81,7 +81,7 @@ public:
           _limit(limit),
           _requiresSearchSequenceToken(requireSearchSequenceToken) {}
 
-    const char* getSourceName() const;
+    const char* getSourceName() const override;
     StageConstraints constraints(Pipeline::SplitState pipeState) const override;
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
@@ -151,10 +151,9 @@ public:
     }
 
 private:
-    virtual Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    GetNextResult doGetNext() {
+    GetNextResult doGetNext() override {
         // We should never execute a DocumentSourceSearch.
         MONGO_UNREACHABLE_TASSERT(6253716);
     }

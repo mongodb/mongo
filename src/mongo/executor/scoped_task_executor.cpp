@@ -79,7 +79,7 @@ public:
     Impl(std::shared_ptr<TaskExecutor> executor, Status shutdownStatus)
         : _executor(std::move(executor)), _shutdownStatus(std::move(shutdownStatus)) {}
 
-    ~Impl() {
+    ~Impl() override {
         // The ScopedTaskExecutor dtor calls shutdown, so this is guaranteed.
         invariant(_inShutdown);
     }
@@ -195,7 +195,7 @@ public:
             cb);
     }
 
-    bool hasTasks() {
+    bool hasTasks() override {
         return _executor->hasTasks();
     }
 

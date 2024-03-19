@@ -167,7 +167,7 @@ private:
         return "Internal command. Do not call directly.";
     }
 
-    bool supportsRetryableWrite() const {
+    bool supportsRetryableWrite() const override {
         return true;
     }
 };

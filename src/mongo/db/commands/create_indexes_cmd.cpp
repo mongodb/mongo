@@ -779,7 +779,7 @@ public:
             return request().getNamespace();
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const {
+        void doCheckAuthorization(OperationContext* opCtx) const override {
             Privilege p(CommandHelpers::resourcePatternForNamespace(ns()), ActionType::createIndex);
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",

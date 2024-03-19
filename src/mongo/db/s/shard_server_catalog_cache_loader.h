@@ -73,7 +73,7 @@ class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
 
 public:
     ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader);
-    ~ShardServerCatalogCacheLoader();
+    ~ShardServerCatalogCacheLoader() override;
 
     /**
      * Initializes internal state so that the loader behaves as a primary or secondary. This can
@@ -98,7 +98,7 @@ public:
      * in case of rollback. Primaries must step down before going through rollback, so this should
      * only be run on secondaries.
      */
-    void onReplicationRollback();
+    void onReplicationRollback() override;
 
     /**
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's

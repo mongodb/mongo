@@ -54,7 +54,7 @@ public:
     static VectorClockMongoD* get(ServiceContext* serviceContext);
 
     VectorClockMongoD() = default;
-    virtual ~VectorClockMongoD() = default;
+    ~VectorClockMongoD() override = default;
 
 private:
     // VectorClockMutable methods implementation
@@ -78,7 +78,7 @@ private:
     void onStepDown() override;
     void onRollback() override {}
     void onBecomeArbiter() override;
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "VectorClockMongoD";
     }
 

@@ -94,7 +94,7 @@ public:
 
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& benchmarkState,
-                             const std::vector<Document>& documents) override final {
+                             const std::vector<Document>& documents) final {
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);

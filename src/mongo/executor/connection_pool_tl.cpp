@@ -344,7 +344,7 @@ public:
         const std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext)
         : _transientSSLContext(transientSSLContext) {}
 
-    ~TransientInternalAuthParametersProvider() = default;
+    ~TransientInternalAuthParametersProvider() override = default;
 
     BSONObj get(size_t index, StringData mechanism) final {
         if (_transientSSLContext) {

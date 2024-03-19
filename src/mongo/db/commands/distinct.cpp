@@ -540,7 +540,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         tasserted(8687400, "distinct command should have not invoked this method");
         return true;
     }

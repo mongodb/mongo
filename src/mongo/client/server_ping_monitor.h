@@ -149,7 +149,7 @@ public:
                       sdam::TopologyListener* rttListener,
                       Milliseconds pingFrequency,
                       std::shared_ptr<executor::TaskExecutor> executor);
-    ~ServerPingMonitor();
+    ~ServerPingMonitor() override;
 
     /**
      * Drops all SingleServerMonitors and shuts down the task executor.
@@ -162,14 +162,14 @@ public:
      */
     void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                         const HostAndPort& address,
-                                        BSONObj reply = BSONObj());
+                                        BSONObj reply = BSONObj()) override;
 
     /**
      * Drop corresponding SingleServerPingMonitors if the server is not included in the
      * newDescritpion.
      */
     void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
-                                           sdam::TopologyDescriptionPtr newDescription);
+                                           sdam::TopologyDescriptionPtr newDescription) override;
 
 private:
     MongoURI _setUri;

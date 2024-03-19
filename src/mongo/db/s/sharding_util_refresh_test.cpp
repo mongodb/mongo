@@ -77,7 +77,7 @@ const Status kRetryableError{ErrorCodes::HostUnreachable, "RetryableError for te
 
 class ShardingRefresherTest : public ConfigServerTestFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         ConfigServerTestFixture::setUp();
 
         for (const auto& shard : kShards) {

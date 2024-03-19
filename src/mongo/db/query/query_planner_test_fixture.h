@@ -63,7 +63,7 @@ namespace mongo {
 
 class QueryPlannerTest : public mongo::unittest::Test {
 protected:
-    void setUp();
+    void setUp() override;
 
     /**
      * Clean up any previous state from a call to runQuery*()

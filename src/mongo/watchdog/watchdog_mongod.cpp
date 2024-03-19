@@ -113,12 +113,13 @@ Status onUpdateWatchdogPeriodSeconds(const int& value) {
 class WatchdogServerStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
-    bool includeByDefault() const {
+    bool includeByDefault() const override {
         // Only include this by default if the watchdog is on
         return watchdogEnabled;
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
         if (!watchdogEnabled) {
             return BSONObj();
         }

@@ -79,7 +79,7 @@ const ShardType kShard1("shard0001", "shard0001:1234");
 
 class ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest
     : public ConfigServerTestFixture {
-    void setUp() {
+    void setUp() override {
         ConfigServerTestFixture::setUp();
         setupShards({kShard0, kShard1});
 
@@ -96,7 +96,7 @@ class ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest
             ->onShardingInitialization(operationContext(), true);
     }
 
-    void tearDown() {
+    void tearDown() override {
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
     }

@@ -73,7 +73,7 @@ public:
         _expressions.clear();
     }
 
-    virtual size_t numChildren() const {
+    size_t numChildren() const override {
         return _expressions.size();
     }
 
@@ -143,7 +143,7 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<AndMatchExpression> self =
             std::make_unique<AndMatchExpression>(_errorAnnotation);
         self->reserve(numChildren());
@@ -156,11 +156,11 @@ public:
         return self;
     }
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
-    virtual void serialize(BSONObjBuilder* out,
-                           const SerializationOptions& opts = {},
-                           bool includePath = true) const;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const override;
 
     bool isTriviallyTrue() const final;
 
@@ -190,7 +190,7 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<OrMatchExpression> self =
             std::make_unique<OrMatchExpression>(_errorAnnotation);
         self->reserve(numChildren());
@@ -203,11 +203,11 @@ public:
         return self;
     }
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
-    virtual void serialize(BSONObjBuilder* out,
-                           const SerializationOptions& opts = {},
-                           bool includePath = true) const;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const override;
 
     bool isTriviallyFalse() const final;
 
@@ -237,7 +237,7 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<NorMatchExpression> self =
             std::make_unique<NorMatchExpression>(_errorAnnotation);
         self->reserve(numChildren());
@@ -250,11 +250,11 @@ public:
         return self;
     }
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
-    virtual void serialize(BSONObjBuilder* out,
-                           const SerializationOptions& opts = {},
-                           bool includePath = true) const;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const override;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -276,7 +276,7 @@ public:
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(NOT, std::move(annotation)), _exp(std::move(expr)) {}
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<NotMatchExpression> self =
             std::make_unique<NotMatchExpression>(_exp->clone(), _errorAnnotation);
         if (getTag()) {
@@ -293,11 +293,11 @@ public:
         return !_exp->matchesSingleElement(elt, details);
     }
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
-    virtual void serialize(BSONObjBuilder* out,
-                           const SerializationOptions& opts = {},
-                           bool includePath = true) const;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const override;
 
     bool equivalent(const MatchExpression* other) const final;
 
@@ -319,7 +319,7 @@ public:
         return _exp.release();
     }
 
-    void resetChild(size_t i, MatchExpression* newChild) {
+    void resetChild(size_t i, MatchExpression* newChild) override {
         tassert(6329405, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         _exp.reset(newChild);
     }

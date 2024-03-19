@@ -169,7 +169,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
 class SizeStorerUpdateTest : public mongo::unittest::Test {
 private:
-    virtual void setUp() {
+    void setUp() override {
         harnessHelper.reset(new WiredTigerHarnessHelper());
         sizeStorer.reset(new WiredTigerSizeStorer(
             harnessHelper->conn(), WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
@@ -179,7 +179,7 @@ private:
         ident = wtrs->getIdent();
         uri = wtrs->getURI();
     }
-    virtual void tearDown() {
+    void tearDown() override {
         rs.reset(nullptr);
         sizeStorer->flush(false);
         sizeStorer.reset(nullptr);

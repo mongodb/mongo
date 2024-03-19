@@ -191,7 +191,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    RecordStore* getRecordStore() const {
+    RecordStore* getRecordStore() const override {
         return _coll->getRecordStore();
     }
 
@@ -534,7 +534,7 @@ public:
 
     uint64_t getIndexSize(OperationContext* opCtx,
                           BSONObjBuilder* details = nullptr,
-                          int scale = 1) const {
+                          int scale = 1) const override {
         return _coll->getIndexSize(opCtx, details, scale);
     }
 
@@ -568,12 +568,12 @@ public:
     }
 
     StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
-        OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const {
+        OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const override {
         return _coll->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs);
     }
 
-    StatusWith<BSONObj> addCollationDefaultsToIndexSpecsForCreate(OperationContext* opCtx,
-                                                                  const BSONObj& indexSpecs) const {
+    StatusWith<BSONObj> addCollationDefaultsToIndexSpecsForCreate(
+        OperationContext* opCtx, const BSONObj& indexSpecs) const override {
         return _coll->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs);
     }
 

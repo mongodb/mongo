@@ -526,7 +526,7 @@ public:
     using Request = CollMod;
     using Reply = CollModReply;
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -759,7 +759,7 @@ class BuildInfoExecutor final : public AsyncRequestExecutor {
 public:
     BuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
 
-    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) {
+    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
         // Critical to observability and diagnosability, categorize as immediate priority.
         ScopedAdmissionPriority skipAdmissionControl(rec->getOpCtx(),
                                                      AdmissionContext::Priority::kExempt);

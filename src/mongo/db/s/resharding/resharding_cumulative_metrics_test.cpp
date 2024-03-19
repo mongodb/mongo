@@ -68,12 +68,11 @@ protected:
         _fieldNames = std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>();
     }
 
-    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
-        override {
+    std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
         return std::make_unique<ReshardingCumulativeMetrics>();
     }
 
-    virtual StringData getRootSectionName() override {
+    StringData getRootSectionName() override {
         return kResharding;
     }
 

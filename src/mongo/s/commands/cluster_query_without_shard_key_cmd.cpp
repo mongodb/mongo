@@ -651,7 +651,7 @@ public:
     // compliant, when they technically should not be. To satisfy this requirement,
     // this command is marked as part of the Stable API, but is not truly a part of
     // it, since it is an internal-only command.
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 };

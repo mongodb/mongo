@@ -310,7 +310,7 @@ private:
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("dbhelpers") {}
-    void setupTests() {
+    void setupTests() override {
         add<RemoveRange>();
         add<FindAndNoopUpdateTest>();
     }

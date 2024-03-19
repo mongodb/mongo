@@ -96,7 +96,7 @@ class KVTestClientObserver final : public ServiceContext::ClientObserver {
 public:
     void onCreateClient(Client* client) override {}
     void onDestroyClient(Client* client) override {}
-    void onCreateOperationContext(OperationContext* opCtx) {
+    void onCreateOperationContext(OperationContext* opCtx) override {
         stdx::unique_lock<Latch> lock(_mutex);
         shard_role_details::setRecoveryUnit(
             opCtx,

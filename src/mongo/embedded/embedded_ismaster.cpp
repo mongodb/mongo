@@ -69,7 +69,7 @@ public:
                "{ isMaster : 1 }";
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -81,10 +81,10 @@ public:
 
     CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
 
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
 
         auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
 

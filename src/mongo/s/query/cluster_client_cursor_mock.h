@@ -65,7 +65,7 @@ public:
                             boost::optional<TxnNumber> txnNumber,
                             std::function<void(void)> killCallback = {});
 
-    ~ClusterClientCursorMock();
+    ~ClusterClientCursorMock() override;
 
     StatusWith<ClusterQueryResult> next() final;
 

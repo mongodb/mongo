@@ -115,7 +115,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
@@ -142,9 +142,8 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        const SerializationOptions& opts = SerializationOptions{}) const final override;
+    void serializeToArray(std::vector<Value>& array,
+                          const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
     GetNextResult doGetNext() final;

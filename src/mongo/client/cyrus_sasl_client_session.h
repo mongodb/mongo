@@ -44,12 +44,12 @@ class CyrusSaslClientSession : public SaslClientSession {
 
 public:
     CyrusSaslClientSession();
-    ~CyrusSaslClientSession();
+    ~CyrusSaslClientSession() override;
 
     /**
      * Overriding to store the password data in sasl_secret_t format
      */
-    virtual void setParameter(Parameter id, StringData value);
+    void setParameter(Parameter id, StringData value) override;
 
     /**
      * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
@@ -59,9 +59,9 @@ public:
      */
     sasl_secret_t* getPasswordAsSecret();
 
-    virtual Status initialize();
+    Status initialize() override;
 
-    virtual Status step(StringData inputData, std::string* outputData);
+    Status step(StringData inputData, std::string* outputData) override;
 
     bool isSuccess() const override {
         return _success;

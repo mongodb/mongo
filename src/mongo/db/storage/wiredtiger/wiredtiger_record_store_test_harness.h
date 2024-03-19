@@ -54,9 +54,9 @@ public:
         : WiredTigerHarnessHelper(Options::ReplicationEnabled, extraStrings) {}
 
     WiredTigerHarnessHelper(Options options, StringData extraStrings);
-    ~WiredTigerHarnessHelper() {}
+    ~WiredTigerHarnessHelper() override {}
 
-    virtual std::unique_ptr<RecordStore> newRecordStore() override {
+    std::unique_ptr<RecordStore> newRecordStore() override {
         return newRecordStore("a.b");
     }
 
@@ -64,18 +64,17 @@ public:
         return newRecordStore(ns, CollectionOptions());
     }
 
-    virtual std::unique_ptr<RecordStore> newRecordStore(
-        const std::string& ns,
-        const CollectionOptions& collOptions,
-        KeyFormat keyFormat = KeyFormat::Long) override;
+    std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
+                                                const CollectionOptions& collOptions,
+                                                KeyFormat keyFormat = KeyFormat::Long) override;
 
-    virtual std::unique_ptr<RecordStore> newOplogRecordStore() override;
+    std::unique_ptr<RecordStore> newOplogRecordStore() override;
 
-    virtual KVEngine* getEngine() override final {
+    KVEngine* getEngine() final {
         return &_engine;
     }
 
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit();
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     /**
      * Create an oplog record store without calling postConstructorInit().

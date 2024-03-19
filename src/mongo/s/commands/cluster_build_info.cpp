@@ -59,7 +59,7 @@ class ClusterBuildInfoExecutor final : public AsyncRequestExecutor {
 public:
     ClusterBuildInfoExecutor() : AsyncRequestExecutor("ClusterBuildInfoExecutor") {}
 
-    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) {
+    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
         auto result = rec->getReplyBuilder()->getBodyBuilder();
         VersionInfoInterface::instance().appendBuildInfo(&result);
         return Status::OK();
@@ -97,7 +97,7 @@ public:
         return false;
     }
 
-    bool allowedWithSecurityToken() const {
+    bool allowedWithSecurityToken() const override {
         return true;
     }
 

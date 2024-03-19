@@ -72,7 +72,7 @@ namespace mongo {
 class ShardingCatalogClientMock : public ShardingCatalogClient {
 public:
     ShardingCatalogClientMock();
-    ~ShardingCatalogClientMock();
+    ~ShardingCatalogClientMock() override;
 
     std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
                                                AggregateCommandRequest& aggRequest,

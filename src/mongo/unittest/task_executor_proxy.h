@@ -64,7 +64,7 @@ public:
      * Does not own target executor.
      */
     TaskExecutorProxy(executor::TaskExecutor* executor);
-    ~TaskExecutorProxy();
+    ~TaskExecutorProxy() override;
 
     executor::TaskExecutor* getExecutor() const;
     void setExecutor(executor::TaskExecutor* executor);

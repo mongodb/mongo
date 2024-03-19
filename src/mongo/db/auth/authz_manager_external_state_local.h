@@ -67,7 +67,7 @@ class AuthzManagerExternalStateLocal : public AuthzManagerExternalState {
     AuthzManagerExternalStateLocal& operator=(const AuthzManagerExternalStateLocal&) = delete;
 
 public:
-    virtual ~AuthzManagerExternalStateLocal() = default;
+    ~AuthzManagerExternalStateLocal() override = default;
 
     Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
                                               BSONObj* foundVersionDoc) override;

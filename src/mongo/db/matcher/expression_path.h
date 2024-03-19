@@ -74,11 +74,11 @@ public:
      * empty path as well as no path cases. optPath() should be preferred in order to
      * distinguish between the two.
      */
-    StringData path() const override final {
+    StringData path() const final {
         return _elementPath ? _elementPath->fieldRef().dottedField() : "";
     }
 
-    const FieldRef* fieldRef() const override final {
+    const FieldRef* fieldRef() const final {
         return _elementPath ? &(_elementPath->fieldRef()) : nullptr;
     }
 

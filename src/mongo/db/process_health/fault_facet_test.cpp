@@ -53,7 +53,7 @@ public:
             FaultFacetType::kMock1, _svcCtx->getFastClockSource(), callback);
     }
 
-    void tearDown() {
+    void tearDown() override {
         serverGlobalParams.clusterRole = _saved;
     }
 
@@ -80,12 +80,12 @@ public:
     static inline const auto kFailure =
         HealthCheckStatus(FaultFacetType::kMock1, Severity::kFailure, "test");
 
-    void setUp() {
+    void setUp() override {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
     }
 
-    void tearDown() {
+    void tearDown() override {
         serverGlobalParams.clusterRole = _saved;
     }
 

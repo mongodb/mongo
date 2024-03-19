@@ -88,7 +88,7 @@ public:
     CallbackState(CallbackFn&& cb, Date_t theReadyDate, const BatonHandle& baton)
         : callback(std::move(cb)), readyDate(theReadyDate), baton(baton) {}
 
-    virtual ~CallbackState() = default;
+    ~CallbackState() override = default;
 
     bool isCanceled() const override {
         return canceled.load() > 0;

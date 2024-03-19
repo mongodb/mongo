@@ -158,7 +158,7 @@ Future<void> authX509(RunCommandHook runCommand, const BSONObj& params, StringDa
 
 class DefaultInternalAuthParametersProvider : public InternalAuthParametersProvider {
 public:
-    ~DefaultInternalAuthParametersProvider() = default;
+    ~DefaultInternalAuthParametersProvider() override = default;
 
     BSONObj get(size_t index, StringData mechanism) final {
         return getInternalAuthParams(index, mechanism);

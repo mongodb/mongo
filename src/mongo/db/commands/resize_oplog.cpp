@@ -78,7 +78,7 @@ public:
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -101,7 +101,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& jsobj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
         uassert(ErrorCodes::NamespaceNotFound, "oplog does not exist", coll);
         uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());

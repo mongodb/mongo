@@ -50,7 +50,7 @@ class PeriodicRunnerEmbedded : public PeriodicRunner {
 public:
     PeriodicRunnerEmbedded(ServiceContext* svc, ClockSource* clockSource);
 
-    ~PeriodicRunnerEmbedded();
+    ~PeriodicRunnerEmbedded() override;
 
     JobAnchor makeJob(PeriodicJob job) override;
 

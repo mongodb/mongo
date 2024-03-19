@@ -48,7 +48,7 @@ class ScopedOperationCompletionShardingActions : public PolymorphicScoped {
 
 public:
     ScopedOperationCompletionShardingActions(OperationContext* opCtx);
-    ~ScopedOperationCompletionShardingActions() noexcept;
+    ~ScopedOperationCompletionShardingActions() noexcept override;
 
 private:
     OperationContext* _opCtx;

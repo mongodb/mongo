@@ -45,7 +45,7 @@ namespace {
 
 class ResourceCatalogTest : public unittest::Test {
 public:
-    void setUp() {
+    void setUp() override {
         ASSERT_EQ(firstResourceId, secondResourceId);
         ASSERT_NE(firstResourceId, thirdResourceId);
     }

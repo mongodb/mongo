@@ -144,7 +144,7 @@ class SimpleDoc : public mongo::unittest::Test {
 public:
     SimpleDoc() : _doc() {}
 
-    virtual void setUp() {
+    void setUp() override {
         // {a: 1}
         ASSERT_OK(root().appendInt("a", 1));
     }
@@ -250,7 +250,7 @@ class NestedDoc : public mongo::unittest::Test {
 public:
     NestedDoc() : _doc() {}
 
-    virtual void setUp() {
+    void setUp() override {
         // {a: {b: {c: 1}}}
         Element elemA = _doc.makeElementObject("a");
         ASSERT_TRUE(elemA.ok());
@@ -373,7 +373,7 @@ class ArrayDoc : public mongo::unittest::Test {
 public:
     ArrayDoc() : _doc() {}
 
-    virtual void setUp() {
+    void setUp() override {
         // {a: []}
         Element elemA = _doc.makeElementArray("a");
         ASSERT_TRUE(elemA.ok());

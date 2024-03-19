@@ -309,7 +309,7 @@ public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) const override;
 
-    bool runsClusterOperations() const {
+    bool runsClusterOperations() const override {
         return false;
     }
 };
@@ -334,36 +334,33 @@ public:
     SEPTransactionClient(const SEPTransactionClient&) = delete;
     SEPTransactionClient operator=(const SEPTransactionClient&) = delete;
 
-    virtual void initialize(std::unique_ptr<details::TxnHooks> hooks) override {
+    void initialize(std::unique_ptr<details::TxnHooks> hooks) override {
         invariant(!_hooks);
         _hooks = std::move(hooks);
     }
 
-    virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override;
-    virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override;
+    SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override;
+    BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override;
 
-    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
-                                                  BSONObj cmd) const override;
-    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override;
+    SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName, BSONObj cmd) const override;
+    BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override;
 
-    virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
-        const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override;
-    virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+    SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const override;
+    BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+                                         std::vector<StmtId> stmtIds) const override;
 
-    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
-        const BulkWriteCommandRequest& cmd) const override;
-    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override;
+    SemiFuture<BulkWriteCommandReply> runCRUDOp(const BulkWriteCommandRequest& cmd) const override;
+    BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override;
 
-    virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
-        const FindCommandRequest& cmd) const override;
-    virtual std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const override;
+    SemiFuture<std::vector<BSONObj>> exhaustiveFind(const FindCommandRequest& cmd) const override;
+    std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const override;
 
-    virtual bool supportsClientTransactionContext() const override {
+    bool supportsClientTransactionContext() const override {
         return true;
     }
 
-    virtual bool runsClusterOperations() const override {
+    bool runsClusterOperations() const override {
         return _behaviors->runsClusterOperations();
     }
 

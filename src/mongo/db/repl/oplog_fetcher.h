@@ -170,7 +170,7 @@ public:
 
         void fetchSuccessful(OplogFetcher* fetcher) final;
 
-        ~OplogFetcherRestartDecisionDefault(){};
+        ~OplogFetcherRestartDecisionDefault() override{};
 
     private:
         // Restarts since the last successful oplog query response.
@@ -254,7 +254,7 @@ public:
                  OnShutdownCallbackFn onShutdownCallbackFn,
                  Config config);
 
-    virtual ~OplogFetcher();
+    ~OplogFetcher() override;
 
     /**
      * Validates documents in current batch of results returned from tailing the remote oplog.

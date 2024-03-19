@@ -71,15 +71,15 @@ public:
                                          std::shared_ptr<void>* dataInOut,
                                          bool isCapped = false);
 
-    virtual const char* name() const;
+    const char* name() const override;
 
-    virtual KeyFormat keyFormat() const {
+    KeyFormat keyFormat() const override {
         return KeyFormat::Long;
     }
 
     virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 
-    virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;
+    bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const override;
 
     void doDeleteRecord(OperationContext* opCtx, const RecordId& dl) override;
 
@@ -92,7 +92,7 @@ public:
                           const char* data,
                           int len) override;
 
-    virtual bool updateWithDamagesSupported() const;
+    bool updateWithDamagesSupported() const override;
 
     StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
                                                const RecordId& loc,
@@ -100,9 +100,9 @@ public:
                                                const char* damageSource,
                                                const mutablebson::DamageVector& damages) override;
 
-    virtual void printRecordMetadata(OperationContext* opCtx,
-                                     const RecordId& recordId,
-                                     std::set<Timestamp>* recordTimestamps) const {}
+    void printRecordMetadata(OperationContext* opCtx,
+                             const RecordId& recordId,
+                             std::set<Timestamp>* recordTimestamps) const override {}
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;
@@ -119,25 +119,25 @@ public:
                                bool inclusive,
                                const AboutToDeleteRecordCallback& aboutToDelete) override;
 
-    virtual void appendNumericCustomStats(OperationContext* opCtx,
-                                          BSONObjBuilder* result,
-                                          double scale) const {}
+    void appendNumericCustomStats(OperationContext* opCtx,
+                                  BSONObjBuilder* result,
+                                  double scale) const override {}
 
-    virtual int64_t storageSize(OperationContext* opCtx,
-                                BSONObjBuilder* extraInfo = nullptr,
-                                int infoLevel = 0) const;
+    int64_t storageSize(OperationContext* opCtx,
+                        BSONObjBuilder* extraInfo = nullptr,
+                        int infoLevel = 0) const override;
 
-    virtual long long dataSize(OperationContext* opCtx) const {
+    long long dataSize(OperationContext* opCtx) const override {
         return _data->dataSize;
     }
 
-    virtual long long numRecords(OperationContext* opCtx) const {
+    long long numRecords(OperationContext* opCtx) const override {
         return _data->records.size();
     }
 
-    virtual void updateStatsAfterRepair(OperationContext* opCtx,
-                                        long long numRecords,
-                                        long long dataSize) {
+    void updateStatsAfterRepair(OperationContext* opCtx,
+                                long long numRecords,
+                                long long dataSize) override {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         invariant(_data->records.size() == size_t(numRecords));
         _data->dataSize = dataSize;
@@ -148,9 +148,9 @@ public:
         return RecordId(_data->nextId - 1);
     }
 
-    virtual void reserveRecordIds(OperationContext* opCtx,
-                                  std::vector<RecordId>* out,
-                                  size_t nRecords) final{};
+    void reserveRecordIds(OperationContext* opCtx,
+                          std::vector<RecordId>* out,
+                          size_t nRecords) final{};
 
     NamespaceString ns(OperationContext* opCtx) const final {
         return _data->ns;

@@ -55,7 +55,7 @@ public:
                long long limit,
                WorkingSet* ws,
                std::unique_ptr<PlanStage> child);
-    ~LimitStage();
+    ~LimitStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;

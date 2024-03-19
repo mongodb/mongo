@@ -99,7 +99,7 @@ public:
     std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName, StringData newName);
 
 protected:
-    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const {
+    std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const override {
         return std::make_unique<ExclusionNode>(
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
@@ -261,7 +261,7 @@ public:
         }
     }
 
-    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const {
+    boost::optional<std::set<FieldRef>> extractExhaustivePaths() const override {
         return boost::none;
     }
 

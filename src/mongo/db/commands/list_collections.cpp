@@ -329,7 +329,7 @@ public:
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
-        virtual bool supportsWriteConcern() const final {
+        bool supportsWriteConcern() const final {
             return false;
         }
 

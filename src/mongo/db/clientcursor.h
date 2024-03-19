@@ -390,7 +390,7 @@ private:
      * Cursors must be unpinned and deregistered from the CursorManager before they can be
      * destroyed.
      */
-    ~ClientCursor();
+    ~ClientCursor() override;
 
     /**
      * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to

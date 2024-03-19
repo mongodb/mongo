@@ -65,7 +65,7 @@ public:
           _catalogEpoch(getCatalogEpoch()),
           _nss(coll.getCollectionPtr()->ns()) {}
 
-    virtual ~RequiresCollectionStage() = default;
+    ~RequiresCollectionStage() override = default;
 
 protected:
     void doSaveState() final;

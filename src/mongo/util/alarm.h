@@ -170,7 +170,7 @@ class AlarmSchedulerPrecise : public AlarmScheduler,
 public:
     explicit AlarmSchedulerPrecise(ClockSource* clockSource) : AlarmScheduler(clockSource) {}
 
-    ~AlarmSchedulerPrecise();
+    ~AlarmSchedulerPrecise() override;
 
     void clearAllAlarms() override;
 

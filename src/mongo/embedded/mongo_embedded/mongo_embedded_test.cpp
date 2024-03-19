@@ -115,7 +115,7 @@ using MongoDBCAPIClientPtr = std::unique_ptr<mongo_embedded_v1_client, ClientDes
 
 class MongodbCAPITest : public mongo::unittest::Test {
 protected:
-    void setUp() {
+    void setUp() override {
         mongo_embedded_v1_init_params params;
         params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT;
         params.log_callback = nullptr;
@@ -146,7 +146,7 @@ protected:
         mongo_embedded_v1_status_destroy(status);
     }
 
-    void tearDown() {
+    void tearDown() override {
         auto* status = mongo_embedded_v1_status_create();
         ASSERT(status);
 

@@ -126,13 +126,13 @@ bool GeometryContainer::hasR2Region() const {
 class GeometryContainer::R2BoxRegion : public R2Region {
 public:
     R2BoxRegion(const GeometryContainer* geometry);
-    virtual ~R2BoxRegion();
+    ~R2BoxRegion() override;
 
-    Box getR2Bounds() const;
+    Box getR2Bounds() const override;
 
-    bool fastContains(const Box& other) const;
+    bool fastContains(const Box& other) const override;
 
-    bool fastDisjoint(const Box& other) const;
+    bool fastDisjoint(const Box& other) const override;
 
 private:
     static Box buildBounds(const GeometryContainer& geometry);

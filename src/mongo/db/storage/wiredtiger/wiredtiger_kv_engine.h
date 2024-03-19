@@ -197,7 +197,7 @@ public:
                        bool ephemeral,
                        bool repair);
 
-    ~WiredTigerKVEngine();
+    ~WiredTigerKVEngine() override;
 
     void notifyStorageStartupRecoveryComplete() override;
     void notifyReplStartupRecoveryComplete(OperationContext* opCtx) override;
@@ -326,8 +326,7 @@ public:
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
 
-    virtual StatusWith<std::deque<std::string>> extendBackupCursor(
-        OperationContext* opCtx) override;
+    StatusWith<std::deque<std::string>> extendBackupCursor(OperationContext* opCtx) override;
 
     int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;
 
@@ -389,9 +388,9 @@ public:
 
     Timestamp getAllDurableTimestamp() const override;
 
-    bool supportsReadConcernSnapshot() const final override;
+    bool supportsReadConcernSnapshot() const final;
 
-    bool supportsOplogTruncateMarkers() const final override;
+    bool supportsOplogTruncateMarkers() const final;
 
     bool supportsReadConcernMajority() const final;
 

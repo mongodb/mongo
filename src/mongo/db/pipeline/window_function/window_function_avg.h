@@ -105,7 +105,7 @@ public:
         }
     }
 
-    void reset() {
+    void reset() override {
         RemovableSum::reset();
         _count = 0;
         _memUsageTracker.add(sizeof(long long));

@@ -80,7 +80,7 @@ BSONObj getReplSecondaryOkMetadata() {
 
 class ClusterIdentityTest : public ShardingTestFixture {
 public:
-    void setUp() {
+    void setUp() override {
         // TODO SERVER-78051: Remove once shards can access the loaded cluster id.
         serverGlobalParams.clusterRole = {
             ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};

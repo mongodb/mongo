@@ -83,7 +83,7 @@ class PipelineCommand final : public Command {
 public:
     PipelineCommand() : Command("aggregate") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -335,7 +335,7 @@ public:
     bool maintenanceOk() const override {
         return false;
     }
-    ReadWriteType getReadWriteType() const {
+    ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }
 

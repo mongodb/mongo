@@ -102,7 +102,7 @@ public:
 
 protected:
     VectorClockMutable();
-    virtual ~VectorClockMutable();
+    ~VectorClockMutable() override;
 
     /**
      * Called by sub-classes in order to actually tick a Component time, once they have determined

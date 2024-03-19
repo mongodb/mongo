@@ -117,8 +117,7 @@ public:
      * Recovers critical sections and indexes from disk when either initial sync or startup recovery
      * have completed.
      */
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final;
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final;
 
 private:
     /**
@@ -132,15 +131,15 @@ private:
      */
     void recoverIndexesCatalog(OperationContext* opCtx);
 
-    void onStartup(OperationContext* opCtx) override final {}
+    void onStartup(OperationContext* opCtx) final {}
     void onSetCurrentConfig(OperationContext* opCtx) final {}
-    void onShutdown() override final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
-    void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
-    void onStepDown() override final {}
-    void onRollback() override final {}
-    void onBecomeArbiter() override final {}
-    inline std::string getServiceName() const override final {
+    void onShutdown() final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {}
+    void onStepDown() final {}
+    void onRollback() final {}
+    void onBecomeArbiter() final {}
+    inline std::string getServiceName() const final {
         return "ShardingRecoveryService";
     }
 };

@@ -105,10 +105,10 @@ public:
                QueryParameterMap qpMap,
                QueryPlannerOptimizationStagesForDebugExplain queryPlannerOptimizationStages);
 
-    BSONObj explainBSON() const override final;
-    BSONObj explainQueryPlannerDebug() const override final;
-    std::string getPlanSummary() const override final;
-    BSONObj getQueryParameters() const override final;
+    BSONObj explainBSON() const final;
+    BSONObj explainQueryPlannerDebug() const final;
+    std::string getPlanSummary() const final;
+    BSONObj getQueryParameters() const final;
 
 private:
     // Metadata field used to populate index information for index scans in the planSummary field.

@@ -233,7 +233,7 @@ class OpObserverTest : public ServiceContextMongoDTest {
 protected:
     explicit OpObserverTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
 
-    virtual void setUp() override {
+    void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
 

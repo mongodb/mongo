@@ -118,7 +118,7 @@ private:
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 
     IndexBuildAction _drainSideWritesUntilNextActionIsAvailable(
-        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) override {
         return {};
     };
 

@@ -157,7 +157,7 @@ public:
         other._owned = false;
     }
 
-    ~OwnedValueAccessor() {
+    ~OwnedValueAccessor() override {
         release();
     }
 
@@ -502,7 +502,7 @@ public:
         other._bsonObj = BSONObj();
     }
 
-    ~BSONObjValueAccessor() {
+    ~BSONObjValueAccessor() override {
         release();
     }
 

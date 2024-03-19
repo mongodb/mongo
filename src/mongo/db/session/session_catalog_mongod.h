@@ -219,7 +219,7 @@ class MongoDOperationContextSession : public MongoDSessionCatalog::Session {
 public:
     MongoDOperationContextSession(OperationContext* opCtx,
                                   MongoDSessionCatalogTransactionInterface* ti);
-    ~MongoDOperationContextSession();
+    ~MongoDOperationContextSession() override;
 
     /**
      * This method takes an operation context with a checked-out session and allows it to be
@@ -255,7 +255,7 @@ class MongoDOperationContextSessionWithoutRefresh : public MongoDSessionCatalog:
 public:
     MongoDOperationContextSessionWithoutRefresh(OperationContext* opCtx,
                                                 MongoDSessionCatalogTransactionInterface* ti);
-    ~MongoDOperationContextSessionWithoutRefresh();
+    ~MongoDOperationContextSessionWithoutRefresh() override;
 
     void checkIn(OperationContext* opCtx, OperationContextSession::CheckInReason reason) override {
         MONGO_UNREACHABLE;
@@ -287,7 +287,7 @@ class MongoDOperationContextSessionWithoutOplogRead : public MongoDSessionCatalo
 public:
     MongoDOperationContextSessionWithoutOplogRead(OperationContext* opCtx,
                                                   MongoDSessionCatalogTransactionInterface* ti);
-    ~MongoDOperationContextSessionWithoutOplogRead();
+    ~MongoDOperationContextSessionWithoutOplogRead() override;
 
     void checkIn(OperationContext* opCtx, OperationContextSession::CheckInReason reason) override {
         MONGO_UNREACHABLE;

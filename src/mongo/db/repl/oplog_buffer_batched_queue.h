@@ -63,16 +63,16 @@ public:
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;
-    bool tryPop(OperationContext* opCtx, Value* value) {
+    bool tryPop(OperationContext* opCtx, Value* value) override {
         MONGO_UNIMPLEMENTED;
     }
     bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) override;
     bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override;
     bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override;
-    bool peek(OperationContext* opCtx, Value* value) {
+    bool peek(OperationContext* opCtx, Value* value) override {
         MONGO_UNIMPLEMENTED;
     }
-    boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const {
+    boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override {
         MONGO_UNIMPLEMENTED;
     };
 

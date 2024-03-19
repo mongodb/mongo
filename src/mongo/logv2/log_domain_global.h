@@ -68,7 +68,7 @@ public:
     };
 
     LogDomainGlobal();
-    ~LogDomainGlobal();
+    ~LogDomainGlobal() override;
 
     LogSource& source() override;
 

@@ -98,7 +98,7 @@ public:
                       ->initializeConfigDatabaseIfNeeded(operationContext()));
     }
 
-    ~BenchmarkConfigServerTestFixture() {
+    ~BenchmarkConfigServerTestFixture() override {
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardingCatalogManager::get(operationContext())->shutDown();

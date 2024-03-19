@@ -73,11 +73,11 @@ public:
         return shouldRetryVal;
     }
 
-    Milliseconds getNextRetryDelay() override final {
+    Milliseconds getNextRetryDelay() final {
         return Milliseconds::zero();
     }
 
-    BSONObj toBSON() const override final {
+    BSONObj toBSON() const final {
         return BSON("retryPolicyType"
                     << "shardRetryPolicy");
     }

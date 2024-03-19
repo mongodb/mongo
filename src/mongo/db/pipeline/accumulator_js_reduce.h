@@ -77,9 +77,9 @@ public:
 
     void reset() final;
 
-    virtual Document serialize(boost::intrusive_ptr<Expression> initializer,
-                               boost::intrusive_ptr<Expression> argument,
-                               const SerializationOptions& options = {}) const override;
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       const SerializationOptions& options = {}) const override;
 
 private:
     static std::string parseReduceFunction(BSONElement func);

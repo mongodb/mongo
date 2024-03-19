@@ -61,7 +61,7 @@ class LocalKMSService final : public KMSService {
 public:
     LocalKMSService(SymmetricKey key) : _key(std::move(key)) {}
 
-    StringData name() const {
+    StringData name() const override {
         return kLocalKms;
     }
 
@@ -132,7 +132,7 @@ std::unique_ptr<KMSService> LocalKMSService::create(const LocalKMS& config) {
 class LocalKMSServiceFactory final : public KMSServiceFactory {
 public:
     LocalKMSServiceFactory() = default;
-    ~LocalKMSServiceFactory() = default;
+    ~LocalKMSServiceFactory() override = default;
 
     std::unique_ptr<KMSService> create(const BSONObj& config) final {
         auto field = config[KmsProviders::kLocalFieldName];

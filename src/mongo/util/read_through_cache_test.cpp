@@ -703,7 +703,7 @@ TEST_F(ReadThroughCacheAsyncTest, ShutdownWithConcurrentInvalidate) {
 
 class MockThreadPool : public ThreadPoolInterface {
 public:
-    ~MockThreadPool() {
+    ~MockThreadPool() override {
         ASSERT(!_mostRecentTask);
     }
     void startup() override {}

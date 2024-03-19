@@ -69,7 +69,7 @@ public:
 
     void benchmarkQueryMatchProject(benchmark::State& state,
                                     BSONObj matchSpec,
-                                    BSONObj projectSpec) override final {
+                                    BSONObj projectSpec) final {
         std::vector<BSONObj> pipeline;
         if (!matchSpec.isEmpty()) {
             pipeline.push_back(BSON("$match" << matchSpec));
@@ -80,8 +80,7 @@ public:
         benchmarkPipeline(state, pipeline);
     }
 
-    void benchmarkPipeline(benchmark::State& state,
-                           const std::vector<BSONObj>& pipeline) override final {
+    void benchmarkPipeline(benchmark::State& state, const std::vector<BSONObj>& pipeline) final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
         auto expCtx = make_intrusive<ExpressionContextForTest>(

@@ -51,7 +51,7 @@ class QueryAnalysisOpObserverConfigSvr final : public QueryAnalysisOpObserver {
 
 public:
     QueryAnalysisOpObserverConfigSvr() = default;
-    ~QueryAnalysisOpObserverConfigSvr() = default;
+    ~QueryAnalysisOpObserverConfigSvr() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

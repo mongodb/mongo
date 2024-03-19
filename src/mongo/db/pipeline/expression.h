@@ -226,7 +226,7 @@ public:
         StringMap<std::string> complexRenames;
     };
 
-    virtual ~Expression(){};
+    ~Expression() override{};
 
     /**
      * Optimize the Expression.
@@ -458,7 +458,7 @@ public:
                                    Value val,
                                    bool wrapRepresentativeValue = false);
 
-    bool selfAndChildrenAreConstant() const override final {
+    bool selfAndChildrenAreConstant() const final {
         return true;
     }
 
@@ -578,7 +578,7 @@ public:
     ExpressionVariadic(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
         : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 
-    Value serialize(const SerializationOptions& options = {}) const {
+    Value serialize(const SerializationOptions& options = {}) const override {
         // As a special case, we would like to serialize a variadic number of children as
         // "?array<?subtype>" if they are all constant. Check for that here, otherwise default to
         // the normal one-by-one serialization of the children.
@@ -719,13 +719,13 @@ public:
         return AccumulatorN::kName.rawData();
     }
 
-    Value serialize(const SerializationOptions& options = {}) const {
+    Value serialize(const SerializationOptions& options = {}) const override {
         MutableDocument md;
         AccumulatorN::serializeHelper(_n, _output, options, md);
         return Value(DOC(getOpName() << md.freeze()));
     }
 
-    Value evaluate(const Document& root, Variables* variables) const {
+    Value evaluate(const Document& root, Variables* variables) const override {
         AccumulatorN accum(this->getExpressionContext());
 
         // Evaluate and initialize 'n'.
@@ -845,7 +845,7 @@ public:
                                         Expression::ExpressionVector&& children)
         : ExpressionFixedArity<SubClass, 1>(expCtx, std::move(children)) {}
 
-    virtual ~ExpressionSingleNumericArg() = default;
+    ~ExpressionSingleNumericArg() override = default;
 
     Value evaluate(const Document& root, Variables* variables) const final {
         Value arg = this->_children[0]->evaluate(root, variables);
@@ -875,7 +875,7 @@ public:
                              Expression::ExpressionVector&& children)
         : ExpressionFixedArity<SubClass, 2>(expCtx, std::move(children)) {}
 
-    virtual ~ExpressionTwoNumericArgs() = default;
+    ~ExpressionTwoNumericArgs() override = default;
 
     /**
      * Evaluate performs the type checking necessary to make sure that both arguments are numeric,
@@ -916,7 +916,7 @@ public:
 template <typename SubClass>
 class DateExpressionAcceptingTimeZone : public Expression {
 public:
-    virtual ~DateExpressionAcceptingTimeZone() {}
+    ~DateExpressionAcceptingTimeZone() override {}
 
     Value evaluate(const Document& root, Variables* variables) const final {
         auto dateVal = _children[_kDate]->evaluate(root, variables);
@@ -1232,7 +1232,7 @@ public:
         return visitor->visit(this);
     }
 
-    bool selfAndChildrenAreConstant() const override final;
+    bool selfAndChildrenAreConstant() const final;
 };
 
 
@@ -2019,7 +2019,7 @@ public:
     }
 
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
-    Value evaluate(const Document& root, Variables* variables) const;
+    Value evaluate(const Document& root, Variables* variables) const override;
     Value serialize(const SerializationOptions& options = {}) const final;
 
     /*
@@ -2278,7 +2278,7 @@ public:
     ExpressionIndexOfArray(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx, std::move(children)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const;
+    Value evaluate(const Document& root, Variables* variables) const override;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 
@@ -2781,7 +2781,7 @@ public:
         return visitor->visit(this);
     }
 
-    bool selfAndChildrenAreConstant() const override final;
+    bool selfAndChildrenAreConstant() const final;
 
 private:
     ExpressionObject(
@@ -3282,7 +3282,7 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
     Value evaluate(const Document& root, Variables* variables) const final;
-    const char* getOpName() const {
+    const char* getOpName() const override {
         return "$_internalFindAllValuesAtPath";
     }
 
@@ -3408,7 +3408,7 @@ public:
         : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
-    const char* getOpName() const;
+    const char* getOpName() const override;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -4005,7 +4005,7 @@ public:
      * then it can be optimized. Stores the optimized regex in '_initialExecStateForConstantRegex'
      * so that it can be reused during expression evaluation.
      */
-    [[nodiscard]] boost::intrusive_ptr<Expression> optimize();
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
 
     bool hasConstantRegex() const {
         return _initialExecStateForConstantRegex.has_value();
@@ -4022,7 +4022,7 @@ public:
     boost::optional<std::pair<boost::optional<std::string>, std::string>>
     getConstantPatternAndOptions() const;
 
-    Value serialize(const SerializationOptions& options = {}) const;
+    Value serialize(const SerializationOptions& options = {}) const override;
 
     const std::string& getOpName() const {
         return _opName;
@@ -4176,7 +4176,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value evaluate(const Document& root, Variables* variables) const;
+    Value evaluate(const Document& root, Variables* variables) const override;
     Value serialize(const SerializationOptions& options = {}) const final;
 };
 

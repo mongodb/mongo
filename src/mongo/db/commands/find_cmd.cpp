@@ -247,7 +247,7 @@ class FindCmd final : public Command {
 public:
     FindCmd() : Command("find") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -465,7 +465,7 @@ public:
          *   --Save state for getMore, transferring ownership of the executor to a ClientCursor.
          *   --Generate response to send to the client.
          */
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* replyBuilder) {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* replyBuilder) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
             const BSONObj& cmdObj = _request.body;

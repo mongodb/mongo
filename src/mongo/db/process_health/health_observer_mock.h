@@ -67,7 +67,7 @@ public:
           _periodicCheckImpl(periodicCheckImpl),
           _observerTimeout(observerTimeout) {}
 
-    virtual ~HealthObserverMock() = default;
+    ~HealthObserverMock() override = default;
 
     bool isConfigured() const override {
         return true;

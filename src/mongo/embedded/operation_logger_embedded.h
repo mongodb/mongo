@@ -39,7 +39,7 @@ class OperationLoggerEmbedded : public OperationLogger {
 
 public:
     OperationLoggerEmbedded() = default;
-    virtual ~OperationLoggerEmbedded() = default;
+    ~OperationLoggerEmbedded() override = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,

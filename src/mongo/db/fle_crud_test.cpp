@@ -143,7 +143,7 @@ public:
 
     KeyMaterial getKey(const UUID& uuid) override;
     BSONObj getEncryptedKey(const UUID& uuid) override;
-    SymmetricKey& getKMSLocalKey() {
+    SymmetricKey& getKMSLocalKey() override {
         return _localKey;
     }
 
@@ -223,8 +223,8 @@ int32_t getTestSeed() {
 
 class FleCrudTest : public ServiceContextMongoDTest {
 protected:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 
     void createCollection(const NamespaceString& ns);
 
@@ -771,10 +771,10 @@ private:
 
 class FleTagsTest : public FleCrudTest {
 protected:
-    void setUp() {
+    void setUp() override {
         FleCrudTest::setUp();
     }
-    void tearDown() {
+    void tearDown() override {
         FleCrudTest::tearDown();
     }
 

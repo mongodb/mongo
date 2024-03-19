@@ -114,12 +114,12 @@ public:
                              std::unique_ptr<TicketHolder> writeTicketHolder)
         : TicketHolderManager(std::move(readTicketHolder), std::move(writeTicketHolder)) {}
 
-    virtual bool supportsRuntimeSizeAdjustment() const override {
+    bool supportsRuntimeSizeAdjustment() const override {
         return true;
     }
 
 protected:
-    virtual void _appendImplStats(BSONObjBuilder& builder) const override {}
+    void _appendImplStats(BSONObjBuilder& builder) const override {}
 };
 }  // namespace admission
 }  // namespace mongo

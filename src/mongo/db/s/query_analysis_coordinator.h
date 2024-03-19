@@ -105,9 +105,9 @@ public:
     static QueryAnalysisCoordinator* get(OperationContext* opCtx);
     static QueryAnalysisCoordinator* get(ServiceContext* serviceContext);
 
-    void onStartup(OperationContext* opCtx) override final;
+    void onStartup(OperationContext* opCtx) final;
 
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final;
+    void onStepUpBegin(OperationContext* opCtx, long long term) final;
 
     /**
      * Creates, updates and deletes the configuration for the collection with the given
@@ -154,28 +154,27 @@ public:
     }
 
 private:
-    bool shouldRegisterReplicaSetAwareService() const override final;
+    bool shouldRegisterReplicaSetAwareService() const final;
 
     /**
      * On a standalone replica set, creates, updates and removes samplers based on the current
      * replica set configuration.
      */
-    void onSetCurrentConfig(OperationContext* opCtx) override final;
+    void onSetCurrentConfig(OperationContext* opCtx) final;
 
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
 
-    void onShutdown() override final {}
+    void onShutdown() final {}
 
-    void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {}
 
-    void onStepDown() override final {}
+    void onStepDown() final {}
 
-    void onRollback() override final {}
+    void onRollback() final {}
 
-    void onBecomeArbiter() override final {}
+    void onBecomeArbiter() final {}
 
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "QueryAnalysisCoordinator";
     }
 

@@ -60,7 +60,7 @@ class UserWriteBlockModeOpObserver final : public OpObserverNoop {
 
 public:
     UserWriteBlockModeOpObserver() = default;
-    ~UserWriteBlockModeOpObserver() = default;
+    ~UserWriteBlockModeOpObserver() override = default;
 
     // Operations to check for allowed writes.
 

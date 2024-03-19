@@ -531,7 +531,7 @@ public:
     LogV2TypesTest() : LogV2Test() {
         detail::setGetTenantIDCallback([this]() -> std::string { return this->tenant.toString(); });
     }
-    ~LogV2TypesTest() {
+    ~LogV2TypesTest() override {
         detail::setGetTenantIDCallback(nullptr);
     }
 

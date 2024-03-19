@@ -148,7 +148,7 @@ public:
                            std::shared_ptr<ReplicaSetMonitorStats> stats,
                            std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
-    virtual ~ServerDiscoveryMonitor() {}
+    ~ServerDiscoveryMonitor() override {}
 
     void shutdown();
 

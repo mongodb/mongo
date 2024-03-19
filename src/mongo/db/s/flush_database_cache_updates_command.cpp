@@ -139,7 +139,7 @@ public:
         /**
          * ns() is the database to flush, with no collection.
          */
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(_dbName());
         }
 

@@ -781,7 +781,7 @@ public:
     BSONObj scheduleSuccessfulCursorResponse(StringData fieldName,
                                              size_t start,
                                              size_t end,
-                                             size_t cursorId) {
+                                             size_t cursorId) override {
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
         // Don't assert that the network has requests like we do in other classes. This is to enable
         // the test in 'NoPrefetchGetMore'.

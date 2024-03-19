@@ -58,7 +58,7 @@ class NodeSBE : public ServiceContextTest {};
 class ABTRecorder : public ce::SamplingExecutor {
 public:
     ABTRecorder(ABTVector& nodes) : _nodes(nodes) {}
-    ~ABTRecorder() = default;
+    ~ABTRecorder() override = default;
 
     std::pair<sbe::value::TypeTags, sbe::value::Value> execute(
         const Metadata& metadata,

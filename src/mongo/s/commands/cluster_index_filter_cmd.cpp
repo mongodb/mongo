@@ -100,7 +100,7 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const {
+                                 const BSONObj& cmdObj) const override {
         auto* authzSession = AuthorizationSession::get(opCtx->getClient());
         ResourcePattern pattern = parseResourcePattern(dbName, cmdObj);
 

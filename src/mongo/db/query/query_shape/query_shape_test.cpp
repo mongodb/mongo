@@ -701,7 +701,7 @@ static const NamespaceString kDefaultTestNss =
 
 struct DummyShapeSpecificComponents : public query_shape::CmdSpecificShapeComponents {
     DummyShapeSpecificComponents(){};
-    void HashValue(absl::HashState state) const {}
+    void HashValue(absl::HashState state) const override {}
     size_t size() const final {
         return sizeof(DummyShapeSpecificComponents);
     }
@@ -740,7 +740,7 @@ public:
     }
 
     // Random number for testing purposes.
-    size_t extraSize() const final override {
+    size_t extraSize() const final {
         return 125;
     }
     void appendCmdSpecificShapeComponents(BSONObjBuilder&,

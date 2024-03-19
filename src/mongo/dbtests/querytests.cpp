@@ -2035,7 +2035,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<FindingStart>();
         add<FindOneOr>();
         add<FindOneEmptyObj>();

@@ -184,7 +184,7 @@ public:
     class TypedInstance : public Instance, public std::enable_shared_from_this<InstanceType> {
     public:
         TypedInstance() = default;
-        virtual ~TypedInstance() = default;
+        ~TypedInstance() override = default;
 
         /**
          * Same functionality as PrimaryOnlyService::lookupInstance, but returns a pointer of
@@ -573,7 +573,7 @@ private:
 class PrimaryOnlyServiceRegistry final : public ReplicaSetAwareService<PrimaryOnlyServiceRegistry> {
 public:
     PrimaryOnlyServiceRegistry() = default;
-    ~PrimaryOnlyServiceRegistry() = default;
+    ~PrimaryOnlyServiceRegistry() override = default;
 
     static PrimaryOnlyServiceRegistry* get(ServiceContext* serviceContext);
 
@@ -621,7 +621,7 @@ public:
     void onStepUpComplete(OperationContext*, long long term) final;
     void onStepDown() final;
     void onRollback() final {}
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "PrimaryOnlyServiceRegistry";
     }
 

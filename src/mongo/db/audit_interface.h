@@ -473,179 +473,182 @@ struct TryLogEventParams {
 class AuditNoOp : public AuditInterface {
 public:
     AuditNoOp() = default;
-    ~AuditNoOp() = default;
+    ~AuditNoOp() override = default;
 
-    void logClientMetadata(Client* client) const {};
+    void logClientMetadata(Client* client) const override{};
 
-    void logAuthentication(Client* client, const AuthenticateEvent& event) const {};
+    void logAuthentication(Client* client, const AuthenticateEvent& event) const override{};
 
     void logCommandAuthzCheck(Client* client,
                               const OpMsgRequest& cmdObj,
                               const CommandInterface& command,
-                              ErrorCodes::Error result) const {};
+                              ErrorCodes::Error result) const override{};
 
     void logKillCursorsAuthzCheck(Client* client,
                                   const NamespaceString& ns,
                                   long long cursorId,
-                                  ErrorCodes::Error result) const {};
+                                  ErrorCodes::Error result) const override{};
 
     void logCreateUser(Client* client,
                        const UserName& username,
                        bool password,
                        const BSONObj* customData,
                        const std::vector<RoleName>& roles,
-                       const boost::optional<BSONArray>& restrictions) const {};
+                       const boost::optional<BSONArray>& restrictions) const override{};
 
-    void logDropUser(Client* client, const UserName& username) const {};
+    void logDropUser(Client* client, const UserName& username) const override{};
 
-    void logDropAllUsersFromDatabase(Client* client, const DatabaseName& dbname) const {};
+    void logDropAllUsersFromDatabase(Client* client, const DatabaseName& dbname) const override{};
 
     void logUpdateUser(Client* client,
                        const UserName& username,
                        bool password,
                        const BSONObj* customData,
                        const std::vector<RoleName>* roles,
-                       const boost::optional<BSONArray>& restrictions) const {};
+                       const boost::optional<BSONArray>& restrictions) const override{};
 
     void logGrantRolesToUser(Client* client,
                              const UserName& username,
-                             const std::vector<RoleName>& roles) const {};
+                             const std::vector<RoleName>& roles) const override{};
 
     void logRevokeRolesFromUser(Client* client,
                                 const UserName& username,
-                                const std::vector<RoleName>& roles) const {};
+                                const std::vector<RoleName>& roles) const override{};
 
     void logCreateRole(Client* client,
                        const RoleName& role,
                        const std::vector<RoleName>& roles,
                        const PrivilegeVector& privileges,
-                       const boost::optional<BSONArray>& restrictions) const {};
+                       const boost::optional<BSONArray>& restrictions) const override{};
 
     void logUpdateRole(Client* client,
                        const RoleName& role,
                        const std::vector<RoleName>* roles,
                        const PrivilegeVector* privileges,
-                       const boost::optional<BSONArray>& restrictions) const {};
+                       const boost::optional<BSONArray>& restrictions) const override{};
 
-    void logDropRole(Client* client, const RoleName& role) const {};
+    void logDropRole(Client* client, const RoleName& role) const override{};
 
-    void logDropAllRolesFromDatabase(Client* client, const DatabaseName& dbname) const {};
+    void logDropAllRolesFromDatabase(Client* client, const DatabaseName& dbname) const override{};
 
     void logGrantRolesToRole(Client* client,
                              const RoleName& role,
-                             const std::vector<RoleName>& roles) const {};
+                             const std::vector<RoleName>& roles) const override{};
 
     void logRevokeRolesFromRole(Client* client,
                                 const RoleName& role,
-                                const std::vector<RoleName>& roles) const {};
+                                const std::vector<RoleName>& roles) const override{};
 
     void logGrantPrivilegesToRole(Client* client,
                                   const RoleName& role,
-                                  const PrivilegeVector& privileges) const {};
+                                  const PrivilegeVector& privileges) const override{};
 
     void logRevokePrivilegesFromRole(Client* client,
                                      const RoleName& role,
-                                     const PrivilegeVector& privileges) const {};
+                                     const PrivilegeVector& privileges) const override{};
 
     void logReplSetReconfig(Client* client,
                             const BSONObj* oldConfig,
-                            const BSONObj* newConfig) const {};
+                            const BSONObj* newConfig) const override{};
 
-    void logApplicationMessage(Client* client, StringData msg) const {};
+    void logApplicationMessage(Client* client, StringData msg) const override{};
 
-    void logStartupOptions(Client* client, const BSONObj& startupOptions) const {};
+    void logStartupOptions(Client* client, const BSONObj& startupOptions) const override{};
 
-    void logShutdown(Client* client) const {};
+    void logShutdown(Client* client) const override{};
 
     void logLogout(Client* client,
                    StringData reason,
                    const BSONArray& initialUsers,
                    const BSONArray& updatedUsers,
-                   const boost::optional<Date_t>& loginTime) const {};
+                   const boost::optional<Date_t>& loginTime) const override{};
 
     void logCreateIndex(Client* client,
                         const BSONObj* indexSpec,
                         StringData indexname,
                         const NamespaceString& nsname,
                         StringData indexBuildState,
-                        ErrorCodes::Error result) const {};
+                        ErrorCodes::Error result) const override{};
 
-    void logCreateCollection(Client* client, const NamespaceString& nsname) const {};
+    void logCreateCollection(Client* client, const NamespaceString& nsname) const override{};
 
     void logCreateView(Client* client,
                        const NamespaceString& nsname,
                        const NamespaceString& viewOn,
                        BSONArray pipeline,
-                       ErrorCodes::Error code) const {};
+                       ErrorCodes::Error code) const override{};
 
-    void logImportCollection(Client* client, const NamespaceString& nsname) const {};
+    void logImportCollection(Client* client, const NamespaceString& nsname) const override{};
 
-    void logCreateDatabase(Client* client, const DatabaseName& dbname) const {};
+    void logCreateDatabase(Client* client, const DatabaseName& dbname) const override{};
 
 
-    void logDropIndex(Client* client, StringData indexname, const NamespaceString& nsname) const {};
+    void logDropIndex(Client* client,
+                      StringData indexname,
+                      const NamespaceString& nsname) const override{};
 
-    void logDropCollection(Client* client, const NamespaceString& nsname) const {};
+    void logDropCollection(Client* client, const NamespaceString& nsname) const override{};
 
     void logDropView(Client* client,
                      const NamespaceString& nsname,
                      const NamespaceString& viewOn,
                      const std::vector<BSONObj>& pipeline,
-                     ErrorCodes::Error code) const {};
+                     ErrorCodes::Error code) const override{};
 
-    void logDropDatabase(Client* client, const DatabaseName& dbname) const {};
+    void logDropDatabase(Client* client, const DatabaseName& dbname) const override{};
 
     void logRenameCollection(Client* client,
                              const NamespaceString& source,
-                             const NamespaceString& target) const {};
+                             const NamespaceString& target) const override{};
 
-    void logEnableSharding(Client* client, StringData dbname) const {};
+    void logEnableSharding(Client* client, StringData dbname) const override{};
 
-    void logAddShard(Client* client, StringData name, const std::string& servers) const {};
+    void logAddShard(Client* client, StringData name, const std::string& servers) const override{};
 
-    void logRemoveShard(Client* client, StringData shardname) const {};
+    void logRemoveShard(Client* client, StringData shardname) const override{};
 
     void logShardCollection(Client* client,
                             const NamespaceString& ns,
                             const BSONObj& keyPattern,
-                            bool unique) const {};
+                            bool unique) const override{};
 
     void logRefineCollectionShardKey(Client* client,
                                      const NamespaceString& ns,
-                                     const BSONObj& keyPattern) const {};
+                                     const BSONObj& keyPattern) const override{};
 
     void logInsertOperation(Client* client,
                             const NamespaceString& nss,
-                            const BSONObj& doc) const {};
+                            const BSONObj& doc) const override{};
 
     void logUpdateOperation(Client* client,
                             const NamespaceString& nss,
-                            const BSONObj& doc) const {};
+                            const BSONObj& doc) const override{};
 
     void logRemoveOperation(Client* client,
                             const NamespaceString& nss,
-                            const BSONObj& doc) const {};
+                            const BSONObj& doc) const override{};
 
-    void logGetClusterParameter(
-        Client* client,
-        const std::variant<std::string, std::vector<std::string>>& requestedParameters) const {};
+    void logGetClusterParameter(Client* client,
+                                const std::variant<std::string, std::vector<std::string>>&
+                                    requestedParameters) const override{};
 
     void logSetClusterParameter(Client* client,
                                 const BSONObj& oldValue,
                                 const BSONObj& newValue,
-                                const boost::optional<TenantId>& tenantId) const {};
+                                const boost::optional<TenantId>& tenantId) const override{};
 
-    void logUpdateCachedClusterParameter(Client* client,
-                                         const BSONObj& oldValue,
-                                         const BSONObj& newValue,
-                                         const boost::optional<TenantId>& tenantId) const {};
+    void logUpdateCachedClusterParameter(
+        Client* client,
+        const BSONObj& oldValue,
+        const BSONObj& newValue,
+        const boost::optional<TenantId>& tenantId) const override{};
 
     void logRotateLog(Client* client,
                       const Status& logStatus,
                       const std::vector<Status>& errors,
-                      const std::string& suffix) const {};
+                      const std::string& suffix) const override{};
 
-    void logConfigEvent(Client* client, const AuditConfigDocument& config) const {};
+    void logConfigEvent(Client* client, const AuditConfigDocument& config) const override{};
 };
 
 }  // namespace audit

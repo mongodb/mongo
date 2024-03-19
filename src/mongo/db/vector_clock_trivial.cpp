@@ -52,7 +52,7 @@ class VectorClockTrivial : public VectorClockMutable {
 
 public:
     VectorClockTrivial();
-    virtual ~VectorClockTrivial();
+    ~VectorClockTrivial() override;
 
 private:
     // VectorClock methods implementation

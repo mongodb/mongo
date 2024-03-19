@@ -420,11 +420,11 @@ namespace {
  */
 class ClientCursorMonitor : public BackgroundJob {
 public:
-    std::string name() const {
+    std::string name() const override {
         return "ClientCursorMonitor";
     }
 
-    void run() {
+    void run() override {
         ThreadClient tc("clientcursormon",
                         getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 

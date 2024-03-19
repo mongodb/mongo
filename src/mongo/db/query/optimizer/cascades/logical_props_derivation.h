@@ -49,7 +49,7 @@ public:
                                          ABT::reference_type nodeRef,
                                          NodePropsMap* nodePropsMap = nullptr,
                                          const Memo* memo = nullptr,
-                                         GroupIdType groupId = -1) const override final;
+                                         GroupIdType groupId = -1) const final;
 };
 
 

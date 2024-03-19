@@ -181,7 +181,7 @@ private:
 
 class QueryStageIXScanBasic : public IndexScanBase {
 public:
-    virtual ~QueryStageIXScanBasic() {}
+    ~QueryStageIXScanBasic() override {}
 
     void run() {
         // foo <= 20
@@ -195,7 +195,7 @@ public:
 
 class QueryStageIXScanLowerUpper : public IndexScanBase {
 public:
-    virtual ~QueryStageIXScanLowerUpper() {}
+    ~QueryStageIXScanLowerUpper() override {}
 
     void run() {
         // 20 <= foo < 30
@@ -211,7 +211,7 @@ public:
 
 class QueryStageIXScanLowerUpperIncl : public IndexScanBase {
 public:
-    virtual ~QueryStageIXScanLowerUpperIncl() {}
+    ~QueryStageIXScanLowerUpperIncl() override {}
 
     void run() {
         // 20 <= foo <= 30
@@ -225,7 +225,7 @@ public:
 
 class QueryStageIXScanLowerUpperInclFilter : public IndexScanBase {
 public:
-    virtual ~QueryStageIXScanLowerUpperInclFilter() {}
+    ~QueryStageIXScanLowerUpperInclFilter() override {}
 
     void run() {
         // 20 <= foo < 30
@@ -240,7 +240,7 @@ public:
 
 class QueryStageIXScanCantMatch : public IndexScanBase {
 public:
-    virtual ~QueryStageIXScanCantMatch() {}
+    ~QueryStageIXScanCantMatch() override {}
 
     void run() {
         // 20 <= foo < 30
@@ -257,7 +257,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_tests") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageIXScanBasic>();
         add<QueryStageIXScanLowerUpper>();
         add<QueryStageIXScanLowerUpperIncl>();

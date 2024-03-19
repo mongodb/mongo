@@ -105,7 +105,7 @@ public:
     static constexpr StringData kShardMergeRecipientServiceName = "ShardMergeRecipientService"_sd;
 
     explicit ShardMergeRecipientService(ServiceContext* serviceContext);
-    ~ShardMergeRecipientService() = default;
+    ~ShardMergeRecipientService() override = default;
 
     StringData getServiceName() const final;
 

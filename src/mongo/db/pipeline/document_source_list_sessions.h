@@ -74,8 +74,8 @@ public:
                                const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
         : DocumentSourceMatch(other, newExpCtx), _allUsers(other._allUsers), _users(other._users) {}
 
-    virtual boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         return make_intrusive<std::decay_t<decltype(*this)>>(*this, newExpCtx);
     }
 
@@ -120,7 +120,7 @@ public:
         return DocumentSourceListSessions::kStageName.rawData();
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,

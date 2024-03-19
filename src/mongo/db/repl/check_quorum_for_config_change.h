@@ -66,13 +66,13 @@ public:
      * "rsConfig" must stay in scope until QuorumChecker's destructor completes.
      */
     QuorumChecker(const ReplSetConfig* rsConfig, int myIndex, long long term);
-    virtual ~QuorumChecker();
+    ~QuorumChecker() override;
 
-    virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
-    virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                 const executor::RemoteCommandResponse& response);
+    std::vector<executor::RemoteCommandRequest> getRequests() const override;
+    void processResponse(const executor::RemoteCommandRequest& request,
+                         const executor::RemoteCommandResponse& response) override;
 
-    virtual bool hasReceivedSufficientResponses() const;
+    bool hasReceivedSufficientResponses() const override;
 
     Status getFinalStatus() const {
         return _finalStatus;

@@ -89,7 +89,7 @@ private:
 
     void onBecomeArbiter() final {}
 
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "PlacementHistoryCleaner";
     }
 

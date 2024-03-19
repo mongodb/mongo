@@ -44,7 +44,7 @@ public:
      */
     explicit YieldPolicyCallbacksImpl(NamespaceString nssForFailpoints);
 
-    virtual ~YieldPolicyCallbacksImpl() = default;
+    ~YieldPolicyCallbacksImpl() override = default;
 
     void duringYield(OperationContext*) const override;
     void handledWriteConflict(OperationContext*) const override;

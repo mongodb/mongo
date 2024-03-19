@@ -58,11 +58,11 @@ namespace mongo {
 /* For diagnostic / testing purposes. Enabled via command line. See docs/test_commands.md. */
 class CmdSleep : public BasicCommand {
 public:
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
@@ -151,7 +151,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         LOGV2(20504, "Test-only command 'sleep' invoked");
         long long msToSleep = 0;
 

@@ -53,8 +53,7 @@ namespace {
 
 class ReshardingOplogApplierMetricsTest : public ShardingDataTransformMetricsTestFixture {
 public:
-    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
-        override {
+    std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
         return std::make_unique<ReshardingCumulativeMetrics>();
     }
 

@@ -70,7 +70,7 @@ public:
     CallbackState(const RemoteCommandOnAnyCallbackFn& cb, const BatonHandle& baton)
         : callback(cb), baton(baton) {}
 
-    virtual ~CallbackState() = default;
+    ~CallbackState() override = default;
 
     bool isCanceled() const override {
         MONGO_UNREACHABLE;

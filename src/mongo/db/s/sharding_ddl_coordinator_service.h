@@ -67,7 +67,7 @@ public:
         : PrimaryOnlyService(serviceContext),
           _externalStateFactory(std::move(externalStateFactory)) {}
 
-    ~ShardingDDLCoordinatorService() = default;
+    ~ShardingDDLCoordinatorService() override = default;
 
     static ShardingDDLCoordinatorService* getService(OperationContext* opCtx);
 

@@ -112,7 +112,7 @@ public:
                        const BSONObj& rawObj,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual ~GeoMatchExpression() {}
+    ~GeoMatchExpression() override {}
     static bool contains(const GeometryContainer& queryGeom,
                          const GeoExpression::Predicate& queryPredicate,
                          bool skipValidation,
@@ -124,15 +124,15 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
     bool matchesGeoContainer(const GeometryContainer&) const;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
-    virtual std::unique_ptr<MatchExpression> clone() const;
+    std::unique_ptr<MatchExpression> clone() const override;
 
     void setCanSkipValidation(bool val) {
         _canSkipValidation = val;
@@ -225,7 +225,7 @@ public:
                            std::shared_ptr<const GeoNearExpression> query,
                            const BSONObj& rawObj);
 
-    virtual ~GeoNearMatchExpression() {}
+    ~GeoNearMatchExpression() override {}
 
     /**
      * Stub implementation that should never be called, since geoNear execution requires an
@@ -233,15 +233,15 @@ public:
      */
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
-    virtual std::unique_ptr<MatchExpression> clone() const;
+    std::unique_ptr<MatchExpression> clone() const override;
 
     const GeoNearExpression& getData() const {
         return *_query;

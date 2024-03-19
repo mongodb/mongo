@@ -138,7 +138,7 @@ public:
                                 UnionRequirement::kAllowed);
     }
 
-    const char* getSourceName() const {
+    const char* getSourceName() const override {
         return kStageName.rawData();
     };
 
@@ -171,16 +171,16 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         // Force to run on the merging half for now.
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    DocumentSource::GetNextResult doGetNext();
+    DocumentSource::GetNextResult doGetNext() override;
 
     void setSource(DocumentSource* source) final {
         pSource = source;

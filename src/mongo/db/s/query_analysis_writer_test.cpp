@@ -202,7 +202,7 @@ void assertBsonObjEqualUnordered(const BSONObj& lhs, const BSONObj& rhs) {
 
 struct QueryAnalysisWriterTest : public ShardServerTestFixture {
 public:
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
         QueryAnalysisWriter::get(operationContext())->onStartup(operationContext());
 
@@ -218,7 +218,7 @@ public:
         tracker.refreshConfigurations({configuration0, configuration1});
     }
 
-    void tearDown() {
+    void tearDown() override {
         QueryAnalysisWriter::get(operationContext())->onShutdown();
         ShardServerTestFixture::tearDown();
     }

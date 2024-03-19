@@ -88,7 +88,7 @@ public:
                   std::move(parseTimeName), std::move(foreignNss), std::move(pipeline)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override final;
+                                           bool bypassDocumentValidation) const final;
     };
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -108,7 +108,7 @@ public:
         _pipeline->getContext()->inUnionWith = true;
     }
 
-    ~DocumentSourceUnionWith();
+    ~DocumentSourceUnionWith() override;
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -216,7 +216,7 @@ private:
         kFinished
     };
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 

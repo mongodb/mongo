@@ -52,7 +52,7 @@ public:
         return nargs;
     }
 
-    virtual ~FixedArityMatchExpression() = default;
+    ~FixedArityMatchExpression() override = default;
 
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);

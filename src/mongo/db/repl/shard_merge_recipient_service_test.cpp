@@ -639,7 +639,7 @@ private:
  */
 class ShardMergeRecipientServiceTestInsert : public ShardMergeRecipientServiceTest {
 private:
-    void addOpObserver(OpObserverRegistry* opObserverRegistry) {
+    void addOpObserver(OpObserverRegistry* opObserverRegistry) override {
         opObserverRegistry->addObserver(std::make_unique<ShardMergeRecipientOpObserver>());
     }
 

@@ -204,7 +204,7 @@ class ClusterInsertCmdBase final : public ClusterWriteCmd {
 public:
     ClusterInsertCmdBase() : ClusterWriteCmd(Impl::kName) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 
@@ -254,7 +254,7 @@ class ClusterUpdateCmdBase final : public ClusterWriteCmd {
 public:
     ClusterUpdateCmdBase() : ClusterWriteCmd{Impl::kName} {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 
@@ -320,7 +320,7 @@ class ClusterDeleteCmdBase final : public ClusterWriteCmd {
 public:
     ClusterDeleteCmdBase() : ClusterWriteCmd(Impl::kName) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 

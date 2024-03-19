@@ -48,9 +48,9 @@ namespace mongo {
 namespace {
 class DevNullStorageEngineFactory : public StorageEngine::Factory {
 public:
-    virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
-                                                  const StorageGlobalParams& params,
-                                                  const StorageEngineLockFile* lockFile) const {
+    std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                          const StorageGlobalParams& params,
+                                          const StorageEngineLockFile* lockFile) const override {
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
@@ -60,16 +60,16 @@ public:
             opCtx, std::make_unique<DevNullKVEngine>(), options);
     }
 
-    virtual StringData getCanonicalName() const {
+    StringData getCanonicalName() const override {
         return "devnull";
     }
 
-    virtual Status validateMetadata(const StorageEngineMetadata& metadata,
-                                    const StorageGlobalParams& params) const {
+    Status validateMetadata(const StorageEngineMetadata& metadata,
+                            const StorageGlobalParams& params) const override {
         return Status::OK();
     }
 
-    virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+    BSONObj createMetadataOptions(const StorageGlobalParams& params) const override {
         return BSONObj();
     }
 };

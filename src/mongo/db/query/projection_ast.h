@@ -141,7 +141,7 @@ public:
     MatchExpressionASTNode(const MatchExpressionASTNode& other)
         : ASTNode{other}, _matchExpr{other._matchExpr} {}
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         return std::make_unique<MatchExpressionASTNode>(*this);
     }
 
@@ -181,7 +181,7 @@ public:
 
     ProjectionPathASTNode(ProjectionPathASTNode&& other) = default;
 
-    ~ProjectionPathASTNode() = default;
+    ~ProjectionPathASTNode() override = default;
 
     ProjectionPathASTNode& operator=(const ProjectionPathASTNode& other) = delete;
 
@@ -200,7 +200,7 @@ public:
         visitor->visit(this);
     }
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         auto cloneNode = std::make_unique<ProjectionPathASTNode>(*this);
         if (_fieldToChildMap) {
             // Change the addresses in the new map to point to the cloned children.
@@ -306,7 +306,7 @@ public:
         visitor->visit(this);
     }
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         return std::make_unique<ProjectionPositionalASTNode>(*this);
     }
 };
@@ -323,7 +323,7 @@ public:
         visitor->visit(this);
     }
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         return std::make_unique<ProjectionSliceASTNode>(*this);
     }
 
@@ -355,7 +355,7 @@ public:
         visitor->visit(this);
     }
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         return std::make_unique<ProjectionElemMatchASTNode>(*this);
     }
 };
@@ -390,7 +390,7 @@ public:
         visitor->visit(this);
     }
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         return std::make_unique<ExpressionASTNode>(*this);
     }
 
@@ -422,7 +422,7 @@ public:
         visitor->visit(this);
     }
 
-    std::unique_ptr<ASTNode> clone() const override final {
+    std::unique_ptr<ASTNode> clone() const final {
         return std::make_unique<BooleanConstantASTNode>(*this);
     }
 

@@ -339,7 +339,7 @@ private:
     void onStepDown() override {}
     void onRollback() override {}
     void onBecomeArbiter() override {}
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "TTLMonitorService";
     }
 };

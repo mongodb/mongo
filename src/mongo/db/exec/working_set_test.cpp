@@ -46,7 +46,7 @@ using std::string;
 
 class WorkingSetFixture : public mongo::unittest::Test {
 protected:
-    void setUp() {
+    void setUp() override {
         ws.reset(new WorkingSet());
         id = ws->allocate();
         ASSERT(id != WorkingSet::INVALID_ID);
@@ -54,7 +54,7 @@ protected:
         ASSERT(nullptr != member);
     }
 
-    void tearDown() {
+    void tearDown() override {
         ws.reset();
         member = nullptr;
     }

@@ -58,7 +58,7 @@ class OperationLoggerTransactionProxy : public OperationLogger {
 
 public:
     OperationLoggerTransactionProxy(std::unique_ptr<OperationLogger> targetOperationLogger);
-    virtual ~OperationLoggerTransactionProxy() = default;
+    ~OperationLoggerTransactionProxy() override = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,

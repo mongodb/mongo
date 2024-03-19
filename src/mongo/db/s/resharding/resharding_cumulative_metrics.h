@@ -67,9 +67,9 @@ public:
     void onCanceled(bool isSameKeyResharding);
 
 private:
-    virtual void reportActive(BSONObjBuilder* bob) const;
-    virtual void reportLatencies(BSONObjBuilder* bob) const;
-    virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
+    void reportActive(BSONObjBuilder* bob) const override;
+    void reportLatencies(BSONObjBuilder* bob) const override;
+    void reportCurrentInSteps(BSONObjBuilder* bob) const override;
 
     const ReshardingCumulativeMetricsFieldNameProvider* _fieldNames;
 

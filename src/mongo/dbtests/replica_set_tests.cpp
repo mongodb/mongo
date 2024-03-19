@@ -60,7 +60,7 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
 
 class ReplicaSetTest : public mongo::unittest::Test {
 protected:
-    void setUp() {
+    void setUp() override {
         auto opCtx = makeOpCtx();
         _storageInterface = std::make_unique<repl::StorageInterfaceImpl>();
         _dropPendingCollectionReaper =
@@ -79,7 +79,7 @@ protected:
         ASSERT_OK(_replCoordExternalState->createLocalLastVoteCollection(opCtx.get()));
     }
 
-    void tearDown() {
+    void tearDown() override {
         auto opCtx = makeOpCtx();
         DBDirectClient client(opCtx.get());
         client.dropCollection(NamespaceString::kLastVoteNamespace);

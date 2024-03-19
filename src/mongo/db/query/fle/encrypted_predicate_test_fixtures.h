@@ -54,7 +54,7 @@ public:
     EncryptedCollScanMode getEncryptedCollScanMode() const override {
         return _mode;
     }
-    ExpressionContext* getExpressionContext() const {
+    ExpressionContext* getExpressionContext() const override {
         return _expCtx.get();
     }
 
@@ -79,7 +79,7 @@ private:
 class EncryptedPredicateRewriteTest : public unittest::Test {
 public:
     EncryptedPredicateRewriteTest();
-    ~EncryptedPredicateRewriteTest();
+    ~EncryptedPredicateRewriteTest() override;
 
     static std::unique_ptr<MatchExpression> makeInExpr(StringData fieldname,
                                                        BSONArray disjunctions) {

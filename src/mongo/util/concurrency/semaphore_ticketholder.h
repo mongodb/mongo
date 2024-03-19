@@ -52,29 +52,29 @@ public:
     explicit SemaphoreTicketHolder(ServiceContext* serviceContext,
                                    int numTickets,
                                    bool trackPeakUsed);
-    ~SemaphoreTicketHolder() override final;
+    ~SemaphoreTicketHolder() final;
 
-    int32_t available() const override final;
+    int32_t available() const final;
 
-    int64_t queued() const override final {
+    int64_t queued() const final {
         auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
         auto added = _semaphoreStats.totalAddedQueue.loadRelaxed();
         return std::max(added - removed, (int64_t)0);
     };
 
-    int64_t numFinishedProcessing() const override final;
+    int64_t numFinishedProcessing() const final;
 
 private:
     boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
                                                     AdmissionContext* admCtx,
-                                                    Date_t until) override final;
+                                                    Date_t until) final;
 
-    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
-    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
+    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) final;
+    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept final;
 
-    void _appendImplStats(BSONObjBuilder& b) const override final;
+    void _appendImplStats(BSONObjBuilder& b) const final;
 
-    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept override final {
+    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept final {
         return _semaphoreStats;
     }
 #if defined(__linux__)

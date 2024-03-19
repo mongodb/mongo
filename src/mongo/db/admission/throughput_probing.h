@@ -120,12 +120,12 @@ public:
                                          std::unique_ptr<TicketHolder> readTicketHolder,
                                          std::unique_ptr<TicketHolder> writeTicketHolder,
                                          Milliseconds interval);
-    virtual bool supportsRuntimeSizeAdjustment() const override {
+    bool supportsRuntimeSizeAdjustment() const override {
         return false;
     }
 
 protected:
-    virtual void _appendImplStats(BSONObjBuilder& builder) const override;
+    void _appendImplStats(BSONObjBuilder& builder) const override;
 
 private:
     /**

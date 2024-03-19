@@ -64,7 +64,7 @@ class Baton : public Waitable,
               public OutOfLineExecutor,
               public std::enable_shared_from_this<Baton> {
 public:
-    virtual ~Baton() = default;
+    ~Baton() override = default;
 
     /**
      * Detaches a baton from an associated opCtx.

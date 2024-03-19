@@ -277,11 +277,11 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleBeforeBlockingNext) {
 TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenYielding) {
     class ThrowyResourceYielder : public ResourceYielder {
     public:
-        void yield(OperationContext*) {
+        void yield(OperationContext*) override {
             uasserted(ErrorCodes::BadValue, "Simulated error");
         }
 
-        void unyield(OperationContext*) {}
+        void unyield(OperationContext*) override {}
     };
 
     std::vector<RemoteCursor> cursors;
@@ -313,9 +313,9 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenYielding) {
 TEST_F(ResultsMergerTestFixture, ShouldBeAbleToHandleExceptionWhenUnyielding) {
     class ThrowyResourceYielder : public ResourceYielder {
     public:
-        void yield(OperationContext*) {}
+        void yield(OperationContext*) override {}
 
-        void unyield(OperationContext*) {
+        void unyield(OperationContext*) override {
             uasserted(ErrorCodes::BadValue, "Simulated error");
         }
     };

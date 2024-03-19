@@ -119,7 +119,7 @@ HostAndPort makeHostAndPort(const ShardId& shardId) {
 
 class AppendRawResponsesTest : public ShardingTestFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         ShardingTestFixture::setUp();
 
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

@@ -77,7 +77,7 @@ protected:
     static BSONField<OID> anOID;
     static BSONField<long long> aLong;
 
-    void setUp() {
+    void setUp() override {
         valBool = true;
         valArray = BSON_ARRAY(1 << 2 << 3);
         valObj = BSON("a" << 1);
@@ -90,7 +90,7 @@ protected:
                                   << aString(valString) << anOID(valOID) << aLong(valLong));
     }
 
-    void tearDown() {}
+    void tearDown() override {}
 };
 
 BSONField<bool> ExtractionFixture::aBool("aBool");

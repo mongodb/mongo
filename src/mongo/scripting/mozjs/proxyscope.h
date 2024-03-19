@@ -119,7 +119,7 @@ class MozJSProxyScope final : public Scope {
 
 public:
     MozJSProxyScope(MozJSScriptEngine* engine);
-    ~MozJSProxyScope();
+    ~MozJSProxyScope() override;
 
     void init(const BSONObj* data) override;
 
@@ -157,7 +157,8 @@ public:
     BSONObj getObject(const char* field) override;
     OID getOID(const char* field) override;
     // Note: The resulting BSONBinData is only valid within the scope of the 'withBinData' callback.
-    void getBinData(const char* field, std::function<void(const BSONBinData&)> withBinData);
+    void getBinData(const char* field,
+                    std::function<void(const BSONBinData&)> withBinData) override;
     Timestamp getTimestamp(const char* field) override;
     JSRegEx getRegEx(const char* field) override;
 

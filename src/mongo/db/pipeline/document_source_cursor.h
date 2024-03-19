@@ -105,7 +105,7 @@ public:
 
     const char* getSourceName() const override;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
@@ -184,7 +184,7 @@ protected:
 
     GetNextResult doGetNext() final;
 
-    ~DocumentSourceCursor();
+    ~DocumentSourceCursor() override;
 
     /**
      * Disposes of '_exec' if it hasn't been disposed already. This involves taking a collection

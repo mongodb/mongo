@@ -239,9 +239,9 @@ public:
     bool contains(const Point& point) const;
 
     // R2Region interface
-    Box getR2Bounds() const;
-    bool fastContains(const Box& other) const;
-    bool fastDisjoint(const Box& other) const;
+    Box getR2Bounds() const override;
+    bool fastContains(const Box& other) const override;
+    bool fastDisjoint(const Box& other) const override;
 
     // For debugging
     std::string toString() const;

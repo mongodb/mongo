@@ -631,7 +631,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_count_scan") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageCountScanDups>();
         add<QueryStageCountScanInclusiveBounds>();
         add<QueryStageCountScanExclusiveBounds>();

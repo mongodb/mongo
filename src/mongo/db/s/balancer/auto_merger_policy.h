@@ -68,7 +68,7 @@ public:
           _firstAction(true),
           _withinRound(true) {}
 
-    ~AutoMergerPolicy() {}
+    ~AutoMergerPolicy() override {}
 
     /*
      * Enables/disables the AutoMerger.

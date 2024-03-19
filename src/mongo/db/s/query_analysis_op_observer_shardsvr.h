@@ -51,7 +51,7 @@ class QueryAnalysisOpObserverShardSvr final : public QueryAnalysisOpObserver {
 
 public:
     QueryAnalysisOpObserverShardSvr() = default;
-    ~QueryAnalysisOpObserverShardSvr() = default;
+    ~QueryAnalysisOpObserverShardSvr() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kAll, NamespaceFilter::kNone};

@@ -36,11 +36,11 @@ namespace mongo {
 template <typename Base>
 class WithDocumentCopyCountFieldNameOverrides : public Base {
 public:
-    virtual StringData getForDocumentsProcessed() const override {
+    StringData getForDocumentsProcessed() const override {
         return kDocumentsCopied;
     }
 
-    virtual StringData getForBytesWritten() const override {
+    StringData getForBytesWritten() const override {
         return kBytesCopied;
     }
 

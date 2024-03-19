@@ -112,7 +112,7 @@ public:
      * CTOR if possible to avoid OperationId collisions.
      */
     OperationContext(Client* client, OperationId opId);
-    virtual ~OperationContext();
+    ~OperationContext() override;
 
     // TODO (SERVER-77213): The RecoveryUnit ownership is being moved to the TransactionResources.
     // Do not add any new usages to these methods as they will go away and will be folded as an

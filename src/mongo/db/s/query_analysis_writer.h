@@ -148,7 +148,7 @@ public:
     };
 
     QueryAnalysisWriter() = default;
-    ~QueryAnalysisWriter() = default;
+    ~QueryAnalysisWriter() override = default;
 
     QueryAnalysisWriter(QueryAnalysisWriter&& source) = delete;
     QueryAnalysisWriter& operator=(QueryAnalysisWriter&& other) = delete;
@@ -164,10 +164,10 @@ public:
     /**
      * ReplicaSetAwareService methods:
      */
-    void onStartup(OperationContext* opCtx);
-    void onShutdown();
-    void onStepUpComplete(OperationContext* opCtx, long long term);
-    inline std::string getServiceName() const override final {
+    void onStartup(OperationContext* opCtx) override;
+    void onShutdown() override;
+    void onStepUpComplete(OperationContext* opCtx, long long term) override;
+    inline std::string getServiceName() const final {
         return "QueryAnalysisWriter";
     }
 
@@ -247,20 +247,19 @@ public:
     }
 
 private:
-    bool shouldRegisterReplicaSetAwareService() const override final;
+    bool shouldRegisterReplicaSetAwareService() const final;
 
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
 
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {}
 
-    void onStepDown() override final {}
+    void onStepDown() final {}
 
-    void onRollback() override final {}
+    void onRollback() final {}
 
-    void onBecomeArbiter() override final {}
+    void onBecomeArbiter() final {}
 
-    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
 
     ExecutorFuture<void> _addReadQuery(const UUID& sampleId,
                                        const NamespaceString& nss,

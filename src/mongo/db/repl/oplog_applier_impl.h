@@ -118,7 +118,8 @@ private:
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
      */
-    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
+    StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
+                                        std::vector<OplogEntry> ops) override;
 
     void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
                                         std::vector<OplogEntry>* ops,

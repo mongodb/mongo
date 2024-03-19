@@ -195,9 +195,9 @@ private:
  */
 class DeferredWriterTestEmpty : public DeferredWriterTestBase {
 public:
-    ~DeferredWriterTestEmpty(){};
+    ~DeferredWriterTestEmpty() override{};
 
-    void run() {
+    void run() override {
         {
             auto gw = getWriter();
             auto writer = gw.get();
@@ -213,7 +213,7 @@ public:
  */
 class DeferredWriterTestConcurrent : public DeferredWriterTestBase {
 public:
-    ~DeferredWriterTestConcurrent(){};
+    ~DeferredWriterTestConcurrent() override{};
 
     void worker(DeferredWriter* writer) {
         for (int i = 0; i < kDocsPerWorker; ++i) {
@@ -221,7 +221,7 @@ public:
         }
     }
 
-    void run() {
+    void run() override {
         ensureEmpty();
         {
             auto gw = getWriter();
@@ -248,9 +248,9 @@ bool compareBsonObjects(const BSONObj& lhs, const BSONObj& rhs) {
  */
 class DeferredWriterTestConsistent : public DeferredWriterTestBase {
 public:
-    ~DeferredWriterTestConsistent() {}
+    ~DeferredWriterTestConsistent() override {}
 
-    void run() {
+    void run() override {
         ensureEmpty();
         {
             auto gw = getWriter();
@@ -285,7 +285,7 @@ private:
  */
 class DeferredWriterTestNoDeadlock : public DeferredWriterTestBase {
 public:
-    void run(void) {
+    void run(void) override {
         int nDocs = 1000;
         ensureEmpty();
         {
@@ -313,7 +313,7 @@ public:
  */
 class DeferredWriterTestCap : public DeferredWriterTestBase {
 public:
-    void run(void) {
+    void run(void) override {
         // Add a few hundred documents.
         int maxDocs = 500;
         // (more than can fit in a 2KB buffer).
@@ -369,7 +369,7 @@ public:
         }
     }
 
-    void run(void) {
+    void run(void) override {
         using namespace std::chrono_literals;
         ensureEmpty();
         ThreadLauncher launcher;
@@ -398,7 +398,7 @@ class DeferredWriterTests : public unittest::OldStyleSuiteSpecification {
 public:
     DeferredWriterTests() : OldStyleSuiteSpecification("deferred_writer_tests") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<DeferredWriterTestEmpty>();
         add<DeferredWriterTestConcurrent>();
         add<DeferredWriterTestConsistent>();

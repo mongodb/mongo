@@ -59,7 +59,7 @@ class ShardServerOpObserver final : public OpObserverNoop {
 
 public:
     ShardServerOpObserver();
-    ~ShardServerOpObserver();
+    ~ShardServerOpObserver() override;
 
 
     NamespaceFilters getNamespaceFilters() const final {

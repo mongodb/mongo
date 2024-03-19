@@ -72,7 +72,7 @@ public:
         return (elem.embeddedObject().nFields() <= numProperties());
     }
 
-    virtual std::unique_ptr<MatchExpression> clone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto maxProperties = std::make_unique<InternalSchemaMaxPropertiesMatchExpression>(
             numProperties(), _errorAnnotation);
         if (getTag()) {

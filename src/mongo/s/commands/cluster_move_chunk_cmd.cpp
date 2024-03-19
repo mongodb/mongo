@@ -125,7 +125,7 @@ public:
             return request().getCommandParameter();
         }
 
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
 
             Timer t;
             const auto chunkManager =

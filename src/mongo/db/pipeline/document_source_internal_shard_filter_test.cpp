@@ -58,7 +58,7 @@ using DocumentSourceInternalShardFilterTest = AggregationContextFixture;
  */
 class ShardFiltererBaseForTest : public ShardFilterer {
 public:
-    std::unique_ptr<ShardFilterer> clone() const {
+    std::unique_ptr<ShardFilterer> clone() const override {
         MONGO_UNREACHABLE;
     }
 

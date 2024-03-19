@@ -54,7 +54,7 @@ public:
                                     const optimizer::properties::PhysProps& physProps,
                                     optimizer::ABT::reference_type physNodeRef,
                                     const optimizer::ChildPropsType& childProps,
-                                    const optimizer::NodeCEMap& nodeCEMap) const override final;
+                                    const optimizer::NodeCEMap& nodeCEMap) const final;
 
 private:
     const CostModelCoefficients _coefficients;

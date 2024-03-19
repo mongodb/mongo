@@ -922,7 +922,7 @@ private:
     const std::string root;
     int generation = 0;
 
-    GeneratorImplementation* clone_impl() const {
+    GeneratorImplementation* clone_impl() const override {
         return new GeneratorImplementation{*this};
     }
 
@@ -940,7 +940,7 @@ class StorageImplementation : public Interface {
 private:
     std::string store;
 
-    StorageImplementation* clone_impl() const {
+    StorageImplementation* clone_impl() const override {
         return new StorageImplementation{*this};
     }
 

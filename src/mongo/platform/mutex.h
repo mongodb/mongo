@@ -352,7 +352,7 @@ public:
     Mutex() : Mutex(defaultData()) {}
     explicit Mutex(std::shared_ptr<Data> data);
 
-    ~Mutex();
+    ~Mutex() override;
 
 private:
     void _onContendedLock() noexcept;

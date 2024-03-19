@@ -113,7 +113,7 @@ public:
         : PathMatchExpression(
               matchType, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)) {}
 
-    virtual ~LeafMatchExpression() = default;
+    ~LeafMatchExpression() override = default;
 
     size_t numChildren() const override {
         return 0;
@@ -176,15 +176,15 @@ public:
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr,
                                   const CollatorInterface* collator = nullptr);
 
-    virtual ~ComparisonMatchExpressionBase() = default;
+    ~ComparisonMatchExpressionBase() override = default;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
-    virtual void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                               const SerializationOptions& opts = {},
-                                               bool includePath = true) const;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const override;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     /**
      * Returns the name of this MatchExpression.
@@ -276,7 +276,7 @@ public:
                               clonable_ptr<ErrorAnnotation> annotation = nullptr,
                               const CollatorInterface* collator = nullptr);
 
-    virtual ~ComparisonMatchExpression() = default;
+    ~ComparisonMatchExpression() override = default;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 };
@@ -519,7 +519,7 @@ public:
                          StringData options,
                          clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    ~RegexMatchExpression();
+    ~RegexMatchExpression() override;
 
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<RegexMatchExpression> e =
@@ -538,7 +538,7 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
@@ -548,7 +548,7 @@ public:
 
     void shortDebugString(StringBuilder& debug) const;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     const std::string& getString() const {
         return _regex;
@@ -622,13 +622,13 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     long long getDivisor() const {
         return _divisor;
@@ -680,7 +680,7 @@ public:
     explicit ExistsMatchExpression(boost::optional<StringData> path,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<ExistsMatchExpression> e =
             std::make_unique<ExistsMatchExpression>(path(), _errorAnnotation);
         if (getTag()) {
@@ -691,13 +691,13 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -731,18 +731,18 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     /**
      * 'collator' must outlive the InMatchExpression and any clones made of it.
      */
-    virtual void _doSetCollator(const CollatorInterface* collator);
+    void _doSetCollator(const CollatorInterface* collator) override;
 
     const std::vector<BSONElement>& getEqualities() const {
         return _equalities->getElements();
@@ -895,17 +895,17 @@ public:
                                     const char* bitMaskBinary,
                                     uint32_t bitMaskLen,
                                     clonable_ptr<ErrorAnnotation> annotation);
-    virtual ~BitTestMatchExpression() {}
+    ~BitTestMatchExpression() override {}
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
+    void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     size_t numBitPositions() const {
         return _bitPositions.size();

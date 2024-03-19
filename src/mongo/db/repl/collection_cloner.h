@@ -109,7 +109,7 @@ public:
                      StorageInterface* storageInterface,
                      ThreadPool* dbPool);
 
-    virtual ~CollectionCloner() = default;
+    ~CollectionCloner() override = default;
 
     /**
      * Waits for any database work to finish or fail.

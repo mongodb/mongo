@@ -269,11 +269,11 @@ public:
     explicit WiredTigerSessionSweeper(WiredTigerSessionCache* sessionCache)
         : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
 
-    virtual string name() const {
+    string name() const override {
         return "WTIdleSessionSweeper";
     }
 
-    virtual void run() {
+    void run() override {
         ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
         // TODO(SERVER-74657): Please revisit if this thread could be made killable.
@@ -1115,15 +1115,15 @@ public:
           _path(path),
           _wtBackup(wtBackup){};
 
-    ~StreamingCursorImpl() = default;
+    ~StreamingCursorImpl() override = default;
 
-    void setCatalogEntries(
-        stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> identsToNsAndUUID) {
+    void setCatalogEntries(stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>
+                               identsToNsAndUUID) override {
         _identsToNsAndUUID = std::move(identsToNsAndUUID);
     }
 
     StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
-                                                     const std::size_t batchSize) {
+                                                     const std::size_t batchSize) override {
         int wtRet = 0;
         std::deque<BackupBlock> backupBlocks;
 

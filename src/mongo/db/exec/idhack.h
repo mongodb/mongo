@@ -69,7 +69,7 @@ public:
                 VariantCollectionPtrOrAcquisition collection,
                 const IndexDescriptor* descriptor);
 
-    ~IDHackStage();
+    ~IDHackStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
@@ -81,7 +81,7 @@ public:
         return STAGE_IDHACK;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() override;
 
     const SpecificStats* getSpecificStats() const final;
 

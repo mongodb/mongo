@@ -127,7 +127,7 @@ public:
                               << NamespaceStringUtil::serialize(
                                      originalNss(), SerializationContext::stateDefault()))) {}
 
-    ~CreateCollectionCoordinatorLegacy() = default;
+    ~CreateCollectionCoordinatorLegacy() override = default;
 
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
@@ -192,7 +192,7 @@ public:
                               << NamespaceStringUtil::serialize(
                                      originalNss(), SerializationContext::stateDefault()))) {}
 
-    ~CreateCollectionCoordinator() = default;
+    ~CreateCollectionCoordinator() override = default;
 
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;

@@ -548,37 +548,37 @@ public:
 
     // Feed one item of input to the sorter.
     // Together, add() and done() represent the input stream.
-    void add(Key key, Value value);
+    void add(Key key, Value value) override;
 
     // Indicate that no more input will arrive.
     // Together, add() and done() represent the input stream.
-    void done() {
+    void done() override {
         invariant(!_done);
         _done = true;
     }
 
-    void restart();
+    void restart() override;
 
     // Together, state() and next() represent the output stream.
     // See BoundedSorter::State for the meaning of each case.
     using State = typename BoundedSorterInterface<Key, Value>::State;
-    State getState() const;
+    State getState() const override;
 
     // Remove and return one item of output.
     // Only valid to call when getState() == kReady.
     // Together, state() and next() represent the output stream.
-    std::pair<Key, Value> next();
+    std::pair<Key, Value> next() override;
 
     // Serialize the bound for explain output
-    Document serializeBound(const SerializationOptions& opts) const {
+    Document serializeBound(const SerializationOptions& opts) const override {
         return {makeBound.serialize(opts)};
     };
 
-    size_t limit() const {
+    size_t limit() const override {
         return _opts.limit;
     }
 
-    bool checkInput() const {
+    bool checkInput() const override {
         return _checkInput;
     }
 

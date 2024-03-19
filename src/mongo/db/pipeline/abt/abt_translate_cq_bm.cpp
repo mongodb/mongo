@@ -58,15 +58,14 @@ class CanonicalQueryABTTranslate : public BonsaiQueryBenchmarkFixture {
 public:
     CanonicalQueryABTTranslate() {}
 
-    void benchmarkPipeline(benchmark::State& state,
-                           const std::vector<BSONObj>& pipeline) override final {
+    void benchmarkPipeline(benchmark::State& state, const std::vector<BSONObj>& pipeline) final {
         state.SkipWithError("Find translation fixture cannot translate a pipeline");
         return;
     }
 
     void benchmarkQueryMatchProject(benchmark::State& state,
                                     BSONObj matchSpec,
-                                    BSONObj projectSpec) override final {
+                                    BSONObj projectSpec) final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
         auto nss = NamespaceString::createNamespaceString_forTest("test.bm");

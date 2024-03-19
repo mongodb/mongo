@@ -409,7 +409,7 @@ public:
     SharedStateBase& operator=(const SharedStateBase&) = delete;
     SharedStateBase& operator=(SharedStateBase&&) = delete;
 
-    virtual ~SharedStateBase() = default;
+    ~SharedStateBase() override = default;
 
     // Only called by future side, but may be called multiple times if waiting times out and is
     // retried.

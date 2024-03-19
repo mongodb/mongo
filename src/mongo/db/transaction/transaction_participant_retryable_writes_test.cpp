@@ -246,7 +246,7 @@ public:
 
 class TransactionParticipantRetryableWritesTest : public MockReplCoordServerFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         MockReplCoordServerFixture::setUp();
         const auto service = opCtx()->getServiceContext();
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
@@ -264,7 +264,7 @@ protected:
         opContextSession.emplace(opCtx());
     }
 
-    void tearDown() {
+    void tearDown() override {
         opContextSession.reset();
 
         MockReplCoordServerFixture::tearDown();
@@ -375,7 +375,7 @@ protected:
 class ShardTransactionParticipantRetryableWritesTest
     : public TransactionParticipantRetryableWritesTest {
 protected:
-    void setUp() {
+    void setUp() override {
         TransactionParticipantRetryableWritesTest::setUp();
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
     }

@@ -186,7 +186,7 @@ public:
 
     static const char* getName();
 
-    AccumulatorType getAccumulatorType() const {
+    AccumulatorType getAccumulatorType() const override {
         return AccumulatorType::kMinN;
     }
 
@@ -381,7 +381,7 @@ public:
 private:
     // top/bottom/topN/bottomN do NOT ignore null values, but MISSING values will be promoted to
     // null so the users see them.
-    void _processValue(const Value& val);
+    void _processValue(const Value& val) override;
 
     std::pair<Value, Value> _genKeyOutPair(const Value& val);
 

@@ -213,7 +213,7 @@ public:
                                     std::make_unique<repl::StorageInterfaceImpl>());
     }
 
-    void tearDown() {
+    void tearDown() override {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
         ASSERT(repairObserver->isDone());
 

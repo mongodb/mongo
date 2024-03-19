@@ -410,7 +410,7 @@ public:
         addChild(idx, std::make_unique<UpdateNode>(value));
     }
 
-    virtual Node* getChild(StringData fieldName) const override {
+    Node* getChild(StringData fieldName) const override {
         auto idx = str::parseUnsignedBase10Integer(fieldName);
         invariant(idx);
         auto it = children.find(*idx);

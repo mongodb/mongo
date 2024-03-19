@@ -1353,7 +1353,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_and") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageAndHashDeleteDuringYield>();
         add<QueryStageAndHashTwoLeaf>();
         add<QueryStageAndHashTwoLeafFirstChildLargeKeys>();

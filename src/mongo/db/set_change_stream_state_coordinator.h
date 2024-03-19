@@ -71,7 +71,7 @@ public:
 
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                  const CancellationToken& token) noexcept;
+                                  const CancellationToken& token) noexcept override;
 
     void _removeStateDocument(OperationContext* opCtx) final;
 
@@ -91,7 +91,7 @@ public:
     explicit SetChangeStreamStateCoordinatorService(ServiceContext* serviceContext)
         : repl::PrimaryOnlyService(serviceContext) {}
 
-    ~SetChangeStreamStateCoordinatorService() = default;
+    ~SetChangeStreamStateCoordinatorService() override = default;
 
     StringData getServiceName() const final;
 

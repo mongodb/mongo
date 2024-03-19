@@ -193,7 +193,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 

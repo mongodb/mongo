@@ -99,15 +99,13 @@ public:
         return kStageNameInternal.rawData();
     }
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        const SerializationOptions& opts = SerializationOptions{}) const final override;
+    void serializeToArray(std::vector<Value>& array,
+                          const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Use 'serializeToArray' above.
      */
-    Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override {
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
         MONGO_UNREACHABLE_TASSERT(7484305);
     }
 
@@ -289,7 +287,7 @@ public:
     bool optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
                            Pipeline::SourceContainer* container);
 
-    GetModPathsReturn getModifiedPaths() const final override;
+    GetModPathsReturn getModifiedPaths() const final;
 
     DepsTracker getRestPipelineDependencies(Pipeline::SourceContainer::iterator itr,
                                             Pipeline::SourceContainer* container,

@@ -285,12 +285,13 @@ class BSONExtractorImpl : public BSONCellExtractor {
 public:
     BSONExtractorImpl(std::vector<CellBlock::PathRequest> pathReqs);
 
-    std::vector<std::unique_ptr<CellBlock>> extractFromBsons(const std::vector<BSONObj>& bsons);
+    std::vector<std::unique_ptr<CellBlock>> extractFromBsons(
+        const std::vector<BSONObj>& bsons) override;
 
     std::vector<std::unique_ptr<CellBlock>> extractFromTopLevelField(
         StringData topLevelField,
         const std::span<const TypeTags>& tags,
-        const std::span<const Value>& vals);
+        const std::span<const Value>& vals) override;
 
     BsonWalkNode* getRoot() {
         return &_root;

@@ -4378,7 +4378,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
 class BulkWriteExecTest : public ShardingTestFixture {
 public:
     BulkWriteExecTest() = default;
-    ~BulkWriteExecTest() = default;
+    ~BulkWriteExecTest() override = default;
 
     const ShardId kShardIdA = ShardId("shardA");
     const ShardId kShardIdB = ShardId("shardB");

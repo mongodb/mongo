@@ -953,7 +953,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_merge_sort_test") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageMergeSortPrefixIndex>();
         add<QueryStageMergeSortDups>();
         add<QueryStageMergeSortDupsNoDedup>();

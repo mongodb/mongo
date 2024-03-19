@@ -428,8 +428,8 @@ public:
 
 /** $add without operands. */
 class NoOperands : public ExpectedResultBase {
-    void populateOperands(intrusive_ptr<ExpressionNary>& expression) {}
-    virtual BSONObj expectedResult() {
+    void populateOperands(intrusive_ptr<ExpressionNary>& expression) override {}
+    BSONObj expectedResult() override {
         return BSON("" << 0);
     }
 };
@@ -457,10 +457,10 @@ public:
 };
 
 class SingleOperandBase : public ExpectedResultBase {
-    void populateOperands(intrusive_ptr<ExpressionNary>& expression) {
+    void populateOperands(intrusive_ptr<ExpressionNary>& expression) override {
         expression->addOperand(ExpressionConstant::create(&expCtx, valueFromBson(operand())));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return operand();
     }
 
@@ -471,48 +471,48 @@ protected:
 
 /** Single int argument. */
 class Int : public SingleOperandBase {
-    BSONObj operand() {
+    BSONObj operand() override {
         return BSON("" << 1);
     }
 };
 
 /** Single long argument. */
 class Long : public SingleOperandBase {
-    BSONObj operand() {
+    BSONObj operand() override {
         return BSON("" << 5555LL);
     }
 };
 
 /** Single double argument. */
 class Double : public SingleOperandBase {
-    BSONObj operand() {
+    BSONObj operand() override {
         return BSON("" << 99.99);
     }
 };
 
 /** Single Date argument. */
 class Date : public SingleOperandBase {
-    BSONObj operand() {
+    BSONObj operand() override {
         return BSON("" << Date_t::fromMillisSinceEpoch(12345));
     }
 };
 
 /** Single null argument. */
 class Null : public SingleOperandBase {
-    BSONObj operand() {
+    BSONObj operand() override {
         return BSON("" << BSONNULL);
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << BSONNULL);
     }
 };
 
 /** Single undefined argument. */
 class Undefined : public SingleOperandBase {
-    BSONObj operand() {
+    BSONObj operand() override {
         return fromjson("{'':undefined}");
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << BSONNULL);
     }
 };
@@ -528,7 +528,7 @@ public:
     }
 
 protected:
-    void populateOperands(intrusive_ptr<ExpressionNary>& expression) {
+    void populateOperands(intrusive_ptr<ExpressionNary>& expression) override {
         auto expCtx = ExpressionContextForTest{};
         expression->addOperand(
             ExpressionConstant::create(&expCtx, valueFromBson(_reverse ? operand2() : operand1())));
@@ -544,52 +544,52 @@ private:
 
 /** Add two ints. */
 class IntInt : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 1);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << 5);
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 6);
     }
 };
 
 /** Adding two large ints produces a long, not an overflowed int. */
 class IntIntNoOverflow : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << numeric_limits<int>::max());
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << numeric_limits<int>::max());
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << ((long long)(numeric_limits<int>::max()) + numeric_limits<int>::max()));
     }
 };
 
 /** Adding an int and a long produces a long. */
 class IntLong : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 1);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << 9LL);
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 10LL);
     }
 };
 
 /** Adding an int and a long produces a double. */
 class IntLongOverflowToDouble : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << numeric_limits<int>::max());
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << numeric_limits<long long>::max());
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         // When the result cannot be represented in a NumberLong, a NumberDouble is returned.
         const auto im = numeric_limits<int>::max();
         const auto llm = numeric_limits<long long>::max();
@@ -600,52 +600,52 @@ class IntLongOverflowToDouble : public TwoOperandBase {
 
 /** Adding an int and a double produces a double. */
 class IntDouble : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 9);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << 1.1);
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 10.1);
     }
 };
 
 /** Adding an int and a Date produces a Date. */
 class IntDate : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 6);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << Date_t::fromMillisSinceEpoch(123450));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << Date_t::fromMillisSinceEpoch(123456));
     }
 };
 
 /** Adding a long and a double produces a double. */
 class LongDouble : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 9LL);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << 1.1);
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 10.1);
     }
 };
 
 /** Adding a long and a double does not overflow. */
 class LongDoubleNoOverflow : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << numeric_limits<long long>::max());
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << double(numeric_limits<long long>::max()));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << static_cast<double>(numeric_limits<long long>::max()) +
                         static_cast<double>(numeric_limits<long long>::max()));
     }
@@ -653,26 +653,26 @@ class LongDoubleNoOverflow : public TwoOperandBase {
 
 /** Adding an int and null. */
 class IntNull : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 1);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return BSON("" << BSONNULL);
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << BSONNULL);
     }
 };
 
 /** Adding a long and undefined. */
 class LongUndefined : public TwoOperandBase {
-    BSONObj operand1() {
+    BSONObj operand1() override {
         return BSON("" << 5LL);
     }
-    BSONObj operand2() {
+    BSONObj operand2() override {
         return fromjson("{'':undefined}");
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << BSONNULL);
     }
 };
@@ -1845,7 +1845,7 @@ private:
 };
 
 class Same : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << DOC_ARRAY(1 << 2)) << "expected"
                            << DOC("$setIsSubset" << true << "$setEquals" << true
                                                  << "$setIntersection" << DOC_ARRAY(1 << 2)
@@ -1855,7 +1855,7 @@ class Same : public ExpectedResultBase {
 };
 
 class Redundant : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << DOC_ARRAY(1 << 2 << 2)) << "expected"
                            << DOC("$setIsSubset" << true << "$setEquals" << true
                                                  << "$setIntersection" << DOC_ARRAY(1 << 2)
@@ -1865,7 +1865,7 @@ class Redundant : public ExpectedResultBase {
 };
 
 class DoubleRedundant : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC(
             "input" << DOC_ARRAY(DOC_ARRAY(1 << 1 << 2) << DOC_ARRAY(1 << 2 << 2)) << "expected"
                     << DOC("$setIsSubset" << true << "$setEquals" << true << "$setIntersection"
@@ -1875,7 +1875,7 @@ class DoubleRedundant : public ExpectedResultBase {
 };
 
 class Super : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << DOC_ARRAY(1)) << "expected"
                            << DOC("$setIsSubset" << false << "$setEquals" << false
                                                  << "$setIntersection" << DOC_ARRAY(1)
@@ -1885,7 +1885,7 @@ class Super : public ExpectedResultBase {
 };
 
 class SuperWithRedundant : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2 << 2) << DOC_ARRAY(1)) << "expected"
                            << DOC("$setIsSubset" << false << "$setEquals" << false
                                                  << "$setIntersection" << DOC_ARRAY(1)
@@ -1895,7 +1895,7 @@ class SuperWithRedundant : public ExpectedResultBase {
 };
 
 class Sub : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1) << DOC_ARRAY(1 << 2)) << "expected"
                            << DOC("$setIsSubset" << true << "$setEquals" << false
                                                  << "$setIntersection" << DOC_ARRAY(1)
@@ -1905,7 +1905,7 @@ class Sub : public ExpectedResultBase {
 };
 
 class SameBackwards : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << DOC_ARRAY(2 << 1)) << "expected"
                            << DOC("$setIsSubset" << true << "$setEquals" << true
                                                  << "$setIntersection" << DOC_ARRAY(1 << 2)
@@ -1915,7 +1915,7 @@ class SameBackwards : public ExpectedResultBase {
 };
 
 class NoOverlap : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << DOC_ARRAY(8 << 4)) << "expected"
                            << DOC("$setIsSubset" << false << "$setEquals" << false
                                                  << "$setIntersection" << vector<Value>()
@@ -1925,7 +1925,7 @@ class NoOverlap : public ExpectedResultBase {
 };
 
 class Overlap : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << DOC_ARRAY(8 << 2 << 4)) << "expected"
                            << DOC("$setIsSubset" << false << "$setEquals" << false
                                                  << "$setIntersection" << DOC_ARRAY(2)
@@ -1935,7 +1935,7 @@ class Overlap : public ExpectedResultBase {
 };
 
 class LastNull : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << Value(BSONNULL)) << "expected"
                            << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                      << "$setDifference" << BSONNULL)
@@ -1946,7 +1946,7 @@ class LastNull : public ExpectedResultBase {
 };
 
 class FirstNull : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(Value(BSONNULL) << DOC_ARRAY(1 << 2)) << "expected"
                            << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                      << "$setDifference" << BSONNULL)
@@ -1957,7 +1957,7 @@ class FirstNull : public ExpectedResultBase {
 };
 
 class LeftNullAndRightEmpty : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(Value(BSONNULL) << vector<Value>()) << "expected"
                            << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                      << "$setDifference" << BSONNULL)
@@ -1968,7 +1968,7 @@ class LeftNullAndRightEmpty : public ExpectedResultBase {
 };
 
 class RightNullAndLeftEmpty : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(vector<Value>() << Value(BSONNULL)) << "expected"
                            << DOC("$setIntersection" << BSONNULL << "$setUnion" << BSONNULL
                                                      << "$setDifference" << BSONNULL)
@@ -1979,7 +1979,7 @@ class RightNullAndLeftEmpty : public ExpectedResultBase {
 };
 
 class NoArg : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC(
             "input" << vector<Value>() << "expected"
                     << DOC("$setIntersection" << vector<Value>() << "$setUnion" << vector<Value>())
@@ -1991,7 +1991,7 @@ class NoArg : public ExpectedResultBase {
 };
 
 class OneArg : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2)) << "expected"
                            << DOC("$setIntersection" << DOC_ARRAY(1 << 2) << "$setUnion"
                                                      << DOC_ARRAY(1 << 2))
@@ -2003,7 +2003,7 @@ class OneArg : public ExpectedResultBase {
 };
 
 class EmptyArg : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC(
             "input" << DOC_ARRAY(vector<Value>()) << "expected"
                     << DOC("$setIntersection" << vector<Value>() << "$setUnion" << vector<Value>())
@@ -2015,7 +2015,7 @@ class EmptyArg : public ExpectedResultBase {
 };
 
 class LeftArgEmpty : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(vector<Value>() << DOC_ARRAY(1 << 2)) << "expected"
                            << DOC("$setIntersection" << vector<Value>() << "$setUnion"
                                                      << DOC_ARRAY(1 << 2) << "$setIsSubset" << true
@@ -2025,7 +2025,7 @@ class LeftArgEmpty : public ExpectedResultBase {
 };
 
 class RightArgEmpty : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2) << vector<Value>()) << "expected"
                            << DOC("$setIntersection" << vector<Value>() << "$setUnion"
                                                      << DOC_ARRAY(1 << 2) << "$setIsSubset" << false
@@ -2035,7 +2035,7 @@ class RightArgEmpty : public ExpectedResultBase {
 };
 
 class ManyArgs : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(8 << 3)
                                         << DOC_ARRAY("asdf"_sd
                                                      << "foo"_sd)
@@ -2054,7 +2054,7 @@ class ManyArgs : public ExpectedResultBase {
 };
 
 class ManyArgsEqual : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1 << 2 << 4)
                                         << DOC_ARRAY(1 << 2 << 2 << 4) << DOC_ARRAY(4 << 1 << 2)
                                         << DOC_ARRAY(2 << 1 << 1 << 4))
@@ -2104,61 +2104,61 @@ private:
 };
 
 class NullBegin : public ExpectedResultBase {
-    string a() {
+    string a() override {
         return string("\0ab", 3);
     }
-    string b() {
+    string b() override {
         return string("\0AB", 3);
     }
-    int expectedResult() {
+    int expectedResult() override {
         return 0;
     }
 };
 
 class NullEnd : public ExpectedResultBase {
-    string a() {
+    string a() override {
         return string("ab\0", 3);
     }
-    string b() {
+    string b() override {
         return string("aB\0", 3);
     }
-    int expectedResult() {
+    int expectedResult() override {
         return 0;
     }
 };
 
 class NullMiddleLt : public ExpectedResultBase {
-    string a() {
+    string a() override {
         return string("a\0a", 3);
     }
-    string b() {
+    string b() override {
         return string("a\0B", 3);
     }
-    int expectedResult() {
+    int expectedResult() override {
         return -1;
     }
 };
 
 class NullMiddleEq : public ExpectedResultBase {
-    string a() {
+    string a() override {
         return string("a\0b", 3);
     }
-    string b() {
+    string b() override {
         return string("a\0B", 3);
     }
-    int expectedResult() {
+    int expectedResult() override {
         return 0;
     }
 };
 
 class NullMiddleGt : public ExpectedResultBase {
-    string a() {
+    string a() override {
         return string("a\0c", 3);
     }
-    string b() {
+    string b() override {
         return string("a\0B", 3);
     }
-    int expectedResult() {
+    int expectedResult() override {
         return 1;
     }
 };
@@ -2243,96 +2243,96 @@ private:
 
 /** Retrieve a full string containing a null character. */
 class FullNull : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("a\0b", 3);
     }
-    int offset() {
+    int offset() override {
         return 0;
     }
-    int length() {
+    int length() override {
         return 3;
     }
-    string expectedResult() {
+    string expectedResult() override {
         return str();
     }
 };
 
 /** Retrieve a substring beginning with a null character. */
 class BeginAtNull : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("a\0b", 3);
     }
-    int offset() {
+    int offset() override {
         return 1;
     }
-    int length() {
+    int length() override {
         return 2;
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("\0b", 2);
     }
 };
 
 /** Retrieve a substring ending with a null character. */
 class EndAtNull : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("a\0b", 3);
     }
-    int offset() {
+    int offset() override {
         return 0;
     }
-    int length() {
+    int length() override {
         return 2;
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("a\0", 2);
     }
 };
 
 /** Drop a beginning null character. */
 class DropBeginningNull : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("\0b", 2);
     }
-    int offset() {
+    int offset() override {
         return 1;
     }
-    int length() {
+    int length() override {
         return 1;
     }
-    string expectedResult() {
+    string expectedResult() override {
         return "b";
     }
 };
 
 /** Drop an ending null character. */
 class DropEndingNull : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("a\0", 2);
     }
-    int offset() {
+    int offset() override {
         return 0;
     }
-    int length() {
+    int length() override {
         return 1;
     }
-    string expectedResult() {
+    string expectedResult() override {
         return "a";
     }
 };
 
 /** When length is negative, the remainder of the string should be returned. */
 class NegativeLength : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("abcdefghij");
     }
-    int offset() {
+    int offset() override {
         return 2;
     }
-    int length() {
+    int length() override {
         return -1;
     }
-    string expectedResult() {
+    string expectedResult() override {
         return "cdefghij";
     }
 };
@@ -2766,30 +2766,30 @@ private:
 
 /** String beginning with a null character. */
 class NullBegin : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("\0aB", 3);
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("\0ab", 3);
     }
 };
 
 /** String containing a null character. */
 class NullMiddle : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("a\0B", 3);
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("a\0b", 3);
     }
 };
 
 /** String ending with a null character. */
 class NullEnd : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("aB\0", 3);
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("ab\0", 3);
     }
 };
@@ -2824,30 +2824,30 @@ private:
 
 /** String beginning with a null character. */
 class NullBegin : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("\0aB", 3);
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("\0AB", 3);
     }
 };
 
 /** String containing a null character. */
 class NullMiddle : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("a\0B", 3);
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("A\0B", 3);
     }
 };
 
 /** String ending with a null character. */
 class NullEnd : public ExpectedResultBase {
-    string str() {
+    string str() override {
         return string("aB\0", 3);
     }
-    string expectedResult() {
+    string expectedResult() override {
         return string("AB\0", 3);
     }
 };
@@ -2907,49 +2907,49 @@ private:
 };
 
 class JustFalse : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(false)) << "expected"
                            << DOC("$allElementsTrue" << false << "$anyElementTrue" << false));
     }
 };
 
 class JustTrue : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(true)) << "expected"
                            << DOC("$allElementsTrue" << true << "$anyElementTrue" << true));
     }
 };
 
 class OneTrueOneFalse : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(true << false)) << "expected"
                            << DOC("$allElementsTrue" << false << "$anyElementTrue" << true));
     }
 };
 
 class Empty : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(vector<Value>()) << "expected"
                            << DOC("$allElementsTrue" << true << "$anyElementTrue" << false));
     }
 };
 
 class TrueViaInt : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(1)) << "expected"
                            << DOC("$allElementsTrue" << true << "$anyElementTrue" << true));
     }
 };
 
 class FalseViaInt : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(DOC_ARRAY(0)) << "expected"
                            << DOC("$allElementsTrue" << false << "$anyElementTrue" << false));
     }
 };
 
 class Null : public ExpectedResultBase {
-    Document getSpec() {
+    Document getSpec() override {
         return DOC("input" << DOC_ARRAY(BSONNULL) << "error"
                            << DOC_ARRAY("$allElementsTrue"_sd
                                         << "$anyElementTrue"_sd));
@@ -3451,7 +3451,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Add::NullDocument>();
         add<Add::NoOperands>();
         add<Add::Date>();

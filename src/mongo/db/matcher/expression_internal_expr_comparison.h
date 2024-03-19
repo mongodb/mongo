@@ -83,7 +83,7 @@ public:
         invariant(_rhs.type() != BSONType::Array);
     }
 
-    virtual ~InternalExprComparisonMatchExpression() = default;
+    ~InternalExprComparisonMatchExpression() override = default;
 
     bool matchesSingleElement(const BSONElement& elem, MatchDetails* details) const final {
         // We use NonLeafArrayBehavior::kMatchSubpath traversal in

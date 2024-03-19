@@ -58,7 +58,7 @@ public:
      */
     const ArrayHistogram* getHistogram(const std::string& path) const override;
 
-    ~CollectionStatisticsMock() = default;
+    ~CollectionStatisticsMock() override = default;
 
 private:
     double _cardinality;

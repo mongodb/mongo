@@ -50,9 +50,9 @@ public:
      **/
     explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession);
 
-    virtual ~SaslPLAINClientConversation();
+    ~SaslPLAINClientConversation() override;
 
-    virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
+    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
 };
 
 }  // namespace mongo

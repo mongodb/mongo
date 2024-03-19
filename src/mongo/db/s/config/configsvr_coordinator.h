@@ -68,7 +68,7 @@ class ConfigsvrCoordinator : public repl::PrimaryOnlyService::TypedInstance<Conf
 public:
     explicit ConfigsvrCoordinator(const BSONObj& stateDoc);
 
-    ~ConfigsvrCoordinator();
+    ~ConfigsvrCoordinator() override;
 
     SharedSemiFuture<void> getCompletionFuture() {
         return _completionPromise.getFuture();
@@ -86,14 +86,14 @@ protected:
     const ConfigsvrCoordinatorId _coordId;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancellationToken& token) noexcept override final;
+                         const CancellationToken& token) noexcept final;
 
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
 
     virtual const ConfigsvrCoordinatorMetadata& metadata() const = 0;
 
-    void interrupt(Status status) noexcept override final;
+    void interrupt(Status status) noexcept final;
 
     void _removeStateDocument(OperationContext* opCtx);
 
@@ -110,7 +110,7 @@ public:
         : ConfigsvrCoordinator(stateDoc),
           _doc(StateDoc::parse(IDLParserContext("CoordinatorDocument"), stateDoc)) {}
 
-    ~ConfigsvrCoordinatorImpl() {}
+    ~ConfigsvrCoordinatorImpl() override {}
 
 protected:
     /**

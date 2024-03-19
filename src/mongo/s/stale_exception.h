@@ -91,7 +91,7 @@ public:
         return _duringOperationType;
     }
 
-    void serialize(BSONObjBuilder* bob) const;
+    void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
 private:
@@ -126,7 +126,7 @@ public:
         return _wanted;
     }
 
-    void serialize(BSONObjBuilder* bob) const;
+    void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
 private:

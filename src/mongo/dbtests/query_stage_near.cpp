@@ -143,8 +143,8 @@ public:
         _intervals.push_back(std::make_unique<MockInterval>(data, min, max));
     }
 
-    virtual std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
-                                                          WorkingSet* workingSet) final {
+    std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
+                                                  WorkingSet* workingSet) final {
         if (_pos == static_cast<int>(_intervals.size()))
             return nullptr;
 
@@ -173,9 +173,9 @@ public:
         return member->doc.value()["distance"].getDouble();
     }
 
-    virtual StageState initialize(OperationContext* opCtx,
-                                  WorkingSet* workingSet,
-                                  WorkingSetID* out) {
+    StageState initialize(OperationContext* opCtx,
+                          WorkingSet* workingSet,
+                          WorkingSetID* out) override {
         return IS_EOF;
     }
 

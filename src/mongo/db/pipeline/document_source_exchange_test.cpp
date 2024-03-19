@@ -109,7 +109,7 @@ const NamespaceString kTestNss =
 class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     std::unique_ptr<executor::TaskExecutor> _executor;
-    virtual void setUp() override {
+    void setUp() override {
         getExpCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
 
         auto net = executor::makeNetworkInterface("ExchangeTest");
@@ -122,7 +122,7 @@ protected:
         _executor->startup();
     }
 
-    virtual void tearDown() override {
+    void tearDown() override {
         _executor->shutdown();
         _executor.reset();
     }

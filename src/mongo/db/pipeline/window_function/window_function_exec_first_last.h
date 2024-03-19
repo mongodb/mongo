@@ -106,7 +106,7 @@ public:
         : WindowFunctionExecForEndpoint(
               iter, std::move(input), std::move(bounds), defaultValue, memTracker) {}
 
-    Value getNext() {
+    Value getNext() override {
         return getFirst();
     }
 };
@@ -120,7 +120,7 @@ public:
         : WindowFunctionExecForEndpoint(
               iter, std::move(input), std::move(bounds), boost::none, memTracker) {}
 
-    Value getNext() {
+    Value getNext() override {
         return getLast();
     }
 };

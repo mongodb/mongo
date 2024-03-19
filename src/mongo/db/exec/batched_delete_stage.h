@@ -123,7 +123,7 @@ public:
                        WorkingSet* ws,
                        CollectionAcquisition collection,
                        PlanStage* child);
-    ~BatchedDeleteStage();
+    ~BatchedDeleteStage() override;
 
     // Returns true when no more work can be done (there are no more deletes to commit).
     bool isEOF() final;
@@ -132,7 +132,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    StageState doWork(WorkingSetID* out);
+    StageState doWork(WorkingSetID* out) override;
 
     StageType stageType() const final {
         return STAGE_BATCHED_DELETE;

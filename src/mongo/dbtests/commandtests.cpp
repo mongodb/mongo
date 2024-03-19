@@ -343,7 +343,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("commands") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<FileMD5::Type0>();
         add<FileMD5::Type2>();
         add<FileMD5::Type2>();

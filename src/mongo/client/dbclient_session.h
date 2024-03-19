@@ -112,7 +112,7 @@ public:
                     const HandshakeValidationHook& hook,
                     const ClientAPIVersionParameters* apiParameters);
 
-    virtual ~DBClientSession() {}
+    ~DBClientSession() override {}
 
     /**
      * Connect to a Mongo database server.
@@ -164,11 +164,11 @@ public:
         _maxWireVersion = maxWireVersion;
     }
 
-    virtual int getMinWireVersion() {
+    int getMinWireVersion() override {
         return _minWireVersion;
     }
 
-    virtual int getMaxWireVersion() {
+    int getMaxWireVersion() override {
         return _maxWireVersion;
     }
 

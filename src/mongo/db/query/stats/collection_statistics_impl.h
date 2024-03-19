@@ -61,7 +61,7 @@ public:
     void addHistogram(const std::string& path,
                       std::shared_ptr<const ArrayHistogram> histogram) const override;
 
-    ~CollectionStatisticsImpl() = default;
+    ~CollectionStatisticsImpl() override = default;
 
 private:
     double _cardinality;

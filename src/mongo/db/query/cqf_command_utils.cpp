@@ -405,599 +405,598 @@ class ABTUnsupportedAggExpressionVisitor : public ExpressionConstVisitor {
 public:
     ABTUnsupportedAggExpressionVisitor() : _eligibility(BonsaiEligibility::FullyEligible) {}
 
-    void visit(const ExpressionConstant* expr) override final {
+    void visit(const ExpressionConstant* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionAbs* expr) override final {
+    void visit(const ExpressionAbs* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionAdd* expr) override final {
+    void visit(const ExpressionAdd* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionAllElementsTrue* expr) override final {
+    void visit(const ExpressionAllElementsTrue* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionAnd* expr) override final {
+    void visit(const ExpressionAnd* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionAnyElementTrue* expr) override final {
+    void visit(const ExpressionAnyElementTrue* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArray* expr) override final {
+    void visit(const ExpressionArray* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArrayElemAt* expr) override final {
+    void visit(const ExpressionArrayElemAt* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionBitAnd* expr) override final {
+    void visit(const ExpressionBitAnd* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionBitOr* expr) override final {
+    void visit(const ExpressionBitOr* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionBitXor* expr) override final {
+    void visit(const ExpressionBitXor* expr) final {
         unsupportedExpression();
     }
-    void visit(const ExpressionBitNot* expr) override final {
+    void visit(const ExpressionBitNot* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFirst* expr) override final {
+    void visit(const ExpressionFirst* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionLast* expr) override final {
+    void visit(const ExpressionLast* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionObjectToArray* expr) override final {
+    void visit(const ExpressionObjectToArray* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArrayToObject* expr) override final {
+    void visit(const ExpressionArrayToObject* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionBsonSize* expr) override final {
+    void visit(const ExpressionBsonSize* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionCeil* expr) override final {
+    void visit(const ExpressionCeil* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionCoerceToBool* expr) override final {
+    void visit(const ExpressionCoerceToBool* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionCompare* expr) override final {
+    void visit(const ExpressionCompare* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionConcat* expr) override final {
+    void visit(const ExpressionConcat* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionConcatArrays* expr) override final {
+    void visit(const ExpressionConcatArrays* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionCond* expr) override final {
+    void visit(const ExpressionCond* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateFromString* expr) override final {
+    void visit(const ExpressionDateFromString* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateFromParts* expr) override final {
+    void visit(const ExpressionDateFromParts* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateDiff* expr) override final {
+    void visit(const ExpressionDateDiff* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateToParts* expr) override final {
+    void visit(const ExpressionDateToParts* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateToString* expr) override final {
+    void visit(const ExpressionDateToString* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateTrunc* expr) override final {
+    void visit(const ExpressionDateTrunc* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDivide* expr) override final {
+    void visit(const ExpressionDivide* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionExp* expr) override final {
+    void visit(const ExpressionExp* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFieldPath* expr) override final {
+    void visit(const ExpressionFieldPath* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFilter* expr) override final {
+    void visit(const ExpressionFilter* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFloor* expr) override final {
+    void visit(const ExpressionFloor* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIfNull* expr) override final {
+    void visit(const ExpressionIfNull* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIn* expr) override final {
+    void visit(const ExpressionIn* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIndexOfArray* expr) override final {
+    void visit(const ExpressionIndexOfArray* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIndexOfBytes* expr) override final {
+    void visit(const ExpressionIndexOfBytes* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIndexOfCP* expr) override final {
+    void visit(const ExpressionIndexOfCP* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIsNumber* expr) override final {
+    void visit(const ExpressionIsNumber* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionLet* expr) override final {
+    void visit(const ExpressionLet* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionLn* expr) override final {
+    void visit(const ExpressionLn* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionLog* expr) override final {
+    void visit(const ExpressionLog* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionLog10* expr) override final {
+    void visit(const ExpressionLog10* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalFLEEqual* expr) override final {
+    void visit(const ExpressionInternalFLEEqual* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalFLEBetween* expr) override final {
+    void visit(const ExpressionInternalFLEBetween* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMap* expr) override final {
+    void visit(const ExpressionMap* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMeta* expr) override final {
+    void visit(const ExpressionMeta* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMod* expr) override final {
+    void visit(const ExpressionMod* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMultiply* expr) override final {
+    void visit(const ExpressionMultiply* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionNot* expr) override final {
+    void visit(const ExpressionNot* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionObject* expr) override final {
+    void visit(const ExpressionObject* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionOr* expr) override final {
+    void visit(const ExpressionOr* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionPow* expr) override final {
+    void visit(const ExpressionPow* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRange* expr) override final {
+    void visit(const ExpressionRange* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionReduce* expr) override final {
+    void visit(const ExpressionReduce* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionReplaceOne* expr) override final {
+    void visit(const ExpressionReplaceOne* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionReplaceAll* expr) override final {
+    void visit(const ExpressionReplaceAll* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSetDifference* expr) override final {
+    void visit(const ExpressionSetDifference* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSetEquals* expr) override final {
+    void visit(const ExpressionSetEquals* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSetIntersection* expr) override final {
+    void visit(const ExpressionSetIntersection* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSetIsSubset* expr) override final {
+    void visit(const ExpressionSetIsSubset* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSetUnion* expr) override final {
+    void visit(const ExpressionSetUnion* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSize* expr) override final {
+    void visit(const ExpressionSize* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionReverseArray* expr) override final {
+    void visit(const ExpressionReverseArray* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSortArray* expr) override final {
+    void visit(const ExpressionSortArray* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSlice* expr) override final {
+    void visit(const ExpressionSlice* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIsArray* expr) override final {
+    void visit(const ExpressionIsArray* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalFindAllValuesAtPath* expr) override final {
+    void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRound* expr) override final {
+    void visit(const ExpressionRound* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSplit* expr) override final {
+    void visit(const ExpressionSplit* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSqrt* expr) override final {
+    void visit(const ExpressionSqrt* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionStrcasecmp* expr) override final {
+    void visit(const ExpressionStrcasecmp* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSubstrBytes* expr) override final {
+    void visit(const ExpressionSubstrBytes* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSubstrCP* expr) override final {
+    void visit(const ExpressionSubstrCP* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionStrLenBytes* expr) override final {
+    void visit(const ExpressionStrLenBytes* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionBinarySize* expr) override final {
+    void visit(const ExpressionBinarySize* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionStrLenCP* expr) override final {
+    void visit(const ExpressionStrLenCP* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSubtract* expr) override final {
+    void visit(const ExpressionSubtract* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSwitch* expr) override final {
+    void visit(const ExpressionSwitch* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTestApiVersion* expr) override final {
+    void visit(const ExpressionTestApiVersion* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionToLower* expr) override final {
+    void visit(const ExpressionToLower* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionToUpper* expr) override final {
+    void visit(const ExpressionToUpper* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTrim* expr) override final {
+    void visit(const ExpressionTrim* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTrunc* expr) override final {
+    void visit(const ExpressionTrunc* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionType* expr) override final {
+    void visit(const ExpressionType* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionZip* expr) override final {
+    void visit(const ExpressionZip* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionConvert* expr) override final {
+    void visit(const ExpressionConvert* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRegexFind* expr) override final {
+    void visit(const ExpressionRegexFind* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRegexFindAll* expr) override final {
+    void visit(const ExpressionRegexFindAll* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRegexMatch* expr) override final {
+    void visit(const ExpressionRegexMatch* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionCosine* expr) override final {
+    void visit(const ExpressionCosine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSine* expr) override final {
+    void visit(const ExpressionSine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTangent* expr) override final {
+    void visit(const ExpressionTangent* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArcCosine* expr) override final {
+    void visit(const ExpressionArcCosine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArcSine* expr) override final {
+    void visit(const ExpressionArcSine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArcTangent* expr) override final {
+    void visit(const ExpressionArcTangent* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionArcTangent2* expr) override final {
+    void visit(const ExpressionArcTangent2* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHyperbolicArcTangent* expr) override final {
+    void visit(const ExpressionHyperbolicArcTangent* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHyperbolicArcCosine* expr) override final {
+    void visit(const ExpressionHyperbolicArcCosine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHyperbolicArcSine* expr) override final {
+    void visit(const ExpressionHyperbolicArcSine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHyperbolicTangent* expr) override final {
+    void visit(const ExpressionHyperbolicTangent* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHyperbolicCosine* expr) override final {
+    void visit(const ExpressionHyperbolicCosine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHyperbolicSine* expr) override final {
+    void visit(const ExpressionHyperbolicSine* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDegreesToRadians* expr) override final {
+    void visit(const ExpressionDegreesToRadians* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRadiansToDegrees* expr) override final {
+    void visit(const ExpressionRadiansToDegrees* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDayOfMonth* expr) override final {
+    void visit(const ExpressionDayOfMonth* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDayOfWeek* expr) override final {
+    void visit(const ExpressionDayOfWeek* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDayOfYear* expr) override final {
+    void visit(const ExpressionDayOfYear* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionHour* expr) override final {
+    void visit(const ExpressionHour* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMillisecond* expr) override final {
+    void visit(const ExpressionMillisecond* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMinute* expr) override final {
+    void visit(const ExpressionMinute* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionMonth* expr) override final {
+    void visit(const ExpressionMonth* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSecond* expr) override final {
+    void visit(const ExpressionSecond* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionWeek* expr) override final {
+    void visit(const ExpressionWeek* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIsoWeekYear* expr) override final {
+    void visit(const ExpressionIsoWeekYear* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIsoDayOfWeek* expr) override final {
+    void visit(const ExpressionIsoDayOfWeek* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionIsoWeek* expr) override final {
+    void visit(const ExpressionIsoWeek* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionYear* expr) override final {
+    void visit(const ExpressionYear* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) override final {
+    void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) override final {
+    void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) override final {
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) override final {
+    void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) override final {
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(
-        const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) override final {
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) override final {
+    void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTests::Testable* expr) override final {
+    void visit(const ExpressionTests::Testable* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalJsEmit* expr) override final {
+    void visit(const ExpressionInternalJsEmit* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalFindSlice* expr) override final {
+    void visit(const ExpressionInternalFindSlice* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalFindPositional* expr) override final {
+    void visit(const ExpressionInternalFindPositional* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalFindElemMatch* expr) override final {
+    void visit(const ExpressionInternalFindElemMatch* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionFunction* expr) override final {
+    void visit(const ExpressionFunction* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionRandom* expr) override final {
+    void visit(const ExpressionRandom* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionToHashedIndexKey* expr) override final {
+    void visit(const ExpressionToHashedIndexKey* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateAdd* expr) override final {
+    void visit(const ExpressionDateAdd* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionDateSubtract* expr) override final {
+    void visit(const ExpressionDateSubtract* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionSetField* expr) override final {
+    void visit(const ExpressionSetField* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionGetField* expr) override final {
+    void visit(const ExpressionGetField* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTsSecond* expr) override final {
+    void visit(const ExpressionTsSecond* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionTsIncrement* expr) override final {
+    void visit(const ExpressionTsIncrement* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalOwningShard* expr) override final {
+    void visit(const ExpressionInternalOwningShard* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalIndexKey* expr) override final {
+    void visit(const ExpressionInternalIndexKey* expr) final {
         unsupportedExpression();
     }
 
-    void visit(const ExpressionInternalKeyStringValue* expr) override final {
+    void visit(const ExpressionInternalKeyStringValue* expr) final {
         unsupportedExpression();
     }
 

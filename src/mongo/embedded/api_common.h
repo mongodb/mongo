@@ -79,13 +79,13 @@ class ExceptionForAPI : public std::exception {
 public:
     explicit ExceptionForAPI(const ErrorEnum code, std::string m)
         : _mesg(std::move(m)), _code(code) {}
-    virtual ~ExceptionForAPI() {}
+    ~ExceptionForAPI() override {}
 
     ErrorEnum statusCode() const noexcept {
         return this->_code;
     }
 
-    const char* what() const noexcept {
+    const char* what() const noexcept override {
         return this->_mesg.c_str();
     }
 

@@ -195,7 +195,7 @@ public:
         : RetryWithBackoffOnErrorCategories(b), _protocol{p} {}
 
     /** Returns true if we should retry sending SyncData given the error */
-    bool recordAndEvaluateRetry(Status status) {
+    bool recordAndEvaluateRetry(Status status) override {
         if (_protocol == MigrationProtocolEnum::kShardMerge || status.isOK()) {
             return false;
         }

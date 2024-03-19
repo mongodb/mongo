@@ -338,7 +338,7 @@ public:
     }
 
     // This is called 100 times as we scan the collection
-    void interject(CountStage&, int) {
+    void interject(CountStage&, int) override {
         insert(BSON(GENOID << "x" << 1));
     }
 };
@@ -356,7 +356,7 @@ public:
     }
 
     // At the point which this is called we are in between counting the first + second record
-    void interject(CountStage& count_stage, int interjection) {
+    void interject(CountStage& count_stage, int interjection) override {
         if (interjection == 0) {
             // At this point, our first interjection, we've counted _recordIds[0]
             // and are about to count _recordIds[1]
@@ -385,7 +385,7 @@ public:
     }
 
     // At the point which this is called we are in between the first and second record
-    void interject(CountStage& count_stage, int interjection) {
+    void interject(CountStage& count_stage, int interjection) override {
         if (interjection == 0) {
             OID id1 = _coll->docFor(&_opCtx, _recordIds[0]).value().getField("_id").OID();
             update(_recordIds[0], BSON("_id" << id1 << "x" << 100));
@@ -404,7 +404,7 @@ public:
         testCount(request, kDocuments + 1, true);  // only applies to indexed case
     }
 
-    void interject(CountStage&, int) {
+    void interject(CountStage&, int) override {
         // Should cause index to be converted to multikey
         insert(BSON(GENOID << "x" << BSON_ARRAY(1 << 2)));
     }
@@ -414,7 +414,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_count") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageCountNoChangeDuringYield>();
         add<QueryStageCountYieldWithSkip>();
         add<QueryStageCountYieldWithLimit>();

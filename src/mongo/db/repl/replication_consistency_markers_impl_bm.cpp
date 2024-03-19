@@ -119,7 +119,7 @@ public:
         return _opCtx.get();
     }
 
-    ~ReplicationConsistencyMarkersBm() {
+    ~ReplicationConsistencyMarkersBm() override {
         tearDown();
     }
 

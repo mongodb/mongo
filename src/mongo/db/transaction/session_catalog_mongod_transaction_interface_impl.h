@@ -52,7 +52,7 @@ class MongoDSessionCatalogTransactionInterfaceImpl
 
 public:
     MongoDSessionCatalogTransactionInterfaceImpl() = default;
-    virtual ~MongoDSessionCatalogTransactionInterfaceImpl() = default;
+    ~MongoDSessionCatalogTransactionInterfaceImpl() override = default;
 
     bool isTransactionPrepared(const ObservableSession& session) override;
 

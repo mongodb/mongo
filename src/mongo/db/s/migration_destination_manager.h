@@ -115,7 +115,7 @@ public:
     };
 
     MigrationDestinationManager();
-    ~MigrationDestinationManager();
+    ~MigrationDestinationManager() override;
 
     /**
      * Returns the singleton instance of the migration destination manager.
@@ -304,7 +304,7 @@ private:
     void onStepDown() final;
     void onRollback() final {}
     void onBecomeArbiter() final {}
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "MigrationDestinationManager";
     }
 

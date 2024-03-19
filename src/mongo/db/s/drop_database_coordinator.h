@@ -65,7 +65,7 @@ public:
           _dbName(nss().dbName()),
           _critSecReason(BSON("dropDatabase" << DatabaseNameUtil::serialize(
                                   _dbName, SerializationContext::stateCommandRequest()))) {}
-    ~DropDatabaseCoordinator() = default;
+    ~DropDatabaseCoordinator() override = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 

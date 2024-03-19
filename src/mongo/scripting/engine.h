@@ -239,7 +239,7 @@ class ScriptEngine : public KillOpListenerInterface {
 
 public:
     ScriptEngine();
-    virtual ~ScriptEngine() = default;
+    ~ScriptEngine() override = default;
 
     virtual Scope* newScope() {
         return createScope();

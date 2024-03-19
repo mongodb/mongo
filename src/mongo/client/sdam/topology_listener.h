@@ -110,13 +110,13 @@ public:
 
     void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
-    virtual void onServerHandshakeCompleteEvent(HelloRTT duration,
-                                                const HostAndPort& address,
-                                                BSONObj reply = BSONObj()) override;
+    void onServerHandshakeCompleteEvent(HelloRTT duration,
+                                        const HostAndPort& address,
+                                        BSONObj reply = BSONObj()) override;
 
     void onServerHandshakeFailedEvent(const HostAndPort& address,
                                       const Status& status,
-                                      BSONObj reply);
+                                      BSONObj reply) override;
 
     void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) override;
     void onServerHeartbeatFailureEvent(Status errorStatus,

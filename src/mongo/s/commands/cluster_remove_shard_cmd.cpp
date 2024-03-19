@@ -99,7 +99,7 @@ public:
                               const DatabaseName&,
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
-                              BSONObjBuilder& result) override final {
+                              BSONObjBuilder& result) final {
         const auto& request = requestParser.request();
         const ShardId target = request.getCommandParameter();
 
@@ -128,7 +128,7 @@ public:
         return true;
     }
 
-    void validateResult(const BSONObj& resultObj) override final {}
+    void validateResult(const BSONObj& resultObj) final {}
 };
 MONGO_REGISTER_COMMAND(RemoveShardCmd).forRouter();
 

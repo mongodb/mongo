@@ -178,7 +178,7 @@ public:
         }
     };
 
-    virtual ~WeakPtrRegistryList() = default;
+    ~WeakPtrRegistryList() override = default;
 
     auto add(const std::shared_ptr<T>& ptr) {
         return BaseList::add(std::weak_ptr<T>(ptr));

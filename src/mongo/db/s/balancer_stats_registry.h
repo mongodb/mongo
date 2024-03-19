@@ -94,18 +94,17 @@ public:
                                                    const UUID& collectionUUID) const;
 
 private:
-    void onSetCurrentConfig(OperationContext* opCtx) override final {}
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
-    void onBecomeArbiter() override final {}
-    void onShutdown() override final {}
-    void onRollback() override final {}
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {}
+    void onBecomeArbiter() final {}
+    void onShutdown() final {}
+    void onRollback() final {}
 
-    void onStartup(OperationContext* opCtx) override final;
-    void onStepUpComplete(OperationContext* opCtx, long long term) override final;
-    void onStepDown() override final;
-    inline std::string getServiceName() const override final {
+    void onStartup(OperationContext* opCtx) final;
+    void onStepUpComplete(OperationContext* opCtx, long long term) final;
+    void onStepDown() final;
+    inline std::string getServiceName() const final {
         return "BalancerStatsRegistry";
     }
 

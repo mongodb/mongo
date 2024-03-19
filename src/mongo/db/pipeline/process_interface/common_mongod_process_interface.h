@@ -88,7 +88,7 @@ class CommonMongodProcessInterface : public CommonProcessInterface {
 public:
     using CommonProcessInterface::CommonProcessInterface;
 
-    virtual ~CommonMongodProcessInterface() = default;
+    ~CommonMongodProcessInterface() override = default;
 
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
         repl::OpTime time) const final;
@@ -118,7 +118,7 @@ public:
                              BSONObjBuilder* builder) const final;
     Status appendQueryExecStats(OperationContext* opCtx,
                                 const NamespaceString& nss,
-                                BSONObjBuilder* builder) const final override;
+                                BSONObjBuilder* builder) const final;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
         Pipeline* pipeline,

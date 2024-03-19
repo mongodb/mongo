@@ -155,7 +155,7 @@ protected:
 
         ClonerStage(std::string name, T* cloner, ClonerRunFn stageFunc)
             : BaseClonerStage(name), _cloner(cloner), _stageFunc(stageFunc) {}
-        virtual AfterStageBehavior run() {
+        AfterStageBehavior run() override {
             return (_cloner->*_stageFunc)();
         }
 

@@ -443,7 +443,7 @@ public:
     ApplyBatchFinalizerForJournal(ReplicationCoordinator* replCoord)
         : ApplyBatchFinalizer(replCoord),
           _waiterThread{&ApplyBatchFinalizerForJournal::_run, this} {};
-    ~ApplyBatchFinalizerForJournal();
+    ~ApplyBatchFinalizerForJournal() override;
 
     void record(const OpTimeAndWallTime& newOpTimeAndWallTime) override;
 

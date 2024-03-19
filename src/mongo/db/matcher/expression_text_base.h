@@ -63,7 +63,7 @@ public:
     static const bool kDiacriticSensitiveDefault;
 
     explicit TextMatchExpressionBase(StringData path);
-    virtual ~TextMatchExpressionBase() {}
+    ~TextMatchExpressionBase() override {}
 
     /**
      * Returns a reference to the parsed text query that this TextMatchExpressionBase owns.

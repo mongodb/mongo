@@ -63,7 +63,7 @@ class MongosTopoCoordTest : public ServiceContextTest {
 public:
     MongosTopoCoordTest() = default;
 
-    virtual void setUp() {
+    void setUp() override {
         _topo = std::make_unique<MongosTopologyCoordinator>();
 
         // The fast clock is used by OperationContext::hasDeadlineExpired.
@@ -74,7 +74,7 @@ public:
             std::make_unique<SharedClockSourceAdapter>(_clkSource));
     }
 
-    virtual void tearDown() {}
+    void tearDown() override {}
 
 protected:
     /**

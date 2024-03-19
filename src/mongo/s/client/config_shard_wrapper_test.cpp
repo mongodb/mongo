@@ -62,7 +62,7 @@ class MockShard : public Shard {
 
 public:
     explicit MockShard(const ShardId& id) : Shard(id) {}
-    ~MockShard() = default;
+    ~MockShard() override = default;
 
     const ConnectionString& getConnString() const override {
         return kConfigCS;
@@ -89,11 +89,11 @@ public:
                                  const BSONObj& cmdObj) override {
         lastReadPref = readPref;
     }
-    Status runAggregation(
-        OperationContext* opCtx,
-        const AggregateCommandRequest& aggRequest,
-        std::function<bool(const std::vector<BSONObj>& batch,
-                           const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
+    Status runAggregation(OperationContext* opCtx,
+                          const AggregateCommandRequest& aggRequest,
+                          std::function<bool(const std::vector<BSONObj>& batch,
+                                             const boost::optional<BSONObj>& postBatchResumeToken)>
+                              callback) override {
         return Status::OK();
     }
 

@@ -59,7 +59,7 @@ class OplogBufferMock : public OplogBuffer {
 
 public:
     OplogBufferMock() = default;
-    virtual ~OplogBufferMock() = default;
+    ~OplogBufferMock() override = default;
 
     void startup(OperationContext*) override {
         startupCalled = true;

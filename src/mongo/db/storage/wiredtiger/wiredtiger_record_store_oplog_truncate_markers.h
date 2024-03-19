@@ -94,9 +94,9 @@ public:
     }
 
 private:
-    virtual bool _hasExcessMarkers(OperationContext* opCtx) const final;
+    bool _hasExcessMarkers(OperationContext* opCtx) const final;
 
-    virtual void _notifyNewMarkerCreation() final {
+    void _notifyNewMarkerCreation() final {
         _reclaimCv.notify_all();
     }
 

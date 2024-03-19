@@ -54,7 +54,8 @@ public:
 
 class ShardResourceYielderFactory : public ResourceYielderFactory {
 public:
-    std::unique_ptr<ResourceYielder> make(OperationContext* opCtx, StringData cmdName) const {
+    std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
+                                          StringData cmdName) const override {
         if (opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction()) {
             return TransactionParticipantResourceYielder::make(cmdName);
         } else {
@@ -65,7 +66,8 @@ public:
 
 class RouterResourceYielderFactory : public ResourceYielderFactory {
 public:
-    std::unique_ptr<ResourceYielder> make(OperationContext* opCtx, StringData cmdName) const {
+    std::unique_ptr<ResourceYielder> make(OperationContext* opCtx,
+                                          StringData cmdName) const override {
         return TransactionRouterResourceYielder::makeForRemoteCommand();
     }
 };

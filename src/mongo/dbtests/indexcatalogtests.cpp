@@ -211,7 +211,7 @@ public:
 class IndexCatalogTests : public unittest::OldStyleSuiteSpecification {
 public:
     IndexCatalogTests() : OldStyleSuiteSpecification("indexcatalogtests") {}
-    void setupTests() {
+    void setupTests() override {
         add<IndexIteratorTests>();
         add<RefreshEntry>();
     }

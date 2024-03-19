@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    virtual void modifyPipeline(std::vector<BSONObj>* pipeline) const final {
+    void modifyPipeline(std::vector<BSONObj>* pipeline) const final {
         BSONObjBuilder sortBuilder;
 
         BSONObjBuilder sortSpecBuilder(sortBuilder.subobjStart("$sort"));
@@ -79,8 +79,8 @@ private:
         pipeline->push_back(sortBuilder.obj());
     }
 
-    virtual StatusWith<CursorResponse> runAggregation(
-        OperationContext* opCtx, AggregateCommandRequest& request) const final {
+    StatusWith<CursorResponse> runAggregation(OperationContext* opCtx,
+                                              AggregateCommandRequest& request) const final {
         auto nss = request.getNamespace();
 
         BSONObjBuilder responseBuilder;

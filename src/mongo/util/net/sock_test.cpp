@@ -214,7 +214,7 @@ public:
         ASSERT_TRUE(_sockets.second);
     }
 
-    ~SocketFailPointTest() {}
+    ~SocketFailPointTest() override {}
 
     bool trySend() {
         char byte = 'x';

@@ -81,7 +81,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         // Critical to observability and diagnosability, annotate as immediate priority.
         ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kExempt);
         result.append("id", repl::instanceId);

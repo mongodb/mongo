@@ -296,7 +296,7 @@ protected:
 // Sort some small # of results in increasing order.
 class QueryStageSortInc : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 100;
     }
 
@@ -319,7 +319,7 @@ public:
 // Sort some small # of results in decreasing order.
 class QueryStageSortDec : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 100;
     }
 
@@ -343,7 +343,7 @@ public:
 template <int LIMIT>
 class QueryStageSortDecWithLimit : public QueryStageSortDec {
 public:
-    virtual int limit() const {
+    int limit() const override {
         return LIMIT;
     }
 };
@@ -351,7 +351,7 @@ public:
 // Sort a big bunch of objects.
 class QueryStageSortExt : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 10000;
     }
 
@@ -374,10 +374,10 @@ public:
 // Mutation invalidation of docs fed to sort.
 class QueryStageSortMutationInvalidation : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 2000;
     }
-    virtual int limit() const {
+    int limit() const override {
         return 10;
     }
 
@@ -509,7 +509,7 @@ public:
 // Deletion invalidation of everything fed to sort.
 class QueryStageSortDeletionInvalidation : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 2000;
     }
 
@@ -609,7 +609,7 @@ public:
 template <int LIMIT>
 class QueryStageSortDeletionInvalidationWithLimit : public QueryStageSortDeletionInvalidation {
 public:
-    virtual int limit() const {
+    int limit() const override {
         return LIMIT;
     }
 };
@@ -617,7 +617,7 @@ public:
 // Should error out if we sort with parallel arrays.
 class QueryStageSortParallelArrays : public QueryStageSortTestBase {
 public:
-    virtual int numObj() {
+    int numObj() override {
         return 100;
     }
 
@@ -691,7 +691,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_sort") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageSortInc>();
         add<QueryStageSortDec>();
         // Sort with limit has a general limiting strategy for limit > 1

@@ -327,7 +327,7 @@ public:
 
 #define ADD_BOTH(TEST) add<TEST<Matcher>>();
 
-    void setupTests() {
+    void setupTests() override {
         ADD_BOTH(Basic);
         ADD_BOTH(DoubleEqual);
         ADD_BOTH(MixedNumericEqual);

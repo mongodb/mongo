@@ -31,7 +31,7 @@ namespace detail {
 
 class ssl_category : public asio::error_category {
 public:
-    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT {
+    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT override {
         return "asio.ssl";
     }
 
@@ -43,7 +43,7 @@ public:
         return std::system_category().message(value);
     }
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    std::string message(int value) const {
+    std::string message(int value) const override {
         const char* s = ::ERR_reason_error_string(value);
         return s ? s : "asio.ssl error";
     }

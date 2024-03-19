@@ -68,7 +68,7 @@ public:
             _bob.append("startedMicros"_sd, durationCount<Microseconds>(_now()));
         }
 
-        ~BasicSpan() {
+        ~BasicSpan() override {
             _spans = boost::none;
             _bob.append("stoppedMicros"_sd, durationCount<Microseconds>(_now()));
         }
@@ -165,7 +165,7 @@ public:
                                                         << 1 << "tid" << 1));
         }
 
-        ~BasicSpan() {
+        ~BasicSpan() override {
             _spans = boost::none;
             _factory->_arrayBuilder->append(BSON("ph"
                                                  << "E"

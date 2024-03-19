@@ -53,7 +53,7 @@ public:
                           DBClientConnection* client,
                           StorageInterface* storageInterface,
                           ThreadPool* dbPool);
-    virtual ~InitialSyncBaseCloner() = default;
+    ~InitialSyncBaseCloner() override = default;
 
 protected:
     InitialSyncSharedData* getSharedData() const final {
@@ -89,7 +89,7 @@ private:
      * Checks to see if we are still within our allowed outage duration.
      * Also probes the sync source for clone-fatal conditions, such as rollback.
      */
-    void handleStageAttemptFailed(BaseClonerStage* stage, Status lastError);
+    void handleStageAttemptFailed(BaseClonerStage* stage, Status lastError) override;
 
     /**
      * Allows the initial sync fuzzer to pause cloner execution at specific points.
@@ -102,12 +102,12 @@ private:
      * string ' db: { ', followed by the stage name, followed by ': ' and the collection UUID
      * if known.
      */
-    virtual std::string describeForFuzzer(BaseClonerStage*) const = 0;
+    std::string describeForFuzzer(BaseClonerStage*) const override = 0;
 
     /**
      * Overriden to allow the BaseCloner to use the initial sync log component.
      */
-    virtual logv2::LogComponent getLogComponent() final;
+    logv2::LogComponent getLogComponent() final;
 
     // Operation that may currently be retrying.
     InitialSyncSharedData::RetryableOperation _retryableOp;

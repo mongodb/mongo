@@ -66,7 +66,7 @@ public:
                       const cascades::Memo& memo,
                       const properties::LogicalProps& logicalProps,
                       const QueryParameterMap& queryParameters,
-                      ABT::reference_type logicalNodeRef) const override final;
+                      ABT::reference_type logicalNodeRef) const final;
 
 private:
     // Selectivity hints per PartialSchemaKey.

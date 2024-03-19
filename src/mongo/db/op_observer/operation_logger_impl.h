@@ -52,7 +52,7 @@ class OperationLoggerImpl : public OperationLogger {
 
 public:
     OperationLoggerImpl() = default;
-    virtual ~OperationLoggerImpl() = default;
+    ~OperationLoggerImpl() override = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,

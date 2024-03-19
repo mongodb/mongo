@@ -66,7 +66,7 @@ public:
         return STAGE_COUNT;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() override;
 
     const SpecificStats* getSpecificStats() const final;
 

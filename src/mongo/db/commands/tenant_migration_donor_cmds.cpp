@@ -191,12 +191,12 @@ public:
         bool supportsWriteConcern() const override {
             return false;
         }
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
     };
 
-    std::string help() const {
+    std::string help() const override {
         return "Start migrating databases whose names match the specified prefix to the specified "
                "replica set.";
     }
@@ -271,7 +271,7 @@ public:
         bool supportsWriteConcern() const override {
             return false;
         }
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
     };
@@ -361,7 +361,7 @@ public:
         bool supportsWriteConcern() const override {
             return false;
         }
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
     };

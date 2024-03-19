@@ -67,7 +67,7 @@ public:
         return &_specificStats;
     }
 
-    PlanStage::StageState doWork(WorkingSetID* id);
+    PlanStage::StageState doWork(WorkingSetID* id) override;
 
 private:
     WorkingSet& _ws;

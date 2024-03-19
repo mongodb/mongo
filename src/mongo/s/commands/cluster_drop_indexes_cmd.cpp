@@ -74,7 +74,7 @@ public:
     using Request = DropIndexes;
     using Reply = DropIndexesReply;
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 

@@ -197,7 +197,7 @@ struct IndexEntry : CoreIndexInfo {
     IndexEntry& operator=(const IndexEntry&) = default;
     IndexEntry& operator=(IndexEntry&&) = default;
 
-    ~IndexEntry() {
+    ~IndexEntry() override {
         // An IndexEntry should never have both formats of multikey metadata simultaneously.
         invariant(multikeyPaths.empty() || multikeyPathSet.empty());
     }
@@ -303,7 +303,7 @@ struct ColumnIndexEntry : CoreIndexInfo {
     ColumnIndexEntry(ColumnIndexEntry&&) = default;
     ColumnIndexEntry& operator=(const ColumnIndexEntry&) = default;
     ColumnIndexEntry& operator=(ColumnIndexEntry&&) = default;
-    ~ColumnIndexEntry() = default;
+    ~ColumnIndexEntry() override = default;
 
     IndexDescriptor::IndexVersion version;
     bool unique;

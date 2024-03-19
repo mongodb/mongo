@@ -75,7 +75,7 @@ public:
 
     explicit ReshardingRecipientService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
-    ~ReshardingRecipientService() = default;
+    ~ReshardingRecipientService() override = default;
 
     class RecipientStateMachine;
 
@@ -142,7 +142,7 @@ public:
         ReshardingDataReplicationFactory dataReplicationFactory,
         ServiceContext* serviceContext);
 
-    ~RecipientStateMachine() = default;
+    ~RecipientStateMachine() override = default;
 
     /**
      *  Runs up until the recipient is in state kStrictConsistency or encountered an error.

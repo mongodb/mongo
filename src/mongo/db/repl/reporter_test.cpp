@@ -155,7 +155,7 @@ protected:
 
 class ReporterTestNoTriggerAtSetUp : public ReporterTest {
 private:
-    virtual bool triggerAtSetUp() const override;
+    bool triggerAtSetUp() const override;
 };
 
 ReporterTest::ReporterTest() {}
@@ -587,8 +587,8 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
     public:
         TaskExecutorWithFailureInScheduleWork(executor::TaskExecutor* executor)
             : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWork(
-            CallbackFn&& override) {
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWork(
+            CallbackFn&& override) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };
@@ -610,7 +610,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMak
     public:
         TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor)
             : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
             const executor::RemoteCommandRequestOnAny& request,
             const RemoteCommandOnAnyCallbackFn& cb,
             const BatonHandle& baton = nullptr) override {
@@ -639,8 +639,8 @@ TEST_F(ReporterTest, FailingToScheduleTimeoutShouldMakeReporterInactive) {
     public:
         TaskExecutorWithFailureInScheduleWorkAt(executor::TaskExecutor* executor)
             : unittest::TaskExecutorProxy(executor) {}
-        virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWorkAt(
-            Date_t when, CallbackFn&&) override {
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWorkAt(Date_t when,
+                                                                          CallbackFn&&) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };

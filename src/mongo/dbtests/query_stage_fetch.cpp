@@ -254,7 +254,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_fetch") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<FetchStageAlreadyFetched>();
         add<FetchStageFilter>();
     }

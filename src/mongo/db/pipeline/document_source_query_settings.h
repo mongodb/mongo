@@ -74,11 +74,11 @@ public:
             return true;
         }
 
-        bool isInitialSource() const {
+        bool isInitialSource() const override {
             return true;
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
 

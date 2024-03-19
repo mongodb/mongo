@@ -65,7 +65,7 @@ protected:
     explicit ReplicaSetEndpointUtilTest(Options options = {})
         : ServiceContextMongoDTest(options.useReplSettings(true)) {}
 
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         // The requirements for a mongod to be a replica set endpoint.

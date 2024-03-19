@@ -41,12 +41,12 @@ namespace {
  */
 class ReplicaSetMonitorProtocolTest : public unittest::Test {
 protected:
-    void setUp() {
+    void setUp() override {
         setGlobalServiceContext(ServiceContext::make());
         ReplicaSetMonitor::cleanup();
     }
 
-    void tearDown() {
+    void tearDown() override {
         ReplicaSetMonitor::cleanup();
         ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
     }

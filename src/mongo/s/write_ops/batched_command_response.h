@@ -209,7 +209,7 @@ public:
     MultipleErrorsOccurredInfo(BSONArray arr) : _arr(std::move(arr)) {}
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
-    void serialize(BSONObjBuilder* bob) const;
+    void serialize(BSONObjBuilder* bob) const override;
 
 private:
     BSONArray _arr;

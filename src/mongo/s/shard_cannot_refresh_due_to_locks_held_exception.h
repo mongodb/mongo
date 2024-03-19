@@ -52,7 +52,7 @@ public:
         return _nss;
     }
 
-    void serialize(BSONObjBuilder* bob) const;
+    void serialize(BSONObjBuilder* bob) const override;
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 

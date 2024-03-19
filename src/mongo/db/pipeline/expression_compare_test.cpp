@@ -115,13 +115,13 @@ protected:
 };
 
 class FieldRangeOptimize : public OptimizeBase {
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return spec();
     }
 };
 
 class NoOptimize : public OptimizeBase {
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return spec();
     }
 };
@@ -146,23 +146,23 @@ public:
     }
 
 protected:
-    virtual BSONObj spec() = 0;
+    BSONObj spec() override = 0;
     virtual BSONObj expectedResult() = 0;
 
 private:
-    virtual BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << expectedResult().firstElement());
     }
 };
 
 class ExpectedTrue : public ExpectedResultBase {
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << true);
     }
 };
 
 class ExpectedFalse : public ExpectedResultBase {
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << false);
     }
 };
@@ -184,188 +184,188 @@ protected:
 
 /** $eq with first < second. */
 class EqLt : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $eq with first == second. */
 class EqEq : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1 << 1));
     }
 };
 
 /** $eq with first > second. */
 class EqGt : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1 << 0));
     }
 };
 
 /** $ne with first < second. */
 class NeLt : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$ne" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $ne with first == second. */
 class NeEq : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$ne" << BSON_ARRAY(1 << 1));
     }
 };
 
 /** $ne with first > second. */
 class NeGt : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$ne" << BSON_ARRAY(1 << 0));
     }
 };
 
 /** $gt with first < second. */
 class GtLt : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gt" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $gt with first == second. */
 class GtEq : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gt" << BSON_ARRAY(1 << 1));
     }
 };
 
 /** $gt with first > second. */
 class GtGt : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gt" << BSON_ARRAY(1 << 0));
     }
 };
 
 /** $gte with first < second. */
 class GteLt : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gte" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $gte with first == second. */
 class GteEq : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gte" << BSON_ARRAY(1 << 1));
     }
 };
 
 /** $gte with first > second. */
 class GteGt : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gte" << BSON_ARRAY(1 << 0));
     }
 };
 
 /** $lt with first < second. */
 class LtLt : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lt" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $lt with first == second. */
 class LtEq : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lt" << BSON_ARRAY(1 << 1));
     }
 };
 
 /** $lt with first > second. */
 class LtGt : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lt" << BSON_ARRAY(1 << 0));
     }
 };
 
 /** $lte with first < second. */
 class LteLt : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lte" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $lte with first == second. */
 class LteEq : public ExpectedTrue {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lte" << BSON_ARRAY(1 << 1));
     }
 };
 
 /** $lte with first > second. */
 class LteGt : public ExpectedFalse {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lte" << BSON_ARRAY(1 << 0));
     }
 };
 
 /** $cmp with first < second. */
 class CmpLt : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$cmp" << BSON_ARRAY(1 << 2));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << -1);
     }
 };
 
 /** $cmp with first == second. */
 class CmpEq : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$cmp" << BSON_ARRAY(1 << 1));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 0);
     }
 };
 
 /** $cmp with first > second. */
 class CmpGt : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$cmp" << BSON_ARRAY(1 << 0));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 1);
     }
 };
 
 /** $cmp results are bracketed to an absolute value of 1. */
 class CmpBracketed : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$cmp" << BSON_ARRAY("z"
                                          << "a"));
     }
-    BSONObj expectedResult() {
+    BSONObj expectedResult() override {
         return BSON("" << 1);
     }
 };
 
 /** Zero operands provided. */
 class ZeroOperands : public ParseError {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$ne" << BSONArray());
     }
 };
 
 /** One operand provided. */
 class OneOperand : public ParseError {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1));
     }
 };
 
 /** Three operands provided. */
 class ThreeOperands : public ParseError {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gt" << BSON_ARRAY(2 << 3 << 4));
     }
 };
@@ -388,31 +388,31 @@ public:
  * ExpressionNary::optimize().
  */
 class OptimizeConstants : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1 << 1));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << true);
     }
 };
 
 /** $cmp is not optimized. */
 class NoOptimizeCmp : public NoOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$cmp" << BSON_ARRAY(1 << "$a"));
     }
 };
 
 /** $ne is not optimized. */
 class NoOptimizeNe : public NoOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$ne" << BSON_ARRAY(1 << "$a"));
     }
 };
 
 /** No optimization is performend without a constant. */
 class NoOptimizeNoConstant : public NoOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$ne" << BSON_ARRAY("$a"
                                         << "$b"));
     }
@@ -420,84 +420,84 @@ class NoOptimizeNoConstant : public NoOptimize {
 
 /** No optimization is performend without an immediate field path. */
 class NoOptimizeWithoutFieldPath : public NoOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(BSON("$and" << BSON_ARRAY("$a")) << 1));
     }
 };
 
 /** No optimization is performend without an immediate field path. */
 class NoOptimizeWithoutFieldPathReverse : public NoOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1 << BSON("$and" << BSON_ARRAY("$a"))));
     }
 };
 
 /** An equality expression is optimized. */
 class OptimizeEq : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY("$a" << 1));
     }
 };
 
 /** A reverse sense equality expression is optimized. */
 class OptimizeEqReverse : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$eq" << BSON_ARRAY(1 << "$a"));
     }
 };
 
 /** A $lt expression is optimized. */
 class OptimizeLt : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lt" << BSON_ARRAY("$a" << 1));
     }
 };
 
 /** A reverse sense $lt expression is optimized. */
 class OptimizeLtReverse : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lt" << BSON_ARRAY(1 << "$a"));
     }
 };
 
 /** A $lte expression is optimized. */
 class OptimizeLte : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lte" << BSON_ARRAY("$b" << 2));
     }
 };
 
 /** A reverse sense $lte expression is optimized. */
 class OptimizeLteReverse : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$lte" << BSON_ARRAY(2 << "$b"));
     }
 };
 
 /** A $gt expression is optimized. */
 class OptimizeGt : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gt" << BSON_ARRAY("$b" << 2));
     }
 };
 
 /** A reverse sense $gt expression is optimized. */
 class OptimizeGtReverse : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gt" << BSON_ARRAY(2 << "$b"));
     }
 };
 
 /** A $gte expression is optimized. */
 class OptimizeGte : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gte" << BSON_ARRAY("$b" << 2));
     }
 };
 
 /** A reverse sense $gte expression is optimized. */
 class OptimizeGteReverse : public FieldRangeOptimize {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$gte" << BSON_ARRAY(2 << "$b"));
     }
 };
@@ -508,7 +508,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Compare::EqLt>();
         add<Compare::EqEq>();
         add<Compare::EqGt>();

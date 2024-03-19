@@ -144,10 +144,10 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::vector<double> baseSeries,
         std::string name);
-    Value roundUp(Value value);
-    Value roundDown(Value value);
+    Value roundUp(Value value) override;
+    Value roundDown(Value value) override;
 
-    std::string getName();
+    std::string getName() override;
 
     /**
      * Returns a vector that represents the preferred number series that this
@@ -175,9 +175,9 @@ class GranularityRounderPowersOfTwo final : public GranularityRounder {
 public:
     static boost::intrusive_ptr<GranularityRounder> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
-    Value roundUp(Value value);
-    Value roundDown(Value value);
-    std::string getName();
+    Value roundUp(Value value) override;
+    Value roundDown(Value value) override;
+    std::string getName() override;
 
 private:
     GranularityRounderPowersOfTwo(const boost::intrusive_ptr<ExpressionContext>& expCtx)

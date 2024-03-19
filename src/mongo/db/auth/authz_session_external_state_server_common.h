@@ -45,11 +45,11 @@ class AuthzSessionExternalStateServerCommon : public AuthzSessionExternalState {
         delete;
 
 public:
-    virtual ~AuthzSessionExternalStateServerCommon();
+    ~AuthzSessionExternalStateServerCommon() override;
 
-    virtual bool shouldAllowLocalhost() const;
-    virtual bool shouldIgnoreAuthChecks() const;
-    virtual bool serverIsArbiter() const;
+    bool shouldAllowLocalhost() const override;
+    bool shouldIgnoreAuthChecks() const override;
+    bool serverIsArbiter() const override;
 
 protected:
     AuthzSessionExternalStateServerCommon(AuthorizationManager* authzManager);

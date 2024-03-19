@@ -57,11 +57,12 @@ public:
         return _validateFunc(remoteHost, request, helloReply);
     }
 
-    StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(const HostAndPort& remoteHost) {
+    StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(
+        const HostAndPort& remoteHost) override {
         return _requestFunc(remoteHost);
     }
 
-    Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
+    Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) override {
         return _replyFunc(remoteHost, std::move(response));
     }
 

@@ -60,7 +60,7 @@ public:
                      ScopedCollectionFilter collectionFilter,
                      WorkingSet* ws,
                      std::unique_ptr<PlanStage> child);
-    ~ShardFilterStage();
+    ~ShardFilterStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;

@@ -60,7 +60,7 @@ ServerParameter* getServerParameter(const std::string& name) {
 
 class ResourceConsumptionMetricsTest : public ServiceContextTest {
 public:
-    void setUp() {
+    void setUp() override {
         _opCtx = makeOperationContext();
         gAggregateOperationResourceConsumptionMetrics = true;
         gDocumentUnitSizeBytes = 128;

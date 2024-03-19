@@ -64,7 +64,7 @@ public:
         return _vopts;
     }
 
-    const char* name() const {
+    const char* name() const override {
         return "external";
     }
 

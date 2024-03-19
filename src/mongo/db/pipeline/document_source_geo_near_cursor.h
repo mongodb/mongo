@@ -82,12 +82,12 @@ private:
                                 boost::optional<FieldPath> locationField,
                                 double distanceMultiplier);
 
-    ~DocumentSourceGeoNearCursor() = default;
+    ~DocumentSourceGeoNearCursor() override = default;
 
     /**
      * Transforms 'obj' into a Document, calculating the distance.
      */
-    Document transformDoc(Document&& obj) const override final;
+    Document transformDoc(Document&& obj) const final;
 
     // The output field in which to store the computed distance.
     FieldPath _distanceField;

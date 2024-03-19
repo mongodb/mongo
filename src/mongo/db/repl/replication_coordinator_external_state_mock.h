@@ -73,54 +73,54 @@ public:
     class GlobalSharedLockAcquirer;
 
     ReplicationCoordinatorExternalStateMock();
-    virtual ~ReplicationCoordinatorExternalStateMock();
-    virtual void startThreads() override;
-    virtual void startSteadyStateReplication(OperationContext* opCtx,
-                                             ReplicationCoordinator* replCoord) override;
-    virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
+    ~ReplicationCoordinatorExternalStateMock() override;
+    void startThreads() override;
+    void startSteadyStateReplication(OperationContext* opCtx,
+                                     ReplicationCoordinator* replCoord) override;
+    bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
-    virtual void shutdown(OperationContext* opCtx);
-    virtual executor::TaskExecutor* getTaskExecutor() const override;
-    virtual std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
-    virtual ThreadPool* getDbWorkThreadPool() const override;
-    virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
+    void shutdown(OperationContext* opCtx) override;
+    executor::TaskExecutor* getTaskExecutor() const override;
+    std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
+    ThreadPool* getDbWorkThreadPool() const override;
+    Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) override;
     void onDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
-    virtual void forwardSecondaryProgress(bool prioritized);
-    virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
+    void forwardSecondaryProgress(bool prioritized) override;
+    bool isSelf(const HostAndPort& host, ServiceContext* service) override;
     bool isSelfFastPath(const HostAndPort& host) final;
     bool isSelfSlowPath(const HostAndPort& host,
                         ServiceContext* service,
                         Milliseconds timeout) final;
-    virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
-    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
-    virtual Status storeLocalConfigDocument(OperationContext* opCtx,
-                                            const BSONObj& config,
-                                            bool writeOplog);
-    virtual Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
-    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
-    virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
-    virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
-    virtual Timestamp getGlobalTimestamp(ServiceContext* service);
+    HostAndPort getClientHostAndPort(const OperationContext* opCtx) override;
+    StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) override;
+    Status storeLocalConfigDocument(OperationContext* opCtx,
+                                    const BSONObj& config,
+                                    bool writeOplog) override;
+    Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
+    StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) override;
+    Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote) override;
+    void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime) override;
+    Timestamp getGlobalTimestamp(ServiceContext* service) override;
     bool oplogExists(OperationContext* opCtx) override;
-    virtual StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx);
-    virtual void closeConnections();
-    virtual void onStepDownHook();
-    virtual void signalApplierToChooseNewSyncSource();
-    virtual void stopProducer();
-    virtual void startProducerIfStopped();
+    StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx) override;
+    void closeConnections() override;
+    void onStepDownHook() override;
+    void signalApplierToChooseNewSyncSource() override;
+    void stopProducer() override;
+    void startProducerIfStopped() override;
     void notifyOtherMemberDataChanged() final;
-    virtual bool tooStale();
-    virtual void clearCommittedSnapshot();
-    virtual void updateCommittedSnapshot(const OpTime& newCommitPoint);
-    virtual void updateLastAppliedSnapshot(const OpTime& optime);
-    virtual bool snapshotsEnabled() const;
-    virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
+    bool tooStale() override;
+    void clearCommittedSnapshot() override;
+    void updateCommittedSnapshot(const OpTime& newCommitPoint) override;
+    void updateLastAppliedSnapshot(const OpTime& optime) override;
+    bool snapshotsEnabled() const override;
+    void notifyOplogMetadataWaiters(const OpTime& committedOpTime) override;
     boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
-    virtual double getElectionTimeoutOffsetLimitFraction() const;
-    virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
-    virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
+    double getElectionTimeoutOffsetLimitFraction() const override;
+    bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const override;
+    std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
+    std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
@@ -210,21 +210,21 @@ public:
     /**
      * Noop
      */
-    virtual void setupNoopWriter(Seconds waitTime);
+    void setupNoopWriter(Seconds waitTime) override;
 
     /**
      * Noop
      */
-    virtual void startNoopWriter(OpTime lastKnownOpTime);
+    void startNoopWriter(OpTime lastKnownOpTime) override;
 
     /**
      * Noop
      */
-    virtual void stopNoopWriter();
+    void stopNoopWriter() override;
 
-    virtual bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
+    bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
 
-    virtual bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
+    bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
 
     /**
      * Clear the _otherMemberDataChanged flag so we can check it later.

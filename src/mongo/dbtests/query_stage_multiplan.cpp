@@ -143,7 +143,7 @@ public:
         _client.dropCollection(nss);
     }
 
-    virtual ~QueryStageMultiPlanTest() {
+    ~QueryStageMultiPlanTest() override {
         dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns_forTest());
         _client.dropCollection(nss);
     }
@@ -768,7 +768,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
  */
 class ThrowyPlanStage : public PlanStage {
 protected:
-    StageState doWork(WorkingSetID* out) {
+    StageState doWork(WorkingSetID* out) override {
         uasserted(ErrorCodes::InternalError, "Mwahahaha! You've fallen into my trap.");
     }
 
@@ -780,10 +780,10 @@ public:
     StageType stageType() const final {
         return STAGE_UNKNOWN;
     }
-    virtual std::unique_ptr<PlanStageStats> getStats() final {
+    std::unique_ptr<PlanStageStats> getStats() final {
         return nullptr;
     }
-    virtual const SpecificStats* getSpecificStats() const final {
+    const SpecificStats* getSpecificStats() const final {
         return nullptr;
     }
 };

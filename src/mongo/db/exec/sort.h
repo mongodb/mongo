@@ -95,7 +95,7 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
 
-    std::unique_ptr<PlanStageStats> getStats() override final;
+    std::unique_ptr<PlanStageStats> getStats() final;
 
 protected:
     // Not owned by us.
@@ -124,11 +124,11 @@ public:
                      bool addSortKeyMetadata,
                      std::unique_ptr<PlanStage> child);
 
-    void spool(WorkingSetID wsid) override final;
+    void spool(WorkingSetID wsid) final;
 
-    void loadingDone() override final;
+    void loadingDone() final;
 
-    StageState unspool(WorkingSetID* out) override final;
+    StageState unspool(WorkingSetID* out) final;
 
     StageType stageType() const final {
         return STAGE_SORT_DEFAULT;
@@ -165,11 +165,11 @@ public:
                     bool addSortKeyMetadata,
                     std::unique_ptr<PlanStage> child);
 
-    virtual void spool(WorkingSetID wsid) override final;
+    void spool(WorkingSetID wsid) final;
 
-    void loadingDone() override final;
+    void loadingDone() final;
 
-    virtual StageState unspool(WorkingSetID* out) override final;
+    StageState unspool(WorkingSetID* out) final;
 
     StageType stageType() const final {
         return STAGE_SORT_SIMPLE;

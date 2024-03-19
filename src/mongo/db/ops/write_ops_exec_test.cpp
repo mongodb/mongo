@@ -406,7 +406,7 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    virtual ~OpObserverMock() {
+    ~OpObserverMock() override {
         ASSERT_FALSE(inBatch);
     }
 

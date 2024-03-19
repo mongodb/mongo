@@ -40,23 +40,23 @@ namespace mongo {
 class WatchdogMonitorMock final : public WatchdogMonitorInterface {
 public:
     WatchdogMonitorMock() = default;
-    ~WatchdogMonitorMock() = default;
+    ~WatchdogMonitorMock() override = default;
 
-    void pauseChecks();
+    void pauseChecks() override;
 
-    void unpauseChecks();
+    void unpauseChecks() override;
 
-    void start();
+    void start() override;
 
-    void setPeriod(Milliseconds duration);
+    void setPeriod(Milliseconds duration) override;
 
-    void shutdown();
+    void shutdown() override;
 
-    std::int64_t getCheckGeneration();
+    std::int64_t getCheckGeneration() override;
 
-    std::int64_t getMonitorGeneration();
+    std::int64_t getMonitorGeneration() override;
 
-    bool getShouldRunChecks_forTest();
+    bool getShouldRunChecks_forTest() override;
 
 private:
     AtomicWord<bool> _shouldRunChecks{true};

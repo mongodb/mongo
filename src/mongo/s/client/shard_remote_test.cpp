@@ -65,7 +65,7 @@ const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 
 
 class ShardRemoteTest : public ShardingTestFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         ShardingTestFixture::setUp();
 
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

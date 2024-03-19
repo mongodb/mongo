@@ -149,7 +149,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void appendStats(BSONObjBuilder&) const {
+    void appendStats(BSONObjBuilder&) const override {
         MONGO_UNREACHABLE;
     }
 };

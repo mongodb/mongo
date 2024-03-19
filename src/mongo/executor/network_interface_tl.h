@@ -91,7 +91,7 @@ public:
                        ServiceContext* ctx,
                        std::unique_ptr<NetworkConnectionHook> onConnectHook,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
-    ~NetworkInterfaceTL();
+    ~NetworkInterfaceTL() override;
 
     constexpr static Milliseconds kCancelCommandTimeout{1000};
 
@@ -258,7 +258,7 @@ private:
         CommandState(NetworkInterfaceTL* interface_,
                      RemoteCommandRequestOnAny request_,
                      const TaskExecutor::CallbackHandle& cbHandle_);
-        ~CommandState() = default;
+        ~CommandState() override = default;
 
         // Create a new CommandState in a shared_ptr
         // Prefer this over raw construction
@@ -281,7 +281,7 @@ private:
                             RemoteCommandRequestOnAny request_,
                             const TaskExecutor::CallbackHandle& cbHandle_,
                             RemoteCommandOnReplyFn&& onReply_);
-        virtual ~ExhaustCommandState() = default;
+        ~ExhaustCommandState() override = default;
 
         // Create a new ExhaustCommandState in a shared_ptr
         // Prefer this over raw construction

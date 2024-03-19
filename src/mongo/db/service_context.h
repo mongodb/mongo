@@ -467,7 +467,7 @@ public:
     static UniqueServiceContext make();
 
     ServiceContext();
-    ~ServiceContext();
+    ~ServiceContext() override;
 
     /**
      * Registers an observer of lifecycle events on Clients created by this ServiceContext.
@@ -896,7 +896,7 @@ public:
     using UniqueService = std::unique_ptr<Service, ServiceDeleter>;
     using ConstructorActionRegisterer = ConstructorActionRegistererType<Service>;
 
-    ~Service();
+    ~Service() override;
 
     /**
      * Creates a new Client object representing a client session associated with this

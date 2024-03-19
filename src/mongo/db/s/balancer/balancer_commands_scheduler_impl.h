@@ -461,7 +461,7 @@ class BalancerCommandsSchedulerImpl : public BalancerCommandsScheduler {
 public:
     BalancerCommandsSchedulerImpl();
 
-    ~BalancerCommandsSchedulerImpl();
+    ~BalancerCommandsSchedulerImpl() override;
 
     void start(OperationContext* opCtx) override;
 

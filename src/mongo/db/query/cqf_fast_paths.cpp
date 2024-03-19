@@ -73,19 +73,19 @@ class FastPathPrinter : public AbstractABTPrinter {
 public:
     FastPathPrinter(BSONObj fastPathExplain) : _explainBSON(std::move(fastPathExplain)) {}
 
-    BSONObj explainBSON() const override final {
+    BSONObj explainBSON() const final {
         return _explainBSON;
     }
 
-    BSONObj explainQueryPlannerDebug() const override final {
+    BSONObj explainQueryPlannerDebug() const final {
         return {};
     }
 
-    std::string getPlanSummary() const override final {
+    std::string getPlanSummary() const final {
         return "COLLSCAN";
     }
 
-    BSONObj getQueryParameters() const override final {
+    BSONObj getQueryParameters() const final {
         // Fast path queries don't get parameterized.
         return {};
     }
@@ -498,7 +498,7 @@ public:
         return {std::move(sbePlan), std::move(data)};
     }
 
-    virtual BSONObj generateExplain() const override {
+    BSONObj generateExplain() const override {
         return BSON("stage"
                     << "FASTPATH"
                     << "type"

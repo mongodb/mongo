@@ -78,7 +78,7 @@ public:
     Database() = default;
 
     // must call close first
-    virtual ~Database() = default;
+    ~Database() override = default;
 
     inline Database(Database&&) = delete;
     inline Database& operator=(Database&&) = delete;

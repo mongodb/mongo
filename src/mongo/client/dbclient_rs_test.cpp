@@ -98,7 +98,7 @@ public:
     }
 
 protected:
-    void setUp() {
+    void setUp() override {
         auto serviceContext = ServiceContext::make();
         setGlobalServiceContext(std::move(serviceContext));
     }
@@ -116,7 +116,7 @@ private:
  */
 class BasicRS : public DBClientRSTest {
 protected:
-    void setUp() {
+    void setUp() override {
         DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
@@ -127,7 +127,7 @@ protected:
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
     }
 
-    void tearDown() {
+    void tearDown() override {
         _replSet.reset();
 
         mongo::ScopedDbConnection::clearPool();
@@ -238,7 +238,7 @@ TEST_F(BasicRS, CommandSecondaryPreferred) {
  */
 class AllNodesDown : public DBClientRSTest {
 protected:
-    void setUp() {
+    void setUp() override {
         DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
@@ -255,7 +255,7 @@ protected:
         getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
-    void tearDown() {
+    void tearDown() override {
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
@@ -358,7 +358,7 @@ TEST_F(AllNodesDown, CommandNearest) {
  */
 class PrimaryDown : public DBClientRSTest {
 protected:
-    void setUp() {
+    void setUp() override {
         DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
@@ -370,7 +370,7 @@ protected:
         getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
-    void tearDown() {
+    void tearDown() override {
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
@@ -466,7 +466,7 @@ TEST_F(PrimaryDown, Nearest) {
  */
 class SecondaryDown : public DBClientRSTest {
 protected:
-    void setUp() {
+    void setUp() override {
         DBClientRSTest::setUp();
         ReplicaSetMonitor::cleanup();
 
@@ -479,7 +479,7 @@ protected:
         getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
-    void tearDown() {
+    void tearDown() override {
         ReplicaSetMonitor::cleanup();
         _replSet.reset();
 
@@ -576,7 +576,7 @@ TEST_F(SecondaryDown, CommandNearest) {
  */
 class TaggedFiveMemberRS : public DBClientRSTest {
 protected:
-    void setUp() {
+    void setUp() override {
         DBClientRSTest::setUp();
 
         // This shuts down the background RSMWatcher thread and prevents it from running. These
@@ -681,7 +681,7 @@ protected:
         getTopologyManager()->setTopologyDescription(_replSet->getTopologyDescription(clock()));
     }
 
-    void tearDown() {
+    void tearDown() override {
         ConnectionString::setConnectionHook(_originalConnectionHook);
         ReplicaSetMonitor::cleanup();
         _replSet.reset();

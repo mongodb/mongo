@@ -56,7 +56,7 @@ class PatternElemCmpTest : public mongo::unittest::Test {
 public:
     PatternElemCmpTest() : _doc(), _size(0) {}
 
-    virtual void setUp() {
+    void setUp() override {
         Element arr = _doc.makeElementArray("x");
         ASSERT_TRUE(arr.ok());
         ASSERT_OK(_doc.root().pushBack(arr));

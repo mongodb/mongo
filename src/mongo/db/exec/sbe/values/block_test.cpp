@@ -684,7 +684,7 @@ public:
         o._vals = {};
         o._tags = {};
     }
-    ~TestBlock() {
+    ~TestBlock() override {
         for (size_t i = 0; i < _vals.size(); ++i) {
             releaseValue(_tags[i], _vals[i]);
         }

@@ -119,11 +119,11 @@ public:
         return _opCtx;
     }
 
-    void saveState();
-    void restoreState(const RestoreContext& context);
+    void saveState() override;
+    void restoreState(const RestoreContext& context) override;
 
-    void detachFromOperationContext();
-    void reattachToOperationContext(OperationContext* opCtx);
+    void detachFromOperationContext() override;
+    void reattachToOperationContext(OperationContext* opCtx) override;
 
     ExecState getNext(BSONObj* out, RecordId* dlOut) override;
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) override;
@@ -161,11 +161,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void markAsKilled(Status killStatus);
+    void markAsKilled(Status killStatus) override;
 
-    void dispose(OperationContext* opCtx);
+    void dispose(OperationContext* opCtx) override;
 
-    void stashResult(const BSONObj& obj);
+    void stashResult(const BSONObj& obj) override;
 
     bool isMarkedAsKilled() const override {
         return !_killStatus.isOK();
@@ -203,21 +203,21 @@ public:
         return _isSaveRecoveryUnitAcrossCommandsEnabled;
     }
 
-    PlanExecutor::QueryFramework getQueryFramework() const override final {
+    PlanExecutor::QueryFramework getQueryFramework() const final {
         return _generatedByBonsai ? PlanExecutor::QueryFramework::kCQF
                                   : PlanExecutor::QueryFramework::kSBEOnly;
     }
 
-    void setReturnOwnedData(bool returnOwnedData) override final {
+    void setReturnOwnedData(bool returnOwnedData) final {
         _mustReturnOwnedBson = returnOwnedData;
     }
 
-    bool usesCollectionAcquisitions() const override final;
+    bool usesCollectionAcquisitions() const final;
 
     /**
      * For queries that have multiple executors, this can be used to differentiate between them.
      */
-    boost::optional<StringData> getExecutorType() const override final {
+    boost::optional<StringData> getExecutorType() const final {
         return CursorType_serializer(_cursorType);
     }
 

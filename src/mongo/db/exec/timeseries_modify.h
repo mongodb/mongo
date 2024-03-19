@@ -149,21 +149,21 @@ public:
                           timeseries::BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
                           std::unique_ptr<MatchExpression> originalPredicate = nullptr);
-    ~TimeseriesModifyStage();
+    ~TimeseriesModifyStage() override;
 
-    StageType stageType() const {
+    StageType stageType() const override {
         return STAGE_TIMESERIES_MODIFY;
     }
 
     bool isEOF() override;
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() override;
 
-    const SpecificStats* getSpecificStats() const {
+    const SpecificStats* getSpecificStats() const override {
         return &_specificStats;
     }
 
-    PlanStage::StageState doWork(WorkingSetID* id);
+    PlanStage::StageState doWork(WorkingSetID* id) override;
 
     bool containsDotsAndDollarsField() const {
         return _params.isUpdate && _params.updateDriver->containsDotsAndDollarsField();

@@ -87,7 +87,7 @@ public:
      * may transfer ownership of some data to returned PlanExecutor.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override final;
+        std::unique_ptr<CanonicalQuery> canonicalQuery) final;
 
 protected:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);

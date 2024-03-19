@@ -121,7 +121,7 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
     MockMongoInterface(std::vector<Document> documentsForLookup = {})
         : _documentsForLookup{std::move(documentsForLookup)} {}
 
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
         static const UUID* oplog_uuid = new UUID(UUID::gen());
         return BSON("uuid" << *oplog_uuid);
     }

@@ -225,7 +225,7 @@ public:
      */
     Status setCollectionCount(OperationContext* opCtx,
                               const NamespaceStringOrUUID& nsOrUUID,
-                              long long newCount) {
+                              long long newCount) override {
         stdx::lock_guard<Latch> lock(_mutex);
         if (_setCollectionCountStatus && _setCollectionCountStatusUUID &&
             nsOrUUID.uuid() == _setCollectionCountStatusUUID) {

@@ -48,7 +48,7 @@ public:
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    virtual void serialize(BSONObjBuilder*) const override;
+    void serialize(BSONObjBuilder*) const override;
 
     const UUID& collectionUUID() const;
     OID bucketId() const;

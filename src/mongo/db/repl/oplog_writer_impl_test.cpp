@@ -73,12 +73,12 @@ public:
 
 class JournalListenerMock : public JournalListener {
 public:
-    Token getToken(OperationContext* opCtx) {
+    Token getToken(OperationContext* opCtx) override {
         return {repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTimeAndWallTime(true),
                 false /* isPrimary */};
     }
 
-    void onDurable(const Token& token) {
+    void onDurable(const Token& token) override {
         stdx::lock_guard<Latch> lock(_mutex);
         _onDurableToken = token.first;
     }

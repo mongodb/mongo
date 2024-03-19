@@ -101,7 +101,8 @@ public:
                           "$out to a sharded collection is not allowed");
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const override {
             ActionSet actions{ActionType::insert, ActionType::remove};
             if (bypassDocumentValidation) {
                 actions.addAction(ActionType::bypassDocumentValidation);
@@ -123,9 +124,9 @@ public:
 
     ~DocumentSourceOut() override;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final override;
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Creates a new $out stage from the given arguments.
@@ -141,7 +142,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    const char* getSourceName() const final override {
+    const char* getSourceName() const final {
         return kStageName.rawData();
     }
 

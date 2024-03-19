@@ -44,7 +44,7 @@ namespace {
 class TransactionResourcesEmbeddedClientObserver : public ServiceContext::ClientObserver {
 public:
     TransactionResourcesEmbeddedClientObserver() = default;
-    ~TransactionResourcesEmbeddedClientObserver() = default;
+    ~TransactionResourcesEmbeddedClientObserver() override = default;
 
     void onCreateClient(Client* client) final {}
 

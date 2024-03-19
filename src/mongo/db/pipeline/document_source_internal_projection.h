@@ -83,7 +83,7 @@ public:
                                                      Pipeline::SourceContainer* container) final;
 
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const projection_ast::Projection& projection() const {
         return _projection;

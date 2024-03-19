@@ -72,7 +72,7 @@ class MongoURI;
 class ReplicaSetMonitorManagerNetworkConnectionHook final : public executor::NetworkConnectionHook {
 public:
     ReplicaSetMonitorManagerNetworkConnectionHook() = default;
-    virtual ~ReplicaSetMonitorManagerNetworkConnectionHook() = default;
+    ~ReplicaSetMonitorManagerNetworkConnectionHook() override = default;
 
     Status validateHost(const HostAndPort& remoteHost,
                         const BSONObj& helloRequest,

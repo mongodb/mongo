@@ -55,7 +55,7 @@ class ShardSplitDonorOpObserver final : public OpObserverNoop {
 
 public:
     ShardSplitDonorOpObserver() = default;
-    ~ShardSplitDonorOpObserver() = default;
+    ~ShardSplitDonorOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

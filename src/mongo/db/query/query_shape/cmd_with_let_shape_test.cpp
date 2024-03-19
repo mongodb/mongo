@@ -44,7 +44,7 @@ class CmdWithLetShapeTest : public unittest::Test {};
 
 struct DummyInnerComponent : public CmdSpecificShapeComponents {
     DummyInnerComponent(){};
-    void HashValue(absl::HashState state) const {}
+    void HashValue(absl::HashState state) const override {}
     size_t size() const final {
         return sizeof(*this);
     }

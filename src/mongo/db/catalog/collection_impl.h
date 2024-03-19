@@ -94,7 +94,7 @@ public:
                             std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
                             std::unique_ptr<RecordStore> recordStore);
 
-    ~CollectionImpl();
+    ~CollectionImpl() override;
 
     std::shared_ptr<Collection> clone() const final;
 
@@ -302,7 +302,7 @@ public:
      */
     bool isEmpty(OperationContext* opCtx) const final;
 
-    inline int averageObjectSize(OperationContext* opCtx) const {
+    inline int averageObjectSize(OperationContext* opCtx) const override {
         uint64_t n = numRecords(opCtx);
 
         if (n == 0)

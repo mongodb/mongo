@@ -186,13 +186,13 @@ public:
 
     InMemIterator(std::vector<Data> data) : _data(std::move(data)) {}
 
-    void openSource() {}
-    void closeSource() {}
+    void openSource() override {}
+    void closeSource() override {}
 
-    bool more() {
+    bool more() override {
         return _index < _data.size();
     }
-    Data next() {
+    Data next() override {
         Data out = std::move(_data[_index]);
         _index++;
         return out;
@@ -291,9 +291,9 @@ public:
           _afterReadChecksumCalculator(checksumVersion),
           _originalChecksum(checksum) {}
 
-    void openSource() {}
+    void openSource() override {}
 
-    void closeSource() {
+    void closeSource() override {
         // If the file iterator reads through all data objects, we can ensure non-corrupt data
         // by comparing the newly calculated checksum with the original checksum from the data
         // written to disk. Some iterators do not read back all data from the file, which prohibits
@@ -308,14 +308,14 @@ public:
         }
     }
 
-    bool more() {
+    bool more() override {
         invariant(!_startOfNewData);
         if (!_done)
             _fillBufferIfNeeded();  // may change _done
         return !_done;
     }
 
-    Data next() {
+    Data next() override {
         Key deserializedKey = nextWithDeferredValue();
         Value deserializedValue = getDeferredValue();
         return Data(std::move(deserializedKey), std::move(deserializedValue));
@@ -355,7 +355,7 @@ public:
         tasserted(ErrorCodes::NotImplemented, "current() not implemented for FileIterator");
     }
 
-    SorterRange getRange() const {
+    SorterRange getRange() const override {
         SorterRange range{
             _fileStartOffset, _fileEndOffset, static_cast<int64_t>(_originalChecksum)};
         if (_afterReadChecksumCalculator.version() != SorterChecksumVersion::v1) {
@@ -527,13 +527,13 @@ public:
         _positioned = true;
     }
 
-    ~MergeIterator() {
+    ~MergeIterator() override {
         _current.reset();
         _heap.clear();
     }
 
-    void openSource() {}
-    void closeSource() {}
+    void openSource() override {}
+    void closeSource() override {}
 
     void addSource(std::shared_ptr<Input> iter) {
         iter->openSource();
@@ -552,7 +552,7 @@ public:
         }
     }
 
-    bool more() {
+    bool more() override {
         if (_remaining > 0 && (_positioned || !_heap.empty() || _current->more()))
             return true;
 
@@ -571,7 +571,7 @@ public:
         return _current->current();
     }
 
-    Data next() {
+    Data next() override {
         invariant(_remaining);
 
         _remaining--;
@@ -867,7 +867,7 @@ public:
         });
     }
 
-    Iterator* done() {
+    Iterator* done() override {
         invariant(!std::exchange(_done, true));
 
         if (this->_iters.empty()) {
@@ -927,7 +927,7 @@ private:
         }
     }
 
-    void spill() {
+    void spill() override {
         if (_data.empty())
             return;
 
@@ -1016,7 +1016,7 @@ public:
         });
     }
 
-    Iterator* done() {
+    Iterator* done() override {
         if (_haveData) {
             if (this->_opts.moveSortedDataIntoIterator) {
                 return new InMemIterator<Key, Value>(std::move(_best));
@@ -1039,7 +1039,7 @@ public:
     void resume() override {}
 
 private:
-    void spill() {
+    void spill() override {
         invariant(false, "LimitOneSorter does not spill to disk");
     }
 
@@ -1142,7 +1142,7 @@ public:
         });
     }
 
-    Iterator* done() {
+    Iterator* done() override {
         if (this->_iters.empty()) {
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
@@ -1278,7 +1278,7 @@ private:
         }
     }
 
-    void spill() {
+    void spill() override {
         invariant(!_done);
 
         if (_data.empty())

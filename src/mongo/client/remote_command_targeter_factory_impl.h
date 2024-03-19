@@ -46,7 +46,7 @@ namespace mongo {
 class RemoteCommandTargeterFactoryImpl final : public RemoteCommandTargeterFactory {
 public:
     RemoteCommandTargeterFactoryImpl();
-    ~RemoteCommandTargeterFactoryImpl();
+    ~RemoteCommandTargeterFactoryImpl() override;
 
     std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
 };

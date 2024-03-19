@@ -59,23 +59,23 @@ public:
         invariant(timeRemainingHigh >= timeRemainingLow);
     }
 
-    virtual const UUID& getUuid() const override {
+    const UUID& getUuid() const override {
         return _uuid;
     }
 
-    virtual boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const override {
+    boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const override {
         return _timeRemainingHigh;
     }
 
-    virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const override {
+    boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const override {
         return _timeRemainingLow;
     }
 
-    virtual Date_t getStartTimestamp() const override {
+    Date_t getStartTimestamp() const override {
         return _startTime;
     }
 
-    virtual ShardingDataTransformMetrics::Role getRole() const override {
+    ShardingDataTransformMetrics::Role getRole() const override {
         return _role;
     }
 
@@ -90,11 +90,11 @@ private:
 class ShardingDataTransformCumulativeMetricsFieldNameProviderForTest
     : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
 public:
-    virtual ~ShardingDataTransformCumulativeMetricsFieldNameProviderForTest() = default;
-    virtual StringData getForDocumentsProcessed() const override {
+    ~ShardingDataTransformCumulativeMetricsFieldNameProviderForTest() override = default;
+    StringData getForDocumentsProcessed() const override {
         return "documentsProcessed";
     }
-    virtual StringData getForBytesWritten() const override {
+    StringData getForBytesWritten() const override {
         return "bytesWritten";
     }
 };

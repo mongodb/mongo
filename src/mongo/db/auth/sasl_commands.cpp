@@ -98,7 +98,7 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        Reply typedRun(OperationContext* opCtx);
+        Reply typedRun(OperationContext* opCtx) override;
     };
 
     std::string help() const final {
@@ -137,7 +137,7 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        Reply typedRun(OperationContext* opCtx);
+        Reply typedRun(OperationContext* opCtx) override;
     };
 
     std::string help() const final {

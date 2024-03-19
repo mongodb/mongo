@@ -129,7 +129,7 @@ public:
                        ThreadPool* writerPool,
                        Timestamp resumeBatchingTs = Timestamp());
 
-    virtual ~TenantOplogApplier();
+    ~TenantOplogApplier() override;
 
     /**
      * Return a future which will be notified when that optime has been reached.  Future will

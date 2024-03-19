@@ -80,7 +80,7 @@ public:
 
     static const Status ClosedStatus;
 
-    virtual ~Session();
+    ~Session() override;
 
     Id id() const {
         return _id;

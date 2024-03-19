@@ -68,15 +68,15 @@ public:
 
 class NeverRetryPolicy : public RetryPolicy {
 public:
-    bool recordAndEvaluateRetry(Status s) override final {
+    bool recordAndEvaluateRetry(Status s) final {
         return false;
     }
 
-    Milliseconds getNextRetryDelay() override final {
+    Milliseconds getNextRetryDelay() final {
         return Milliseconds::zero();
     }
 
-    BSONObj toBSON() const override final {
+    BSONObj toBSON() const final {
         return BSON("retryPolicyType"
                     << "NeverRetryPolicy");
     }
@@ -97,7 +97,7 @@ public:
     bool recordAndEvaluateRetry(Status status) override {
         return helpers::isAnyCategory<Categories...>(status);
     }
-    Milliseconds getNextRetryDelay() override final {
+    Milliseconds getNextRetryDelay() final {
         return _backoff.nextSleep();
     }
     Backoff _backoff;

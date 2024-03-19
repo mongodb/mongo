@@ -51,11 +51,11 @@ public:
         return Value(BSONNULL);
     }
 
-    void add(Value value) {
+    void add(Value value) override {
         update(std::move(value), +1);
     }
 
-    void remove(Value value) {
+    void remove(Value value) override {
         update(std::move(value), -1);
     }
 
@@ -78,7 +78,7 @@ public:
         return Value(sqrt(_m2->getValue(false).coerceToDouble() / adjustedCount));
     }
 
-    void reset() {
+    void reset() override {
         _m2->reset();
         _sum->reset();
         _memUsageTracker.set(sizeof(*this));

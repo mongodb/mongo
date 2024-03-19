@@ -61,7 +61,7 @@ class ClusterGetMoreCmdBase final : public Command {
 public:
     ClusterGetMoreCmdBase() : Command(Impl::kName) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 

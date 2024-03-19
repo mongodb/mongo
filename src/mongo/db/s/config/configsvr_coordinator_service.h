@@ -52,7 +52,7 @@ public:
     explicit ConfigsvrCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
 
-    ~ConfigsvrCoordinatorService() = default;
+    ~ConfigsvrCoordinatorService() override = default;
 
     static ConfigsvrCoordinatorService* getService(OperationContext* opCtx);
 

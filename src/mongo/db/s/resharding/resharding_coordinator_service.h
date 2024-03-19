@@ -251,7 +251,7 @@ public:
 
     explicit ReshardingCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
-    ~ReshardingCoordinatorService() = default;
+    ~ReshardingCoordinatorService() override = default;
 
     friend ReshardingCoordinator;
 
@@ -303,7 +303,7 @@ public:
         const ReshardingCoordinatorDocument& coordinatorDoc,
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
         ServiceContext* serviceContext);
-    ~ReshardingCoordinator() = default;
+    ~ReshardingCoordinator() override = default;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;

@@ -44,7 +44,7 @@ class RecordStore;
 
 class RecoveryUnitHarnessHelper : public HarnessHelper {
 public:
-    virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override = 0;
     virtual std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
                                                            const std::string& ns) = 0;
 };

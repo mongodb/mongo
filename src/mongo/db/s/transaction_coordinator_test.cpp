@@ -1203,11 +1203,11 @@ protected:
 class TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventTrue
     : public TransactionCoordinatorDecisionPersistenceTest {
 public:
-    void setUp() {
+    void setUp() override {
         _controller.emplace("featureFlagEndOfTransactionChangeEvent", true);
         TransactionCoordinatorDecisionPersistenceTest::setUp();
     }
-    void tearDown() {
+    void tearDown() override {
         TransactionCoordinatorDecisionPersistenceTest::tearDown();
         _controller.reset();
     }
@@ -1219,11 +1219,11 @@ private:
 class TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventFalse
     : public TransactionCoordinatorDecisionPersistenceTest {
 public:
-    void setUp() {
+    void setUp() override {
         _controller.emplace("featureFlagEndOfTransactionChangeEvent", false);
         TransactionCoordinatorDecisionPersistenceTest::setUp();
     }
-    void tearDown() {
+    void tearDown() override {
         TransactionCoordinatorDecisionPersistenceTest::tearDown();
         _controller.reset();
     }

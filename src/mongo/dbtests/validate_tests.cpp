@@ -4834,7 +4834,7 @@ class ValidateTests : public unittest::OldStyleSuiteSpecification {
 public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
 
-    void setupTests() {
+    void setupTests() override {
         // TODO SERVER-83593: re-enable background validation tests.
 
         // Add tests for both full validate and non-full validate.

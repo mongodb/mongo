@@ -449,7 +449,7 @@ public:
         restore();
     }
 
-    ~RandomCursor() {
+    ~RandomCursor() override {
         if (_cursor) {
             // On destruction, we must always handle freeing the underlying raw WT_CURSOR pointer.
             _saveStorageCursorOnDetachFromOperationContext = false;

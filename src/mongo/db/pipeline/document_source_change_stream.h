@@ -116,7 +116,7 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             // Change streams require "majority" readConcern. If the client did not specify an
             // explicit readConcern, change streams will internally upconvert the readConcern to
             // majority (so clients can always send aggregations without readConcern). We therefore
@@ -125,7 +125,7 @@ public:
                 kStageName, repl::ReadConcernLevel::kMajorityReadConcern, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
 
@@ -364,8 +364,7 @@ public:
           _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
                                  ActionType::internal)}) {}
 
-    PrivilegeVector requiredPrivileges(bool isMongos,
-                                       bool bypassDocumentValidation) const override final {
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
         return _privileges;
     }
 

@@ -115,7 +115,7 @@ public:
                                                std::move(observer)},
           _scopedObserver(registerInstanceMetrics()) {}
 
-    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const {
+    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override {
         return boost::none;
     }
 

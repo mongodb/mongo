@@ -47,7 +47,7 @@ public:
 
     // This is only called by a $where query.  The query system must be smart enough to realize
     // that it should do a fetch beforehand.
-    BSONObj toBSON() const {
+    BSONObj toBSON() const override {
         return _obj;
     }
 
@@ -103,7 +103,7 @@ public:
     IndexKeyMatchableDocument(const BSONObj& key, const BSONObj& keyPattern)
         : _keyPattern(keyPattern), _key(key) {}
 
-    BSONObj toBSON() const {
+    BSONObj toBSON() const override {
         return _key;
     }
 

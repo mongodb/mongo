@@ -52,7 +52,7 @@ class VectorClockMutable;
 class VectorClockTestFixture : public ShardingMongoDTestFixture {
 protected:
     VectorClockTestFixture();
-    ~VectorClockTestFixture();
+    ~VectorClockTestFixture() override;
 
     /**
      * Sets up this fixture as the primary node in a shard server replica set with a VectorClock

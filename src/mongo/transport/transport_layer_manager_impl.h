@@ -58,7 +58,7 @@ public:
                               TransportLayer* egressLayer);
     explicit TransportLayerManagerImpl(std::unique_ptr<TransportLayer> tl);
 
-    ~TransportLayerManagerImpl() = default;
+    ~TransportLayerManagerImpl() override = default;
 
     Status start() override;
     void shutdown() override;
@@ -85,7 +85,7 @@ public:
 
     static std::unique_ptr<TransportLayerManager> makeAndStartDefaultEgressTransportLayer();
 
-    virtual TransportLayer* getEgressLayer() {
+    TransportLayer* getEgressLayer() override {
         return _egressLayer;
     }
 

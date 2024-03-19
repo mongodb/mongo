@@ -136,8 +136,7 @@ public:
     void say(Message& toSend, bool isRetry, std::string* actualServer) final;
 
     using DBClientBase::runCommandWithTarget;
-    virtual std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(
-        OpMsgRequest request) final;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) final;
 
     std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> runCommandWithTarget(
         OpMsgRequest request, std::shared_ptr<DBClientBase>) final;

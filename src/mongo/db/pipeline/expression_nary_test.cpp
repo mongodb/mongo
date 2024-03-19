@@ -70,7 +70,7 @@ namespace ExpressionTests {
 /** A dummy child of ExpressionNary used for testing. */
 class Testable : public ExpressionNary {
 public:
-    virtual Value evaluate(const Document& root, Variables* variables) const {
+    Value evaluate(const Document& root, Variables* variables) const override {
         // Just put all the values in a list.
         // By default, this is not associative/commutative so the results will change if
         // instantiated as commutative or associative and operations are reordered.
@@ -80,15 +80,15 @@ public:
         return Value(values);
     }
 
-    virtual const char* getOpName() const {
+    const char* getOpName() const override {
         return "$testable";
     }
 
-    virtual Associativity getAssociativity() const {
+    Associativity getAssociativity() const override {
         return _associativity;
     }
 
-    virtual bool isCommutative() const {
+    bool isCommutative() const override {
         return _isCommutative;
     }
 
@@ -183,7 +183,7 @@ public:
 
 class ExpressionNaryTest : public unittest::Test {
 public:
-    virtual void setUp() override {
+    void setUp() override {
         _notAssociativeNorCommutative =
             Testable::create(&expCtx, ExpressionNary::Associativity::kNone, false);
         _associativeOnly = Testable::create(&expCtx, ExpressionNary::Associativity::kFull, false);
@@ -920,7 +920,7 @@ TEST_F(ExpressionTruncTwoArgTest, NullArg2) {
 
 class ExpressionSqrtTest : public ExpressionNaryTestOneArg {
 public:
-    virtual void assertEvaluates(Value input, Value output) override {
+    void assertEvaluates(Value input, Value output) override {
         _expr = new ExpressionSqrt(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
@@ -965,7 +965,7 @@ TEST_F(ExpressionSqrtTest, SqrtNaNArg) {
 
 class ExpressionExpTest : public ExpressionNaryTestOneArg {
 public:
-    virtual void assertEvaluates(Value input, Value output) override {
+    void assertEvaluates(Value input, Value output) override {
         _expr = new ExpressionExp(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
@@ -1006,7 +1006,7 @@ TEST_F(ExpressionExpTest, ExpNaNArg) {
 
 class ExpressionCeilTest : public ExpressionNaryTestOneArg {
 public:
-    virtual void assertEvaluates(Value input, Value output) override {
+    void assertEvaluates(Value input, Value output) override {
         _expr = new ExpressionCeil(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }
@@ -1064,7 +1064,7 @@ TEST_F(ExpressionCeilTest, NullArg) {
 
 class ExpressionFloorTest : public ExpressionNaryTestOneArg {
 public:
-    virtual void assertEvaluates(Value input, Value output) override {
+    void assertEvaluates(Value input, Value output) override {
         _expr = new ExpressionFloor(&expCtx);
         ExpressionNaryTestOneArg::assertEvaluates(input, output);
     }

@@ -71,13 +71,13 @@ public:
     void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
 
     // Seeking is not currently supported.
-    boost::optional<Record> seekExact(const RecordId& id) {
+    boost::optional<Record> seekExact(const RecordId& id) override {
         tasserted(6968300, "MultiBsonStreamCursor::seekExact is not supported");
         return boost::none;
     }
 
     // Seeking is not currently supported.
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
         tasserted(6968320, "MultiBsonStreamCursor::seek is not supported");
         return {};
     }

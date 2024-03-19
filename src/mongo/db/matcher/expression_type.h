@@ -84,14 +84,15 @@ public:
                               std::move(annotation)),
           _typeSet(std::move(typeSet)) {}
 
-    virtual ~TypeMatchExpressionBase() = default;
+    ~TypeMatchExpressionBase() override = default;
 
     /**
      * Returns the name of this MatchExpression.
      */
     virtual StringData name() const = 0;
 
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const {
+    bool matchesSingleElement(const BSONElement& elem,
+                              MatchDetails* details = nullptr) const override {
         return _typeSet.hasType(elem.type());
     }
 
@@ -334,7 +335,7 @@ public:
                                   typeSet,
                                   std::move(annotation)) {}
 
-    StringData name() const {
+    StringData name() const override {
         return kName;
     }
 
@@ -405,7 +406,7 @@ public:
                                   std::move(typeSet),
                                   std::move(annotation)) {}
 
-    StringData name() const {
+    StringData name() const override {
         return kName;
     }
 

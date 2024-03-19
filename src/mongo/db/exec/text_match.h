@@ -86,7 +86,7 @@ public:
                    std::unique_ptr<PlanStage> child,
                    const TextMatchParams& params,
                    WorkingSet* ws);
-    ~TextMatchStage();
+    ~TextMatchStage() override;
 
     void addChild(PlanStage* child);
 

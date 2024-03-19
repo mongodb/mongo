@@ -111,7 +111,7 @@ public:
 
 protected:
     explicit ReplCoordTest(Options options = Options{}.useMockClock(true));
-    virtual ~ReplCoordTest();
+    ~ReplCoordTest() override;
 
     /**
      * Asserts that calling start(configDoc, selfHost) successfully initiates the

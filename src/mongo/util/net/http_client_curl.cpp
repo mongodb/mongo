@@ -316,7 +316,7 @@ public:
     explicit CurlHandleTimer(ClockSource* clockSource, std::shared_ptr<AlarmScheduler> scheduler)
         : _clockSource(clockSource), _scheduler(std::move(scheduler)), _handle(nullptr) {}
 
-    virtual ~CurlHandleTimer() {
+    ~CurlHandleTimer() override {
         if (_handle) {
             _handle->cancel().ignore();
         }
@@ -445,7 +445,7 @@ public:
           _protocol(protocol) {}
 
 
-    virtual ~PooledCurlHandle() = default;
+    ~PooledCurlHandle() override = default;
 
     const HostAndPort& getHostAndPort() const final {
         return _target;

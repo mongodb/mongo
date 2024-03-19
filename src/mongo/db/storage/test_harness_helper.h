@@ -51,7 +51,7 @@ namespace mongo {
  */
 class HarnessHelper : public ScopedGlobalServiceContextForTest {
 public:
-    virtual ~HarnessHelper() = default;
+    ~HarnessHelper() override = default;
     explicit HarnessHelper()
         : _threadClient(getGlobalServiceContext()->getService(ClusterRole::ShardServer)) {}
 

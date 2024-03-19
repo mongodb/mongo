@@ -85,7 +85,7 @@ public:
     const DatabaseName kTenantDB =
         DatabaseName::createDatabaseName_forTest(boost::none, kTenantId.toString() + "_ db");
 
-    void setUp() {
+    void setUp() override {
         _opCtx = makeOperationContext();
         auto service = getServiceContext();
 
@@ -95,7 +95,7 @@ public:
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).startup();
     }
 
-    void tearDown() {
+    void tearDown() override {
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
     }
 
@@ -307,7 +307,7 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
 
 class RecoverAccessBlockerTest : public ServiceContextMongoDTest {
 public:
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
@@ -326,7 +326,7 @@ public:
         repl::createOplog(_opCtx.get());
     }
 
-    void tearDown() {
+    void tearDown() override {
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
     }
 

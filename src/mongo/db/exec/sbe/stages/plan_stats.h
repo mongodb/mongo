@@ -148,7 +148,7 @@ struct IndexScanStats final : public SpecificStats {
         return std::make_unique<IndexScanStats>(*this);
     }
 
-    uint64_t estimateObjectSizeInBytes() const {
+    uint64_t estimateObjectSizeInBytes() const override {
         return sizeof(*this);
     }
 
@@ -407,10 +407,10 @@ struct PlanStatsNumReadsVisitor : PlanStatsVisitorBase<true> {
     // To avoid overloaded-virtual warnings.
     using PlanStatsConstVisitor::visit;
 
-    void visit(tree_walker::MaybeConstPtr<true, sbe::ScanStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::ScanStats> stats) final {
         numReads += stats->numReads;
     }
-    void visit(tree_walker::MaybeConstPtr<true, sbe::IndexScanStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::IndexScanStats> stats) final {
         numReads += stats->numReads;
     }
 

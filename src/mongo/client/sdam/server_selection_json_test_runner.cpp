@@ -146,9 +146,9 @@ public:
         parseTest(testFilePath);
     }
 
-    ~JsonRttTestCase() = default;
+    ~JsonRttTestCase() override = default;
 
-    TestCaseResult execute() {
+    TestCaseResult execute() override {
         LOGV2(4333500, "### Running Test ###", "testFilePath"_attr = _testFilePath);
 
         ServerDescriptionPtr updatedServerDescription;
@@ -176,7 +176,7 @@ public:
         return result;
     }
 
-    const std::string& FilePath() const {
+    const std::string& FilePath() const override {
         return _testFilePath;
     }
 
@@ -250,9 +250,9 @@ public:
                                          testFilePath.string()};
         }
     }
-    ~JsonServerSelectionTestCase() = default;
+    ~JsonServerSelectionTestCase() override = default;
 
-    TestCaseResult execute() {
+    TestCaseResult execute() override {
         LOGV2(4333504, "### Running Test ###", "testFilePath"_attr = _testFilePath);
         if (_parseError)
             return *_parseError;
@@ -289,11 +289,11 @@ public:
         return result;
     }
 
-    const std::string& FilePath() const {
+    const std::string& FilePath() const override {
         return _testFilePath;
     }
 
-    bool errorIsExpected() {
+    bool errorIsExpected() override {
         return _errorExpected;
     }
 

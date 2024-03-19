@@ -54,7 +54,7 @@ public:
     const std::vector<HostAndPort> kHosts{HostAndPort("FakeHost1", 12345),
                                           HostAndPort("FakeHost2", 12345)};
 
-    void setUp() {
+    void setUp() override {
         auto factory = RemoteCommandTargeterFactoryMock();
         _targeter = factory.create(ConnectionString::forStandalones(kHosts));
 

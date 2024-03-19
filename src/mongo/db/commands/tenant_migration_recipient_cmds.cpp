@@ -202,12 +202,12 @@ public:
         bool supportsWriteConcern() const override {
             return false;
         }
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
     };
 
-    std::string help() const {
+    std::string help() const override {
         return "Internal replica set command; instructs the recipient to sync data as part of a "
                "tenant migration.";
     }
@@ -419,12 +419,12 @@ public:
             return false;
         }
 
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
     };
 
-    std::string help() const {
+    std::string help() const override {
         return "Interrupts tenant migration data sync and marks that the recipient's durable state "
                "machine may be garbage collected.";
     }

@@ -95,7 +95,7 @@ public:
 
     const char* getSourceName() const override;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
 protected:
     GetNextResult doGetNext() final;

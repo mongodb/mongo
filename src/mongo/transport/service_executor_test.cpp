@@ -119,7 +119,7 @@ public:
         _ioContext.stop();
     }
 
-    void drain() override final {
+    void drain() final {
         _ioContext.restart();
         while (_ioContext.poll()) {
             LOGV2_DEBUG(22984, 1, "Draining remaining work in reactor.");

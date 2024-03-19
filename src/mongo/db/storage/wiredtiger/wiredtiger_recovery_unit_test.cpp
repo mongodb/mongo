@@ -102,14 +102,14 @@ public:
         _engine.notifyStorageStartupRecoveryComplete();
     }
 
-    ~WiredTigerRecoveryUnitHarnessHelper() {}
+    ~WiredTigerRecoveryUnitHarnessHelper() override {}
 
-    virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
     }
 
-    virtual std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
-                                                           const std::string& ns) final {
+    std::unique_ptr<RecordStore> createRecordStore(OperationContext* opCtx,
+                                                   const std::string& ns) final {
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;

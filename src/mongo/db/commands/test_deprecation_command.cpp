@@ -51,11 +51,11 @@ class TestDeprecationCmd : public BasicCommand {
 public:
     TestDeprecationCmd() : BasicCommand("testDeprecation") {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
-    const std::set<std::string>& deprecatedApiVersions() const {
+    const std::set<std::string>& deprecatedApiVersions() const override {
         return kApiVersions1;
     }
 

@@ -50,29 +50,28 @@ class ClusterServerParameterInitializer
 
 public:
     ClusterServerParameterInitializer() = default;
-    ~ClusterServerParameterInitializer() = default;
+    ~ClusterServerParameterInitializer() override = default;
 
     static ClusterServerParameterInitializer* get(OperationContext* opCtx);
     static ClusterServerParameterInitializer* get(ServiceContext* serviceContext);
 
     // Virtual methods coming from the ReplicaSetAwareService
-    void onStartup(OperationContext* opCtx) override final {}
+    void onStartup(OperationContext* opCtx) final {}
 
-    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
 
     static void synchronizeAllParametersFromDisk(OperationContext* opCtx);
     /**
      * Called after startup recovery or initial sync is complete.
      */
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final;
-    void onShutdown() override final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
-    void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
-    void onStepDown() override final {}
-    void onRollback() override final {}
-    void onBecomeArbiter() override final {}
-    inline std::string getServiceName() const override final {
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final;
+    void onShutdown() final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {}
+    void onStepDown() final {}
+    void onRollback() final {}
+    void onBecomeArbiter() final {}
+    inline std::string getServiceName() const final {
         return "ClusterServerParameterInitializer";
     }
 };

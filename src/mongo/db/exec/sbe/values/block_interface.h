@@ -344,7 +344,7 @@ public:
         o._val = 0;
     }
 
-    ~MonoBlock() {
+    ~MonoBlock() override {
         releaseValue(_tag, _val);
     }
 
@@ -461,7 +461,7 @@ public:
     HeterogeneousBlock(std::vector<TypeTags> tags, std::vector<Value> vals, bool isDense = false)
         : _vals(std::move(vals)), _tags(std::move(tags)), _isDense(isDense) {}
 
-    ~HeterogeneousBlock() {
+    ~HeterogeneousBlock() override {
         release();
     }
 

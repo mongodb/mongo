@@ -56,7 +56,7 @@ protected:
     explicit ShardServerOpObserverReplicaSetEndpointTest(Options options = {})
         : ServiceContextMongoDTest(options.useReplSettings(true)) {}
 
-    virtual void setUp() override {
+    void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
 

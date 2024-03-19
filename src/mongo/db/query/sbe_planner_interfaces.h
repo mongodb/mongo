@@ -59,7 +59,7 @@ public:
      * Consumes the canonical query to create the final 'PlanExecutor'. Must be called at most once.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override final;
+        std::unique_ptr<CanonicalQuery> canonicalQuery) final;
 
 private:
     OperationContext* _opCtx;
@@ -95,7 +95,7 @@ public:
      * Consumes the canonical query to create the final 'PlanExecutor'. Must be called at most once.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override final;
+        std::unique_ptr<CanonicalQuery> canonicalQuery) final;
 
 private:
     OperationContext* _opCtx;

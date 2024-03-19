@@ -65,7 +65,7 @@ namespace mongo {
 class CommonProcessInterface : public MongoProcessInterface {
 public:
     using MongoProcessInterface::MongoProcessInterface;
-    virtual ~CommonProcessInterface() = default;
+    ~CommonProcessInterface() override = default;
 
     /**
      * Estimates the size of writes that will be executed on the current node. Note that this
@@ -177,10 +177,10 @@ public:
                                        CurrentOpCursorMode cursorMode,
                                        CurrentOpBacktraceMode backtraceMode) const final;
 
-    virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
+    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override;
 
-    virtual void updateClientOperationTime(OperationContext* opCtx) const final;
+    void updateClientOperationTime(OperationContext* opCtx) const final;
 
     boost::optional<ShardVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

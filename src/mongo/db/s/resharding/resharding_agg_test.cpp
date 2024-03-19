@@ -112,13 +112,13 @@ public:
           _oplogIt(_oplogContents.rbegin()),
           _nextOpTime(std::move(startTime)) {}
 
-    virtual ~MockTransactionHistoryIterator() = default;
+    ~MockTransactionHistoryIterator() override = default;
 
-    bool hasNext() const {
+    bool hasNext() const override {
         return !_nextOpTime.isNull();
     }
 
-    repl::OplogEntry next(OperationContext* opCtx) {
+    repl::OplogEntry next(OperationContext* opCtx) override {
         BSONObj oplogBSON = findOneOplogEntry(_nextOpTime);
 
         auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
@@ -132,7 +132,7 @@ public:
         return oplogEntry;
     }
 
-    repl::OpTime nextOpTime(OperationContext* opCtx) {
+    repl::OpTime nextOpTime(OperationContext* opCtx) override {
         BSONObj oplogBSON = findOneOplogEntry(_nextOpTime);
 
         auto prevOpTime = oplogBSON[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName];
@@ -195,7 +195,7 @@ public:
     }
 
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(
-        repl::OpTime time) const {
+        repl::OpTime time) const override {
         return std::unique_ptr<TransactionHistoryIteratorBase>(
             new MockTransactionHistoryIterator(_mockResults, time));
     }
@@ -213,7 +213,7 @@ public:
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern) {
+        boost::optional<BSONObj> readConcern) override {
         DBDirectClient client(expCtx->opCtx);
         auto result = client.findOne(nss, documentKey.toBson());
         if (result.isEmpty()) {

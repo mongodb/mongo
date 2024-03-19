@@ -119,7 +119,7 @@ public:
                  bool participateInTrialRunTracking = true,
                  bool forceIncreasedSpilling = false);
 
-    ~HashAggStage();
+    ~HashAggStage() override;
 
     std::unique_ptr<PlanStage> clone() const final;
 

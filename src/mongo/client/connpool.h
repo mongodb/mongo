@@ -307,7 +307,7 @@ public:
 class DBConnectionPool : public PeriodicTask {
 public:
     DBConnectionPool();
-    ~DBConnectionPool();
+    ~DBConnectionPool() override;
 
     /** right now just controls some asserts.  defaults to "dbconnectionpool" */
     void setName(const std::string& name) {
@@ -404,10 +404,10 @@ public:
         bool operator()(const std::string& a, const std::string& b) const;
     };
 
-    virtual std::string taskName() const {
+    std::string taskName() const override {
         return "DBConnectionPool-cleaner";
     }
-    virtual void taskDoWork();
+    void taskDoWork() override;
 
     /**
      * Shuts down the connection pool, unblocking any waiters on connections.
@@ -512,7 +512,7 @@ public:
         _setSocketTimeout();
     }
 
-    ~ScopedDbConnection();
+    ~ScopedDbConnection() override;
 
     static void clearPool();
 
@@ -529,16 +529,16 @@ public:
     }
 
     /** get the associated connection object */
-    DBClientBase* get() {
+    DBClientBase* get() override {
         uassert(13102, "connection was returned to the pool already", _conn);
         return _conn;
     }
 
-    bool ok() const {
+    bool ok() const override {
         return _conn != nullptr;
     }
 
-    std::string getHost() const {
+    std::string getHost() const override {
         return _host;
     }
 
@@ -553,7 +553,7 @@ public:
         we can't be sure we fully read all expected data of a reply on the socket.  so
         we don't try to reuse the connection in that situation.
     */
-    void done();
+    void done() override;
 
 private:
     void _setSocketTimeout();

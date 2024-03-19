@@ -118,7 +118,7 @@ public:
     explicit AsioReactorTimer(asio::io_context& ctx)
         : _timer(std::make_shared<TimerType>(asio::system_timer(ctx))) {}
 
-    ~AsioReactorTimer() {
+    ~AsioReactorTimer() override {
         // The underlying timer won't get destroyed until the last promise from _asyncWait
         // has been filled, so cancel the timer so our promises get fulfilled
         cancel();
@@ -261,7 +261,7 @@ private:
     class ReactorClockSource final : public ClockSource {
     public:
         explicit ReactorClockSource(AsioReactor* reactor) : _reactor(reactor) {}
-        ~ReactorClockSource() = default;
+        ~ReactorClockSource() override = default;
 
         Milliseconds getPrecision() override {
             MONGO_UNREACHABLE;

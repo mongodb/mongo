@@ -52,7 +52,7 @@ class DefaultBaton : public Baton {
 public:
     explicit DefaultBaton(OperationContext* opCtx);
 
-    ~DefaultBaton();
+    ~DefaultBaton() override;
 
     void schedule(Task func) noexcept override;
 

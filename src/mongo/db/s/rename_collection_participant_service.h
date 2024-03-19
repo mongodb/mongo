@@ -66,7 +66,7 @@ public:
     explicit RenameCollectionParticipantService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
 
-    ~RenameCollectionParticipantService() = default;
+    ~RenameCollectionParticipantService() override = default;
 
     static RenameCollectionParticipantService* getService(OperationContext* opCtx);
 
@@ -113,7 +113,7 @@ public:
               IDLParserContext("RenameCollectionParticipantDocument"), participantDoc.getOwned())),
           _request(_doc.getRenameCollectionRequest()) {}
 
-    ~RenameParticipantInstance();
+    ~RenameParticipantInstance() override;
 
     /*
      * Check if the given participant document has the same options as the current instance.
@@ -159,12 +159,12 @@ private:
     const RenameCollectionRequest _request;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancellationToken& token) noexcept override final;
+                         const CancellationToken& token) noexcept final;
 
     SemiFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                               const CancellationToken& token) noexcept;
 
-    void interrupt(Status status) noexcept override final;
+    void interrupt(Status status) noexcept final;
 
     template <typename Func>
     auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn) {

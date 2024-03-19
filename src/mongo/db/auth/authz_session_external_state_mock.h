@@ -50,15 +50,15 @@ public:
           _allowLocalhostReturnValue(false),
           _serverIsArbiterReturnValue(false) {}
 
-    virtual bool shouldIgnoreAuthChecks() const {
+    bool shouldIgnoreAuthChecks() const override {
         return _ignoreAuthChecksReturnValue;
     }
 
-    virtual bool shouldAllowLocalhost() const {
+    bool shouldAllowLocalhost() const override {
         return _allowLocalhostReturnValue;
     }
 
-    virtual bool serverIsArbiter() const {
+    bool serverIsArbiter() const override {
         return _serverIsArbiterReturnValue;
     }
 
@@ -70,7 +70,7 @@ public:
         _allowLocalhostReturnValue = returnValue;
     }
 
-    virtual void startRequest(OperationContext* opCtx) {}
+    void startRequest(OperationContext* opCtx) override {}
 
 private:
     bool _ignoreAuthChecksReturnValue;

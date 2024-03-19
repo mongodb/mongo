@@ -124,7 +124,7 @@ public:
      *     this connection to fall into a failed state.
      */
     MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect = false);
-    virtual ~MockDBClientConnection();
+    ~MockDBClientConnection() override;
 
     //
     // DBClientBase methods

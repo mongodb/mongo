@@ -110,11 +110,11 @@ public:
         }
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                     bool isImplicitDefault) const {
+                                                     bool isImplicitDefault) const override {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(DocumentSourceListLocalSessions::kStageName);
         }
 
@@ -127,8 +127,7 @@ public:
         return DocumentSourceListLocalSessions::kStageName.rawData();
     }
 
-    Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override {
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
         return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
     }
 

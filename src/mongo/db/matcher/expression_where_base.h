@@ -65,7 +65,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(6400211);
     }
 
-    void resetChild(size_t, MatchExpression*) {
+    void resetChild(size_t, MatchExpression*) override {
         MONGO_UNREACHABLE;
     };
 

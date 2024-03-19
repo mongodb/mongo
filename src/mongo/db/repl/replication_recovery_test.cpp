@@ -163,7 +163,7 @@ public:
         _initialDataTimestamp = snapshotName;
     }
 
-    Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const {
+    Timestamp getInitialDataTimestamp(ServiceContext* serviceCtx) const override {
         stdx::lock_guard<Latch> lock(_mutex);
         return _initialDataTimestamp;
     };

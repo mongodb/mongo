@@ -66,11 +66,11 @@ public:
                                   bool trackPeakUsed);
     ~PriorityTicketHolder() override{};
 
-    int32_t available() const override final;
+    int32_t available() const final;
 
-    int64_t queued() const override final;
+    int64_t queued() const final;
 
-    int64_t numFinishedProcessing() const override final;
+    int64_t numFinishedProcessing() const final;
 
     std::int64_t expedited() const;
 
@@ -79,17 +79,17 @@ public:
     void updateLowPriorityAdmissionBypassThreshold(int32_t newBypassThreshold);
 
 private:
-    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
+    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) final;
 
     boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
                                                     AdmissionContext* admCtx,
-                                                    Date_t until) override final;
+                                                    Date_t until) final;
 
-    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
+    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept final;
 
-    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept override final;
+    QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept final;
 
-    void _appendImplStats(BSONObjBuilder& b) const override final;
+    void _appendImplStats(BSONObjBuilder& b) const final;
 
     static QueueType _getQueueType(AdmissionContext::Priority priority) {
         switch (priority) {

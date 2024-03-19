@@ -69,7 +69,7 @@ public:
                               << NamespaceStringUtil::serialize(
                                      originalNss(), SerializationContext::stateDefault()))) {}
 
-    ~DropCollectionCoordinator() = default;
+    ~DropCollectionCoordinator() override = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 

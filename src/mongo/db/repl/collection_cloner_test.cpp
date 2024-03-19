@@ -157,7 +157,7 @@ protected:
 
 class CollectionClonerTestResumable : public CollectionClonerTest {
 protected:
-    void setUp() {
+    void setUp() override {
         CollectionClonerTest::setUp();
         setInitialSyncId();
     }

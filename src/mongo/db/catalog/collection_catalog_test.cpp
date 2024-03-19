@@ -122,7 +122,7 @@ public:
             std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
     }
 
-    void tearDown() {
+    void tearDown() override {
         globalLock.reset();
     }
 
@@ -140,7 +140,7 @@ protected:
 
 class CollectionCatalogIterationTest : public ServiceContextMongoDTest {
 public:
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
         globalLock.emplace(opCtx.get());
@@ -162,7 +162,7 @@ public:
         }
     }
 
-    void tearDown() {
+    void tearDown() override {
         for (auto& it : dbMap) {
             for (auto& kv : it.second) {
                 catalog.deregisterCollection(
@@ -217,7 +217,7 @@ protected:
 
 class CollectionCatalogResourceTest : public ServiceContextMongoDTest {
 public:
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
         globalLock.emplace(opCtx.get());
@@ -242,7 +242,7 @@ public:
         ASSERT_EQ(5, numEntries);
     }
 
-    void tearDown() {
+    void tearDown() override {
         std::vector<UUID> collectionsToDeregister;
         for (auto&& coll :
              catalog.range(DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb"))) {

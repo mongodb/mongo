@@ -170,7 +170,7 @@ public:
                   ReplicationProcess* replicationProcess,
                   const OnCompletionFn& onCompletion);
 
-    virtual ~InitialSyncer();
+    ~InitialSyncer() override;
 
     /**
      * Returns true if an initial sync is currently running or in the process of shutting down.

@@ -268,7 +268,7 @@ public:
                  ReplicationProcess* replicationProcess,
                  ReplicationCoordinator* replicationCoordinator);
 
-    virtual ~RollbackImpl();
+    ~RollbackImpl() override;
 
     /**
      * Runs the rollback algorithm.

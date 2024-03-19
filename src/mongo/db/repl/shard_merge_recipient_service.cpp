@@ -217,7 +217,7 @@ bool isRetriableOplogFetcherError(Status oplogFetcherStatus) {
 class OplogFetcherRestartDecisionTenantMigration
     : public OplogFetcher::OplogFetcherRestartDecision {
 public:
-    ~OplogFetcherRestartDecisionTenantMigration(){};
+    ~OplogFetcherRestartDecisionTenantMigration() override{};
     bool shouldContinue(OplogFetcher* fetcher, Status status) final {
         return false;
     }
@@ -277,7 +277,7 @@ public:
         MONGO_UNREACHABLE;
     };
 
-    virtual StatusWith<ReplSetConfig> getCurrentConfig() const final {
+    StatusWith<ReplSetConfig> getCurrentConfig() const final {
         MONGO_UNREACHABLE;
     }
 

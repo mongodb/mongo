@@ -52,7 +52,7 @@ public:
     using ChooseNewSyncSourceHook = std::function<void()>;
 
     SyncSourceSelectorMock();
-    virtual ~SyncSourceSelectorMock();
+    ~SyncSourceSelectorMock() override;
 
     void clearSyncSourceDenylist() override;
     HostAndPort chooseNewSyncSource(const OpTime& ot) override;

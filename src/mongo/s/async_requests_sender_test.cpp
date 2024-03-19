@@ -100,13 +100,13 @@ protected:
 TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
     class ThrowyResourceYielder : public ResourceYielder {
     public:
-        void yield(OperationContext*) {
+        void yield(OperationContext*) override {
             if (_count++) {
                 uasserted(ErrorCodes::BadValue, "Simulated error");
             }
         }
 
-        void unyield(OperationContext*) {}
+        void unyield(OperationContext*) override {}
 
     private:
         int _count = 0;
@@ -162,9 +162,9 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
 TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
     class ThrowyResourceYielder : public ResourceYielder {
     public:
-        void yield(OperationContext*) {}
+        void yield(OperationContext*) override {}
 
-        void unyield(OperationContext*) {
+        void unyield(OperationContext*) override {
             if (_count++) {
                 uasserted(ErrorCodes::BadValue, "Simulated error");
             }
@@ -236,11 +236,11 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
 TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
     class CountingResourceYielder : public ResourceYielder {
     public:
-        void yield(OperationContext*) {
+        void yield(OperationContext*) override {
             ++timesYielded;
         }
 
-        void unyield(OperationContext*) {
+        void unyield(OperationContext*) override {
             ++timesUnyielded;
         }
 

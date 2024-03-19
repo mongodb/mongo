@@ -203,12 +203,12 @@ public:
           _spoolId{spoolId},
           _vals{std::move(vals)} {}
 
-    std::unique_ptr<PlanStage> clone() const {
+    std::unique_ptr<PlanStage> clone() const override {
         return std::make_unique<SpoolConsumerStage<IsStack>>(
             _spoolId, _vals, _yieldPolicy, _commonStats.nodeId, participateInTrialRunTracking());
     }
 
-    void prepare(CompileCtx& ctx) {
+    void prepare(CompileCtx& ctx) override {
         if (!_buffer) {
             _buffer = ctx.getSpoolBuffer(_spoolId);
         }
@@ -225,7 +225,7 @@ public:
         }
     }
 
-    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) override {
         if (auto it = _outAccessors.find(slot); it != _outAccessors.end()) {
             return &it->second;
         }
@@ -233,14 +233,14 @@ public:
         return ctx.getAccessor(slot);
     }
 
-    void open(bool reOpen) {
+    void open(bool reOpen) override {
         auto optTimer(getOptTimer(_opCtx));
 
         _commonStats.opens++;
         _bufferIt = _buffer->size();
     }
 
-    PlanState getNext() {
+    PlanState getNext() override {
         auto optTimer(getOptTimer(_opCtx));
         checkForInterruptAndYield(_opCtx);
 
@@ -268,13 +268,13 @@ public:
         return trackPlanState(PlanState::ADVANCED);
     }
 
-    void close() {
+    void close() override {
         auto optTimer(getOptTimer(_opCtx));
 
         trackClose();
     }
 
-    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const {
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override {
         auto ret = std::make_unique<PlanStageStats>(_commonStats);
 
         if (includeDebugInfo) {
@@ -287,11 +287,11 @@ public:
         return ret;
     }
 
-    const SpecificStats* getSpecificStats() const {
+    const SpecificStats* getSpecificStats() const override {
         return nullptr;
     }
 
-    std::vector<DebugPrinter::Block> debugPrint() const {
+    std::vector<DebugPrinter::Block> debugPrint() const override {
         auto ret = PlanStage::debugPrint();
 
         DebugPrinter::addSpoolIdentifier(ret, _spoolId);
@@ -309,7 +309,7 @@ public:
         return ret;
     }
 
-    size_t estimateCompileTimeSize() const {
+    size_t estimateCompileTimeSize() const override {
         size_t size = sizeof(*this);
         size += size_estimator::estimate(_vals);
         return size;

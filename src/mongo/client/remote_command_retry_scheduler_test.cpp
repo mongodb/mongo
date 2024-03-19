@@ -104,7 +104,7 @@ class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExec
 public:
     TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor)
         : unittest::TaskExecutorProxy(executor) {}
-    virtual StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
+    StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
         const executor::RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) override {

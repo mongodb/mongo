@@ -67,7 +67,7 @@ public:
 
 protected:
     ShardingTestFixtureCommon();
-    ~ShardingTestFixtureCommon();
+    ~ShardingTestFixtureCommon() override;
 
     void setUp() override;
     void tearDown() override;

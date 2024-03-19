@@ -112,14 +112,14 @@ public:
 
     const char* getSourceName() const override;
 
-    virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         // The desugaring of DocumentSourceSearch happens after sharded planning, so we should never
         // execute distributedPlanLogic here, instead it should be called against
         // DocumentSourceSearch.
         MONGO_UNREACHABLE_TASSERT(7815902);
     }
 
-    virtual boost::intrusive_ptr<DocumentSource> clone(
+    boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
         if (_metadataMergeProtocolVersion) {
@@ -216,7 +216,7 @@ protected:
      */
     Value serializeWithoutMergePipeline(const SerializationOptions& opts) const;
 
-    virtual Value serialize(const SerializationOptions& opts) const override;
+    Value serialize(const SerializationOptions& opts) const override;
 
     /**
      * Inspects the cursor to see if it set any vars, and propogates their definitions to the

@@ -71,7 +71,7 @@ public:
 
     Value serialize() const final;
 
-    bool getCheckExistenceForDiffInsertOperations() const override final {
+    bool getCheckExistenceForDiffInsertOperations() const final {
         return _checkExistenceForDiffInsertOperations;
     }
 

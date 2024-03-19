@@ -79,7 +79,7 @@ public:
      * expected to only be useful in those cases.
      */
     WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, WiredTigerOplogManager* oplogManager);
-    ~WiredTigerRecoveryUnit();
+    ~WiredTigerRecoveryUnit() override;
 
     void prepareUnitOfWork() override;
 
@@ -150,7 +150,7 @@ public:
 
     bool isReadSourcePinned() const override;
 
-    virtual void setOrderedCommit(bool orderedCommit) override {
+    void setOrderedCommit(bool orderedCommit) override {
         _orderedCommit = orderedCommit;
     }
 
@@ -166,7 +166,7 @@ public:
 
     std::unique_ptr<StorageStats> computeOperationStatisticsSinceLastCall() override;
 
-    void ignoreAllMultiTimestampConstraints() {
+    void ignoreAllMultiTimestampConstraints() override {
         _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = true;
     }
 

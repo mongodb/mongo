@@ -76,7 +76,7 @@ public:
 
     Value getValue() const override;
 
-    void reset() {
+    void reset() override {
         _sumAcc->reset();
         _posInfiniteValueCount = 0;
         _negInfiniteValueCount = 0;

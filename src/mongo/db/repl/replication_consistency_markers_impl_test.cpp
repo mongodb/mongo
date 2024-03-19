@@ -83,11 +83,11 @@ BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minV
 
 class JournalListenerWithDurabilityTracking : public JournalListener {
 public:
-    Token getToken(OperationContext* opCtx) {
+    Token getToken(OperationContext* opCtx) override {
         return {};
     }
 
-    void onDurable(const Token& token) {
+    void onDurable(const Token& token) override {
         onDurableCalled = true;
     }
 

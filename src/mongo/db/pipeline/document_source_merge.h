@@ -146,7 +146,7 @@ public:
         MergeWhenNotMatchedModeEnum _whenNotMatched;
     };
 
-    virtual ~DocumentSourceMerge() = default;
+    ~DocumentSourceMerge() override = default;
 
     const char* getSourceName() const final {
         return kStageName.rawData();
@@ -160,7 +160,7 @@ public:
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Creates a new $merge stage from the given arguments.

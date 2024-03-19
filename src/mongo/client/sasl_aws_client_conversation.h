@@ -51,7 +51,7 @@ class SaslAWSClientConversation : public SaslClientConversation {
 public:
     explicit SaslAWSClientConversation(SaslClientSession* saslClientSession);
 
-    virtual ~SaslAWSClientConversation() = default;
+    ~SaslAWSClientConversation() override = default;
 
     StatusWith<bool> step(StringData inputData, std::string* outputData) override;
 

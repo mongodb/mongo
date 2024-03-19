@@ -117,8 +117,8 @@ public:
         /**
          * Lookup from a sharded collection may not be allowed.
          */
-        Status checkShardedForeignCollAllowed(
-            const NamespaceString& nss, bool inMultiDocumentTransaction) const override final {
+        Status checkShardedForeignCollAllowed(const NamespaceString& nss,
+                                              bool inMultiDocumentTransaction) const final {
             if (!inMultiDocumentTransaction) {
                 return Status::OK();
             }
@@ -152,7 +152,7 @@ public:
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override final;
+                                           bool bypassDocumentValidation) const final;
 
     private:
         bool _hasInternalCollation = false;
@@ -165,9 +165,8 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final;
-    void serializeToArray(
-        std::vector<Value>& array,
-        const SerializationOptions& opts = SerializationOptions{}) const final override;
+    void serializeToArray(std::vector<Value>& array,
+                          const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
@@ -375,8 +374,7 @@ private:
     /**
      * Should not be called; use serializeToArray instead.
      */
-    Value serialize(
-        const SerializationOptions& opts = SerializationOptions{}) const final override {
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
         MONGO_UNREACHABLE_TASSERT(7484304);
     }
 

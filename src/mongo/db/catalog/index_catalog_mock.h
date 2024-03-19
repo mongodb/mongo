@@ -45,7 +45,7 @@ public:
         return std::make_unique<IndexCatalogMock>(*this);
     }
 
-    void init(OperationContext*, Collection*, bool = false) {
+    void init(OperationContext*, Collection*, bool = false) override {
         MONGO_UNREACHABLE;
     }
 

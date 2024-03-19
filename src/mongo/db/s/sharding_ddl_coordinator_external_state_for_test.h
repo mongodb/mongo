@@ -40,17 +40,17 @@ using MockCommandResponse = sharding_test_helpers::FaultGenerator;
 class ShardingDDLCoordinatorExternalStateForTest : public ShardingDDLCoordinatorExternalState {
 public:
     ShardingDDLCoordinatorExternalStateForTest();
-    virtual void checkShardedDDLAllowedToStart(OperationContext* opCtx,
-                                               const NamespaceString& nss) const override;
-    virtual void waitForVectorClockDurable(OperationContext* opCtx) const override;
-    virtual void assertIsPrimaryShardForDb(OperationContext* opCtx,
-                                           const DatabaseName& dbName) const override;
-    virtual bool isShardedTimeseries(OperationContext* opCtx,
-                                     const NamespaceString& bucketNss) const override;
-    virtual void allowMigrations(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 bool allowMigrations) override;
-    virtual bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
+    void checkShardedDDLAllowedToStart(OperationContext* opCtx,
+                                       const NamespaceString& nss) const override;
+    void waitForVectorClockDurable(OperationContext* opCtx) const override;
+    void assertIsPrimaryShardForDb(OperationContext* opCtx,
+                                   const DatabaseName& dbName) const override;
+    bool isShardedTimeseries(OperationContext* opCtx,
+                             const NamespaceString& bucketNss) const override;
+    void allowMigrations(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         bool allowMigrations) override;
+    bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
 
     MockCommandResponse allowMigrationsResponse;
     MockCommandResponse migrationsAllowedResponse;
@@ -64,7 +64,7 @@ public:
     ShardingDDLCoordinatorExternalStateFactoryForTest(
         std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> externalState);
 
-    virtual std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const override;
+    std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const override;
 
 private:
     std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> _externalState;

@@ -56,7 +56,7 @@ class TenantMigrationDonorOpObserver final : public OpObserverNoop {
 
 public:
     TenantMigrationDonorOpObserver() = default;
-    ~TenantMigrationDonorOpObserver() = default;
+    ~TenantMigrationDonorOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

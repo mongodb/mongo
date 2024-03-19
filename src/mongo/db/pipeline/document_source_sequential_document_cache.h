@@ -66,7 +66,7 @@ public:
         return DocumentSourceSequentialDocumentCache::kStageName.rawData();
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      _cache->isServing() ? PositionRequirement::kFirst
                                                          : PositionRequirement::kNone,
@@ -128,7 +128,7 @@ private:
     DocumentSourceSequentialDocumentCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           SequentialDocumentCache* cache);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     SequentialDocumentCache* _cache;
 

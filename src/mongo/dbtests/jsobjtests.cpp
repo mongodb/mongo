@@ -796,10 +796,10 @@ protected:
 };
 
 class BadType : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":1}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         set(ret, 4, 50);
         return ret;
@@ -807,10 +807,10 @@ class BadType : public Base {
 };
 
 class EooBeforeEnd : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":1}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         // (first byte of size)++
         set(ret, 0, get(ret, 0) + 1);
@@ -831,10 +831,10 @@ public:
 };
 
 class TotalSizeTooSmall : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":1}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         // (first byte of size)--
         set(ret, 0, get(ret, 0) - 1);
@@ -844,10 +844,10 @@ class TotalSizeTooSmall : public Base {
 };
 
 class EooMissing : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":1}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         set(ret, ret.objsize() - 1, (char)0xff);
         // (first byte of size)--
@@ -873,10 +873,10 @@ class WrongStringSize : public Base {
 };
 
 class ZeroStringSize : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":\"b\"}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         set(ret, 7, 0);
         return ret;
@@ -884,10 +884,10 @@ class ZeroStringSize : public Base {
 };
 
 class NegativeStringSize : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":\"b\"}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         set(ret, 10, -100);
         return ret;
@@ -895,10 +895,10 @@ class NegativeStringSize : public Base {
 };
 
 class WrongSubobjectSize : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":{\"b\":1}}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         set(ret, 0, get(ret, 0) + 1);
         set(ret, 7, get(ret, 7) + 1);
@@ -907,10 +907,10 @@ class WrongSubobjectSize : public Base {
 };
 
 class WrongDbrefNsSize : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{ \"a\": Dbref( \"b\", \"ffffffffffffffffffffffff\" ) }");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         set(ret, 0, get(ret, 0) + 1);
         set(ret, 7, get(ret, 7) + 1);
@@ -919,10 +919,10 @@ class WrongDbrefNsSize : public Base {
 };
 
 class NoFieldNameEnd : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":1}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         memset(const_cast<char*>(ret.objdata()) + 5, 0xff, ret.objsize() - 5);
         return ret;
@@ -930,10 +930,10 @@ class NoFieldNameEnd : public Base {
 };
 
 class BadRegex : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":/c/i}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         memset(const_cast<char*>(ret.objdata()) + 7, 0xff, ret.objsize() - 7);
         return ret;
@@ -941,10 +941,10 @@ class BadRegex : public Base {
 };
 
 class BadRegexOptions : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":/c/i}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         memset(const_cast<char*>(ret.objdata()) + 9, 0xff, ret.objsize() - 9);
         return ret;
@@ -952,14 +952,14 @@ class BadRegexOptions : public Base {
 };
 
 class CodeWScopeBase : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         BSONObjBuilder b;
         BSONObjBuilder scope;
         scope.append("a", "b");
         b.appendCodeWScope("c", "d", scope.done());
         return b.obj();
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
         modify(ret);
         return ret;
@@ -970,37 +970,37 @@ protected:
 };
 
 class CodeWScopeSmallSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const {
+    void modify(BSONObj& o) const override {
         set(o, 7, 7);
     }
 };
 
 class CodeWScopeZeroStrSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const {
+    void modify(BSONObj& o) const override {
         set(o, 11, 0);
     }
 };
 
 class CodeWScopeSmallStrSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const {
+    void modify(BSONObj& o) const override {
         set(o, 11, 1);
     }
 };
 
 class CodeWScopeNoSizeForObj : public CodeWScopeBase {
-    void modify(BSONObj& o) const {
+    void modify(BSONObj& o) const override {
         set(o, 7, 13);
     }
 };
 
 class CodeWScopeSmallObjSize : public CodeWScopeBase {
-    void modify(BSONObj& o) const {
+    void modify(BSONObj& o) const override {
         set(o, 17, 1);
     }
 };
 
 class CodeWScopeBadObject : public CodeWScopeBase {
-    void modify(BSONObj& o) const {
+    void modify(BSONObj& o) const override {
         set(o, 21, JSTypeMax + 1);
     }
 };
@@ -1133,22 +1133,22 @@ protected:
 };
 
 class LabelBasic : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("a" << (BSON("$gt" << 1)));
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON("a" << GT << 1);
     }
 };
 
 class LabelShares : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("z"
                     << "q"
                     << "a" << (BSON("$gt" << 1)) << "x"
                     << "p");
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON("z"
                     << "q"
                     << "a" << GT << 1 << "x"
@@ -1157,17 +1157,17 @@ class LabelShares : public LabelBase {
 };
 
 class LabelDouble : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("a" << (BSON("$gt" << 1 << "$lte"
                                        << "x")));
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON("a" << GT << 1 << LTE << "x");
     }
 };
 
 class LabelDoubleShares : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("z"
                     << "q"
                     << "a"
@@ -1176,7 +1176,7 @@ class LabelDoubleShares : public LabelBase {
                     << "x"
                     << "p");
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON("z"
                     << "q"
                     << "a" << GT << 1 << LTE << "x"
@@ -1186,16 +1186,16 @@ class LabelDoubleShares : public LabelBase {
 };
 
 class LabelSize : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("a" << BSON("$size" << 4));
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON("a" << mongo::BSIZE << 4);
     }
 };
 
 class LabelMulti : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("z"
                     << "q"
                     << "a"
@@ -1208,7 +1208,7 @@ class LabelMulti : public LabelBase {
                     << "x"
                     << "p");
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON("z"
                     << "q"
                     << "a" << GT << 1 << LTE << "x"
@@ -1217,7 +1217,7 @@ class LabelMulti : public LabelBase {
     }
 };
 class LabelishOr : public LabelBase {
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("$or" << BSON_ARRAY(BSON("a" << BSON("$gt" << 1 << "$lte"
                                                                << "x"))
                                         << BSON("b" << BSON("$ne" << 1 << "$ne"
@@ -1226,7 +1226,7 @@ class LabelishOr : public LabelBase {
                                         << BSON("x"
                                                 << "p")));
     }
-    BSONObj actual() {
+    BSONObj actual() override {
         return BSON(OR(BSON("a" << GT << 1 << LTE << "x"),
                        BSON("b" << NE << 1 << NE << "f" << NE << 22.3),
                        BSON("x"
@@ -1973,7 +1973,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("jsobj") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<BufBuilderBasic>();
         add<BufBuilderReallocLimit>();
         add<BSONElementBasic>();

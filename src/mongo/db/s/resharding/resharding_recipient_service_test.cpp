@@ -184,7 +184,7 @@ public:
     }
 
     boost::optional<ShardingIndexesCatalogCache> getCollectionIndexInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss) {
+        OperationContext* opCtx, const NamespaceString& nss) override {
         return boost::none;
     }
 

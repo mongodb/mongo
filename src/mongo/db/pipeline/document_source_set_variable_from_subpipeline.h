@@ -69,7 +69,7 @@ public:
         std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
         Variables::Id varID);
 
-    ~DocumentSourceSetVariableFromSubPipeline() = default;
+    ~DocumentSourceSetVariableFromSubPipeline() override = default;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         // {shardsStage, mergingStage, sortPattern}
@@ -138,7 +138,7 @@ protected:
 
 private:
     GetNextResult doGetNext() final;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     std::unique_ptr<Pipeline, PipelineDeleter> _subPipeline;
     Variables::Id _variableID;
     // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to

@@ -68,7 +68,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const final {
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         MONGO_UNREACHABLE;
     }
 

@@ -189,7 +189,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("count") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Basic>();
         add<Query>();
         add<QueryFields>();

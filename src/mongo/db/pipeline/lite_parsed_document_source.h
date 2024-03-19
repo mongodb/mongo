@@ -316,8 +316,8 @@ public:
         return {_foreignNss};
     }
 
-    virtual PrivilegeVector requiredPrivileges(bool isMongos,
-                                               bool bypassDocumentValidation) const = 0;
+    PrivilegeVector requiredPrivileges(bool isMongos,
+                                       bool bypassDocumentValidation) const override = 0;
 
 protected:
     NamespaceString _foreignNss;
@@ -336,10 +336,9 @@ public:
                                             boost::optional<NamespaceString> foreignNss,
                                             boost::optional<LiteParsedPipeline> pipeline);
 
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final override;
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
 
-    virtual void getForeignExecutionNamespaces(
-        stdx::unordered_set<NamespaceString>& nssSet) const override;
+    void getForeignExecutionNamespaces(stdx::unordered_set<NamespaceString>& nssSet) const override;
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;

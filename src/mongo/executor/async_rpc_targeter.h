@@ -69,14 +69,14 @@ class LocalHostTargeter : public Targeter {
 public:
     LocalHostTargeter() = default;
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
         HostAndPort h = HostAndPort("localhost", serverGlobalParams.port);
         std::vector<HostAndPort> hostList{h};
 
         return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
     }
 
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {
         return SemiFuture<void>::makeReady();
     }
 };
@@ -89,13 +89,13 @@ class FixedTargeter : public Targeter {
 public:
     FixedTargeter(HostAndPort host) : _host(host){};
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
         std::vector<HostAndPort> hostList{_host};
 
         return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
     }
 
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {
         return SemiFuture<void>::makeReady();
     }
 

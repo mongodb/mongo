@@ -60,7 +60,7 @@ class AuthOpObserver final : public OpObserverNoop {
 
 public:
     AuthOpObserver();
-    ~AuthOpObserver();
+    ~AuthOpObserver() override;
 
     // The filtering for this OpObserver is derived from the namespace filters in
     // AuthorizationManagerImpl and the various AuditInterface implementations, see SERVER-83383.

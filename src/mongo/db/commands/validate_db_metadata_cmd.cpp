@@ -100,7 +100,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    bool maintenanceOk() const {
+    bool maintenanceOk() const override {
         return false;
     }
 

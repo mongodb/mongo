@@ -59,7 +59,7 @@ public:
                     PlanNodeId nodeId,
                     PlanYieldPolicy* yieldPolicy = nullptr,
                     bool participateInTrialRunTracking = true);
-    ~BlockToRowStage();
+    ~BlockToRowStage() override;
 
     std::unique_ptr<PlanStage> clone() const final;
 

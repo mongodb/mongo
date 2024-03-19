@@ -107,7 +107,7 @@ static constexpr Milliseconds kServerRequestTimeout{10000};
 class ConfigServerHealthObserver final : public HealthObserverBase {
 public:
     explicit ConfigServerHealthObserver(ServiceContext* svcCtx);
-    ~ConfigServerHealthObserver() = default;
+    ~ConfigServerHealthObserver() override = default;
 
     /**
      * Health observer unique type.

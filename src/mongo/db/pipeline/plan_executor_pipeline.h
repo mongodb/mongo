@@ -201,9 +201,9 @@ public:
         return _pipeline->getTypeString();
     }
 
-    PlanExecutor::QueryFramework getQueryFramework() const override final;
+    PlanExecutor::QueryFramework getQueryFramework() const final;
 
-    bool usesCollectionAcquisitions() const override final {
+    bool usesCollectionAcquisitions() const final {
         // TODO SERVER-78724: Replace this whenever aggregations use shard role acquisitions.
         return false;
     }

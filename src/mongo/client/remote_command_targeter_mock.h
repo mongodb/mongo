@@ -51,7 +51,7 @@ namespace mongo {
 class RemoteCommandTargeterMock final : public RemoteCommandTargeter {
 public:
     RemoteCommandTargeterMock();
-    virtual ~RemoteCommandTargeterMock();
+    ~RemoteCommandTargeterMock() override;
 
     /**
      * Shortcut for unit-tests.

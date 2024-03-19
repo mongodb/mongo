@@ -50,7 +50,7 @@ namespace {
 class APIVersionMetricsTest : public ServiceContextTest {
 
 public:
-    virtual void setUp() {
+    void setUp() override {
         apiParams = APIParameters();
 
         // The fast clock is used by OperationContext::hasDeadlineExpired.
@@ -61,7 +61,7 @@ public:
             std::make_unique<SharedClockSourceAdapter>(_clkSource));
     }
 
-    virtual void tearDown() {}
+    void tearDown() override {}
 
 protected:
     /**

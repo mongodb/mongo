@@ -740,7 +740,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpochNoRWCChan
  */
 class ReadWriteConcernDefaultsTestWithClusterTime : public VectorClockTestFixture {
 public:
-    virtual ~ReadWriteConcernDefaultsTestWithClusterTime() {
+    ~ReadWriteConcernDefaultsTestWithClusterTime() override {
         ReadWriteConcernDefaults::get(getServiceContext()).invalidate();
     }
 

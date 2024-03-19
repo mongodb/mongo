@@ -57,7 +57,7 @@ class ProfileCmdRequest;
 class ProfileCmdBase : public BasicCommand {
 public:
     ProfileCmdBase() : BasicCommand("profile") {}
-    virtual ~ProfileCmdBase() {}
+    ~ProfileCmdBase() override {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;

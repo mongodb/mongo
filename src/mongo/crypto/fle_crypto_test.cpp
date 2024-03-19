@@ -193,7 +193,7 @@ public:
 
     BSONObj getEncryptedKey(const UUID& uuid) override;
 
-    SymmetricKey& getKMSLocalKey() {
+    SymmetricKey& getKMSLocalKey() override {
         return _localKey;
     }
 

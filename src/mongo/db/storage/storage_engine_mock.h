@@ -66,7 +66,7 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
     void endBackup(OperationContext* opCtx) final {}
-    Status disableIncrementalBackup(OperationContext* opCtx) {
+    Status disableIncrementalBackup(OperationContext* opCtx) override {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
@@ -184,7 +184,8 @@ public:
         return StorageEngine::CheckpointIteration{0};
     }
 
-    bool hasDataBeenCheckpointed(StorageEngine::CheckpointIteration checkpointIteration) const {
+    bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const override {
         return false;
     }
 

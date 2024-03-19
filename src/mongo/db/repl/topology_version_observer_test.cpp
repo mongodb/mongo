@@ -86,7 +86,7 @@ protected:
     }
 
 public:
-    virtual void setUp() {
+    void setUp() override {
         auto configObj = getConfigObj();
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
@@ -107,7 +107,7 @@ public:
         observer->init(serviceContext, replCoord);
     }
 
-    virtual void tearDown() {
+    void tearDown() override {
         observer->shutdown();
         ASSERT(observer->isShutdown());
         observer.reset();

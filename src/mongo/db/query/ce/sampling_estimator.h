@@ -79,7 +79,7 @@ public:
                       PrefixId& prefixId,
                       std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
                       std::unique_ptr<SamplingExecutor> executor);
-    ~SamplingEstimator();
+    ~SamplingEstimator() override;
 
     CERecord deriveCE(const Metadata& metadata,
                       const cascades::Memo& memo,

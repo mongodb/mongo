@@ -69,7 +69,7 @@ public:
                       StorageInterface* storageInterface,
                       ThreadPool* dbPool);
 
-    virtual ~AllDatabaseCloner() = default;
+    ~AllDatabaseCloner() override = default;
 
     Stats getStats() const;
 

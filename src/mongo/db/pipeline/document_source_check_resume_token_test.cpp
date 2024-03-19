@@ -102,7 +102,7 @@ class ChangeStreamOplogCursorMock : public SeekableRecordCursor {
 public:
     ChangeStreamOplogCursorMock(std::list<Record>* records) : _records(records) {}
 
-    virtual ~ChangeStreamOplogCursorMock() {}
+    ~ChangeStreamOplogCursorMock() override {}
 
     boost::optional<Record> next() override {
         if (_records->empty()) {
@@ -152,7 +152,7 @@ public:
     }
     void detachFromOperationContext() override {}
     void reattachToOperationContext(OperationContext* opCtx) override {}
-    void setSaveStorageCursorOnDetachFromOperationContext(bool) {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
 
 private:
     bool _initialized = false;

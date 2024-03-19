@@ -80,11 +80,11 @@ public:
  */
 class FifoTicketQueue : public TicketQueue {
 public:
-    void push(std::shared_ptr<TicketWaiter> val) {
+    void push(std::shared_ptr<TicketWaiter> val) override {
         _queue.push(std::move(val));
     }
 
-    std::shared_ptr<TicketWaiter> pop() {
+    std::shared_ptr<TicketWaiter> pop() override {
         if (_queue.empty()) {
             return nullptr;
         }

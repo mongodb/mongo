@@ -133,7 +133,7 @@ protected:
 
     explicit ServiceContextMongoDTest(Options options = {});
 
-    virtual ~ServiceContextMongoDTest();
+    ~ServiceContextMongoDTest() override;
 
     void tearDown() override;
 

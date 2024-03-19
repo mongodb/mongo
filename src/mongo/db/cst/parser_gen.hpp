@@ -728,7 +728,7 @@ public:
 
         syntax_error(const syntax_error& s) : std::runtime_error(s.what()), location(s.location) {}
 
-        ~syntax_error() YY_NOEXCEPT YY_NOTHROW;
+        ~syntax_error() YY_NOEXCEPT override YY_NOTHROW;
 
         location_type location;
     };

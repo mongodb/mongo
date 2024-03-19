@@ -78,7 +78,7 @@ public:
         ++_metadataTracker->usageCounter;
     }
 
-    ~RangePreserver() {
+    ~RangePreserver() override {
         stdx::lock_guard<Latch> managerLock(_metadataManager->_managerLock);
 
         invariant(_metadataTracker->usageCounter != 0);
@@ -96,7 +96,7 @@ public:
 
     // This will only ever refer to the active metadata, so CollectionMetadata should never be
     // boost::none
-    const CollectionMetadata& get() {
+    const CollectionMetadata& get() override {
         invariant(_metadataTracker->metadata);
         return _metadataTracker->metadata.value();
     }

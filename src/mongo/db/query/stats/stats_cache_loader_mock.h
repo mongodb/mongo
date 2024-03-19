@@ -47,7 +47,7 @@ public:
     SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
                                        const StatsPathString& statsPath) override;
 
-    void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats);
+    void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats) override;
 
     static const Status kInternalErrorStatus;
 

@@ -268,7 +268,7 @@ public:
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
     void onShutdown() override;
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "RangeDeleterService";
     }
 
@@ -303,10 +303,9 @@ private:
     void _stopService();
 
     /* ReplicaSetAwareServiceShardSvr "empty implemented" methods */
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final{};
-    void onBecomeArbiter() override final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final{};
+    void onBecomeArbiter() final {}
 };
 
 /**

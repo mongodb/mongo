@@ -87,7 +87,7 @@ class ShardingDDLCoordinator
 public:
     explicit ShardingDDLCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& coorDoc);
 
-    ~ShardingDDLCoordinator();
+    ~ShardingDDLCoordinator() override;
 
     /**
      * Whether this coordinator is allowed to start when user write blocking is enabled, even if the
@@ -205,7 +205,7 @@ protected:
 
 private:
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancellationToken& token) noexcept override final;
+                         const CancellationToken& token) noexcept final;
 
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
@@ -215,7 +215,7 @@ private:
         const CancellationToken& token,
         const Status& status) noexcept;
 
-    void interrupt(Status status) override final;
+    void interrupt(Status status) final;
 
     bool _removeDocument(OperationContext* opCtx);
 
@@ -469,7 +469,7 @@ protected:
         return getCurrentSession();
     }
 
-    virtual boost::optional<Status> getAbortReason() const override {
+    boost::optional<Status> getAbortReason() const override {
         const auto& status = _doc.getAbortReason();
         invariant(!status || !status->isOK(), "when persisted, status must be an error");
         return status;

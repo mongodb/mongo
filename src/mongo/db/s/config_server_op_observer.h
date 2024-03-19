@@ -57,7 +57,7 @@ class ConfigServerOpObserver final : public OpObserverNoop {
 
 public:
     ConfigServerOpObserver();
-    ~ConfigServerOpObserver();
+    ~ConfigServerOpObserver() override;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfigAndSystem, NamespaceFilter::kConfigAndSystem};

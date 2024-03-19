@@ -50,7 +50,7 @@ namespace {
 class ObjectArray : public mongo::unittest::Test {
 public:
     ObjectArray() {}
-    ~ObjectArray() {
+    ~ObjectArray() override {
         for (auto& pair : objs) {
             releaseValue(pair.first, pair.second);
         }

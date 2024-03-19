@@ -970,7 +970,7 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeNonZeroVotes) {
 
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
 public:
-    void setUp() {
+    void setUp() override {
         BSONObj configBson = BSON("_id"
                                   << "mySet"
                                   << "version" << initConfigVersion << "term" << initConfigTerm

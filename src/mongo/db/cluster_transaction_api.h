@@ -52,7 +52,7 @@ public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) const override;
 
-    bool runsClusterOperations() const {
+    bool runsClusterOperations() const override {
         // Cluster commands will attach appropriate shard versions for any targeted namespaces, so
         // it is safe to use this client within a caller's operation with shard versions.
         return true;

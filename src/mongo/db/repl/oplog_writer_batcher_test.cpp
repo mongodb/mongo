@@ -46,19 +46,19 @@ class OplogWriterBufferMock : public OplogBuffer {
 
 public:
     OplogWriterBufferMock() = default;
-    virtual ~OplogWriterBufferMock() = default;
-    void startup(OperationContext*) {
+    ~OplogWriterBufferMock() override = default;
+    void startup(OperationContext*) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    void shutdown(OperationContext* opCtx) {
+    void shutdown(OperationContext* opCtx) override {
         MONGO_UNIMPLEMENTED;
     }
 
     void push(OperationContext*,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              boost::optional<std::size_t> bytes) {
+              boost::optional<std::size_t> bytes) override {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -68,36 +68,36 @@ public:
         _notEmptyCv.notify_one();
     }
 
-    void waitForSpace(OperationContext*, std::size_t size) {
+    void waitForSpace(OperationContext*, std::size_t size) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    bool isEmpty() const {
+    bool isEmpty() const override {
         stdx::lock_guard<Latch> lk(_mutex);
         return _queue.empty();
     }
 
-    std::size_t getMaxSize() const {
+    std::size_t getMaxSize() const override {
         MONGO_UNIMPLEMENTED;
     }
 
-    std::size_t getSize() const {
+    std::size_t getSize() const override {
         MONGO_UNIMPLEMENTED;
     }
 
-    std::size_t getCount() const {
+    std::size_t getCount() const override {
         MONGO_UNIMPLEMENTED;
     }
 
-    void clear(OperationContext*) {
+    void clear(OperationContext*) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    bool tryPop(OperationContext*, Value* value) {
+    bool tryPop(OperationContext*, Value* value) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) {
+    bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) override {
         stdx::lock_guard<Latch> lk(_mutex);
         if (_queue.empty()) {
             return false;
@@ -107,36 +107,36 @@ public:
         return true;
     }
 
-    bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) {
+    bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override {
         stdx::unique_lock<Latch> lk(_mutex);
         interruptible->waitForConditionOrInterruptFor(
             _notEmptyCv, lk, waitDuration, [&] { return !_queue.empty(); });
         return !_queue.empty();
     }
 
-    bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
+    bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    bool peek(OperationContext*, Value* value) {
+    bool peek(OperationContext*, Value* value) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    boost::optional<OplogBuffer::Value> lastObjectPushed(OperationContext*) const {
+    boost::optional<OplogBuffer::Value> lastObjectPushed(OperationContext*) const override {
         MONGO_UNIMPLEMENTED;
     }
 
-    void enterDrainMode() {
+    void enterDrainMode() override {
         stdx::lock_guard<Latch> lk(_mutex);
         _drainMode = true;
     }
 
-    void exitDrainMode() {
+    void exitDrainMode() override {
         stdx::lock_guard<Latch> lk(_mutex);
         _drainMode = false;
     }
 
-    bool inDrainModeAndEmpty() {
+    bool inDrainModeAndEmpty() override {
         stdx::lock_guard<Latch> lk(_mutex);
         return _drainMode && _queue.empty();
     }

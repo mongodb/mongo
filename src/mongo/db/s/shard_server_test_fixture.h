@@ -51,7 +51,7 @@ namespace mongo {
 class ShardServerTestFixture : public ShardingMongoDTestFixture {
 protected:
     ShardServerTestFixture(Options options = {}, bool setUpMajorityReads = true);
-    ~ShardServerTestFixture();
+    ~ShardServerTestFixture() override;
 
     void setUp() override;
 
@@ -81,7 +81,7 @@ protected:
 class ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture {
 protected:
     void setUp() override;
-    virtual std::unique_ptr<CatalogCache> makeCatalogCache() override;
+    std::unique_ptr<CatalogCache> makeCatalogCache() override;
     CatalogCacheMock* getCatalogCacheMock();
     CatalogCacheLoaderMock* getCatalogCacheLoaderMock();
 

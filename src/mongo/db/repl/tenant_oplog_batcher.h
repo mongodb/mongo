@@ -94,7 +94,7 @@ public:
                        Timestamp resumeBatchingTs,
                        OpTime beginApplyingAfterOpTime);
 
-    virtual ~TenantOplogBatcher();
+    ~TenantOplogBatcher() override;
 
     /**
      * Returns a future for the next oplog batch. Client must not ask for another batch until

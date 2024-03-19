@@ -72,7 +72,7 @@ LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
 class SessionsCollectionShardedTest : public RouterCatalogCacheTestFixture {
 public:
     SessionsCollectionShardedTest() = default;
-    ~SessionsCollectionShardedTest() = default;
+    ~SessionsCollectionShardedTest() override = default;
 
     void setUp() override {
         RouterCatalogCacheTestFixture::setUp();

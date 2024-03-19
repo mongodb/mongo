@@ -73,7 +73,7 @@ public:
         return getTimers()->makeTimer();
     }
 
-    void setUp() {
+    void setUp() override {
         _opCtx = getGlobalServiceContext()->makeOperationContext(Client::getCurrent());
     }
 

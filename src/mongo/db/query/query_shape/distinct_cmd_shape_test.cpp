@@ -83,7 +83,7 @@ protected:
     boost::intrusive_ptr<ExpressionContext> expCtx;
     SerializationOptions opts;
 
-    void setUp() {
+    void setUp() override {
         expCtx = make_intrusive<ExpressionContextForTest>();
         opts =
             SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);

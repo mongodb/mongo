@@ -140,7 +140,7 @@ namespace mongo {
 namespace {
 
 class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         // The config database's primary shard is always config, and it is always sharded.
@@ -168,7 +168,7 @@ class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoa
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }
 
-    void tearDown() {
+    void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
     }
@@ -179,7 +179,7 @@ class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoa
      * ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
      * DBClientMock analogous to the NetworkInterfaceMock.
      */
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:

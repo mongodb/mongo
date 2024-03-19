@@ -217,7 +217,7 @@ public:
      */
     static std::shared_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 
-    virtual ~SSLManagerInterface();
+    ~SSLManagerInterface() override;
 
     /**
      * Initiates a TLS connection.

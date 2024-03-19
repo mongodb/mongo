@@ -77,7 +77,7 @@ public:
     static JournalFlusher* get(OperationContext* opCtx);
     static void set(ServiceContext* serviceCtx, std::unique_ptr<JournalFlusher> journalFlusher);
 
-    std::string name() const {
+    std::string name() const override {
         return "JournalFlusher";
     }
 
@@ -85,7 +85,7 @@ public:
      * Runs data flushes every 'storageGlobalParams.journalCommitIntervalMs' millis (unless
      * '_disablePeriodicFlushes' is set) or immediately if  waitForJournalFlush() is called.
      */
-    void run();
+    void run() override;
 
     /**
      * Signals the thread to quit and then waits until it does. The given 'reason' is returned to

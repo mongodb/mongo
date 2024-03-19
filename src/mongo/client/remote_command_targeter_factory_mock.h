@@ -46,7 +46,7 @@ namespace mongo {
 class RemoteCommandTargeterFactoryMock final : public RemoteCommandTargeterFactory {
 public:
     RemoteCommandTargeterFactoryMock();
-    ~RemoteCommandTargeterFactoryMock();
+    ~RemoteCommandTargeterFactoryMock() override;
 
     /**
      * If the input connection string matches one of the pre-defined targeters added through an

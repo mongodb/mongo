@@ -209,7 +209,7 @@ private:
         Cache(ServiceContext* service,
               ThreadPoolInterface& threadPool,
               FetchDefaultsFn fetchDefaultsFn);
-        virtual ~Cache() = default;
+        ~Cache() override = default;
 
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);
 

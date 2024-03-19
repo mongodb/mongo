@@ -114,7 +114,7 @@ public:
         explicit Session(MockCoordinator* mc) : _mc{mc} {
             LOGV2_DEBUG(7015130, 3, "MockCoordinator::Session ctor");
         }
-        ~Session() {
+        ~Session() override {
             LOGV2_DEBUG(7015131, 3, "MockCoordinator::Session dtor");
         }
 

@@ -131,7 +131,7 @@ class DBHashCmd : public BasicCommand {
 public:
     DBHashCmd() : BasicCommand("dbHash", "dbhash") {}
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 

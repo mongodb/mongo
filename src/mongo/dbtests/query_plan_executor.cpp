@@ -95,7 +95,7 @@ class PlanExecutorTest : public unittest::Test {
 public:
     PlanExecutorTest() : _client(&_opCtx) {}
 
-    virtual ~PlanExecutorTest() {
+    ~PlanExecutorTest() override {
         _client.dropCollection(nss);
     }
 

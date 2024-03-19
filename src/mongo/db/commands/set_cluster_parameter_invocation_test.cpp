@@ -65,7 +65,7 @@ class MockParameterService : public ServerParameterService {
 public:
     MockParameterService(std::function<ServerParameter*(StringData)> get) : _getMock(get){};
 
-    ServerParameter* get(StringData parameterName) {
+    ServerParameter* get(StringData parameterName) override {
         return _getMock(parameterName);
     }
 
@@ -83,23 +83,24 @@ public:
     void append(OperationContext* opCtx,
                 BSONObjBuilder* b,
                 StringData name,
-                const boost::optional<TenantId>&) {}
+                const boost::optional<TenantId>&) override {}
 
     void appendSupportingRoundtrip(OperationContext* opCtx,
                                    BSONObjBuilder* b,
                                    StringData name,
-                                   const boost::optional<TenantId>&) {}
+                                   const boost::optional<TenantId>&) override {}
 
-    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) {
+    Status set(const BSONElement& newValueElement,
+               const boost::optional<TenantId>& tenantId) override {
         return Status(ErrorCodes::BadValue, "Should not call set() in this test");
     }
 
-    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) {
+    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) override {
         return Status(ErrorCodes::BadValue, "Should not call setFromString() in this test");
     }
 
     Status validate(const BSONElement& newValueElement,
-                    const boost::optional<TenantId>& tenantId) const {
+                    const boost::optional<TenantId>& tenantId) const override {
         return validateImpl(newValueElement);
     }
 

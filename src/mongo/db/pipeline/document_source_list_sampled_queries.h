@@ -103,7 +103,7 @@ public:
             return true;
         }
 
-        void assertSupportsMultiDocumentTransaction() const {
+        void assertSupportsMultiDocumentTransaction() const override {
             transactionNotSupported(kStageName);
         }
 
@@ -116,7 +116,7 @@ public:
                                      DocumentSourceListSampledQueriesSpec spec)
         : DocumentSource(kStageName, pExpCtx), _spec(std::move(spec)) {}
 
-    virtual ~DocumentSourceListSampledQueries() = default;
+    ~DocumentSourceListSampledQueries() override = default;
 
     StageConstraints constraints(
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
@@ -142,7 +142,7 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

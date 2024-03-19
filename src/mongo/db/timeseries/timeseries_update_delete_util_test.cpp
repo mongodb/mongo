@@ -48,7 +48,7 @@ namespace {
 
 class TimeseriesUpdateDeleteUtilTest : public ServiceContextMongoDTest {
 protected:
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
         _opCtx = cc().makeOperationContext();
     }

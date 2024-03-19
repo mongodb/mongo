@@ -48,7 +48,7 @@ namespace {
 class ClassicExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& state,
-                             const std::vector<Document>& documents) override final {
+                             const std::vector<Document>& documents) final {
         QueryTestServiceContext testServiceContext;
         auto opContext = testServiceContext.makeOperationContext();
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.bm");

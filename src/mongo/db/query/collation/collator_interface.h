@@ -99,7 +99,7 @@ public:
      */
     CollatorInterface(Collation spec) : _spec(std::move(spec)) {}
 
-    virtual ~CollatorInterface() {}
+    ~CollatorInterface() override {}
 
     virtual std::unique_ptr<CollatorInterface> clone() const = 0;
     virtual std::shared_ptr<CollatorInterface> cloneShared() const = 0;
@@ -109,7 +109,7 @@ public:
      * 0 if 'left' is greater than 'right' w.r.t. the collation, and 0 if 'left' and 'right' are
      * equal w.r.t. the collation.
      */
-    virtual int compare(StringData left, StringData right) const = 0;
+    int compare(StringData left, StringData right) const override = 0;
 
     /**
      * Hashes the string such that strings which are equal under this collation also have equal

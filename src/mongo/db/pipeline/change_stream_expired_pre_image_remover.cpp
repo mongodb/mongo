@@ -96,11 +96,11 @@ public:
         changeStreamExpiredPreImagesRemover = std::move(preImagesRemover);
     }
 
-    std::string name() const {
+    std::string name() const override {
         return "ChangeStreamExpiredPreImagesRemover";
     }
 
-    void run() {
+    void run() override {
         LOGV2(7080100, "Starting Change Stream Expired Pre-images Remover thread");
         ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 

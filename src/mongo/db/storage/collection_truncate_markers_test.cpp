@@ -159,13 +159,13 @@ public:
 private:
     bool _expirePartialMarker = false;
 
-    virtual bool _hasExcessMarkers(OperationContext* opCtx) const override {
+    bool _hasExcessMarkers(OperationContext* opCtx) const override {
         return !getMarkers().empty();
     }
 
-    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx,
-                                          const RecordId& highestSeenRecordId,
-                                          const Date_t& highestSeenWallTime) const override {
+    bool _hasPartialMarkerExpired(OperationContext* opCtx,
+                                  const RecordId& highestSeenRecordId,
+                                  const Date_t& highestSeenWallTime) const override {
         return _expirePartialMarker;
     }
 };
@@ -186,7 +186,7 @@ public:
               std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker){};
 
 private:
-    virtual bool _hasExcessMarkers(OperationContext* opCtx) const override {
+    bool _hasExcessMarkers(OperationContext* opCtx) const override {
         return !getMarkers().empty();
     }
 };

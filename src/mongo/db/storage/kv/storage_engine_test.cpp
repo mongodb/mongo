@@ -266,7 +266,7 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
 
 class StorageEngineTimestampMonitorTest : public StorageEngineTest {
 public:
-    void setUp() {
+    void setUp() override {
         StorageEngineTest::setUp();
         _storageEngine->startTimestampMonitor();
     }
@@ -611,15 +611,15 @@ public:
     }
 
     // Increment the timestamps each time they are called for testing purposes.
-    virtual Timestamp getCheckpointTimestamp() const override {
+    Timestamp getCheckpointTimestamp() const override {
         checkpointTimestamp = std::make_unique<Timestamp>(checkpointTimestamp->getInc() + 1);
         return *checkpointTimestamp;
     }
-    virtual Timestamp getOldestTimestamp() const override {
+    Timestamp getOldestTimestamp() const override {
         oldestTimestamp = std::make_unique<Timestamp>(oldestTimestamp->getInc() + 1);
         return *oldestTimestamp;
     }
-    virtual Timestamp getStableTimestamp() const override {
+    Timestamp getStableTimestamp() const override {
         stableTimestamp = std::make_unique<Timestamp>(stableTimestamp->getInc() + 1);
         return *stableTimestamp;
     }
@@ -638,7 +638,7 @@ public:
     /**
      * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
      */
-    void setUp() {
+    void setUp() override {
         ServiceContextTest::setUp();
 
         auto opCtx = makeOperationContext();
@@ -655,7 +655,7 @@ public:
         _storageEngine->startTimestampMonitor();
     }
 
-    void tearDown() {
+    void tearDown() override {
         _storageEngine->cleanShutdown(getServiceContext());
         _storageEngine.reset();
 

@@ -69,11 +69,11 @@ public:
 
     static Status onUpdateTTLMonitorSleepSeconds(int newSleepSeconds);
 
-    std::string name() const {
+    std::string name() const override {
         return "TTLMonitor";
     }
 
-    void run();
+    void run() override;
 
     /**
      * Signals the thread to quit and then waits until it does.

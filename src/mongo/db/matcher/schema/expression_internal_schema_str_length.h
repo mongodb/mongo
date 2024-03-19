@@ -58,7 +58,7 @@ public:
                                            StringData name,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual ~InternalSchemaStrLengthMatchExpression() {}
+    ~InternalSchemaStrLengthMatchExpression() override {}
 
     virtual Validator getComparator() const = 0;
 

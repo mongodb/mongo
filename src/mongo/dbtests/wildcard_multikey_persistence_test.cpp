@@ -119,7 +119,7 @@ public:
         _opCtx = cc().makeOperationContext();
     }
 
-    virtual ~WildcardMultikeyPersistenceTestFixture() {
+    ~WildcardMultikeyPersistenceTestFixture() override {
         _opCtx.reset();
     }
 

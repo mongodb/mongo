@@ -459,7 +459,7 @@ protected:
     }
 
 private:
-    virtual boost::intrusive_ptr<ExpressionContext> makeExpCtx() override {
+    boost::intrusive_ptr<ExpressionContext> makeExpCtx() override {
         return new ExpressionContext(operationContext(), nullptr, _nss);
     }
 

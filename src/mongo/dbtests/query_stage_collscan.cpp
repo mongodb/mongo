@@ -126,7 +126,7 @@ public:
         }
     }
 
-    virtual ~QueryStageCollectionScanTest() {
+    ~QueryStageCollectionScanTest() override {
         dbtests::WriteContextForTests ctx(&_opCtx, kNss.ns_forTest());
         _client.dropCollection(kNss);
     }

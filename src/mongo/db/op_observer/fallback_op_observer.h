@@ -55,7 +55,7 @@ class FallbackOpObserver final : public OpObserverNoop {
 
 public:
     FallbackOpObserver() = default;
-    ~FallbackOpObserver() = default;
+    ~FallbackOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfigAndSystem, NamespaceFilter::kConfigAndSystem};

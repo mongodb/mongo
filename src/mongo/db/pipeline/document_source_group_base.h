@@ -81,7 +81,7 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
@@ -209,7 +209,7 @@ protected:
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
-    virtual ~DocumentSourceGroupBase();
+    ~DocumentSourceGroupBase() override;
 
     void initializeFromBson(BSONElement elem);
     virtual bool isSpecFieldReserved(StringData fieldName) = 0;

@@ -100,7 +100,7 @@ public:
             return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::collStats)};
         }
 
-        void assertPermittedInAPIVersion(const APIParameters&) const;
+        void assertPermittedInAPIVersion(const APIParameters&) const override;
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -144,7 +144,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

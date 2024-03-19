@@ -61,12 +61,12 @@ class ClassicStageBuilderTest : public ServiceContextMongoDTest {
 public:
     ClassicStageBuilderTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
 
-    void setUp() {
+    void setUp() override {
         _opCtx = makeOperationContext();
         _workingSet = std::make_unique<WorkingSet>();
     }
 
-    void tearDown() {
+    void tearDown() override {
         _opCtx.reset();
         _workingSet.reset();
     }

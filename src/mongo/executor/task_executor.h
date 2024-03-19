@@ -132,7 +132,7 @@ public:
      * Destroys the task executor. Implicitly performs the equivalent of shutdown() and join()
      * before returning, if necessary.
      */
-    virtual ~TaskExecutor();
+    ~TaskExecutor() override;
 
     /**
      * Causes the executor to initialize its internal state (start threads if appropriate, create
@@ -244,7 +244,7 @@ public:
      * Schedules the given Task to run in this executor.
      * Note that 'func' is implicitly noexcept and should not ever leak exceptions.
      */
-    void schedule(OutOfLineExecutor::Task func) final override;
+    void schedule(OutOfLineExecutor::Task func) final;
 
     /**
      * Schedules "work" to be run by the executor ASAP.

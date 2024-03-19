@@ -60,7 +60,7 @@ public:
         OnShutdownCallbackFn onShutdownCallbackFn,
         Config config);
 
-    virtual ~OplogFetcherMock();
+    ~OplogFetcherMock() override;
 
     /**
      * Simulate a batch received by the OplogFetcher. This is a batch that will be enqueued using

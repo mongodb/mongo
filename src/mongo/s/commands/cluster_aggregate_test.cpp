@@ -75,7 +75,7 @@ protected:
     // The index of the shard expected to receive the response is used to prevent different shards
     // from returning documents with the same shard key. This is expected to be 0 for queries
     // targeting one shard.
-    void expectReturnsSuccess(int shardIndex) {
+    void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
 
@@ -91,7 +91,7 @@ protected:
         });
     }
 
-    void expectInspectRequest(int shardIndex, InspectionCallback cb) {
+    void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
 

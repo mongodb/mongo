@@ -41,7 +41,7 @@ namespace {
 class TransactionResourcesNonMongoDClientObserver : public ServiceContext::ClientObserver {
 public:
     TransactionResourcesNonMongoDClientObserver() = default;
-    ~TransactionResourcesNonMongoDClientObserver() = default;
+    ~TransactionResourcesNonMongoDClientObserver() override = default;
 
     void onCreateClient(Client* client) final {}
 

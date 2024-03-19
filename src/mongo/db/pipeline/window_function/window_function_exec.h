@@ -105,7 +105,7 @@ public:
         return _function->getValue();
     }
 
-    void reset() {
+    void reset() override {
         _function->reset();
         _values = std::queue<MemoryUsageTokenWith<Value>>();
         _memTracker->set(_function->getApproximateSize());

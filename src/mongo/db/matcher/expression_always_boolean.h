@@ -57,7 +57,7 @@ public:
                                  clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(type, std::move(annotation)), _value(value) {}
 
-    virtual ~AlwaysBooleanMatchExpression() = default;
+    ~AlwaysBooleanMatchExpression() override = default;
 
     /**
      * The name of this MatchExpression.

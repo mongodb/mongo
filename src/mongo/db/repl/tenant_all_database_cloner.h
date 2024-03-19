@@ -76,7 +76,7 @@ public:
                             ThreadPool* dbPool,
                             StringData tenantId);
 
-    virtual ~TenantAllDatabaseCloner() = default;
+    ~TenantAllDatabaseCloner() override = default;
 
     Stats getStats() const;
 

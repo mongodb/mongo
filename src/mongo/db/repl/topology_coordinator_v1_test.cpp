@@ -124,7 +124,7 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 
 class TopoCoordTest : public mongo::unittest::Test {
 public:
-    virtual void setUp() {
+    void setUp() override {
         _options = TopologyCoordinator::Options{};
         _options.maxSyncSourceLagSecs = Seconds{100};
         _topo = std::make_unique<TopologyCoordinator>(_options);
@@ -139,7 +139,7 @@ public:
         changeSyncSourceThresholdMillis.store(0LL);
     }
 
-    virtual void tearDown() {
+    void tearDown() override {
         _topo = nullptr;
         _cbData = nullptr;
     }
@@ -2437,7 +2437,7 @@ TEST_F(TopoCoordTest, ChangedTooOftenRecentlyReturnsFalseWhenNotFilled) {
 
 class PrepareHeartbeatResponseV1Test : public TopoCoordTest {
 public:
-    virtual void setUp() {
+    void setUp() override {
         TopoCoordTest::setUp();
         updateConfig(BSON("_id"
                           << "rs0"
@@ -3919,7 +3919,7 @@ TEST_F(TopoCoordTest, NodeBecomesSecondaryAsNormalWhenReadCommittedSupportedAndC
 
 class HeartbeatResponseTestV1 : public TopoCoordTest {
 public:
-    virtual void setUp() {
+    void setUp() override {
         TopoCoordTest::setUp();
         updateConfig(BSON("_id"
                           << "rs0"
@@ -4665,7 +4665,7 @@ TEST_F(HeartbeatResponseTestV1,
 
 class ReevalSyncSourceTest : public TopoCoordTest {
 public:
-    virtual void setUp() {
+    void setUp() override {
         TopoCoordTest::setUp();
         updateConfig(BSON("_id"
                           << "rs0"
@@ -5212,7 +5212,7 @@ DEATH_TEST_F(ReevalSyncSourceTest, CrashOnSyncSourceParameterIsSelf, "7785601") 
 
 class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {
 public:
-    virtual void setUp() {
+    void setUp() override {
         TopoCoordTest::setUp();
         updateConfig(makeRSConfigWithVersionAndTerm(initConfigVersion, initConfigTerm), 0);
         setSelfMemberState(MemberState::RS_SECONDARY);
@@ -8028,7 +8028,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfSyncSourceHasDifferen
 
 class HeartbeatResponseTestOneRetryV1 : public HeartbeatResponseTestV1 {
 public:
-    virtual void setUp() {
+    void setUp() override {
         HeartbeatResponseTestV1::setUp();
 
         // Bring up the node we are heartbeating.
@@ -8127,7 +8127,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1,
 
 class HeartbeatResponseTestTwoRetriesV1 : public HeartbeatResponseTestOneRetryV1 {
 public:
-    virtual void setUp() {
+    void setUp() override {
         HeartbeatResponseTestOneRetryV1::setUp();
         // First retry fails at t + 4500ms
         HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(

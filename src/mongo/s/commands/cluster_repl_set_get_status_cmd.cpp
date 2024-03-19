@@ -53,12 +53,12 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -73,11 +73,11 @@ public:
         return Status::OK();
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const DatabaseName& dbName,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const DatabaseName& dbName,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         if (cmdObj["forShell"].trueValue()) {
             NotPrimaryErrorTracker::get(cc()).disable();
         }

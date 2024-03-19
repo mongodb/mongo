@@ -70,8 +70,7 @@ const auto kShardKey = BSON("newKey" << 1);
 class ReshardingMetricsTest : public ShardingDataTransformMetricsTestFixture {
 
 public:
-    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
-        override {
+    std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
         return std::make_unique<ReshardingCumulativeMetrics>();
     }
 
@@ -87,7 +86,7 @@ public:
                                                    getCumulativeMetrics());
     }
 
-    virtual StringData getRootSectionName() override {
+    StringData getRootSectionName() override {
         return kResharding;
     }
 

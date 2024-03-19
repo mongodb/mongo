@@ -71,14 +71,14 @@ public:
                              ServiceContext::UniqueOperationContext opCtx,
                              const NamespaceString& nss,
                              const BSONObj& idIndexSpec);
-    virtual ~CollectionBulkLoaderImpl();
+    ~CollectionBulkLoaderImpl() override;
 
-    virtual Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
+    Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
-    virtual Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
-                                   std::vector<BSONObj>::const_iterator end,
-                                   ParseRecordIdAndDocFunc fn) override;
-    virtual Status commit() override;
+    Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
+                           std::vector<BSONObj>::const_iterator end,
+                           ParseRecordIdAndDocFunc fn) override;
+    Status commit() override;
 
     CollectionBulkLoaderImpl::Stats getStats() const;
 

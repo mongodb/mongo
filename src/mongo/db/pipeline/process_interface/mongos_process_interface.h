@@ -92,7 +92,7 @@ class MongosProcessInterface : public CommonProcessInterface {
 public:
     using CommonProcessInterface::CommonProcessInterface;
 
-    virtual ~MongosProcessInterface() = default;
+    ~MongosProcessInterface() override = default;
 
     std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
         OperationContext* opCtx, const NamespaceString& ns) const final;

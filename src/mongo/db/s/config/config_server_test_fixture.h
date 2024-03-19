@@ -94,7 +94,7 @@ inline void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
 class ConfigServerTestFixture : public ShardingMongoDTestFixture {
 protected:
     explicit ConfigServerTestFixture(Options options = {}, bool setUpMajorityReads = true);
-    ~ConfigServerTestFixture();
+    ~ConfigServerTestFixture() override;
 
     void setUp() override;
     void tearDown() override;

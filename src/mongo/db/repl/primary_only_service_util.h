@@ -115,7 +115,7 @@ private:
 class DefaultPrimaryOnlyServiceInstance
     : public repl::PrimaryOnlyService::TypedInstance<DefaultPrimaryOnlyServiceInstance> {
 public:
-    ~DefaultPrimaryOnlyServiceInstance();
+    ~DefaultPrimaryOnlyServiceInstance() override;
 
     /**
      * The name of the 'PrimaryOnlyService::Instance'.

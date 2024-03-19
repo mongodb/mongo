@@ -63,8 +63,8 @@ public:
     }
 
     void startNetwork();
-    virtual void setUp() override;
-    virtual void tearDown() override;
+    void setUp() override;
+    void tearDown() override;
 
     RemoteCommandRequestOnAny kUnimportantRequest{
         {testHost()},

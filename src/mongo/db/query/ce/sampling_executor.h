@@ -41,7 +41,7 @@ namespace mongo::optimizer::ce {
 class SBESamplingExecutor : public SamplingExecutor {
 public:
     SBESamplingExecutor(OperationContext* opCtx) : _opCtx(opCtx) {}
-    ~SBESamplingExecutor();
+    ~SBESamplingExecutor() override;
 
     std::pair<sbe::value::TypeTags, sbe::value::Value> execute(
         const Metadata& metadata,

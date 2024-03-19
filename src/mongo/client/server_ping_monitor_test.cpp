@@ -245,14 +245,14 @@ private:
 
 class SingleServerPingMonitorTest : public ServerPingMonitorTestFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         ServerPingMonitorTestFixture::setUp();
         _replSet.reset(new MockReplicaSet(
             "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false));
         _hostAndPort = HostAndPort(_replSet->getSecondaries()[0]);
     }
 
-    void tearDown() {
+    void tearDown() override {
         _replSet.reset();
         ServerPingMonitorTestFixture::tearDown();
     }

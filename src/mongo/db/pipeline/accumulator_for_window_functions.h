@@ -96,7 +96,7 @@ public:
 class AccumulatorRankBase : public AccumulatorForWindowFunctions {
 public:
     explicit AccumulatorRankBase(ExpressionContext* expCtx, bool isAscending);
-    void reset();
+    void reset() override;
 
     Value getValue(bool toBeMerged) final {
         return Value::createIntOrLong(_lastRank);

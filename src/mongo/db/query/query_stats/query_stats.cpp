@@ -142,7 +142,7 @@ public:
         queryStatsEvictedMetric.increment(numEvicted);
     }
 
-    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
+    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) override {
         assertConfigurationAllowed();
         QueryStatsStoreManager::getRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
     }

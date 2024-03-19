@@ -703,7 +703,7 @@ private:
         return result;
     }
 
-    PlanCacheKey buildPlanCacheKey() const {
+    PlanCacheKey buildPlanCacheKey() const override {
         return plan_cache_key_factory::make<PlanCacheKey>(*_cq,
                                                           getCollections().getMainCollection());
     }
@@ -829,7 +829,7 @@ private:
         return result;
     }
 
-    sbe::PlanCacheKey buildPlanCacheKey() const {
+    sbe::PlanCacheKey buildPlanCacheKey() const override {
         return plan_cache_key_factory::make(
             *_cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
     }
@@ -932,7 +932,7 @@ private:
         return nullptr;
     }
 
-    sbe::PlanCacheKey buildPlanCacheKey() const {
+    sbe::PlanCacheKey buildPlanCacheKey() const override {
         return plan_cache_key_factory::make(
             *_cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
     }

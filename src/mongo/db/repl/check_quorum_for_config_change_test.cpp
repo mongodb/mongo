@@ -101,7 +101,7 @@ protected:
     bool isQuorumCheckDone();
 
 private:
-    void setUp() {
+    void setUp() override {
         executor::ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
     }
@@ -143,14 +143,14 @@ void CheckQuorumTest::_runQuorumCheck(const ReplSetConfig& config, int myIndex) 
 
 class CheckQuorumForInitiate : public CheckQuorumTest {
 private:
-    virtual Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) {
+    Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) override {
         return checkQuorumForInitiate(&getExecutor(), config, myIndex, 0);
     }
 };
 
 class CheckQuorumForReconfig : public CheckQuorumTest {
 protected:
-    virtual Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) {
+    Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) override {
         return checkQuorumForReconfig(&getExecutor(), config, myIndex, 0);
     }
 };

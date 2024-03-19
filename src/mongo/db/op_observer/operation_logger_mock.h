@@ -39,7 +39,7 @@ class OperationLoggerMock : public OperationLogger {
 
 public:
     OperationLoggerMock() = default;
-    virtual ~OperationLoggerMock() = default;
+    ~OperationLoggerMock() override = default;
 
     void appendOplogEntryChainInfo(OperationContext* opCtx,
                                    repl::MutableOplogEntry* oplogEntry,

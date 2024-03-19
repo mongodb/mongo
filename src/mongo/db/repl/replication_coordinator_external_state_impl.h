@@ -88,70 +88,70 @@ public:
         DropPendingCollectionReaper* dropPendingCollectionReaper,
         StorageInterface* storageInterface,
         ReplicationProcess* replicationProcess);
-    virtual ~ReplicationCoordinatorExternalStateImpl();
-    virtual void startThreads() override;
-    virtual void startSteadyStateReplication(OperationContext* opCtx,
-                                             ReplicationCoordinator* replCoord) override;
-    virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
+    ~ReplicationCoordinatorExternalStateImpl() override;
+    void startThreads() override;
+    void startSteadyStateReplication(OperationContext* opCtx,
+                                     ReplicationCoordinator* replCoord) override;
+    bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
-    virtual void shutdown(OperationContext* opCtx);
+    void shutdown(OperationContext* opCtx) override;
 
-    virtual executor::TaskExecutor* getTaskExecutor() const override;
+    executor::TaskExecutor* getTaskExecutor() const override;
     std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
-    virtual ThreadPool* getDbWorkThreadPool() const override;
-    virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
+    ThreadPool* getDbWorkThreadPool() const override;
+    Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) override;
     void onDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
-    virtual void forwardSecondaryProgress(bool prioritized = false);
-    virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
+    void forwardSecondaryProgress(bool prioritized = false) override;
+    bool isSelf(const HostAndPort& host, ServiceContext* service) override;
     bool isSelfFastPath(const HostAndPort& host) final;
     bool isSelfSlowPath(const HostAndPort& host,
                         ServiceContext* service,
                         Milliseconds timeout) final;
     Status createLocalLastVoteCollection(OperationContext* opCtx) final;
-    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
-    virtual Status storeLocalConfigDocument(OperationContext* opCtx,
-                                            const BSONObj& config,
-                                            bool writeOplog);
-    virtual Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
-    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
-    virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
-    virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
-    virtual Timestamp getGlobalTimestamp(ServiceContext* service);
+    StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) override;
+    Status storeLocalConfigDocument(OperationContext* opCtx,
+                                    const BSONObj& config,
+                                    bool writeOplog) override;
+    Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
+    StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) override;
+    Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote) override;
+    void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime) override;
+    Timestamp getGlobalTimestamp(ServiceContext* service) override;
     bool oplogExists(OperationContext* opCtx) final;
-    virtual StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx);
-    virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
-    virtual void closeConnections();
-    virtual void onStepDownHook();
-    virtual void signalApplierToChooseNewSyncSource();
-    virtual void stopProducer();
-    virtual void startProducerIfStopped();
+    StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx) override;
+    HostAndPort getClientHostAndPort(const OperationContext* opCtx) override;
+    void closeConnections() override;
+    void onStepDownHook() override;
+    void signalApplierToChooseNewSyncSource() override;
+    void stopProducer() override;
+    void startProducerIfStopped() override;
     void notifyOtherMemberDataChanged() final;
-    virtual bool tooStale();
+    bool tooStale() override;
     void clearCommittedSnapshot() final;
     void updateCommittedSnapshot(const OpTime& newCommitPoint) final;
     void updateLastAppliedSnapshot(const OpTime& optime) final;
-    virtual bool snapshotsEnabled() const;
-    virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
+    bool snapshotsEnabled() const override;
+    void notifyOplogMetadataWaiters(const OpTime& committedOpTime) override;
     boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
-    virtual double getElectionTimeoutOffsetLimitFraction() const;
-    virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
-    virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
+    double getElectionTimeoutOffsetLimitFraction() const override;
+    bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const override;
+    std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
+    std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
     JournalListener* getReplicationJournalListener() final;
 
 
     // Methods from JournalListener.
-    virtual JournalListener::Token getToken(OperationContext* opCtx);
-    virtual void onDurable(const JournalListener::Token& token);
+    JournalListener::Token getToken(OperationContext* opCtx) override;
+    void onDurable(const JournalListener::Token& token) override;
 
-    virtual void setupNoopWriter(Seconds waitTime);
-    virtual void startNoopWriter(OpTime);
-    virtual void stopNoopWriter();
+    void setupNoopWriter(Seconds waitTime) override;
+    void startNoopWriter(OpTime) override;
+    void stopNoopWriter() override;
 
-    virtual bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
+    bool isCWWCSetOnConfigShard(OperationContext* opCtx) const final;
 
-    virtual bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
+    bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
 
 private:
     /**

@@ -137,12 +137,12 @@ public:
         return StorageRepairObserver::get(getServiceContext());
     }
 
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
         storageGlobalParams.repair = true;
     }
 
-    void tearDown() {
+    void tearDown() override {
         auto repairObserver = getRepairObserver();
         if (_assertRepairIncompleteOnTearDown) {
             ASSERT(repairObserver->isIncomplete());

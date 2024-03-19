@@ -86,7 +86,7 @@ class QueryStageSubplanTest : public unittest::Test {
 public:
     QueryStageSubplanTest() : _client(_opCtx.get()) {}
 
-    virtual ~QueryStageSubplanTest() {
+    ~QueryStageSubplanTest() override {
         dbtests::WriteContextForTests ctx(opCtx(), nss.ns_forTest());
         _client.dropCollection(nss);
     }

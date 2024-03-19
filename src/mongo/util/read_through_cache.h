@@ -552,7 +552,7 @@ public:
           _lookupFn(std::move(lookupFn)),
           _cache(cacheSize) {}
 
-    ~ReadThroughCache() {
+    ~ReadThroughCache() override {
         invariant(_inProgressLookups.empty());
     }
 

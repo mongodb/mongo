@@ -74,11 +74,11 @@ public:
                   OpTime lastWrittenOpTime,
                   OpTime lastAppliedOpTime,
                   int primaryIndex);
-        virtual ~Algorithm();
-        virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
-        virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                     const executor::RemoteCommandResponse& response);
-        virtual bool hasReceivedSufficientResponses() const;
+        ~Algorithm() override;
+        std::vector<executor::RemoteCommandRequest> getRequests() const override;
+        void processResponse(const executor::RemoteCommandRequest& request,
+                             const executor::RemoteCommandResponse& response) override;
+        bool hasReceivedSufficientResponses() const override;
 
         /**
          * Returns a VoteRequest::Result indicating the result of the election.

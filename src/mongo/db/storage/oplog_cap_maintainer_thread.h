@@ -46,11 +46,11 @@ public:
 
     static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
 
-    virtual std::string name() const {
+    std::string name() const override {
         return _name;
     }
 
-    virtual void run();
+    void run() override;
 
     /**
      * Waits until the maintainer thread finishes.

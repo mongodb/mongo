@@ -105,7 +105,7 @@ public:
         result.append("durationSeconds", durationCount<Seconds>(micros));
         return true;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 };

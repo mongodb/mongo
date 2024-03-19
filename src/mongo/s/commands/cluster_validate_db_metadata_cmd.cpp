@@ -76,7 +76,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    bool maintenanceOk() const {
+    bool maintenanceOk() const override {
         // The db metadata maybe stale or incorrect while the node is in recovery mode, so we
         // disallow the command.
         return false;

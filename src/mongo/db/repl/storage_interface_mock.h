@@ -78,7 +78,7 @@ class CollectionBulkLoaderMock : public CollectionBulkLoader {
 public:
     explicit CollectionBulkLoaderMock(std::shared_ptr<CollectionMockStats> collStats)
         : stats(std::move(collStats)){};
-    virtual ~CollectionBulkLoaderMock() = default;
+    ~CollectionBulkLoaderMock() override = default;
     Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
     Status insertDocuments(std::vector<BSONObj>::const_iterator begin,

@@ -293,7 +293,7 @@ class BatchWriteExecTest : public virtual service_context_test::RouterRoleOverri
                            public ShardingTestFixture {
 public:
     BatchWriteExecTest() = default;
-    ~BatchWriteExecTest() = default;
+    ~BatchWriteExecTest() override = default;
 
     void setUp() override {
         ShardingTestFixture::setUp();
@@ -4128,7 +4128,7 @@ TEST_F(BatchWriteExecTest,
 class BatchWriteExecTargeterErrorTest : public ShardingTestFixture {
 public:
     BatchWriteExecTargeterErrorTest() = default;
-    ~BatchWriteExecTargeterErrorTest() = default;
+    ~BatchWriteExecTargeterErrorTest() override = default;
 
     void setUp() override {
         ShardingTestFixture::setUp();

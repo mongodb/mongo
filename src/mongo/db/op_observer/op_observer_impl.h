@@ -69,7 +69,7 @@ class OpObserverImpl : public OpObserver {
 
 public:
     OpObserverImpl(std::unique_ptr<OperationLogger> operationLogger);
-    virtual ~OpObserverImpl() = default;
+    ~OpObserverImpl() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};

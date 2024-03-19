@@ -138,7 +138,7 @@ public:
     explicit TestDefaultPrimaryOnlyService(ServiceContext* serviceContext)
         : repl::PrimaryOnlyService(serviceContext) {}
 
-    ~TestDefaultPrimaryOnlyService() = default;
+    ~TestDefaultPrimaryOnlyService() override = default;
 
     StringData getServiceName() const final {
         return kTestPrimaryOnlyServiceName;

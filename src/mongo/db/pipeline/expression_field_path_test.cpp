@@ -555,7 +555,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<FieldPath::Invalid>();
         add<FieldPath::Dependencies>();
         add<FieldPath::Missing>();

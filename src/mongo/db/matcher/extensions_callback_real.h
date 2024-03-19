@@ -61,7 +61,7 @@ public:
      */
     ExtensionsCallbackReal(OperationContext* opCtx, const NamespaceString* nss);
 
-    ~ExtensionsCallbackReal(){};
+    ~ExtensionsCallbackReal() override{};
 
     std::unique_ptr<MatchExpression> createText(
         TextMatchExpressionBase::TextParams text) const final;

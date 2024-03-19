@@ -53,7 +53,7 @@ namespace mongo {
 
 class FlowControlTest : public ServiceContextMongoDTest {
 public:
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
@@ -72,7 +72,7 @@ public:
         opCtx = client->makeOperationContext();
     }
 
-    void tearDown() {
+    void tearDown() override {
         ServiceContextMongoDTest::tearDown();
     }
 

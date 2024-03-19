@@ -81,10 +81,10 @@ std::once_flag initializeServerStatusSectionFlag;
 
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
-    virtual ~WiredTigerFactory() {}
-    virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
-                                                  const StorageGlobalParams& params,
-                                                  const StorageEngineLockFile* lockFile) const {
+    ~WiredTigerFactory() override {}
+    std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                          const StorageGlobalParams& params,
+                                          const StorageEngineLockFile* lockFile) const override {
         if (lockFile && lockFile->createdByUncleanShutdown()) {
             LOGV2_WARNING(22302, "Recovering data from the last clean checkpoint.");
 
@@ -162,20 +162,20 @@ public:
         return std::make_unique<StorageEngineImpl>(opCtx, std::move(kv), options);
     }
 
-    virtual StringData getCanonicalName() const {
+    StringData getCanonicalName() const override {
         return kWiredTigerEngineName;
     }
 
-    virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
+    Status validateCollectionStorageOptions(const BSONObj& options) const override {
         return WiredTigerRecordStore::parseOptionsField(options).getStatus();
     }
 
-    virtual Status validateIndexStorageOptions(const BSONObj& options) const {
+    Status validateIndexStorageOptions(const BSONObj& options) const override {
         return WiredTigerIndex::parseIndexOptions(options).getStatus();
     }
 
-    virtual Status validateMetadata(const StorageEngineMetadata& metadata,
-                                    const StorageGlobalParams& params) const {
+    Status validateMetadata(const StorageEngineMetadata& metadata,
+                            const StorageGlobalParams& params) const override {
         Status status =
             metadata.validateStorageEngineOption("directoryPerDB", params.directoryperdb);
         if (!status.isOK()) {
@@ -204,7 +204,7 @@ public:
         return Status::OK();
     }
 
-    virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+    BSONObj createMetadataOptions(const StorageGlobalParams& params) const override {
         BSONObjBuilder builder;
         builder.appendBool("directoryPerDB", params.directoryperdb);
         builder.appendBool("directoryForIndexes", wiredTigerGlobalOptions.directoryForIndexes);

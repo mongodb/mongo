@@ -91,7 +91,7 @@ public:
 
     VirtualCollectionImpl(const VirtualCollectionImpl&) = default;
 
-    ~VirtualCollectionImpl() = default;
+    ~VirtualCollectionImpl() override = default;
 
     const VirtualCollectionOptions& getVirtualCollectionOptions() const {
         return _shared->_recordStore->getOptions();
@@ -512,7 +512,7 @@ public:
         return _shared->_recordStore->dataSize(opCtx) == 0LL;
     }
 
-    inline int averageObjectSize(OperationContext* opCtx) const {
+    inline int averageObjectSize(OperationContext* opCtx) const override {
         return 0;
     }
 

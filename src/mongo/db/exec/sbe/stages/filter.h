@@ -156,7 +156,7 @@ public:
         }
     }
 
-    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const {
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override {
         auto ret = std::make_unique<PlanStageStats>(_commonStats);
         ret->specific = std::make_unique<FilterStats>(_specificStats);
 

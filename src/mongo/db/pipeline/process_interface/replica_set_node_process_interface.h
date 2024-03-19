@@ -86,7 +86,7 @@ public:
     ReplicaSetNodeProcessInterface(std::shared_ptr<executor::TaskExecutor> executor)
         : NonShardServerProcessInterface(std::move(executor)) {}
 
-    virtual ~ReplicaSetNodeProcessInterface() = default;
+    ~ReplicaSetNodeProcessInterface() override = default;
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
@@ -102,30 +102,31 @@ public:
                                     bool multi,
                                     boost::optional<OID> targetEpoch) override;
 
-    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const NamespaceString& sourceNs,
-                                                 const NamespaceString& targetNs,
-                                                 bool dropTarget,
-                                                 bool stayTemp,
-                                                 const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes);
+    void renameIfOptionsAndIndexesHaveNotChanged(
+        OperationContext* opCtx,
+        const NamespaceString& sourceNs,
+        const NamespaceString& targetNs,
+        bool dropTarget,
+        bool stayTemp,
+        const BSONObj& originalCollectionOptions,
+        const std::list<BSONObj>& originalIndexes) override;
     void createCollection(OperationContext* opCtx,
                           const DatabaseName& dbName,
-                          const BSONObj& cmdObj);
-    void dropCollection(OperationContext* opCtx, const NamespaceString& collection);
+                          const BSONObj& cmdObj) override;
+    void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
-                                        const std::vector<BSONObj>& indexSpecs);
+                                        const std::vector<BSONObj>& indexSpecs) override;
     void createTimeseriesView(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& cmdObj,
-                              const TimeseriesOptions& userOpts);
+                              const TimeseriesOptions& userOpts) override;
 
     Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             const NamespaceString& ns,
                             std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                             const WriteConcernOptions& wc,
-                            boost::optional<OID> targetEpoch);
+                            boost::optional<OID> targetEpoch) override;
 
 private:
     /**

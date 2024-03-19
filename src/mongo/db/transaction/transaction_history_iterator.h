@@ -69,7 +69,7 @@ public:
      * Creates a new iterator starting with an oplog entry with the given start opTime.
      */
     TransactionHistoryIterator(repl::OpTime startingOpTime, bool permitYield = false);
-    virtual ~TransactionHistoryIterator() = default;
+    ~TransactionHistoryIterator() override = default;
 
     bool hasNext() const override;
     repl::OplogEntry next(OperationContext* opCtx) override;

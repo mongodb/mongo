@@ -59,7 +59,7 @@ class FcvOpObserver final : public OpObserverNoop {
 
 public:
     FcvOpObserver() = default;
-    ~FcvOpObserver() = default;
+    ~FcvOpObserver() override = default;
 
     // FcvOpObserver overrides.
 

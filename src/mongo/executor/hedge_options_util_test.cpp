@@ -52,7 +52,7 @@ namespace {
 
 class HedgeOptionsUtilTestFixture : public unittest::Test {
 protected:
-    void setUp() {
+    void setUp() override {
         // Reset all the hedging server parameters.
         setParameters(kDefaultParameters);
     }

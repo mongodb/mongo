@@ -52,7 +52,7 @@ public:
         invariant(mockType == FaultFacetType::kMock1 || mockType == FaultFacetType::kMock2);
     }
 
-    ~FaultFacetMock() = default;
+    ~FaultFacetMock() override = default;
 
     FaultFacetType getType() const override {
         return _mockType;

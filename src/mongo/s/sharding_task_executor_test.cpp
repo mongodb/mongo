@@ -76,7 +76,7 @@ LogicalSessionId constructFullLsid() {
 
 class ShardingTaskExecutorTest : public ShardingTestFixture {
 protected:
-    void setUp() {
+    void setUp() override {
         ShardingTestFixture::setUp();
 
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

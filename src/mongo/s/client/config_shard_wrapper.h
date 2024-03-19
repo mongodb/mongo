@@ -70,7 +70,7 @@ class ConfigShardWrapper : public Shard {
 public:
     ConfigShardWrapper(std::shared_ptr<Shard> configShard);
 
-    ~ConfigShardWrapper() = default;
+    ~ConfigShardWrapper() override = default;
 
     const ConnectionString& getConnString() const override;
 
@@ -88,11 +88,11 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) final;
 
-    Status runAggregation(
-        OperationContext* opCtx,
-        const AggregateCommandRequest& aggRequest,
-        std::function<bool(const std::vector<BSONObj>& batch,
-                           const boost::optional<BSONObj>& postBatchResumeToken)> callback);
+    Status runAggregation(OperationContext* opCtx,
+                          const AggregateCommandRequest& aggRequest,
+                          std::function<bool(const std::vector<BSONObj>& batch,
+                                             const boost::optional<BSONObj>& postBatchResumeToken)>
+                              callback) override;
 
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,

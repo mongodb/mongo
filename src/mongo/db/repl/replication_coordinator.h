@@ -141,7 +141,7 @@ public:
         StatusAndDuration(const Status& stat, Milliseconds ms) : status(stat), duration(ms) {}
     };
 
-    virtual ~ReplicationCoordinator();
+    ~ReplicationCoordinator() override;
 
     /**
      * Does any initial bookkeeping needed to start replication, and instructs the other

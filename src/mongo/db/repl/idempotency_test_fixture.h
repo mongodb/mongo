@@ -105,7 +105,7 @@ public:
             ->setMode(FailPoint::alwaysOn);
     }
 
-    ~IdempotencyTest() {
+    ~IdempotencyTest() override {
         globalFailPointRegistry()
             .find("doUntimestampedWritesForIdempotencyTests")
             ->setMode(FailPoint::off);

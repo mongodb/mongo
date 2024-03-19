@@ -93,7 +93,7 @@ public:
                            ThreadPool* dbPool,
                            StringData tenantId);
 
-    virtual ~TenantCollectionCloner() = default;
+    ~TenantCollectionCloner() override = default;
 
     Stats getStats() const;
 

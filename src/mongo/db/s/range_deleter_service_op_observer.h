@@ -51,7 +51,7 @@ class RangeDeleterServiceOpObserver final : public OpObserverNoop {
 
 public:
     RangeDeleterServiceOpObserver();
-    ~RangeDeleterServiceOpObserver();
+    ~RangeDeleterServiceOpObserver() override;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

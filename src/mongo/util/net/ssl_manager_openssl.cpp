@@ -467,7 +467,7 @@ public:
 
     SSLConnectionOpenSSL(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len);
 
-    ~SSLConnectionOpenSSL();
+    ~SSLConnectionOpenSSL() override;
 };
 
 ////////////////////////////////////////////////////////////////
@@ -1268,7 +1268,7 @@ public:
     explicit SSLManagerOpenSSL(const SSLParams& params,
                                const boost::optional<TransientSSLParams>& transientSSLParams,
                                bool isServer);
-    ~SSLManagerOpenSSL() {
+    ~SSLManagerOpenSSL() override {
         stopJobs();
     }
 

@@ -1076,14 +1076,14 @@ public:
         _metrics = &ResourceConsumption::MetricsCollector::get(opCtx);
         WiredTigerIndexCursorGeneric::reattachToOperationContext(opCtx);
     }
-    void setSaveStorageCursorOnDetachFromOperationContext(bool detach) {
+    void setSaveStorageCursorOnDetachFromOperationContext(bool detach) override {
         WiredTigerIndexCursorGeneric::setSaveStorageCursorOnDetachFromOperationContext(detach);
     }
 
     /**
      *  Returns the checkpoint ID for checkpoint cursors, otherwise 0.
      */
-    uint64_t getCheckpointId() const {
+    uint64_t getCheckpointId() const override {
         return _cursor->getCheckpointId();
     }
 
@@ -1468,7 +1468,7 @@ private:
         }
     }
 
-    virtual bool matchesPositionedKey(const key_string::Value& search) const override {
+    bool matchesPositionedKey(const key_string::Value& search) const override {
         // We perform different comparisons depending on whether this is an old-format or new-format
         // key. New-format keys have record IDs at the end.
         if (isRecordIdAtEndOfKeyString()) {
@@ -1526,7 +1526,7 @@ public:
         }
     }
 
-    virtual bool matchesPositionedKey(const key_string::Value& search) const override {
+    bool matchesPositionedKey(const key_string::Value& search) const override {
         return key_string::compare(
                    search.getBuffer(), _key.getBuffer(), search.getSize(), _key.getSize()) == 0;
     }

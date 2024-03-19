@@ -281,7 +281,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("logical_sessions") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<SessionsCollectionStandaloneRemoveTest>();
         add<SessionsCollectionStandaloneRefreshTest>();
         add<SessionsCollectionStandaloneFindTest>();

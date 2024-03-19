@@ -61,7 +61,7 @@ class SubBaton final : public Baton {
 public:
     explicit SubBaton(BatonHandle baton) : _baton(std::move(baton)) {}
 
-    ~SubBaton() {
+    ~SubBaton() override {
         invariant(_isDead);
     }
 

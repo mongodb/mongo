@@ -134,7 +134,7 @@ public:
                       State state,
                       ProvenanceEnum provenance = ProvenanceEnum::kReshardCollection);
 
-    ~ReshardingMetrics();
+    ~ReshardingMetrics() override;
 
     static std::unique_ptr<ReshardingMetrics> makeInstance(UUID instanceId,
                                                            BSONObj shardKey,
@@ -213,7 +213,7 @@ public:
 
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
-    virtual StringData getStateString() const noexcept override;
+    StringData getStateString() const noexcept override;
 
 private:
     std::string createOperationDescription() const noexcept override;

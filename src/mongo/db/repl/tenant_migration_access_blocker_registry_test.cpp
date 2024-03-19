@@ -52,12 +52,12 @@ namespace mongo {
 
 class TenantMigrationAccessBlockerRegistryTest : public ServiceContextTest {
 public:
-    void setUp() {
+    void setUp() override {
         _opCtx = makeOperationContext();
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).startup();
     }
 
-    void tearDown() {
+    void tearDown() override {
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
     }
 

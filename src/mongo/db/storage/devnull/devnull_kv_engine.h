@@ -155,7 +155,7 @@ public:
         return true;
     }
 
-    std::vector<std::string> getAllIdents(OperationContext* opCtx) const {
+    std::vector<std::string> getAllIdents(OperationContext* opCtx) const override {
         return std::vector<std::string>();
     }
 

@@ -88,7 +88,7 @@ public:
     void appendLetCmdSpecificShapeComponents(BSONObjBuilder& bob,
                                              const boost::intrusive_ptr<ExpressionContext>&,
                                              const SerializationOptions&) const final;
-    size_t extraSize() const final override;
+    size_t extraSize() const final;
 
 private:
     AggCmdShapeComponents _components;

@@ -50,7 +50,7 @@ class Session : public Decorable<Session> {
 public:
     explicit Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
-    ~Session() {
+    ~Session() override {
         invariant(!_numWaitingToCheckOut);
     }
 

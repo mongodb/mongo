@@ -59,7 +59,7 @@ public:
                        const IndexDescriptor* indexDescriptor,
                        WorkingSet* workingSet);
 
-    virtual ~RequiresIndexStage() = default;
+    ~RequiresIndexStage() override = default;
 
 protected:
     /**
@@ -72,9 +72,9 @@ protected:
      */
     virtual void doRestoreStateRequiresIndex() = 0;
 
-    void doSaveStateRequiresCollection() override final;
+    void doSaveStateRequiresCollection() final;
 
-    void doRestoreStateRequiresCollection() override final;
+    void doRestoreStateRequiresCollection() final;
 
     const IndexDescriptor* indexDescriptor() const {
         return _entry ? _entry->descriptor() : nullptr;

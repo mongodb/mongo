@@ -45,7 +45,7 @@ namespace mongo {
 class ConfigServerCatalogCacheLoader final : public CatalogCacheLoader {
 public:
     ConfigServerCatalogCacheLoader();
-    ~ConfigServerCatalogCacheLoader() = default;
+    ~ConfigServerCatalogCacheLoader() override = default;
     ;
 
     /**

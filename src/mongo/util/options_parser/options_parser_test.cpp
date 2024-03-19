@@ -66,7 +66,9 @@ constexpr auto OptionParserTest = moe::OptionSection::OptionParserUsageType::Opt
 
 class OptionsParserTester : public moe::OptionsParser {
 public:
-    Status readConfigFile(const std::string& filename, std::string* config, moe::ConfigExpand) {
+    Status readConfigFile(const std::string& filename,
+                          std::string* config,
+                          moe::ConfigExpand) override {
         if (filename != _filename) {
             ::mongo::StringBuilder sb;
             sb << "Parser using filename: " << filename

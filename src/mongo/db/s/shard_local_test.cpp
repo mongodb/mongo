@@ -68,7 +68,7 @@ protected:
             ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     }
 
-    ~ShardLocalTest() {
+    ~ShardLocalTest() override {
         serverGlobalParams.clusterRole = ClusterRole::None;
     }
 

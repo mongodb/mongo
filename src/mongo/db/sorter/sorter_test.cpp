@@ -140,27 +140,27 @@ class IntIterator : public IWIterator {
 public:
     IntIterator(int start = 0, int stop = INT_MAX, int increment = 1)
         : _current(start), _increment(increment), _stop(stop) {}
-    void openSource() {}
-    void closeSource() {}
-    bool more() {
+    void openSource() override {}
+    void closeSource() override {}
+    bool more() override {
         if (_increment == 0)
             return true;
         if (_increment > 0)
             return _current < _stop;
         return _current > _stop;
     }
-    IWPair next() {
+    IWPair next() override {
         IWPair out(_current, -_current);
         _current += _increment;
         return out;
     }
-    IntWrapper nextWithDeferredValue() {
+    IntWrapper nextWithDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    IntWrapper getDeferredValue() {
+    IntWrapper getDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    const IntWrapper& current() {
+    const IntWrapper& current() override {
         MONGO_UNREACHABLE;
     }
 
@@ -172,21 +172,21 @@ private:
 
 class EmptyIterator : public IWIterator {
 public:
-    void openSource() {}
-    void closeSource() {}
-    bool more() {
+    void openSource() override {}
+    void closeSource() override {}
+    bool more() override {
         return false;
     }
-    Data next() {
+    Data next() override {
         MONGO_UNREACHABLE;
     }
-    IntWrapper nextWithDeferredValue() {
+    IntWrapper nextWithDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    IntWrapper getDeferredValue() {
+    IntWrapper getDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    const IntWrapper& current() {
+    const IntWrapper& current() override {
         MONGO_UNREACHABLE;
     }
 };
@@ -198,24 +198,24 @@ public:
         invariant(limit > 0);
     }
 
-    void openSource() {}
-    void closeSource() {}
+    void openSource() override {}
+    void closeSource() override {}
 
-    bool more() {
+    bool more() override {
         return _remaining && _source->more();
     }
-    Data next() {
+    Data next() override {
         invariant(more());
         _remaining--;
         return _source->next();
     }
-    IntWrapper nextWithDeferredValue() {
+    IntWrapper nextWithDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    IntWrapper getDeferredValue() {
+    IntWrapper getDeferredValue() override {
         MONGO_UNREACHABLE;
     }
-    const IntWrapper& current() {
+    const IntWrapper& current() override {
         MONGO_UNREACHABLE;
     }
 
@@ -359,23 +359,23 @@ public:
             class UnsortedIter : public IWIterator {
             public:
                 UnsortedIter() : _pos(0) {}
-                void openSource() {}
-                void closeSource() {}
-                bool more() {
+                void openSource() override {}
+                void closeSource() override {}
+                bool more() override {
                     return _pos < sizeof(unsorted) / sizeof(unsorted[0]);
                 }
-                IWPair next() {
+                IWPair next() override {
                     IWPair ret(unsorted[_pos], -unsorted[_pos]);
                     _pos++;
                     return ret;
                 }
-                IntWrapper nextWithDeferredValue() {
+                IntWrapper nextWithDeferredValue() override {
                     MONGO_UNREACHABLE;
                 }
-                IntWrapper getDeferredValue() {
+                IntWrapper getDeferredValue() override {
                     MONGO_UNREACHABLE;
                 }
-                const IntWrapper& current() {
+                const IntWrapper& current() override {
                     MONGO_UNREACHABLE;
                 }
                 size_t _pos;
@@ -719,17 +719,17 @@ class PauseAndResume : public Basic {
         sorter->resume();
     }
 
-    size_t numAdded() const {
+    size_t numAdded() const override {
         return 5;
     }
 
     // returns an iterator with the correct results
-    std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         return std::make_shared<IntIterator>(0, 5);  // 0, 1, ... 4
     }
 
     // like correct but with opposite sort direction
-    std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         return std::make_shared<IntIterator>(4, -1, -1);  // 4, 3, ... 0
     }
 };
@@ -798,17 +798,17 @@ class PauseAndResumeLimit : public Limit {
         sorter->resume();
     }
 
-    size_t numAdded() const {
+    size_t numAdded() const override {
         return 6;
     }
 
     // returns an iterator with the correct results
-    std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         return std::make_shared<IntIterator>(-1, 4);
     }
 
     // like correct but with opposite sort direction
-    std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         return std::make_shared<IntIterator>(4, -1, -1);
     }
 };
@@ -838,17 +838,17 @@ class PauseAndResumeLimitOne : public Limit {
         sorter->resume();
     }
 
-    size_t numAdded() const {
+    size_t numAdded() const override {
         return 6;
     }
 
     // returns an iterator with the correct results
-    std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         return std::make_shared<IntIterator>(-1, 0);
     }
 
     // like correct but with opposite sort direction
-    std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         return std::make_shared<IntIterator>(4, 3, -1);
     }
 };
@@ -950,7 +950,7 @@ public:
 template <long long Limit, bool Random = true>
 class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
     typedef LotsOfDataLittleMemory<Random> Parent;
-    SortOptions adjustSortOptions(SortOptions opts) {
+    SortOptions adjustSortOptions(SortOptions opts) override {
         // Make sure our tests will spill or not as desired
         MONGO_STATIC_ASSERT(MEM_LIMIT / 2 > (100 * sizeof(IWPair)));
         MONGO_STATIC_ASSERT(MEM_LIMIT < (5000 * sizeof(IWPair)));

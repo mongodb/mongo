@@ -60,7 +60,7 @@ class AuthzManagerExternalStateMock : public AuthzManagerExternalStateLocal {
 
 public:
     AuthzManagerExternalStateMock();
-    virtual ~AuthzManagerExternalStateMock();
+    ~AuthzManagerExternalStateMock() override;
 
     void setAuthorizationManager(AuthorizationManager* authzManager);
     void setAuthzVersion(OperationContext* opCtx, int version);

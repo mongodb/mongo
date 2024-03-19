@@ -51,8 +51,7 @@ protected:
         _fieldNames = std::make_unique<GlobalIndexCumulativeMetricsFieldNameProvider>();
     }
 
-    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
-        override {
+    std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() override {
         return std::make_unique<GlobalIndexCumulativeMetrics>();
     }
     GlobalIndexCumulativeMetrics* _globalIndexCumulativeMetrics;

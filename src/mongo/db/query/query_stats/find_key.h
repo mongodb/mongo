@@ -49,7 +49,7 @@ struct FindCmdComponents : public SpecificKeyComponents {
           } {}
 
 
-    std::size_t size() const {
+    std::size_t size() const override {
         return sizeof(FindCmdComponents);
     }
 
@@ -124,7 +124,7 @@ public:
         return H::combine(std::move(h), *key);
     }
 
-    const SpecificKeyComponents& specificComponents() const {
+    const SpecificKeyComponents& specificComponents() const override {
         return _components;
     }
 

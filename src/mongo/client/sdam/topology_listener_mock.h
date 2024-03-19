@@ -47,7 +47,7 @@ namespace mongo::sdam {
 class TopologyListenerMock : public TopologyListener {
 public:
     TopologyListenerMock() = default;
-    virtual ~TopologyListenerMock() = default;
+    ~TopologyListenerMock() override = default;
 
     void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) override;
 

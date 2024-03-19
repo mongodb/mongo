@@ -77,7 +77,7 @@ public:
     BSONObj credentials;
     BSONObj sha1_creds, sha256_creds;
 
-    void setUp() {
+    void setUp() override {
         user.reset(new User(UserRequest(UserName("spencer", "test"), boost::none)));
         adminUser.reset(new User(UserRequest(UserName("admin", "admin"), boost::none)));
 

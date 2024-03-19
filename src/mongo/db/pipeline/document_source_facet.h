@@ -104,7 +104,7 @@ public:
                   std::move(parseTimeName), boost::none, std::move(pipelines)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override final {
+                                           bool bypassDocumentValidation) const final {
             PrivilegeVector requiredPrivileges;
             for (auto&& pipeline : _pipelines) {
                 Privilege::addPrivilegesToPrivilegeVector(
@@ -187,7 +187,7 @@ private:
                         size_t bufferSizeBytes,
                         size_t maxOutputDocBytes);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
     std::vector<FacetPipeline> _facets;

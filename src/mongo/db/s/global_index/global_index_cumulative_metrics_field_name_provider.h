@@ -38,8 +38,8 @@ namespace global_index {
 class GlobalIndexCumulativeMetricsFieldNameProvider
     : public ShardingDataTransformCumulativeMetricsFieldNameProvider {
 public:
-    virtual StringData getForDocumentsProcessed() const override;
-    virtual StringData getForBytesWritten() const override;
+    StringData getForDocumentsProcessed() const override;
+    StringData getForBytesWritten() const override;
 
     // TODO: Replace this placeholder method with one method per global index coordinator
     // role/state combination. See ReshardingCumulativeMetricsFieldNameProvider for an

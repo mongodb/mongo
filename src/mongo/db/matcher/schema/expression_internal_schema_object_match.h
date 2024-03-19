@@ -85,7 +85,7 @@ public:
         return _sub.get();
     }
 
-    void resetChild(size_t i, MatchExpression* other) final override {
+    void resetChild(size_t i, MatchExpression* other) final {
         tassert(6329410, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         _sub.reset(other);
     }

@@ -46,7 +46,7 @@ namespace mongo {
  */
 class ClusterStatisticsImpl final : public ClusterStatistics {
 public:
-    ~ClusterStatisticsImpl();
+    ~ClusterStatisticsImpl() override;
 
     StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* opCtx) override;
 

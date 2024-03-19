@@ -76,11 +76,11 @@ public:
     Status stop(int gracePeriodMillis);
 
 private:
-    virtual std::string name() const {
+    std::string name() const override {
         return "PeriodicTaskRunner";
     }
 
-    virtual void run();
+    void run() override;
 
     // Returns true if shutdown has been requested.  You must hold _mutex to call this
     // function.

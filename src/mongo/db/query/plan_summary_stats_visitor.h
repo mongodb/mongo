@@ -44,45 +44,45 @@ public:
 
     explicit PlanSummaryStatsVisitor(PlanSummaryStats& summary) : _summary(summary) {}
 
-    void visit(tree_walker::MaybeConstPtr<true, sbe::ScanStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::ScanStats> stats) final {
         _summary.totalDocsExamined += stats->numReads;
     }
-    void visit(tree_walker::MaybeConstPtr<true, sbe::ColumnScanStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::ColumnScanStats> stats) final {
         _summary.totalDocsExamined += stats->numRowStoreFetches + stats->numRowStoreScans;
         for (auto const& stat : stats->cursorStats)
             _summary.totalKeysExamined += stat.numNexts + stat.numSeeks;
         for (auto const& stat : stats->parentCursorStats)
             _summary.totalKeysExamined += stat.numNexts + stat.numSeeks;
     }
-    void visit(tree_walker::MaybeConstPtr<true, sbe::IndexScanStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::IndexScanStats> stats) final {
         _summary.totalKeysExamined += stats->keysExamined;
     }
-    void visit(tree_walker::MaybeConstPtr<true, sbe::HashAggStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::HashAggStats> stats) final {
         _summary.usedDisk |= stats->spilledRecords > 0;
     }
-    void visit(tree_walker::MaybeConstPtr<true, sbe::WindowStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::WindowStats> stats) final {
         _summary.usedDisk |= stats->spilledRecords > 0;
     }
-    void visit(tree_walker::MaybeConstPtr<true, SortStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, SortStats> stats) final {
         _summary.hasSortStage = true;
         _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
         _summary.sortSpills += stats->spills;
         _summary.sortTotalDataSizeBytes += stats->totalDataSizeBytes;
         _summary.keysSorted += stats->keysSorted;
     }
-    void visit(tree_walker::MaybeConstPtr<true, GroupStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, GroupStats> stats) final {
         _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
     }
-    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
-    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceLookupStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceLookupStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
-    void visit(tree_walker::MaybeConstPtr<true, UnionWithStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, UnionWithStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
-    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceFacetStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceFacetStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
 

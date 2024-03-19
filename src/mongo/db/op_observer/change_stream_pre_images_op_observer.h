@@ -45,7 +45,7 @@ class ChangeStreamPreImagesOpObserver final : public OpObserverNoop {
 
 public:
     ChangeStreamPreImagesOpObserver() = default;
-    ~ChangeStreamPreImagesOpObserver() = default;
+    ~ChangeStreamPreImagesOpObserver() override = default;
 
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,

@@ -148,7 +148,7 @@ public:
         service->setOpObserver(std::move(opObserverUniquePtr));
     }
 
-    virtual ~QueryStageBatchedDeleteTest() {
+    ~QueryStageBatchedDeleteTest() override {
         _client.dropCollection(nss);
     }
 

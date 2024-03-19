@@ -87,7 +87,7 @@ class ShardingCatalogClientImpl final : public ShardingCatalogClient {
 
 public:
     ShardingCatalogClientImpl(std::shared_ptr<Shard> overrideConfigShard);
-    virtual ~ShardingCatalogClientImpl();
+    ~ShardingCatalogClientImpl() override;
 
     /*
      * Updates (or if "upsert" is true, creates) catalog data for the sharded collection "collNs" by

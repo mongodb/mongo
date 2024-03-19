@@ -53,9 +53,9 @@ public:
 
 class NoAdminAccess : public AdminAccess {
 public:
-    virtual ~NoAdminAccess() {}
+    ~NoAdminAccess() override {}
 
-    virtual bool haveAdminUsers(OperationContext* opCtx) const {
+    bool haveAdminUsers(OperationContext* opCtx) const override {
         return false;
     }
 };

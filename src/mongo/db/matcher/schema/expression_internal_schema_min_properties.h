@@ -72,7 +72,7 @@ public:
         return (elem.embeddedObject().nFields() >= numProperties());
     }
 
-    virtual std::unique_ptr<MatchExpression> clone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto minProperties = std::make_unique<InternalSchemaMinPropertiesMatchExpression>(
             numProperties(), _errorAnnotation);
         if (getTag()) {

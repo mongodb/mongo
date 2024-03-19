@@ -72,7 +72,7 @@ protected:
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }
 
-    ~ClusterCursorManagerTest() {
+    ~ClusterCursorManagerTest() override {
         _manager.shutdown(_opCtx.get());
     }
 

@@ -116,7 +116,7 @@ public:
         return _expression->getFilter();
     }
 
-    void resetChild(size_t i, MatchExpression* other) {
+    void resetChild(size_t i, MatchExpression* other) override {
         tassert(6329407, "Out-of-bounds access to child of MatchExpression.", i < kNumChildren);
         _expression->resetFilter(other);
     };

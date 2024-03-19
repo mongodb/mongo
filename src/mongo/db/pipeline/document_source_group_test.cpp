@@ -463,7 +463,7 @@ private:
 
 class ParseErrorBase : public Base {
 public:
-    virtual ~ParseErrorBase() {}
+    ~ParseErrorBase() override {}
     void _doTest() final {
         ASSERT_THROWS(createGroup(spec()), AssertionException);
     }
@@ -474,7 +474,7 @@ protected:
 
 class ExpressionBase : public Base {
 public:
-    virtual ~ExpressionBase() {}
+    ~ExpressionBase() override {}
     void _doTest() final {
         createGroup(spec());
         auto source = DocumentSourceMock::createForTest(Document(doc()), ctx());
@@ -493,10 +493,10 @@ protected:
 };
 
 class IdConstantBase : public ExpressionBase {
-    virtual BSONObj doc() {
+    BSONObj doc() override {
         return BSONObj();
     }
-    virtual BSONObj expected() {
+    BSONObj expected() override {
         // Since spec() specifies a constant _id, its value will be passed through.
         return spec();
     }
@@ -514,49 +514,49 @@ public:
 
 /** $group spec is an empty object. */
 class EmptySpec : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSONObj();
     }
 };
 
 /** $group _id is an empty object. */
 class IdEmptyObject : public IdConstantBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << BSONObj());
     }
 };
 
 /** $group _id is computed from an object expression. */
 class IdObjectExpression : public ExpressionBase {
-    BSONObj doc() {
+    BSONObj doc() override {
         return BSON("a" << 6);
     }
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << BSON("z"
                                   << "$a"));
     }
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("_id" << BSON("z" << 6));
     }
 };
 
 /** $group _id is specified as an invalid object expression. */
 class IdInvalidObjectExpression : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << BSON("$add" << 1 << "$and" << 1));
     }
 };
 
 /** $group with two _id specs. */
 class TwoIdSpecs : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "_id" << 2);
     }
 };
 
 /** $group _id is the empty string. */
 class IdEmptyString : public IdConstantBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id"
                     << "");
     }
@@ -564,7 +564,7 @@ class IdEmptyString : public IdConstantBase {
 
 /** $group _id is a std::string constant. */
 class IdStringConstant : public IdConstantBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id"
                     << "abc");
     }
@@ -572,21 +572,21 @@ class IdStringConstant : public IdConstantBase {
 
 /** $group _id is a field path expression. */
 class IdFieldPath : public ExpressionBase {
-    BSONObj doc() {
+    BSONObj doc() override {
         return BSON("a" << 5);
     }
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id"
                     << "$a");
     }
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("_id" << 5);
     }
 };
 
 /** $group with _id set to an invalid field path. */
 class IdInvalidFieldPath : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id"
                     << "$a..");
     }
@@ -594,106 +594,106 @@ class IdInvalidFieldPath : public ParseErrorBase {
 
 /** $group _id is a numeric constant. */
 class IdNumericConstant : public IdConstantBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 2);
     }
 };
 
 /** $group _id is an array constant. */
 class IdArrayConstant : public IdConstantBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << BSON_ARRAY(1 << 2));
     }
 };
 
 /** $group _id is a regular expression (not supported). */
 class IdRegularExpression : public IdConstantBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return fromjson("{_id:/a/}");
     }
 };
 
 /** The name of an aggregate field is specified with a $ prefix. */
 class DollarAggregateFieldName : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "$foo" << BSON("$sum" << 1));
     }
 };
 
 /** An aggregate field spec that is not an object. */
 class NonObjectAggregateSpec : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "a" << 1);
     }
 };
 
 /** An aggregate field spec that is not an object. */
 class EmptyObjectAggregateSpec : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "a" << BSONObj());
     }
 };
 
 /** An aggregate field spec with an invalid accumulator operator. */
 class BadAccumulator : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "a" << BSON("$bad" << 1));
     }
 };
 
 /** An aggregate field spec with an array argument. */
 class SumArray : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "a" << BSON("$sum" << BSONArray()));
     }
 };
 
 /** Multiple accumulator operators for a field. */
 class MultipleAccumulatorsForAField : public ParseErrorBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 1 << "a" << BSON("$sum" << 1 << "$push" << 1));
     }
 };
 
 /** Aggregation using duplicate field names is allowed currently. */
 class DuplicateAggregateFieldNames : public ExpressionBase {
-    BSONObj doc() {
+    BSONObj doc() override {
         return BSONObj();
     }
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 0 << "z" << BSON("$sum" << 1) << "z" << BSON("$push" << 1));
     }
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("_id" << 0 << "z" << 1 << "z" << BSON_ARRAY(1));
     }
 };
 
 /** Aggregate the value of an object expression. */
 class AggregateObjectExpression : public ExpressionBase {
-    BSONObj doc() {
+    BSONObj doc() override {
         return BSON("a" << 6);
     }
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 0 << "z"
                           << BSON("$first" << BSON("x"
                                                    << "$a")));
     }
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("_id" << 0 << "z" << BSON("x" << 6));
     }
 };
 
 /** Aggregate the value of an operator expression. */
 class AggregateOperatorExpression : public ExpressionBase {
-    BSONObj doc() {
+    BSONObj doc() override {
         return BSON("a" << 6);
     }
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("_id" << 0 << "z"
                           << BSON("$first"
                                   << "$a"));
     }
-    BSONObj expected() {
+    BSONObj expected() override {
         return BSON("_id" << 0 << "z" << 6);
     }
 };
@@ -709,7 +709,7 @@ class CheckResultsBase : public Base {
 public:
     CheckResultsBase(GroupStageType groupStageType = GroupStageType::Default)
         : Base(groupStageType) {}
-    virtual ~CheckResultsBase() {}
+    ~CheckResultsBase() override {}
     void _doTest() override {
         runSharded(false);
         runSharded(true);
@@ -788,80 +788,80 @@ class EmptyCollection : public CheckResultsBase {};
 
 /** A $group performed on a single document. */
 class SingleDocument : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("a" << 1)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id" << 0 << "a"
                           << BSON("$sum"
                                   << "$a"));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0,a:1}]";
     }
 };
 
 /** A $group performed on two values for a single key. */
 class TwoValuesSingleKey : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("a" << 1), DOC("a" << 2)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id" << 0 << "a"
                           << BSON("$push"
                                   << "$a"));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0,a:[1,2]}]";
     }
 };
 
 /** A $group performed on two values with one key each. */
 class TwoValuesTwoKeys : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("_id" << 0 << "a" << 1), DOC("_id" << 1 << "a" << 2)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id"
                     << "$_id"
                     << "a"
                     << BSON("$push"
                             << "$a"));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0,a:[1]},{_id:1,a:[2]}]";
     }
 };
 
 /** A $group performed on two values with two keys each. */
 class FourValuesTwoKeys : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("id" << 0 << "a" << 1),
                 DOC("id" << 1 << "a" << 2),
                 DOC("id" << 0 << "a" << 3),
                 DOC("id" << 1 << "a" << 4)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id"
                     << "$id"
                     << "a"
                     << BSON("$push"
                             << "$a"));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0,a:[1,3]},{_id:1,a:[2,4]}]";
     }
 };
 
 /** A $group performed on two values with two keys each and two accumulator operations. */
 class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("id" << 0 << "a" << 1),
                 DOC("id" << 1 << "a" << 2),
                 DOC("id" << 0 << "a" << 3),
                 DOC("id" << 1 << "a" << 4)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id"
                     << "$id"
                     << "list"
@@ -869,31 +869,31 @@ class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
                             << "$a")
                     << "sum" << BSON("$sum" << BSON("$divide" << BSON_ARRAY("$a" << 2))));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0,list:[1,3],sum:2},{_id:1,list:[2,4],sum:3}]";
     }
 };
 
 /** Null and undefined _id values are grouped together. */
 class GroupNullUndefinedIds : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("a" << BSONNULL << "b" << 100), DOC("b" << 10)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id"
                     << "$a"
                     << "sum"
                     << BSON("$sum"
                             << "$b"));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:null,sum:110}]";
     }
 };
 
 /** A complex _id expression. */
 class ComplexId : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {DOC("a"
                     << "de"_sd
                     << "b"
@@ -911,28 +911,28 @@ class ComplexId : public CheckResultsBase {
                     << "d"
                     << "ef"_sd)};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id" << BSON("$concat" << BSON_ARRAY("$a"
                                                           << "$b"
                                                           << "$c"
                                                           << "$d")));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:'deadbeef'}]";
     }
 };
 
 /** An undefined accumulator value is dropped. */
 class UndefinedAccumulatorValue : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {Document()};
     }
-    virtual BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return BSON("_id" << 0 << "first"
                           << BSON("$first"
                                   << "$missing"));
     }
-    virtual std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0, first:null}]";
     }
 };
@@ -962,7 +962,7 @@ public:
     }
 
 private:
-    std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:0,list:[1,2,10,20]},{_id:1,list:[3,4,30,40]}]";
     }
 };
@@ -991,13 +991,13 @@ public:
  * SERVER-6766
  */
 class StringConstantIdAndAccumulatorExpressions : public CheckResultsBase {
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {Document()};
     }
-    BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         return fromjson("{_id:{$const:'$_id...'},a:{$push:{$const:'$a...'}}}");
     }
-    std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:'$_id...',a:['$a...']}]";
     }
 };
@@ -1011,14 +1011,14 @@ public:
         // Run standard base tests.
         CheckResultsBase::_doTest();
     }
-    std::deque<DocumentSource::GetNextResult> inputData() {
+    std::deque<DocumentSource::GetNextResult> inputData() override {
         return {Document()};
     }
-    BSONObj groupSpec() {
+    BSONObj groupSpec() override {
         // An array can be specified using $const.
         return fromjson("{_id:[1,2,3],a:{$push:{$const:[4,5,6]}}}");
     }
-    std::string expectedResultSetString() {
+    std::string expectedResultSetString() override {
         return "[{_id:[1,2,3],a:[[4,5,6]]}]";
     }
 };
@@ -1304,7 +1304,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("DocumentSourceGroupTests") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<NonObject>();
         add<EmptySpec>();
         add<IdEmptyObject>();

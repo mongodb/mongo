@@ -76,7 +76,7 @@ class CursorMock : public RecordCursor {
 public:
     CursorMock(std::deque<Record>* records) : _records(records) {}
 
-    virtual ~CursorMock() {}
+    ~CursorMock() override {}
 
     boost::optional<Record> next() override {
         if (_records->empty()) {
@@ -93,7 +93,7 @@ public:
     }
     void detachFromOperationContext() override {}
     void reattachToOperationContext(OperationContext* opCtx) override {}
-    void setSaveStorageCursorOnDetachFromOperationContext(bool) {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
 
 private:
     std::deque<Record>* _records;

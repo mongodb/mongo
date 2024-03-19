@@ -71,7 +71,7 @@ void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceStrin
 
 class SplitVectorTest : public ShardServerTestFixture {
 public:
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
@@ -316,7 +316,7 @@ const std::string kJumboPattern = "a";
 
 class SplitVectorJumboTest : public ShardServerTestFixture {
 public:
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
@@ -380,7 +380,7 @@ int numDocs = (BSONObjMaxUserSize / maxShardingUnitTestOplogDocSize) + 2;
  */
 class SplitVectorMaxResponseSizeTest : public ShardServerTestFixture {
 public:
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();

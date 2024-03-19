@@ -62,7 +62,7 @@ namespace process_health {
 class HealthObserverBase : public HealthObserver {
 public:
     explicit HealthObserverBase(ServiceContext* svcCtx);
-    virtual ~HealthObserverBase() = default;
+    ~HealthObserverBase() override = default;
 
     ClockSource* clockSource() const {
         return _svcCtx->getPreciseClockSource();

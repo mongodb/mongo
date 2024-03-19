@@ -1494,7 +1494,7 @@ public:
         add<BasicAsyncJS<scopeFactory>>();
     }
 
-    void setupTests() {
+    void setupTests() override {
         setupTestsWithScopeFactory<&ScriptEngine::newScope>();
         setupTestsWithScopeFactory<&ScriptEngine::newScopeForCurrentThread>();
     }

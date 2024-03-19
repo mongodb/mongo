@@ -138,7 +138,7 @@ protected:
             static_cast<double>(stats->common.works);
     }
 
-    std::string getProductivityFormula(const PlanStageStats* stats) const {
+    std::string getProductivityFormula(const PlanStageStats* stats) const override {
         StringBuilder sb;
         sb << "(" << stats->common.advanced << " advanced)/(" << stats->common.works << " works)";
         return sb.str();

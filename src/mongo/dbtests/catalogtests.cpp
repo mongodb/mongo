@@ -118,7 +118,7 @@ public:
         addNameCallback(nameForTestClass<T>(), [] { T().run(); });
     }
 
-    void setupTests() {
+    void setupTests() override {
         add<ConcurrentCreateCollectionTest>();
     }
 };

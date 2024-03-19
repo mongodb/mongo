@@ -168,7 +168,7 @@ public:
 };
 
 class simple1 : public Base {
-    void pop() {
+    void pop() override {
         SBTGB(1);
         SBTGB("yo");
         SBTGB(2);
@@ -176,7 +176,7 @@ class simple1 : public Base {
 };
 
 class simple2 : public Base {
-    void pop() {
+    void pop() override {
         SBTGB(1);
         SBTGB("yo");
         SBTGB(2);
@@ -344,7 +344,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("basic") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<RarelyTest>();
         add<Base64Tests>();
 

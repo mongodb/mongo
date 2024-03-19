@@ -848,7 +848,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("DocumentSourceUnwindTests") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Empty>();
         add<EmptyArray>();
         add<MissingValue>();

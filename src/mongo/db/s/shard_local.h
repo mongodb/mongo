@@ -67,7 +67,7 @@ public:
 
     explicit ShardLocal(const ShardId& id);
 
-    ~ShardLocal() = default;
+    ~ShardLocal() override = default;
 
     /**
      * These functions are implemented for the Shard interface's sake. They should not be called on
@@ -87,11 +87,11 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) override;
 
-    Status runAggregation(
-        OperationContext* opCtx,
-        const AggregateCommandRequest& aggRequest,
-        std::function<bool(const std::vector<BSONObj>& batch,
-                           const boost::optional<BSONObj>& postBatchResumeToken)> callback);
+    Status runAggregation(OperationContext* opCtx,
+                          const AggregateCommandRequest& aggRequest,
+                          std::function<bool(const std::vector<BSONObj>& batch,
+                                             const boost::optional<BSONObj>& postBatchResumeToken)>
+                              callback) override;
 
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,

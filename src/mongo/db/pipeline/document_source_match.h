@@ -67,10 +67,10 @@ public:
     DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    virtual ~DocumentSourceMatch() = default;
+    ~DocumentSourceMatch() override = default;
 
-    virtual boost::intrusive_ptr<DocumentSource> clone(
-        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         // Raw new is needed to access non-public constructors.
         return new DocumentSourceMatch(*this, newExpCtx);
     }

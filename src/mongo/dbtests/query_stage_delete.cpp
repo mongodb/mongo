@@ -282,7 +282,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_delete") {}
 
-    void setupTests() {
+    void setupTests() override {
         // Stage-specific tests below.
         add<QueryStageDeleteUpcomingObjectWasDeleted>();
         add<QueryStageDeleteReturnOldDoc>();

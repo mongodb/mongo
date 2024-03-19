@@ -134,7 +134,7 @@ public:
     explicit TLTimer(const std::shared_ptr<TLTypeFactory>& factory,
                      const transport::ReactorHandle& reactor)
         : TLTypeFactory::Type(factory), _reactor(reactor), _timer(_reactor->makeTimer()) {}
-    ~TLTimer() {
+    ~TLTimer() override {
         // Release must be the first expression of this dtor
         release();
     }
@@ -176,7 +176,7 @@ public:
           _transientSSLContext(transientSSLContext),
           _connMetrics(serviceContext->getFastClockSource()) {}
 
-    ~TLConnection() {
+    ~TLConnection() override {
         // Release must be the first expression of this dtor
         release();
     }

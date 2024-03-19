@@ -259,7 +259,7 @@ public:
                             std::string name,
                             Options options = Options{});
 
-    ~ConnectionPool();
+    ~ConnectionPool() override;
 
     void shutdown();
 
@@ -390,7 +390,7 @@ class ConnectionPool::ConnectionInterface : public TimerInterface {
 public:
     explicit ConnectionInterface(size_t generation) : _generation(generation) {}
 
-    virtual ~ConnectionInterface() = default;
+    ~ConnectionInterface() override = default;
 
     /**
      * Indicates that the user is now done with this connection. Users MUST call either

@@ -61,7 +61,7 @@ public:
     boost::optional<Record> next() final {
         return {};
     }
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
         return {};
     }
     boost::optional<Record> seekExact(const RecordId& id) final {
@@ -91,19 +91,19 @@ public:
         _dummy = BSON("_id" << 1);
     }
 
-    virtual const char* name() const {
+    const char* name() const override {
         return "devnull";
     }
 
-    virtual NamespaceString ns(OperationContext* opCtx) const override {
+    NamespaceString ns(OperationContext* opCtx) const override {
         return _ns;
     }
 
-    virtual long long dataSize(OperationContext* opCtx) const {
+    long long dataSize(OperationContext* opCtx) const override {
         return 0;
     }
 
-    virtual long long numRecords(OperationContext* opCtx) const {
+    long long numRecords(OperationContext* opCtx) const override {
         return 0;
     }
 
@@ -111,17 +111,17 @@ public:
         return _options.capped;
     }
 
-    virtual KeyFormat keyFormat() const {
+    KeyFormat keyFormat() const override {
         return _keyFormat;
     }
 
-    virtual int64_t storageSize(OperationContext* opCtx,
-                                BSONObjBuilder* extraInfo = nullptr,
-                                int infoLevel = 0) const {
+    int64_t storageSize(OperationContext* opCtx,
+                        BSONObjBuilder* extraInfo = nullptr,
+                        int infoLevel = 0) const override {
         return 0;
     }
 
-    virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
+    bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const override {
         return false;
     }
 
@@ -144,7 +144,7 @@ public:
         return Status::OK();
     }
 
-    virtual bool updateWithDamagesSupported() const {
+    bool updateWithDamagesSupported() const override {
         return false;
     }
 
@@ -156,9 +156,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void printRecordMetadata(OperationContext* opCtx,
-                                     const RecordId& recordId,
-                                     std::set<Timestamp>* recordTimestamps) const {
+    void printRecordMetadata(OperationContext* opCtx,
+                             const RecordId& recordId,
+                             std::set<Timestamp>* recordTimestamps) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -184,23 +184,23 @@ public:
                                bool inclusive,
                                const AboutToDeleteRecordCallback& aboutToDelete) override {}
 
-    virtual void appendNumericCustomStats(OperationContext* opCtx,
-                                          BSONObjBuilder* result,
-                                          double scale) const {
+    void appendNumericCustomStats(OperationContext* opCtx,
+                                  BSONObjBuilder* result,
+                                  double scale) const override {
         result->appendNumber("numInserts", _numInserts);
     }
 
-    virtual void updateStatsAfterRepair(OperationContext* opCtx,
-                                        long long numRecords,
-                                        long long dataSize) {}
+    void updateStatsAfterRepair(OperationContext* opCtx,
+                                long long numRecords,
+                                long long dataSize) override {}
 
     RecordId getLargestKey(OperationContext* opCtx) const final {
         return RecordId();
     }
 
-    virtual void reserveRecordIds(OperationContext* opCtx,
-                                  std::vector<RecordId>* out,
-                                  size_t nRecords) final {
+    void reserveRecordIds(OperationContext* opCtx,
+                          std::vector<RecordId>* out,
+                          size_t nRecords) final {
         for (size_t i = 0; i < nRecords; i++) {
             out->push_back(RecordId(i));
         }
@@ -224,7 +224,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    virtual Status addKey(const key_string::Value& keyString) {
+    Status addKey(const key_string::Value& keyString) override {
         return Status::OK();
     }
 };
@@ -237,68 +237,68 @@ public:
                               Ordering::make(BSONObj()),
                               KeyFormat::Long) {}
 
-    virtual ~DevNullSortedDataInterface() {}
+    ~DevNullSortedDataInterface() override {}
 
-    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
-                                                                        bool dupsAllowed) {
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                bool dupsAllowed) override {
         return {};
     }
 
-    virtual Status insert(OperationContext* opCtx,
-                          const key_string::Value& keyString,
-                          bool dupsAllowed,
-                          IncludeDuplicateRecordId includeDuplicateRecordId) {
+    Status insert(OperationContext* opCtx,
+                  const key_string::Value& keyString,
+                  bool dupsAllowed,
+                  IncludeDuplicateRecordId includeDuplicateRecordId) override {
         return Status::OK();
     }
 
-    virtual void unindex(OperationContext* opCtx,
-                         const key_string::Value& keyString,
-                         bool dupsAllowed) {}
+    void unindex(OperationContext* opCtx,
+                 const key_string::Value& keyString,
+                 bool dupsAllowed) override {}
 
-    virtual Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) {
+    Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) override {
         return Status::OK();
     }
 
-    virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              const key_string::Value& keyString) const override {
+    boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                      const key_string::Value& keyString) const override {
         return boost::none;
     }
 
-    virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const {
+    IndexValidateResults validate(OperationContext* opCtx, bool full) const override {
         return IndexValidateResults{};
     }
 
-    virtual bool appendCustomStats(OperationContext* opCtx,
-                                   BSONObjBuilder* output,
-                                   double scale) const {
+    bool appendCustomStats(OperationContext* opCtx,
+                           BSONObjBuilder* output,
+                           double scale) const override {
         return false;
     }
 
-    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const {
+    long long getSpaceUsedBytes(OperationContext* opCtx) const override {
         return 0;
     }
 
-    virtual long long getFreeStorageBytes(OperationContext* opCtx) const {
+    long long getFreeStorageBytes(OperationContext* opCtx) const override {
         return 0;
     }
 
-    virtual bool isEmpty(OperationContext* opCtx) {
+    bool isEmpty(OperationContext* opCtx) override {
         return true;
     }
 
-    virtual int64_t numEntries(OperationContext* opCtx) const {
+    int64_t numEntries(OperationContext* opCtx) const override {
         return 0;
     }
 
-    virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const key_string::Value& keyString) const {}
+    void printIndexEntryMetadata(OperationContext* opCtx,
+                                 const key_string::Value& keyString) const override {}
 
-    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
-                                                                   bool isForward) const {
+    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           bool isForward) const override {
         return {};
     }
 
-    virtual Status initAsEmpty(OperationContext* opCtx) {
+    Status initAsEmpty(OperationContext* opCtx) override {
         return Status::OK();
     }
 };
@@ -362,17 +362,17 @@ public:
         _exhaustCursor = false;
     };
 
-    ~StreamingCursorImpl() = default;
+    ~StreamingCursorImpl() override = default;
 
     BSONObj getMetadataObject(UUID backupId) {
         return BSONObj();
     }
 
-    void setCatalogEntries(
-        stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> identsToNsAndUUID) {}
+    void setCatalogEntries(stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>
+                               identsToNsAndUUID) override {}
 
     StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
-                                                     const std::size_t batchSize) {
+                                                     const std::size_t batchSize) override {
         if (_exhaustCursor) {
             std::deque<BackupBlock> emptyVector;
             return emptyVector;

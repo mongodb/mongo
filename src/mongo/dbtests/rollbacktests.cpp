@@ -747,7 +747,7 @@ public:
         add<T<true, true, true>>();
     }
 
-    void setupTests() {
+    void setupTests() override {
         addAll<CreateCollection>();
         addAll<RenameCollection>();
         addAll<DropCollection>();

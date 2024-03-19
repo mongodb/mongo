@@ -60,7 +60,7 @@ public:
           _numProperties(numProperties),
           _name(name) {}
 
-    virtual ~InternalSchemaNumPropertiesMatchExpression() {}
+    ~InternalSchemaNumPropertiesMatchExpression() override {}
 
     size_t numChildren() const final {
         return 0;

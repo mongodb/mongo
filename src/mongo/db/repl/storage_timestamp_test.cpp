@@ -1854,7 +1854,7 @@ TEST_F(StorageTimestampTest, SetMinValidAppliedThrough) {
  */
 class KVDropDatabase : public StorageTimestampTest {
 private:
-    void _doTest() {
+    void _doTest() override {
         // Not actually called.
     }
 
@@ -1985,7 +1985,7 @@ TEST(StorageTimestampTest, KVDropDatabasePrimary) {
  */
 class TimestampIndexBuilds : public StorageTimestampTest {
 private:
-    void _doTest() {
+    void _doTest() override {
         // Not actually called.
     }
 

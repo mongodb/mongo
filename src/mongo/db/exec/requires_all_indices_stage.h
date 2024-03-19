@@ -53,12 +53,12 @@ public:
         _allIndicesRequiredChecker.emplace(std::move(multipleCollection));
     }
 
-    virtual ~RequiresAllIndicesStage() = default;
+    ~RequiresAllIndicesStage() override = default;
 
 protected:
-    void doSaveStateRequiresCollection() override final {}
+    void doSaveStateRequiresCollection() final {}
 
-    void doRestoreStateRequiresCollection() override final {
+    void doRestoreStateRequiresCollection() final {
         if (_allIndicesRequiredChecker) {
             const auto& coll = collection();
             auto multipleCollection = coll.isAcquisition()

@@ -101,11 +101,11 @@ public:
         getWiredTigerKVEngine()->notifyStorageStartupRecoveryComplete();
     }
 
-    ~WiredTigerKVHarnessHelper() {
+    ~WiredTigerKVHarnessHelper() override {
         getWiredTigerKVEngine()->cleanShutdown();
     }
 
-    virtual KVEngine* restartEngine() override {
+    KVEngine* restartEngine() override {
         getEngine()->cleanShutdown();
         _svcCtx->clearStorageEngine();
         _svcCtx->setStorageEngine(makeEngine());
@@ -113,7 +113,7 @@ public:
         return getEngine();
     }
 
-    virtual KVEngine* getEngine() override {
+    KVEngine* getEngine() override {
         return _svcCtx->getStorageEngine()->getEngine();
     }
 

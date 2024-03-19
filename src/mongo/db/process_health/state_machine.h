@@ -189,7 +189,7 @@ public:
             return _state;
         }
 
-        StateEventRegistryPtr enter(StateCallback&& cb) {
+        StateEventRegistryPtr enter(StateCallback&& cb) override {
             _onEnter.push_back(std::move(cb));
             return this;
         }
@@ -199,7 +199,7 @@ public:
                 cb(previous, _state, m);
         }
 
-        StateEventRegistryPtr exit(StateCallback&& cb) {
+        StateEventRegistryPtr exit(StateCallback&& cb) override {
             _onExit.push_back(std::move(cb));
             return this;
         }

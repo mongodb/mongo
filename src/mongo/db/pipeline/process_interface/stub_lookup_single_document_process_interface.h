@@ -58,7 +58,7 @@ namespace mongo {
 
 class StubShardFilterer : public ShardFilterer {
 public:
-    std::unique_ptr<ShardFilterer> clone() const {
+    std::unique_ptr<ShardFilterer> clone() const override {
         MONGO_UNREACHABLE;
     }
 
@@ -113,7 +113,7 @@ public:
         const NamespaceString& nss,
         UUID collectionUUID,
         const Document& documentKey,
-        boost::optional<BSONObj> readConcern);
+        boost::optional<BSONObj> readConcern) override;
 
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;

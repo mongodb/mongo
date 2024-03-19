@@ -280,7 +280,7 @@ public:
          * Passed in TypeBits must outlive this Reader instance.
          */
         explicit Reader(const TypeBits& typeBits) : _curBit(0), _typeBits(typeBits) {}
-        ~Reader() = default;
+        ~Reader() override = default;
 
         uint8_t readStringLike() final;
         uint8_t readNumeric() final;
@@ -308,7 +308,7 @@ public:
     class ExplainReader : public ReaderBase {
     public:
         explicit ExplainReader(ReaderBase& reader) : _reader(reader){};
-        ~ExplainReader() = default;
+        ~ExplainReader() override = default;
 
         uint8_t readStringLike() final;
         uint8_t readNumeric() final;

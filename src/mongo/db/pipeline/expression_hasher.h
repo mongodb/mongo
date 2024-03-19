@@ -750,11 +750,11 @@ public:
         combine(OpType::kAccumulatorPercentile, expr->_method);
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) {
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) override {
         combine(OpType::kAccumulatorStdDevPop);
     }
 
-    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) {
+    void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) override {
         combine(OpType::kAccumulatorStdDevSamp);
     }
 

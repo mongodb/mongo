@@ -47,7 +47,7 @@ class EOFStage final : public PlanStage {
 public:
     EOFStage(ExpressionContext* expCtx);
 
-    ~EOFStage();
+    ~EOFStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
@@ -57,7 +57,7 @@ public:
         return STAGE_EOF;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() override;
 
     const SpecificStats* getSpecificStats() const final;
 

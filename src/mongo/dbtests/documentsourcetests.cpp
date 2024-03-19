@@ -120,7 +120,7 @@ public:
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 
-    virtual ~DocumentSourceCursorTest() {
+    ~DocumentSourceCursorTest() override {
         client.dropCollection(nss);
     }
 

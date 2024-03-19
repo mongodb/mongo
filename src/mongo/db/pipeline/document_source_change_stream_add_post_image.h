@@ -113,7 +113,7 @@ public:
         return boost::none;
     }
 
-    DepsTracker::State getDependencies(DepsTracker* deps) const {
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
         // The namespace is not technically needed yet, but we will if there is more than one
         // collection involved.
         deps->fields.insert(DocumentSourceChangeStream::kNamespaceField.toString());
@@ -136,7 +136,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const char* getSourceName() const final {
         return kStageName.rawData();

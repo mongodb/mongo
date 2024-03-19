@@ -59,7 +59,7 @@ public:
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("sock") {}
-    void setupTests() {
+    void setupTests() override {
         add<HostByName>();
     }
 };

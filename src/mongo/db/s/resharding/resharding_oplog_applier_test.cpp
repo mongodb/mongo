@@ -223,7 +223,7 @@ public:
         _cancelableOpCtxExecutor->startup();
     }
 
-    void tearDown() {
+    void tearDown() override {
         _executor->shutdown();
         _executor->join();
 

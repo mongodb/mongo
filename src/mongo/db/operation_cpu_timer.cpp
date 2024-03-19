@@ -82,7 +82,7 @@ MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadDetach);
 class PosixTimer final : public OperationCPUTimer {
 public:
     PosixTimer(const std::shared_ptr<OperationCPUTimers>& timers) : OperationCPUTimer(timers) {}
-    ~PosixTimer() = default;
+    ~PosixTimer() override = default;
 
     Nanoseconds getElapsed() const override;
 

@@ -57,7 +57,7 @@ public:
                                                StringData name,
                                                clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual ~InternalSchemaNumArrayItemsMatchExpression() {}
+    ~InternalSchemaNumArrayItemsMatchExpression() override {}
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 

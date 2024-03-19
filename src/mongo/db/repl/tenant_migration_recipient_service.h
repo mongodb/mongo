@@ -103,7 +103,7 @@ public:
     static constexpr StringData kNoopMsg = "Resume token noop"_sd;
 
     explicit TenantMigrationRecipientService(ServiceContext* serviceContext);
-    ~TenantMigrationRecipientService() = default;
+    ~TenantMigrationRecipientService() override = default;
 
     StringData getServiceName() const final;
 

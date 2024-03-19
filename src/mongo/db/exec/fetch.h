@@ -63,7 +63,7 @@ public:
                const MatchExpression* filter,
                VariantCollectionPtrOrAcquisition collection);
 
-    ~FetchStage();
+    ~FetchStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
@@ -75,7 +75,7 @@ public:
         return STAGE_FETCH;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() override;
 
     const SpecificStats* getSpecificStats() const final;
 

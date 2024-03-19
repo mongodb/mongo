@@ -51,7 +51,7 @@ class ClientOutOfLineExecutor final : public OutOfLineExecutor {
 public:
     ClientOutOfLineExecutor() noexcept;
 
-    ~ClientOutOfLineExecutor() noexcept;
+    ~ClientOutOfLineExecutor() noexcept override;
 
     static ClientOutOfLineExecutor* get(const Client*) noexcept;
 

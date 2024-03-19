@@ -98,7 +98,7 @@ public:
         return true;
     }
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 
@@ -356,7 +356,7 @@ public:
             return true;
         }
 
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             preRunImplHook(opCtx);
 
             BSONObjBuilder bob = result->getBodyBuilder();
@@ -505,7 +505,7 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     rpc::ReplyBuilderInterface* result) {
+                     rpc::ReplyBuilderInterface* result) override {
             preExplainImplHook(opCtx);
 
             uassert(ErrorCodes::InvalidLength,

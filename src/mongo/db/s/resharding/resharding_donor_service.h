@@ -67,7 +67,7 @@ public:
 
     explicit ReshardingDonorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
-    ~ReshardingDonorService() = default;
+    ~ReshardingDonorService() override = default;
 
     class DonorStateMachine;
 
@@ -107,7 +107,7 @@ public:
                                std::unique_ptr<DonorStateMachineExternalState> externalState,
                                ServiceContext* serviceContext);
 
-    ~DonorStateMachine() = default;
+    ~DonorStateMachine() override = default;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& stepdownToken) noexcept override;

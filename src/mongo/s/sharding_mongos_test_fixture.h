@@ -63,7 +63,7 @@ protected:
     ShardingTestFixture();
     ShardingTestFixture(bool withMockCatalogCache);
 
-    ~ShardingTestFixture();
+    ~ShardingTestFixture() override;
 
     /**
      * Returns the mock targeter for the config server. Useful to use like so,

@@ -287,7 +287,7 @@ TEST_F(OperationContextTest, CancellationTokenIsCancelableAtFirst) {
 
 class OperationDeadlineTests : public OperationContextTest {
 public:
-    void setUp() {
+    void setUp() override {
         ServiceContext* serviceCtx = getServiceContext();
         serviceCtx->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
         serviceCtx->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));

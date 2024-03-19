@@ -94,7 +94,8 @@ public:
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none) override;
 
-    BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity);
+    BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
+                                      ExplainOptions::Verbosity verbosity) override;
 
     boost::optional<ShardVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -102,7 +103,7 @@ public:
         return boost::none;  // Nothing is sharded here.
     }
 
-    virtual void checkRoutingInfoEpochOrThrow(
+    void checkRoutingInfoEpochOrThrow(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         ChunkVersion targetCollectionPlacementVersion) const override {

@@ -70,7 +70,7 @@ namespace mongo {
 class DocumentSourceBucketAuto final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$bucketAuto"_sd;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

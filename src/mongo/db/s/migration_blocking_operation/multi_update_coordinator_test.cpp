@@ -225,7 +225,7 @@ public:
     MultiUpdateCoordinatorExternalStateFactoryForTest(std::shared_ptr<ExternalStateFake> fakeState)
         : _fakeState{fakeState} {}
 
-    std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const {
+    std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const override {
         return std::make_unique<MultiUpdateCoordinatorExternalStateForTest>(_fakeState);
     }
 

@@ -99,7 +99,7 @@ public:
     };
 
     explicit TestService(ServiceContext* serviceContext) : PrimaryOnlyService(serviceContext) {}
-    ~TestService() = default;
+    ~TestService() override = default;
 
     StringData getServiceName() const override {
         return kTestServiceName;

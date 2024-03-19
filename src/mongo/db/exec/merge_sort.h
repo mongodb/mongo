@@ -77,7 +77,7 @@ public:
         return STAGE_SORT_MERGE;
     }
 
-    std::unique_ptr<PlanStageStats> getStats();
+    std::unique_ptr<PlanStageStats> getStats() override;
 
     const SpecificStats* getSpecificStats() const final;
 

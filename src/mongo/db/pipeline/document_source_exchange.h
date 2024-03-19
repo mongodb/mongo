@@ -245,7 +245,7 @@ public:
 
     const char* getSourceName() const final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * DocumentSourceExchange does not have a direct source (it is reading through the shared

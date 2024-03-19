@@ -56,7 +56,7 @@ using executor::ThreadPoolTaskExecutor;
 
 class TestRetryPolicy : public RetryPolicy {
 public:
-    bool recordAndEvaluateRetry(Status s) override final {
+    bool recordAndEvaluateRetry(Status s) final {
         if (_numRetriesPerformed == _maxRetries) {
             return false;
         }
@@ -64,7 +64,7 @@ public:
         return true;
     }
 
-    Milliseconds getNextRetryDelay() override final {
+    Milliseconds getNextRetryDelay() final {
         auto&& out = _retryDelays.front();
         _retryDelays.pop_front();
         return out;
@@ -74,7 +74,7 @@ public:
         _retryDelays.push_back(retryDelay);
     }
 
-    BSONObj toBSON() const override final {
+    BSONObj toBSON() const final {
         return BSON("retryPolicyType"
                     << "TestRetryPolicy");
     }
@@ -183,11 +183,11 @@ private:
 class FailingTargeter : public Targeter {
 public:
     FailingTargeter(Status errorToFailWith) : _status{errorToFailWith} {}
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
         return _status;
     }
 
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {
         return SemiFuture<void>::makeReady();
     }
 
@@ -209,11 +209,11 @@ public:
         _resolvedHosts = resolvedHosts;
     };
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
         return SemiFuture<std::vector<HostAndPort>>::makeReady(_resolvedHosts);
     }
 
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) final {
         return SemiFuture<void>::makeReady();
     }
 

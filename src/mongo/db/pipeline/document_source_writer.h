@@ -141,7 +141,7 @@ public:
     }
 
 protected:
-    GetNextResult doGetNext() final override;
+    GetNextResult doGetNext() final;
     /**
      * Prepares the stage to be able to write incoming batches.
      */

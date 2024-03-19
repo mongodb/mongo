@@ -139,7 +139,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_limit_skip") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageLimitSkipBasicTest>();
     }
 };

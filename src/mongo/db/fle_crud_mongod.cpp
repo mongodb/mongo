@@ -236,7 +236,7 @@ public:
         return BSONObj();
     }
 
-    virtual bool existsById(PrfBlock block) const override {
+    bool existsById(PrfBlock block) const override {
         return getRecordById(block).has_value();
     }
 
@@ -304,7 +304,7 @@ public:
         return BSONObj();
     }
 
-    virtual bool existsById(PrfBlock block) const override {
+    bool existsById(PrfBlock block) const override {
         return getRecordById(block).has_value();
     }
 

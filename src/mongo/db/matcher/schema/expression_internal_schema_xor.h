@@ -72,7 +72,7 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> clone() const {
+    std::unique_ptr<MatchExpression> clone() const override {
         auto xorCopy = std::make_unique<InternalSchemaXorMatchExpression>(_errorAnnotation);
         xorCopy->reserve(numChildren());
         for (size_t i = 0; i < numChildren(); ++i) {

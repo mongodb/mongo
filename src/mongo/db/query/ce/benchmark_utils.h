@@ -327,7 +327,7 @@ public:
         _arrayBuilder.append(results.toBSON());
     }
 
-    void printResults() {
+    void printResults() override {
         std::cout << _arrayBuilder.arr().jsonString(
                          ExtendedCanonicalV2_0_0, 1 /*pretty*/, true /*isArray*/)
                   << std::endl;
@@ -347,7 +347,7 @@ public:
         _results.push_back(results.toString());
     }
 
-    void printResults() {
+    void printResults() override {
         for (auto&& str : _results) {
             std::cout << str << std::endl;
         }

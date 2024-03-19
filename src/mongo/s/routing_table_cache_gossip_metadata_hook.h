@@ -48,7 +48,7 @@ namespace rpc {
 class RoutingTableCacheGossipMetadataHook : public EgressMetadataHook {
 public:
     RoutingTableCacheGossipMetadataHook(ServiceContext* serviceContext);
-    virtual ~RoutingTableCacheGossipMetadataHook() = default;
+    ~RoutingTableCacheGossipMetadataHook() override = default;
 
     Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) final;
 

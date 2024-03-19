@@ -233,7 +233,7 @@ public:
 
     void clearFilteringMetadata(OperationContext* opCtx,
                                 const NamespaceString& sourceNss,
-                                const NamespaceString& tempReshardingNss) {
+                                const NamespaceString& tempReshardingNss) override {
         stdx::unordered_set<NamespaceString> namespacesToRefresh{sourceNss, tempReshardingNss};
         resharding::clearFilteringMetadata(
             opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);

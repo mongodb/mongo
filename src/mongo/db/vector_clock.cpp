@@ -149,7 +149,7 @@ void VectorClock::_advanceTime(LogicalTimeArray&& newTime) {
 class VectorClock::PlainComponentFormat : public VectorClock::ComponentFormat {
 public:
     using ComponentFormat::ComponentFormat;
-    virtual ~PlainComponentFormat() = default;
+    ~PlainComponentFormat() override = default;
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,
@@ -168,7 +168,7 @@ LogicalTime fromOptionalTimestamp(const boost::optional<Timestamp>& time) {
 class VectorClock::ConfigTimeComponent : public VectorClock::PlainComponentFormat {
 public:
     ConfigTimeComponent() : PlainComponentFormat(VectorClock::kConfigTimeFieldName) {}
-    virtual ~ConfigTimeComponent() = default;
+    ~ConfigTimeComponent() override = default;
 
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
@@ -182,7 +182,7 @@ public:
 class VectorClock::TopologyTimeComponent : public VectorClock::PlainComponentFormat {
 public:
     TopologyTimeComponent() : PlainComponentFormat(VectorClock::kTopologyTimeFieldName) {}
-    virtual ~TopologyTimeComponent() = default;
+    ~TopologyTimeComponent() override = default;
 
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
@@ -196,7 +196,7 @@ public:
 class VectorClock::SignedComponentFormat : public VectorClock::ComponentFormat {
 public:
     using ComponentFormat::ComponentFormat;
-    virtual ~SignedComponentFormat() = default;
+    ~SignedComponentFormat() override = default;
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,

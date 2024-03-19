@@ -41,7 +41,7 @@ class MoveUnshardedPolicy : public ActionsStreamPolicy {
 public:
     MoveUnshardedPolicy();
 
-    virtual StringData getName() const {
+    StringData getName() const override {
         static StringData name("MoveUnshardedPolicy");
         return name;
     };

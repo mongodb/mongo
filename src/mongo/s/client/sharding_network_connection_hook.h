@@ -48,7 +48,7 @@ namespace mongo {
 class ShardingNetworkConnectionHook final : public executor::NetworkConnectionHook {
 public:
     ShardingNetworkConnectionHook() = default;
-    virtual ~ShardingNetworkConnectionHook() = default;
+    ~ShardingNetworkConnectionHook() override = default;
 
     /**
      * Checks that the given host is valid to be used in this sharded cluster, based on its

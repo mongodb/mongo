@@ -94,7 +94,7 @@ TEST(ReplSetRequestVotes, ResponseAcceptsUnknownField) {
 
 class VoteRequesterTest : public mongo::unittest::Test {
 public:
-    virtual void setUp() {
+    void setUp() override {
         ReplSetConfig config(
             ReplSetConfig::parse(BSON("_id"
                                       << "rs0"
@@ -126,7 +126,7 @@ public:
                                                       -1));
     }
 
-    virtual void tearDown() {
+    void tearDown() override {
         _requester.reset(nullptr);
     }
 
@@ -243,7 +243,7 @@ protected:
 
 class VoteRequesterDryRunTest : public VoteRequesterTest {
 public:
-    virtual void setUp() {
+    void setUp() override {
         ReplSetConfig config(
             ReplSetConfig::parse(BSON("_id"
                                       << "rs0"
@@ -278,7 +278,7 @@ public:
 
 class VoteRequesterCatchupTakeoverDryRunTest : public VoteRequesterTest {
 public:
-    virtual void setUp() {
+    void setUp() override {
         ReplSetConfig config(
             ReplSetConfig::parse(BSON("_id"
                                       << "rs0"

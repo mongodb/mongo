@@ -83,7 +83,7 @@ public:
     }
 
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;
@@ -92,7 +92,7 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
 
-    DepsTracker::State getDependencies(DepsTracker* deps) const {
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
         // This stage doesn't use any variables.
         if (_shardFilterer->isCollectionSharded()) {
             const BSONObj& keyPattern = _shardFilterer->getKeyPattern().toBSON();

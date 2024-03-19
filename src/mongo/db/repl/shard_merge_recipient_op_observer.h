@@ -55,7 +55,7 @@ class ShardMergeRecipientOpObserver final : public OpObserverNoop {
 
 public:
     ShardMergeRecipientOpObserver() = default;
-    ~ShardMergeRecipientOpObserver() = default;
+    ~ShardMergeRecipientOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};

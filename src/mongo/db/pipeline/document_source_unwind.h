@@ -66,7 +66,7 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
      * Returns the unwound path, and the 'includeArrayIndex' path, if specified.

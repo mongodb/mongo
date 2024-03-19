@@ -88,7 +88,7 @@ protected:
         _resultsMerger.reattachToOperationContext(getOpCtx());
     }
 
-    virtual void doDetachFromOperationContext() {
+    void doDetachFromOperationContext() override {
         _resultsMerger.detachFromOperationContext();
     }
 

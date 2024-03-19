@@ -40,7 +40,7 @@ class MockJWKSFetcher : public JWKSFetcher {
 public:
     MockJWKSFetcher(BSONObj keys) : _keys(std::move(keys)) {}
 
-    JWKSet fetch() {
+    JWKSet fetch() override {
         if (_shouldFail) {
             uasserted(ErrorCodes::NetworkTimeout,
                       "Mock JWKS fetcher configured to simulate timeout");

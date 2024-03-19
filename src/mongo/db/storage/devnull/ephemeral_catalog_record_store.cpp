@@ -66,8 +66,8 @@ public:
     RemoveChange(Data* data, RecordId loc, const EphemeralForTestRecord& rec)
         : _data(data), _loc(loc), _rec(rec) {}
 
-    virtual void commit(OperationContext* opCtx, boost::optional<Timestamp>) {}
-    virtual void rollback(OperationContext* opCtx) {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
+    void rollback(OperationContext* opCtx) override {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
         Records::iterator it = _data->records.find(_loc);
@@ -103,8 +103,8 @@ public:
         _data->dataSize -= _dataSize;
     }
 
-    virtual void commit(OperationContext* opCtx, boost::optional<Timestamp>) {}
-    virtual void rollback(OperationContext* opCtx) {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
+    void rollback(OperationContext* opCtx) override {
         using std::swap;
 
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
@@ -138,7 +138,7 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
         // not implemented
         return {};
     }
@@ -211,7 +211,7 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
         // not implemented
         return {};
     }

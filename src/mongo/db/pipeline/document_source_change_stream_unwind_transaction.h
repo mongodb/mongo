@@ -88,7 +88,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
@@ -96,7 +96,7 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const {
+    const char* getSourceName() const override {
         return DocumentSourceChangeStreamUnwindTransaction::kStageName.rawData();
     }
 

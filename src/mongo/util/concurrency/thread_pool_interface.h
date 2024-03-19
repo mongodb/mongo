@@ -50,7 +50,7 @@ public:
      * The destructor may block if join() has not previously been called and returned.
      * It is fatal to destroy the pool while another thread is blocked on join().
      */
-    virtual ~ThreadPoolInterface() = default;
+    ~ThreadPoolInterface() override = default;
 
     /**
      * Starts the thread pool. May be called at most once.

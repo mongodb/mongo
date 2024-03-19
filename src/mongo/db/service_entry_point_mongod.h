@@ -42,7 +42,7 @@ namespace mongo {
 class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
 public:
     ServiceEntryPointMongod();
-    ~ServiceEntryPointMongod();
+    ~ServiceEntryPointMongod() override;
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept final;
 

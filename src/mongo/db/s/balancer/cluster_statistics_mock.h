@@ -41,7 +41,7 @@ class ClusterStatisticsMock final : public ClusterStatistics {
 public:
     ClusterStatisticsMock() {}
 
-    ~ClusterStatisticsMock() {}
+    ~ClusterStatisticsMock() override {}
 
     void setStats(std::vector<ShardStatistics>&& clusterStats,
                   std::map<NamespaceString, std::vector<ShardStatistics>>&& collStats) {

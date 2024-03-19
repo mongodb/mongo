@@ -80,7 +80,7 @@ public:
                        const HandshakeValidationHook& hook = HandshakeValidationHook(),
                        const ClientAPIVersionParameters* apiParameters = nullptr);
 
-    virtual ~DBClientConnection() {
+    ~DBClientConnection() override {
         _numConnections.fetchAndAdd(-1);
     }
 
@@ -119,7 +119,7 @@ public:
 
     bool isUsingTransientSSLParams() const override;
 
-    bool isTLS();
+    bool isTLS() override;
 #endif
 
 protected:

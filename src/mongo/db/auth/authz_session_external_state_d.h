@@ -45,13 +45,13 @@ class AuthzSessionExternalStateMongod : public AuthzSessionExternalStateServerCo
 
 public:
     AuthzSessionExternalStateMongod(AuthorizationManager* authzManager);
-    virtual ~AuthzSessionExternalStateMongod();
+    ~AuthzSessionExternalStateMongod() override;
 
-    virtual bool shouldIgnoreAuthChecks() const;
+    bool shouldIgnoreAuthChecks() const override;
 
-    virtual bool serverIsArbiter() const;
+    bool serverIsArbiter() const override;
 
-    virtual void startRequest(OperationContext* opCtx);
+    void startRequest(OperationContext* opCtx) override;
 };
 
 }  // namespace mongo

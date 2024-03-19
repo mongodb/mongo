@@ -82,7 +82,7 @@ protected:
 private:
     void validateDocument(const CollectionPtr& collection,
                           const BSONObj& obj,
-                          const BSONObj& keyPattern) const override final;
+                          const BSONObj& keyPattern) const final;
 
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.

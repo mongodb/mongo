@@ -3655,7 +3655,7 @@ public:
         _children = operands;
     }
 
-    virtual Value evaluate(const Document& root, Variables* variables) const {
+    Value evaluate(const Document& root, Variables* variables) const override {
         int arraySize = _children[0]->evaluate(root, variables).getArrayLength();
         auto args = evaluateAndValidateArguments(root, _children, arraySize, variables);
         auto indexVec = _indexMap.find(args.targetOfSearch);
@@ -5209,7 +5209,7 @@ public:
         _children = operands;
     }
 
-    virtual Value evaluate(const Document& root, Variables* variables) const {
+    Value evaluate(const Document& root, Variables* variables) const override {
         const Value lhs = _children[0]->evaluate(root, variables);
 
         uassert(17310,

@@ -58,7 +58,7 @@ class ClusterCountCmdBase final : public ErrmsgCommandDeprecated {
 public:
     ClusterCountCmdBase() : ErrmsgCommandDeprecated(Impl::kName) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 

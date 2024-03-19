@@ -87,7 +87,7 @@ public:
         }
 
     private:
-        NamespaceString ns() const {
+        NamespaceString ns() const override {
             return NamespaceString(DatabaseName::kAdmin);
         }
 

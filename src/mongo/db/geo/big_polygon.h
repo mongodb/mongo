@@ -54,7 +54,7 @@ public:
 
     BigSimplePolygon(S2Loop* loop);
 
-    virtual ~BigSimplePolygon();
+    ~BigSimplePolygon() override;
 
     void Init(S2Loop* loop);
 
@@ -84,23 +84,23 @@ public:
     // S2Region interface
     //
 
-    BigSimplePolygon* Clone() const;
+    BigSimplePolygon* Clone() const override;
 
-    S2Cap GetCapBound() const;
+    S2Cap GetCapBound() const override;
 
-    S2LatLngRect GetRectBound() const;
+    S2LatLngRect GetRectBound() const override;
 
-    bool Contains(S2Cell const& cell) const;
+    bool Contains(S2Cell const& cell) const override;
 
-    bool MayIntersect(S2Cell const& cell) const;
+    bool MayIntersect(S2Cell const& cell) const override;
 
-    bool VirtualContainsPoint(S2Point const& p) const;
+    bool VirtualContainsPoint(S2Point const& p) const override;
 
-    void Encode(Encoder* encoder) const;
+    void Encode(Encoder* encoder) const override;
 
-    bool Decode(Decoder* decoder);
+    bool Decode(Decoder* decoder) override;
 
-    bool DecodeWithinScope(Decoder* decoder);
+    bool DecodeWithinScope(Decoder* decoder) override;
 
 private:
     std::unique_ptr<S2Loop> _loop;

@@ -64,7 +64,7 @@ class CmdRenameCollection final : public TypedCommand<CmdRenameCollection> {
 public:
     using Request = RenameCollectionCommand;
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

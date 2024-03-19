@@ -80,7 +80,7 @@ public:
         return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
     }
 
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
@@ -100,7 +100,7 @@ public:
                                    CreateCommand(NamespaceString::kShardMergeRecipientsNamespace)));
     }
 
-    void tearDown() {
+    void tearDown() override {
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
     }
 

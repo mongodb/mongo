@@ -202,7 +202,7 @@ private:
             invariant(session);
             _client = std::make_shared<AsyncDBClient>(std::move(hp), std::move(session), nullptr);
         }
-        ~LeasedStream() {
+        ~LeasedStream() override {
             _fixture->_streamDestroyedCalls.fetchAndAdd(1);
         }
         AsyncDBClient* getClient() override {

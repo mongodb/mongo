@@ -147,154 +147,154 @@ protected:
 };
 
 class NoOptimizeBase : public OptimizeBase {
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return constify(spec());
     }
 };
 
 /** $and without operands. */
 class NoOperands : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSONArray());
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return true;
     }
 };
 
 /** $and passed 'true'. */
 class True : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return true;
     }
 };
 
 /** $and passed 'false'. */
 class False : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(false));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return false;
     }
 };
 
 /** $and passed 'true', 'true'. */
 class TrueTrue : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << true));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return true;
     }
 };
 
 /** $and passed 'true', 'false'. */
 class TrueFalse : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << false));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return false;
     }
 };
 
 /** $and passed 'false', 'true'. */
 class FalseTrue : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(false << true));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return false;
     }
 };
 
 /** $and passed 'false', 'false'. */
 class FalseFalse : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(false << false));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return false;
     }
 };
 
 /** $and passed 'true', 'true', 'true'. */
 class TrueTrueTrue : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << true << true));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return true;
     }
 };
 
 /** $and passed 'true', 'true', 'false'. */
 class TrueTrueFalse : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << true << false));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return false;
     }
 };
 
 /** $and passed '0', '1'. */
 class ZeroOne : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(0 << 1));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return false;
     }
 };
 
 /** $and passed '1', '2'. */
 class OneTwo : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(1 << 2));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return true;
     }
 };
 
 /** $and passed a field path. */
 class FieldPath : public ExpectedResultBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a"));
     }
-    bool expectedResult() {
+    bool expectedResult() override {
         return true;
     }
 };
 
 /** A constant expression is optimized to a constant. */
 class OptimizeConstantExpression : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(1));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << true);
     }
 };
 
 /** A non constant expression is not optimized. */
 class NonConstant : public NoOptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a"));
     }
 };
 
 /** An expression beginning with a single constant is optimized. */
 class ConstantNonConstantTrue : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(1 << "$a"));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$and" << BSON_ARRAY("$a"));
     }
     // note: using $and as serialization of ExpressionCoerceToBool rather than
@@ -302,41 +302,41 @@ class ConstantNonConstantTrue : public OptimizeBase {
 };
 
 class ConstantNonConstantFalse : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(0 << "$a"));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << false);
     }
 };
 
 /** An expression with a field path and '1'. */
 class NonConstantOne : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a" << 1));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$and" << BSON_ARRAY("$a"));
     }
 };
 
 /** An expression with a field path and '0'. */
 class NonConstantZero : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a" << 0));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << false);
     }
 };
 
 /** An expression with two field paths and '1'. */
 class NonConstantNonConstantOne : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a"
                                          << "$b" << 1));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$and" << BSON_ARRAY("$a"
                                          << "$b"));
     }
@@ -344,42 +344,42 @@ class NonConstantNonConstantOne : public OptimizeBase {
 
 /** An expression with two field paths and '0'. */
 class NonConstantNonConstantZero : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a"
                                          << "$b" << 0));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << false);
     }
 };
 
 /** An expression with '0', '1', and a field path. */
 class ZeroOneNonConstant : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(0 << 1 << "$a"));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << false);
     }
 };
 
 /** An expression with '1', '1', and a field path. */
 class OneOneNonConstant : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(1 << 1 << "$a"));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$and" << BSON_ARRAY("$a"));
     }
 };
 
 /** Nested $and expressions. */
 class Nested : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(1 << BSON("$and" << BSON_ARRAY(1)) << "$a"
                                            << "$b"));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$and" << BSON_ARRAY("$a"
                                          << "$b"));
     }
@@ -387,12 +387,12 @@ class Nested : public OptimizeBase {
 
 /** Nested $and expressions containing a nested value evaluating to false. */
 class NestedZero : public OptimizeBase {
-    BSONObj spec() {
+    BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(
                         1 << BSON("$and" << BSON_ARRAY(BSON("$and" << BSON_ARRAY(0)))) << "$a"
                           << "$b"));
     }
-    BSONObj expectedOptimized() {
+    BSONObj expectedOptimized() override {
         return BSON("$const" << false);
     }
 };
@@ -403,7 +403,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<And::NoOperands>();
         add<And::True>();
         add<And::False>();

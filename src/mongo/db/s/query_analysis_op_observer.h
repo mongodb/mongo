@@ -51,27 +51,27 @@ class QueryAnalysisOpObserver : public OpObserverNoop {
 
 public:
     QueryAnalysisOpObserver() = default;
-    ~QueryAnalysisOpObserver() = default;
+    ~QueryAnalysisOpObserver() override = default;
 
-    virtual void onInserts(OperationContext* opCtx,
-                           const CollectionPtr& coll,
-                           std::vector<InsertStatement>::const_iterator first,
-                           std::vector<InsertStatement>::const_iterator last,
-                           const std::vector<RecordId>& recordIds,
-                           std::vector<bool> fromMigrate,
-                           bool defaultFromMigrate,
-                           OpStateAccumulator* opAccumulator = nullptr) = 0;
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
+                   const std::vector<RecordId>& recordIds,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   OpStateAccumulator* opAccumulator = nullptr) override = 0;
 
-    virtual void onUpdate(OperationContext* opCtx,
-                          const OplogUpdateEntryArgs& args,
-                          OpStateAccumulator* opAccumulator = nullptr) = 0;
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override = 0;
 
-    virtual void onDelete(OperationContext* opCtx,
-                          const CollectionPtr& coll,
-                          StmtId stmtId,
-                          const BSONObj& doc,
-                          const OplogDeleteEntryArgs& args,
-                          OpStateAccumulator* opAccumulator = nullptr) = 0;
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const BSONObj& doc,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override = 0;
 
 protected:
     void insertInConfigQueryAnalyzersNamespaceImpl(

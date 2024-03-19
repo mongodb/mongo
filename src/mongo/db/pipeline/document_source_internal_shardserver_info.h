@@ -121,7 +121,7 @@ private:
 
     GetNextResult doGetNext() final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     bool _didEmit = false;
 };

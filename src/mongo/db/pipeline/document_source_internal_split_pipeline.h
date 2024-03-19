@@ -108,7 +108,7 @@ private:
         : DocumentSource(kStageName, expCtx), _mergeType(mergeType), _mergeShardId(mergeShardId) {}
 
     GetNextResult doGetNext() final;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 
     // Populated with a valid ShardId if this stage was constructed with

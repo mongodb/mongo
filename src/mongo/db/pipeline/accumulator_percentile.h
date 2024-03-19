@@ -59,7 +59,7 @@ public:
     static constexpr auto kDiscrete = "discrete"_sd;
 
     static constexpr auto kName = "$percentile"_sd;
-    const char* getOpName() const {
+    const char* getOpName() const override {
         return kName.rawData();
     }
 
@@ -97,7 +97,7 @@ public:
      * Ingressing values and computing the requested percentiles.
      */
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged);
+    Value getValue(bool toBeMerged) override;
 
     /**
      * Other infra for the accumulators.
@@ -117,7 +117,7 @@ public:
      */
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const;
+                       const SerializationOptions& options) const override;
 
     /**
      * Helper that allows both the accumulator and expression $percentile to serialize their
@@ -185,7 +185,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const;
+                       const SerializationOptions& options) const override;
 
     /**
      * Helper that allows both the accumulator and expression $median to serialize their

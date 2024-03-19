@@ -139,7 +139,7 @@ public:
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
                      boost::optional<size_t> cachedPlanHash = boost::none);
 
-    virtual ~PlanExecutorImpl();
+    ~PlanExecutorImpl() override;
     CanonicalQuery* getCanonicalQuery() const final;
     const NamespaceString& nss() const final;
     const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const final;
@@ -168,7 +168,7 @@ public:
     LockPolicy lockPolicy() const final;
     const PlanExplainer& getPlanExplainer() const final;
 
-    PlanExecutor::QueryFramework getQueryFramework() const override final {
+    PlanExecutor::QueryFramework getQueryFramework() const final {
         return PlanExecutor::QueryFramework::kClassicOnly;
     }
 
@@ -191,11 +191,11 @@ public:
         return false;
     }
 
-    void setReturnOwnedData(bool returnOwnedData) override final {
+    void setReturnOwnedData(bool returnOwnedData) final {
         _mustReturnOwnedBson = returnOwnedData;
     }
 
-    bool usesCollectionAcquisitions() const override final;
+    bool usesCollectionAcquisitions() const final;
 
 private:
     /**

@@ -139,7 +139,7 @@ public:
         invariant(_exec, kNoExecutorStr);
     }
 
-    virtual ~GuaranteedExecutor() = default;
+    ~GuaranteedExecutor() override = default;
 
     /**
      * Return a wrapped task that is enforced to run once and only once.
@@ -180,7 +180,7 @@ public:
         // Fallback invariants via GuaranteedExecutor's constructor.
     }
 
-    virtual ~GuaranteedExecutorWithFallback() = default;
+    ~GuaranteedExecutorWithFallback() override = default;
 
     void schedule(Task func) override {
         _preferred->schedule([func = std::move(func), fallback = _fallback](Status status) mutable {

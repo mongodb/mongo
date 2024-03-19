@@ -49,7 +49,7 @@ namespace {
 class Scheduler : public OutOfLineExecutor {
 public:
     explicit Scheduler(std::shared_ptr<InlineExecutor::State>& state) : _state(state) {}
-    ~Scheduler() = default;
+    ~Scheduler() override = default;
 
     void schedule(OutOfLineExecutor::Task func) override {
         if (auto state = _state.lock()) {

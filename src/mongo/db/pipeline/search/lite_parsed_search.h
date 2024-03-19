@@ -56,11 +56,11 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const {
+                                                 bool isImplicitDefault) const override {
         return onlyReadConcernLocalSupported(getParseTimeName(), level, isImplicitDefault);
     }
 
-    void assertSupportsMultiDocumentTransaction() const {
+    void assertSupportsMultiDocumentTransaction() const override {
         transactionNotSupported(getParseTimeName());
     }
 

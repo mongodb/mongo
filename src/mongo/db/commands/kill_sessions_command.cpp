@@ -119,10 +119,10 @@ public:
         return false;
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const DatabaseName& dbName,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) override {
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         IDLParserContext ctx("KillSessionsCmd");
         auto ksc = KillSessionsCmdFromClient::parse(ctx, cmdObj);
 

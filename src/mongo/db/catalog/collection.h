@@ -229,7 +229,7 @@ public:
     };
 
     Collection() = default;
-    virtual ~Collection() = default;
+    ~Collection() override = default;
 
     /**
      * Clones this Collection instance. Some members are deep copied and some are shallow copied.
@@ -771,7 +771,7 @@ public:
 
     CollectionPtr(const CollectionPtr&) = delete;
     CollectionPtr(CollectionPtr&&);
-    ~CollectionPtr();
+    ~CollectionPtr() override;
 
     CollectionPtr& operator=(const CollectionPtr&) = delete;
     CollectionPtr& operator=(CollectionPtr&&);

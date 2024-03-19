@@ -55,7 +55,7 @@ class TimeSeriesOpObserver final : public OpObserverNoop {
 
 public:
     TimeSeriesOpObserver() = default;
-    ~TimeSeriesOpObserver() = default;
+    ~TimeSeriesOpObserver() override = default;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {NamespaceFilter::kSystem, NamespaceFilter::kSystem};

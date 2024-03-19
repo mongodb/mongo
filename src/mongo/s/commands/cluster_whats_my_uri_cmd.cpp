@@ -52,7 +52,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 

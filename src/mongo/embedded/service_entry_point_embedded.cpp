@@ -63,13 +63,13 @@ namespace mongo {
 namespace {
 
 class EmbeddedClientObserver final : public ServiceContext::ClientObserver {
-    void onCreateClient(Client* client) {
+    void onCreateClient(Client* client) override {
         auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
         transport::ServiceExecutorContext::set(client, std::move(seCtx));
     }
-    void onDestroyClient(Client*) {}
-    void onCreateOperationContext(OperationContext*) {}
-    void onDestroyOperationContext(OperationContext*) {}
+    void onDestroyClient(Client*) override {}
+    void onCreateOperationContext(OperationContext*) override {}
+    void onDestroyOperationContext(OperationContext*) override {}
 };
 
 ServiceContext::ConstructorActionRegisterer registerClientObserverConstructor{

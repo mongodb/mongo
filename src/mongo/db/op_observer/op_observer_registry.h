@@ -74,11 +74,11 @@ class OpObserverRegistry final : public OpObserver {
 
 public:
     OpObserverRegistry();
-    virtual ~OpObserverRegistry();
+    ~OpObserverRegistry() override;
 
     // This implementaton is unused, but needs to be implemented to conform to the OpObserver
     // interface.
-    NamespaceFilters getNamespaceFilters() const {
+    NamespaceFilters getNamespaceFilters() const override {
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};
     }
 
@@ -491,7 +491,7 @@ public:
 
     void onEmptyCapped(OperationContext* const opCtx,
                        const NamespaceString& collectionName,
-                       const UUID& uuid) {
+                       const UUID& uuid) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onEmptyCapped(opCtx, collectionName, uuid);

@@ -112,7 +112,7 @@ public:
     using NetworkResponseList = std::list<NetworkResponse>;
 
     NetworkInterfaceMock();
-    virtual ~NetworkInterfaceMock();
+    ~NetworkInterfaceMock() override;
 
     ////////////////////////////////////////////////////////////////////////////////
     //

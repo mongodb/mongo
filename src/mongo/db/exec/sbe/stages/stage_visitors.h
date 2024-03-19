@@ -66,7 +66,7 @@ public:
     }
 
 protected:
-    virtual void visit(const sbe::PlanStage* root) {
+    void visit(const sbe::PlanStage* root) override {
         auto stats = root->getCommonStats();
         if (stats->stageType == "seek"_sd) {
             collectionSeeks += stats->opens;

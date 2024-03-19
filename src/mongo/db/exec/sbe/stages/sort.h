@@ -88,7 +88,7 @@ public:
               PlanNodeId planNodeId,
               bool participateInTrialRunTracking = true);
 
-    ~SortStage();
+    ~SortStage() override;
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -118,7 +118,7 @@ private:
     class SortImpl : public SortIface {
     public:
         SortImpl(SortStage& stage);
-        ~SortImpl();
+        ~SortImpl() override;
 
         void prepare(CompileCtx& ctx) final;
         value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;

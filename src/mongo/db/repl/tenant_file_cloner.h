@@ -110,7 +110,7 @@ public:
                      StorageInterface* storageInterface,
                      ThreadPool* dbPool);
 
-    virtual ~TenantFileCloner() = default;
+    ~TenantFileCloner() override = default;
 
     /**
      * Waits for any file system work to finish or fail.

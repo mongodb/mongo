@@ -81,7 +81,7 @@ class ReplicationCoordinatorNoOp final : public ReplicationCoordinator {
 
 public:
     ReplicationCoordinatorNoOp(ServiceContext* serviceContext);
-    ~ReplicationCoordinatorNoOp() = default;
+    ~ReplicationCoordinatorNoOp() override = default;
 
     ReplicationCoordinatorNoOp(ReplicationCoordinatorNoOp&) = delete;
     ReplicationCoordinatorNoOp& operator=(ReplicationCoordinatorNoOp&) = delete;
@@ -333,7 +333,7 @@ public:
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const final;
 
-    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) final;
+    void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) final;
 
     Status stepUpIfEligible(bool skipDryRun) final;
 
@@ -380,28 +380,28 @@ public:
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
-    virtual void restartScheduledHeartbeats_forTest() final;
+    void restartScheduledHeartbeats_forTest() final;
 
-    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+    void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
     class WriteConcernTagChangesNoOp : public WriteConcernTagChanges {
-        virtual ~WriteConcernTagChangesNoOp() = default;
-        virtual bool reserveDefaultWriteConcernChange() {
+        ~WriteConcernTagChangesNoOp() override = default;
+        bool reserveDefaultWriteConcernChange() override {
             return false;
         };
-        virtual void releaseDefaultWriteConcernChange() {}
+        void releaseDefaultWriteConcernChange() override {}
 
-        virtual bool reserveConfigWriteConcernTagChange() {
+        bool reserveConfigWriteConcernTagChange() override {
             return false;
         };
-        virtual void releaseConfigWriteConcernTagChange() {}
+        void releaseConfigWriteConcernTagChange() override {}
     };
 
-    virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
+    WriteConcernTagChanges* getWriteConcernTagChanges() override;
 
-    virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
+    SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
-    virtual bool isRetryableWrite(OperationContext* opCtx) const override;
+    bool isRetryableWrite(OperationContext* opCtx) const override;
 
     boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
 

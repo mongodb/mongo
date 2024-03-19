@@ -70,8 +70,8 @@ public:
     bool isUpdatePending(OperationContext* opCtx,
                          const NamespaceString& nss,
                          AggregateCommandRequest& request) const override;
-    virtual InternalSessionPool::Session acquireSession() override;
-    virtual void releaseSession(InternalSessionPool::Session session) override;
+    InternalSessionPool::Session acquireSession() override;
+    void releaseSession(InternalSessionPool::Session session) override;
 
 private:
     InternalSessionPool* _sessionPool;

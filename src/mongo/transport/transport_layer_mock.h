@@ -65,7 +65,7 @@ public:
     TransportLayerMock();
     explicit TransportLayerMock(std::unique_ptr<SessionManager> sm)
         : _sessionManager(std::move(sm)) {}
-    ~TransportLayerMock();
+    ~TransportLayerMock() override;
 
     std::shared_ptr<Session> createSession(bool isFromRouterPort = false);
     std::shared_ptr<Session> get(Session::Id id);
@@ -96,7 +96,7 @@ public:
         return "mock"_sd;
     }
 
-    virtual ReactorHandle getReactor(WhichReactor which) override;
+    ReactorHandle getReactor(WhichReactor which) override;
 
     // Set to a factory function to use your own session type.
     std::function<std::shared_ptr<Session>(TransportLayer*)> createSessionHook;

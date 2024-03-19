@@ -45,9 +45,9 @@ class AuthzSessionExternalStateMongos : public AuthzSessionExternalStateServerCo
 
 public:
     AuthzSessionExternalStateMongos(AuthorizationManager* authzManager);
-    virtual ~AuthzSessionExternalStateMongos();
+    ~AuthzSessionExternalStateMongos() override;
 
-    virtual void startRequest(OperationContext* opCtx);
+    void startRequest(OperationContext* opCtx) override;
 };
 
 }  // namespace mongo

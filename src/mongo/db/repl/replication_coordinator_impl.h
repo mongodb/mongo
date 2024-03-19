@@ -153,327 +153,323 @@ public:
                                StorageInterface* storage,
                                int64_t prngSeed);
 
-    virtual ~ReplicationCoordinatorImpl();
+    ~ReplicationCoordinatorImpl() override;
 
     // ================== Members of public ReplicationCoordinator API ===================
 
-    virtual void startup(OperationContext* opCtx,
-                         StorageEngine::LastShutdownState lastShutdownState) override;
+    void startup(OperationContext* opCtx,
+                 StorageEngine::LastShutdownState lastShutdownState) override;
 
-    virtual void enterTerminalShutdown() override;
+    void enterTerminalShutdown() override;
 
-    virtual bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) override;
+    bool enterQuiesceModeIfSecondary(Milliseconds quiesceTime) override;
 
-    virtual bool inQuiesceMode() const override;
+    bool inQuiesceMode() const override;
 
-    virtual void shutdown(OperationContext* opCtx,
-                          BSONObjBuilder* shutdownTimeElapsedBuilder) override;
+    void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder) override;
 
-    virtual const ReplSettings& getSettings() const override;
+    const ReplSettings& getSettings() const override;
 
-    virtual MemberState getMemberState() const override;
+    MemberState getMemberState() const override;
 
-    virtual std::vector<MemberData> getMemberData() const override;
+    std::vector<MemberData> getMemberData() const override;
 
-    virtual bool canAcceptNonLocalWrites() const override;
+    bool canAcceptNonLocalWrites() const override;
 
-    virtual Status waitForMemberState(Interruptible* interruptible,
-                                      MemberState expectedState,
-                                      Milliseconds timeout) override;
+    Status waitForMemberState(Interruptible* interruptible,
+                              MemberState expectedState,
+                              Milliseconds timeout) override;
 
-    virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;
+    bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;
 
-    virtual bool isInPrimaryOrSecondaryState_UNSAFE() const override;
+    bool isInPrimaryOrSecondaryState_UNSAFE() const override;
 
-    virtual Seconds getSecondaryDelaySecs() const override;
+    Seconds getSecondaryDelaySecs() const override;
 
-    virtual void clearSyncSourceDenylist() override;
+    void clearSyncSourceDenylist() override;
 
-    virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
-        OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern);
+    ReplicationCoordinator::StatusAndDuration awaitReplication(
+        OperationContext* opCtx,
+        const OpTime& opTime,
+        const WriteConcernOptions& writeConcern) override;
 
-    virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
-        const OpTime& opTime, const WriteConcernOptions& writeConcern);
+    SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
+        const OpTime& opTime, const WriteConcernOptions& writeConcern) override;
 
     void stepDown(OperationContext* opCtx,
                   bool force,
                   const Milliseconds& waitTime,
                   const Milliseconds& stepdownTime) override;
 
-    virtual bool isWritablePrimaryForReportingPurposes();
+    bool isWritablePrimaryForReportingPurposes() override;
 
-    virtual bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName);
-    virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
-                                                   const DatabaseName& dbName);
+    bool canAcceptWritesForDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
+    bool canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
+                                           const DatabaseName& dbName) override;
 
     bool canAcceptWritesFor(OperationContext* opCtx,
                             const NamespaceStringOrUUID& nsorUUID) override;
     bool canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                    const NamespaceStringOrUUID& nsOrUUID) override;
 
-    virtual Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
+    Status checkIfWriteConcernCanBeSatisfied(
+        const WriteConcernOptions& writeConcern) const override;
 
-    virtual Status checkIfCommitQuorumCanBeSatisfied(
+    Status checkIfCommitQuorumCanBeSatisfied(
         const CommitQuorumOptions& commitQuorum) const override;
 
-    virtual bool isCommitQuorumSatisfied(
-        const CommitQuorumOptions& commitQuorum,
-        const std::vector<mongo::HostAndPort>& members) const override;
+    bool isCommitQuorumSatisfied(const CommitQuorumOptions& commitQuorum,
+                                 const std::vector<mongo::HostAndPort>& members) const override;
 
-    virtual Status checkCanServeReadsFor(OperationContext* opCtx,
-                                         const NamespaceString& ns,
-                                         bool secondaryOk);
-    virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
-                                                const NamespaceString& ns,
-                                                bool secondaryOk);
+    Status checkCanServeReadsFor(OperationContext* opCtx,
+                                 const NamespaceString& ns,
+                                 bool secondaryOk) override;
+    Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        bool secondaryOk) override;
 
-    virtual bool shouldRelaxIndexConstraints(OperationContext* opCtx, const NamespaceString& ns);
+    bool shouldRelaxIndexConstraints(OperationContext* opCtx, const NamespaceString& ns) override;
 
-    virtual void setMyLastWrittenOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime);
-    virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime);
-    virtual void setMyLastDurableOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime);
-    virtual void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime);
-    virtual void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime);
+    void setMyLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastAppliedOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastDurableOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime) override;
 
-    virtual void resetMyLastOpTimes();
+    void resetMyLastOpTimes() override;
 
-    virtual void setMyHeartbeatMessage(const std::string& msg);
+    void setMyHeartbeatMessage(const std::string& msg) override;
 
-    virtual OpTime getMyLastWrittenOpTime() const override;
-    virtual OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime(
-        bool rollbackSafe = false) const override;
+    OpTime getMyLastWrittenOpTime() const override;
+    OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime(bool rollbackSafe = false) const override;
 
-    virtual OpTime getMyLastAppliedOpTime() const override;
-    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
+    OpTime getMyLastAppliedOpTime() const override;
+    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
 
-    virtual OpTime getMyLastDurableOpTime() const override;
-    virtual OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;
+    OpTime getMyLastDurableOpTime() const override;
+    OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;
 
-    virtual Status waitUntilMajorityOpTime(OperationContext* opCtx,
-                                           OpTime targetOpTime,
-                                           boost::optional<Date_t> deadline = boost::none) override;
+    Status waitUntilMajorityOpTime(OperationContext* opCtx,
+                                   OpTime targetOpTime,
+                                   boost::optional<Date_t> deadline = boost::none) override;
 
-    virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
-                                               const ReadConcernArgs& readConcern,
-                                               boost::optional<Date_t> deadline) override;
-    virtual Status waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
-                                               LogicalTime clusterTime,
-                                               boost::optional<Date_t> deadline) override;
+    Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                       const ReadConcernArgs& readConcern,
+                                       boost::optional<Date_t> deadline) override;
+    Status waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
+                                       LogicalTime clusterTime,
+                                       boost::optional<Date_t> deadline) override;
 
-    virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
-                                          const ReadConcernArgs& readConcern) override;
+    Status waitUntilOpTimeForRead(OperationContext* opCtx,
+                                  const ReadConcernArgs& readConcern) override;
     Status awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) override;
-    virtual OID getElectionId() override;
+    OID getElectionId() override;
 
-    virtual int getMyId() const override;
+    int getMyId() const override;
 
-    virtual HostAndPort getMyHostAndPort() const override;
+    HostAndPort getMyHostAndPort() const override;
 
-    virtual Status setFollowerMode(const MemberState& newState) override;
+    Status setFollowerMode(const MemberState& newState) override;
 
-    virtual Status setFollowerModeRollback(OperationContext* opCtx) override;
+    Status setFollowerModeRollback(OperationContext* opCtx) override;
 
-    virtual ApplierState getApplierState() override;
+    ApplierState getApplierState() override;
 
-    virtual void signalDrainComplete(OperationContext* opCtx,
-                                     long long termWhenBufferIsEmpty) noexcept override;
+    void signalDrainComplete(OperationContext* opCtx,
+                             long long termWhenBufferIsEmpty) noexcept override;
 
-    virtual void signalUpstreamUpdater() override;
+    void signalUpstreamUpdater() override;
 
-    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
+    StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
 
-    virtual Status processReplSetGetStatus(OperationContext* opCtx,
-                                           BSONObjBuilder* result,
-                                           ReplSetGetStatusResponseStyle responseStyle) override;
+    Status processReplSetGetStatus(OperationContext* opCtx,
+                                   BSONObjBuilder* result,
+                                   ReplSetGetStatusResponseStyle responseStyle) override;
 
-    virtual void appendSecondaryInfoData(BSONObjBuilder* result) override;
+    void appendSecondaryInfoData(BSONObjBuilder* result) override;
 
-    virtual ReplSetConfig getConfig() const override;
+    ReplSetConfig getConfig() const override;
 
-    virtual ConnectionString getConfigConnectionString() const override;
+    ConnectionString getConfigConnectionString() const override;
 
-    virtual Milliseconds getConfigElectionTimeoutPeriod() const override;
+    Milliseconds getConfigElectionTimeoutPeriod() const override;
 
-    virtual std::vector<MemberConfig> getConfigVotingMembers() const override;
+    std::vector<MemberConfig> getConfigVotingMembers() const override;
 
-    virtual size_t getNumConfigVotingMembers() const override;
+    size_t getNumConfigVotingMembers() const override;
 
-    virtual std::int64_t getConfigTerm() const override;
+    std::int64_t getConfigTerm() const override;
 
-    virtual std::int64_t getConfigVersion() const override;
+    std::int64_t getConfigVersion() const override;
 
-    virtual ConfigVersionAndTerm getConfigVersionAndTerm() const override;
+    ConfigVersionAndTerm getConfigVersionAndTerm() const override;
 
-    virtual int getConfigNumMembers() const override;
+    int getConfigNumMembers() const override;
 
-    virtual Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const override;
+    Milliseconds getConfigHeartbeatTimeoutPeriodMillis() const override;
 
-    virtual BSONObj getConfigBSON() const override;
+    BSONObj getConfigBSON() const override;
 
-    virtual boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
+    boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
         const HostAndPort& hap) const override;
 
-    virtual bool isConfigLocalHostAllowed() const override;
+    bool isConfigLocalHostAllowed() const override;
 
-    virtual Milliseconds getConfigHeartbeatInterval() const override;
+    Milliseconds getConfigHeartbeatInterval() const override;
 
-    virtual Status validateWriteConcern(const WriteConcernOptions& writeConcern) const override;
+    Status validateWriteConcern(const WriteConcernOptions& writeConcern) const override;
 
-    virtual void processReplSetGetConfig(BSONObjBuilder* result,
-                                         bool commitmentStatus = false,
-                                         bool includeNewlyAdded = false) override;
+    void processReplSetGetConfig(BSONObjBuilder* result,
+                                 bool commitmentStatus = false,
+                                 bool includeNewlyAdded = false) override;
 
-    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
+    void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
-    virtual void advanceCommitPoint(const OpTimeAndWallTime& committedOpTimeAndWallTime,
-                                    bool fromSyncSource) override;
+    void advanceCommitPoint(const OpTimeAndWallTime& committedOpTimeAndWallTime,
+                            bool fromSyncSource) override;
 
-    virtual void cancelAndRescheduleElectionTimeout() override;
+    void cancelAndRescheduleElectionTimeout() override;
 
-    virtual Status setMaintenanceMode(OperationContext* opCtx, bool activate) override;
+    Status setMaintenanceMode(OperationContext* opCtx, bool activate) override;
 
-    virtual bool getMaintenanceMode() override;
+    bool getMaintenanceMode() override;
 
-    virtual bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const override;
+    bool shouldDropSyncSourceAfterShardSplit(OID replicaSetId) const override;
 
-    virtual Status processReplSetSyncFrom(OperationContext* opCtx,
-                                          const HostAndPort& target,
-                                          BSONObjBuilder* resultObj) override;
+    Status processReplSetSyncFrom(OperationContext* opCtx,
+                                  const HostAndPort& target,
+                                  BSONObjBuilder* resultObj) override;
 
-    virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) override;
+    Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) override;
 
-    virtual Status processReplSetReconfig(OperationContext* opCtx,
-                                          const ReplSetReconfigArgs& args,
-                                          BSONObjBuilder* resultObj) override;
+    Status processReplSetReconfig(OperationContext* opCtx,
+                                  const ReplSetReconfigArgs& args,
+                                  BSONObjBuilder* resultObj) override;
 
-    virtual Status doReplSetReconfig(OperationContext* opCtx,
-                                     GetNewConfigFn getNewConfig,
-                                     bool force) override;
+    Status doReplSetReconfig(OperationContext* opCtx,
+                             GetNewConfigFn getNewConfig,
+                             bool force) override;
 
-    virtual Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) override;
+    Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) override;
 
-    virtual Status awaitConfigCommitment(OperationContext* opCtx,
-                                         bool waitForOplogCommitment,
-                                         long long term) override;
+    Status awaitConfigCommitment(OperationContext* opCtx,
+                                 bool waitForOplogCommitment,
+                                 long long term) override;
 
-    virtual Status processReplSetInitiate(OperationContext* opCtx,
-                                          const BSONObj& configObj,
-                                          BSONObjBuilder* resultObj) override;
+    Status processReplSetInitiate(OperationContext* opCtx,
+                                  const BSONObj& configObj,
+                                  BSONObjBuilder* resultObj) override;
 
-    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) override;
+    Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) override;
 
-    virtual bool buildsIndexes() override;
+    bool buildsIndexes() override;
 
-    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
-                                                       bool durablyWritten) override;
+    std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op, bool durablyWritten) override;
 
-    virtual WriteConcernOptions getGetLastErrorDefault() override;
+    WriteConcernOptions getGetLastErrorDefault() override;
 
-    virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) override;
+    Status checkReplEnabledForCommand(BSONObjBuilder* result) override;
 
-    virtual HostAndPort chooseNewSyncSource(const OpTime& lastOpTimeFetched) override;
+    HostAndPort chooseNewSyncSource(const OpTime& lastOpTimeFetched) override;
 
-    virtual void denylistSyncSource(const HostAndPort& host, Date_t until) override;
+    void denylistSyncSource(const HostAndPort& host, Date_t until) override;
 
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
+    void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
 
-    virtual ChangeSyncSourceAction shouldChangeSyncSource(
-        const HostAndPort& currentSource,
-        const rpc::ReplSetMetadata& replMetadata,
-        const rpc::OplogQueryMetadata& oqMetadata,
-        const OpTime& previousOpTimeFetched,
-        const OpTime& lastOpTimeFetched) const override;
+    ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                  const rpc::ReplSetMetadata& replMetadata,
+                                                  const rpc::OplogQueryMetadata& oqMetadata,
+                                                  const OpTime& previousOpTimeFetched,
+                                                  const OpTime& lastOpTimeFetched) const override;
 
-    virtual ChangeSyncSourceAction shouldChangeSyncSourceOnError(
+    ChangeSyncSourceAction shouldChangeSyncSourceOnError(
         const HostAndPort& currentSource, const OpTime& lastOpTimeFetched) const override;
 
-    virtual OpTime getLastCommittedOpTime() const override;
-    virtual OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const override;
+    OpTime getLastCommittedOpTime() const override;
+    OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const override;
 
-    virtual Status processReplSetRequestVotes(OperationContext* opCtx,
-                                              const ReplSetRequestVotesArgs& args,
-                                              ReplSetRequestVotesResponse* response) override;
+    Status processReplSetRequestVotes(OperationContext* opCtx,
+                                      const ReplSetRequestVotesArgs& args,
+                                      ReplSetRequestVotesResponse* response) override;
 
-    virtual void prepareReplMetadata(const BSONObj& metadataRequestObj,
-                                     const OpTime& lastOpTimeFromClient,
-                                     BSONObjBuilder* builder) const override;
+    void prepareReplMetadata(const BSONObj& metadataRequestObj,
+                             const OpTime& lastOpTimeFromClient,
+                             BSONObjBuilder* builder) const override;
 
-    virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                      ReplSetHeartbeatResponse* response) override;
+    Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+                              ReplSetHeartbeatResponse* response) override;
 
-    virtual bool getWriteConcernMajorityShouldJournal() override;
+    bool getWriteConcernMajorityShouldJournal() override;
 
-    virtual void clearCommittedSnapshot() override;
+    void clearCommittedSnapshot() override;
     /**
      * Get current term from topology coordinator
      */
-    virtual long long getTerm() const override;
+    long long getTerm() const override;
 
     // Returns the ServiceContext where this instance runs.
-    virtual ServiceContext* getServiceContext() override {
+    ServiceContext* getServiceContext() override {
         return _service;
     }
 
-    virtual Status updateTerm(OperationContext* opCtx, long long term) override;
+    Status updateTerm(OperationContext* opCtx, long long term) override;
 
-    virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
+    OpTime getCurrentCommittedSnapshotOpTime() const override;
 
-    virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                            const Timestamp& untilSnapshot) override;
+    void waitUntilSnapshotCommitted(OperationContext* opCtx,
+                                    const Timestamp& untilSnapshot) override;
 
     void appendDiagnosticBSON(BSONObjBuilder*, StringData) override;
 
-    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
-    virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
+    void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
 
-    virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
-        WriteConcernOptions wc) override;
+    WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
-    virtual Status stepUpIfEligible(bool skipDryRun) override;
+    Status stepUpIfEligible(bool skipDryRun) override;
 
-    virtual Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
+    Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 
-    virtual void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
+    void incrementNumCatchUpOpsIfCatchingUp(long numOps) override;
 
-    virtual boost::optional<Timestamp> getRecoveryTimestamp() override;
+    boost::optional<Timestamp> getRecoveryTimestamp() override;
 
-    virtual bool setContainsArbiter() const override;
+    bool setContainsArbiter() const override;
 
-    virtual void attemptToAdvanceStableTimestamp() override;
+    void attemptToAdvanceStableTimestamp() override;
 
-    virtual void finishRecoveryIfEligible(OperationContext* opCtx) override;
+    void finishRecoveryIfEligible(OperationContext* opCtx) override;
 
-    virtual void updateAndLogStateTransitionMetrics(
+    void updateAndLogStateTransitionMetrics(
         ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
         size_t numOpsKilled,
         size_t numOpsRunning) const override;
 
-    virtual TopologyVersion getTopologyVersion() const override;
+    TopologyVersion getTopologyVersion() const override;
 
-    virtual void incrementTopologyVersion() override;
+    void incrementTopologyVersion() override;
 
     using SharedHelloResponse = std::shared_ptr<const HelloResponse>;
 
-    virtual SharedSemiFuture<SharedHelloResponse> getHelloResponseFuture(
+    SharedSemiFuture<SharedHelloResponse> getHelloResponseFuture(
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion) override;
 
-    virtual std::shared_ptr<const HelloResponse> awaitHelloResponse(
+    std::shared_ptr<const HelloResponse> awaitHelloResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion,
         boost::optional<Date_t> deadline) override;
 
-    virtual StatusWith<OpTime> getLatestWriteOpTime(
-        OperationContext* opCtx) const noexcept override;
+    StatusWith<OpTime> getLatestWriteOpTime(OperationContext* opCtx) const noexcept override;
 
-    virtual HostAndPort getCurrentPrimaryHostAndPort() const override;
+    HostAndPort getCurrentPrimaryHostAndPort() const override;
 
     void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
 
@@ -483,11 +479,11 @@ public:
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
-    virtual void restartScheduledHeartbeats_forTest() override;
+    void restartScheduledHeartbeats_forTest() override;
 
-    virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
+    void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
-    virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
+    SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
     // ==================== Private API ===================
     // Called by AutoGetRstlForStepUpStepDown before taking RSTL when making stepdown transitions
@@ -605,7 +601,7 @@ public:
     class WriteConcernTagChangesImpl : public WriteConcernTagChanges {
     public:
         WriteConcernTagChangesImpl() = default;
-        virtual ~WriteConcernTagChangesImpl() = default;
+        ~WriteConcernTagChangesImpl() override = default;
 
         bool reserveDefaultWriteConcernChange() override {
             stdx::lock_guard lock(_mutex);

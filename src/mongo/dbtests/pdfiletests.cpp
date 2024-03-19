@@ -183,7 +183,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("pdfile") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<Insert::InsertNoId>();
         add<Insert::UpdateDate>();
         add<Insert::UpdateDate2>();

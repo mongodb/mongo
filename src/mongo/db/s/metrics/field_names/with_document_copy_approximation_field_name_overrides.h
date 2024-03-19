@@ -36,11 +36,11 @@ namespace mongo {
 template <typename Base>
 class WithDocumentCopyApproximationFieldNameOverrides : public Base {
 public:
-    virtual StringData getForApproxDocumentsToProcess() const override {
+    StringData getForApproxDocumentsToProcess() const override {
         return kApproxDocumentsToCopy;
     }
 
-    virtual StringData getForApproxBytesToScan() const override {
+    StringData getForApproxBytesToScan() const override {
         return kApproxBytesToCopy;
     }
 

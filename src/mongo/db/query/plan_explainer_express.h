@@ -70,7 +70,7 @@ public:
         return {};
     }
 
-    BSONObj getOptimizerDebugInfo() const {
+    BSONObj getOptimizerDebugInfo() const override {
         return {};
     }
 

@@ -160,7 +160,7 @@ public:
     /**
      * evaluateNumericArg  evaluates the implented trig function on one numericArg.
      */
-    Value evaluateNumericArg(const Value& numericArg) const {
+    Value evaluateNumericArg(const Value& numericArg) const override {
         switch (numericArg.getType()) {
             case BSONType::NumberDouble: {
                 auto input = numericArg.getDouble();
@@ -205,7 +205,7 @@ public:
     /**
      * getOpName returns the name of the operation, e.g., $sin
      */
-    virtual const char* getOpName() const = 0;
+    const char* getOpName() const override = 0;
 };
 
 /**
@@ -248,7 +248,7 @@ public:
     /**
      * getOpName returns the name of the operation, e.g., $sinh
      */
-    virtual const char* getOpName() const = 0;
+    const char* getOpName() const override = 0;
 };
 
 class ExpressionArcTangent2 final : public ExpressionTwoNumericArgs<ExpressionArcTangent2> {

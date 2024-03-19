@@ -67,7 +67,7 @@ class ShardingMongoDTestFixture : public ShardingTestFixtureCommon,
                                   public ServiceContextMongoDTest {
 protected:
     ShardingMongoDTestFixture(Options options = {}, bool allowMajorityReads = true);
-    ~ShardingMongoDTestFixture();
+    ~ShardingMongoDTestFixture() override;
 
     void setUp() override;
     void tearDown() override;

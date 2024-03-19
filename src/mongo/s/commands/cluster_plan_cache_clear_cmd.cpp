@@ -97,7 +97,7 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const {
+                                 const BSONObj& cmdObj) const override {
         AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
         ResourcePattern pattern = parseResourcePattern(dbName, cmdObj);
 
@@ -111,7 +111,7 @@ public:
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result);
+             BSONObjBuilder& result) override;
 };
 MONGO_REGISTER_COMMAND(ClusterPlanCacheClearCmd).forRouter();
 

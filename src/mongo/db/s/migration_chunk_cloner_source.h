@@ -104,9 +104,9 @@ public:
                                                const std::vector<repl::ReplOperation>& stmts,
                                                repl::OpTime prepareOrCommitOpTime);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>);
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
 
-    void rollback(OperationContext* opCtx){};
+    void rollback(OperationContext* opCtx) override{};
 
 private:
     const LogicalSessionId _lsid;
@@ -179,9 +179,9 @@ public:
     LogRetryableApplyOpsForShardingHandler(std::vector<NamespaceString> namespaces,
                                            std::vector<repl::OpTime> opTimes);
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>);
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
 
-    void rollback(OperationContext* opCtx){};
+    void rollback(OperationContext* opCtx) override{};
 
 private:
     std::vector<NamespaceString> _namespaces;

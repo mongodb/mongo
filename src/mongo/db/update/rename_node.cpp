@@ -77,7 +77,8 @@ public:
 
     void setCollator(const CollatorInterface* collator) final {}
 
-    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    Status init(BSONElement modExpr,
+                const boost::intrusive_ptr<ExpressionContext>& expCtx) override {
         return Status::OK();
     }
 

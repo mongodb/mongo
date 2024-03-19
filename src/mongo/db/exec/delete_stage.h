@@ -125,16 +125,16 @@ public:
                 CollectionAcquisition collection,
                 PlanStage* child);
 
-    bool isEOF();
-    StageState doWork(WorkingSetID* out);
+    bool isEOF() override;
+    StageState doWork(WorkingSetID* out) override;
 
-    StageType stageType() const {
+    StageType stageType() const override {
         return STAGE_DELETE;
     }
 
-    std::unique_ptr<mongo::PlanStageStats> getStats();
+    std::unique_ptr<mongo::PlanStageStats> getStats() override;
 
-    const SpecificStats* getSpecificStats() const;
+    const SpecificStats* getSpecificStats() const override;
 
 protected:
     void doSaveStateRequiresCollection() final {

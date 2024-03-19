@@ -115,7 +115,7 @@ public:
     bool requiresAuth() const override {
         return true;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
     bool localHostOnlyIfNoAuth() const override {

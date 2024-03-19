@@ -158,9 +158,9 @@ public:
     BSONObj getStats(boost::optional<const UUID&> migrationId = boost::none);
     void getStats(BSONObjBuilder& bob, boost::optional<const UUID&> migrationId = boost::none);
 
-    void onInitialDataAvailable(OperationContext*, bool) override final {}
+    void onInitialDataAvailable(OperationContext*, bool) final {}
 
-    void onShutdown() override final {
+    void onShutdown() final {
         {
             stdx::lock_guard lk(_mutex);
             // Prevents a new migration from starting up during or after shutdown.
@@ -170,24 +170,24 @@ public:
         _resetMigrationHandle();
     }
 
-    void onRollback() override final {
+    void onRollback() final {
         interruptAll();
         _resetMigrationHandle();
     }
 
-    void onStartup(OperationContext*) override final {}
+    void onStartup(OperationContext*) final {}
 
-    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
 
-    void onStepUpBegin(OperationContext*, long long) override final {}
+    void onStepUpBegin(OperationContext*, long long) final {}
 
-    void onStepUpComplete(OperationContext*, long long) override final {}
+    void onStepUpComplete(OperationContext*, long long) final {}
 
-    void onStepDown() override final {}
+    void onStepDown() final {}
 
-    void onBecomeArbiter() override final {}
+    void onBecomeArbiter() final {}
 
-    inline std::string getServiceName() const override final {
+    inline std::string getServiceName() const final {
         return "TenantFileImporterService";
     }
 

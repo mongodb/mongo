@@ -166,12 +166,12 @@ public:
         _element.reset(e, BSONElement());
     }
 
-    virtual ~SingleElementElementIterator() {}
+    ~SingleElementElementIterator() override {}
 
-    virtual bool more() {
+    bool more() override {
         return !_seen;
     }
-    virtual Context next() {
+    Context next() override {
         _seen = true;
         return _element;
     }
@@ -185,8 +185,8 @@ class SimpleArrayElementIterator : public ElementIterator {
 public:
     SimpleArrayElementIterator(const BSONElement& theArray, bool returnArrayLast);
 
-    virtual bool more();
-    virtual Context next();
+    bool more() override;
+    Context next() override;
 
 private:
     BSONElement _theArray;
@@ -217,13 +217,13 @@ public:
      */
     BSONElementIterator(const ElementPath* path, const BSONObj& objectToIterate);
 
-    virtual ~BSONElementIterator();
+    ~BSONElementIterator() override;
 
     void reset(const ElementPath* path, size_t suffixIndex, BSONElement elementToIterate);
     void reset(const ElementPath* path, const BSONObj& objectToIterate);
 
-    bool more();
-    Context next();
+    bool more() override;
+    Context next() override;
 
 private:
     /**

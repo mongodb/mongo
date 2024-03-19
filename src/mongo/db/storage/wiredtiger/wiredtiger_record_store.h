@@ -141,7 +141,7 @@ public:
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
 
-    virtual ~WiredTigerRecordStore();
+    ~WiredTigerRecordStore() override;
 
     void getOplogTruncateStats(BSONObjBuilder& builder) const override;
 

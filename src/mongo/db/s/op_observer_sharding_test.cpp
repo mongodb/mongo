@@ -102,7 +102,7 @@ void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata 
 
 class DocumentKeyStateTest : public ShardServerTestFixture {
 protected:
-    virtual void setUp() override {
+    void setUp() override {
         ShardServerTestFixture::setUp();
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(

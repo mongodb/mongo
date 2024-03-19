@@ -62,7 +62,7 @@ class CatalogCacheLoaderMock final : public CatalogCacheLoader {
 
 public:
     CatalogCacheLoaderMock() = default;
-    ~CatalogCacheLoaderMock() = default;
+    ~CatalogCacheLoaderMock() override = default;
 
     /**
      * These functions should never be called. They trigger invariants if called.

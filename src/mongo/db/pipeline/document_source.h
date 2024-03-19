@@ -342,7 +342,7 @@ public:
         };
     };
 
-    virtual ~DocumentSource() {}
+    ~DocumentSource() override {}
 
     /**
      * Makes a deep clone of the DocumentSource by serializing and re-parsing it. DocumentSources

@@ -56,7 +56,7 @@ class PrimaryOnlyServiceOpObserver final : public OpObserverNoop {
 
 public:
     explicit PrimaryOnlyServiceOpObserver(ServiceContext* serviceContext);
-    ~PrimaryOnlyServiceOpObserver();
+    ~PrimaryOnlyServiceOpObserver() override;
 
     NamespaceFilters getNamespaceFilters() const final {
         return {/*update=*/NamespaceFilter::kNone, /*delete=*/NamespaceFilter::kConfig};

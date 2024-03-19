@@ -48,7 +48,7 @@ namespace mongo {
 class ReadOnlyCatalogCacheLoader final : public CatalogCacheLoader {
 public:
     ReadOnlyCatalogCacheLoader() = default;
-    ~ReadOnlyCatalogCacheLoader();
+    ~ReadOnlyCatalogCacheLoader() override;
 
     void initializeReplicaSetRole(bool isPrimary) override {}
     void onStepDown() override {}

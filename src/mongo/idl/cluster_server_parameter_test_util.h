@@ -65,7 +65,7 @@ const auto kNilCPT = LogicalTime::kUninitialized;
 
 class ClusterServerParameterTestBase : public ServiceContextMongoDTest {
 public:
-    virtual void setUp() override {
+    void setUp() override {
         gMultitenancySupport = true;
         // Set up mongod.
         ServiceContextMongoDTest::setUp();

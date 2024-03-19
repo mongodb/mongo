@@ -221,7 +221,7 @@ public:
     Reactor(const Reactor&) = delete;
     Reactor& operator=(const Reactor&) = delete;
 
-    virtual ~Reactor() = default;
+    ~Reactor() override = default;
 
     /*
      * Run the event loop of the reactor until stop() is called.
@@ -231,7 +231,7 @@ public:
     virtual void stop() = 0;
     virtual void drain() = 0;
 
-    virtual void schedule(Task task) = 0;
+    void schedule(Task task) override = 0;
     virtual void dispatch(Task task) = 0;
 
     virtual bool onReactorThread() const = 0;

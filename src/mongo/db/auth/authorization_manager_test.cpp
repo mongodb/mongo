@@ -114,7 +114,7 @@ public:
                                   "password", saslGlobalParams.scramSHA256IterationCount.load()));
     }
 
-    ~AuthorizationManagerTest() {
+    ~AuthorizationManagerTest() override {
         if (authzManager)
             AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
     }

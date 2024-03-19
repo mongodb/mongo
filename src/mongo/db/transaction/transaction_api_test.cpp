@@ -124,7 +124,7 @@ const BSONObj kResWithNonTransientCommitErrorAndNonRetryableWriteConcernError =
 
 class MockResourceYielder : public ResourceYielder {
 public:
-    void yield(OperationContext*) {
+    void yield(OperationContext*) override {
         _timesYielded++;
 
         if (_skipNTimes > 0) {
@@ -138,7 +138,7 @@ public:
         }
     }
 
-    void unyield(OperationContext*) {
+    void unyield(OperationContext*) override {
         _timesUnyielded++;
 
         if (_skipNTimes > 0) {
@@ -186,11 +186,11 @@ class MockTransactionClient : public SEPTransactionClient {
 public:
     using SEPTransactionClient::SEPTransactionClient;
 
-    virtual void initialize(std::unique_ptr<TxnHooks> hooks) override {
+    void initialize(std::unique_ptr<TxnHooks> hooks) override {
         _hooks = std::move(hooks);
     }
 
-    virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
+    SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
         stdx::unique_lock<Latch> ul(_mutex);
         [&]() {
             StringData cmdName = cmd.firstElementFieldNameStringData();
@@ -234,43 +234,41 @@ public:
         return SemiFuture<BSONObj>::makeReady(nextResponseRes);
     }
 
-    virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override {
+    BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override {
+    BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
-                                                  BSONObj cmd) const override {
+    SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
-        const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+    SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
-        const BulkWriteCommandRequest& cmd) const override {
+    BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+                                         std::vector<StmtId> stmtIds) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override {
+    SemiFuture<BulkWriteCommandReply> runCRUDOp(const BulkWriteCommandRequest& cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual bool supportsClientTransactionContext() const override {
+    BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool supportsClientTransactionContext() const override {
         return true;
     }
 
-    virtual bool runsClusterOperations() const override {
+    bool runsClusterOperations() const override {
         return false;
     }
 
@@ -550,58 +548,55 @@ private:
 
 class MockClusterOperationTransactionClient : public txn_api::TransactionClient {
 public:
-    virtual void initialize(std::unique_ptr<txn_api::details::TxnHooks> hooks) {}
+    void initialize(std::unique_ptr<txn_api::details::TxnHooks> hooks) override {}
 
-    virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override {
+    BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
+    SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override {
+    BSONObj runCommandCheckedSync(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName,
-                                                  BSONObj cmd) const override {
+    SemiFuture<BSONObj> runCommandChecked(const DatabaseName& dbName, BSONObj cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
-        const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+    SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
                                                  std::vector<StmtId> stmtIds) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<BulkWriteCommandReply> runCRUDOp(
-        const BulkWriteCommandRequest& cmd) const override {
+    BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+                                         std::vector<StmtId> stmtIds) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override {
+    SemiFuture<BulkWriteCommandReply> runCRUDOp(const BulkWriteCommandRequest& cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
-        const FindCommandRequest& cmd) const override {
+    BulkWriteCommandReply runCRUDOpSync(const BulkWriteCommandRequest& cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const override {
+    SemiFuture<std::vector<BSONObj>> exhaustiveFind(const FindCommandRequest& cmd) const override {
         MONGO_UNREACHABLE;
     }
 
-    virtual bool supportsClientTransactionContext() const override {
+    std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool supportsClientTransactionContext() const override {
         return true;
     }
 
-    virtual bool runsClusterOperations() const override {
+    bool runsClusterOperations() const override {
         return true;
     }
 };

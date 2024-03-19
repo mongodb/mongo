@@ -172,15 +172,15 @@ GeoHashConverter::Parameters getConverterParams() {
 class HashBoxRegion : public R2Region {
 public:
     HashBoxRegion(Box box) : _box(box) {}
-    Box getR2Bounds() const {
+    Box getR2Bounds() const override {
         return _box;
     }
 
-    bool fastContains(const Box& other) const {
+    bool fastContains(const Box& other) const override {
         return _box.contains(other);
     }
 
-    bool fastDisjoint(const Box& other) const {
+    bool fastDisjoint(const Box& other) const override {
         if (!_box.intersects(other))
             return true;
 

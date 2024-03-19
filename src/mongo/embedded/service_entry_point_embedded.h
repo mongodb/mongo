@@ -39,7 +39,7 @@ class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
 
 public:
     ServiceEntryPointEmbedded();
-    ~ServiceEntryPointEmbedded();
+    ~ServiceEntryPointEmbedded() override;
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override;
 

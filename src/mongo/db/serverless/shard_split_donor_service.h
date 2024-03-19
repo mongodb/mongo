@@ -73,7 +73,7 @@ public:
 
     explicit ShardSplitDonorService(ServiceContext* const serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
-    ~ShardSplitDonorService() = default;
+    ~ShardSplitDonorService() override = default;
 
     class DonorStateMachine;
 
@@ -118,7 +118,7 @@ public:
                       ShardSplitDonorService* serviceInstance,
                       const ShardSplitDonorDocument& initialState);
 
-    ~DonorStateMachine() = default;
+    ~DonorStateMachine() override = default;
 
     /**
      * Try to abort this split operation. If the split operation is uninitialized, this will

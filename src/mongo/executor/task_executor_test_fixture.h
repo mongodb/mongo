@@ -62,7 +62,7 @@ public:
     static RemoteCommandRequest assertRemoteCommandNameEquals(StringData cmdName,
                                                               const RemoteCommandRequest& request);
 
-    virtual ~TaskExecutorTest();
+    ~TaskExecutorTest() override;
 
     executor::NetworkInterfaceMock* getNet() {
         return _net;

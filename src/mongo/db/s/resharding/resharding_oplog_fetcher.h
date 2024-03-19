@@ -90,7 +90,7 @@ public:
                            ShardId recipientShard,
                            NamespaceString toWriteInto);
 
-    ~ReshardingOplogFetcher();
+    ~ReshardingOplogFetcher() override;
 
     Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override;
 

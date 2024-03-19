@@ -80,7 +80,7 @@ public:
     LogicalSessionCacheImpl(const LogicalSessionCacheImpl&) = delete;
     LogicalSessionCacheImpl& operator=(const LogicalSessionCacheImpl&) = delete;
 
-    ~LogicalSessionCacheImpl();
+    ~LogicalSessionCacheImpl() override;
 
     void joinOnShutDown() override;
 

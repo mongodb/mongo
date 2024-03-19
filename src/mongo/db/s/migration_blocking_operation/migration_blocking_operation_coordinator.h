@@ -52,15 +52,15 @@ public:
     MigrationBlockingOperationCoordinator(ShardingDDLCoordinatorService* service,
                                           const BSONObj& initialState);
 
-    virtual void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
 
     void beginOperation(OperationContext* opCtx, const UUID& operationUUID);
     void endOperation(OperationContext* opCtx, const UUID& operationUUID);
 
 private:
-    virtual StringData serializePhase(const Phase& phase) const override;
-    virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                          const CancellationToken& token) noexcept override;
+    StringData serializePhase(const Phase& phase) const override;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
 
     Phase _getCurrentPhase() const;
     bool _isFirstOperation(WithLock lk) const;

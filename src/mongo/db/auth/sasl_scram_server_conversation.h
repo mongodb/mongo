@@ -72,7 +72,7 @@ public:
      *
      **/
     StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData inputData);
+                                                       StringData inputData) override;
 
     StatusWith<std::string> saslPrep(StringData str) const {
         if (std::is_same<SHA1Block, HashBlock>::value) {

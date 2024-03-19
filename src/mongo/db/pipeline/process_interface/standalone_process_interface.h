@@ -54,7 +54,7 @@ public:
         return std::make_unique<LocalWriteSizeEstimator>();
     }
 
-    virtual ~StandaloneProcessInterface() = default;
+    ~StandaloneProcessInterface() override = default;
 };
 
 }  // namespace mongo

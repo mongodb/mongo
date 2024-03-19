@@ -1656,7 +1656,7 @@ protected:
     OID rid3;
 
 private:
-    virtual void setUp() {
+    void setUp() override {
         ReplCoordTest::setUp();
         initAndStart();
     }

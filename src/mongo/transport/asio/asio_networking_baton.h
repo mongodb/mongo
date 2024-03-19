@@ -61,7 +61,7 @@ public:
     AsioNetworkingBaton(const TransportLayer* tl, OperationContext* opCtx)
         : _opCtx(opCtx), _tl(tl) {}
 
-    ~AsioNetworkingBaton() {
+    ~AsioNetworkingBaton() override {
         invariant(!_opCtx);
         invariant(_sessions.empty());
         invariant(_scheduled.empty());

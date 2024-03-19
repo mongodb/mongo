@@ -108,7 +108,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual ~TransactionHistoryIteratorMock() {}
+    ~TransactionHistoryIteratorMock() override {}
 
     bool hasNext() const override {
         return !_nextOpTime.isNull();

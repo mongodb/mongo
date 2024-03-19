@@ -97,7 +97,7 @@ public:
         _done.store(true);
     }
 
-    virtual bool hasReceivedSufficientResponses() const {
+    bool hasReceivedSufficientResponses() const override {
         if (_done.load()) {
             return _done.load();
         }
@@ -121,7 +121,7 @@ private:
 class ScatterGatherTest : public executor::ThreadPoolExecutorTest {
 protected:
     int64_t countLogLinesContaining(const std::string& needle);
-    void setUp() {
+    void setUp() override {
         executor::ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
     }

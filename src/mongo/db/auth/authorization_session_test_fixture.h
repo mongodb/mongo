@@ -45,7 +45,7 @@ namespace mongo {
 class FailureCapableAuthzManagerExternalStateMock : public AuthzManagerExternalStateMock {
 public:
     FailureCapableAuthzManagerExternalStateMock() = default;
-    ~FailureCapableAuthzManagerExternalStateMock() = default;
+    ~FailureCapableAuthzManagerExternalStateMock() override = default;
 
     void setFindsShouldFail(bool enable) {
         _findsShouldFail = enable;
@@ -68,7 +68,7 @@ private:
 
 class AuthorizationSessionTestFixture : public ServiceContextMongoDTest {
 public:
-    void setUp();
+    void setUp() override;
 
     void tearDown() override {
         authzSession->logoutAllDatabases(_client.get(), "Ending AuthorizationSessionTest");

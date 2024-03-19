@@ -48,7 +48,7 @@ class CurrentOpCommandBase : public BasicCommand {
 public:
     CurrentOpCommandBase() : BasicCommand("currentOp") {}
 
-    virtual ~CurrentOpCommandBase() {}
+    ~CurrentOpCommandBase() override {}
 
     bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;

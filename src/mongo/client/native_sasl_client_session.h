@@ -49,11 +49,11 @@ class NativeSaslClientSession : public SaslClientSession {
 
 public:
     NativeSaslClientSession();
-    ~NativeSaslClientSession();
+    ~NativeSaslClientSession() override;
 
-    virtual Status initialize();
+    Status initialize() override;
 
-    virtual Status step(StringData inputData, std::string* outputData);
+    Status step(StringData inputData, std::string* outputData) override;
 
     bool isSuccess() const override {
         return _success;

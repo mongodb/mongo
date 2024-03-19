@@ -111,7 +111,7 @@ private:
          *     replSet and making sure that it lives longer than this object.
          */
         MockConnHook(MockConnRegistry* registry);
-        ~MockConnHook();
+        ~MockConnHook() override;
 
         std::unique_ptr<mongo::DBClientBase> connect(
             const mongo::ConnectionString& connString,

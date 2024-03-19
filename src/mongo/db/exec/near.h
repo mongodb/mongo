@@ -91,7 +91,7 @@ class NearStage : public RequiresIndexStage {
 public:
     struct CoveredInterval;
 
-    ~NearStage();
+    ~NearStage() override;
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;

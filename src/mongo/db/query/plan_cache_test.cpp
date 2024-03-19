@@ -910,7 +910,7 @@ TEST_F(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
  */
 class CachePlanSelectionTest : public unittest::Test {
 protected:
-    void setUp() {
+    void setUp() override {
         params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
         addIndex(BSON("_id" << 1), "_id_");
     }

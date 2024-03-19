@@ -122,7 +122,7 @@ struct PlanStatsSpecificStatsPrinter : PlanStatsVisitorBase<true> {
     // To avoid overloaded-virtual warnings.
     using PlanStatsConstVisitor::visit;
 
-    void visit(tree_walker::MaybeConstPtr<true, sbe::HashLookupStats> stats) override final {
+    void visit(tree_walker::MaybeConstPtr<true, sbe::HashLookupStats> stats) final {
         _stream << "dsk:" << stats->usedDisk << "\n";
         _stream << "htRecs:" << stats->spilledHtRecords << "\n";
         _stream << "htIndices:" << stats->spilledHtBytesOverAllRecords << "\n";

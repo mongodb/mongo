@@ -155,7 +155,7 @@ public:
     explicit ServerMechanismBase(std::string authenticationDatabase)
         : _authenticationDatabase(std::move(authenticationDatabase)) {}
 
-    virtual ~ServerMechanismBase() = default;
+    ~ServerMechanismBase() override = default;
 
     /**
      * Returns the principal name which this mechanism is performing authentication for.
@@ -296,7 +296,7 @@ class MakeServerMechanism : public ServerMechanismBase {
 public:
     explicit MakeServerMechanism(std::string authenticationDatabase)
         : ServerMechanismBase(std::move(authenticationDatabase)) {}
-    virtual ~MakeServerMechanism() = default;
+    ~MakeServerMechanism() override = default;
 
     using policy_type = Policy;
 
@@ -332,7 +332,7 @@ public:
     explicit MakeServerFactory(Service*) {}
     MakeServerFactory() = default;
 
-    virtual ServerMechanism* createImpl(std::string authenticationDatabase) override {
+    ServerMechanism* createImpl(std::string authenticationDatabase) override {
         return new ServerMechanism(std::move(authenticationDatabase));
     }
 

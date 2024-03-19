@@ -130,7 +130,7 @@ private:
 // Tests distinct with single key indices.
 class QueryStageDistinctBasic : public DistinctBase {
 public:
-    virtual ~QueryStageDistinctBasic() {}
+    ~QueryStageDistinctBasic() override {}
 
     void run() {
         // Insert a ton of documents with a: 1
@@ -197,7 +197,7 @@ public:
 // Tests distinct with multikey indices.
 class QueryStageDistinctMultiKey : public DistinctBase {
 public:
-    virtual ~QueryStageDistinctMultiKey() {}
+    ~QueryStageDistinctMultiKey() override {}
 
     void run() {
         // Insert a ton of documents with a: [1, 2, 3]
@@ -332,7 +332,7 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_distinct") {}
 
-    void setupTests() {
+    void setupTests() override {
         add<QueryStageDistinctBasic>();
         add<QueryStageDistinctMultiKey>();
         add<QueryStageDistinctCompoundIndex>();

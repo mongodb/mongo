@@ -91,27 +91,26 @@ private:
      */
     void _reapInternalTransactions(ServiceContext* service);
 
-    void onStartup(OperationContext* opCtx) override final;
+    void onStartup(OperationContext* opCtx) final;
     void onSetCurrentConfig(OperationContext* opCtx) final {}
-    void onShutdown() override final;
+    void onShutdown() final;
 
-    void onStepUpComplete(OperationContext* opCtx, long long term) override final {
+    void onStepUpComplete(OperationContext* opCtx, long long term) final {
         stdx::lock_guard lg(_mutex);
         _enabled = true;
     }
 
-    void onStepDown() override final {
+    void onStepDown() final {
         stdx::lock_guard lg(_mutex);
         _enabled = false;
         _lsidsToEagerlyReap.clear();
     }
 
-    void onRollback() override final {}
-    void onInitialDataAvailable(OperationContext* opCtx,
-                                bool isMajorityDataAvailable) override final {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
-    void onBecomeArbiter() override final {}
-    inline std::string getServiceName() const override final {
+    void onRollback() final {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) final {}
+    void onBecomeArbiter() final {}
+    inline std::string getServiceName() const final {
         return "InternalTransactionsReapService";
     }
 

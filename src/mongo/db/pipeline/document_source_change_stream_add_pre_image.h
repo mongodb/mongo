@@ -119,7 +119,7 @@ public:
         return boost::none;
     }
 
-    DepsTracker::State getDependencies(DepsTracker* deps) const {
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->fields.insert(DocumentSourceChangeStream::kPreImageIdField.toString());
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
@@ -128,7 +128,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     const char* getSourceName() const final {
         return kStageName.rawData();

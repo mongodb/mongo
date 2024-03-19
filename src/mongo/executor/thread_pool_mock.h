@@ -68,7 +68,7 @@ public:
      * generator that is used to determine which schedulable task runs next.
      */
     ThreadPoolMock(NetworkInterfaceMock* net, int32_t prngSeed, Options options);
-    ~ThreadPoolMock();
+    ~ThreadPoolMock() override;
 
     void startup() override;
     void shutdown() override;

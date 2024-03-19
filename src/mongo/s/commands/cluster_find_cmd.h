@@ -61,7 +61,7 @@ public:
 
     ClusterFindCmdBase() : Command(Impl::kName) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 
@@ -91,11 +91,11 @@ public:
      * A find command does not increment the command counter, but rather increments the
      * query counter.
      */
-    bool shouldAffectCommandCounter() const override final {
+    bool shouldAffectCommandCounter() const final {
         return false;
     }
 
-    bool shouldAffectQueryCounter() const override final {
+    bool shouldAffectQueryCounter() const final {
         return true;
     }
 
@@ -220,7 +220,7 @@ public:
             }
         }
 
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanRunHere(opCtx);
 
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);

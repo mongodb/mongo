@@ -54,7 +54,7 @@ class AuthzManagerExternalStateMongod : public AuthzManagerExternalStateLocal {
 
 public:
     AuthzManagerExternalStateMongod();
-    virtual ~AuthzManagerExternalStateMongod();
+    ~AuthzManagerExternalStateMongod() override;
 
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) final;

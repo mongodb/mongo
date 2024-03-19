@@ -175,7 +175,7 @@ public:
                     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
         : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
-    ~PipelineRewrite(){};
+    ~PipelineRewrite() override{};
 
     void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
@@ -204,7 +204,7 @@ public:
                   EncryptedCollScanModeAllowed mode)
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
-    ~FilterRewrite(){};
+    ~FilterRewrite() override{};
 
     void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
