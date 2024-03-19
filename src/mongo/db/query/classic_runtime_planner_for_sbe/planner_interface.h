@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/stage_builder_util.h"
 
 namespace mongo::classic_runtime_planner_for_sbe {
 
@@ -87,6 +88,12 @@ protected:
         bool isFromPlanCache,
         boost::optional<size_t> cachedPlanHash,
         std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage);
+
+    std::unique_ptr<QuerySolution> extendSolutionWithPipeline(
+        std::unique_ptr<QuerySolution> solution);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> prepareSbePlanAndData(
+        const QuerySolution& solution, boost::optional<std::string> replanReason = boost::none);
 
     OperationContext* opCtx() {
         return _plannerData.opCtx;
@@ -150,7 +157,12 @@ private:
 class SingleSolutionPassthroughPlanner final : public PlannerBase {
 public:
     SingleSolutionPassthroughPlanner(PlannerDataForSBE plannerData,
-                                     std::unique_ptr<QuerySolution> solution);
+                                     std::unique_ptr<QuerySolution> solution,
+                                     boost::optional<std::string> replanReason = boost::none);
+
+    SingleSolutionPassthroughPlanner(
+        PlannerDataForSBE plannerData,
+        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData);
 
     /**
      * Builds and caches SBE plan for the given solution and returns PlanExecutor for it.
@@ -160,52 +172,8 @@ public:
 
 private:
     std::unique_ptr<QuerySolution> _solution;
-};
-
-class CachedPlanner final : public PlannerBase {
-public:
-    CachedPlanner(PlannerDataForSBE plannerData,
-                  PlanYieldPolicy::YieldPolicy yieldPolicy,
-                  std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder);
-
-    /**
-     * Recovers SBE plan from cache and performs trial on it. When the trial period ends, this
-     * function checks the stats to determine if the number of reads during the trial meets the
-     * criteria for replanning and replans if necessary.
-     *
-     * Returns PlanExecutor for the final selected plan.
-     */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
-
-private:
-    /**
-     * Executes the "trial" portion of a single plan until it
-     *   - reaches EOF,
-     *   - reaches the 'maxNumResults' limit,
-     *   - early exits via the TrialRunTracker, or
-     *   - returns a failure Status.
-     *
-     * All documents returned by the plan are enqueued into the 'CandidatePlan->results' queue.
-     */
-    sbe::plan_ranker::CandidatePlan _collectExecutionStatsForCachedPlan(
-        std::unique_ptr<sbe::PlanStage> root,
-        stage_builder::PlanStageData data,
-        size_t maxTrialPeriodNumReads);
-
-    /**
-     * Uses the QueryPlanner and the MultiPlanner to re-generate candidate plans for this
-     * query and select a new winner.
-     *
-     * The plan cache is modified only if 'shouldCache' is true. The 'replanReason' string is used
-     * to indicate the reason for replanning, which can be included, for example, into plan stats
-     * summary.
-     */
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _replan(
-        std::unique_ptr<CanonicalQuery> canonicalQuery, bool shouldCache, std::string replanReason);
-
-    PlanYieldPolicy::YieldPolicy _yieldPolicy;
-    std::unique_ptr<sbe::CachedPlanHolder> _cachedPlanHolder;
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> _sbePlanAndData;
+    bool _isFromPlanCache;
 };
 
 class MultiPlanner final : public PlannerBase {
@@ -250,5 +218,13 @@ public:
 private:
     std::unique_ptr<SubplanStage> _subplanStage;
 };
+
+/**
+ * Does a trial run of the cached solution & constructs `ValidCandidatePlanner` if it still works as
+ * expected. Uses the QueryPlanner and the MultiPlanner to re-generate candidate plans for this
+ * query and select a new winner otherwise.
+ */
+std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
+    PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder);
 
 }  // namespace mongo::classic_runtime_planner_for_sbe

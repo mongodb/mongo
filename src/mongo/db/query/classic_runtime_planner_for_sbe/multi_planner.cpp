@@ -47,6 +47,7 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
     : PlannerBase(std::move(plannerData)),
       _cachingMode((std::move(cachingMode))),
       _replanReason(replanReason) {
+    LOGV2_DEBUG(6215001, 5, "Using classic multi-planner for SBE");
     _multiPlanStage =
         std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
                                          collections().getMainCollectionPtrOrAcquisition(),
@@ -58,11 +59,6 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
             opCtx(), collections().getMainCollectionPtrOrAcquisition(), *cq(), *solution, ws());
         _multiPlanStage->addPlan(std::move(solution), std::move(nextPlanRoot), ws());
     }
-}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
-    LOGV2_DEBUG(6215001, 5, "Using classic multi-planner for SBE");
 
     auto trialPeriodYieldPolicy =
         makeClassicYieldPolicy(opCtx(),
@@ -70,9 +66,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
                                static_cast<PlanStage*>(_multiPlanStage.get()),
                                yieldPolicy(),
                                collections().getMainCollectionPtrOrAcquisition());
-
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
+}
 
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
     // Calculate and update the number of works based on totalKeysExamined + totalDocsExamined to
     // align with how SBE calculates the works.
     auto stats = _multiPlanStage->getStats();

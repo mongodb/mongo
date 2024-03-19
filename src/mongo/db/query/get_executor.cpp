@@ -957,8 +957,8 @@ private:
             planCacheCounters.incrementSbeHitsCounter();
 
             auto result = releaseResult();
-            result->runtimePlanner = std::make_unique<crp_sbe::CachedPlanner>(
-                makePlannerData(), _yieldPolicy, std::move(cacheEntry));
+            result->runtimePlanner =
+                crp_sbe::makePlannerForCacheEntry(makePlannerData(), std::move(cacheEntry));
             return result;
         }
 

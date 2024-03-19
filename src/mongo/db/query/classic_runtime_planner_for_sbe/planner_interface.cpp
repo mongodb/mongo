@@ -81,4 +81,22 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                     std::move(remoteExplains),
                                     std::move(classicRuntimePlannerStage)));
 }
+
+std::unique_ptr<QuerySolution> PlannerBase::extendSolutionWithPipeline(
+    std::unique_ptr<QuerySolution> solution) {
+    if (cq()->cqPipeline().empty()) {
+        return solution;
+    }
+    return QueryPlanner::extendWithAggPipeline(
+        *cq(), std::move(solution), plannerParams().secondaryCollectionsInfo);
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
+PlannerBase::prepareSbePlanAndData(const QuerySolution& solution,
+                                   boost::optional<std::string> replanReason) {
+    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
+        opCtx(), collections(), *cq(), solution, sbeYieldPolicy());
+    sbePlanAndData.second.replanReason = std::move(replanReason);
+    return sbePlanAndData;
+}
 }  // namespace mongo::classic_runtime_planner_for_sbe

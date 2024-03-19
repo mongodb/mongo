@@ -40,28 +40,39 @@
 namespace mongo::classic_runtime_planner_for_sbe {
 
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
-    PlannerDataForSBE plannerData, std::unique_ptr<QuerySolution> solution)
-    : PlannerBase(std::move(plannerData)), _solution(std::move(solution)) {}
+    PlannerDataForSBE plannerData,
+    std::unique_ptr<QuerySolution> solution,
+    boost::optional<std::string> replanReason)
+    : PlannerBase(std::move(plannerData)),
+      _solution(extendSolutionWithPipeline(std::move(solution))),
+      _sbePlanAndData(prepareSbePlanAndData(*_solution, std::move(replanReason))),
+      _isFromPlanCache(false) {}
+
+SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
+    PlannerDataForSBE plannerData,
+    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData)
+    : PlannerBase(std::move(plannerData)),
+      _solution(nullptr),
+      _sbePlanAndData(std::move(sbePlanAndData)),
+      _isFromPlanCache(true) {}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::makeExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     LOGV2_DEBUG(8523405, 5, "Using SBE single solution planner");
-    if (!cq()->cqPipeline().empty()) {
-        _solution = QueryPlanner::extendWithAggPipeline(
-            *cq(), std::move(_solution), plannerParams().secondaryCollectionsInfo);
+    if (!_isFromPlanCache) {
+        // Create a pinned plan cache entry.
+        tassert(8779800, "expected 'solution' not to be null", _solution);
+        plan_cache_util::updatePlanCache(opCtx(),
+                                         collections(),
+                                         *cq(),
+                                         *_solution,
+                                         *_sbePlanAndData.first,
+                                         _sbePlanAndData.second);
     }
-
-    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-        opCtx(), collections(), *cq(), *_solution, sbeYieldPolicy());
-
-    // Create a pinned plan cache entry.
-    plan_cache_util::updatePlanCache(
-        opCtx(), collections(), *cq(), *_solution, *sbePlanAndData.first, sbePlanAndData.second);
-
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_solution),
-                                  std::move(sbePlanAndData),
-                                  false /*isFromPlanCache*/,
+                                  std::move(_sbePlanAndData),
+                                  _isFromPlanCache,
                                   cachedPlanHash(),
                                   nullptr /*classicRuntimePlannerStage*/);
 }

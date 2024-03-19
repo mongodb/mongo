@@ -40,17 +40,13 @@
 namespace mongo::classic_runtime_planner_for_sbe {
 
 SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(plannerData)) {
+    LOGV2_DEBUG(8542100, 5, "Using classic subplanner for SBE");
     _subplanStage =
         std::make_unique<SubplanStage>(cq()->getExpCtxRaw(),
                                        collections().getMainCollectionPtrOrAcquisition(),
                                        ws(),
                                        cq(),
                                        PlanCachingMode::NeverCache);
-}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
-    LOGV2_DEBUG(8542100, 5, "Using classic subplanner for SBE");
 
     auto trialPeriodYieldPolicy =
         makeClassicYieldPolicy(opCtx(),
@@ -58,14 +54,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
                                static_cast<PlanStage*>(_subplanStage.get()),
                                yieldPolicy(),
                                collections().getMainCollectionPtrOrAcquisition());
-
     uassertStatusOK(_subplanStage->pickBestPlan(plannerParams(),
                                                 trialPeriodYieldPolicy.get(),
                                                 false /* shouldConstructClassicExecutableTree */));
+}
 
-    std::unique_ptr<QuerySolution> solution;
-
-    solution = _subplanStage->extractBestWholeQuerySolution();
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    std::unique_ptr<QuerySolution> solution = _subplanStage->extractBestWholeQuerySolution();
 
     // Extend the winning solution with the agg pipeline and build the execution tree.
     if (!cq()->cqPipeline().empty()) {
