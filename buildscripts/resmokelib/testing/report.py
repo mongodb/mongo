@@ -131,10 +131,11 @@ class TestReport(unittest.TestResult):
             if test.dynamic:
                 self.num_dynamic += 1
 
-            # Set up the test-specific logger.
-            (test_logger, url_endpoint) = logging.loggers.new_test_logger(
-                test.short_name(), test.basename(), command, test.logger, self.job_num, test.id(),
-                self.job_logger)
+        # Set up the test-specific logger.
+        (test_logger, url_endpoint) = logging.loggers.new_test_logger(test.short_name(),
+                                                                      test.basename(), command,
+                                                                      test.logger, self.job_num,
+                                                                      test.id(), self.job_logger)
 
         test_info.add_logger(test_logger)
         test_info.add_logger(self.job_logger)
