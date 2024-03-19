@@ -36,7 +36,7 @@ public:
     }
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
-    std::string message(int value) const {
+    std::string message(int value) const override {
         if (value == asio::ssl::error::no_renegotiation) {
             return "peer requested renegotiation, which is not supported";
         }
@@ -48,7 +48,7 @@ public:
         return s ? s : "asio.ssl error";
     }
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
-    std::string message(int value) const {
+    std::string message(int value) const override {
         // engine_apple produces osstatus_errorcategory messages except for stream_truncated
         if (value == asio::ssl::error::stream_truncated) {
             return "asio.ssl stream truncated";
@@ -83,11 +83,11 @@ namespace detail {
 
 class stream_category : public asio::error_category {
 public:
-    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT {
+    const char* name() const ASIO_ERROR_CATEGORY_NOEXCEPT override {
         return "asio.ssl.stream";
     }
 
-    std::string message(int value) const {
+    std::string message(int value) const override {
         switch (value) {
             case stream_truncated:
                 return "stream truncated";
