@@ -99,19 +99,9 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     auto framework = exec->getQueryFramework();
 
-    // Find whether there is an index filter set for the query shape. The 'indexFilterSet' field
-    // will always be false in the case of EOF or idhack plans.
     boost::optional<uint32_t> queryHash;
     boost::optional<uint32_t> planCacheKeyHash;
     const auto& mainCollection = collections.getMainCollection();
-    auto indexFilterSet = [&]() {
-        if (!mainCollection || !exec->getCanonicalQuery()) {
-            return false;
-        }
-        const QuerySettings* querySettings =
-            QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
-        return querySettings->getAllowedIndicesFilter(*exec->getCanonicalQuery()).has_value();
-    }();
     if (mainCollection && exec->getCanonicalQuery()) {
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             !QueryKnobConfiguration::decoration(exec->getCanonicalQuery()->getOpCtx())
@@ -131,7 +121,6 @@ void generatePlannerInfo(PlanExecutor* exec,
             queryHash = planCacheKeyInfo.queryHash();
         }
     }
-    plannerBob.append("indexFilterSet", indexFilterSet);
 
     // In general we should have a canonical query, but sometimes we may avoid creating a canonical
     // query as an optimization (specifically, the update system does not canonicalize for idhack
@@ -152,7 +141,7 @@ void generatePlannerInfo(PlanExecutor* exec,
         }
 
         parsedQueryBob.doneFast();
-    } else if (nullptr != query) {
+    } else if (query) {
         BSONObjBuilder parsedQueryBob(plannerBob.subobjStart("parsedQuery"));
         query->getPrimaryMatchExpression()->serialize(&parsedQueryBob, {});
         parsedQueryBob.doneFast();
@@ -161,9 +150,22 @@ void generatePlannerInfo(PlanExecutor* exec,
             plannerBob.append("collation", query->getCollator()->getSpec().toBSON());
         }
 
+        // If there exists a matching index filter, set 'indexFilterSet' to false if query settings
+        // set, as they have higher priority.
         auto& querySettings = query->getExpCtx()->getQuerySettings();
         if (auto querySettingsBSON = querySettings.toBSON(); !querySettingsBSON.isEmpty()) {
             plannerBob.append("querySettings", querySettingsBSON);
+            plannerBob.append("indexFilterSet", false);
+        } else {
+            const bool existsMatchingIndexFilter = [&]() {
+                if (!mainCollection) {
+                    return false;
+                }
+                const auto* indexFilters =
+                    QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
+                return indexFilters->getAllowedIndicesFilter(*query).has_value();
+            }();
+            plannerBob.append("indexFilterSet", existsMatchingIndexFilter);
         }
     }
 
