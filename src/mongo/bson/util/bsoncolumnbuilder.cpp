@@ -474,7 +474,7 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
     const char* end = binary + size;
 
     // Last encountered non-RLE block during binary scan
-    uint64_t lastNonRLE = 0xE;
+    uint64_t lastNonRLE = simple8b::kSingleZero;
 
     while (pos != end) {
         uint8_t control = *pos;
@@ -501,7 +501,7 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
 
             // Uncompressed literal case
             lastUncompressed = element;
-            lastNonRLE = 0xE;
+            lastNonRLE = simple8b::kSingleZero;
             current.control = nullptr;
             last.control = nullptr;
 
@@ -541,24 +541,60 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
                 uassert(8288101, "Invalid double encoding in BSON Column", encoded);
                 d64.lastEncodedValue = *encoded;
             }
-            if (!usesDeltaOfDelta(lastUncompressed.type())) {
-                d64.lastEncodedValue = expandDelta(
-                    d64.lastEncodedValue, simple8b::sum<int64_t>(pos + 1, blocksSize, lastNonRLE));
-            } else {
+            if (usesDeltaOfDelta(lastUncompressed.type())) {
                 d64.lastEncodedValueForDeltaOfDelta =
                     expandDelta(d64.lastEncodedValueForDeltaOfDelta,
                                 simple8b::prefixSum<int64_t>(
                                     pos + 1, blocksSize, d64.lastEncodedValue, lastNonRLE));
+            } else if (onlyZeroDelta(lastUncompressed.type())) {
+                simple8b::visitAll<int64_t>(
+                    pos + 1,
+                    blocksSize,
+                    lastNonRLE,
+                    [](int64_t delta) {
+                        uassert(8819300, "Unexpected non-zero delta in BSON Column", delta == 0);
+                    },
+                    []() {});
+            } else {
+                d64.lastEncodedValue = expandDelta(
+                    d64.lastEncodedValue, simple8b::sum<int64_t>(pos + 1, blocksSize, lastNonRLE));
+
+                if (lastUncompressed.type() == NumberDouble) {
+                    current.lastAtEndOfBlock =
+                        Simple8bTypeUtil::decodeDouble(d64.lastEncodedValue, d64.scaleIndex);
+                }
             }
-            if (lastUncompressed.type() == NumberDouble) {
-                current.lastAtEndOfBlock =
-                    Simple8bTypeUtil::decodeDouble(d64.lastEncodedValue, d64.scaleIndex);
-            }
+
             current.scaleIndex = d64.scaleIndex;
         } else {
-            auto& d128 = std::get<BSONColumn::Iterator::DecodingState::Decoder128>(state.decoder);
-            d128.lastEncodedValue = expandDelta(
-                d128.lastEncodedValue, simple8b::sum<int128_t>(pos + 1, blocksSize, lastNonRLE));
+            // Helper to determine if we may only encode zero deltas
+            auto zeroDeltaOnly = [&]() {
+                if (lastUncompressed.type() == BinData) {
+                    int len;
+                    lastUncompressed.binData(len);
+                    if (len > 16) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            if (zeroDeltaOnly()) {
+                simple8b::visitAll<int128_t>(
+                    pos + 1,
+                    blocksSize,
+                    lastNonRLE,
+                    [](int128_t delta) {
+                        uassert(8819301, "Unexpected non-zero delta in BSON Column", delta == 0);
+                    },
+                    []() {});
+            } else {
+                auto& d128 =
+                    std::get<BSONColumn::Iterator::DecodingState::Decoder128>(state.decoder);
+                d128.lastEncodedValue =
+                    expandDelta(d128.lastEncodedValue,
+                                simple8b::sum<int128_t>(pos + 1, blocksSize, lastNonRLE));
+            }
         }
 
         // Remember control block and advance the position to next
