@@ -231,12 +231,18 @@ public:
         return _numCompleted;
     };
 
+    const std::vector<NamespaceString>& getNamespacesFromFailedMigrations() const {
+        return _failedNss;
+    }
+
     // Resolve all enqueued tasks and record the number completed successfully
     void waitForQueuedAndProcessResponses() {
         for (const auto& [migrateInfo, futureStatus] : _migrationsAndResponses) {
             auto status = futureStatus.getNoThrow(_opCtx);
             if (processResponse(migrateInfo, status)) {
                 _numCompleted++;
+            } else {
+                _failedNss.push_back(migrateInfo.nss);
             }
         }
     }
@@ -247,6 +253,7 @@ protected:
     OperationContext* _opCtx;
     BalancerCommandsScheduler& _scheduler;
     MigrationsAndResponses _migrationsAndResponses;
+    std::vector<NamespaceString> _failedNss;
     int _numCompleted;
 };
 
@@ -1413,6 +1420,11 @@ Balancer::MigrationStats Balancer::_doMigrations(OperationContext* opCtx,
 
     for (const auto& migrationTask : allMigrationTasks) {
         migrationTask->waitForQueuedAndProcessResponses();
+        // Remove from the imbalancedCache the failed migrations. Regardless of the reason, we
+        // prevent failed migrations from being prioritized next round.
+        for (const auto& nss : migrationTask->getNamespacesFromFailedMigrations()) {
+            _imbalancedCollectionsCache.erase(nss);
+        }
     }
 
     return MigrationStats{allMigrationTasks[0]->getNumCompleted(),
