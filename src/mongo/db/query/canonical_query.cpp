@@ -208,9 +208,25 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                 _proj->optimize();
             }
         }
+
+        _metadataDeps = _proj->metadataDeps();
+        uassert(ErrorCodes::BadValue,
+                "cannot use sortKey $meta projection without a sort",
+                !(_proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
+                  _findCommand->getSort().isEmpty()));
     }
+
     if (parsedFind->sort) {
         _sortPattern = std::move(parsedFind->sort);
+
+        // Be sure to track and add any metadata dependencies from the sort (e.g. text score).
+        _metadataDeps |= _sortPattern->metadataDeps(parsedFind->unavailableMetadata);
+
+        // If the results of this query might have to be merged on a remote node, then that node
+        // might need the sort key metadata. Request that the plan generates this metadata.
+        if (_expCtx->needsMerge) {
+            _metadataDeps.set(DocumentMetadataFields::kSortKey);
+        }
     }
     _cqPipeline = std::move(cqPipeline);
     _isCountLike = isCountLike;
@@ -237,25 +253,6 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     dassert(parsed_find_command::isValid(_primaryMatchExpression.get(), *_findCommand).isOK());
     if (auto status = isValidNormalized(_primaryMatchExpression.get()); !status.isOK()) {
         uasserted(status.code(), status.reason());
-    }
-
-    if (_proj) {
-        _metadataDeps = _proj->metadataDeps();
-        uassert(ErrorCodes::BadValue,
-                "cannot use sortKey $meta projection without a sort",
-                !(_proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
-                  _findCommand->getSort().isEmpty()));
-    }
-
-    if (_sortPattern) {
-        // Be sure to track and add any metadata dependencies from the sort (e.g. text score).
-        _metadataDeps |= _sortPattern->metadataDeps(parsedFind->unavailableMetadata);
-
-        // If the results of this query might have to be merged on a remote node, then that node
-        // might need the sort key metadata. Request that the plan generates this metadata.
-        if (_expCtx->needsMerge) {
-            _metadataDeps.set(DocumentMetadataFields::kSortKey);
-        }
     }
 
     // If the 'returnKey' option is set, then the plan should produce index key metadata.
