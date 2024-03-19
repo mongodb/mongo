@@ -41,6 +41,7 @@ jsTestLog("Prepare transaction");
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Verify that the writeConflicts metrics in serverStatus is incremented on secondary.
+rst.awaitReplication();
 const status2 = secondary.adminCommand({serverStatus: 1});
 assert.gt(status2.metrics.operation.writeConflicts, status1.metrics.operation.writeConflicts);
 
@@ -48,6 +49,7 @@ jsTestLog("Commit transaction");
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
 // Verify that the committed transaction data is present on secondary.
+rst.awaitReplication();
 assert.eq(secondary.getDB(dbName)[collName].findOne({_id: 1}), {_id: 1});
 
 // verify that secondaries are not holding any transactional lock resources.

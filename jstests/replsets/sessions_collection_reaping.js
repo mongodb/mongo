@@ -52,6 +52,7 @@ assert.commandWorked(sessionsCollOnPrimary.remove({}));
 // Test that a reap on a secondary does not lead to the on-disk state reaping of the session
 // since the session does not exist in the secondary's session catalog.
 {
+    replTest.awaitReplication();
     assert.commandWorked(secondary.adminCommand({clearLog: 'global'}));
     assert.commandWorked(secondary.adminCommand({reapLogicalSessionCacheNow: 1}));
 

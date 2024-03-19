@@ -23,6 +23,24 @@ replSetTest.startSet({
 });
 replSetTest.initiate();
 
+// Used to set security token on primary and secondary node. Run this when you want to change the
+// tenant that can interact with the repl set
+function setTokenOnEachNode(token) {
+    replSetTest.nodes.forEach(node => {
+        node._setSecurityToken(token);
+    })
+}
+
+function clearTokenOnEachNode(token) {
+    setTokenOnEachNode(undefined);
+}
+
+const firstOrgTenantId = ObjectId();
+const secondOrgTenantId = ObjectId();
+
+const token1 = _createTenantToken({tenant: firstOrgTenantId});
+const token2 = _createTenantToken({tenant: secondOrgTenantId});
+
 // Sets the change stream state for the provided tenant id.
 function setChangeStreamState(enabled) {
     assert.soon(() => {
@@ -44,6 +62,9 @@ function setChangeStreamState(enabled) {
 function assertChangeStreamState(enabled) {
     const primary = replSetTest.getPrimary();
     const secondary = replSetTest.getSecondary();
+    clearTokenOnEachNode();
+    replSetTest.awaitReplication();
+    setTokenOnEachNode(token1);
 
     assert.eq(
         assert.commandWorked(primary.getDB("admin").runCommand({getChangeStreamState: 1})).enabled,
@@ -64,24 +85,6 @@ function assertChangeStreamState(enabled) {
     assert.eq(primaryColls.includes("system.preimages"), enabled);
     assert.eq(secondaryColls.includes("system.preimages"), enabled);
 }
-
-// Used to set security token on primary and secondary node. Run this when you want to change the
-// tenant that can interact with the repl set
-function setTokenOnEachNode(token) {
-    replSetTest.nodes.forEach(node => {
-        node._setSecurityToken(token);
-    })
-}
-
-function clearTokenOnEachNode(token) {
-    setTokenOnEachNode(undefined);
-}
-
-const firstOrgTenantId = ObjectId();
-const secondOrgTenantId = ObjectId();
-
-const token1 = _createTenantToken({tenant: firstOrgTenantId});
-const token2 = _createTenantToken({tenant: secondOrgTenantId});
 
 setTokenOnEachNode(token1);
 

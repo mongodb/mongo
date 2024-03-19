@@ -62,6 +62,7 @@ secondaryColl = secondaryDb[primaryColl.getName()];
 assert.commandWorked(
     primaryDb.createCollection(primaryColl.getName(), {capped: true, size: 100000, max: 3}));
 assert.commandWorked(primaryColl.createIndex({timestamp: 1}, {expireAfterSeconds: 3600}));
+rst.awaitReplication();
 assert(hasTTLIndex(secondaryColl), "TTL index 2 did not replicate");
 
 // Disable the TTL monitor briefly so it can't clean our entries before the test is set up.
@@ -95,6 +96,7 @@ assert.commandWorked(
     primaryDb.createCollection(primaryColl.getName(), {capped: true, size: 100000, max: 3}));
 assert.commandWorked(primaryColl.createIndex({timestamp: 1}, {expireAfterSeconds: 3600}));
 primaryDb.adminCommand({setParameter: 1, ttlMonitorEnabled: false});
+rst.awaitReplication();
 assert(hasTTLIndex(secondaryColl), "The collection is not a TTL collection.");
 assert.commandWorked(primaryColl.insert([
     {name: "doc1", timestamp: expired},

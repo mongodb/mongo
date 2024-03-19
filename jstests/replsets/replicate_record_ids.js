@@ -59,6 +59,7 @@ assert(!oplogNoRid.rid, `Unexpectedly found rid in entry: ${tojson(oplogNoRid)}`
 primDB.runCommand({create: replRidCollName, recordIdsReplicated: true});
 const docAInsertOpTime =
     assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [docA]})).opTime;
+replSet.awaitReplication();
 const docAReplRid = getRidForDoc(primDB, replRidCollName, docA);
 assert.eq(docAReplRid, getRidForDoc(secDB, replRidCollName, docA));
 

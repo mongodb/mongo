@@ -523,6 +523,7 @@ const migrationX509Options = makeX509OptionsForTest();
     // donorAbortMigration. In this case, since the donorRst in this test only has two nodes, the
     // majority will include both nodes, so we assert that all the nodes in this replica set have
     // written the noop.
+    tenantMigrationTest.getDonorRst().awaitReplication();
     tenantMigrationTest.getDonorRst().nodes.forEach((node) => {
         const oplog = node.getDB("local").oplog.rs;
         let findRes = oplog.findOne({op: "n", "o.msg": "NoSuchTenantMigration error"});

@@ -2230,14 +2230,19 @@ var ReplSetTest = function ReplSetTest(opts) {
               "established on " + id);
     };
 
-    // Wait until the optime of the specified type reaches the primary's last applied optime. Blocks
-    // on all secondary nodes or just 'secondaries', if specified. The timeout will reset if any of
-    // the secondaries makes progress.
+    // Wait until the optime of the specified type reaches the primary or the targetNode's last
+    // applied optime if provided. Blocks on all secondary nodes or just 'secondaries', if
+    // specified. The timeout will reset if any of the secondaries makes progress.
     ReplSetTest.prototype.awaitReplication = function(
-        timeout, secondaryOpTimeType, secondaries, retryIntervalMS) {
+        timeout, secondaryOpTimeType, secondaries, retryIntervalMS, targetNode) {
         if (secondaries !== undefined && secondaries !== this._secondaries) {
             print("ReplSetTest awaitReplication: going to check only " +
                   secondaries.map(s => s.host));
+        }
+
+        if (targetNode !== undefined) {
+            print(`ReplSetTest awaitReplication: wait against targetNode ${
+                targetNode.host} instead of primary.`)
         }
 
         timeout = timeout || this.kDefaultTimeoutMS;
@@ -2245,14 +2250,14 @@ var ReplSetTest = function ReplSetTest(opts) {
 
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
-        var primaryLatestOpTime;
+        var targetLatestOpTime;
 
-        // Blocking call, which will wait for the last optime written on the primary to be available
+        // Blocking call, which will wait for the last optime written on the target to be available
         var awaitLastOpTimeWrittenFn = function(rst) {
-            var primary = rst.getPrimary();
+            var target = targetNode || rst.getPrimary();
             assert.soonNoExcept(function() {
                 try {
-                    primaryLatestOpTime = _getLastOpTime(rst, primary);
+                    targetLatestOpTime = _getLastOpTime(rst, target);
                 } catch (e) {
                     print("ReplSetTest caught exception " + e);
                     return false;
@@ -2261,25 +2266,25 @@ var ReplSetTest = function ReplSetTest(opts) {
                 return true;
             }, "awaiting oplog query", timeout);
         };
-
         awaitLastOpTimeWrittenFn(this);
 
-        // get the latest config version from primary (with a few retries in case of error)
-        var primaryConfigVersion;
-        var primaryName;
-        var primary;
+        // get the latest config version from target (with a few retries in case of error)
+        var targetConfigVersion;
+        var targetName;
+        var target;
         var num_attempts = 3;
 
         assert.retryNoExcept(() => {
-            primary = this.getPrimary();
-            primaryConfigVersion =
-                asCluster(this, primary, () => this.getReplSetConfigFromNode()).version;
-            primaryName = primary.host;
+            target = targetNode || this.getPrimary();
+            targetConfigVersion =
+                asCluster(this, target, () => this.getReplSetConfigFromNode(this.getNodeId(target)))
+                    .version;
+            targetName = target.host;
             return true;
         }, "ReplSetTest awaitReplication: couldnt get repl set config.", num_attempts, 1000);
 
-        print("ReplSetTest awaitReplication: starting: optime for primary, " + primaryName +
-              ", is " + tojson(primaryLatestOpTime));
+        print("ReplSetTest awaitReplication: starting: optime for target, " + targetName + ", is " +
+              tojson(targetLatestOpTime));
 
         let nodesCaughtUp = false;
         let secondariesToCheck = secondaries || this._secondaries;
@@ -2306,23 +2311,23 @@ var ReplSetTest = function ReplSetTest(opts) {
                                                              .next()
                                                              .version);
 
-            if (primaryConfigVersion != secondaryConfigVersion) {
+            if (targetConfigVersion != secondaryConfigVersion) {
                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
                       secondaryName + ", has config version #" + secondaryConfigVersion +
-                      ", but expected config version #" + primaryConfigVersion);
+                      ", but expected config version #" + targetConfigVersion);
 
-                if (secondaryConfigVersion > primaryConfigVersion) {
-                    primary = rst.getPrimary();
-                    primaryConfigVersion = primary.getDB("local")['system.replset']
-                                               .find()
-                                               .readConcern("local")
-                                               .limit(1)
-                                               .next()
-                                               .version;
-                    primaryName = primary.host;
+                if (secondaryConfigVersion > targetConfigVersion) {
+                    target = targetNode || rst.getPrimary();
+                    targetConfigVersion = target.getDB("local")['system.replset']
+                                              .find()
+                                              .readConcern("local")
+                                              .limit(1)
+                                              .next()
+                                              .version;
+                    targetName = target.host;
 
-                    print("ReplSetTest awaitReplication: optime for primary, " + primaryName +
-                          ", is " + tojson(primaryLatestOpTime));
+                    print("ReplSetTest awaitReplication: optime for target, " + targetName +
+                          ", is " + tojson(targetLatestOpTime));
                 }
 
                 return Progress.ConfigMismatch;
@@ -2365,18 +2370,18 @@ var ReplSetTest = function ReplSetTest(opts) {
                  (globalThis.rs.compareOpTimes(nodeProgress[index], secondaryOpTime) != 0));
             nodeProgress[index] = secondaryOpTime;
 
-            if (globalThis.rs.compareOpTimes(primaryLatestOpTime, secondaryOpTime) < 0) {
-                primaryLatestOpTime = _getLastOpTime(rst, primary);
+            if (globalThis.rs.compareOpTimes(targetLatestOpTime, secondaryOpTime) < 0) {
+                targetLatestOpTime = _getLastOpTime(rst, target);
                 print("ReplSetTest awaitReplication: optime for " + secondaryName +
-                      " is newer, resetting latest primary optime to " +
-                      tojson(primaryLatestOpTime) + ". Also resetting awaitReplication timeout");
+                      " is newer, resetting latest target optime to " + tojson(targetLatestOpTime) +
+                      ". Also resetting awaitReplication timeout");
                 return Progress.InProgress;
             }
 
-            if (!friendlyEqual(primaryLatestOpTime, secondaryOpTime)) {
+            if (!friendlyEqual(targetLatestOpTime, secondaryOpTime)) {
                 print("ReplSetTest awaitReplication: optime for secondary #" + secondaryCount +
                       ", " + secondaryName + ", is " + tojson(secondaryOpTime) + " but latest is " +
-                      tojson(primaryLatestOpTime));
+                      tojson(targetLatestOpTime));
                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
                       secondaryName + ", is NOT synced");
 
@@ -2400,7 +2405,7 @@ var ReplSetTest = function ReplSetTest(opts) {
             assert.soonNoExcept(() => {
                 try {
                     print("ReplSetTest awaitReplication: checking secondaries against latest " +
-                          "primary optime " + tojson(primaryLatestOpTime));
+                          "target optime " + tojson(targetLatestOpTime));
                     var secondaryCount = 0;
 
                     for (var i = 0; i < secondariesToCheck.length; i++) {
@@ -2426,7 +2431,7 @@ var ReplSetTest = function ReplSetTest(opts) {
                     }
 
                     print("ReplSetTest awaitReplication: finished: all " + secondaryCount +
-                          " secondaries synced at optime " + tojson(primaryLatestOpTime));
+                          " secondaries synced at optime " + tojson(targetLatestOpTime));
                     nodesCaughtUp = true;
                     return true;
                 } catch (e) {
@@ -2435,8 +2440,8 @@ var ReplSetTest = function ReplSetTest(opts) {
                     // We might have a new primary now
                     awaitLastOpTimeWrittenFn();
 
-                    print("ReplSetTest awaitReplication: resetting: optime for primary " +
-                          this._primary + " is " + tojson(primaryLatestOpTime));
+                    print("ReplSetTest awaitReplication: resetting: optime for target " + target +
+                          " is " + tojson(targetLatestOpTime));
 
                     return false;
                 }

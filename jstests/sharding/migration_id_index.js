@@ -33,6 +33,7 @@ assert.commandWorked(
     testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 6}, to: st.shard1.shardName}));
 
 // Check that the collection was created with a v:1 _id index on the non-primary shard.
+st.rs1.awaitReplication();
 spec = IndexCatalogHelpers.findByName(
     st.rs1.getPrimary().getDB("test").migration_id_index.getIndexes(), "_id_");
 assert.neq(spec, null, "_id index spec not found");

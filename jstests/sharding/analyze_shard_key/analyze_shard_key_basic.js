@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const setParameterOpts = {
     analyzeShardKeyNumRanges: 100
@@ -42,10 +43,14 @@ function testExistingUnshardedCollection(writeConn, testCases) {
     const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const coll = writeConn.getCollection(ns);
+    const db = writeConn.getDB(dbName);
 
     const candidateKey0 = {candidateKey0: 1};
     const candidateKey1 = {candidateKey1: 1};  // does not have a supporting index.
     assert.commandWorked(coll.createIndex(candidateKey0));
+    if (!FixtureHelpers.isStandalone(db)) {
+        FixtureHelpers.awaitReplication(db);
+    }
 
     // Analyze shard keys while the collection is empty.
     testCases.forEach(testCase => {
@@ -79,6 +84,9 @@ function testExistingUnshardedCollection(writeConn, testCases) {
         docs.push({candidateKey0: i, candidateKey1: i});
     }
     assert.commandWorked(coll.insert(docs));
+    if (!FixtureHelpers.isStandalone(db)) {
+        FixtureHelpers.awaitReplication(db);
+    }
     testCases.forEach(testCase => {
         jsTest.log(`Running analyzeShardKey command against a non-empty unsharded collection: ${
             tojson(testCase)}`);
@@ -120,6 +128,7 @@ function testExistingShardedCollection(st, testCases) {
     const candidateKey0 = {candidateKey0: 1};
     const candidateKey1 = {candidateKey1: 1};  // does not have a supporting index
     assert.commandWorked(coll.createIndex(candidateKey0));
+    FixtureHelpers.awaitReplication(st.s.getDB(dbName));
 
     // Analyze shard keys while the collection is empty.
     testCases.forEach(testCase => {
@@ -155,6 +164,7 @@ function testExistingShardedCollection(st, testCases) {
         docs.push({currentKey: -i, candidateKey0: -i, candidateKey1: -i});
     }
     assert.commandWorked(coll.insert(docs));
+
     testCases.forEach(testCase => {
         jsTest.log(`Running analyzeShardKey command against a non-empty sharded collection: ${
             tojson(testCase)}`);

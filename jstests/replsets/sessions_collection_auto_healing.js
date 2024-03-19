@@ -106,6 +106,7 @@ let timeoutMinutes = res.localLogicalSessionTimeoutMinutes;
 
     validateSessionsCollection(primary, true, false, timeoutMinutes);
 
+    replTest.awaitReplication();
     assert.commandFailedWithCode(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}),
                                  [ErrorCodes.IndexNotFound]);
 

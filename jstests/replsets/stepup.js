@@ -39,6 +39,7 @@ assert.commandWorked(primary.getDB("test").bar.insert({x: 3}, {writeConcern: {w:
 // Step up the secondary. Retry since the old primary may step down when we try to ask for its
 // vote.
 let numStepUpCmds = 0;
+rst.awaitReplication();
 assert.soonNoExcept(function() {
     numStepUpCmds++;
     return secondary.adminCommand({replSetStepUp: 1}).ok;

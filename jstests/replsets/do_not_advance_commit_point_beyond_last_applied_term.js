@@ -72,6 +72,7 @@ assert.soon(() => {
 });
 assert.commandWorked(
     nodeA.getDB(dbName)[collName].insert({term: 3}, {writeConcern: {w: "majority"}}));
+rst.awaitReplication(1000, undefined, [nodeA, nodeC, nodeD], undefined, nodeA);
 assert.eq(1, nodeC.getDB(dbName)[collName].find({term: 3}).itcount());
 assert.eq(1, nodeD.getDB(dbName)[collName].find({term: 3}).itcount());
 

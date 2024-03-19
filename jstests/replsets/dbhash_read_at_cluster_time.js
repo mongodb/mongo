@@ -97,6 +97,7 @@ assert.eq(atClusterTimeHashBefore,
 
     // Using $_internalReadAtClusterTime or snapshot read concern to read at the opTime
     // of the first insert should return the same md5sum on the secondary as it did on the primary.
+    rst.awaitReplication();
     res = assert.commandWorked(secondaryDB.runCommand({
         dbHash: 1,
         $_internalReadAtClusterTime: clusterTime,

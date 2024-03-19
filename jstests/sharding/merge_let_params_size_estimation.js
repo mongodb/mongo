@@ -77,6 +77,7 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
 
     if (isReplSet) {
         aggCommand["$readPreference"] = {mode: "secondary"};
+        testFixture.awaitReplication();
     }
 
     // The aggregate should not fail.

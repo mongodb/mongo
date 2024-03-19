@@ -43,6 +43,7 @@ let joinUpdate = startParallelShell(
 
 // This secondary read should not cause a hang.
 st.s.setReadPref('secondary');
+st.rs0.awaitReplication();
 let res = assert.commandWorked(coll.getDB('test').runReadCommand(
     {find: 'user', filter: {dummy: {'$exists': false}}, readConcern: {level: 'local'}}));
 

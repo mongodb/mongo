@@ -79,6 +79,7 @@ assert.commandFailedWithCode(primary.adminCommand({
                              ErrorCodes.IDLFailedToParse);
 
 // Running 'voteAbortIndexBuild' as data-bearing secondary, should succeed.
+rst.awaitReplication();
 assert.commandWorked(primary.adminCommand({
     voteAbortIndexBuild: buildUUID,
     hostAndPort: rst.getSecondary().host,

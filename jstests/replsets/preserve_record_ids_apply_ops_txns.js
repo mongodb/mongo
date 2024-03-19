@@ -120,6 +120,7 @@ jsTestLog("Testing that within a transaction the recordIds are preserved on inse
 session.startTransaction();
 assert.commandWorked(replRidColl.insertMany(docs));
 session.commitTransaction();
+replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
@@ -130,6 +131,7 @@ assert.commandWorked(replRidColl.update({a: 0}, {$set: {a: 101}}));
 assert.commandWorked(replRidColl.update({b: 300}, {$set: {a: 300}}, {upsert: true}));
 assert.commandWorked(replRidColl.update({a: {$gt: 80}}, {$inc: {a: 1}}, {multi: true}));
 session.commitTransaction();
+replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
@@ -148,6 +150,7 @@ assert.commandWorked(replRidColl.insertMany(docs));
 assert.commandWorked(unReplRidColl.insertMany(docs));
 assert.commandWorked(replRidColl.insertMany(docs));
 session.commitTransaction();
+replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
@@ -160,6 +163,7 @@ assert.commandWorked(unReplRidColl.update({b: 400}, {$set: {a: 300}}, {upsert: t
 assert.commandWorked(replRidColl.update({a: {$gt: 80}}, {$inc: {a: 1}}, {multi: true}));
 assert.commandWorked(unReplRidColl.update({a: {$gt: 80}}, {$inc: {a: 1}}, {multi: true}));
 session.commitTransaction();
+replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
@@ -184,6 +188,7 @@ for (let i = 0; i < 20; i++) {
     }
 }
 assert.commandWorked(primDB.runCommand({applyOps: ops}));
+replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
@@ -248,6 +253,7 @@ for (let i = 0; i < numIters; i++) {
 }
 
 assert.commandWorked(primDB.runCommand({applyOps: ops}));
+replSet.awaitReplication();
 assert.eq(replRidColl.find().count(), numIters - docsRemovedPerColl);
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();

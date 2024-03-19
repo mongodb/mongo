@@ -1046,7 +1046,7 @@ tasks:
 
 - <<: *gen_task_template
   name: write_concern_majority_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "read_write_concern", "large", "write"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "incompatible_mac", "read_write_concern", "large", "write", "secondary_read_after_majority_write"]
   commands:
   - func: "generate resmoke tasks"
     vars:

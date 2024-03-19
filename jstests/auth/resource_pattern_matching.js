@@ -6,6 +6,7 @@
 // This test logs in users on the admin database, but doesn't log them out, which can fail with
 // implicit sessions and ReplSetTest when the fixture attempts to verify data hashes at shutdown by
 // authenticating as the __system user.
+
 TestData.disableImplicitSessions = true;
 
 function setup_users(granter) {
@@ -76,12 +77,14 @@ function invalidateUserCache(verifier) {
     admin.logout();
 }
 
-function run_test(name, granter, verifier, privileges, collections) {
+function run_test(name, granter, verifier, privileges, collections, rst) {
     print("\n=== testing " + name + "() ===\n");
 
     grant_privileges(granter, privileges);
     invalidateUserCache(verifier);
-
+    if (rst) {
+        rst.awaitReplication();
+    }
     const verifierDB = verifier.getSiblingDB('admin');
     assert(verifierDB.auth("test_user", "password"));
 
@@ -233,7 +236,7 @@ const keyfile = "jstests/libs/key1";
     const primary = rst.getPrimary().getDB('admin');
     rst.awaitSecondaryNodes();
     const secondary = rst.getSecondaries()[0].getDB('admin');
-    run_tests(primary, secondary);
+    run_tests(primary, secondary, rst);
     rst.stopSet();
     print('--- done with the rs tests ---');
 }

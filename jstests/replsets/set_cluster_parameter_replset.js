@@ -29,6 +29,7 @@ function checkClusterParameterInitialSync(rst) {
     runSetClusterParameter(rst.getPrimary(), newStrParameter);
 
     // Check that the new values are visible on the majority of the nodes.
+    rst.awaitReplication();
     runGetClusterParameterReplicaSet(rst,
                                      ["testIntClusterParameter", "testStrClusterParameter"],
                                      [newIntParameter, newStrParameter]);
@@ -73,6 +74,7 @@ function checkClusterParameterRestart(rst) {
     runSetClusterParameter(rst.getPrimary(), newStrParameter);
 
     // Check that the new values are visible on the majority of the nodes.
+    rst.awaitReplication();
     runGetClusterParameterReplicaSet(rst,
                                      ["testIntClusterParameter", "testStrClusterParameter"],
                                      [newIntParameter, newStrParameter]);

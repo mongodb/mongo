@@ -98,6 +98,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {}) {
     function assertConsistentImageEntries(lsid, txnNumber) {
         const imageEntriesOnPrimary =
             getImageEntriesForTxnOnNode(st.rs0.getPrimary(), lsid, txnNumber);
+        st.rs0.awaitReplication();
         st.rs0.getSecondaries().forEach(secondary => {
             const imageEntriesOnSecondary = getImageEntriesForTxnOnNode(secondary, lsid, txnNumber);
             assert.eq(imageEntriesOnSecondary, imageEntriesOnPrimary);

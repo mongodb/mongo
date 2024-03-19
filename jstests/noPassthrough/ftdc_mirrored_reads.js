@@ -128,7 +128,7 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
         }
         // There are two secondaries, so `kOperations * 2` reads must be resolved.
         return primaryResolvedBeforeReads + kOperations * 2 <= primaryResolvedAfterReads;
-    }, "Failed to update extended FTDC metrics within time limit", 10000);
+    }, "Failed to update extended FTDC metrics within time limit", 30000);
 
     const primaryDataAfterReads = getDiagnosticData(primary);
     const primarySentAfterReads = primaryDataAfterReads.sent;
@@ -143,6 +143,6 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
         let mirroredReadsProcessedAfter = getMirroredReadsProcessedAsSecondary();
         return mirroredReadsSucceeded ==
             (mirroredReadsProcessedAfter - mirroredReadsProcessedBefore);
-    }, "Failed to wait for secondary mirrored reads stats to converge", 10000);
+    }, "Failed to wait for secondary mirrored reads stats to converge", 30000);
 }
 rst.stopSet();

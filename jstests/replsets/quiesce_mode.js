@@ -52,6 +52,7 @@ function runFind() {
 jsTestLog("Test quiesce mode when shutting down a secondary");
 
 jsTestLog("Create a cursor on the secondary.");
+replTest.awaitReplication();
 let res = assert.commandWorked(secondaryDB.runCommand({find: collName, batchSize: 2}));
 assert.eq(2, res.cursor.firstBatch.length, res);
 let cursorId = res.cursor.id;

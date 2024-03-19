@@ -573,7 +573,8 @@ buildvariants:
   - name: .multi_shard .common
   - name: query_golden_classic
   - name: .query_fuzzer
-  - name: .read_write_concern
+  # read-after-majority-write is no longer guaranteed with featureFlagReduceMajorityWriteConcern.
+  - name: .read_write_concern !.secondary_read_after_majority_write
   - name: .recordids_replicated
   - name: replica_sets_large_txns_format_jscore_passthrough_gen
   - name: .replica_sets !.multi_oplog

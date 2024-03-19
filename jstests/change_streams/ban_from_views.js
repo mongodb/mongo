@@ -1,5 +1,9 @@
 /**
  * Test that the $changeStream stage cannot be used in a view definition pipeline.
+ *
+ * @tags: [
+ *   assumes_read_preference_unchanged,
+ * ]
  */
 import {
     assertDropAndRecreateCollection,

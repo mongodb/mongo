@@ -1591,7 +1591,7 @@ tasks:
 
 - <<: *gen_task_template
   name: cwrwc_wc_majority_passthrough_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "read_write_concern", "write"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "incompatible_mac", "read_write_concern", "write", "secondary_read_after_majority_write"]
   commands:
   - func: "generate resmoke tasks"
     vars:

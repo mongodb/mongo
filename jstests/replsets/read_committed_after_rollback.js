@@ -59,6 +59,7 @@ var newPrimaryColl = newPrimary.getCollection(collName);
 // Set up initial state.
 assert.commandWorked(oldPrimaryColl.insert({_id: 1, state: 'old'},
                                            {writeConcern: {w: 'majority', wtimeout: 30000}}));
+replTest.awaitReplication();
 assert.eq(doDirtyRead(oldPrimaryColl), 'old');
 assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 assert.eq(doDirtyRead(newPrimaryColl), 'old');

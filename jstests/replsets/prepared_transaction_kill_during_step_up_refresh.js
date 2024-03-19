@@ -62,6 +62,7 @@ const newSession = new _DelegatingDriverSession(newPrimary, session);
 
 assert.commandWorked(PrepareHelpers.commitTransaction(newSession, prepareTimestamp));
 
+rst.awaitReplication();
 assert.eq(doc, primaryColl.findOne({}), primaryColl.find({}).toArray());
 
 rst.stopSet();

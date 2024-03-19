@@ -9,6 +9,7 @@
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {
     moveDatabaseAndUnshardedColls
@@ -101,6 +102,7 @@ const newShardName =
     //
     assert.commandWorked(
         st.s.getCollection(ns).insert({readFromSecondary: 1, skey: -1}, {writeConcern: {w: 3}}));
+    FixtureHelpers.awaitReplication(st.s.getDB(dbName));
     let secondaryRes = assert.commandWorked(st.s.getDB(dbName).runCommand({
         find: collName,
         filter: {readFromSecondary: 1, skey: -1},

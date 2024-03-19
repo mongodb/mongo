@@ -120,6 +120,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         txnNumber: NumberLong(parentTxnNumber),
         stmtId: NumberInt(stmtId++)
     }));
+    st.rs0.awaitReplication();
     const parentSessionDoc = shard0PrimaryConfigTxnColl.findOne({"_id.id": sessionUUID});
 
     const childLsid = {id: sessionUUID, txnNumber: NumberLong(parentTxnNumber), txnUUID: UUID()};
@@ -144,6 +145,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     }
 
     runRetryableInternalTransaction(childTxnNumber);
+    st.rs0.awaitReplication();
     assert.eq(shard0PrimaryConfigTxnColl.count({"_id.id": sessionUUID}), 2);
 
     st.rs0.nodes.forEach(node => {
@@ -153,6 +155,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
 
     childTxnNumber++;
     runRetryableInternalTransaction(childTxnNumber);
+    st.rs0.awaitReplication();
     assert.eq(shard0PrimaryConfigTxnColl.count({"_id.id": sessionUUID}), 2);
 
     st.rs0.nodes.forEach(node => {

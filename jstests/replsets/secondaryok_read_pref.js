@@ -20,7 +20,7 @@ const priDB = rst.getPrimary().getDB(jsTestName());
 assert(priDB.dropDatabase());
 
 assert.commandWorked(priDB.test.insert({a: 1}, {writeConcern: {w: "majority"}}));
-
+rst.awaitReplication();
 const secDB = rst.getSecondary().getDB(jsTestName());
 
 for (let readPref of readPrefs) {
