@@ -48,7 +48,7 @@ function addToQueryCache(
     let keyHash = '';
     if (queryArg instanceof Array) {
         assert.eq(resCount, collArg.aggregate(queryArg).toArray().length);
-        keyHash = getPlanCacheKeyFromPipeline(queryArg, collArg, db);
+        keyHash = getPlanCacheKeyFromPipeline(queryArg, collArg);
     } else {
         assert.eq(resCount, collArg.find(queryArg, projectArg).itcount());
         keyHash = getPlanCacheKeyFromShape(

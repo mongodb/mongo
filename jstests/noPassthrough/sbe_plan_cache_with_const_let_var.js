@@ -43,7 +43,7 @@ assert.eq(result, [{_id: 5}]);
 assert.gt(coll.getPlanCache().list().length, 0, coll.getPlanCache().list());
 
 let exp = assert.commandWorked(db.runCommand({explain: findWithConstLet5}))
-let planCacheKey = getPlanCacheKeyFromExplain(exp, db);
+let planCacheKey = getPlanCacheKeyFromExplain(exp);
 
 result = assert.commandWorked(db.runCommand(findWithConstLet500)).cursor.firstBatch;
 exp = assert.commandWorked(db.runCommand({explain: findWithConstLet500}))
@@ -52,6 +52,6 @@ exp = assert.commandWorked(db.runCommand({explain: findWithConstLet500}))
 // are correct and different. Otherwise, the const let value may be incorrectly baked into SBE plan
 // and then the 2nd query would return the same document as the first query.
 assert.eq(result, [{_id: 500}]);
-assert.eq(planCacheKey, getPlanCacheKeyFromExplain(exp, db), coll.getPlanCache().list());
+assert.eq(planCacheKey, getPlanCacheKeyFromExplain(exp), coll.getPlanCache().list());
 
 MongoRunner.stopMongod(conn);

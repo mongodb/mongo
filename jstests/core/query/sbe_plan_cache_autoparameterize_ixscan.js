@@ -61,11 +61,11 @@ assert.eq(1, coll.getPlanCache().list().length, cacheEntries);
 const explain = coll.find(filter2).sort(sortPattern).explain();
 const planCacheKey = cacheEntry.planCacheKey;
 assert.neq(null, planCacheKey, cacheEntry);
-assert.eq(planCacheKey, getPlanCacheKeyFromExplain(explain, db), explain);
+assert.eq(planCacheKey, getPlanCacheKeyFromExplain(explain), explain);
 
 const queryHash = cacheEntry.queryHash;
 assert.neq(null, queryHash, cacheEntry);
-assert.eq(queryHash, getQueryHashFromExplain(explain, db), explain);
+assert.eq(queryHash, getQueryHashFromExplain(explain), explain);
 
 // Clear the plan cache, and run 'filter2' again. This time, verify that we create a cache entry
 // with the same planCacheKey and queryHash as before.
@@ -92,13 +92,13 @@ const filterWithVeryLargeValue = {
 };
 
 assert.neq(
-    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithInf}]), db),
-    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}]), db));
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithInf}])),
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}])));
 
 // Auto-parameterization should still apply if no infinity value is involved.
 assert.eq(
-    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: {"a": {$not: {$gt: 1}}}}]), db),
-    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}]), db));
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: {"a": {$not: {$gt: 1}}}}])),
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}])));
 
 const singleElemIn = {
     "a": {$in: [1]}
@@ -109,9 +109,9 @@ const multipleElemsIn = {
 const multipleElemsIn2 = {
     "a": {$in: [3, 4]}
 };
-assert.neq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: singleElemIn}]), db),
-           getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}]), db));
+assert.neq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: singleElemIn}])),
+           getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}])));
 
 // Auto-parameterization should still apply if there's no single-element $in query.
-assert.eq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}]), db),
-          getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn2}]), db));
+assert.eq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}])),
+          getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn2}])));

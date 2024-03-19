@@ -98,7 +98,7 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     // Get constants needed for replanning.
     const cursorStageName = "$cursor";
     const planCacheKey =
-        getPlanCacheKeyFromExplain(getAggPlanStage(explain, cursorStageName)[cursorStageName], db);
+        getPlanCacheKeyFromExplain(getAggPlanStage(explain, cursorStageName)[cursorStageName]);
     const planCacheEntry = (() => {
         const planCache = bucketsColl.getPlanCache().list([{$match: {planCacheKey}}]);
         assert.eq(planCache.length, 1, planCache);

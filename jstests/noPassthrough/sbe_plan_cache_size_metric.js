@@ -27,7 +27,7 @@ function getCacheEntriesByQueryHashKey(coll, queryHash) {
 
 function assertQueryInPlanCache(coll, query) {
     const explainResult = assert.commandWorked(coll.explain().find(query).finish());
-    const queryHash = getQueryHashFromExplain(explainResult, db);
+    const queryHash = getQueryHashFromExplain(explainResult);
     const planCacheEntries = getCacheEntriesByQueryHashKey(coll, queryHash);
     assert.eq(1, planCacheEntries.length, planCacheEntries);
 }

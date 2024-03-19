@@ -153,7 +153,7 @@ function planCacheEntryForPipeline(pipeline, collection) {
         collection = coll;
     }
 
-    const planCacheKey = getPlanCacheKeyFromPipeline(pipeline, collection, db);
+    const planCacheKey = getPlanCacheKeyFromPipeline(pipeline, collection);
     const res = collection.getPlanCache().list([{$match: {planCacheKey: planCacheKey}}]);
     if (res.length === 0) {
         return null;

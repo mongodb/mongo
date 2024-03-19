@@ -959,7 +959,7 @@ export function getFieldValueFromExplain(explainRes, getValueCallback) {
  *
  * This helper function can be used for any optimizer.
  */
-export function getPlanCacheKeyFromExplain(explainRes, db) {
+export function getPlanCacheKeyFromExplain(explainRes) {
     explainRes = getSingleNodeExplain(explainRes);
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
         return (plannerOutput.hasOwnProperty("winningPlan") &&
@@ -974,7 +974,7 @@ export function getPlanCacheKeyFromExplain(explainRes, db) {
  *
  * This helper function can be used for any optimizer.
  */
-export function getQueryHashFromExplain(explainRes, db) {
+export function getQueryHashFromExplain(explainRes) {
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
         return (plannerOutput.hasOwnProperty("winningPlan") &&
                 plannerOutput.winningPlan.hasOwnProperty("shards"))
@@ -994,17 +994,16 @@ export function getPlanCacheKeyFromShape(
     const explainRes = assert.commandWorked(
         collection.explain().find(query, projection).collation(collation).sort(sort).finish());
 
-    return getPlanCacheKeyFromExplain(explainRes, db);
+    return getPlanCacheKeyFromExplain(explainRes);
 }
 
 /**
  * Helper to run a explain on the given pipeline and get the "planCacheKey" from the explain
  * result.
  */
-export function getPlanCacheKeyFromPipeline(pipeline, collection, db) {
+export function getPlanCacheKeyFromPipeline(pipeline, collection) {
     const explainRes = assert.commandWorked(collection.explain().aggregate(pipeline));
-
-    return getPlanCacheKeyFromExplain(explainRes, db);
+    return getPlanCacheKeyFromExplain(explainRes);
 }
 
 /**

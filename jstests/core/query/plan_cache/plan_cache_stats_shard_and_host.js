@@ -25,7 +25,7 @@ assert.commandWorked(coll.insert({a: 2, b: 3}));
 assert.eq(1, coll.find({a: 2, b: 3}).itcount());
 
 const explain = coll.find({a: 2, b: 3}).explain();
-const planCacheKey = getPlanCacheKeyFromExplain(explain, db);
+const planCacheKey = getPlanCacheKeyFromExplain(explain);
 
 function filterPlanCacheEntriesByKey(planCacheKey, planCacheContents) {
     let filteredPlanCacheEntries = [];

@@ -88,13 +88,13 @@ let explainRes = coll.find({a: 'foo', b: 5}).collation({locale: 'en_US'}).explai
 
 // The query should have cached plans.
 assert.lt(0,
-          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
+          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length,
           dumpPlanCacheState());
 
 explainRes = coll.find({a: 'foo', b: 5}).collation({locale: 'fr_CA'}).explain();
 // A query with a different collation should have no cached plans.
 assert.eq(0,
-          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
+          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length,
           dumpPlanCacheState());
 // Cache the query, then assert that different collations lead to different hashes.
 coll.find({a: 'foo', b: 5}).collation({locale: 'fr_CA'}).toArray();
@@ -105,7 +105,7 @@ assert.neq(cache[0].solutionHash, cache[1].solutionHash);
 explainRes = coll.find({a: 'foo', b: 'bar'}).collation({locale: 'en_US'}).explain();
 // A query with different string locations should have no cached plans.
 assert.eq(0,
-          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
+          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes)).length,
           dumpPlanCacheState());
 
 coll.getPlanCache().clear();

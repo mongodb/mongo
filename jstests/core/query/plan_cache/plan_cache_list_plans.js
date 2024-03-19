@@ -64,7 +64,7 @@ function getPlansForCacheEntry(query = {}, sort = {}, projection = {}) {
 }
 
 function getPlansForCacheEntryFromPipeline(pipeline) {
-    const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll, db);
+    const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll);
 
     const res =
         coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
