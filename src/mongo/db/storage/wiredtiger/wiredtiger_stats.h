@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
 #include <wiredtiger.h>
 
@@ -64,7 +63,16 @@ public:
     WiredTigerStats& operator-=(const WiredTigerStats&);
 
 protected:
-    std::map<int, long long> _stats;
+    // See src/third_party/wiredtiger/src/include/stat.h
+    // which is derived from src/third_party/wiredtiger/dist/stat_data.py
+    int64_t bytes_read{0};
+    int64_t bytes_write{0};
+    int64_t lock_dhandle_wait{0};
+    int64_t txn_bytes_dirty{0};
+    int64_t read_time{0};
+    int64_t write_time{0};
+    int64_t lock_schema_wait{0};
+    int64_t cache_time{0};
 };
 
 inline WiredTigerStats operator-(WiredTigerStats lhs, const WiredTigerStats& rhs) {
