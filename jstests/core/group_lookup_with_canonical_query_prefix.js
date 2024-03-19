@@ -15,6 +15,7 @@
  *    assumes_read_concern_local,
  *    assumes_read_concern_unchanged,
  *    requires_fcv_60,
+ *    no_selinux,
  * ]
  */
 load("jstests/aggregation/extras/utils.js");  // for arrayEq.
