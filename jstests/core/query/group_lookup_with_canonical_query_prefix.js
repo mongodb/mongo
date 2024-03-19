@@ -15,6 +15,7 @@
  *    assumes_read_concern_local,
  *    assumes_read_concern_unchanged,
  *    requires_fcv_80,
+ *    no_selinux,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
