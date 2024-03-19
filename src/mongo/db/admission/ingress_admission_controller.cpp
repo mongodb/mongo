@@ -30,7 +30,9 @@
 #include "mongo/db/admission/ingress_admission_controller.h"
 
 #include "mongo/db/admission/ingress_admission_control_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -38,23 +40,54 @@ namespace mongo {
 namespace {
 const auto getIngressAdmissionController =
     ServiceContext::declareDecoration<IngressAdmissionController>();
+
+class WaitingForIngressAdmissionGuard {
+public:
+    explicit WaitingForIngressAdmissionGuard(OperationContext* opCtx) : _opCtx(opCtx) {
+        stdx::unique_lock<Client> lk(*_opCtx->getClient());
+        CurOp::get(opCtx)->setWaitingForIngressAdmission_inlock(lk, true);
+    }
+
+    ~WaitingForIngressAdmissionGuard() {
+        stdx::unique_lock<Client> lk(*_opCtx->getClient());
+        CurOp::get(_opCtx)->setWaitingForIngressAdmission_inlock(lk, false);
+    }
+
+private:
+    OperationContext* _opCtx;
+};
 }  // namespace
+
+IngressAdmissionController::IngressAdmissionController()
+    : _ticketHolder(&getIngressAdmissionController.owner(*this),
+                    gIngressAdmissionControllerTicketPoolSize.load(),
+                    false) {}
 
 IngressAdmissionController& IngressAdmissionController::get(OperationContext* opCtx) {
     return getIngressAdmissionController(opCtx->getServiceContext());
 }
 
 Ticket IngressAdmissionController::admitOperation(OperationContext* opCtx) {
-    // TODO(SERVER-86112): Provide fully functional implementation
-    return Ticket::ephemeral(AdmissionContext::get(opCtx));
+    auto& admCtx = AdmissionContext::get(opCtx);
+    auto* curOp = CurOp::get(opCtx);
+
+    // Try to get the ticket without waiting
+    if (auto ticket = _ticketHolder.tryAcquire(&admCtx)) {
+        return std::move(*ticket);
+    }
+
+    // Mark the operation as waiting for ticket
+    WaitingForIngressAdmissionGuard guard{opCtx};
+    return _ticketHolder.waitForTicket(
+        *opCtx, &admCtx, curOp->debug().waitForIngressAdmissionTicketDurationMicros);
 }
 
 void IngressAdmissionController::resizeTicketPool(int32_t newSize) {
-    // TODO(SERVER-86112): Provide fully functional implementation
+    uassert(8611200, "Failed to resize ticket pool", _ticketHolder.resize(newSize));
 }
 
 void IngressAdmissionController::appendStats(BSONObjBuilder& b) const {
-    // TODO(SERVER-86231): Provide fully functional implementation
+    _ticketHolder.appendStats(b);
 }
 
 Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try {
