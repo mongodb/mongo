@@ -496,8 +496,8 @@ private:
 
         // Buffered BSONObj when determining reference object. Will be compressed when this is
         // complete and we transition into kSubObjAppending.
-        std::vector<BSONObj,
-                    typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObj>>
+        std::vector<BSONObjType,
+                    typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObjType>>
             bufferedObjElements;
 
         // Current offset of the binary relative to previous intermediate() calls.

@@ -351,6 +351,26 @@ BSONObj mergeObj(const BSONObj& reference, const BSONObj& obj) {
     return builder.obj();
 }
 
+// TODO (SERVER-87887): Remove this function.
+template <class BSONObjType, class Allocator>
+auto copyBufferedObjElements(
+    const std::vector<BSONObjType,
+                      typename std::allocator_traits<Allocator>::template rebind_alloc<
+                          BSONObjType>>& bufferedObjElements,
+    Allocator allocator) {
+    std::vector<BSONObjType,
+                typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObjType>>
+        copy(allocator);
+    copy.reserve(bufferedObjElements.size());
+    std::transform(bufferedObjElements.begin(),
+                   bufferedObjElements.end(),
+                   std::back_inserter(copy),
+                   [allocator](const BSONObjType& obj) {
+                       return BSONObjType{TrackableBSONObj{obj.get().get()}, allocator};
+                   });
+    return copy;
+}
+
 }  // namespace
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
@@ -1217,7 +1237,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::Intern
       subobjStates(other.subobjStates),
       referenceSubObj(TrackableBSONObj{other.referenceSubObj.get().get()}, allocator),
       referenceSubObjType(other.referenceSubObjType),
-      bufferedObjElements(other.bufferedObjElements),
+      bufferedObjElements(copyBufferedObjElements(other.bufferedObjElements, allocator)),
       offset(other.offset),
       lastBufLength(other.lastBufLength),
       lastControl(other.lastControl) {}
@@ -1236,7 +1256,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::operat
     subobjStates = other.subobjStates;
     referenceSubObj = {TrackableBSONObj{other.referenceSubObj.get().get()}, allocator};
     referenceSubObjType = other.referenceSubObjType;
-    bufferedObjElements = other.bufferedObjElements;
+    bufferedObjElements = copyBufferedObjElements(other.bufferedObjElements, allocator);
     offset = other.offset;
     lastBufLength = other.lastBufLength;
     lastControl = other.lastControl;
@@ -1369,7 +1389,8 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
                 }
 
                 _is.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
-                _is.bufferedObjElements.push_back(_is.referenceSubObj.get().get());
+                _is.bufferedObjElements.emplace_back(
+                    TrackableBSONObj{_is.referenceSubObj.get().get()}, _is.allocator);
                 _is.mode = Mode::kSubObjDeterminingReference;
                 return *this;
             }
@@ -1379,7 +1400,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
         // If we've buffered twice as many objects as we have sub-elements we will achieve good
         // compression so use the currently built reference.
         if (numElementsReferenceObj * 2 >= _is.bufferedObjElements.size()) {
-            _is.bufferedObjElements.push_back(obj.getOwned());
+            _is.bufferedObjElements.emplace_back(TrackableBSONObj{obj.getOwned()}, _is.allocator);
             return *this;
         }
 
@@ -1415,7 +1436,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::skip() {
     }
 
     if (_is.mode == Mode::kSubObjDeterminingReference) {
-        _is.bufferedObjElements.push_back(BSONObj());
+        _is.bufferedObjElements.emplace_back(TrackableBSONObj{BSONObj()}, _is.allocator);
     } else {
         for (auto&& subobj : _is.subobjStates) {
             subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
@@ -2294,7 +2315,8 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_startDetermineS
 
     _is.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
     _is.referenceSubObjType = type;
-    _is.bufferedObjElements.push_back(_is.referenceSubObj.get().get());
+    _is.bufferedObjElements.emplace_back(TrackableBSONObj{_is.referenceSubObj.get().get()},
+                                         _is.allocator);
     _is.mode = Mode::kSubObjDeterminingReference;
 }
 
@@ -2331,7 +2353,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_finishDetermine
     };
 
     invariant(traverseLockStep(
-        _is.referenceSubObj.get().get(), _is.bufferedObjElements.front(), perElement));
+        _is.referenceSubObj.get().get(), _is.bufferedObjElements.front().get().get(), perElement));
     _is.mode = Mode::kSubObjAppending;
 
     // Append remaining buffered objects.
@@ -2340,7 +2362,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_finishDetermine
     for (; it != end; ++it) {
         // The objects we append here should always be compatible with our reference object. If they
         // are not then there is a bug somewhere.
-        invariant(_appendSubElements(*it));
+        invariant(_appendSubElements(it->get().get()));
     }
     _is.bufferedObjElements.clear();
 }
