@@ -140,7 +140,7 @@ feature_flags:
     featureFlagCompactOptions:
         description: "Feature flag to execute compaction with more options"
         cpp_varname: gFeatureFlagCompactOptions
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagLogSlowOpsBasedOnTimeWorking:
         description: "Feature flag to enable slow operation logging based on time working rather
