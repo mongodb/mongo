@@ -45,6 +45,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -63,6 +64,7 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64
       _session(nullptr),
       _cursorGen(0),
       _cursorsOut(0),
+      _compiled(nullptr),
       _idleExpireTime(Date_t::min()) {
     invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
 }
@@ -72,12 +74,14 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
                                      uint64_t epoch,
                                      uint64_t cursorEpoch)
     : _epoch(epoch),
-      _cache(cache),
       _session(nullptr),
       _cursorGen(0),
       _cursorsOut(0),
+      _cache(cache),
+      _compiled(nullptr),
       _idleExpireTime(Date_t::min()) {
     invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
+    setCompiledConfigurationsPerConnection(cache->getCompiledConfigurations());
 }
 
 WiredTigerSession::~WiredTigerSession() {
@@ -205,18 +209,14 @@ uint64_t WiredTigerSession::genTableId() {
 // -----------------------
 
 WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-    : _engine(engine),
-      _conn(engine->getConnection()),
-      _clockSource(_engine->getClockSource()),
-      _shuttingDown(0),
-      _prepareCommitOrAbortCounter(0) {}
+    : WiredTigerSessionCache(engine->getConnection(), engine->getClockSource(), engine) {}
 
-WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn, ClockSource* cs)
-    : _engine(nullptr),
-      _conn(conn),
-      _clockSource(cs),
-      _shuttingDown(0),
-      _prepareCommitOrAbortCounter(0) {}
+WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn,
+                                               ClockSource* cs,
+                                               WiredTigerKVEngine* engine)
+    : _conn(conn), _clockSource(cs), _engine(engine) {
+    uassertStatusOK(_compiledConfigurations.compileAll(_conn));
+}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();

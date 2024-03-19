@@ -87,14 +87,15 @@ public:
             std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         auto ru = WiredTigerRecoveryUnit::get(_opCtxHolder.get());
-        _wtSession = ru->getSession()->getSession();
-        invariant(wtRCToStatus(_wtSession->create(_wtSession, "table:mytable", nullptr), _wtSession)
+        _session = ru->getSession();
+        auto wt_session = _session->getSession();
+        invariant(wtRCToStatus(wt_session->create(wt_session, "table:mytable", nullptr), wt_session)
                       .isOK());
         ru->abandonSnapshot();
     }
 
-    WT_SESSION* wtSession() const {
-        return _wtSession;
+    WiredTigerSession* session() const {
+        return _session;
     }
 
 private:
@@ -107,13 +108,13 @@ private:
     ThreadClient _threadClient;
     ServiceContext::UniqueOperationContext _opCtxHolder;
 
-    WT_SESSION* _wtSession;
+    WiredTigerSession* _session;
 };
 
 void BM_WiredTigerBeginTxnBlock(benchmark::State& state) {
     WiredTigerTestHelper helper;
     for (auto _ : state) {
-        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(), nullptr);
+        WiredTigerBeginTxnBlock beginTxn(helper.session(), nullptr);
     }
 }
 
@@ -121,7 +122,7 @@ template <PrepareConflictBehavior behavior, RoundUpPreparedTimestamps round>
 void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
     WiredTigerTestHelper helper;
     for (auto _ : state) {
-        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(),
+        WiredTigerBeginTxnBlock beginTxn(helper.session(),
                                          behavior,
                                          round,
                                          RoundUpReadTimestamp::kNoRoundError,
@@ -132,7 +133,7 @@ void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
 void BM_setTimestamp(benchmark::State& state) {
     WiredTigerTestHelper helper;
     for (auto _ : state) {
-        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(), nullptr);
+        WiredTigerBeginTxnBlock beginTxn(helper.session(), nullptr);
         ASSERT_OK(beginTxn.setReadSnapshot(Timestamp(1)));
     }
 }

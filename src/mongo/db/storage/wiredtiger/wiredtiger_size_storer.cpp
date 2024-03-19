@@ -173,7 +173,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
         if (syncToDisk) {
             txnConfig += ",sync=true";
         }
-        WiredTigerBeginTxnBlock txnOpen(session.getSession(), txnConfig.c_str());
+        WiredTigerBeginTxnBlock txnOpen(&session, txnConfig.c_str());
 
         for (auto&& [uri, sizeInfo] : buffer) {
             WiredTigerItem key(uri.c_str(), uri.size());

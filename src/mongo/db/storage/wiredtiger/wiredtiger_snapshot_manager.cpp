@@ -89,7 +89,7 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommi
 }
 
 Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
-    WT_SESSION* session,
+    WiredTigerSession* session,
     PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps,
     RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const {

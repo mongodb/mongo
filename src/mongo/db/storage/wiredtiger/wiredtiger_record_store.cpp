@@ -1426,7 +1426,7 @@ void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
     Timestamp oldestTs = _kvEngine->getOldestTimestamp();
     const std::string config = "read_timestamp={:x},roundup_timestamps=(read=true)"_format(
         oldestTs.isNull() ? 1 : oldestTs.asULL());
-    WiredTigerBeginTxnBlock beginTxn(session.getSession(), config.c_str());
+    WiredTigerBeginTxnBlock beginTxn(&session, config.c_str());
 
     // Open a version cursor. This is a debug cursor that enables iteration through the history of
     // values for a given record.

@@ -431,7 +431,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     //   timestamp of 1.
     // - If there is an oldest timestamp, reading at timestamp 1 will get rounded up.
     const std::string config = "read_timestamp=1,roundup_timestamps=(read=true)";
-    WiredTigerBeginTxnBlock beginTxn(session.getSession(), config.c_str());
+    WiredTigerBeginTxnBlock beginTxn(&session, config.c_str());
 
     // Open a version cursor. This is a debug cursor that enables iteration through the history of
     // values for a given index entry.

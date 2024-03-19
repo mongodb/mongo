@@ -38,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
@@ -49,67 +50,95 @@
 namespace mongo {
 using namespace fmt::literals;
 
+static CompiledConfiguration compiledBeginTransaction(
+    "WT_SESSION.begin_transaction",
+    "ignore_prepare=%s,roundup_timestamps=(prepared=%d,read=%d),no_timestamp=%d");
+
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
-    WT_SESSION* session,
+    WiredTigerSession* session,
     PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps,
     RoundUpReadTimestamp roundUpReadTimestamp,
     RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite)
     : _session(session) {
     invariant(!_rollback);
+    _wt_session = _session->getSession();
 
-    str::stream builder;
-    if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
-        builder << "ignore_prepare=true,";
-    } else if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflictsAllowWrites) {
-        builder << "ignore_prepare=force,";
-    }
-    if (roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound ||
-        roundUpReadTimestamp == RoundUpReadTimestamp::kRound) {
-        builder << "roundup_timestamps=(";
+    const char* compiled_config = nullptr;
+    // Only create a bound configuration string if we have non-default options.
+    if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflicts ||
+        prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflictsAllowWrites ||
+        roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound ||
+        roundUpReadTimestamp == RoundUpReadTimestamp::kRound ||
+        allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce ||
+        MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
+                       getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
+                       !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
+        const char* ignore_prepare;
+        if (prepareConflictBehavior == PrepareConflictBehavior::kIgnoreConflicts) {
+            ignore_prepare = "true";
+        } else if (prepareConflictBehavior ==
+                   PrepareConflictBehavior::kIgnoreConflictsAllowWrites) {
+            ignore_prepare = "force";
+        } else {
+            ignore_prepare = "false";
+        }
+
+        bool roundup_prepared = false;
         if (roundUpPreparedTimestamps == RoundUpPreparedTimestamps::kRound) {
-            builder << "prepared=true,";
+            roundup_prepared = true;
         }
-        if (roundUpReadTimestamp == RoundUpReadTimestamp::kRound) {
-            builder << "read=true";
-        }
-        builder << "),";
-    }
-    if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
-        builder << "no_timestamp=true,";
-    } else if (MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
-                              getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
-                              !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
-        // We can safely ignore setting this configuration option when recovering from the oplog as
-        // standalone because:
-        // 1. Replaying oplog entries write with a timestamp.
-        // 2. The instance is put in read-only mode after oplog application has finished.
-        builder << "no_timestamp=true,";
-    }
 
-    const std::string beginTxnConfigString = builder;
-    invariantWTOK(_session->begin_transaction(_session, beginTxnConfigString.c_str()), _session);
+        bool roundup_read = false;
+        if (roundUpReadTimestamp == RoundUpReadTimestamp::kRound) {
+            roundup_read = true;
+        }
+
+        bool no_timestamp = false;
+        if (allowUntimestampedWrite != RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce) {
+            no_timestamp = true;
+        } else if (MONGO_unlikely(gAllowUnsafeUntimestampedWrites &&
+                                  getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
+                                  !repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
+            // We can safely ignore setting this configuration option when recovering from the
+            // oplog as standalone because:
+            // 1. Replaying oplog entries write with a timestamp.
+            // 2. The instance is put in read-only mode after oplog application has finished.
+            no_timestamp = true;
+        }
+
+        compiled_config = compiledBeginTransaction.getConfig(_session);
+        invariantWTOK(_wt_session->bind_configuration(_wt_session,
+                                                      compiled_config,
+                                                      ignore_prepare,
+                                                      (int)roundup_prepared,
+                                                      (int)roundup_read,
+                                                      (int)no_timestamp),
+                      _wt_session);
+    }
+    invariantWTOK(_wt_session->begin_transaction(_wt_session, compiled_config), _wt_session);
     _rollback = true;
 }
 
-WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config)
+WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WiredTigerSession* session, const char* config)
     : _session(session) {
     invariant(!_rollback);
-    invariantWTOK(_session->begin_transaction(_session, config), _session);
+    _wt_session = _session->getSession();
+    invariantWTOK(_wt_session->begin_transaction(_wt_session, config), _wt_session);
     _rollback = true;
 }
 
 WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
     if (_rollback) {
-        invariant(_session->rollback_transaction(_session, nullptr) == 0);
+        invariant(_wt_session->rollback_transaction(_wt_session, nullptr) == 0);
     }
 }
 
 Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp) {
     invariant(_rollback);
-    return wtRCToStatus(
-        _session->timestamp_transaction_uint(_session, WT_TS_TXN_TYPE_READ, readTimestamp.asULL()),
-        _session);
+    return wtRCToStatus(_wt_session->timestamp_transaction_uint(
+                            _wt_session, WT_TS_TXN_TYPE_READ, readTimestamp.asULL()),
+                        _wt_session);
 }
 
 void WiredTigerBeginTxnBlock::done() {

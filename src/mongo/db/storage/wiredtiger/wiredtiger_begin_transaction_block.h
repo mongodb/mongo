@@ -38,6 +38,7 @@
 
 namespace mongo {
 
+class WiredTigerSession;
 /**
  * When constructed, this object begins a WiredTiger transaction on the provided session. The
  * transaction will be rolled back if done() is not called before the object is destructed.
@@ -57,12 +58,12 @@ public:
     // earlier.
     enum class RoundUpPreparedTimestamps { kNoRound, kRound };
 
-    WiredTigerBeginTxnBlock(WT_SESSION* session,
+    WiredTigerBeginTxnBlock(WiredTigerSession* session,
                             PrepareConflictBehavior prepareConflictBehavior,
                             RoundUpPreparedTimestamps roundUpPreparedTimestamps,
                             RoundUpReadTimestamp roundUpReadTimestamp,
                             RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite);
-    WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config);
+    WiredTigerBeginTxnBlock(WiredTigerSession* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 
     /**
@@ -77,7 +78,8 @@ public:
     void done();
 
 private:
-    WT_SESSION* _session;
+    WiredTigerSession* _session;
+    WT_SESSION* _wt_session;
     bool _rollback = false;
 };
 

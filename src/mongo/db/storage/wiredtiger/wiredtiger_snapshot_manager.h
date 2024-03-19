@@ -42,6 +42,7 @@
 
 namespace mongo {
 
+class WiredTigerSession;
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 
 class WiredTigerOplogManager;
@@ -68,7 +69,7 @@ public:
      * Throws if there is currently no committed snapshot.
      */
     Timestamp beginTransactionOnCommittedSnapshot(
-        WT_SESSION* session,
+        WiredTigerSession* session,
         PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps,
         RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const;
