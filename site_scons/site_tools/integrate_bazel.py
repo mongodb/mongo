@@ -679,11 +679,10 @@ def generate(env: SCons.Environment.Environment) -> None:
             formatted_options = [f'--//bazel/config:{_SANITIZER_MAP[opt]}=True' for opt in options]
             bazel_internal_flags.extend(formatted_options)
 
-        # Disable RE for external developers
+        # Disable RE for external developers and when executing on non-linux amd64/arm64 platforms
         is_external_developer = not os.path.exists("/opt/mongodbtoolchain")
-
-        # TODO SERVER-85806 enable RE for amd64
-        if normalized_os != "linux" or normalized_arch not in ["arm64"] or is_external_developer:
+        if normalized_os != "linux" or normalized_arch not in ["arm64"
+                                                               "amd64"] or is_external_developer:
             bazel_internal_flags.append('--config=local')
 
         # Disable remote execution for public release builds.

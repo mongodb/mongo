@@ -46,15 +46,19 @@ def _setup_local_config_platform(ctx):
     elif arch == "aarch64":
         arch = "arm64"
 
+    # EngFlow's "default" pool is ARM64
+    remote_execution_pool = "x86_64" if arch == "amd64" else "default"
+
     if distro != None and distro + "_" + arch in REMOTE_EXECUTION_CONTAINERS:
         container_url = REMOTE_EXECUTION_CONTAINERS[distro + "_" + arch]["container-image"]
         print("Local host platform is configured to use this container if doing remote execution: {}".format(container_url))
         exec_props = """
     exec_properties = {
         "container-image": "%s",
-        "dockerNetwork": "standard"
+        "dockerNetwork": "standard",
+        "Pool": "%s",
     },
-""" % container_url
+""" % (container_url, remote_execution_pool)
     else:
         exec_props = ""
 

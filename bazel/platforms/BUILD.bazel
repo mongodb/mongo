@@ -52,6 +52,9 @@ constraint_setting(name = "distro")
         exec_properties = {
             "container-image": REMOTE_EXECUTION_CONTAINERS[distro_or_os + "_" + arch]["container-image"],
             "dockerNetwork": "standard",
+
+            # EngFlow's "default" pool is ARM64
+            "Pool": "x86_64" if arch == "amd64" else "default",
         },
     )
     for compiler in [
