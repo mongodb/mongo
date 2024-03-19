@@ -1802,13 +1802,9 @@ void ShardingCatalogManager::_addShardInTransaction(
     }
 
     // 2. Set up and run the commit statements
-    // TODO SERVER-66261 newShard may be passed by reference.
     // TODO SERVER-81582: generate batches of transactions to insert the database/placementHistory
     // and collection/placementHistory before adding the shard in config.shards.
-    auto transactionChain = [opCtx,
-                             newShard,
-                             dbNames = std::move(databasesInNewShard),
-                             nssList = std::move(collectionsInNewShard)](
+    auto transactionChain = [opCtx, &newShard, &databasesInNewShard, &collectionsInNewShard](
                                 const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         write_ops::InsertCommandRequest insertShardEntry(NamespaceString::kConfigsvrShardsNamespace,
                                                          {newShard.toBSON()});
@@ -1816,7 +1812,7 @@ void ShardingCatalogManager::_addShardInTransaction(
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertShardEntryResponse) {
                 uassertStatusOK(insertShardEntryResponse.toStatus());
-                if (dbNames.empty()) {
+                if (databasesInNewShard.empty()) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
@@ -1825,8 +1821,8 @@ void ShardingCatalogManager::_addShardInTransaction(
                 }
 
                 std::vector<BSONObj> databaseEntries;
-                std::transform(dbNames.begin(),
-                               dbNames.end(),
+                std::transform(databasesInNewShard.begin(),
+                               databasesInNewShard.end(),
                                std::back_inserter(databaseEntries),
                                [&](const DatabaseName& dbName) {
                                    return DatabaseType(dbName,
@@ -1842,7 +1838,7 @@ void ShardingCatalogManager::_addShardInTransaction(
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertDatabaseEntriesResponse) {
                 uassertStatusOK(insertDatabaseEntriesResponse.toStatus());
-                if (nssList.empty()) {
+                if (collectionsInNewShard.empty()) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
@@ -1851,8 +1847,8 @@ void ShardingCatalogManager::_addShardInTransaction(
                 }
                 std::vector<BSONObj> collEntries;
 
-                std::transform(nssList.begin(),
-                               nssList.end(),
+                std::transform(collectionsInNewShard.begin(),
+                               collectionsInNewShard.end(),
                                std::back_inserter(collEntries),
                                [&](const CollectionType& coll) { return coll.toBSON(); });
                 write_ops::InsertCommandRequest insertCollectionEntries(
@@ -1862,7 +1858,7 @@ void ShardingCatalogManager::_addShardInTransaction(
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertCollectionEntriesResponse) {
                 uassertStatusOK(insertCollectionEntriesResponse.toStatus());
-                if (nssList.empty()) {
+                if (collectionsInNewShard.empty()) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
@@ -1874,8 +1870,8 @@ void ShardingCatalogManager::_addShardInTransaction(
                     ShardKeyPattern(sharding_ddl_util::unsplittableCollectionShardKey());
                 const auto shardId = ShardId(newShard.getName());
                 std::transform(
-                    nssList.begin(),
-                    nssList.end(),
+                    collectionsInNewShard.begin(),
+                    collectionsInNewShard.end(),
                     std::back_inserter(chunkEntries),
                     [&](const CollectionType& coll) {
                         // Create a single chunk for this
@@ -1896,7 +1892,7 @@ void ShardingCatalogManager::_addShardInTransaction(
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertChunkEntriesResponse) {
                 uassertStatusOK(insertChunkEntriesResponse.toStatus());
-                if (dbNames.empty()) {
+                if (databasesInNewShard.empty()) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
@@ -1904,8 +1900,8 @@ void ShardingCatalogManager::_addShardInTransaction(
                     return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
                 }
                 std::vector<BSONObj> placementEntries;
-                std::transform(dbNames.begin(),
-                               dbNames.end(),
+                std::transform(databasesInNewShard.begin(),
+                               databasesInNewShard.end(),
                                std::back_inserter(placementEntries),
                                [&](const DatabaseName& dbName) {
                                    return NamespacePlacementType(NamespaceString(dbName),
@@ -1913,8 +1909,8 @@ void ShardingCatalogManager::_addShardInTransaction(
                                                                  {ShardId(newShard.getName())})
                                        .toBSON();
                                });
-                std::transform(nssList.begin(),
-                               nssList.end(),
+                std::transform(collectionsInNewShard.begin(),
+                               collectionsInNewShard.end(),
                                std::back_inserter(placementEntries),
                                [&](const CollectionType& coll) {
                                    NamespacePlacementType placementInfo(
