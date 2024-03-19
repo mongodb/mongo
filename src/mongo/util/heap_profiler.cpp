@@ -713,13 +713,12 @@ namespace heap_profiler_detail_tcmalloc {
 class HeapProfiler {
 public:
     static const int kMaxImportantSamples = 4 * 3600;  // reset every 4 hours at 1Hz
+    static const int kMaxStackInfos = 20000;
     static inline HeapProfiler* heapProfiler;
 
     HeapProfiler() {
         sampleIntervalBytes = HeapProfilingSampleIntervalBytes;
         tcmalloc::MallocExtension::SetProfileSamplingRate(sampleIntervalBytes);
-        auto profileToken = tcmalloc::MallocExtension::StartAllocationProfiling();
-        profileTokens.push_back(std::move(profileToken));
     }
 
     static void generateServerStatusSection(BSONObjBuilder& builder) {
@@ -790,6 +789,7 @@ private:
         tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kHeap)
             .Iterate([&](const auto& sample) {
                 totalActiveBytes += sample.sum;
+                sampleBytesAllocated += sample.allocated_size;
                 // Compute backtrace hash of sample stack
                 uint32_t stackHash = StackHash(sample);
                 StackInfo* stackInfo = stackInfoMap[stackHash];
@@ -807,20 +807,6 @@ private:
                     stackInfo->activeBytes = sample.sum;
                 }
             });
-
-        // Get the series of allocation samples to this point
-        auto currentToken = std::move(profileTokens.back());
-        profileTokens.pop_back();
-        auto allocProfile = std::move(currentToken).Stop();
-        // Start a new allocation profile session for the next invocation
-        auto newToken = tcmalloc::MallocExtension::StartAllocationProfiling();
-        profileTokens.push_back(std::move(newToken));
-
-        // Sum all the allocations performed (of what we sampled)
-        int64_t allocatedBytes = 0;
-        allocProfile.Iterate(
-            [&](const tcmalloc::Profile::Sample& sample) { allocatedBytes += sample.sum; });
-        sampleBytesAllocated += allocatedBytes;
 
         BSONObjBuilder(builder.subobjStart("stats"))
             .appendNumber("totalActiveBytes", static_cast<long long>(totalActiveBytes))
@@ -857,9 +843,15 @@ private:
             importantStacks.clear();
             numImportantSamples = 0;
         }
+
+        // We also will clear the stack infos if it gets too large, as opposed to taking up more
+        // memory or disabling the heap profiler entirely.
+        if (stackInfoMap.size() >= kMaxStackInfos) {
+            LOGV2(8592505, "Clearing stackInfoMap");
+            stackInfoMap.clear();
+        }
     }
 
-    std::vector<tcmalloc::MallocExtension::AllocationProfilingToken> profileTokens;
     std::atomic_size_t sampleIntervalBytes;
     std::atomic_size_t sampleBytesAllocated{0};
 
@@ -898,8 +890,6 @@ public:
     }
 };
 
-#ifdef MONGO_HAVE_HEAP_PROFILER
-
 auto& heapProfilerServerStatusSection =
     *ServerStatusSectionBuilder<HeapProfilerServerStatusSection>("heapProfile");
 
@@ -908,8 +898,6 @@ MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("de
     if (HeapProfilingEnabled)
         HeapProfiler::start();
 }
-
-#endif  // MONGO_HAVE_HEAP_PROFILER
 
 }  // namespace
 }  // namespace mongo
