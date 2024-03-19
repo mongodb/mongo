@@ -693,37 +693,61 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         (opCtx->getClient()->session() &&
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 
-    if (supportsWriteConcern && !clientSuppliedWriteConcern &&
+    bool canApplyDefaultWC = supportsWriteConcern &&
         (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName)) &&
-        !opCtx->getClient()->isInDirectClient()) {
-        if (isInternalClient) {
-            uassert(
-                5569900,
-                "received command without explicit writeConcern on an internalClient connection {}"_format(
-                    redact(request.body.toString())),
-                request.body.hasField(WriteConcernOptions::kWriteConcernField));
-        } else {
-            // This command is not from a DBDirectClient or internal client, and supports WC, but
-            // wasn't given one - so apply the default, if there is one.
-            const auto rwcDefaults =
+        !opCtx->getClient()->isInDirectClient();
+
+    if (canApplyDefaultWC) {
+        auto getDefaultWC = ([&]() {
+            auto rwcDefaults =
                 ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
-            if (const auto wcDefault = rwcDefaults.getDefaultWriteConcern()) {
-                _parc->_wc = *wcDefault;
-                if (repl::feature_flags::gDefaultWCMajority.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    const auto defaultWriteConcernSource =
-                        rwcDefaults.getDefaultWriteConcernSource();
-                    customDefaultWriteConcernWasApplied = defaultWriteConcernSource &&
-                        defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
-                } else {
-                    customDefaultWriteConcernWasApplied = true;
+            auto wcDefault = rwcDefaults.getDefaultWriteConcern();
+            if (repl::feature_flags::gDefaultWCMajority.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                const auto defaultWriteConcernSource = rwcDefaults.getDefaultWriteConcernSource();
+                customDefaultWriteConcernWasApplied = defaultWriteConcernSource &&
+                    defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
+            } else {
+                customDefaultWriteConcernWasApplied = true;
+            }
+            return wcDefault;
+        });
+
+        if (!clientSuppliedWriteConcern) {
+            if (isInternalClient) {
+                uassert(
+                    5569900,
+                    "received command without explicit writeConcern on an internalClient connection {}"_format(
+                        redact(request.body.toString())),
+                    request.body.hasField(WriteConcernOptions::kWriteConcernField));
+            } else {
+                // This command is not from a DBDirectClient or internal client, and supports WC,
+                // but wasn't given one - so apply the default, if there is one.
+                const auto wcDefault = getDefaultWC();
+                // Default WC can be 'boost::none' if the implicit default is used and set to 'w:1'.
+                if (wcDefault) {
+                    _parc->_wc = *wcDefault;
+
+                    LOGV2_DEBUG(22766,
+                                2,
+                                "Applying default writeConcern on {command} of {writeConcern}",
+                                "Applying default writeConcern on command",
+                                "command"_attr = request.getCommandName(),
+                                "writeConcern"_attr = *wcDefault);
                 }
-                LOGV2_DEBUG(22766,
-                            2,
-                            "Applying default writeConcern on {command} of {writeConcern}",
-                            "Applying default writeConcern on command",
-                            "command"_attr = request.getCommandName(),
-                            "writeConcern"_attr = *wcDefault);
+            }
+        }
+        // Client supplied a write concern object without 'w' field.
+        else if (_parc->_wc->isExplicitWithoutWField()) {
+            const auto wcDefault = getDefaultWC();
+            // Default WC can be 'boost::none' if the implicit default is used and set to 'w:1'.
+            if (wcDefault) {
+                clientSuppliedWriteConcern = false;
+                _parc->_wc->wMode = wcDefault->wMode;
+                _parc->_wc->wNumNodes = wcDefault->wNumNodes;
+                if (_parc->_wc->syncMode == WriteConcernOptions::SyncMode::UNSET) {
+                    _parc->_wc->syncMode = wcDefault->syncMode;
+                }
             }
         }
     }

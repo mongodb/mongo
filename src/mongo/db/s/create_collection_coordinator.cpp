@@ -296,7 +296,6 @@ void insertChunks(OperationContext* opCtx,
         return insertOp;
     }());
 
-    insertRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     {
         auto newClient =
             opCtx->getServiceContext()->makeClient("CreateCollectionCoordinator::insertChunks");
@@ -312,6 +311,7 @@ void insertChunks(OperationContext* opCtx,
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
         newOpCtx->setLogicalSessionId(*osi.getSessionId());
         newOpCtx->setTxnNumber(*osi.getTxnNumber());
+        newOpCtx->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
 
         BatchedCommandResponse response;
         BatchWriteExecStats stats;

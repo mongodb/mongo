@@ -137,6 +137,21 @@ public:
     int wNumNodes;
     std::string wMode;
 
+    /**
+     * Returns whether this write concern is explicitly set but missing 'w' field.
+     */
+    bool isExplicitWithoutWField() const {
+        return !usedDefaultConstructedWC && notExplicitWValue;
+    }
+
+    /**
+     * Returns whether this write concern requests acknowledgment to the write operation.
+     * Note that setting 'w' field to 0 requests no acknowledgment.
+     */
+    bool requiresWriteAcknowledgement() const {
+        return !(wNumNodes == 0 && wMode.empty());
+    }
+
     // Timeout in milliseconds.
     int wTimeout;
     // Deadline. If this is set to something other than Date_t::max(), this takes precedence over

@@ -1234,61 +1234,29 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewCWRWCToBeSavedOnDiskValidSetWriteConcernWithOnlyJ) {
-    auto oldDefaults = setupOldDefaults();
-    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
-        operationContext(),
-        boost::none,
-        uassertStatusOK(WriteConcernOptions::parse(BSON("j" << true))));
-    ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
-           defaults.getDefaultReadConcern()->getLevel());
-    ASSERT(!defaults.getDefaultReadConcernSource());
-    ASSERT_EQ(1, defaults.getDefaultWriteConcern()->wNumNodes);
-    ASSERT_EQ(0, defaults.getDefaultWriteConcern()->wTimeout);
-    ASSERT(WriteConcernOptions::SyncMode::JOURNAL == defaults.getDefaultWriteConcern()->syncMode);
-    ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
-    ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
-    // Default write concern source is not saved on disk.
-    ASSERT(!defaults.getDefaultWriteConcernSource());
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidSetWriteConcernWithoutWField) {
+    setupOldDefaults();
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(),
+                           boost::none,
+                           uassertStatusOK(WriteConcernOptions::parse(BSON("j" << true)))),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 
-    _lookupMock.setLookupCallReturnValue(std::move(defaults));
-    _rwcd.refreshIfNecessary(operationContext());
-    auto newDefaults = _rwcd.getDefault(operationContext());
-    ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
-}
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(),
+                           boost::none,
+                           uassertStatusOK(WriteConcernOptions::parse(BSON("wtimeout" << 12345)))),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 
-TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewCWRWCToBeSavedOnDiskValidSetWriteConcernWithOnlyWtimeout) {
-    auto oldDefaults = setupOldDefaults();
-    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
-        operationContext(),
-        boost::none,
-        uassertStatusOK(WriteConcernOptions::parse(BSON("wtimeout" << 12345))));
-    ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
-           defaults.getDefaultReadConcern()->getLevel());
-    ASSERT(!defaults.getDefaultReadConcernSource());
-    ASSERT_EQ(1, defaults.getDefaultWriteConcern()->wNumNodes);
-    ASSERT_EQ(12345, defaults.getDefaultWriteConcern()->wTimeout);
-    ASSERT(WriteConcernOptions::SyncMode::UNSET == defaults.getDefaultWriteConcern()->syncMode);
-    ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
-    ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
-    // Default write concern source is not saved on disk.
-    ASSERT(!defaults.getDefaultWriteConcernSource());
-
-    _lookupMock.setLookupCallReturnValue(std::move(defaults));
-    _rwcd.refreshIfNecessary(operationContext());
-    auto newDefaults = _rwcd.getDefault(operationContext());
-    ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
-    if (_isDefaultWCMajorityEnabled) {
-        // Default write concern source is calculated through 'getDefault'.
-        ASSERT(newDefaults.getDefaultWriteConcernSource() ==
-               DefaultWriteConcernSourceEnum::kGlobal);
-    }
+    ASSERT_THROWS_CODE(
+        _rwcd.generateNewCWRWCToBeSavedOnDisk(
+            operationContext(),
+            boost::none,
+            uassertStatusOK(WriteConcernOptions::parse(BSON("j" << true << "wtimeout" << 12345)))),
+        AssertionException,
+        ErrorCodes::BadValue);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestRefreshDefaultsWithDeletedDefaults) {
