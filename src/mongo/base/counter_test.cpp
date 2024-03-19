@@ -50,5 +50,20 @@ TEST(CounterTest, IncrementDecrement) {
     ASSERT_EQUALS(c.get(), -1);
 }
 
+TEST(CounterTest, IncrementDecrementRelaxed) {
+    Counter64 c;
+    ASSERT_EQUALS(c.get(), 0);
+    c.incrementRelaxed();
+    ASSERT_EQUALS(c.get(), 1);
+    c.decrementRelaxed();
+    ASSERT_EQUALS(c.get(), 0);
+    c.decrementRelaxed(3);
+    ASSERT_EQUALS(c.get(), -3);
+    c.incrementRelaxed(1);
+    ASSERT_EQUALS(c.get(), -2);
+    c.decrementRelaxed(-1);
+    ASSERT_EQUALS(c.get(), -1);
+}
+
 }  // namespace
 }  // namespace mongo
