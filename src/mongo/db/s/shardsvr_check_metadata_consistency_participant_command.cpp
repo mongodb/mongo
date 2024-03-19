@@ -131,6 +131,12 @@ public:
             const auto& primaryShardId = request().getPrimaryShardId();
             const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
 
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName
+                                  << " can only be run over a specific collection or database",
+                    commandLevel == MetadataConsistencyCommandLevelEnum::kCollectionLevel ||
+                        commandLevel == MetadataConsistencyCommandLevelEnum::kDatabaseLevel);
+
             // Get the list of collections from configsvr sorted by namespace
             const auto configsvrCollections =
                 getCollectionsListFromConfigServer(opCtx, nss, commandLevel);

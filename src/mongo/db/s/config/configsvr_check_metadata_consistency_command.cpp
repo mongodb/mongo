@@ -143,7 +143,10 @@ public:
                     break;
                 }
                 default:
-                    MONGO_UNREACHABLE;
+                    uasserted(ErrorCodes::IllegalOperation,
+                              str::stream()
+                                  << Request::kCommandName
+                                  << " can only be run over a specific collection or database");
             }
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
