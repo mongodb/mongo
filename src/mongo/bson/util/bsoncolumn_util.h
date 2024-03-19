@@ -105,6 +105,12 @@ inline bool usesDeltaOfDelta(BSONType type) {
     return type == jstOID || type == Date || type == bsonTimestamp;
 }
 
+inline bool onlyZeroDelta(BSONType type) {
+    return type == RegEx || type == DBRef || type == CodeWScope || type == Symbol ||
+        type == Object || type == Array || type == jstNULL || type == Undefined || type == MinKey ||
+        type == MaxKey;
+}
+
 inline bool uses128bit(BSONType type) {
     return type == NumberDecimal || type == BinData || type == String || type == Code;
 }
