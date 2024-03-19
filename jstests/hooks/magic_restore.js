@@ -8,11 +8,12 @@ import {
     _runMagicRestoreNode,
     _writeObjsToMagicRestorePipe
 } from "jstests/libs/backup_utils.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
 // sourceConn must also contain a timestamp in `test.magic_restore_checkpointTimestamp` of when the
 // backup was taken.
-function performRestore(sourceConn, dbpath) {
+function performRestore(sourceConn, expectedConfig, dbpath, options) {
     // Read checkpointTimestamp from source cluster.
     const checkpointTimestamp = sourceConn.getDB("magic_restore_metadata")
                                     .getCollection("magic_restore_checkpointTimestamp")
@@ -25,7 +26,7 @@ function performRestore(sourceConn, dbpath) {
     }];
 
     _writeObjsToMagicRestorePipe(objs, MongoRunner.dataDir);
-    _runMagicRestoreNode(dbpath, MongoRunner.dataDir);
+    _runMagicRestoreNode(dbpath, MongoRunner.dataDir, options);
 }
 
 // Performs a data consistency check between two nodes. The `local` database is ignored due to
@@ -84,12 +85,30 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
                 return;
             }
 
+            // When we restore a sharded cluster we are running the individual shards individually
+            // as replica sets. This causes the system.keys collection to be populated differently
+            // than it is in a complete sharded cluster with configsvr. The `config.mongos`
+            // collection is expected to be different here since shard names and last known ping
+            // times will be different from the source node.
+            if (sourceCollName === "system.keys" || sourceCollName === "mongos") {
+                return;
+            }
+
             // If we have finished iterating restoreCollectionInfos then we are missing a
             // collection.
             assert(idx < restoreCollectionInfos.length,
                    "restore node is missing the " + dbName + "." + sourceCollName + " namespace.");
 
-            const restoreCollName = restoreCollectionInfos[idx++].name;
+            let restoreCollName = restoreCollectionInfos[idx++].name;
+
+            // When we restore a sharded cluster we are running the individual shards individually
+            // as replica sets. This causes the system.keys collection to be populated differently
+            // than it is in a complete sharded cluster with configsvr. The `config.mongos`
+            // collection is expected to be different here since shard names and last known ping
+            // times will be different from the source node.
+            if (restoreCollName === "system.keys" || restoreCollName === "mongos") {
+                restoreCollName = restoreCollectionInfos[idx++].name;
+            }
 
             // Make sure we compare the same collections (if they don't match one is missing from
             // restore node).
@@ -118,40 +137,58 @@ function dataConsistencyCheck(sourceNode, restoreNode) {
     });
 }
 
-const conn = db.getMongo();
-const backupDbPath = MongoRunner.dataPath + '../magicRestore';
+function performMagicRestore(sourceNode, dbPath, options) {
+    jsTestLog("Magic Restore: Beginning magic restore for node " + sourceNode + ".");
 
-jsTestLog("Magic Restore: Beginning magic restore.");
+    let rst = new ReplSetTest({nodes: 1});
 
-let rst = new ReplSetTest({nodes: 1});
+    rst.startSet();
+    rst.initiateWithHighElectionTimeout();
 
-rst.startSet();
-rst.initiateWithHighElectionTimeout();
+    let expectedConfig =
+        assert.commandWorked(rst.getPrimary().adminCommand({replSetGetConfig: 1})).config;
 
-jsTestLog("Magic Restore: Getting config.");
+    jsTestLog("Magic Restore: Stopping cluster.");
 
-let expectedConfig =
-    assert.commandWorked(rst.getPrimary().adminCommand({replSetGetConfig: 1})).config;
+    rst.stopSet(null /*signal*/, true /*forRestart*/);
 
-jsTestLog("Magic Restore: Stopping cluster.");
+    jsTestLog("Magic Restore: Restarting with magic restore options.");
 
-rst.stopSet(null /*signal*/, true /*forRestart*/);
+    performRestore(sourceNode, expectedConfig, dbPath);
 
-jsTestLog("Magic Restore: Restarting with magic restore options.");
+    jsTestLog("Magic Restore: Starting restore cluster for data consistency check.");
 
-performRestore(conn, backupDbPath);
+    rst.startSet({restart: true, dbpath: dbPath});
 
-jsTestLog("Magic Restore: Starting restore cluster for data consistency check.");
+    try {
+        dataConsistencyCheck(sourceNode, rst.getPrimary());
+    } finally {
+        jsTestLog("Magic Restore: Stopping magic restore cluster and cleaning up restore dbpath.");
 
-rst.startSet({restart: true, dbpath: backupDbPath});
+        // ReplSetTest clears the dbpath when it is stopped.
+        rst.stopSet();
+    }
 
-try {
-    dataConsistencyCheck(conn, rst.getPrimary());
-} finally {
-    jsTestLog("Magic Restore: Stopping magic restore cluster and cleaning up restore dbpath.");
-
-    // ReplSetTest clears the dbpath when it is stopped.
-    rst.stopSet();
+    jsTestLog("Magic Restore: Magic restore complete.");
 }
 
-jsTestLog("Magic Restore: Magic restore complete.");
+const topology = DiscoverTopology.findConnectedNodes(db);
+
+if (topology.type == Topology.kShardedCluster) {
+    // Perform restore for the config server.
+    const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0'
+    let configMongo = new Mongo(topology.configsvr.nodes[0]);
+    performMagicRestore(configMongo, path, {"configsvr": ''});
+
+    // Need to iterate over the shards and do one restore per shard.
+    for (const [shardName, shard] of Object.entries(topology.shards)) {
+        const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/' + shardName + '/node0';
+        let nodeMongo = new Mongo(shard.nodes[0]);
+        performMagicRestore(nodeMongo, dbPathPrefix, {"replSet": shardName, "shardsvr": ''});
+    }
+} else {
+    // Is replica set so just need to do one restore.
+    const conn = db.getMongo();
+    const backupDbPath = MongoRunner.dataPath + '../magicRestore/node0';
+    performMagicRestore(conn, backupDbPath, {"replSet": "rs"});
+}

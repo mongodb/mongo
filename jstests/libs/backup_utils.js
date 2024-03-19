@@ -179,7 +179,7 @@ export function _writeObjsToMagicRestorePipe(objs, pipeDir) {
 /**
  * Helper function that starts and completes a magic restore node on the provided 'backupDbPath'.
  */
-export function _runMagicRestoreNode(backupDbPath, pipeDir) {
+export function _runMagicRestoreNode(backupDbPath, pipeDir, options = {}) {
     const {pipePath} = _generateMagicRestorePipePath(pipeDir);
     // Magic restore will exit the mongod process cleanly. 'runMongod' may acquire a connection to
     // mongod before it exits, and so we wait for the process to exit in the 'assert.soon' below. If
@@ -189,7 +189,8 @@ export function _runMagicRestoreNode(backupDbPath, pipeDir) {
         dbpath: backupDbPath,
         noCleanData: true,
         magicRestore: "",
-        env: {namedPipeInput: pipePath}
+        env: {namedPipeInput: pipePath},
+        ...options
     });
     if (conn) {
         assert.soon(() => {

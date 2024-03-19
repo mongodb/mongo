@@ -251,6 +251,7 @@ buildvariants:
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
   - name: magic_restore_replica_sets_jscore_passthrough_gen
+  - name: magic_restore_sharding_jscore_passthrough_gen
   - name: .multiversion_sanity_check
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -377,6 +378,7 @@ buildvariants:
   - name: .jstestfuzz !.feature_flag_guarded !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
   - name: magic_restore_replica_sets_jscore_passthrough_gen
+  - name: magic_restore_sharding_jscore_passthrough_gen
   - name: .multiversion_sanity_check
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
