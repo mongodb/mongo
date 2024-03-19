@@ -353,7 +353,7 @@ void startFTDC(ServiceContext* serviceContext,
         // - Replica set.
         // - Standalone router (mongoS).
         // - Config server.
-        // - Shard server with embedded outer.
+        // - Shard server with embedded router.
         // It should NOT be added in these cases:
         // - Standalone server (no replica set).
         // - Shard server without embedded router or config server.

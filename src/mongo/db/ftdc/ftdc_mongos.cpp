@@ -72,13 +72,13 @@ public:
         // Sharding connections.
         {
             auto const grid = Grid::get(opCtx);
-            if (grid->getExecutorPool()) {
+            if (grid->isInitialized()) {
                 grid->getExecutorPool()->appendConnectionStats(&stats);
-            }
 
-            auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
-            if (customConnPoolStatsFn) {
-                customConnPoolStatsFn(&stats);
+                auto const customConnPoolStatsFn = grid->getCustomConnectionPoolStatsFn();
+                if (customConnPoolStatsFn) {
+                    customConnPoolStatsFn(&stats);
+                }
             }
         }
 
@@ -100,8 +100,8 @@ class NetworkInterfaceStatsCollector final : public FTDCCollectorInterface {
 public:
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         auto const grid = Grid::get(opCtx);
-        if (auto executorPool = grid->getExecutorPool()) {
-            executorPool->appendNetworkInterfaceStats(builder);
+        if (grid->isInitialized()) {
+            grid->getExecutorPool()->appendNetworkInterfaceStats(builder);
         }
 
         if (auto executor = ReplicaSetMonitorManager::get()->getExecutor()) {
