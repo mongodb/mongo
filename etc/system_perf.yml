@@ -121,7 +121,7 @@ modules:
     prefix: ${workdir}/src
     branch: master
   - name: genny
-    owner: 10gen
+    owner: mongodb
     repo: genny
     prefix: ${workdir}/src
     branch: master
