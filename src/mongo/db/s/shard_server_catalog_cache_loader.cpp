@@ -317,6 +317,31 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
 }
 
 /**
+ * Runs the given function and throws an exception if the topology term has changed between the
+ * start and end of it. If it changes this will uassert with an InterruptedDueToReplStateChange
+ * error.
+ */
+template <typename F>
+auto runAndThrowIfTermChanged(OperationContext* opCtx, F&& fn) {
+    auto termBeforeOperation = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+    if constexpr (!std::is_same_v<void, std::invoke_result_t<F, decltype(termBeforeOperation)>>) {
+        auto result = fn(termBeforeOperation);
+        auto termAtEndOfOperation = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+        uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                "Change of ReplicaSet term detected between start and end of operation",
+                termBeforeOperation == termAtEndOfOperation);
+        return result;
+    } else {
+        fn(termBeforeOperation);
+        auto termAtEndOfOperation = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+        uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                "Change of ReplicaSet term detected between start and end of operation",
+                termBeforeOperation == termAtEndOfOperation);
+    }
+}
+
+/**
  * Sends _flushRoutingTableCacheUpdates to the primary to force it to refresh its routing table for
  * collection 'nss' and then waits for the refresh to replicate to this node.
  */
@@ -328,18 +353,28 @@ void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
     auto selfShard = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
 
-    auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
-        Seconds{30},
-        Shard::RetryPolicy::kIdempotent));
+    // Run the operation on the primary and await the result to be replicated to this node. To avoid
+    // issues with rollback/term changes this is wrapped in a runAndThrowIfTermChanged since we
+    // currently have no way to detect a topology change/rollback after the return from primary is
+    // received.
+    runAndThrowIfTermChanged(opCtx, [&](auto term) {
+        auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
+            Seconds{30},
+            Shard::RetryPolicy::kIdempotent));
 
-    uassertStatusOK(cmdResponse.commandStatus);
+        uassertStatusOK(cmdResponse.commandStatus);
 
-    uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
-        opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
+        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+            opCtx,
+            {repl::OpTime{
+                 cmdResponse.response.getField(LogicalTime::kOperationTimeFieldName).timestamp(),
+                 term},
+             boost::none}));
+    });
 }
 
 /**
@@ -353,18 +388,24 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
     auto selfShard = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
 
-    auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        BSON("_flushDatabaseCacheUpdates" << dbName.toString()),
-        Seconds{30},
-        Shard::RetryPolicy::kIdempotent));
+    runAndThrowIfTermChanged(opCtx, [&](const auto term) {
+        auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            BSON("_flushDatabaseCacheUpdates" << dbName.toString()),
+            Seconds{30},
+            Shard::RetryPolicy::kIdempotent));
 
-    uassertStatusOK(cmdResponse.commandStatus);
+        uassertStatusOK(cmdResponse.commandStatus);
 
-    uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
-        opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
+        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+            opCtx,
+            {repl::OpTime{
+                 cmdResponse.response.getField(LogicalTime::kOperationTimeFieldName).timestamp(),
+                 term},
+             boost::none}));
+    });
 }
 
 void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
