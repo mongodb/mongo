@@ -234,11 +234,7 @@ public:
     virtual std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) = 0;
 
 protected:
-    CollectionShardingStateFactory(ServiceContext* serviceContext)
-        : _serviceContext(serviceContext) {}
-
-    // The service context which owns this factory
-    ServiceContext* const _serviceContext;
+    CollectionShardingStateFactory() = default;
 };
 
 }  // namespace mongo

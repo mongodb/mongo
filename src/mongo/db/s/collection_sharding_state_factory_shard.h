@@ -42,6 +42,10 @@ public:
     CollectionShardingStateFactoryShard(ServiceContext* serviceContext);
 
     std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override;
+
+private:
+    // The service context which owns this factory
+    ServiceContext* const _serviceContext;
 };
 
 }  // namespace mongo

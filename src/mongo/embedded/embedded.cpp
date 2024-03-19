@@ -182,8 +182,7 @@ public:
 
 class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
 public:
-    CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext)
-        : CollectionShardingStateFactory(serviceContext) {}
+    CollectionShardingStateFactoryEmbedded() = default;
 
     std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
         return std::make_unique<CollectionShardingStateStandalone>();
@@ -248,7 +247,7 @@ ServiceContext::ConstructorActionRegisterer shardingStateRegisterer{
     [](ServiceContext* service) {
         ShardingState::create(service);
         CollectionShardingStateFactory::set(
-            service, std::make_unique<CollectionShardingStateFactoryEmbedded>(service));
+            service, std::make_unique<CollectionShardingStateFactoryEmbedded>());
     },
     [](ServiceContext* service) {
         CollectionShardingStateFactory::clear(service);

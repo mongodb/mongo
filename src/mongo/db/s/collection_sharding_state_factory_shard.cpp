@@ -37,7 +37,7 @@ namespace mongo {
 
 CollectionShardingStateFactoryShard::CollectionShardingStateFactoryShard(
     ServiceContext* serviceContext)
-    : CollectionShardingStateFactory(serviceContext) {}
+    : _serviceContext(serviceContext) {}
 
 std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryShard::make(
     const NamespaceString& nss) {
