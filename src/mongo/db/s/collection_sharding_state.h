@@ -127,11 +127,6 @@ public:
     static void appendInfoForShardingStateCommand(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
-     * Returns the namespace to which this CSS corresponds.
-     */
-    virtual const NamespaceString& nss() const = 0;
-
-    /**
      * If the shard currently doesn't know whether the collection is sharded or not, it will throw a
      * StaleConfig error.
      *
@@ -229,11 +224,6 @@ public:
     static void clear(ServiceContext* service);
 
     virtual ~CollectionShardingStateFactory() = default;
-
-    /**
-     * Must be called prior to destruction to wait for any ongoing work to complete.
-     */
-    virtual void join() = 0;
 
     /**
      * Called by the CollectionShardingState::acquire method once per newly cached namespace. It is

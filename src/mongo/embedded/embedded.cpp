@@ -89,7 +89,6 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/embedded/collection_sharding_state_factory_embedded.h"
 #include "mongo/embedded/embedded_options_parser_init.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/embedded/operation_logger_embedded.h"
@@ -122,9 +121,82 @@ namespace mongo {
 namespace embedded {
 namespace {
 
+class UnshardedCollection final : public ScopedCollectionDescription::Impl {
+public:
+    UnshardedCollection() = default;
+
+    const CollectionMetadata& get() override {
+        return metadata;
+    }
+
+private:
+    CollectionMetadata metadata;
+};
+
+const std::shared_ptr<UnshardedCollection> kUnshardedCollection =
+    std::make_shared<UnshardedCollection>();
+
+class CollectionShardingStateStandalone final : public CollectionShardingState {
+public:
+    CollectionShardingStateStandalone() = default;
+
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const override {
+        return {kUnshardedCollection};
+    }
+
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx,
+                                                         bool operationIsVersioned) const override {
+        return {kUnshardedCollection};
+    }
+
+    ScopedCollectionFilter getOwnershipFilter(OperationContext*,
+                                              OrphanCleanupPolicy orphanCleanupPolicy,
+                                              bool supportNonVersionedOperations) const override {
+        return {kUnshardedCollection};
+    }
+
+    boost::optional<CollectionIndexes> getCollectionIndexes(
+        OperationContext* opCtx) const override {
+        return boost::none;
+    }
+
+    boost::optional<ShardingIndexesCatalogCache> getIndexes(
+        OperationContext* opCtx) const override {
+        return boost::none;
+    }
+
+    ScopedCollectionFilter getOwnershipFilter(
+        OperationContext* opCtx,
+        OrphanCleanupPolicy orphanCleanupPolicy,
+        const ShardVersion& receivedShardVersion) const override {
+        return {kUnshardedCollection};
+    }
+
+    void checkShardVersionOrThrow(OperationContext* opCtx) const override {}
+
+    void checkShardVersionOrThrow(OperationContext* opCtx,
+                                  const ShardVersion& shardVersion) const override {}
+
+    void appendShardVersion(BSONObjBuilder* builder) const override {}
+};
+
+class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
+public:
+    CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext)
+        : CollectionShardingStateFactory(serviceContext) {}
+
+    std::unique_ptr<CollectionShardingState> make(const NamespaceString&) override {
+        return std::make_unique<CollectionShardingStateStandalone>();
+    }
+};
+
 // Noop, to fulfill dependencies for other initializers.
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {}
+
+MONGO_INITIALIZER(FsyncLockedForWriting)(InitializerContext* context) {
+    setLockedForWritingImpl([]() { return false; });
+}
 
 ServiceContext::ConstructorActionRegisterer registerWireSpec{
     "RegisterWireSpec", [](ServiceContext* service) {
@@ -157,10 +229,6 @@ ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
         IndexBuildsCoordinator::set(serviceContext,
                                     std::make_unique<IndexBuildsCoordinatorEmbedded>());
     });
-
-MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
-    setLockedForWritingImpl([]() { return false; });
-}
 
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
     "FilterAllowedIndexFieldNamesEmbedded",

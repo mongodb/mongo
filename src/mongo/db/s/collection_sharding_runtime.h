@@ -142,10 +142,6 @@ public:
     static ScopedCollectionShardingState acquire(OperationContext* opCtx,
                                                  const NamespaceString& nss) = delete;
 
-    const NamespaceString& nss() const override {
-        return _nss;
-    }
-
     ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const override;
     ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx,
                                                          bool operationIsVersioned) const override;

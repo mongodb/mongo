@@ -33,7 +33,6 @@
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
 #include <mutex>
-#include <string>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -46,7 +45,6 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -64,32 +62,21 @@ public:
         : _factory(std::move(factory)) {}
 
     struct CSSAndLock {
-        CSSAndLock(std::unique_ptr<CollectionShardingState> css)
-            : cssMutex(
-                  "CSSMutex::" +
-                  NamespaceStringUtil::serialize(css->nss(), SerializationContext::stateDefault())),
+        CSSAndLock(const NamespaceString& nss, std::unique_ptr<CollectionShardingState> css)
+            : cssMutex("CSSMutex::" +
+                       NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
               css(std::move(css)) {}
 
         const Lock::ResourceMutex cssMutex;
         std::unique_ptr<CollectionShardingState> css;
     };
 
-    /**
-     * Joins the factory, waiting for any outstanding tasks using the factory to be finished. Must
-     * be called before destruction.
-     */
-    void join() {
-        _factory->join();
-    }
-
     CSSAndLock* getOrCreate(const NamespaceString& nss) noexcept {
-        const auto nssStr =
-            NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
         stdx::lock_guard<Latch> lg(_mutex);
-        auto it = _collections.find(nssStr);
+        auto it = _collections.find(nss);
         if (it == _collections.end()) {
-            auto inserted =
-                _collections.try_emplace(nssStr, std::make_unique<CSSAndLock>(_factory->make(nss)));
+            auto inserted = _collections.try_emplace(
+                nss, std::make_unique<CSSAndLock>(nss, _factory->make(nss)));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -97,26 +84,25 @@ public:
         return it->second.get();
     }
 
-    void appendInfoForShardingStateCommand(BSONObjBuilder* builder) {
+    void appendInfoForShardingStateCommand(BSONObjBuilder* builder) const {
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
         {
             stdx::lock_guard<Latch> lg(_mutex);
-            for (const auto& coll : _collections) {
-                coll.second->css->appendShardVersion(builder);
+            for (const auto& [_, cssAndLock] : _collections) {
+                cssAndLock->css->appendShardVersion(builder);
             }
         }
 
         versionB.done();
     }
 
-    std::vector<NamespaceString> getCollectionNames() {
+    std::vector<NamespaceString> getCollectionNames() const {
         stdx::lock_guard lg(_mutex);
         std::vector<NamespaceString> result;
         result.reserve(_collections.size());
-        for (const auto& [ns, _] : _collections) {
-            result.emplace_back(NamespaceStringUtil::deserialize(
-                boost::none, ns, SerializationContext::stateDefault()));
+        for (const auto& [nss, _] : _collections) {
+            result.emplace_back(nss);
         }
         return result;
     }
@@ -124,11 +110,11 @@ public:
 private:
     std::unique_ptr<CollectionShardingStateFactory> _factory;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateMap::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("CollectionShardingStateMap::_mutex");
 
     // Entries of the _collections map must never be deleted or replaced. This is to guarantee that
     // a 'nss' is always associated to the same 'ResourceMutex'.
-    using CollectionsMap = StringMap<std::unique_ptr<CSSAndLock>>;
+    using CollectionsMap = absl::flat_hash_map<NamespaceString, std::unique_ptr<CSSAndLock>>;
     CollectionsMap _collections;
 };
 
@@ -207,11 +193,8 @@ void CollectionShardingStateFactory::set(ServiceContext* service,
 }
 
 void CollectionShardingStateFactory::clear(ServiceContext* service) {
-    auto& collectionsMap = CollectionShardingStateMap::get(service);
-    if (collectionsMap) {
-        collectionsMap->join();
+    if (auto& collectionsMap = CollectionShardingStateMap::get(service))
         collectionsMap.reset();
-    }
 }
 
 }  // namespace mongo
