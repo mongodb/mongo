@@ -215,6 +215,14 @@ Status ReplSetConfig::_initialize(bool forInitiate,
     _calculateMajorities();
     _addInternalWriteConcernModes();
     _initializeConnectionString();
+
+    // Count how many members can vote
+    for (const MemberConfig& m : getMembers()) {
+        if (m.getNumVotes() > 0) {
+            ++_votingMemberCount;
+        }
+    }
+
     return Status::OK();
 }
 

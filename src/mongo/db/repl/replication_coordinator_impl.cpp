@@ -3544,7 +3544,7 @@ std::vector<MemberConfig> ReplicationCoordinatorImpl::getConfigVotingMembers() c
 
 size_t ReplicationCoordinatorImpl::getNumConfigVotingMembers() const {
     stdx::lock_guard<Latch> lock(_mutex);
-    return _rsConfig.votingMembers().size();
+    return _rsConfig.getCountOfVotingMembers();
 }
 
 std::int64_t ReplicationCoordinatorImpl::getConfigTerm() const {

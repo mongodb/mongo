@@ -337,6 +337,13 @@ public:
     };
 
     /**
+     * Returns a count voting members in this ReplSetConfig.
+     */
+    size_t getCountOfVotingMembers() const {
+        return _votingMemberCount;
+    };
+
+    /**
      * Access a MemberConfig element by index.
      */
     const MemberConfig& getMemberAt(size_t i) const;
@@ -627,6 +634,7 @@ private:
     int _writableVotingMembersCount = 0;
     int _writeMajority = 0;
     int _totalVotingMembers = 0;
+    int _votingMemberCount = 0;
     ReplSetTagConfig _tagConfig;
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
     ConnectionString _connectionString;
