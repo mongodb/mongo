@@ -3,7 +3,7 @@
  * insert.
  * @tags: [
  *   change_stream_does_not_expect_txns,
- *   featureFlagReplicateVectoredInsertsTransactionally
+ *   requires_fcv_80
  * ]
  */
 

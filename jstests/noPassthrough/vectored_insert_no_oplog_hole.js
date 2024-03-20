@@ -1,8 +1,8 @@
 /**
- * Test that vectoredinserts do not hold open an oplog hole; other operations can continue to
+ * Test that vectored inserts do not hold open an oplog hole; other operations can continue to
  * replicate while a vectored insert is in progress.
  *
- * @tags: [featureFlagReplicateVectoredInsertsTransactionally, requires_timeseries]
+ * @tags: [requires_fcv_80, requires_timeseries]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
