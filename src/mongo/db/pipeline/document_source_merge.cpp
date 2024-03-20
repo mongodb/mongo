@@ -368,7 +368,7 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
             if (!pipeline.has_value()) {
                 return boost::none;
             }
-            auto expCtxWithLetVariables = pExpCtx->copyWith(pExpCtx->ns);
+            auto expCtxWithLetVariables = pExpCtx->copyWith(getOutputNs());
             if (spec.getLet()) {
                 BSONObjBuilder cleanLetSpecBuilder;
                 for (auto&& [name, expr] : *letVariables) {
