@@ -148,24 +148,6 @@ public:
                     "prepareTransaction must be run within a transaction",
                     txnParticipant);
 
-            auto txnRouter = TransactionRouter::get(opCtx);
-            if (txnRouter) {
-                auto nss = ns();
-                auto additionalParticipants = txnRouter.getAdditionalParticipantsForResponse(
-                    opCtx, definition()->getName(), nss);
-                if (additionalParticipants) {
-                    for (const auto& p : *additionalParticipants) {
-                        uassert(ErrorCodes::IllegalOperation,
-                                str::stream()
-                                    << "Cannot prepare transaction because this shard added "
-                                       "participant(s) to this transaction, and did not "
-                                       "receive a response from additional participant: "
-                                    << p.first,
-                                p.second);
-                    }
-                }
-            }
-
             TxnNumberAndRetryCounter txnNumberAndRetryCounter{*opCtx->getTxnNumber(),
                                                               *opCtx->getTxnRetryCounter()};
 
