@@ -52,6 +52,8 @@
 
 #include "mongo/logv2/log.h"
 
+MONGO_FAIL_POINT_DEFINE(sleepAfterExtraIndexKeysHashing);
+
 namespace mongo {
 
 namespace {
@@ -433,6 +435,14 @@ private:
                                                           OplogEntriesEnum::Batch,
                                                           status);
                 HealthLogInterface::get(opCtx)->log(*entry);
+            }
+
+            if (MONGO_unlikely(sleepAfterExtraIndexKeysHashing.shouldFail())) {
+                LOGV2_DEBUG(
+                    3083201,
+                    3,
+                    "Sleeping for 1 second due to sleepAfterExtraIndexKeysHashing failpoint");
+                opCtx->sleepFor(Milliseconds(1000));
             }
 
             start = stats.lastKey;

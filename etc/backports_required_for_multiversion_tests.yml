@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
+    ticket: SERVER-80340
   - test_file: jstests/sharding/query/find_and_modify_with_partial_shard_key.js
     ticket: SERVER-44422
   - test_file: jstests/sharding/query/delete_with_partial_shard_key.js
@@ -154,6 +156,8 @@ last-continuous:
     sharding_jscore_multiversion_passthrough: null
 last-lts:
   all:
+  - test_file: jstests/replsets/ignore_dbcheck_in_initial_sync.js
+    ticket: SERVER-80340
   - test_file: jstests/core/null_query_semantics.js
     ticket: SERVER-21929
   - test_file: jstests/core/or_to_in.js
