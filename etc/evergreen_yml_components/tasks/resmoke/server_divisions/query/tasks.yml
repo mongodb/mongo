@@ -323,6 +323,15 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: change_streams_embedded_router
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: change_streams_multi_stmt_txn_mongos_passthrough
   tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
