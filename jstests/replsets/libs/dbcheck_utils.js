@@ -1,7 +1,44 @@
 /**
  * Contains helper functions for testing dbCheck.
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+export const logQueries = {
+    allErrorsOrWarningsQuery: {$or: [{"severity": "warning"}, {"severity": "error"}]},
+    recordNotFoundQuery: {
+        "severity": "error",
+        "msg": "found extra index key entry without corresponding document",
+        "data.context.indexSpec": {$exists: true}
+    },
+    missingIndexKeysQuery: {
+        "severity": "error",
+        "msg": "Document has missing index keys",
+        "data.context.missingIndexKeys": {$exists: true},
+    },
+    recordDoesNotMatchQuery: {
+        "severity": "error",
+        "msg":
+            "found index key entry with corresponding document/keystring set that does not contain the expected key string",
+        "data.context.indexSpec": {$exists: true}
+    },
+    collNotFoundWarningQuery: {
+        severity: "warning",
+        "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
+    },
+    indexNotFoundWarningQuery: {
+        severity: "warning",
+        "msg": "abandoning dbCheck extra index keys check because index no longer exists"
+    },
+    duringInitialSyncQuery:
+        {severity: "warning", "msg": "cannot execute dbcheck due to ongoing initial sync"},
+    errorQuery: {"severity": "error"},
+    warningQuery: {"severity": "warning"},
+    infoOrErrorQuery:
+        {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]},
+    infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"},
+    inconsistentBatchQuery: {"severity": "error", "msg": "dbCheck batch inconsistent"},
+};
 
 // Apply function on all secondary nodes except arbiters.
 export const forEachNonArbiterSecondary = (replSet, f) => {
@@ -76,6 +113,83 @@ export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) =
     replSet.awaitReplication();
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
 };
+
+// Clear health log and insert nDocs documents with two fields `a` and `b`.
+export const resetAndInsertTwoFields = (replSet, db, collName, nDocs, docSuffix = null) => {
+    db[collName].drop();
+    clearHealthLog(replSet);
+
+    if (docSuffix) {
+        assert.commandWorked(db[collName].insertMany(
+            [...Array(nDocs).keys()].map(
+                x => ({a: x.toString() + docSuffix, b: x.toString() + docSuffix})),
+            {ordered: false}));
+    } else {
+        assert.commandWorked(db[collName].insertMany(
+            [...Array(nDocs).keys()].map(x => ({a: x, b: x})), {ordered: false}));
+    }
+
+    replSet.awaitReplication();
+    assert.eq(db.getCollection(collName).find({}).count(), nDocs);
+};
+
+// Clear health log and insert nDocs documents with identical 'a' field
+export const resetAndInsertIdentical = (replSet, db, collName, nDocs) => {
+    db[collName].drop();
+    clearHealthLog(replSet);
+
+    assert.commandWorked(db[collName].insertMany(
+        [...Array(nDocs).keys()].map(x => ({_id: x, a: 0})), {ordered: false}));
+
+    replSet.awaitReplication();
+    assert.eq(db.getCollection(collName).find({}).count(), nDocs);
+};
+
+// Insert numDocs documents with missing index keys for testing.
+export const insertDocsWithMissingIndexKeys =
+    (replSet, dbName, collName, doc, numDocs = 1, doPrimary = true, doSecondary = true) => {
+        const primaryDb = replSet.getPrimary().getDB(dbName);
+        const secondaryDb = replSet.getSecondary().getDB(dbName);
+
+        assert.commandWorked(primaryDb.createCollection(collName));
+
+        // Create an index for every key in the document.
+        let index = {};
+        for (let key in doc) {
+            index[key] = 1;
+            assert.commandWorked(primaryDb[collName].createIndex(index));
+            index = {};
+        }
+        replSet.awaitReplication();
+
+        // dbCheck requires the _id index to iterate through documents in a batch.
+        let skipIndexNewRecordsExceptIdPrimary;
+        let skipIndexNewRecordsExceptIdSecondary;
+        if (doPrimary) {
+            skipIndexNewRecordsExceptIdPrimary =
+                configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+        }
+        if (doSecondary) {
+            skipIndexNewRecordsExceptIdSecondary =
+                configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+        }
+        for (let i = 0; i < numDocs; i++) {
+            assert.commandWorked(primaryDb[collName].insert(doc));
+        }
+        replSet.awaitReplication();
+        if (doPrimary) {
+            skipIndexNewRecordsExceptIdPrimary.off();
+        }
+        if (doSecondary) {
+            skipIndexNewRecordsExceptIdSecondary.off();
+        }
+
+        // Verify that index has been replicated to all nodes, including _id index.
+        forEachNonArbiterNode(replSet, function(node) {
+            assert.eq(Object.keys(doc).length + 1,
+                      node.getDB(dbName)[collName].getIndexes().length);
+        });
+    }
 
 // Run dbCheck with given parameters and potentially wait for completion.
 export const runDbCheck = (replSet,
