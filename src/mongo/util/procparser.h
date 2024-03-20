@@ -198,24 +198,6 @@ Status parseProcSelfMountStatsImpl(
 Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder);
 
 /**
- * Read a string matching /proc/self/status format and parse for any matching keys.
- *
- * keys - list of keys to output in BSON. If keys is empty, all keys are outputed.
- * data - string to parse
- * builder - BSON output
- */
-Status parseProcSelfStatus(const std::vector<StringData>& keys,
-                           StringData data,
-                           BSONObjBuilder* builder);
-
-/**
- * Read from file, and write the specified list of keys in builder.
- */
-Status parseProcSelfStatusFile(StringData filename,
-                               const std::vector<StringData>& keys,
-                               BSONObjBuilder* builder);
-
-/**
  * Get a vector of disks to monitor by enumerating the specified directory.
  *
  * If the directory does not exist, or otherwise permission is denied, returns an empty vector.

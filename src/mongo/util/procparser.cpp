@@ -759,64 +759,6 @@ Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder)
     return parseProcSelfMountStats(swString.getValue(), builder);
 }
 
-// Here is an example of the type of string it supports:
-//
-// > cat /proc/self/status
-// Name:	cat
-// Umask:	0002
-// State:	R (running)
-// Tgid:	1003535
-// Ngid:	0
-// Pid:	1003535
-// PPid:	1002759
-// TracerPid:	0
-// Uid:	1000	1000	1000	1000
-// Gid:	1000	1000	1000	1000
-// FDSize:	256
-// Groups:	4 20 24 25 27 29 30 44 46 119 120 999 1000
-//
-Status parseProcSelfStatus(const std::vector<StringData>& keys,
-                           StringData data,
-                           BSONObjBuilder* builder) {
-    return parseGenericStats(
-        keys,
-        data,
-        [](StringData line, StringSplitIterator& lineIt) {
-            lineIt = StringSplitIterator(
-                line.begin(), line.end(), boost::token_finder([](char c) { return c == ':'; }));
-            return stringDataFromRange(*lineIt);
-        },
-        [&](StringData key, StringSplitIterator& valueIt) {
-            auto it = valueIt->begin();
-            while (*it == ' ' || *it == '\t') {
-                ++it;
-            }
-            StringData value = stringDataFromRange(it, valueIt->end());
-
-            uint64_t numVal;
-            if (NumberParser{}(value, &numVal).isOK()) {
-                builder->appendNumber(key, static_cast<long long>(numVal));
-            } else {
-                builder->append(key, value);
-            }
-        });
-}
-
-Status parseProcSelfStatusFile(StringData filename,
-                               const std::vector<StringData>& keys,
-                               BSONObjBuilder* builder) {
-    auto swString = readFileAsString(filename);
-    if (!swString.isOK()) {
-        return swString.getStatus();
-    }
-
-    auto status = parseProcSelfStatus(keys, swString.getValue(), builder);
-    if (!status.isOK()) {
-        status.addContext(format(FMT_STRING("Parsing {}"), filename));
-    }
-    return status;
-}
-
 namespace {
 
 /**

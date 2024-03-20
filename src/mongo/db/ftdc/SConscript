@@ -116,6 +116,7 @@ env.CppUnitTest(
         'file_writer_test.cpp',
         'ftdc_test.cpp',
         'ftdc_util_test.cpp',
+        'ftdc_prctl_test.cpp',
         'varint_test.cpp',
     ],
     LIBDEPS=[

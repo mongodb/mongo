@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <utility>
 #include <vector>
@@ -68,10 +69,6 @@ static const std::vector<StringData> kMemKeys{
     "Inactive(anon)"_sd,
     "Active(file)"_sd,
     "Inactive(file)"_sd,
-};
-
-static const std::vector<StringData> kStatusKeys{
-    "THP_enabled"_sd,
 };
 
 static const std::vector<StringData> kNetstatKeys{
@@ -138,10 +135,11 @@ public:
         }
 
         {
-            BSONObjBuilder subObjBuilder(builder.subobjStart("status"));
-            processStatusErrors(procparser::parseProcSelfStatusFile(
-                                    "/proc/self/status", kStatusKeys, &subObjBuilder),
-                                &subObjBuilder);
+            int thpDisabled = prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0);
+            if (thpDisabled >= 0) {
+                BSONObjBuilder subObjBuilder(builder.subobjStart("status"));
+                subObjBuilder.appendNumber("process_opting_into_THP_if_enabled", !thpDisabled);
+            }
         }
 
         {
