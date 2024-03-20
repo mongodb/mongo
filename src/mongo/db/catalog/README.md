@@ -2327,14 +2327,12 @@ schema, per returned document:
     idxEntryBytesRead: 0,
     // The number of index entry units read from the storage engine
     idxEntryUnitsRead: 0,
-    // The number of random seeks to a position on an index or collection
-    cursorSeeks: 0,
-    // The number of keys sorted for query operations
-    keysSorted: 0,
-    // The number of times an in-memory sort operation had to spill to disk
-    sorterSpills: 0,
     // The number of document units returned by query operations
-    docUnitsReturned: 0
+    docUnitsReturned: 0,
+    // These fields are ALWAYS ZERO and only present for backwards compatibility:
+    cursorSeeks: 0,
+    keysSorted: 0,
+    sorterSpills: 0,
   },
   // Metrics recorded while the node was SECONDARY
   secondaryMetrics: {
@@ -2342,10 +2340,11 @@ schema, per returned document:
     docUnitsRead: 0,
     idxEntryBytesRead: 0,
     idxEntryUnitsRead: 0,
+    docUnitsReturned: 0,
+    // These fields are ALWAYS ZERO and only present for backwards compatibility:
     cursorSeeks: 0,
     keysSorted: 0,
     sorterSpills: 0,
-    docUnitsReturned: 0
   },
   // The amount of active CPU time used by all operations
   cpuNanos: 0,

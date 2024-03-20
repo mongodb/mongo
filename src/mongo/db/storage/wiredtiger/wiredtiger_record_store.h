@@ -445,7 +445,7 @@ protected:
      *
      * If countSeekMetric is false, does not record this seek towards metrics collection.
      */
-    RecordId seekIdCommon(const RecordId& id, BoundInclusion boundInclusion, bool countSeekMetric);
+    RecordId seekIdCommon(const RecordId& id, BoundInclusion boundInclusion);
 
     /**
      * Perform an exact seek on the cursor, and return the Record, if one exists.

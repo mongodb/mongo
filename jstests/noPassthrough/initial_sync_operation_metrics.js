@@ -18,9 +18,12 @@ const assertMetricsExist = function(metrics) {
             assert.gte(readMetrics.docUnitsRead, 0);
             assert.gte(readMetrics.idxEntryBytesRead, 0);
             assert.gte(readMetrics.idxEntryUnitsRead, 0);
-            assert.gte(readMetrics.keysSorted, 0);
             assert.gte(readMetrics.docUnitsReturned, 0);
-            assert.gte(readMetrics.cursorSeeks, 0);
+
+            // We maintain these fields for backwards-compatibility, but always return zero.
+            assert.eq(readMetrics.cursorSeeks, 0);
+            assert.eq(readMetrics.keysSorted, 0);
+            assert.eq(readMetrics.sorterSpills, 0);
         });
 
         assert.gte(metrics.cpuNanos, 0);

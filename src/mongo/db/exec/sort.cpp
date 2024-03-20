@@ -35,7 +35,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
@@ -86,16 +85,10 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
 
 void SortStageDefault::loadingDone() {
     _sortExecutor.loadingDone();
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(expCtx()->opCtx);
-    metricsCollector.incrementKeysSorted(_sortExecutor.stats().keysSorted);
-    metricsCollector.incrementSorterSpills(_sortExecutor.stats().spills);
 }
 
 void SortStageSimple::loadingDone() {
     _sortExecutor.loadingDone();
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(expCtx()->opCtx);
-    metricsCollector.incrementKeysSorted(_sortExecutor.stats().keysSorted);
-    metricsCollector.incrementSorterSpills(_sortExecutor.stats().spills);
 }
 
 std::unique_ptr<PlanStageStats> SortStage::getStats() {

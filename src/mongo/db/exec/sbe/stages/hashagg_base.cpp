@@ -191,14 +191,6 @@ void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
         spillRowToDisk(it.first, it.second);
     }
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    // We're not actually doing any sorting here or using the 'Sorter' class, but for the purposes
-    // of $operationMetrics we incorporate the number of spilled records into the "keysSorted"
-    // metric. Similarly, "sorterSpills" despite the name counts the number of individual spill
-    // events.
-    metricsCollector.incrementKeysSorted(_ht->size());
-    metricsCollector.incrementSorterSpills(1);
-
     _ht->clear();
 
     static_cast<Derived*>(this)->getHashAggStats()->spills++;

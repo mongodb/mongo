@@ -874,9 +874,6 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     invariantWTOK(ret, c->session);
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneCursorSeek(_uri);
-
     WT_ITEM old_value;
     ret = c->get_value(c, &old_value);
     invariantWTOK(ret, c->session);
@@ -887,6 +884,7 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
     invariantWTOK(ret, c->session);
 
     auto keyLength = computeRecordIdSize(id);
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneDocWritten(_uri, old_length + keyLength);
 
     _changeNumRecordsAndDataSize(opCtx, -1, -old_length);
@@ -1294,9 +1292,6 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
                                        .value_or(Timestamp{})
                                        .toString());
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneCursorSeek(_uri);
-
     WT_ITEM old_value;
     ret = c->get_value(c, &old_value);
     invariantWTOK(ret, c->session);
@@ -1355,6 +1350,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
 
     // For updates that don't modify the document size, they should count as at least one unit, so
     // just attribute them as 1-byte modifications for simplicity.
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
     _changeNumRecordsAndDataSize(opCtx, 0, sizeDiff);
     return Status::OK();
@@ -2184,7 +2180,7 @@ void WiredTigerRecordStoreCursor::resetCursor() {
 
 boost::optional<Record> WiredTigerRecordStoreCursor::seek(const RecordId& start,
                                                           BoundInclusion boundInclusion) {
-    auto id = seekIdCommon(start, boundInclusion, true /* countSeekMetric */);
+    auto id = seekIdCommon(start, boundInclusion);
     if (id.isNull()) {
         return boost::none;
     }
@@ -2195,8 +2191,7 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seek(const RecordId& start,
 }
 
 RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
-                                                   BoundInclusion boundInclusion,
-                                                   bool countSeekMetric) {
+                                                   BoundInclusion boundInclusion) {
     invariant(_hasRestored);
     dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
 
@@ -2237,9 +2232,6 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
 
     _positioned = true;
     _eof = false;
-    if (countSeekMetric && _metrics) {
-        _metrics->incrementOneCursorSeek(_uri);
-    }
     return getKey(c, _keyFormat);
 }
 
@@ -2272,10 +2264,6 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seekExactCommon(const Recor
         return {};
     }
     invariantWTOK(seekRet, c->session);
-
-    if (_metrics) {
-        _metrics->incrementOneCursorSeek(_uri);
-    }
 
     _eof = false;
     _positioned = true;
@@ -2311,9 +2299,7 @@ bool WiredTigerRecordStoreCursor::restore(bool tolerateCappedRepositioning) {
         return true;
     }
 
-    // For simplification of metrics reporting, don't count this as a seek.
-    const bool countSeek = false;
-    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, countSeek);
+    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude);
     if (foundId.isNull()) {
         _eof = true;
         return true;
@@ -2365,7 +2351,7 @@ boost::optional<Record> WiredTigerCappedCursorBase::seekExact(const RecordId& id
 
 boost::optional<Record> WiredTigerCappedCursorBase::seek(const RecordId& start,
                                                          BoundInclusion boundInclusion) {
-    auto id = seekIdCommon(start, boundInclusion, true /* countSeekMetric */);
+    auto id = seekIdCommon(start, boundInclusion);
     if (id.isNull()) {
         return boost::none;
     }
@@ -2422,9 +2408,7 @@ bool WiredTigerCappedCursorBase::restore(bool tolerateCappedRepositioning) {
         return true;
     }
 
-    // For simplification of metrics reporting, don't count this as a seek.
-    const bool countSeek = false;
-    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, countSeek);
+    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude);
     if (foundId.isNull()) {
         _eof = true;
         // Capped read collscans do not tolerate cursor repositioning. By contrast, write collscans
@@ -2567,9 +2551,9 @@ boost::optional<Record> WiredTigerOplogCursor::seek(const RecordId& start,
     RecordId id;
     if (!_forward && _readTimestampForOplog && start.getLong() > *_readTimestampForOplog) {
         auto key = RecordId(*_readTimestampForOplog);
-        id = seekIdCommon(key, BoundInclusion::kInclude, true /* countSeekMetric */);
+        id = seekIdCommon(key, BoundInclusion::kInclude);
     } else {
-        id = seekIdCommon(start, boundInclusion, true /* countSeekMetric */);
+        id = seekIdCommon(start, boundInclusion);
     }
 
     if (id.isNull()) {

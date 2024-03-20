@@ -53,7 +53,7 @@ const ServiceContext::Decoration<ResourceConsumption> getGlobalResourceConsumpti
     ServiceContext::declareDecoration<ResourceConsumption>();
 
 static const char kCpuNanos[] = "cpuNanos";
-static const char kCursorSeeks[] = "cursorSeeks";
+static const char kCursorSeeks_alwaysZero[] = "cursorSeeks";
 static const char kDocBytesRead[] = "docBytesRead";
 static const char kDocBytesWritten[] = "docBytesWritten";
 static const char kDocUnitsRead[] = "docUnitsRead";
@@ -64,12 +64,12 @@ static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
 static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
 static const char kIdxEntryUnitsWritten[] = "idxEntryUnitsWritten";
 static const char kTotalUnitsWritten[] = "totalUnitsWritten";
-static const char kKeysSorted[] = "keysSorted";
+static const char kKeysSorted_alwaysZero[] = "keysSorted";
 static const char kMemUsage[] = "memUsage";
 static const char kNumMetrics[] = "numMetrics";
 static const char kPrimaryMetrics[] = "primaryMetrics";
 static const char kSecondaryMetrics[] = "secondaryMetrics";
-static const char kSorterSpills[] = "sorterSpills";
+static const char kSorterSpills_alwaysZero[] = "sorterSpills";
 
 inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long long value) {
     if (value != 0) {
@@ -180,10 +180,10 @@ void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
     builder->appendNumber(kDocUnitsRead, docsRead.units());
     builder->appendNumber(kIdxEntryBytesRead, idxEntriesRead.bytes());
     builder->appendNumber(kIdxEntryUnitsRead, idxEntriesRead.units());
-    builder->appendNumber(kKeysSorted, keysSorted);
-    builder->appendNumber(kSorterSpills, sorterSpills);
+    builder->appendNumber(kKeysSorted_alwaysZero, 0);    // set to zero for backwards-compatibility
+    builder->appendNumber(kSorterSpills_alwaysZero, 0);  // set to zero for backwards-compatibility
     builder->appendNumber(kDocUnitsReturned, docsReturned.units());
-    builder->appendNumber(kCursorSeeks, cursorSeeks);
+    builder->appendNumber(kCursorSeeks_alwaysZero, 0);  // set to zero for backwards-compatibility
 }
 
 void ResourceConsumption::WriteMetrics::toBson(BSONObjBuilder* builder) const {
@@ -230,10 +230,13 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
     appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docsRead.units());
     appendNonZeroMetric(builder, kIdxEntryBytesRead, readMetrics.idxEntriesRead.bytes());
     appendNonZeroMetric(builder, kIdxEntryUnitsRead, readMetrics.idxEntriesRead.units());
-    appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
-    appendNonZeroMetric(builder, kSorterSpills, readMetrics.sorterSpills);
+    appendNonZeroMetric(
+        builder, kKeysSorted_alwaysZero, 0);  // set to zero for backwards-compatibility
+    appendNonZeroMetric(
+        builder, kSorterSpills_alwaysZero, 0);  // set to zero for backwards-compatibility
     appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docsReturned.units());
-    appendNonZeroMetric(builder, kCursorSeeks, readMetrics.cursorSeeks);
+    appendNonZeroMetric(
+        builder, kCursorSeeks_alwaysZero, 0);  // set to zero for backwards-compatibility
 
     if (cpuTimer) {
         appendNonZeroMetric(builder, kCpuNanos, durationCount<Nanoseconds>(cpuTimer->getElapsed()));
@@ -266,22 +269,6 @@ void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryRead(StringData
                 "bytes"_attr = bytesRead);
 }
 
-void ResourceConsumption::MetricsCollector::_incrementKeysSorted(int64_t keysSorted) {
-    _metrics.readMetrics.keysSorted += keysSorted;
-    LOGV2_DEBUG(6523902,
-                2,
-                "ResourceConsumption::MetricsCollector::incrementKeysSorted",
-                "keysSorted"_attr = keysSorted);
-}
-
-void ResourceConsumption::MetricsCollector::_incrementSorterSpills(int64_t spills) {
-    _metrics.readMetrics.sorterSpills += spills;
-    LOGV2_DEBUG(6523903,
-                2,
-                "ResourceConsumption::MetricsCollector::incrementSorterSpills",
-                "spills"_attr = spills);
-}
-
 void ResourceConsumption::MetricsCollector::_incrementDocUnitsReturned(
     StringData ns, DocumentUnitCounter docUnits) {
     _metrics.readMetrics.docsReturned += docUnits;
@@ -312,14 +299,6 @@ void ResourceConsumption::MetricsCollector::_incrementOneIdxEntryWritten(StringD
                 "ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten",
                 "uri"_attr = uri,
                 "bytesWritten"_attr = bytesWritten);
-}
-
-void ResourceConsumption::MetricsCollector::_incrementOneCursorSeek(StringData uri) {
-    _metrics.readMetrics.cursorSeeks++;
-    LOGV2_DEBUG(6523907,
-                2,
-                "ResourceConsumption::MetricsCollector::incrementOneCursorSeek",
-                "uri"_attr = uri);
 }
 
 void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationContext* opCtx,

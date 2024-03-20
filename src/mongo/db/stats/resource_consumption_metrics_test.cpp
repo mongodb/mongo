@@ -270,10 +270,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 8);
-        operationMetrics.incrementKeysSorted(16);
-        operationMetrics.incrementSorterSpills(32);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     ASSERT(operationMetrics.hasCollectedMetrics());
@@ -283,11 +280,8 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 1);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 8);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 16);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 32);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 64);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
 
     // Clear metrics so we do not double-count.
     reset(operationMetrics);
@@ -298,10 +292,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
 
         operationMetrics.incrementOneDocRead("", 32);
         operationMetrics.incrementOneIdxEntryRead("", 128);
-        operationMetrics.incrementKeysSorted(256);
-        operationMetrics.incrementSorterSpills(512);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -309,11 +300,8 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 2);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 8 + 128);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 16 + 256);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 32 + 512);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 64 + 1024);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1 + 1);
 }
 
 TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
@@ -329,10 +317,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 8);
-        operationMetrics.incrementKeysSorted(16);
-        operationMetrics.incrementSorterSpills(32);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     auto metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -340,11 +325,8 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsRead.units(), 1);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.bytes(), 8);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.keysSorted, 16);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.sorterSpills, 32);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.bytes(), 64);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.cursorSeeks, 1);
 
     // Clear metrics so we do not double-count.
     reset(operationMetrics);
@@ -355,10 +337,7 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
 
         operationMetrics.incrementOneDocRead("", 32);
         operationMetrics.incrementOneIdxEntryRead("", 128);
-        operationMetrics.incrementKeysSorted(256);
-        operationMetrics.incrementSorterSpills(512);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -366,11 +345,8 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsRead.units(), 2);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.bytes(), 8 + 128);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.keysSorted, 16 + 256);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.sorterSpills, 32 + 512);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.bytes(), 64 + 1024);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.cursorSeeks, 1 + 1);
 }
 
 TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
@@ -385,20 +361,14 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 8);
-        operationMetrics.incrementKeysSorted(16);
-        operationMetrics.incrementSorterSpills(32);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek("");
 
         ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx.get())
                       ->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
         operationMetrics.incrementOneDocRead("", 32);
         operationMetrics.incrementOneIdxEntryRead("", 128);
-        operationMetrics.incrementKeysSorted(256);
-        operationMetrics.incrementSorterSpills(512);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     auto metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
@@ -406,19 +376,14 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 0);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 0);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 0);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsRead.bytes(), 2 + 32);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsRead.units(), 2);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.bytes(), 8 + 128);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.keysSorted, 16 + 256);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.sorterSpills, 32 + 512);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.bytes(), 64 + 1024);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.cursorSeeks, 1 + 1);
 
     reset(operationMetrics);
 
@@ -430,20 +395,14 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 8);
-        operationMetrics.incrementKeysSorted(16);
-        operationMetrics.incrementSorterSpills(32);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
-        operationMetrics.incrementOneCursorSeek("");
 
         ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx.get())
                       ->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
         operationMetrics.incrementOneDocRead("", 32);
         operationMetrics.incrementOneIdxEntryRead("", 128);
-        operationMetrics.incrementKeysSorted(256);
-        operationMetrics.incrementSorterSpills(512);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
@@ -451,20 +410,14 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsAcrossStates) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 2);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 8 + 128);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 16 + 256);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 32 + 512);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 64 + 1024);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1 + 8);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1 + 1);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsRead.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsRead.units(), 0);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.idxEntriesRead.units(), 0);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.keysSorted, 0);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.sorterSpills, 0);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.docsReturned.units(), 0);
-    ASSERT_EQ(metricsCopy["db1"].secondaryReadMetrics.cursorSeeks, 0);
 }
 
 TEST_F(ResourceConsumptionMetricsTest, DocumentUnitsRead) {
@@ -762,66 +715,6 @@ TEST_F(ResourceConsumptionMetricsTest, CpuNanos) {
     ASSERT_EQ(Nanoseconds(0), globalCpuTime);
 }
 
-TEST_F(ResourceConsumptionMetricsTest, CursorSeeks) {
-    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
-    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
-
-    int expectedSeeks = 0;
-
-    {
-        ResourceConsumption::ScopedMetricsCollector scope(
-            _opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db1"));
-        operationMetrics.incrementOneCursorSeek("");
-        operationMetrics.incrementOneCursorSeek("");
-        operationMetrics.incrementOneCursorSeek("");
-
-        expectedSeeks += 3;
-    }
-
-    auto metricsCopy = globalResourceConsumption.getDbMetrics();
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, expectedSeeks);
-}
-
-TEST_F(ResourceConsumptionMetricsTest, PauseMetricsCollectorBlock) {
-    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
-    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
-
-    {
-        ResourceConsumption::ScopedMetricsCollector scope(
-            _opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db1"));
-        {
-            // Metrics increase within this scope should not be applied.
-            ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(_opCtx.get());
-            operationMetrics.incrementOneDocRead("", 2);
-            operationMetrics.incrementOneIdxEntryRead("", 8);
-            operationMetrics.incrementKeysSorted(16);
-            operationMetrics.incrementSorterSpills(32);
-            operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
-            operationMetrics.incrementOneCursorSeek("");
-        }
-
-        // Once PauseMetricsCollectorBlock goes out of scope, metrics collection should work as
-        // normal.
-        operationMetrics.incrementOneDocRead("", 4);
-        operationMetrics.incrementOneIdxEntryRead("", 16);
-        operationMetrics.incrementKeysSorted(32);
-        operationMetrics.incrementSorterSpills(64);
-        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(128));
-        operationMetrics.incrementOneCursorSeek("");
-    }
-
-    auto metricsCopy = globalResourceConsumption.getDbMetrics();
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.bytes(), 4);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 16);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 32);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 64);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 128);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
-}
-
 TEST_F(ResourceConsumptionMetricsTest, ResetMetricsBetweenCollection) {
     auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
     auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
@@ -832,10 +725,7 @@ TEST_F(ResourceConsumptionMetricsTest, ResetMetricsBetweenCollection) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 4);
-        operationMetrics.incrementKeysSorted(8);
-        operationMetrics.incrementSorterSpills(16);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(32));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     auto metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
@@ -843,11 +733,8 @@ TEST_F(ResourceConsumptionMetricsTest, ResetMetricsBetweenCollection) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 1);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 4);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 8);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 16);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 32);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
 
     // We expect this metrics collection to wipe out the metrics from the previous one.
     {
@@ -855,10 +742,7 @@ TEST_F(ResourceConsumptionMetricsTest, ResetMetricsBetweenCollection) {
             _opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db2"));
         operationMetrics.incrementOneDocRead("", 64);
         operationMetrics.incrementOneIdxEntryRead("", 128);
-        operationMetrics.incrementKeysSorted(256);
-        operationMetrics.incrementSorterSpills(512);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getDbMetrics();
@@ -868,21 +752,15 @@ TEST_F(ResourceConsumptionMetricsTest, ResetMetricsBetweenCollection) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 0);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 0);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 0);
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 0);
-    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 0);
 
     ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsRead.bytes(), 64);
     ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsRead.units(), 1);
     ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.idxEntriesRead.bytes(), 128);
     ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.idxEntriesRead.units(), 8);
-    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.keysSorted, 256);
-    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.sorterSpills, 512);
     ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsReturned.bytes(), 1024);
     ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsReturned.units(), 8);
-    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.cursorSeeks, 1);
 }
 
 TEST_F(ResourceConsumptionMetricsTest, MetricsWithTenantId) {
@@ -947,10 +825,7 @@ TEST_F(ResourceConsumptionMetricsTest, MergeWithTenantId) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 4);
-        operationMetrics.incrementKeysSorted(8);
-        operationMetrics.incrementSorterSpills(16);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(32));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     std::string dbName1Str = str::stream() << tenantId.toString() << "_db1";
@@ -959,11 +834,8 @@ TEST_F(ResourceConsumptionMetricsTest, MergeWithTenantId) {
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.docsRead.units(), 1);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.idxEntriesRead.bytes(), 4);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.idxEntriesRead.units(), 1);
-    ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.keysSorted, 8);
-    ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.sorterSpills, 16);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.docsReturned.bytes(), 32);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.docsReturned.units(), 1);
-    ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.cursorSeeks, 1);
 
     {
         ResourceConsumption::ScopedMetricsCollector scope(
@@ -971,10 +843,7 @@ TEST_F(ResourceConsumptionMetricsTest, MergeWithTenantId) {
 
         operationMetrics.incrementOneDocRead("", 2);
         operationMetrics.incrementOneIdxEntryRead("", 4);
-        operationMetrics.incrementKeysSorted(8);
-        operationMetrics.incrementSorterSpills(16);
         operationMetrics.incrementDocUnitsReturned("", makeDocUnits(32));
-        operationMetrics.incrementOneCursorSeek("");
     }
 
     metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
@@ -982,22 +851,16 @@ TEST_F(ResourceConsumptionMetricsTest, MergeWithTenantId) {
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.docsRead.units(), 0);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.idxEntriesRead.bytes(), 0);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.idxEntriesRead.units(), 0);
-    ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.keysSorted, 0);
-    ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.sorterSpills, 0);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.docsReturned.bytes(), 0);
     ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.docsReturned.units(), 0);
-    ASSERT_EQ(metricsCopy[dbName1Str].primaryReadMetrics.cursorSeeks, 0);
 
     std::string otherDbName1Str = str::stream() << otherTenantId.toString() << "_db1";
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.docsRead.bytes(), 2);
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.docsRead.units(), 1);
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.idxEntriesRead.bytes(), 4);
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.idxEntriesRead.units(), 1);
-    ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.keysSorted, 8);
-    ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.sorterSpills, 16);
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.docsReturned.bytes(), 32);
     ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.docsReturned.units(), 1);
-    ASSERT_EQ(metricsCopy[otherDbName1Str].primaryReadMetrics.cursorSeeks, 1);
 }
 
 }  // namespace mongo

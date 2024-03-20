@@ -50,7 +50,6 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -261,10 +260,6 @@ void DocumentSourceBucketAuto::initializeBucketIteration() {
     // Initialize the iterator on '_sorter'.
     invariant(_sorter);
     _sortedInput.reset(_sorter->done());
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
-    metricsCollector.incrementKeysSorted(_sorter->stats().numSorted());
-    metricsCollector.incrementSorterSpills(_sorter->stats().spilledRanges());
 
     _sorter.reset();
 

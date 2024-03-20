@@ -46,7 +46,6 @@
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/sorter/sorter.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
@@ -384,9 +383,6 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
     if (_stage._sorterFileStats) {
         _stage._specificStats.spilledDataStorageSize += _stage._sorterFileStats->bytesSpilled();
     }
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_stage._opCtx);
-    metricsCollector.incrementKeysSorted(_sorter->stats().numSorted());
-    metricsCollector.incrementSorterSpills(_sorter->stats().spilledRanges());
 
     _stage._children[0]->close();
 }

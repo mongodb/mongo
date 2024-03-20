@@ -281,10 +281,6 @@ void GroupProcessor::spill() {
             break;
     }
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_expCtx->opCtx);
-    metricsCollector.incrementKeysSorted(ptrs.size());
-    metricsCollector.incrementSorterSpills(1);
-
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.
     GroupProcessorBase::reset();

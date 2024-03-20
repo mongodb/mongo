@@ -403,7 +403,6 @@ private:
         _eof = false;
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneCursorSeek(c->uri);
 
         // Make sure we land on a key matching the search key or a key immediately after.
         //

@@ -159,9 +159,6 @@ public:
             docsRead += other.docsRead;
             idxEntriesRead += other.idxEntriesRead;
             docsReturned += other.docsReturned;
-            keysSorted += other.keysSorted;
-            sorterSpills += other.sorterSpills;
-            cursorSeeks += other.cursorSeeks;
         }
 
         ReadMetrics& operator+=(const ReadMetrics& other) {
@@ -180,13 +177,6 @@ public:
         IdxEntryUnitCounter idxEntriesRead;
         // Number of document units returned by a query
         DocumentUnitCounter docsReturned;
-
-        // Number of keys sorted for query operations
-        long long keysSorted = 0;
-        // Number of individual spills of data to disk by the sorter
-        long long sorterSpills = 0;
-        // Number of cursor seeks
-        long long cursorSeeks = 0;
     };
 
     /* WriteMetrics maintains metrics for write operations. */
@@ -369,30 +359,6 @@ public:
         }
 
         /**
-         * Increments the number of keys sorted for a query operation. This is a no-op when metrics
-         * collection is disabled on this operation.
-         */
-        void incrementKeysSorted(int64_t keysSorted) {
-            if (!isCollecting()) {
-                return;
-            }
-
-            _incrementKeysSorted(keysSorted);
-        }
-
-        /**
-         * Increments the number of number of individual spills to disk by the sorter for query
-         * operations. This is a no-op when metrics collection is disabled on this operation.
-         */
-        void incrementSorterSpills(int64_t spills) {
-            if (!isCollecting()) {
-                return;
-            }
-
-            _incrementSorterSpills(spills);
-        }
-
-        /**
          * Increments the number of document units returned in the command response.
          */
         void incrementDocUnitsReturned(StringData ns, DocumentUnitCounter docUnits) {
@@ -430,20 +396,6 @@ public:
         }
 
         /**
-         * This should be called once every time the storage engine successfully does a cursor seek.
-         * Note that if it takes multiple attempts to do a successful seek, this function should
-         * only be called once. If the seek does not find anything, this function should not be
-         * called.
-         */
-        void incrementOneCursorSeek(StringData uri) {
-            if (!isCollecting()) {
-                return;
-            }
-
-            _incrementOneCursorSeek(uri);
-        }
-
-        /**
          * Pause metrics collection, overriding kInScopeCollecting status. The scope status may be
          * changed during a pause, but will not come into effect until resume() is called.
          */
@@ -477,12 +429,9 @@ public:
         // metrics and calls these costlier implementations when we are.
         void _incrementOneDocRead(StringData uri, int64_t docBytesRead);
         void _incrementOneIdxEntryRead(StringData uri, int64_t bytesRead);
-        void _incrementKeysSorted(int64_t keysSorted);
-        void _incrementSorterSpills(int64_t spills);
         void _incrementDocUnitsReturned(StringData ns, DocumentUnitCounter docUnits);
         void _incrementOneDocWritten(StringData uri, int64_t bytesWritten);
         void _incrementOneIdxEntryWritten(StringData uri, int64_t bytesWritten);
-        void _incrementOneCursorSeek(StringData uri);
 
         /**
          * Represents the ScopedMetricsCollector state.

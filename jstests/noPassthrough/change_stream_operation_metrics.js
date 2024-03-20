@@ -108,7 +108,6 @@ let nextId = nDocs;
         // The first aggregate operation should not read anything yet.
         assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 0);
-        assert.eq(metrics[dbName].primaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
 
@@ -121,7 +120,6 @@ let nextId = nDocs;
         // guaranteed.
         assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 0);
-        assert.eq(metrics[dbName].primaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
 
@@ -138,7 +136,6 @@ let nextId = nDocs;
         assert.eq(metrics[dbName].totalUnitsWritten, 1);
         assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 0);
-        assert.eq(metrics[dbName].primaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
 
@@ -158,7 +155,6 @@ let nextId = nDocs;
         // Will read at least one document from the oplog.
         assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 0);
-        assert.gt(metrics[dbName].primaryMetrics.cursorSeeks, 0);
         // Returns one large document
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 4);
     });
@@ -174,7 +170,6 @@ let nextId = nDocs;
         assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 1);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 3);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryUnitsRead, 1);
-        assert.gt(metrics[dbName].primaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
 
@@ -193,13 +188,12 @@ let nextId = nDocs;
     let res = cur.next();
     assert.docEq(newDoc, res.fullDocument, res);
     assertMetrics(primary, (metrics) => {
-        // Performs at least three seeks (oplog, _id index, collection), reads at least one entry
-        // from the oplog, once from the collection, and then returns one large response document.
+        // Reads at least one entry from the oplog, one from the collection, and then returns one
+        // large response document.
         assert.gte(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 3);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryUnitsRead, 1);
-        assert.gt(metrics[dbName].primaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 4);
     });
 })();
@@ -212,7 +206,6 @@ let nextId = nDocs;
         // The first aggregate operation should not read anything from the oplog.
         assert.eq(metrics[dbName].secondaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
-        assert.eq(metrics[dbName].secondaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsReturned, 0);
     });
 
@@ -224,7 +217,6 @@ let nextId = nDocs;
         // Calling hasNext should continue to not read anything.
         assert.eq(metrics[dbName].secondaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
-        assert.eq(metrics[dbName].secondaryMetrics.cursorSeeks, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsReturned, 0);
     });
 
@@ -248,11 +240,9 @@ let nextId = nDocs;
     });
     assert.eq(doc, cur.next().fullDocument);
     assertMetrics(secondary, (metrics) => {
-        // Performs one seek on the oplog, read at least one entry, and then returns one large
-        // response document.
+        // Read at least one entry, and then returns one large response document.
         assert.gt(metrics[dbName].secondaryMetrics.docBytesRead, 0);
         assert.gt(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
-        assert.gte(metrics[dbName].secondaryMetrics.cursorSeeks, 1);
         assert.gte(metrics[dbName].secondaryMetrics.docUnitsReturned, 3);
     });
 
@@ -277,14 +267,12 @@ let nextId = nDocs;
     let res = cur.next();
     assert.docEq(newDoc, res.fullDocument, res);
     assertMetrics(secondary, (metrics) => {
-        // Performs at least three seeks (oplog, _id index, collection), reads at least one entry
-        // from the oplog and once from the collection, and then returns one large response
-        // document.
+        // Reads at least one entry from the oplog and once from the collection, and then returns
+        // one large response document.
         assert.gt(metrics[dbName].secondaryMetrics.docBytesRead, 0);
         assert.gt(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.idxEntryBytesRead, 3);
         assert.eq(metrics[dbName].secondaryMetrics.idxEntryUnitsRead, 1);
-        assert.gte(metrics[dbName].secondaryMetrics.cursorSeeks, 3);
         assert.gte(metrics[dbName].secondaryMetrics.docUnitsReturned, 4);
     });
 })();

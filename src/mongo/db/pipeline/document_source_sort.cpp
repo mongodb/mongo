@@ -58,7 +58,6 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -624,9 +623,6 @@ void DocumentSourceSort::loadDocument(Document&& doc) {
 
 void DocumentSourceSort::loadingDone() {
     _sortExecutor->loadingDone();
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
-    metricsCollector.incrementKeysSorted(_sortExecutor->stats().keysSorted);
-    metricsCollector.incrementSorterSpills(_sortExecutor->stats().spills);
     _populated = true;
 }
 

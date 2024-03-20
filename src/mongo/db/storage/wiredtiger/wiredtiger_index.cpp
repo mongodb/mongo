@@ -537,7 +537,6 @@ boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneCursorSeek(uri());
 
     if (ret == WT_NOTFOUND)
         return boost::none;
@@ -1189,8 +1188,6 @@ protected:
         int ret = wiredTigerPrepareConflictRetry(
             _opCtx, [&] { return _forward ? cur->next(cur) : cur->prev(cur); });
 
-        _metrics->incrementOneCursorSeek(_uri);
-
         if (ret == WT_NOTFOUND) {
             return false;
         }
@@ -1812,9 +1809,6 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     }
     invariantWTOK(ret, c->session);
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneCursorSeek(_uri);
-
     WT_ITEM old;
     invariantWTOK(c->get_value(c, &old), c->session);
 
@@ -1848,6 +1842,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
 
     // The RecordId matches, so remove the entry.
     if (id == idInIndex) {
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
         invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c)),
                       c->session);
         metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size);
