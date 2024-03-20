@@ -768,22 +768,17 @@ public:
         }
     }
 
-    // testBlockBased is a temporary option; it will be removed once all
-    // functionality for block based decompression is in place and all
-    // relevant tests are onboarded
     static void verifyDecompression(const BufBuilder& columnBinary,
-                                    const std::vector<BSONElement>& expected,
-                                    bool testBlockBased = true) {
+                                    const std::vector<BSONElement>& expected) {
         BSONBinData bsonBinData;
         bsonBinData.data = columnBinary.buf();
         bsonBinData.length = columnBinary.len();
         bsonBinData.type = Column;
-        verifyDecompression(bsonBinData, expected, testBlockBased);
+        verifyDecompression(bsonBinData, expected);
     }
 
     static void verifyDecompression(BSONBinData columnBinary,
-                                    const std::vector<BSONElement>& expected,
-                                    bool testBlockBased = true) {
+                                    const std::vector<BSONElement>& expected) {
         BSONObjBuilder obj;
         obj.append(""_sd, columnBinary);
         BSONElement columnElement = obj.done().firstElement();
@@ -914,8 +909,7 @@ public:
             }
         }
 
-        // TODO(SERVER-87861): Remove this gate once all types are onboarded and bugs are fixed
-        if (testBlockBased) {
+        {
             boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
             std::vector<BSONElement> collection;
             BSONColumnBlockBased c((const char*)columnBinary.data, columnBinary.length);
@@ -1272,7 +1266,7 @@ TEST_F(BSONColumnTest, BasicSkipRepeat) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elem, BSONElement(), elem}, true);
+    verifyDecompression(binData, {elem, BSONElement(), elem});
 }
 
 TEST_F(BSONColumnTest, OnlySkip) {
@@ -1680,7 +1674,7 @@ TEST_F(BSONColumnTest, DoubleOverflowEndsWithSkip) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DoubleSameScale) {
@@ -3645,7 +3639,7 @@ TEST_F(BSONColumnTest, SimpleOneValueRLE) {
     auto binData = cb.finalize();
 
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, DateAllIdenticalRLENoOverflow) {
@@ -3734,7 +3728,7 @@ TEST_F(BSONColumnTest, RLEAfterMixedValueBlock) {
     auto binData = cb.finalize();
 
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, RLEAfterMixedValueBlock128) {
@@ -3771,7 +3765,7 @@ TEST_F(BSONColumnTest, RLEAfterMixedValueBlock128) {
     auto binData = cb.finalize();
 
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock) {
@@ -3821,7 +3815,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
@@ -3878,7 +3872,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlock128) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreIdentical) {
@@ -3989,8 +3983,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreIdentical128
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent) {
@@ -4105,8 +4098,7 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent128
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected, true);
-    // TODO(SERVER-87305): block-based testing fails with a testing assertion binaryEqualValues
-    verifyDecompression(binData, elems, false);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, Interleaved) {
@@ -4637,8 +4629,7 @@ TEST_F(BSONColumnTest, DecodeInterleavedObjectAsScalar) {
         binData.data = expected.buf();
         binData.length = expected.len();
         binData.type = BinDataType::Column;
-        // TODO(SERVER-87303): turning this on for block-based testing causes a segfault
-        verifyDecompression(binData, elems, false);
+        verifyDecompression(binData, elems);
     };
 
     test(appendInterleavedStartLegacy);
@@ -7350,7 +7341,7 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, true);
+    verifyDecompression(binData, elems);
 }
 
 TEST_F(BSONColumnTest, NonZeroRLEInLastBlock) {
@@ -7653,7 +7644,7 @@ TEST_F(BSONColumnTest, AppendMinKey) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {createElementMinKey()}, true);
+    verifyDecompression(binData, {createElementMinKey()});
 }
 
 TEST_F(BSONColumnTest, AppendMaxKey) {
@@ -7666,7 +7657,7 @@ TEST_F(BSONColumnTest, AppendMaxKey) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {createElementMaxKey()}, true);
+    verifyDecompression(binData, {createElementMaxKey()});
 }
 
 TEST_F(BSONColumnTest, AppendMinKeyInSubObj) {
