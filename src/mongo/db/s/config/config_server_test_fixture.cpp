@@ -78,6 +78,7 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -132,6 +133,7 @@ void ConfigServerTestFixture::setUp() {
         std::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
     auto configServerCatalogCacheLoader = std::make_unique<ConfigServerCatalogCacheLoader>();
     CatalogCacheLoader::set(getServiceContext(), std::move(configServerCatalogCacheLoader));
+    RoutingInformationCache::set(getServiceContext());
 
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
 

@@ -137,10 +137,10 @@ private:
 };
 
 /**
- * Initialize the sharding components of this server, if they haven't already been set up. This can
- * be used on both shard and config servers.
+ * Initialize the sharding components for a mongod running as a config server (if they haven't
+ * already been set up).
  */
-void initializeGlobalShardingStateForMongoD(OperationContext* opCtx);
+void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx);
 
 /**
  * Helper method to initialize sharding awareness from the shard identity document if it can be

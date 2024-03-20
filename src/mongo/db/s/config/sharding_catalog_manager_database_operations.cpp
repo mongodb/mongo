@@ -84,6 +84,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -132,7 +133,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
 
     // Make sure to force update of any stale metadata
-    ON_BLOCK_EXIT([&] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
+    ON_BLOCK_EXIT([&] { RoutingInformationCache::get(opCtx)->purgeDatabase(dbName); });
 
     auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
 

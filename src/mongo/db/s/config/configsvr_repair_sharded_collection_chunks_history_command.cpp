@@ -54,7 +54,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 
@@ -126,7 +126,7 @@ public:
         ShardingCatalogManager::get(opCtx)->upgradeChunksHistory(
             opCtx, nss, cmdObj["force"].booleanSafe(), validAfter);
 
-        Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
+        RoutingInformationCache::get(opCtx)->invalidateCollectionEntry_LINEARIZABLE(nss);
 
         return true;
     }

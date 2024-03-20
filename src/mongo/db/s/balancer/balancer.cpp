@@ -100,6 +100,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -289,8 +290,8 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
     }
 
     auto swCM =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss);
+        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
+            opCtx, nss);
     if (!swCM.isOK()) {
         return swCM.getStatus();
     }
@@ -474,8 +475,8 @@ bool processRebalanceResponse(OperationContext* opCtx,
         gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
 
-        const auto [cm, _] =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+        const auto [cm, _] = uassertStatusOK(
+            RoutingInformationCache::get(opCtx)->getCollectionRoutingInfoWithRefresh(
                 opCtx, migrateInfo.nss));
 
         if (cm.getShardKeyPattern().isHashedPattern()) {
@@ -767,9 +768,9 @@ Status Balancer::moveRange(OperationContext* opCtx,
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     const auto fromShardId = [&]() {
-        const auto [cm, _] = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
-                opCtx, nss));
+        const auto [cm, _] =
+            uassertStatusOK(RoutingInformationCache::get(opCtx)
+                                ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
         if (request.getMin()) {
             const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
             return chunk.getShardId();
@@ -1362,8 +1363,8 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
 
     for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
         auto routingInfoStatus =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
-                opCtx, splitInfo.nss);
+            RoutingInformationCache::get(opCtx)
+                ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, splitInfo.nss);
         if (!routingInfoStatus.isOK()) {
             return routingInfoStatus.getStatus();
         }

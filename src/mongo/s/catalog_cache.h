@@ -169,7 +169,7 @@ class CatalogCache {
     CatalogCache& operator=(const CatalogCache&) = delete;
 
 public:
-    CatalogCache(ServiceContext* service, CatalogCacheLoader& cacheLoader);
+    CatalogCache(ServiceContext* service, CatalogCacheLoader& cacheLoader, StringData kind = ""_sd);
     virtual ~CatalogCache();
 
     /**
@@ -463,6 +463,9 @@ private:
         const NamespaceString& nss,
         ChunkManager&& cm,
         boost::optional<ShardingIndexesCatalogCache>&& sii);
+
+    // (Optional) the kind of catalog cache instantiated. Used for logging and reporting purposes.
+    std::string _kind;
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;

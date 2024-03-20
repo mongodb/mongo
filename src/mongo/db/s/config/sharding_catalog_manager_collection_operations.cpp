@@ -89,6 +89,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -614,8 +615,8 @@ void ShardingCatalogManager::configureCollectionBalancing(
     }
 
     const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss));
+        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
+            opCtx, nss));
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
 
@@ -640,7 +641,8 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
+        RoutingInformationCache::get(opCtx)->getCollectionRoutingInfoWithPlacementRefresh(opCtx,
+                                                                                          nss));
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 

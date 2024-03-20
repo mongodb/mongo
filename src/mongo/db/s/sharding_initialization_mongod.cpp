@@ -112,6 +112,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_uptime_reporter.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_state.h"
@@ -602,7 +603,7 @@ void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
 void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,
                                                           bool isMajorityDataAvailable) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        initializeGlobalShardingStateForMongoD(opCtx);
+        initializeGlobalShardingStateForConfigServer(opCtx);
     }
 
     if (auto shardIdentityDoc = getShardIdentityDoc(opCtx)) {
@@ -611,7 +612,7 @@ void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCt
     }
 }
 
-void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
+void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
     if (Grid::get(opCtx)->isShardingInitialized()) {
         return;
     }
@@ -624,24 +625,27 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
         return boost::none;
     }();
 
-    // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-    if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+    // TODO SERVER-84243 replace the block below with the initialisation of the filtering metadata
+    // cache.
+    {
         CatalogCacheLoader::set(service,
                                 std::make_unique<ShardServerCatalogCacheLoader>(
                                     std::make_unique<ConfigServerCatalogCacheLoader>()));
-        {
-            // This is only called in startup when there shouldn't be replication state changes, but
-            // to be safe we take the RSTL anyway.
-            repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            bool isReplSet = replCoord->getSettings().isReplSet();
-            bool isStandaloneOrPrimary =
-                !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-            CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-        }
-    } else {
-        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+
+        // This is only called in startup when there shouldn't be replication state changes, but
+        // to be safe we take the RSTL anyway.
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool isReplSet = replCoord->getSettings().isReplSet();
+        bool isStandaloneOrPrimary =
+            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+
+        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
     }
+
+    // TODO SERVER-84243 replace the line below with the initialisation of the routing information
+    // cache on the Grid.
+    RoutingInformationCache::set(service);
 
     _initializeGlobalShardingState(opCtx, configCS);
 

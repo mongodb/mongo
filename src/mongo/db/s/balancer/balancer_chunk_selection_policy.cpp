@@ -88,6 +88,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -576,8 +577,8 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicy::selectChunksToM
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::_getSplitCandidatesForCollection(
     OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
     auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss);
+        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
+            opCtx, nss);
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }
@@ -614,8 +615,8 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicy::_getMigrateCand
     const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
     stdx::unordered_set<ShardId>* availableShards) {
     auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss);
+        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
+            opCtx, nss);
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }

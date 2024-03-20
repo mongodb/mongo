@@ -56,6 +56,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
@@ -149,9 +150,14 @@ public:
         if (auto const shardingState = ShardingState::get(opCtx); shardingState->enabled()) {
             auto const grid = Grid::get(opCtx);
             auto const catalogCache = grid->catalogCache();
+            auto const routingInfoCache = RoutingInformationCache::get(opCtx);
 
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
+            if (routingInfoCache) {
+                routingInfoCache->report(&result);
+            }
+
             auto nRangeDeletions = [&]() {
                 try {
                     return RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();

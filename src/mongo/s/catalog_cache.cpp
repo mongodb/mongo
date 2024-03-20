@@ -258,11 +258,14 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
     return _disambiguatingSequenceNum < other._disambiguatingSequenceNum;
 }
 
-CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& cacheLoader)
-    : _cacheLoader(cacheLoader),
-      _executor([] {
+CatalogCache::CatalogCache(ServiceContext* const service,
+                           CatalogCacheLoader& cacheLoader,
+                           StringData kind)
+    : _kind(kind),
+      _cacheLoader(cacheLoader),
+      _executor([this] {
           ThreadPool::Options options;
-          options.poolName = "CatalogCache";
+          options.poolName = "CatalogCache" + (_kind.empty() ? "" : "::" + _kind);
           options.minThreads = 0;
           options.maxThreads = 6;
           return options;
@@ -813,7 +816,8 @@ void CatalogCache::purgeAllDatabases() {
 }
 
 void CatalogCache::report(BSONObjBuilder* builder) const {
-    BSONObjBuilder cacheStatsBuilder(builder->subobjStart("catalogCache"));
+    BSONObjBuilder cacheStatsBuilder(
+        builder->subobjStart("catalogCache" + (_kind.empty() ? "" : "::" + _kind)));
 
     const size_t numDatabaseEntries = _databaseCache.getCacheInfo().size();
     const size_t numCollectionEntries = _collectionCache.getCacheInfo().size();

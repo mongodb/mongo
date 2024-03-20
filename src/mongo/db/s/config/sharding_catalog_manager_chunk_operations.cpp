@@ -108,6 +108,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -2181,8 +2182,8 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                               const BSONObj& minKey,
                                               boost::optional<int64_t> optMaxChunkSizeBytes) {
     const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss));
+        RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfoWithPlacementRefresh(
+            opCtx, nss));
     auto chunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
@@ -2286,9 +2287,8 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto cm =
-        uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
-                opCtx, nss))
+        uassertStatusOK(RoutingInformationCache::get(opCtx)
+                            ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss))
             .cm;
 
     uassert(ErrorCodes::InvalidUUID,

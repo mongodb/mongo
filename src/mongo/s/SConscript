@@ -361,6 +361,7 @@ env.Library(
         'config_server_catalog_cache_loader.cpp',
         'grid.cpp',
         'router_uptime_reporter.cpp',
+        'routing_information_cache.cpp',
         'shard_util.cpp',
         'sharding_index_catalog_cache.cpp',
         'sharding_state.cpp',

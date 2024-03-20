@@ -52,7 +52,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -60,8 +60,8 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -182,20 +182,24 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     auto request = aggregation_request_helper::parseFromBSON(
                         opCtx, nss, aggRequestBSON, boost::none, false);
 
-                    auto catalogCache = Grid::get(opCtx)->catalogCache();
+                    auto routingInfoCache = RoutingInformationCache::get(opCtx);
                     shardVersionRetry(
                         opCtx,
-                        catalogCache,
+                        routingInfoCache,
                         nss,
                         "pipeline to detect inconsistent sharded indexes"_sd,
                         [&] {
                             BSONObjBuilder responseBuilder;
+                            auto cri = uassertStatusOK(
+                                RoutingInformationCache::get(opCtx)->getCollectionRoutingInfo(opCtx,
+                                                                                              nss));
                             auto status = ClusterAggregate::runAggregate(
                                 opCtx,
                                 ClusterAggregate::Namespaces{nss, nss},
                                 request,
                                 LiteParsedPipeline{request},
                                 PrivilegeVector(),
+                                cri,
                                 &responseBuilder);
 
                             // Stop counting if the agg command failed for one of the collections

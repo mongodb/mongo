@@ -86,6 +86,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
+#include "mongo/s/routing_information_cache.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
@@ -117,7 +118,7 @@ static constexpr int64_t kBigChunkMarker = std::numeric_limits<int64_t>::max();
 ShardVersion getShardVersion(OperationContext* opCtx,
                              const ShardId& shardId,
                              const NamespaceString& nss) {
-    auto cri = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    auto cri = RoutingInformationCache::get(opCtx)->getShardedCollectionRoutingInfo(opCtx, nss);
     return cri.getShardVersion(shardId);
 }
 
@@ -179,8 +180,7 @@ void handleActionResult(OperationContext* opCtx,
 
     if (status == ErrorCodes::StaleConfig) {
         if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
-            Grid::get(opCtx)
-                ->catalogCache()
+            RoutingInformationCache::get(opCtx)
                 ->invalidateShardOrEntireCollectionEntryForShardedCollection(
                     nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
         }
@@ -566,8 +566,7 @@ public:
                       }
 
                       if (migrationResponse.isOK()) {
-                          Grid::get(opCtx)
-                              ->catalogCache()
+                          RoutingInformationCache::get(opCtx)
                               ->invalidateShardOrEntireCollectionEntryForShardedCollection(
                                   _nss, boost::none, moveRequest.getDestinationShard());
 
@@ -657,8 +656,7 @@ public:
                           // The sequence is complete; update the state of the merged chunk...
                           auto& mergedChunk = mergeRequest.chunkToMergeWith;
 
-                          Grid::get(opCtx)
-                              ->catalogCache()
+                          RoutingInformationCache::get(opCtx)
                               ->invalidateShardOrEntireCollectionEntryForShardedCollection(
                                   _nss, boost::none, mergedChunk->shard);
 

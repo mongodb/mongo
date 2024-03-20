@@ -985,11 +985,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
-            CatalogCacheLoader::get(_service).onStepDown();
-            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        } else if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            CatalogCacheLoader::get(_service).onStepDown();
         }
+
+        // TODO SERVER-84243: replace with cache for filtering metadata
+        CatalogCacheLoader::get(_service).onStepDown();
     }
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
@@ -1087,10 +1086,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
 
-        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            CatalogCacheLoader::get(_service).onStepUp();
-        }
+        // TODO SERVER-84243: replace with cache for filtering metadata
+        CatalogCacheLoader::get(_service).onStepUp();
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         if (ShardingState::get(opCtx)->enabled()) {
