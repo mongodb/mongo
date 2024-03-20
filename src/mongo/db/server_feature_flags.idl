@@ -135,7 +135,7 @@ feature_flags:
     featureFlagAutoCompact:
         description: "Feature flag to execute background compaction"
         cpp_varname: gFeatureFlagAutoCompact
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagCompactOptions:
         description: "Feature flag to execute compaction with more options"

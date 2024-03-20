@@ -14,6 +14,7 @@
  *  # can cause too much cache pressure for some concurrency tests with transactions.
  *  does_not_support_transactions,
  *  featureFlagAutoCompact,
+ *  requires_fcv_80,
  *  incompatible_with_macos,
  *  # Requires all nodes to be running the latest binary.
  *  multiversion_incompatible,
