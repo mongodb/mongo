@@ -581,9 +581,10 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         _ticketWaitWhenStashed);
 
     auto totalBlockedTime = _sumBlockedTimeTotal() - _blockedTimeAtStart;
-    // TODO SERVER-86069: Uncomment the below invariant
-    // invariant(Milliseconds(executionTimeMillis) >= totalBlockedTime);
-    _debug.workingTimeMillis = Milliseconds(executionTimeMillis) - totalBlockedTime;
+    auto workingMillis = Milliseconds(executionTimeMillis) - totalBlockedTime;
+    // Round up to zero if necessary to allow precision errors from FastClockSource used by flow
+    // control ticketholder.
+    _debug.workingTimeMillis = (workingMillis < Milliseconds(0) ? Milliseconds(0) : workingMillis);
 
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
