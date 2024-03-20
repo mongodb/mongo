@@ -281,7 +281,7 @@ template <class BufBuilderType = UntrackedBufBuilder,
 class BSONColumnBuilder {
 public:
     explicit BSONColumnBuilder(Allocator = {});
-    BSONColumnBuilder(BufBuilderType, Allocator = {});
+    explicit BSONColumnBuilder(BufBuilderType, Allocator = {});
 
     /**
      * Initializes this BSONColumnBuilder from a BSONColumn binary. Leaves the BSONColumnBuilder in
