@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/admission/ticketholder_manager.h"
-#include "mongo/db/server_feature_flags_gen.h"
 
 #include "mongo/db/commands/server_status.h"
 
@@ -54,15 +52,6 @@ public:
             ticketHolderManager->appendStats(executionBuilder);
             executionBuilder.done();
         }
-
-        // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
-        if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
-            BSONObjBuilder ingressBuilder(admissionBuilder.subobjStart("ingress"));
-            auto& controller = IngressAdmissionController::get(opCtx);
-            controller.appendStats(ingressBuilder);
-            ingressBuilder.done();
-        }
-
         return admissionBuilder.obj();
     }
 };

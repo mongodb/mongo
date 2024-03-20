@@ -292,6 +292,11 @@ public:
         }
     }
 
+    // TODO(SERVER-86112): Remove
+    static Ticket ephemeral(AdmissionContext& admissionContext) {
+        return Ticket(nullptr, &admissionContext);
+    }
+
     /**
      * Returns whether or not a ticket is being held.
      */
