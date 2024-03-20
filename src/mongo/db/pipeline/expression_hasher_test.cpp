@@ -187,4 +187,21 @@ TEST_F(ExpressionHasherTest, ExpressionsAreNotEqual) {
         ASSERT(list2Hashes.contains(hash));
     }
 }
+
+/**
+ * Here we are testing the following scenario: imagine that we have two identical $expr with let
+ * inside. This will create two identical variable definitions, which are the same except for
+ * variable id field inside ExpressionFieldPath which represents user defined variable (among other
+ * things). We need to make sure that the hash of the both ExpressionFieldPaths are the same and
+ * don't take into account variable id.
+ */
+TEST_F(ExpressionHasherTest, UserVariables) {
+    ctx.variablesParseState.defineVariable("oplogField");
+    auto fp1 = ExpressionFieldPath::parse(&ctx, "$$oplogField", ctx.variablesParseState);
+    ctx.variablesParseState.defineVariable("oplogField");
+    auto fp2 = ExpressionFieldPath::parse(&ctx, "$$oplogField", ctx.variablesParseState);
+
+    ASSERT_EQ(fp1->serialize().getString(), fp2->serialize().getString());
+    ASSERT_EQ(hash(*fp1), hash(*fp2));
+}
 }  // namespace mongo
