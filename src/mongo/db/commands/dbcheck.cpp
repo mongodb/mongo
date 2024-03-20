@@ -52,6 +52,8 @@
 
 #include "mongo/logv2/log.h"
 
+MONGO_FAIL_POINT_DEFINE(sleepAfterExtraIndexKeysHashing);
+
 namespace mongo {
 
 namespace {
@@ -425,6 +427,14 @@ private:
                 // On debug builds, health-log every batch result; on release builds, health-log
                 // every N batches.
                 HealthLogInterface::get(opCtx)->log(*entry);
+            }
+
+            if (MONGO_unlikely(sleepAfterExtraIndexKeysHashing.shouldFail())) {
+                LOGV2_DEBUG(
+                    3083201,
+                    3,
+                    "Sleeping for 1 second due to sleepAfterExtraIndexKeysHashing failpoint");
+                opCtx->sleepFor(Milliseconds(1000));
             }
 
             WriteConcernResult unused;
