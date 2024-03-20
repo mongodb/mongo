@@ -270,6 +270,11 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
         return query_settings::QuerySettings();
     }
 
+    // No query settings for queries with encryption information.
+    if (parsedFind.findCommandRequest->getEncryptionInformation()) {
+        return query_settings::QuerySettings();
+    }
+
     // If query settings are present as part of the request, use them as opposed to performing the
     // query settings lookup. In this case, no check for 'reject' setting will be made.
     if (auto querySettings = parsedFind.findCommandRequest->getQuerySettings()) {
@@ -324,6 +329,11 @@ QuerySettings lookupQuerySettingsForAgg(
     const NamespaceString& nss) {
     // No query settings lookup on internal dbs or system collections in user dbs.
     if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
+
+    // No query settings for queries with encryption information.
+    if (aggregateCommandRequest.getEncryptionInformation()) {
         return query_settings::QuerySettings();
     }
 

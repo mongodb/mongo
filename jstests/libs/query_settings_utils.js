@@ -39,6 +39,7 @@ export class QuerySettingsUtils {
         return {
             aggregate: collectionless ? 1 : this.collName,
             $db: this.db.getName(),
+            cursor: {},
             ...aggregateObj
         };
     }
@@ -53,26 +54,26 @@ export class QuerySettingsUtils {
     /**
      * Return query settings for the current tenant without query hashes.
      */
-    getQuerySettings(opts = {}) {
-        return this.adminDB
-            .aggregate([
-                {$querySettings: opts},
-                {$project: {queryShapeHash: 0}},
-                {$sort: {representativeQuery: 1}},
-            ])
-            .toArray();
+    getQuerySettings({showDebugQueryShape = false,
+                      showQueryShapeHash = false,
+                      filter = undefined} = {}) {
+        const pipeline = [{$querySettings: showDebugQueryShape ? {showDebugQueryShape} : {}}];
+        if (filter) {
+            pipeline.push({$match: filter});
+        }
+        if (!showQueryShapeHash) {
+            pipeline.push({$project: {queryShapeHash: 0}});
+        }
+        pipeline.push({$sort: {representativeQuery: 1}});
+        return this.adminDB.aggregate(pipeline).toArray();
     }
 
     /**
      * Return queryShapeHash for a given query from querySettings.
      */
     getQueryHashFromQuerySettings(representativeQuery) {
-        const settings = this.adminDB
-                             .aggregate([
-                                 {$querySettings: {}},
-                                 {$match: {representativeQuery}},
-                             ])
-                             .toArray();
+        const settings =
+            this.getQuerySettings({showQueryShapeHash: true, filter: {representativeQuery}});
         assert.lte(
             settings.length,
             1,
@@ -163,12 +164,14 @@ export class QuerySettingsUtils {
      * been propagated throughout the cluster.
      */
     withQuerySettings(representativeQuery, settings, runTest) {
-        assert.commandWorked(
-            db.adminCommand({setQuerySettings: representativeQuery, settings: settings}));
-        this.assertQueryShapeConfiguration(
-            [this.makeQueryShapeConfiguration(settings, representativeQuery)]);
+        const queryShapeHash = assert
+                                   .commandWorked(db.adminCommand(
+                                       {setQuerySettings: representativeQuery, settings: settings}))
+                                   .queryShapeHash;
+        assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
         const result = runTest();
-        this.removeAllQuerySettings();
+        assert.commandWorked(db.adminCommand({removeQuerySettings: representativeQuery}));
+        assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
         return result;
     }
 
