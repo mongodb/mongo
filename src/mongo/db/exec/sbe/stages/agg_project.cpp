@@ -47,7 +47,7 @@ AggProjectStage::AggProjectStage(std::unique_ptr<PlanStage> input,
 std::unique_ptr<PlanStage> AggProjectStage::clone() const {
     value::SlotMap<AggExprPair> projects;
     for (auto& [k, v] : _projects) {
-        projects.emplace(k, AggExprPair{v.init ? v.init->clone() : nullptr, v.acc->clone()});
+        projects.emplace(k, AggExprPair{v.init ? v.init->clone() : nullptr, v.agg->clone()});
     }
     return std::make_unique<AggProjectStage>(_children[0]->clone(),
                                              std::move(projects),
@@ -64,7 +64,7 @@ void AggProjectStage::prepare(CompileCtx& ctx) {
         ctx.root = this;
         ctx.aggExpression = true;
         ctx.accumulator = outAccessor.get();
-        auto aggCode = aggExprPair.acc->compile(ctx);
+        auto aggCode = aggExprPair.agg->compile(ctx);
         auto initCode = aggExprPair.init ? aggExprPair.init->compile(ctx) : nullptr;
         _slots.emplace_back(slot);
         _initCodes.emplace_back(std::move(initCode));
@@ -131,7 +131,7 @@ std::unique_ptr<PlanStageStats> AggProjectStage::getStats(bool includeDebugInfo)
         DebugPrinter printer;
         BSONObjBuilder bob;
         value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
-            auto printBlock = expr.acc->debugPrint();
+            auto printBlock = expr.agg->debugPrint();
             if (expr.init) {
                 printBlock.emplace_back(DebugPrinter::Block("init{`"));
                 DebugPrinter::addBlocks(printBlock, expr.init->debugPrint());
@@ -162,7 +162,7 @@ std::vector<DebugPrinter::Block> AggProjectStage::debugPrint() const {
 
         DebugPrinter::addIdentifier(ret, slot);
         ret.emplace_back("=");
-        DebugPrinter::addBlocks(ret, expr.acc->debugPrint());
+        DebugPrinter::addBlocks(ret, expr.agg->debugPrint());
         if (expr.init) {
             ret.emplace_back(DebugPrinter::Block("init{`"));
             DebugPrinter::addBlocks(ret, expr.init->debugPrint());

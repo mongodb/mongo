@@ -679,11 +679,543 @@ export function blockProcessingTestCases(
         {
             name: "GroupWithMixOfProjectedOutField",
             pipeline: [
-                {$project: {_id: 0, x: 1 /* y not included */}},
+                {$project: {_id: 0, x: 1}},  // y not included
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: "$y", a: {$min: "$x"}}},
             ],
             usesBlockProcessing: false
-        }
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByZ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {z: 1}, output: "$w"}},
+                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByZ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {z: 1}, output: "$w", n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByZ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {z: 1}, output: ["$w"]}},
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByZ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByZ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {z: 1}, output: ["$w", "$z"]}},
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByZ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByZ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {z: 1}, output: "$w"}},
+                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByZ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {z: 1}, output: "$w", n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByZ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {z: 1}, output: ["$w"]}},
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByZ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByZ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {z: 1}, output: ["$w", "$z"]}},
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByZ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByZ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {z: 1}, output: "$w"}},
+                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1}, output: "$w", n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByZ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {z: 1}, output: ["$w"]}},
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByZ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {z: 1}, output: ["$w", "$z"]}},
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByZAndW_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: "$w"}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByZAndW_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByZAndW_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByZAndW_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: "$w"}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByZAndW_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByZAndW_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByZAndW_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByZAndW_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: "$w"}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputEmptyArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1}, output: [], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1}, output: [], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputEmptyArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {z: 1, w: -1}, output: [], n: 3}},
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: [], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
     ];
 }

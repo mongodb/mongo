@@ -285,6 +285,23 @@ struct AccumTopBottomNInputs : public Inputs {
     SbExpr sortSpec;
 };
 
+struct AccumBlockTopBottomNInputs : public Inputs {
+    AccumBlockTopBottomNInputs(std::pair<SbExpr::Vector, bool> value,
+                               std::pair<SbExpr::Vector, bool> sortBy,
+                               SbExpr sortSpec)
+        : values(std::move(value.first)),
+          sortBy(std::move(sortBy.first)),
+          sortSpec(std::move(sortSpec)),
+          valueIsArray(value.second),
+          useMK(sortBy.second) {}
+
+    SbExpr::Vector values;
+    SbExpr::Vector sortBy;
+    SbExpr sortSpec;
+    bool valueIsArray = false;
+    bool useMK = false;
+};
+
 struct InitAccumNInputs : public Inputs {
     InitAccumNInputs(SbExpr maxSize, SbExpr isGroupAccum)
         : maxSize(std::move(maxSize)), isGroupAccum(std::move(isGroupAccum)) {}
