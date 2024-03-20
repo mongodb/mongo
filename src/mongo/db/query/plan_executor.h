@@ -292,6 +292,12 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
+     * Releases all storage engine resources that the plan executor has acquired. The plan will be
+     * left in the "saved" state so a call to restoreState() will be necessary afterwards.
+     */
+    void releaseAllAcquiredResources();
+
+    /**
      * Produces the next document from the query execution plan. The caller can request that the
      * executor returns documents by passing a non-null pointer for the 'objOut' output parameter,
      * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'.

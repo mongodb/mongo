@@ -68,6 +68,20 @@ void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
     }
 }
 
+void PlanExecutor::releaseAllAcquiredResources() {
+    auto opCtx = getOpCtx();
+    invariant(opCtx);
+
+    saveState();
+    // Detach + reattach forces us to release all resources back to the storage engine. This is
+    // currently a side-effect of how Storage Engine cursors are implemented in the plans.
+    //
+    // TODO SERVER-87866: See if we can remove this if saveState/restoreState actually release all
+    // resources.
+    detachFromOperationContext();
+    reattachToOperationContext(opCtx);
+}
+
 const CollectionPtr& VariantCollectionPtrOrAcquisition::getCollectionPtr() const {
     return *visit(OverloadedVisitor{
                       [](const CollectionPtr* collectionPtr) { return collectionPtr; },
