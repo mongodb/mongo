@@ -8,11 +8,11 @@
  * ]
  */
 
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     checkHealthLog,
     clearHealthLog,
     forEachNonArbiterNode,
+    insertDocsWithMissingIndexKeys,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
@@ -65,54 +65,12 @@ function getMissingIndexKeysQuery(numMissing) {
     };
 }
 
-// Insert numDocs documents with missing index keys for testing.
-function insertDocsWithMissingIndexKeys(
-    collName, doc, numDocs = 1, doPrimary = true, doSecondary = true) {
-    assert.commandWorked(primaryDb.createCollection(collName));
-
-    // Create an index for every key in the document.
-    let index = {};
-    for (let key in doc) {
-        index[key] = 1;
-        assert.commandWorked(primaryDb[collName].createIndex(index));
-        index = {};
-    }
-    replSet.awaitReplication();
-
-    // dbCheck requires the _id index to iterate through documents in a batch.
-    let skipIndexNewRecordsExceptIdPrimary;
-    let skipIndexNewRecordsExceptIdSecondary;
-    if (doPrimary) {
-        skipIndexNewRecordsExceptIdPrimary =
-            configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
-    }
-    if (doSecondary) {
-        skipIndexNewRecordsExceptIdSecondary =
-            configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
-    }
-    for (let i = 0; i < numDocs; i++) {
-        assert.commandWorked(primaryDb[collName].insert(doc));
-    }
-    replSet.awaitReplication();
-    if (doPrimary) {
-        skipIndexNewRecordsExceptIdPrimary.off();
-    }
-    if (doSecondary) {
-        skipIndexNewRecordsExceptIdSecondary.off();
-    }
-
-    // Verify that index has been replicated to all nodes, including _id index.
-    forEachNonArbiterNode(replSet, function(node) {
-        assert.eq(Object.keys(doc).length + 1, node.getDB(dbName)[collName].getIndexes().length);
-    });
-}
-
 function checkMissingIndexKeys(doc, numDocs = 1, maxDocsPerBatch = 10000) {
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
     // Create indexes and insert docs without inserting corresponding index keys.
-    insertDocsWithMissingIndexKeys(collName, doc, numDocs);
+    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc, numDocs);
 
     runDbCheck(replSet, primary.getDB(dbName), collName, {
         maxDocsPerBatch: maxDocsPerBatch,
@@ -154,10 +112,10 @@ function testMultipleDocsOneInconsistency() {
     primaryDb[collName].drop();
 
     // Insert multiple docs that are consistent.
-    insertDocsWithMissingIndexKeys(collName, doc1, 10, false, false);
+    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 10, false, false);
 
     // Insert one doc that is inconsistent.
-    insertDocsWithMissingIndexKeys(collName, doc1, 1, true, true);
+    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 1, true, true);
 
     runDbCheck(replSet,
                primaryDb,
@@ -179,7 +137,7 @@ function testNoInconsistencies() {
     primaryDb[collName].drop();
 
     // Insert documents without any inconsistencies.
-    insertDocsWithMissingIndexKeys(collName, doc1, 2, false, false);
+    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 2, false, false);
 
     runDbCheck(replSet,
                primaryDb,
@@ -201,7 +159,7 @@ function testPrimaryOnly() {
     primaryDb[collName].drop();
 
     // Insert a document that has missing index keys on the primary only.
-    insertDocsWithMissingIndexKeys(collName, doc1, 1, true, false);
+    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 1, true, false);
     replSet.awaitReplication();
 
     runDbCheck(replSet,
@@ -227,7 +185,7 @@ function testSecondaryOnly() {
     primaryDb[collName].drop();
 
     // Insert a document that has missing index keys on the secondary only.
-    insertDocsWithMissingIndexKeys(collName, doc1, 1, false, true);
+    insertDocsWithMissingIndexKeys(replSet, dbName, collName, doc1, 1, false, true);
     replSet.awaitReplication();
 
     runDbCheck(replSet,

@@ -801,7 +801,9 @@ unsigned int batchesProcessed = 0;
 
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
-                               const DbCheckOplogBatch& entry) {
+                               const DbCheckOplogBatch& entry,
+                               BSONObj batchStart,
+                               BSONObj batchEnd) {
     const auto msg = "replication consistency check";
 
     // Set up the hasher,
@@ -1027,10 +1029,57 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                                auth::ValidatedTenancyScope::get(opCtx),
                                entry.getTid(),
                                SerializationContext::stateDefault());
+    auto skipDbCheck = mode != OplogApplication::Mode::kSecondary;
+    auto severity = skipDbCheck ? SeverityEnum::Warning : SeverityEnum::Info;
+    std::string oplogApplicationMode;
+    if (mode == OplogApplication::Mode::kInitialSync) {
+        oplogApplicationMode = "initial sync";
+    } else if (mode == OplogApplication::Mode::kUnstableRecovering) {
+        oplogApplicationMode = "unstable recovering";
+    } else if (mode == OplogApplication::Mode::kStableRecovering) {
+        oplogApplicationMode = "stable recovering";
+    } else if (mode == OplogApplication::Mode::kApplyOpsCmd) {
+        oplogApplicationMode = "applyOps";
+    } else {
+        oplogApplicationMode = "secondary";
+    }
     switch (type) {
         case OplogEntriesEnum::Batch: {
             const auto invocation = DbCheckOplogBatch::parse(ctx, cmd);
-            return dbCheckBatchOnSecondary(opCtx, opTime, invocation);
+
+            // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
+            // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
+            // be used as batchStart.
+            BSONObj batchStart, batchEnd;
+            if (!invocation.getBatchStart()) {
+                batchStart = BSON("_id" << invocation.getMinKey().elem());
+            } else {
+                batchStart = invocation.getBatchStart().get();
+            }
+            if (!invocation.getBatchEnd()) {
+                batchEnd = BSON("_id" << invocation.getMaxKey().elem());
+            } else {
+                batchEnd = invocation.getBatchEnd().get();
+            }
+
+            if (!skipDbCheck) {
+                return dbCheckBatchOnSecondary(opCtx, opTime, invocation, batchStart, batchEnd);
+            }
+
+            BSONObjBuilder data;
+            data.append("batchStart", batchStart);
+            data.append("batchEnd", batchEnd);
+            auto healthLogEntry = mongo::dbCheckHealthLogEntry(
+                invocation.getNss(),
+                boost::none /*collectionUUID*/,
+                SeverityEnum::Warning,
+                "cannot execute dbcheck due to ongoing " + oplogApplicationMode,
+                ScopeEnum::Cluster,
+                type,
+                data.obj());
+            HealthLogInterface::get(Client::getCurrent()->getServiceContext())
+                ->log(*healthLogEntry);
+            return Status::OK();
         }
         case OplogEntriesEnum::Collection: {
             // TODO SERVER-61963.
@@ -1040,13 +1089,14 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             [[fallthrough]];
         case OplogEntriesEnum::Stop:
             const auto invocation = DbCheckOplogStartStop::parse(ctx, cmd);
-            auto healthLogEntry = mongo::dbCheckHealthLogEntry(boost::none /*nss*/,
-                                                               boost::none /*collectionUUID*/,
-                                                               SeverityEnum::Info,
-                                                               "",
-                                                               ScopeEnum::Cluster,
-                                                               type,
-                                                               boost::none /*data*/);
+            auto healthLogEntry = mongo::dbCheckHealthLogEntry(
+                boost::none /*nss*/,
+                boost::none /*collectionUUID*/,
+                severity,
+                skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
+                ScopeEnum::Cluster,
+                type,
+                boost::none /*data*/);
             const auto secondaryIndexCheckParameters =
                 invocation.getSecondaryIndexCheckParameters();
             if (secondaryIndexCheckParameters) {

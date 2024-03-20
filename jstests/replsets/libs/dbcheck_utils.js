@@ -1,6 +1,7 @@
 /**
  * Contains helper functions for testing dbCheck.
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const logQueries = {
@@ -29,6 +30,8 @@ export const logQueries = {
         severity: "warning",
         "msg": "abandoning dbCheck extra index keys check because index no longer exists"
     },
+    duringInitialSyncQuery:
+        {severity: "warning", "msg": "cannot execute dbcheck due to ongoing initial sync"},
     errorQuery: {"severity": "error"},
     warningQuery: {"severity": "warning"},
     infoOrErrorQuery:
@@ -152,6 +155,52 @@ export const resetAndInsertIdentical = (replSet, db, collName, nDocs) => {
     replSet.awaitReplication();
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
 };
+
+// Insert numDocs documents with missing index keys for testing.
+export const insertDocsWithMissingIndexKeys =
+    (replSet, dbName, collName, doc, numDocs = 1, doPrimary = true, doSecondary = true) => {
+        const primaryDb = replSet.getPrimary().getDB(dbName);
+        const secondaryDb = replSet.getSecondary().getDB(dbName);
+
+        assert.commandWorked(primaryDb.createCollection(collName));
+
+        // Create an index for every key in the document.
+        let index = {};
+        for (let key in doc) {
+            index[key] = 1;
+            assert.commandWorked(primaryDb[collName].createIndex(index));
+            index = {};
+        }
+        replSet.awaitReplication();
+
+        // dbCheck requires the _id index to iterate through documents in a batch.
+        let skipIndexNewRecordsExceptIdPrimary;
+        let skipIndexNewRecordsExceptIdSecondary;
+        if (doPrimary) {
+            skipIndexNewRecordsExceptIdPrimary =
+                configureFailPoint(primaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+        }
+        if (doSecondary) {
+            skipIndexNewRecordsExceptIdSecondary =
+                configureFailPoint(secondaryDb, "skipIndexNewRecords", {skipIdIndex: false});
+        }
+        for (let i = 0; i < numDocs; i++) {
+            assert.commandWorked(primaryDb[collName].insert(doc));
+        }
+        replSet.awaitReplication();
+        if (doPrimary) {
+            skipIndexNewRecordsExceptIdPrimary.off();
+        }
+        if (doSecondary) {
+            skipIndexNewRecordsExceptIdSecondary.off();
+        }
+
+        // Verify that index has been replicated to all nodes, including _id index.
+        forEachNonArbiterNode(replSet, function(node) {
+            assert.eq(Object.keys(doc).length + 1,
+                      node.getDB(dbName)[collName].getIndexes().length);
+        });
+    }
 
 // Run dbCheck with given parameters and potentially wait for completion.
 export const runDbCheck = (replSet,
