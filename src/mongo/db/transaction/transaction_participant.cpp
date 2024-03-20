@@ -1343,6 +1343,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     _ruState = shard_role_details::getWriteUnitOfWork(opCtx)->release();
     shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
 
+    CurOp::get(opCtx)->updateStatsOnTransactionStash();
     _locker = shard_role_details::swapLocker(
         opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), wl);
     _locker->releaseTicket();
@@ -1446,6 +1447,7 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // is just an empty locker. At the end of the operation, if the transaction is not complete, we
     // will stash the operation context's locker and replace it with a new empty locker.
     shard_role_details::swapLocker(opCtx, std::move(_locker), lk);
+    CurOp::get(opCtx)->updateStatsOnTransactionUnstash();
     shard_role_details::getLocker(opCtx)->updateThreadIdToCurrentThread();
 
     auto oldState = shard_role_details::setRecoveryUnit(

@@ -194,7 +194,7 @@ private:
         if (_top) {
             auto locker = shard_role_details::getLocker(opCtx());
             curOp->_lockStatsBase = locker->getLockerInfo(boost::none).stats;
-            curOp->_ticketWaitTimeAtStart = locker->getTimeQueuedForTicketMicros();
+            curOp->_ticketWaitBase = locker->getTimeQueuedForTicketMicros();
         }
 
         _top = curOp;
@@ -420,6 +420,31 @@ ProgressMeter& CurOp::setProgress_inlock(StringData message,
     return _progressMeter.value();
 }
 
+void CurOp::updateStatsOnTransactionUnstash() {
+    // Store lock stats and ticket wait times from the locker after unstashing. These stats have
+    // accrued outside of this CurOp instance so we will ignore/subtract them when reporting on this
+    // operation.
+    auto locker = shard_role_details::getLocker(opCtx());
+    _lockStatsBase = locker->getLockerInfo(boost::none).stats;
+    _ticketWaitBase = locker->getTimeQueuedForTicketMicros() +
+        Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
+}
+
+void CurOp::updateStatsOnTransactionStash() {
+    // Store lock stats and ticket wait times that happened during this operation before locker is
+    // stashed. We take the delta of locker stats before stashing and the base stats which includes
+    // the snapshot of locker stats when it was unstashed. This stats delta on stashing is added
+    // when reporting on this operation.
+    auto locker = shard_role_details::getLocker(opCtx());
+
+    _lockStatsOnceStashed = locker->getLockerInfo(_lockStatsBase).stats;
+    _lockStatsBase = {};
+
+    _ticketWaitWhenStashed = locker->getTimeQueuedForTicketMicros() +
+        Microseconds(locker->getFlowControlStats().timeAcquiringMicros) - _ticketWaitBase;
+    _ticketWaitBase = Microseconds(0);
+}
+
 void CurOp::setNS_inlock(NamespaceString nss) {
     _nss = std::move(nss);
 }
@@ -440,6 +465,9 @@ TickSource::Tick CurOp::startTime() {
         _cpuTimer->start();
     }
 
+    _debug.waitForTicketDurationMillis = duration_cast<Milliseconds>(
+        shard_role_details::getLocker(opCtx())->getTimeQueuedForTicketMicros() - _ticketWaitBase +
+        _ticketWaitWhenStashed);
     _blockedTimeAtStart = _sumBlockedTimeTotal();
 
     // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
@@ -474,12 +502,16 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
 }
 
 Milliseconds CurOp::_sumBlockedTimeTotal() {
-    auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(_lockStatsBase);
+    auto locker = shard_role_details::getLocker(opCtx());
+    auto lockStats = locker->getLockerInfo(_lockStatsBase).stats;
+
     auto waitForTickets = _debug.waitForTicketDurationMillis +
-        duration_cast<Milliseconds>(Microseconds(
-            shard_role_details::getLocker(opCtx())->getFlowControlStats().timeAcquiringMicros));
+        duration_cast<Milliseconds>(
+                              Microseconds(locker->getFlowControlStats().timeAcquiringMicros));
+    lockStats.append(_lockStatsOnceStashed);
+
     auto waitForLocks =
-        duration_cast<Milliseconds>(Microseconds(lockerInfo.stats.getCumulativeWaitTimeMicros()));
+        duration_cast<Milliseconds>(Microseconds(lockStats.getCumulativeWaitTimeMicros()));
 
     return waitForTickets + waitForLocks;
 }
@@ -545,8 +577,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     // CurOpStack. The precise time queued for tickets of a sub-operation is the ticket wait time
     // from the locker minus the ticket wait time taken when this operation started.
     _debug.waitForTicketDurationMillis = duration_cast<Milliseconds>(
-        shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros() -
-        _ticketWaitTimeAtStart);
+        shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros() - _ticketWaitBase +
+        _ticketWaitWhenStashed);
 
     auto totalBlockedTime = _sumBlockedTimeTotal() - _blockedTimeAtStart;
     // TODO SERVER-86069: Uncomment the below invariant
@@ -592,6 +624,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     if (forceLog || shouldLogSlowOp) {
         auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(_lockStatsBase);
+        lockerInfo.stats.append(_lockStatsOnceStashed);
         if (_debug.storageStats == nullptr &&
             shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
             opCtx->getServiceContext()->getStorageEngine()) {
@@ -1688,6 +1721,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("locks", [](auto field, auto args, auto& b) {
         auto lockerInfo =
             shard_role_details::getLocker(args.opCtx)->getLockerInfo(args.curop.getLockStatsBase());
+        // TODO SERVER-88195: Account for _lockStatsOnceStashed
         BSONObjBuilder locks(b.subobjStart(field));
         lockerInfo.stats.report(&locks);
     });

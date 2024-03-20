@@ -555,12 +555,12 @@ public:
         return getLockMode(resourceIdReplicationStateTransitionLock) == MODE_X;
     }
 
-    void setTicketQueueTime(Milliseconds queueTime) {
-        _timeQueuedForTicketMicros = duration_cast<Microseconds>(queueTime);
+    void addTicketQueueTime(Milliseconds queueTime) {
+        _timeQueuedForTicketMicros += duration_cast<Microseconds>(queueTime);
     }
 
-    void setFlowControlTicketQueueTime(Milliseconds queueTime) {
-        _flowControlStats.timeAcquiringMicros =
+    void addFlowControlTicketQueueTime(Milliseconds queueTime) {
+        _flowControlStats.timeAcquiringMicros +=
             durationCount<Microseconds>(duration_cast<Microseconds>(queueTime));
     }
 
