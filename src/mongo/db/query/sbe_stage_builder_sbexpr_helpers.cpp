@@ -276,6 +276,14 @@ SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage)
     return abt::wrap(stage_builder::makeABTFail(error, errorMessage));
 }
 
+SbExpr SbExprBuilder::makeFillEmpty(SbExpr expr, SbExpr altExpr) {
+    if (hasABT(expr) && hasABT(altExpr)) {
+        return abt::wrap(stage_builder::makeFillEmpty(extractABT(expr), extractABT(altExpr)));
+    } else {
+        return stage_builder::makeFillEmpty(extractExpr(expr), extractExpr(altExpr));
+    }
+}
+
 SbExpr SbExprBuilder::makeFillEmptyFalse(SbExpr expr) {
     if (hasABT(expr)) {
         return abt::wrap(stage_builder::makeFillEmptyFalse(extractABT(expr)));

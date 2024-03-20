@@ -78,6 +78,8 @@ inline auto makeABTConstant(StringData str) {
     return makeABTConstant(tag, value);
 }
 
+optimizer::ABT makeFillEmpty(optimizer::ABT expr, optimizer::ABT altExpr);
+
 /**
  * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
  * expression.

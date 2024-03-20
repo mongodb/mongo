@@ -234,6 +234,9 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
  */
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);
 
+std::unique_ptr<sbe::EExpression> makeFillEmpty(std::unique_ptr<sbe::EExpression> expr,
+                                                std::unique_ptr<sbe::EExpression> altExpr);
+
 /**
  * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
  * expression.

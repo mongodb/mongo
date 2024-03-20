@@ -81,10 +81,6 @@ public:
         return _opName;
     }
 
-    bool countAddendIsIntegerOrDouble() const {
-        return _countAddendIsIntegerOrDouble;
-    }
-
     /**
      * This method returns the number of agg expressions that need to be generated for this
      * Op.
@@ -184,10 +180,6 @@ private:
 
     // Info about the specific accumulation op named by '_opName'.
     const OpInfo* _opInfo = nullptr;
-
-    // Flag that indicates if this is a "$sum" op whose input is an integer constant or a
-    // double constant.
-    bool _countAddendIsIntegerOrDouble = false;
 };
 
 extern const StringData kCount;

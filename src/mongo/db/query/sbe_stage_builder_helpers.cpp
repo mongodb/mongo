@@ -257,6 +257,11 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
         sbe::makeS<sbe::CoScanStage>(planNodeId), makeInt64Constant(limit), nullptr, planNodeId);
 }
 
+std::unique_ptr<sbe::EExpression> makeFillEmpty(std::unique_ptr<sbe::EExpression> expr,
+                                                std::unique_ptr<sbe::EExpression> altExpr) {
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(expr), std::move(altExpr));
+}
+
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
 }

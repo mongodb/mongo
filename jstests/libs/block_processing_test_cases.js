@@ -24,6 +24,30 @@ export function blockProcessingTestCases(
             usesBlockProcessing: sbeFullEnabled
         },
         {
+            name: "Count",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$count: "count"},
+                {$project: {_id: 1, count: 1}}
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "Count_FilterHalf",
+            pipeline: [
+                {
+                    $match: {
+                        [timeFieldName]: {
+                            $lt: new Date((dateLowerBound.getTime() + dateUpperBound.getTime()) / 2)
+                        }
+                    }
+                },
+                {$count: "count"},
+                {$project: {_id: 1, count: 1}}
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
             name: "GroupByNull_MinWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},

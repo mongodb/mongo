@@ -102,6 +102,11 @@ SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
     return SbExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
 }
 
+optimizer::ABT makeFillEmpty(optimizer::ABT expr, optimizer::ABT altExpr) {
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::FillEmpty, std::move(expr), std::move(altExpr));
+}
+
 optimizer::ABT makeFillEmptyFalse(optimizer::ABT e) {
     return optimizer::make<optimizer::BinaryOp>(
         optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::boolean(false));

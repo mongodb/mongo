@@ -147,6 +147,7 @@ public:
 
     SbExpr makeFail(ErrorCodes::Error error, StringData errorMessage);
 
+    SbExpr makeFillEmpty(SbExpr expr, SbExpr altExpr);
     SbExpr makeFillEmptyFalse(SbExpr expr);
     SbExpr makeFillEmptyTrue(SbExpr expr);
     SbExpr makeFillEmptyNull(SbExpr expr);

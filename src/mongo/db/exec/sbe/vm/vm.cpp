@@ -1801,31 +1801,20 @@ std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState() {
     return {accTag, accValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value>
-ByteCode::builtinConvertPartialCountSumToDoubleDoubleSum(ArityType arity) {
-    auto [_, partialCountSumTag, partialCountSumValue] = getFromStack(1);
-    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
-    // state we are free to do any in-place update as we see fit.
-    auto [accTag, accValue] = moveOwnedFromStack(0);
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConvertSimpleSumToDoubleDoubleSum(
+    ArityType arity) {
+    invariant(arity == 1);
 
-    // Initialize a DoubleDoubleSum array, if necessary (that is, if on the first call to this
-    // function, we are merging two simple sums).
-    if (accTag == value::TypeTags::Nothing) {
-        std::tie(accTag, accValue) = initializeDoubleDoubleSumState();
-    } else if (value::isNumber(accTag)) {
-        auto [newArrTag, newArrValue] = initializeDoubleDoubleSumState();
-        value::ValueGuard guard{newArrTag, newArrValue};
-        aggDoubleDoubleSumImpl(value::getArrayView(newArrValue), accTag, accValue);
-        std::tie(accTag, accValue) = std::tie(newArrTag, newArrValue);
-        guard.reset();
-    }
+    auto [accTag, accVal] = initializeDoubleDoubleSumState();
+    value::ValueGuard accGuard{accTag, accVal};
+    value::Array* accumulator = value::getArrayView(accVal);
 
-    value::ValueGuard guard{accTag, accValue};
-    tassert(7720308, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
-    tassert(7720309, "The input value must be numeric", value::isNumber(partialCountSumTag));
-    aggDoubleDoubleSumImpl(value::getArrayView(accValue), partialCountSumTag, partialCountSumValue);
-    guard.reset();
-    return {true, accTag, accValue};
+    auto [_, simpleSumTag, simpleSumVal] = getFromStack(0);
+
+    aggDoubleDoubleSumImpl(accumulator, simpleSumTag, simpleSumVal);
+
+    accGuard.reset();
+    return {true, accTag, accVal};
 }
 
 template <bool merging>
@@ -1868,10 +1857,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
     ArityType arity) {
     auto [_, fieldTag, fieldValue] = getFromStack(0);
 
-    // For a count-like accumulator like {$sum: 1}, we use aggSum instruction. In this case, the
-    // result type is guaranteed to be either 'NumberInt32', 'NumberInt64', or 'NumberDouble'. We
-    // should transform the scalar result into an array which is the over-the-wire data format from
-    // a shard to a merging side.
+    // For {$sum: 1}, we use aggSum instruction. In this case, the result type is guaranteed to be
+    // either 'NumberInt32', 'NumberInt64', or 'NumberDouble'. We should transform the scalar result
+    // into an array which is the over-the-wire data format from a shard to a merging side.
     if (fieldTag == value::TypeTags::NumberInt32 || fieldTag == value::TypeTags::NumberInt64 ||
         fieldTag == value::TypeTags::NumberDouble) {
         auto [tag, val] = value::makeNewArray();
@@ -9434,7 +9422,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
         case Builtin::convertSimpleSumToDoubleDoubleSum:
-            return builtinConvertPartialCountSumToDoubleDoubleSum(arity);
+            return builtinConvertSimpleSumToDoubleDoubleSum(arity);
         case Builtin::aggDoubleDoubleSum:
             return builtinAggDoubleDoubleSum<false /*merging*/>(arity);
         case Builtin::doubleDoubleSumFinalize:

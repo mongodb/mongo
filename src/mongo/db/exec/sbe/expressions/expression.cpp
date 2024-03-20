@@ -643,7 +643,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::doubleDoubleSum, false}},
     {"convertSimpleSumToDoubleDoubleSum",
      BuiltinFn{
-         [](size_t n) { return n == 1; }, vm::Builtin::convertSimpleSumToDoubleDoubleSum, true}},
+         [](size_t n) { return n == 1; }, vm::Builtin::convertSimpleSumToDoubleDoubleSum, false}},
     {"aggDoubleDoubleSum",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggDoubleDoubleSum, true}},
     {"aggMergeDoubleDoubleSums",

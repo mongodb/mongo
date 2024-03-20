@@ -350,12 +350,14 @@ SbExpr::Vector generateGroupByKeyExprs(StageBuilderState& state,
 
 std::variant<Expression*, BSONElement> getTopBottomNValueExprHelper(
     const AccumulationStatement& accStmt) {
+    auto accOp = Accum::Op{accStmt};
+
     auto expObj = dynamic_cast<ExpressionObject*>(accStmt.expr.argument.get());
     auto expConst =
         !expObj ? dynamic_cast<ExpressionConstant*>(accStmt.expr.argument.get()) : nullptr;
 
     tassert(5807015,
-            str::stream() << accStmt.expr.name << " accumulator must have an object argument",
+            str::stream() << accOp.getOpName() << " accumulator must have an object argument",
             expObj || (expConst && expConst->getValue().isObject()));
 
     if (expObj) {
@@ -374,7 +376,7 @@ std::variant<Expression*, BSONElement> getTopBottomNValueExprHelper(
     }
 
     tasserted(5807016,
-              str::stream() << accStmt.expr.name
+              str::stream() << accOp.getOpName()
                             << " accumulator must have an output field in the argument");
 }
 

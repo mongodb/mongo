@@ -1783,7 +1783,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinConvertPartialCountSumToDoubleDoubleSum(
+    FastTuple<bool, value::TypeTags, value::Value> builtinConvertSimpleSumToDoubleDoubleSum(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     // The template parameter is false for a regular DoubleDouble summation and true if merging
