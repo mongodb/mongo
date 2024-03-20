@@ -31,7 +31,10 @@ function setUpAllScenarios(st) {
 
 let shardingScenarios = {
     singleShard: {
-        compatibleCollections: [shardedCollName, unshardedCollName],
+        // Can't test unsharded collections because SERVER-86583 makes reads on unsharded collection
+        // on sharded clusters throw conflicts when reading at a point-in-time earlier than the its
+        // latest local catalog ddl.
+        compatibleCollections: [shardedCollName],
         setUp: function() {
             const st = new ShardingTest({
                 mongos: 1,

@@ -323,4 +323,72 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     }
 }
 
+// Tests non-transaction reads with readConcern snapshot + atClusterTime.
+{
+    function runTest(command) {
+        jsTest.log("Running non-txn snapshot read with command: " + command);
+
+        const db = st.s.getDB('test');
+        const coll = db['sharded'];
+
+        assert.commandWorked(st.s.getDB(db.getName()).dropDatabase());
+        assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
+        assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {x: 0}}));
+        assert.commandWorked(st.s.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {x: -1},
+            to: st.shard0.shardName,
+            _waitForDelete: true
+        }));
+        assert.commandWorked(st.s.adminCommand({
+            moveChunk: coll.getFullName(),
+            find: {x: 1},
+            to: st.shard1.shardName,
+            _waitForDelete: true
+        }));
+
+        assert.commandWorked(coll.insertMany([{x: -1, a: 'sharded'}, {x: 1, a: 'sharded'}]));
+
+        // Get a clusterTime inclusive of the above inserts, but not inclusive of the
+        // drop-and-recreate operation that will follow.
+        const clusterTimeBeforeDropAndRecreateAsUnsharded =
+            db.getMongo().getClusterTime().clusterTime;
+
+        // Drop and recreate
+        assert(coll.drop());
+        assert.commandWorked(coll.insert({x: 0, a: 'unsharded'}));
+
+        // Make sure the router is aware of the new post-drop routing table for 'coll'.
+        assert.eq(1, coll.find().itcount());
+
+        // Read with snapshot readConcern and atClusterTime set at that clusterTime. Expect a
+        // conflict to be thrown.
+        let cmdResponse;
+        if (command == 'find') {
+            cmdResponse = coll.runCommand({
+                find: coll.getName(),
+                readConcern:
+                    {level: 'snapshot', atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded}
+            });
+        } else if (command == 'aggregate') {
+            cmdResponse = coll.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [],
+                cursor: {},
+                readConcern:
+                    {level: 'snapshot', atClusterTime: clusterTimeBeforeDropAndRecreateAsUnsharded}
+            });
+        }
+
+        assert.commandFailedWithCode(
+            cmdResponse, [ErrorCodes.SnapshotUnavailable, ErrorCodes.StaleChunkHistory]);
+    }
+
+    ['find',
+     'aggregate']
+        .forEach(command => {
+            runTest(command);
+        });
+}
+
 st.stop();

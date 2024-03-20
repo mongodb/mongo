@@ -1477,6 +1477,13 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
+    const auto receivedShardVersion{
+        OperationShardingState::get(opCtx).getShardVersion(_autoCollForRead.getNss())};
+    if (receivedShardVersion == ShardVersion::UNSHARDED()) {
+        auto_get_collection::checkLocalCatalogIsValidForUnshardedShardVersion(
+            opCtx, *catalog, _autoCollForRead.getCollection(), _autoCollForRead.getNss());
+    }
+
     checkCollectionUUIDMismatch(opCtx,
                                 catalog,
                                 _autoCollForRead.getNss(),
