@@ -7,6 +7,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
@@ -142,6 +143,16 @@ for (let [scenarioName, scenario] of Object.entries(shardingScenarios)) {
             for (let i = 0; st['rs' + i] !== undefined; i++) {
                 st['rs' + i].awaitLastOpCommitted();
             }
+        }
+
+        // TODO SERVER-77915: remove once 8.0 becomes last-lts
+        if (!FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation") &&
+            collName == unshardedCollName) {
+            // Skip testing with untracked unsharded collections because reads at a point-in-time
+            // earlier than the latest catalog change (including index DDL) will throw conflicts.
+            jsTestLog('Skip unsharded collection scenario');
+            st.stop();
+            return;
         }
 
         // Pass the same DB handle as "primaryDB" and "secondaryDB" params; the test functions will
