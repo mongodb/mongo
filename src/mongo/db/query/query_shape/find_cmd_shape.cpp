@@ -256,7 +256,11 @@ QueryShapeHash FindCmdShape::sha256Hash(OperationContext*, const SerializationCo
 
     // Write small or typically empty "find" command shape parts to the buffer.
     findCommandShapeBuffer.appendStr(FindCommandRequest::kCommandName, false /*includeEndingNull*/);
-    findCommandShapeBuffer.appendNum(components.optionalArgumentsEncoding());
+
+    // Append bits corresponding to the optional command parameter values and a one bit indicator
+    // whether the command specification includes a namespace or a UUID of a collection.
+    findCommandShapeBuffer.appendNum(components.optionalArgumentsEncoding() << 1 |
+                                     (nssOrUUID.isNamespaceString() ? 1 : 0));
     auto nssDataRange = nssOrUUID.asDataRange();
     findCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
     findCommandShapeBuffer.appendBuf(components.min.objdata(), components.min.objsize());

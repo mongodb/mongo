@@ -272,7 +272,7 @@ testQuerySettingsParameterized({
     }
 
     const query = qsutils.makeFindQueryInstance({filter: {b: 1}});
-    const queryShapeHash = "258FB48FDF9262600FC7CF932BB7DC6082121B469CE6BD9C9C43BAE84621AA61";
+    const queryShapeHash = "7F312F79FC0C37F532CBB024677C8D15641A290DA4F122B05BC5AE077CB314A7";
     const initialSettings = {queryFramework: "classic"};
     const finalSettings = {...initialSettings, reject: true};
 

@@ -285,8 +285,8 @@ TEST_F(FindCmdShapeTest, SizeOfShapeWithAndWithoutCollation) {
 }
 
 TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
-    auto makeTemplateFindCommandRequest = []() {
-        auto findCommandRequest = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    auto makeTemplateFindCommandRequest = [](NamespaceStringOrUUID nsOrUUID) {
+        auto findCommandRequest = std::make_unique<FindCommandRequest>(std::move(nsOrUUID));
         findCommandRequest->setFilter(BSON("a" << 1));
         findCommandRequest->setSort(BSON("b" << 1));
         findCommandRequest->setProjection(BSON("c" << 1));
@@ -309,13 +309,13 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
     // Hexadecimal form of the SHA256 hash value of the template "find" command produced by
     // 'makeTemplateFindCommandRequest()'.
     const std::string templateHashValue{
-        "01FDD9B676E40546066F183D0CDB74A0FE8CDF0C2CEE5FB7144CD14BCE8C5763"};
+        "BFC747604CE59A4865F7298E12A913762EABA3E6DDB94C273EC4A11878AF1A76"};
 
     // Verify value of the SHA256 hash of the "find" command shape - it must not change over
     // versions, and should not depend on the execution platform.
     {
         auto parsedFind = uassertStatusOK(
-            parsed_find_command::parse(_expCtx, {makeTemplateFindCommandRequest()}));
+            parsed_find_command::parse(_expCtx, {makeTemplateFindCommandRequest(kDefaultTestNss)}));
         auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
         auto shapeHash = findCommandShape->sha256Hash(nullptr, SerializationContext{});
         ASSERT_EQ(templateHashValue, shapeHash.toHexString());
@@ -364,7 +364,7 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
                                                       modifyMaxFn,
                                                       modifyLetFn,
                                                       modifyAttributesFn}) {
-        auto findCommandRequest = makeTemplateFindCommandRequest();
+        auto findCommandRequest = makeTemplateFindCommandRequest(kDefaultTestNss);
         findCommandRequestModificationFunc(*findCommandRequest);
         auto parsedFind =
             uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(findCommandRequest)}));
@@ -376,6 +376,33 @@ TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
         ASSERT_NE(templateHashValue, shapeHash.toHexString())
             << findCommandShape->toFindCommandRequest()->toBSON(BSONObj{}).toString();
     }
+
+    // Verify that the "find" command shape includes information if the collection of the command is
+    // specified as a namespace or a collection UUID.
+    NamespaceString testNamespace =
+        NamespaceString::createNamespaceString_forTest("db.coll789ABCDEF");
+    auto findCommandShapeHashForCollectionAsUUID = [&]() {
+        // Build the collection UUID from the same byte array as the namespace.
+        const auto collectionUUID = UUID::fromCDR(testNamespace.asDataRange());
+        auto findCommandRequest = makeTemplateFindCommandRequest(NamespaceStringOrUUID{
+            DatabaseName::createDatabaseName_forTest(boost::none, "any"), collectionUUID});
+        auto parsedFind =
+            uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(findCommandRequest)}));
+        auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+        return findCommandShape->sha256Hash(nullptr, SerializationContext{});
+    }();
+
+    auto findCommandShapeHashForCollectionAsNamespace = [&]() {
+        auto findCommandRequest =
+            makeTemplateFindCommandRequest(NamespaceStringOrUUID{testNamespace});
+        auto parsedFind =
+            uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(findCommandRequest)}));
+        auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+        return findCommandShape->sha256Hash(nullptr, SerializationContext{});
+    }();
+
+    ASSERT_NE(findCommandShapeHashForCollectionAsUUID.toHexString(),
+              findCommandShapeHashForCollectionAsNamespace.toHexString());
 }
 }  // namespace
 
