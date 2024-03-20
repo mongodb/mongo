@@ -28,6 +28,10 @@ TimeseriesTest.run(() => {
         assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), x: i}));
     }
 
-    assert.commandWorked(db.runCommand({compact: coll.getName(), force: true}));
-    assert.commandWorked(db.runCommand({compact: "system.buckets." + coll.getName(), force: true}));
+    // The compact command can be successful or interrupted because of cache pressure or
+    // concurrent calls to compact.
+    let res = db.runCommand({compact: coll.getName(), force: true});
+    assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
+    res = db.runCommand({compact: "system.buckets." + coll.getName(), force: true});
+    assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
 });

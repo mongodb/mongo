@@ -38,8 +38,10 @@ export const $config = (function() {
         function compact(db, collName) {
             let res = db.runCommand({compact: collName, force: true});
             if (!isEphemeral(db)) {
-                assert.commandWorked(res);
+                assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
             } else {
+                // The compact command can be successful or interrupted because of cache pressure or
+                // concurrent calls to compact.
                 assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
             }
         }

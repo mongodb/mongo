@@ -39,7 +39,8 @@ export const $config = (function() {
     function runCompact(db, config) {
         let res = db.runCommand(config);
 
-        // The compact command can be successful or interrupted because of cache pressure.
+        // The compact command can be successful or interrupted because of cache pressure or
+        // concurrent calls to compact.
         assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
     }
 

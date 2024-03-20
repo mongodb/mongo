@@ -173,9 +173,12 @@ lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, 0, 1);
 // Compact
 // Use force:true in case we're in replset.
 var commandResult = testDB.runCommand({compact: testColl.getName(), force: true});
-// If storage engine supports compact, it should count as a command.
+// The storage engine may not support compact or if it does, it can be interrupted because of cache
+// pressure or concurrent calls to compact.
 if (!commandResult.ok) {
-    assert.commandFailedWithCode(commandResult, ErrorCodes.CommandNotSupported);
+    assert.commandFailedWithCode(commandResult,
+                                 [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted],
+                                 tojson(commandResult));
 }
 lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, 0, 1);
 

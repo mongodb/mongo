@@ -1598,8 +1598,7 @@ StatusWith<int64_t> WiredTigerRecordStore::doCompact(OperationContext* opCtx,
 
     if (ret == EBUSY) {
         return Status(ErrorCodes::Interrupted,
-                      str::stream() << "Compaction interrupted on " << getURI()
-                                    << " due to cache eviction pressure");
+                      str::stream() << "Compaction interrupted on " << getURI());
     }
     invariantWTOK(ret, s);
 

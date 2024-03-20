@@ -110,8 +110,12 @@ function runTest(badViewDefinition) {
     if (runningOnMongos || storageEngine === "inMemory") {
         print("Not testing compact command on mongos or ephemeral storage engine");
     } else {
-        assert.commandWorked(viewsDB.runCommand({compact: "collection", force: true}),
-                             makeErrorMessage("compact"));
+        // The compact command can be successful or interrupted because of cache pressure or
+        // concurrent calls to compact.
+        assert.commandWorkedOrFailedWithCode(
+            viewsDB.runCommand({compact: "collection", force: true}),
+            ErrorCodes.Interrupted,
+            makeErrorMessage("compact"));
     }
 
     assert.commandWorked(

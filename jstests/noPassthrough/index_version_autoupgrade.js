@@ -108,10 +108,10 @@ testIndexVersionAutoUpgrades(function(coll) {
     var res = coll.getDB().runCommand({compact: coll.getName()});
     if (res.ok === 0) {
         // Ephemeral storage engines don't support the "compact" command. The existing indexes
-        // should remain unchanged.
-        assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
-    } else {
-        assert.commandWorked(res);
+        // should remain unchanged. Also, it's possible for compact to be interrupted due to cache
+        // pressure or concurrent compact calls.
+        assert.commandFailedWithCode(
+            res, [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted], tojson(res));
     }
     return coll;
 }, false);

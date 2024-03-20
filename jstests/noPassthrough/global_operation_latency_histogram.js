@@ -140,9 +140,12 @@ function runTests(testDB, isMongos) {
 
     // Compact
     const commandResult = testDB.runCommand({compact: testColl.getName()});
-    // If storage engine supports compact, it should count as a command.
+    // The storage engine may not support compact or if it does, it can be interrupted because of
+    // cache pressure or concurrent calls to compact.
     if (!commandResult.ok) {
-        assert.commandFailedWithCode(commandResult, ErrorCodes.CommandNotSupported);
+        assert.commandFailedWithCode(commandResult,
+                                     [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted],
+                                     tojson(commandResult));
     }
     lastHistogram = checkHistogramDiff(lastHistogram, testDB, 0, 0, 1);
 
