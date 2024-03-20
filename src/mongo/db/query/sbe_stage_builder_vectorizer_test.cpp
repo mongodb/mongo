@@ -729,79 +729,102 @@ TEST(VectorizerTest, ConvertBooleanOrOnCell) {
 }
 
 TEST(VectorizerTest, ConvertFilter) {
-    auto tmpVar = getABTLocalVariableName(7, 0);
-    auto tree1 = make<FunctionCall>(
-        "blockTraverseFPlaceholder",
-        makeSeq(make<Variable>("inputVar"),
-                make<LambdaAbstraction>(
-                    tmpVar,
-                    make<BinaryOp>(
-                        Operations::FillEmpty,
-                        make<BinaryOp>(Operations::Gt, make<Variable>(tmpVar), Constant::int32(9)),
-                        Constant::boolean(false)))));
-
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
     bindings.emplace("inputVar"_sd,
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    auto processed =
-        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+    auto tmpVar = getABTLocalVariableName(7, 0);
 
-    ASSERT_TRUE(processed.expr.has_value());
-    ASSERT_EXPLAIN_BSON_AUTO(
-        "{\n"
-        "    nodeType: \"Let\", \n"
-        "    variable: \"__l7_0\", \n"
-        "    bind: {\n"
-        "        nodeType: \"FunctionCall\", \n"
-        "        name: \"cellBlockGetFlatValuesBlock\", \n"
-        "        arguments: [\n"
-        "            {\n"
-        "                nodeType: \"Variable\", \n"
-        "                name: \"inputVar\"\n"
-        "            }\n"
-        "        ]\n"
-        "    }, \n"
-        "    expression: {\n"
-        "        nodeType: \"FunctionCall\", \n"
-        "        name: \"cellFoldValues_F\", \n"
-        "        arguments: [\n"
-        "            {\n"
-        "                nodeType: \"FunctionCall\", \n"
-        "                name: \"valueBlockFillEmpty\", \n"
-        "                arguments: [\n"
-        "                    {\n"
-        "                        nodeType: \"FunctionCall\", \n"
-        "                        name: \"valueBlockGtScalar\", \n"
-        "                        arguments: [\n"
-        "                            {\n"
-        "                                nodeType: \"Variable\", \n"
-        "                                name: \"__l7_0\"\n"
-        "                            }, \n"
-        "                            {\n"
-        "                                nodeType: \"Const\", \n"
-        "                                tag: \"NumberInt32\", \n"
-        "                                value: 9\n"
-        "                            }\n"
-        "                        ]\n"
-        "                    }, \n"
-        "                    {\n"
-        "                        nodeType: \"Const\", \n"
-        "                        tag: \"Boolean\", \n"
-        "                        value: false\n"
-        "                    }\n"
-        "                ]\n"
-        "            }, \n"
-        "            {\n"
-        "                nodeType: \"Variable\", \n"
-        "                name: \"inputVar\"\n"
-        "            }\n"
-        "        ]\n"
-        "    }\n"
-        "}\n",
-        *processed.expr);
+    {
+        auto tree1 = make<FunctionCall>(
+            "blockTraverseFPlaceholder",
+            makeSeq(make<Variable>("inputVar"),
+                    make<LambdaAbstraction>(tmpVar,
+                                            make<BinaryOp>(Operations::FillEmpty,
+                                                           make<BinaryOp>(Operations::Gt,
+                                                                          make<Variable>(tmpVar),
+                                                                          Constant::int32(9)),
+                                                           Constant::boolean(false)))));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"Let\", \n"
+            "    variable: \"__l7_0\", \n"
+            "    bind: {\n"
+            "        nodeType: \"FunctionCall\", \n"
+            "        name: \"cellBlockGetFlatValuesBlock\", \n"
+            "        arguments: [\n"
+            "            {\n"
+            "                nodeType: \"Variable\", \n"
+            "                name: \"inputVar\"\n"
+            "            }\n"
+            "        ]\n"
+            "    }, \n"
+            "    expression: {\n"
+            "        nodeType: \"FunctionCall\", \n"
+            "        name: \"cellFoldValues_F\", \n"
+            "        arguments: [\n"
+            "            {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"valueBlockFillEmpty\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"FunctionCall\", \n"
+            "                        name: \"valueBlockGtScalar\", \n"
+            "                        arguments: [\n"
+            "                            {\n"
+            "                                nodeType: \"Variable\", \n"
+            "                                name: \"__l7_0\"\n"
+            "                            }, \n"
+            "                            {\n"
+            "                                nodeType: \"Const\", \n"
+            "                                tag: \"NumberInt32\", \n"
+            "                                value: 9\n"
+            "                            }\n"
+            "                        ]\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"Const\", \n"
+            "                        tag: \"Boolean\", \n"
+            "                        value: false\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            {\n"
+            "                nodeType: \"Variable\", \n"
+            "                name: \"inputVar\"\n"
+            "            }\n"
+            "        ]\n"
+            "    }\n"
+            "}\n",
+            *processed.expr);
+    }
+
+    {
+        auto tree1 = make<FunctionCall>(
+            "blockTraverseFPlaceholder",
+            makeSeq(make<Variable>("inputVar"),
+                    make<LambdaAbstraction>(
+                        tmpVar,
+                        make<BinaryOp>(Operations::FillEmpty,
+                                       make<FunctionCall>("coerceToBool",
+                                                          makeSeq(make<FunctionCall>(
+                                                              "trunc",
+                                                              makeSeq(make<Variable>("inputVar"),
+                                                                      Constant::int32(2))))),
+                                       Constant::boolean(false)))));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_FALSE(processed.expr.has_value());
+    }
 }
 
 TEST(VectorizerTest, ConvertTypeMatch) {
@@ -3782,20 +3805,7 @@ TEST(VectorizerTest, ConvertCoerceToBoolFunction) {
     auto processed =
         Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree, bindings, boost::none);
 
-    ASSERT_TRUE(processed.expr.has_value());
-
-    ASSERT_EXPLAIN_BSON_AUTO(
-        "{\n"
-        "    nodeType: \"FunctionCall\", \n"
-        "    name: \"valueBlockCoerceToBool\", \n"
-        "    arguments: [\n"
-        "        {\n"
-        "            nodeType: \"Variable\", \n"
-        "            name: \"inputVar\"\n"
-        "        }\n"
-        "    ]\n"
-        "}\n",
-        *processed.expr);
+    ASSERT_FALSE(processed.expr.has_value());
 }
 
 TEST(VectorizerTest, ConvertRound) {

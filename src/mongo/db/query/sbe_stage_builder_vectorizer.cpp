@@ -574,13 +574,6 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                         TypeSignature::kBlockType.include(TypeSignature::kBooleanType),
                         args[0].sourceCell};
             }
-
-            if (op.name() == "coerceToBool"s) {
-                return {makeABTFunction("valueBlockCoerceToBool"_sd, std::move(*args[0].expr)),
-                        TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
-                            .include(args[0].typeSignature.intersect(TypeSignature::kNothingType)),
-                        args[0].sourceCell};
-            }
         }
 
         if (arity == 6 && op.name() == "dateTrunc"s &&
