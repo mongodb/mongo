@@ -92,8 +92,4 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const BSONObj& cmdObj,
                                    bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex = boost::none);
-/**
- * Creates a time-series collection as described in 'option' on the namespace 'ns'.
- */
-Status createTimeseries(OperationContext* opCtx, const NamespaceString& ns, const BSONObj& options);
 }  // namespace mongo

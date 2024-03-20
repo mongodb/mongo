@@ -248,7 +248,7 @@ void NonShardServerProcessInterface::createTimeseriesView(OperationContext* opCt
                                                           const BSONObj& cmdObj,
                                                           const TimeseriesOptions& userOpts) {
     try {
-        uassertStatusOK(mongo::createTimeseries(opCtx, ns, cmdObj));
+        uassertStatusOK(mongo::createCollection(opCtx, ns.dbName(), cmdObj));
     } catch (DBException& ex) {
         _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
     }

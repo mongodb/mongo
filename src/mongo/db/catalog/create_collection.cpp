@@ -809,18 +809,6 @@ Status createCollection(OperationContext* opCtx,
 }
 }  // namespace
 
-Status createTimeseries(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const BSONObj& options) {
-    StatusWith<CollectionOptions> statusWith =
-        CollectionOptions::parse(options, CollectionOptions::parseForCommand);
-    if (!statusWith.isOK()) {
-        return statusWith.getStatus();
-    }
-    auto collectionOptions = statusWith.getValue();
-    return _createTimeseries(opCtx, ns, collectionOptions);
-}
-
 Status createCollection(OperationContext* opCtx,
                         const DatabaseName& dbName,
                         const BSONObj& cmdObj,
