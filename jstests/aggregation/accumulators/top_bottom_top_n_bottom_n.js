@@ -414,7 +414,8 @@ assert(coll.drop());
 assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 const testConstantOutputAndSort = (op) => {
     const results =
-        coll.aggregate([{$group: {_id: null, result: {[op]: {n: 3, output: "abc", sortBy: {}}}}}])
+        coll.aggregate(
+                [{$group: {_id: null, result: {[op]: {n: 3, output: "abc", sortBy: {a: 1}}}}}])
             .toArray();
     assert.eq(results.length, 1, results);
     assert.docEq(results[0], {_id: null, result: ["abc", "abc", "abc"]}, results);

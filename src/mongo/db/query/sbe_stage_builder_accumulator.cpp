@@ -332,25 +332,6 @@ SbExpr::Vector buildAccumAggsMin(const Op& acc,
     }
 }
 
-boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMin(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputs,
-    StageBuilderState& state,
-    SbSlot bitmapInternalSlot) {
-    SbExprBuilder b(state);
-
-    auto blockAgg =
-        b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
-
-    auto rowAgg = b.makeFunction("min"_sd, std::move(inputs->inputExpr));
-
-    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
-    pairs.emplace();
-    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
-
-    return pairs;
-}
-
 SbExpr::Vector buildCombineAggsMin(const Op& acc,
                                    StageBuilderState& state,
                                    const SbSlotVector& inputSlots) {
@@ -397,25 +378,6 @@ SbExpr::Vector buildAccumAggsMax(const Op& acc,
     } else {
         return SbExpr::makeSeq(b.makeFunction("max"_sd, std::move(inputs->inputExpr)));
     }
-}
-
-boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMax(
-    const Op& acc,
-    std::unique_ptr<AccumSingleInput> inputs,
-    StageBuilderState& state,
-    SbSlot bitmapInternalSlot) {
-    SbExprBuilder b(state);
-
-    auto blockAgg =
-        b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
-
-    auto rowAgg = b.makeFunction("max"_sd, std::move(inputs->inputExpr));
-
-    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
-    pairs.emplace();
-    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
-
-    return pairs;
 }
 
 SbExpr::Vector buildCombineAggsMax(const Op& acc,
@@ -1019,9 +981,10 @@ SbExpr::Vector buildAccumAggsTopBottomN(const Op& acc,
     auto sortSpec = std::move(inputs->sortSpec);
 
     return SbExpr::makeSeq(b.makeFunction(isAccumulatorTopN(acc) ? "aggTopN" : "aggBottomN",
+                                          std::move(sortSpec),
+                                          b.makeNullConstant(),
                                           std::move(key),
-                                          std::move(value),
-                                          std::move(sortSpec)));
+                                          std::move(value)));
 }
 
 SbExpr::Vector buildCombineAggsTopBottomN(const Op& acc,
@@ -1422,7 +1385,7 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
     // result type of buildAccumExprs() is not AccumSingleInput.
     auto inputs = castInputsTo<AccumSingleInput>(acc.buildAccumExprs(state, std::move(inputsIn)));
 
-    // Try to vectorize 'inputs->inputExpr' and return the result.
+    // Try to vectorize 'inputs->inputExpr'.
     auto expr = buildVectorizedExpr(state, std::move(inputs->inputExpr), outputs, false);
 
     if (expr) {
@@ -1435,15 +1398,168 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
         SbSlot internalSlot = SbSlot{state.slotId()};
         inputs->inputExpr = SbExpr{internalSlot};
 
-        accumBlockExprs->inputs = std::move(inputs);
         accumBlockExprs->exprs.emplace_back(std::move(expr));
         accumBlockExprs->slots.emplace_back(internalSlot);
+
+        accumBlockExprs->inputs = std::move(inputs);
 
         return accumBlockExprs;
     }
 
     // If vectorization failed, return boost::none.
     return boost::none;
+}
+
+boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMin(
+    const Op& acc,
+    std::unique_ptr<AccumSingleInput> inputs,
+    StageBuilderState& state,
+    SbSlot bitmapInternalSlot) {
+    SbExprBuilder b(state);
+
+    auto blockAgg =
+        b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+
+    auto rowAgg = b.makeFunction("min"_sd, std::move(inputs->inputExpr));
+
+    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
+    pairs.emplace();
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
+
+    return pairs;
+}
+
+boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsMax(
+    const Op& acc,
+    std::unique_ptr<AccumSingleInput> inputs,
+    StageBuilderState& state,
+    SbSlot bitmapInternalSlot) {
+    SbExprBuilder b(state);
+
+    auto blockAgg =
+        b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+
+    auto rowAgg = b.makeFunction("max"_sd, std::move(inputs->inputExpr));
+
+    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
+    pairs.emplace();
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
+
+    return pairs;
+}
+
+boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsTopBottomN(
+    const Op& acc,
+    std::unique_ptr<AccumBlockTopBottomNInputs> inputs,
+    StageBuilderState& state,
+    const PlanStageSlots& outputs) {
+    // Try to vectorize each element of 'inputs->values'.
+    SbExpr::Vector valueExprs;
+    for (size_t i = 0; i < inputs->values.size(); ++i) {
+        auto valueExpr = buildVectorizedExpr(state, std::move(inputs->values[i]), outputs, false);
+        if (!valueExpr) {
+            // If vectorization failed, return boost::none.
+            return boost::none;
+        }
+
+        valueExprs.emplace_back(std::move(valueExpr));
+    }
+
+    // Try to vectorize each element of 'inputs->sortBy'.
+    SbExpr::Vector keyExprs;
+    for (size_t i = 0; i < inputs->sortBy.size(); ++i) {
+        auto keyExpr = buildVectorizedExpr(state, std::move(inputs->sortBy[i]), outputs, false);
+        if (!keyExpr) {
+            // If vectorization failed, return boost::none.
+            return boost::none;
+        }
+
+        keyExprs.emplace_back(std::move(keyExpr));
+    }
+
+    // If vectorization succeeded, allocate K+1 slots and update 'inputs->values' and
+    // 'inputs->sortBy' to refer to these slots. Then put 'inputs', the vectorized
+    // expressions, and the K+1 internal slots into an AccumBlockExprs struct and return it.
+    boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
+    accumBlockExprs.emplace();
+
+    inputs->values = SbExpr::Vector{};
+    for (size_t i = 0; i < valueExprs.size(); ++i) {
+        SbSlot valueInternalSlot = SbSlot{state.slotId()};
+        inputs->values.emplace_back(SbExpr{valueInternalSlot});
+        accumBlockExprs->exprs.emplace_back(std::move(valueExprs[i]));
+        accumBlockExprs->slots.emplace_back(valueInternalSlot);
+    }
+
+    inputs->sortBy = SbExpr::Vector{};
+    for (size_t i = 0; i < keyExprs.size(); ++i) {
+        SbSlot keyInternalSlot = SbSlot{state.slotId()};
+        inputs->sortBy.emplace_back(SbExpr{keyInternalSlot});
+        accumBlockExprs->exprs.emplace_back(std::move(keyExprs[i]));
+        accumBlockExprs->slots.emplace_back(keyInternalSlot);
+    }
+
+    accumBlockExprs->inputs = std::move(inputs);
+
+    return accumBlockExprs;
+}
+
+boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsTopBottomN(
+    const Op& acc,
+    std::unique_ptr<AccumBlockTopBottomNInputs> inputs,
+    StageBuilderState& state,
+    SbSlot bitmapInternalSlot) {
+    SbExprBuilder b(state);
+
+    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
+    pairs.emplace();
+
+    tassert(8448717,
+            "Expected single sortBy when 'useMK' is false",
+            inputs->useMK || inputs->sortBy.size() == 1);
+
+    tassert(8448718,
+            "Expected single value when 'valueIsArray' is false",
+            inputs->valueIsArray || inputs->values.size() == 1);
+
+    bool isTopN = isAccumulatorTopN(acc);
+    auto [fnName, blockFnName] = inputs->valueIsArray
+        ? std::pair(isTopN ? "aggTopNArray"_sd : "aggBottomNArray"_sd,
+                    isTopN ? "valueBlockAggTopNArray"_sd : "valueBlockAggBottomNArray"_sd)
+        : std::pair(isTopN ? "aggTopN"_sd : "aggBottomN"_sd,
+                    isTopN ? "valueBlockAggTopN"_sd : "valueBlockAggBottomN"_sd);
+
+    auto blockArgs = SbExpr::makeSeq(bitmapInternalSlot, inputs->sortSpec.clone());
+    auto args = SbExpr::makeSeq(std::move(inputs->sortSpec));
+
+    auto numKeysExpr =
+        inputs->useMK ? b.makeInt32Constant(inputs->sortBy.size()) : b.makeNullConstant();
+
+    blockArgs.emplace_back(numKeysExpr.clone());
+    args.emplace_back(std::move(numKeysExpr));
+
+    for (auto& keyExpr : inputs->sortBy) {
+        blockArgs.emplace_back(keyExpr.clone());
+        args.emplace_back(std::move(keyExpr));
+    }
+
+    if (!inputs->valueIsArray) {
+        auto valueExpr = std::move(inputs->values[0]);
+        blockArgs.emplace_back(valueExpr.clone());
+        args.emplace_back(std::move(valueExpr));
+    } else {
+        for (auto& valueExpr : inputs->values) {
+            blockArgs.emplace_back(valueExpr.clone());
+            args.emplace_back(std::move(valueExpr));
+        }
+    }
+
+    auto blockAgg = b.makeFunction(blockFnName, std::move(blockArgs));
+    auto rowAgg = b.makeFunction(fnName, std::move(args));
+
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
+
+    return pairs;
 }
 
 static const StringDataMap<OpInfo> accumOpInfoMap = {
@@ -1463,14 +1579,18 @@ static const StringDataMap<OpInfo> accumOpInfoMap = {
 
     // Bottom
     {AccumulatorBottom::getName(),
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
             .buildInit = makeBuildFn(&buildInitializeAccumN),
             .buildFinalize = makeBuildFn(&buildFinalizeTopBottom),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 
     // BottomN
     {AccumulatorBottomN::getName(),
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
             .buildInit = makeBuildFn(&buildInitializeAccumN),
             .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
@@ -1619,14 +1739,18 @@ static const StringDataMap<OpInfo> accumOpInfoMap = {
 
     // Top
     {AccumulatorTop::getName(),
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
             .buildInit = makeBuildFn(&buildInitializeAccumN),
             .buildFinalize = makeBuildFn(&buildFinalizeTopBottom),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},
 
     // TopN
     {AccumulatorTopN::getName(),
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsTopBottomN),
+            .buildAccumAggs = makeBuildFn(&buildAccumAggsTopBottomN),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsTopBottomN),
             .buildInit = makeBuildFn(&buildInitializeAccumN),
             .buildFinalize = makeBuildFn(&buildFinalizeTopBottomN),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsTopBottomN)}},

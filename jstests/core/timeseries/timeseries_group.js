@@ -47,15 +47,16 @@ TimeseriesTest.run((insert) => {
     const metaVals = ["foo", "bar", "baz"];
     const xVals = [null, undefined, 42, -12.345, NaN, "789", "antidisestablishmentarianism"];
     const yVals = [0, 73.73, -Inf, "blah", str, undefined, null];
-    const zVals = [0, 1, 2, 8, 23.9, 67, 247.8, -23, -456.7, -8e9, undefined];
-    const wVals = [0, 1, -2, 4, 7, -8.8, 9, 46, -99, 1e40, Inf, -Inf, NaN, str, [], {}, undefined];
+
+    const zSpecialVals = [undefined, 10e10, -10e10];
+    const wSpecialVals = [Inf, -Inf, NaN, str, [], {}, undefined];
 
     let nextId = 0;
     let nextDateOffset = 0;
-    let zIdx = 0;
-    let wIdx = 1;
+    let zSeed = 1234;
+    let wSeed = 5767;
 
-    for (let i = 0; i < 10; ++i) {
+    for (let i = 0; i < 5; ++i) {
         const documents = [];
 
         for (let meta of metaVals) {
@@ -63,8 +64,21 @@ TimeseriesTest.run((insert) => {
                 for (let y of yVals) {
                     let id = nextId;
                     let t = new Date(datePrefix + nextDateOffset);
-                    let z = zVals[zIdx];
-                    let w = wVals[wIdx];
+                    let z = zSeed;
+                    let w = wSeed;
+
+                    z = z % 2 == 0 ? z / 2 : -(z + 1) / 2;
+                    w = w % 2 == 0 ? w / 2 : -(w + 1) / 2;
+
+                    if (zSeed % 26 == 1 && zSpecialVals.length > 0) {
+                        z = zSpecialVals[0];
+                        zSpecialVals.shift();
+                    }
+
+                    if (wSeed % 26 == 1 && wSpecialVals.length > 0) {
+                        w = wSpecialVals[0];
+                        wSpecialVals.shift();
+                    }
 
                     let doc = {_id: id, [timeFieldName]: t, [metaFieldName]: meta};
 
@@ -85,8 +99,8 @@ TimeseriesTest.run((insert) => {
 
                     nextId = nextId + 1;
                     nextDateOffset = (nextDateOffset + 5) % 199;
-                    zIdx = (zIdx + 2) % zVals.length;
-                    wIdx = (wIdx + 3) % wVals.length;
+                    zSeed = (zSeed + 997) % 9967;
+                    wSeed = (wSeed + 991) % 9973;
                 }
             }
         }

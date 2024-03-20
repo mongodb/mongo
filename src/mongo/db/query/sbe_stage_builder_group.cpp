@@ -236,13 +236,11 @@ SbExpr::Vector generateGroupByKeyExprs(StageBuilderState& state,
     return exprs;
 }
 
-SbExpr getTopBottomNValueExpr(StageBuilderState& state,
-                              const AccumulationStatement& accStmt,
-                              const PlanStageSlots& outputs) {
-    SbExprBuilder b(state);
-
+std::variant<Expression*, BSONElement> getTopBottomNValueExprHelper(
+    const AccumulationStatement& accStmt) {
     auto expObj = dynamic_cast<ExpressionObject*>(accStmt.expr.argument.get());
-    auto expConst = dynamic_cast<ExpressionConstant*>(accStmt.expr.argument.get());
+    auto expConst =
+        !expObj ? dynamic_cast<ExpressionConstant*>(accStmt.expr.argument.get()) : nullptr;
 
     tassert(5807015,
             str::stream() << accStmt.expr.name << " accumulator must have an object argument",
@@ -251,9 +249,7 @@ SbExpr getTopBottomNValueExpr(StageBuilderState& state,
     if (expObj) {
         for (auto& [key, value] : expObj->getChildExpressions()) {
             if (key == AccumulatorN::kFieldNameOutput) {
-                auto rootSlot = outputs.getResultObjIfExists();
-                auto outputExpr = generateExpression(state, value.get(), rootSlot, outputs);
-                return b.makeFillEmptyNull(std::move(outputExpr));
+                return value.get();
             }
         }
     } else {
@@ -261,15 +257,67 @@ SbExpr getTopBottomNValueExpr(StageBuilderState& state,
         auto objBson = objConst.getDocument().toBson();
         auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
         if (outputField.ok()) {
-            auto [outputTag, outputVal] = sbe::bson::convertFrom<false /* View */>(outputField);
-            auto outputExpr = b.makeConstant(outputTag, outputVal);
-            return b.makeFillEmptyNull(std::move(outputExpr));
+            return outputField;
         }
     }
 
     tasserted(5807016,
               str::stream() << accStmt.expr.name
                             << " accumulator must have an output field in the argument");
+}
+
+SbExpr getTopBottomNValueExpr(StageBuilderState& state,
+                              const AccumulationStatement& accStmt,
+                              const PlanStageSlots& outputs) {
+    SbExprBuilder b(state);
+
+    auto valueExpr = getTopBottomNValueExprHelper(accStmt);
+
+    if (holds_alternative<Expression*>(valueExpr)) {
+        auto rootSlot = outputs.getResultObjIfExists();
+        auto* expr = get<Expression*>(valueExpr);
+        return b.makeFillEmptyNull(generateExpression(state, expr, rootSlot, outputs));
+    } else {
+        auto [tag, val] = sbe::bson::convertFrom<false /*View*/>(get<BSONElement>(valueExpr));
+        return b.makeConstant(tag, val);
+    }
+}
+
+std::pair<SbExpr::Vector, bool> getBlockTopBottomNValueExpr(StageBuilderState& state,
+                                                            const AccumulationStatement& accStmt,
+                                                            const PlanStageSlots& outputs) {
+    SbExprBuilder b(state);
+    bool isArray = false;
+
+    auto valueExpr = getTopBottomNValueExprHelper(accStmt);
+
+    if (holds_alternative<Expression*>(valueExpr)) {
+        auto rootSlot = outputs.getResultObjIfExists();
+        auto* expr = get<Expression*>(valueExpr);
+        auto* arrayExpr = dynamic_cast<ExpressionArray*>(expr);
+
+        if (arrayExpr) {
+            isArray = true;
+
+            // If the output field from the $top/$bottom AccumulationStatement is an
+            // ExpressionArray, then we set 'isArray' to true and return a vector of the
+            // element expressions.
+            SbExpr::Vector sbExprs;
+            for (size_t i = 0; i < arrayExpr->getChildren().size(); ++i) {
+                auto* elemExpr = arrayExpr->getChildren()[i].get();
+                sbExprs.emplace_back(
+                    b.makeFillEmptyNull(generateExpression(state, elemExpr, rootSlot, outputs)));
+            }
+
+            return {std::move(sbExprs), isArray};
+        }
+
+        auto sbExpr = b.makeFillEmptyNull(generateExpression(state, expr, rootSlot, outputs));
+        return {SbExpr::makeSeq(std::move(sbExpr)), isArray};
+    } else {
+        auto [tag, val] = sbe::bson::convertFrom<false /*View*/>(get<BSONElement>(valueExpr));
+        return {SbExpr::makeSeq(b.makeConstant(tag, val)), isArray};
+    }
 }
 
 SbExpr getTopBottomNSortByExpr(StageBuilderState& state,
@@ -316,6 +364,62 @@ SbExpr getTopBottomNSortByExpr(StageBuilderState& state,
         // keys (or the sole part's key in cases where the sort pattern has only one part),
         // so we generate a call to sortKeyComponentVectorToArray() to perform the conversion.
         return b.makeFunction("sortKeyComponentVectorToArray", std::move(sortKeys.fullKeyExpr));
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
+
+std::pair<SbExpr::Vector, bool> getBlockTopBottomNSortByExpr(StageBuilderState& state,
+                                                             const AccumulationStatement& accStmt,
+                                                             const PlanStageSlots& outputs,
+                                                             SbExpr sortSpecExpr) {
+    constexpr bool allowCallGenCheapSortKey = true;
+    bool useMK = false;
+
+    SbExprBuilder b(state);
+
+    auto sortPattern = getSortPattern(accStmt);
+    tassert(8448719, "Expected sort pattern for $top/$bottom accumulator", sortPattern.has_value());
+
+    auto plan = makeSortKeysPlan(*sortPattern, allowCallGenCheapSortKey);
+    auto sortKeys = buildSortKeys(state, plan, *sortPattern, outputs, std::move(sortSpecExpr));
+
+    if (plan.type == BuildSortKeysPlan::kTraverseFields) {
+        auto keyExprs = [&] {
+            if (sortPattern->size() == 1) {
+                // When the sort pattern has only one part, we return the sole part's key expr.
+                return SbExpr::makeSeq(std::move(sortKeys.keyExprs[0]));
+            } else if (sortPattern->size() > 1) {
+                // When the sort pattern has more than one part, we return an array containing
+                // each part's key expr (in order).
+                useMK = true;
+                return std::move(sortKeys.keyExprs);
+            } else {
+                return SbExpr::makeSeq(b.makeFunction("newArray"));
+            }
+        }();
+
+        if (sortKeys.parallelArraysCheckExpr) {
+            // If 'parallelArraysCheckExpr' is not null, inject it into 'fullKeyExpr'.
+            auto parallelArraysError =
+                b.makeFail(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
+
+            tassert(8448720, "Expected vector to be non-empty", !keyExprs.empty());
+
+            keyExprs[0] = b.makeIf(std::move(sortKeys.parallelArraysCheckExpr),
+                                   std::move(keyExprs[0]),
+                                   std::move(parallelArraysError));
+        }
+
+        return {std::move(keyExprs), useMK};
+    } else if (plan.type == BuildSortKeysPlan::kCallGenCheapSortKey) {
+        // generateCheapSortKey() returns a SortKeyComponentVector, but we need an array of
+        // keys (or the sole part's key in cases where the sort pattern has only one part),
+        // so we generate a call to sortKeyComponentVectorToArray() to perform the conversion.
+        auto fullKeyExpr =
+            b.makeFunction("sortKeyComponentVectorToArray", std::move(sortKeys.fullKeyExpr));
+
+        return {SbExpr::makeSeq(std::move(fullKeyExpr)), useMK};
     } else {
         MONGO_UNREACHABLE;
     }
@@ -382,9 +486,9 @@ boost::optional<Accum::AccumBlockExprs> generateAccumBlockExprs(
     if (isTopBottomN(accStmt)) {
         auto spec = SbExpr{state.getSortSpecSlot(&accStmt)};
 
-        inputs = std::make_unique<Accum::AccumTopBottomNInputs>(
-            getTopBottomNValueExpr(state, accStmt, outputs),
-            getTopBottomNSortByExpr(state, accStmt, outputs, std::move(spec)),
+        inputs = std::make_unique<Accum::AccumBlockTopBottomNInputs>(
+            getBlockTopBottomNValueExpr(state, accStmt, outputs),
+            getBlockTopBottomNSortByExpr(state, accStmt, outputs, std::move(spec)),
             SbExpr{state.getSortSpecSlot(&accStmt)});
     } else {
         // For all other accumulators, we call generateExpression() on 'argument' to create an
