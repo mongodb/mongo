@@ -90,7 +90,7 @@ function runTestFailure(sessionOpts) {
     let testCmd = Object.merge(
         {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
 
-    // TODO (SERVER-73632): Simplify this path once 8.0 becomes last LTS.
+    // TODO (SERVER-88107): Simplify this path once 8.0 becomes last LTS.
     const binVersion = assert.commandWorked(shard0Primary.adminCommand({serverStatus: 1}));
     let errorCode = MongoRunner.compareBinVersions(binVersion.version, "8.0") >= 0
         ? ErrorCodes.OperationNotSupportedInTransaction
@@ -139,7 +139,7 @@ function runTestGetMore(sessionOpts) {
     // Verify getMores were used by checking serverStatus metrics.
     const commandMetricsAfter = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
 
-    // TODO (SERVER-73632): Simplify this path once 8.0 becomes last LTS.
+    // TODO (SERVER-88107): Simplify this path once 8.0 becomes last LTS.
     const binVersion = assert.commandWorked(shard0Primary.adminCommand({serverStatus: 1}));
     if (MongoRunner.compareBinVersions(binVersion.version, "8.0") >= 0) {
         assert.gt(commandMetricsAfter.find.total, commandMetricsBefore.find.total);

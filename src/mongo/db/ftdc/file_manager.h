@@ -78,7 +78,7 @@ public:
         const boost::filesystem::path& path,
         FTDCCollectorCollection* collection,
         Client* client,
-        UseMultiserviceSchema multiserviceSchema);
+        UseMultiServiceSchema multiServiceSchema);
 
     /**
      * Rotates files
@@ -109,7 +109,7 @@ private:
     FTDCFileManager(const FTDCConfig* config,
                     const boost::filesystem::path& path,
                     FTDCCollectorCollection* collection,
-                    UseMultiserviceSchema multiserviceSchema);
+                    UseMultiServiceSchema multiServiceSchema);
 
     /**
      * Gets a list of metrics files in a directory.
@@ -164,7 +164,7 @@ private:
     FTDCCollectorCollection* const _rotateCollectors;
 
     // Whether or not to use the multiversion schema for FTDC file output
-    UseMultiserviceSchema _multiserviceSchema;
+    UseMultiServiceSchema _multiServiceSchema;
 };
 
 }  // namespace mongo

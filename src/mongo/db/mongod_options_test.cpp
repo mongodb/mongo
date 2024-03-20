@@ -88,7 +88,7 @@ public:
     Environment env;
 
 private:
-    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagEmbeddedRouter", true};
+    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagRouterPort", true};
 };
 
 TEST_F(MongodOptionsTest, Base) {

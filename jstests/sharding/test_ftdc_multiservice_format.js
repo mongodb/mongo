@@ -10,15 +10,15 @@
 
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
-const setFeatureFlags = {
-    setParameter: {featureFlagMultiserviceFTDCSchema: true, featureFlagEmbeddedRouter: true}
+const setFeatureFlag = {
+    setParameter: {featureFlagRouterPort: true}
 };
 var st = new ShardingTest({
     embeddedRouter: true,
     configShard: true,
     shards: 1,
-    rs: setFeatureFlags,
-    mongos: setFeatureFlags,
+    rs: setFeatureFlag,
+    mongos: setFeatureFlag,
 });
 
 const db = st.rs0.getPrimary().getDB("admin");

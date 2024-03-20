@@ -80,7 +80,7 @@ void startFTDC(ServiceContext* serviceContext,
                boost::filesystem::path& path,
                FTDCStartMode startupMode,
                std::vector<RegisterCollectorsFunction> registerCollectorsFns,
-               UseMultiserviceSchema multiserviceSchema);
+               UseMultiServiceSchema multiServiceSchema);
 
 /**
  * Stop Full Time Data Capture

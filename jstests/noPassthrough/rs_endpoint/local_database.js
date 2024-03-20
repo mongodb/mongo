@@ -2,7 +2,11 @@
  * Tests that commands against the "local" database work correctly when the replica set endpoint is
  * used.
  *
- * @tags: [requires_fcv_73, featureFlagEmbeddedRouter, requires_persistence]
+ * @tags: [
+ *    requires_fcv_80,
+ *    featureFlagRouterPort,
+ *    requires_persistence,
+ * ]
  */
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";

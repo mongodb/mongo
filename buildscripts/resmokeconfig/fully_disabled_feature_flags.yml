@@ -16,9 +16,3 @@
 - featureFlagReplicaSetEndpoint
 - featureFlagCreateCollectionInPreparedTransactions
 - featureFlagReduceMajorityWriteLatency
-# TODO (SERVER-87249): This feature flag exists because the new FTDC format depends on whether the
-# router service is present, but there is no way to check for that from jstests, so this feature
-# flag is used for that. Enabling it in "all feature flags" suites would break many tests because
-# those tests don't enable the embedded router. It can be removed once featureFlagEmbeddedRouter is
-# synonym of "there is a router service".
-- featureFlagMultiserviceFTDCSchema

@@ -306,7 +306,7 @@ void startFTDC(ServiceContext* serviceContext,
                boost::filesystem::path& path,
                FTDCStartMode startupMode,
                std::vector<RegisterCollectorsFunction> registerCollectorsFns,
-               UseMultiserviceSchema multiserviceSchema) {
+               UseMultiServiceSchema multiServiceSchema) {
     FTDCConfig config;
     config.period = Milliseconds(ftdcStartupParams.periodMillis.load());
     // Only enable FTDC if our caller says to enable FTDC, MongoS may not have a valid path to write
@@ -317,7 +317,8 @@ void startFTDC(ServiceContext* serviceContext,
     config.maxFileSizeBytes = ftdcStartupParams.maxFileSizeMB.load() * 1024 * 1024;
 
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot) &&
+    if (feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledUseLatestFCVWhenUninitialized(
+            fcvSnapshot) &&
         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         // By embedding the router in MongoD, the FTDC machinery will produce diagnostic data for
         // router and shard services, requiring extra space for retention. If that is the case and
@@ -336,7 +337,7 @@ void startFTDC(ServiceContext* serviceContext,
 
     ftdcDirectoryPathParameter = path;
 
-    auto controller = std::make_unique<FTDCController>(path, config, multiserviceSchema);
+    auto controller = std::make_unique<FTDCController>(path, config, multiServiceSchema);
 
     for (auto&& fn : registerCollectorsFns) {
         fn(controller.get());

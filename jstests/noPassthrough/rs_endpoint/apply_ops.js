@@ -2,10 +2,10 @@
  * Tests that applyOps commands work correctly when the replica set endpoint is used.
  *
  * @tags: [
- *   requires_fcv_73,
- *   featureFlagEmbeddedRouter,
+ *   requires_fcv_80,
+ *   featureFlagRouterPort,
  *   featureFlagSecurityToken,
- *   requires_persistence
+ *   requires_persistence,
  * ]
  */
 
