@@ -228,7 +228,7 @@ public:
     /**
      * When batchSize > 1, marks the write op complete if all child write ops have received
      * responses. Otherwise defers the state update of the child write op until later. Batchsize of
-     * 1 is handled differently in _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite
+     * 1 is handled differently in _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite.
      */
     void noteWriteWithoutShardKeyWithIdResponse(
         const TargetedWrite& targetedWrite,

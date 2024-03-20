@@ -258,6 +258,7 @@ public:
     void noteWriteOpResponse(const std::unique_ptr<TargetedWrite>& targetedWrite,
                              WriteOp& op,
                              const BulkWriteCommandReply& commandReply,
+                             size_t numOps,
                              boost::optional<const BulkWriteReplyItem&> replyItem);
 
     /**
@@ -360,13 +361,20 @@ public:
      * Finalizes/resets state after executing (or attempting to execute) a write without shard key
      * with _id.
      */
-    void finishExecutingWriteWithoutShardKeyWithId(TargetedBatchMap& childBatches);
+    void finishExecutingWriteWithoutShardKeyWithId();
 
     void noteTargetedShard(const TargetedWriteBatch& targetedBatch);
     void noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks);
     void noteTwoPhaseWriteProtocol(const TargetedWriteBatch& targetedBatch,
                                    size_t nsIdx,
                                    int nShardsOwningChunks);
+
+    void resetTargeterHasStaleShardResponse() {
+        _targeterHasStaleShardResponse = false;
+    }
+    bool targeterHasStaleShardResponse() const {
+        return _targeterHasStaleShardResponse;
+    }
 
 private:
     // The OperationContext the client bulkWrite request is run on.
@@ -398,6 +406,18 @@ private:
     // We always process WriteWithoutShardKeyWithId writes in their own round and thus there is
     // only ever a single op in consideration here.
     boost::optional<std::pair<int /* opIdx */, std::vector<ShardWCError>>> _deferredWCErrors;
+
+    // Optionally stores a vector of TargetedWriteBatch, BulkWriteCommandReply and
+    // BulkWriteReplyItem tuple for writes of type WithoutShardKeyWithId in a targeted batch to
+    // defer updating batch stats until we are sure that there is no retry of such writes is needed.
+    // This is necessary for responses that have n > 0 in a given round because we do not want to
+    // increment the batch stats multiple times for retried statements.
+    boost::optional<std::vector<std::tuple<const TargetedWriteBatch*,
+                                           const BulkWriteCommandReply,
+                                           boost::optional<const BulkWriteReplyItem>>>>
+        _deferredResponses;
+
+    bool _targeterHasStaleShardResponse = false;
 
     // Statement ids for the ops that had already been executed, thus were not executed in this
     // bulkWrite.

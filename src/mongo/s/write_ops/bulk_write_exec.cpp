@@ -118,7 +118,6 @@ void executeChildBatches(OperationContext* opCtx,
                          boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     // We are starting a new round of execution and so this should have been reset to false.
     invariant(!bulkWriteOp.shouldStopCurrentRound());
-
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto& childBatch : childBatches) {
         bulkWriteOp.noteTargetedShard(*childBatch.second);
@@ -698,7 +697,6 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
     TargetedBatchMap& childBatches,
     BulkWriteOp& bulkWriteOp,
     stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace) {
-
     executeChildBatches(opCtx,
                         targeters,
                         childBatches,
@@ -706,7 +704,10 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
                         errorsPerNamespace,
                         /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
-    bulkWriteOp.finishExecutingWriteWithoutShardKeyWithId(childBatches);
+    // We need to know if the targeters encountered a Stale Shard Response
+    // to determine whether to parse the _deferredResponses.
+    bulkWriteOp.noteStaleResponses(targeters, errorsPerNamespace);
+    bulkWriteOp.finishExecutingWriteWithoutShardKeyWithId();
 }
 
 void coordinateMultiUpdate(OperationContext* opCtx,
@@ -800,7 +801,9 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
 
             // If we saw any staleness errors, tell the targeters to invalidate their cache
             // so that they may be refreshed.
-            bulkWriteOp.noteStaleResponses(targeters, errorsPerNamespace);
+            // The staleness errors for WithoutShardKeyWithId writes have been evaluated earlier.
+            if (targetStatus.getValue() != WriteType::WithoutShardKeyWithId)
+                bulkWriteOp.noteStaleResponses(targeters, errorsPerNamespace);
         }
 
         rounds++;
@@ -847,7 +850,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
             numRoundsWithoutProgress = 0;
         }
         numCompletedOps = currCompletedOps;
-
+        bulkWriteOp.resetTargeterHasStaleShardResponse();
         LOGV2_DEBUG(7934202,
                     2,
                     "Completed a round of bulkWrite execution",
@@ -1242,11 +1245,10 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
 void BulkWriteOp::noteWriteOpResponse(const std::unique_ptr<TargetedWrite>& targetedWrite,
                                       WriteOp& op,
                                       const BulkWriteCommandReply& commandReply,
+                                      size_t numOps,
                                       const boost::optional<const BulkWriteReplyItem&> replyItem) {
     if (op.getWriteType() == WriteType::WithoutShardKeyWithId) {
-        // Since WithoutShardKeyWithId is always sent in its own batch, the top-level summary fields
-        // give us information for that specific write.
-        // Here, we have to extract the fields that are equivalent to 'n' in 'update' and 'delete'
+        // We have to extract the fields that are equivalent to 'n' in 'update' and 'delete'
         // command replies:
         // - For an update, this is 'nMatched' (rather than 'nUpdated', as it is possible the update
         // matches a document but the update modification is a no-op, e.g. it sets a field to its
@@ -1255,7 +1257,8 @@ void BulkWriteOp::noteWriteOpResponse(const std::unique_ptr<TargetedWrite>& targ
         // Since the write is either an update or a delete, summing these two values gives us the
         // correct value of 'n'.
         auto n = commandReply.getNMatched() + commandReply.getNDeleted();
-        op.noteWriteWithoutShardKeyWithIdResponse(*targetedWrite, n, 1, replyItem);
+        op.noteWriteWithoutShardKeyWithIdResponse(*targetedWrite, n, numOps, replyItem);
+
         if (op.getWriteState() == WriteOpState_Completed) {
             _shouldStopCurrentRound = true;
         }
@@ -1268,6 +1271,11 @@ void BulkWriteOp::noteChildBatchResponse(
     const TargetedWriteBatch& targetedBatch,
     const BulkWriteCommandReply& commandReply,
     boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
+    int firstTargetedWriteOpIdx = targetedBatch.getWrites().front()->writeOpRef.first;
+    bool isWithoutShardKeyWithIdWrite =
+        (_writeOps[firstTargetedWriteOpIdx].getWriteType() == WriteType::WithoutShardKeyWithId);
+    bool shouldDeferWriteWithoutShardKeyReponse =
+        isWithoutShardKeyWithIdWrite && targetedBatch.getNumOps() > 1;
 
     const auto& replyItems = exhaustCursorForReplyItems(_opCtx, targetedBatch, commandReply);
 
@@ -1300,7 +1308,15 @@ void BulkWriteOp::noteChildBatchResponse(
             tassert(8266001,
                     "bulkWrite should always get replies when not in errorsOnly",
                     _clientRequest.getErrorsOnly());
-            noteWriteOpResponse(write, writeOp, commandReply, boost::none);
+            if (shouldDeferWriteWithoutShardKeyReponse) {
+                if (!_deferredResponses) {
+                    _deferredResponses.emplace();
+                }
+                _deferredResponses->push_back(
+                    std::make_tuple(&targetedBatch, commandReply, boost::none));
+            }
+            noteWriteOpResponse(
+                write, writeOp, commandReply, targetedBatch.getNumOps(), boost::none);
             continue;
         }
 
@@ -1350,7 +1366,8 @@ void BulkWriteOp::noteChildBatchResponse(
             tassert(8516601,
                     "bulkWrite received more replies than writes",
                     _clientRequest.getErrorsOnly());
-            noteWriteOpResponse(write, writeOp, commandReply, boost::none);
+            noteWriteOpResponse(
+                write, writeOp, commandReply, targetedBatch.getNumOps(), boost::none);
             continue;
         }
 
@@ -1368,7 +1385,8 @@ void BulkWriteOp::noteChildBatchResponse(
                     "bulkWrite should get a reply for every write op when not in errorsOnly mode",
                     _clientRequest.getErrorsOnly());
 
-            noteWriteOpResponse(write, writeOp, commandReply, boost::none);
+            noteWriteOpResponse(
+                write, writeOp, commandReply, targetedBatch.getNumOps(), boost::none);
             // We need to keep the replyIndex where it is until we see the op matching its index.
             replyIndex--;
             continue;
@@ -1376,8 +1394,16 @@ void BulkWriteOp::noteChildBatchResponse(
 
         _approximateSize += reply.getApproximateSize();
 
+        if (shouldDeferWriteWithoutShardKeyReponse) {
+            if (!_deferredResponses) {
+                _deferredResponses.emplace();
+            }
+            auto newReply = BulkWriteReplyItem::parse(reply.toBSON());
+            _deferredResponses->push_back(std::make_tuple(&targetedBatch, commandReply, newReply));
+        }
+
         if (reply.getStatus().isOK()) {
-            noteWriteOpResponse(write, writeOp, commandReply, reply);
+            noteWriteOpResponse(write, writeOp, commandReply, targetedBatch.getNumOps(), reply);
         } else {
             lastError.emplace(write->writeOpRef.first, reply.getStatus());
             writeOp.noteWriteError(*write, *lastError);
@@ -1730,6 +1756,7 @@ void BulkWriteOp::noteStaleResponses(
                             "status"_attr = error.error.getStatus());
                 targeter->noteStaleShardResponse(
                     _opCtx, error.endpoint, *error.error.getStatus().extraInfo<StaleConfigInfo>());
+                _targeterHasStaleShardResponse = true;
             }
             for (const auto& error : errors->second.getErrors(ErrorCodes::StaleDbVersion)) {
                 LOGV2_DEBUG(7279202,
@@ -1741,6 +1768,7 @@ void BulkWriteOp::noteStaleResponses(
                     _opCtx,
                     error.endpoint,
                     *error.error.getStatus().extraInfo<StaleDbRoutingVersion>());
+                _targeterHasStaleShardResponse = true;
             }
             for (const auto& error :
                  errors->second.getErrors(ErrorCodes::CannotImplicitlyCreateCollection)) {
@@ -1756,7 +1784,7 @@ void BulkWriteOp::noteStaleResponses(
     }
 }
 
-void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId(TargetedBatchMap& childBatches) {
+void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
     // See _deferredWCErrors for details.
     if (_deferredWCErrors) {
         auto& [opIdx, wcErrors] = _deferredWCErrors.value();
@@ -1767,8 +1795,35 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId(TargetedBatchMap& ch
         }
         _deferredWCErrors = boost::none;
     }
-    // See _shouldStopCurrentRound for details.
-    _shouldStopCurrentRound = false;
+
+    if (_deferredResponses) {
+        for (unsigned long idx = 0; idx < _deferredResponses->size(); idx++) {
+            auto [targetedWriteBatch, response, replyItem] = _deferredResponses->at(idx);
+            LOGV2_DEBUG(864041,
+                        4,
+                        "Processing deferred response for WithoutShardKeyWithId: ",
+                        "idx"_attr = idx,
+                        "shardId"_attr = targetedWriteBatch->getShardId().toString(),
+                        "responseN"_attr = response.getNModified());
+            const auto& write =
+                targetedWriteBatch->getWrites()[idx % targetedWriteBatch->getWrites().size()];
+            WriteOp& writeOp = _writeOps[write->writeOpRef.first];
+            if (_targeterHasStaleShardResponse) {
+                if (writeOp.getWriteState() != WriteOpState_Ready) {
+                    writeOp.resetWriteToReady();
+                    _shouldStopCurrentRound = false;
+                }
+            } else if (writeOp.getWriteState() != WriteOpState_Error) {
+                auto nVal = response.getNModified() + response.getNDeleted();
+                auto repl = replyItem.has_value()
+                    ? boost::optional<const BulkWriteReplyItem&>(replyItem.value())
+                    : boost::optional<const BulkWriteReplyItem&>(boost::none);
+                writeOp.noteWriteWithoutShardKeyWithIdResponse(
+                    *write, nVal, targetedWriteBatch->getNumOps(), repl);
+            }
+        }
+    }
+    _deferredResponses = boost::none;
 }
 
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {

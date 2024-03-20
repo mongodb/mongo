@@ -39,7 +39,6 @@ assert.commandWorked(
 // This update via mongos1 should trigger a StaleConfigError as mongos1 is not aware of moved chunk.
 const session = st.s1.startSession({retryWrites: true});
 const sessionColl = session.getDatabase(db.getName()).getCollection(db.coll.getName());
-
 let res = sessionColl.bulkWrite(
     [
         {updateOne: {"filter": {_id: -1}, "update": {$inc: {counter: 1}}}},
@@ -52,7 +51,6 @@ assert.eq(res.matchedCount, 2);
 let mongosServerStatus =
     assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
 assert.eq(3, mongosServerStatus.metrics.query.updateOneWithoutShardKeyWithIdRetryCount);
-
 assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard0.shardName}));
 
@@ -63,11 +61,9 @@ res = sessionColl.bulkWrite(
         {deleteOne: {"filter": {_id: 2}}},
     ],
     {ordered: false});
-
 assert.eq(res.deletedCount, 2);
 mongosServerStatus =
     assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
 assert.eq(3, mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdRetryCount);
-
 session.endSession();
 st.stop();

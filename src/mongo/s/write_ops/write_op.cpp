@@ -281,7 +281,9 @@ void WriteOp::_updateOpState(boost::optional<bool> markWriteWithoutShardKeyWithI
     // combine that partial result with any new ones. _bulkWriteReplyItem will be overwritten
     // below with a new merged reply combining all of the values in childSuccesses, and so we need
     // to add our existing partial result to childSuccesses to get it merged in too.
-    if (_bulkWriteReplyItem) {
+    // TODO (SERVER-87809): Remove this condition by de-duplicating the calls to _updateOpState()
+    // for WWSKWID writes.
+    if (_bulkWriteReplyItem && _writeType != WriteType::WithoutShardKeyWithId) {
         childSuccesses.push_back(&_bulkWriteReplyItem.value());
     }
 
@@ -424,10 +426,11 @@ void WriteOp::noteWriteWithoutShardKeyWithIdResponse(
     int n,
     int batchSize,
     boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
-    tassert(8346300,
-            "BulkWriteReplyItem 'n' value does not match supplied 'n' value",
-            !bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
+
     if (batchSize == 1) {
+        tassert(8346300,
+                "BulkWriteReplyItem 'n' value does not match supplied 'n' value",
+                !bulkWriteReplyItem || bulkWriteReplyItem->getN() == n);
         _noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
             targetedWrite, n, bulkWriteReplyItem);
         return;
