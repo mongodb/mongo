@@ -32,7 +32,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
-#include <type_traits>
 #include <typeinfo>
 #include <utility>
 
@@ -70,6 +69,7 @@
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
@@ -78,7 +78,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -367,11 +366,13 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
                                                           const BSONObj& cmdObj,
                                                           boost::optional<ShardId> dataShard) {
     cluster::createDatabase(opCtx, dbName);
-    // TODO SERVER-85437: remove this check and keep only the 'else' branch.
-    if (serverGlobalParams.upgradeBackCompat || serverGlobalParams.downgradeBackCompat) {
+
+    // TODO (SERVER-85437): Remove the FCV check and keep only the 'else' branch
+    if (!feature_flags::g80CollectionCreationPath.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
         router.route(opCtx,
-                     "ShardServerProcessInterface::createCollection",
+                     "ShardServerProcessInterface::_createCollectionCommon",
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
                          BSONObjBuilder finalCmdBuilder(cmdObj);
                          finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
@@ -400,12 +401,11 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
         const auto collName = cmdObj.firstElement().String();
         const auto nss = NamespaceStringUtil::deserialize(dbName, collName);
 
-        // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj
-        // guarantees to propagate the apiVersion and apiStrict paramers. Note that
-        // shardsvrCreateCollection as internal command will skip the apiVersionCheck.
-        // However in case of view, the create command might run an aggregation. Having those
-        // fields propagated guarantees the api version check will keep working within the
-        // aggregation framework
+        // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj guarantees
+        // to propagate the apiVersion and apiStrict paramers. Note that shardsvrCreateCollection as
+        // internal command will skip the apiVersionCheck. However in case of view, the create
+        // command might run an aggregation. Having those fields propagated guarantees the api
+        // version check will keep working within the aggregation framework.
         auto request = ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), cmdObj);
 
         ShardsvrCreateCollection shardsvrCollCommand(nss);
@@ -417,7 +417,7 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
         shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
         router.route(opCtx,
-                     "ShardServerProcessInterface::createCollection",
+                     "ShardServerProcessInterface::_createCollectionCommon",
                      [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
                          cluster::createCollection(opCtx, shardsvrCollCommand);
                      });
