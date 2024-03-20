@@ -71,4 +71,4 @@ selector:
 executor:
   config: {}
   hooks:
-  - class: CombineBenchmarkResults
+  - class: GenerateAndCheckPerfResults

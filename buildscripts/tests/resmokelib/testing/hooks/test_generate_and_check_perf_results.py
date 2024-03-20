@@ -3,10 +3,14 @@
 
 import datetime
 import unittest
+import logging
 
 import mock
 
-import buildscripts.resmokelib.testing.hooks.combine_benchmark_results as cbr
+import buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results as cbr
+from typing import List, Dict
+from buildscripts.util.cedar_report import CedarMetric
+from buildscripts.resmokelib.errors import ServerFailure
 
 # pylint: disable=protected-access
 from buildscripts.resmokelib.errors import CedarReportError
@@ -116,6 +120,18 @@ _BM_FULL_REPORT = {
         ]
 }
 
+_BM_FULL_REPORT_WITH_DUPS = {
+    "context":
+        _BM_CONTEXT, "benchmarks": [
+            _BM_REPORT_1,
+            _BM_REPORT_1,
+            _BM_REPORT_2,
+            _BM_MEAN_REPORT,
+            _BM_MULTITHREAD_REPORT,
+            _BM_MULTITHREAD_MEDIAN_REPORT,
+        ]
+}
+
 # 12/31/2999 @ 11:59pm (UTC)
 _START_TIME = 32503679999
 
@@ -123,7 +139,7 @@ _START_TIME = 32503679999
 _END_TIME = 32503680000
 
 
-class CombineBenchmarkResultsFixture(unittest.TestCase):
+class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
 
     # Mock the hook's parent class because we're testing only functionality of this hook and
     # not anything related to or inherit from the parent class.
@@ -131,33 +147,33 @@ class CombineBenchmarkResultsFixture(unittest.TestCase):
     def setUp(self, MockHook):  # pylint: disable=arguments-differ,unused-argument
         self.bm_threads_report = cbr._BenchmarkThreadsReport(_BM_CONTEXT)
 
-        self.cbr_hook = cbr.CombineBenchmarkResults(None, None)
+        self.cbr_hook = cbr.GenerateAndCheckPerfResults(None, None)
 
         self.cbr_hook.create_time = datetime.datetime.utcfromtimestamp(_START_TIME)
         self.cbr_hook.end_time = datetime.datetime.utcfromtimestamp(_END_TIME)
         self.cbr_hook._parse_report(_BM_FULL_REPORT)
 
 
-class TestCombineBenchmarkResults(CombineBenchmarkResultsFixture):
+class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
     def test_generate_cedar_report(self):
-        report = self.cbr_hook._generate_cedar_report()
+        report = self.cbr_hook._generate_cedar_report(self.cbr_hook._parse_report(_BM_FULL_REPORT))
 
         self.assertEqual(len(report), 2)
-        self.assertEqual(report[0]["info"]["args"]["thread_level"], 1)
-        self.assertEqual(len(report[0]["metrics"]), 3)
-        self.assertEqual(report[1]["info"]["args"]["thread_level"], 10)
-        self.assertEqual(len(report[1]["metrics"]), 2)
+        self.assertEqual(report[0].thread_level, 1)
+        self.assertEqual(len(report[0].metrics), 3)
+        self.assertEqual(report[1].thread_level, 10)
+        self.assertEqual(len(report[1].metrics), 2)
 
     def test_generate_cedar_report_with_dup_metric_names(self):
         # After we parse the same report twice we have duplicated metrics
-        self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        report = self.cbr_hook._parse_report(_BM_FULL_REPORT_WITH_DUPS)
 
         # self.assertRaises(Exception, self.cbr_hook._generate_cedar_report)
         with self.assertRaisesRegex(CedarReportError, _BM_REPORT_1["name"]):
-            self.cbr_hook._generate_cedar_report()
+            self.cbr_hook._generate_cedar_report(report)
 
 
-class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
+class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
     def test_thread_from_name(self):
         name_obj = self.bm_threads_report.parse_bm_name({"name": "BM_Name/arg name:100/threads:10"})
         self.assertEqual(name_obj.thread_count, "10")
@@ -254,3 +270,69 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
         collected_types = (m.type for m in cedar_metrics[2])
         self.assertIn("LATENCY", collected_types)
         self.assertIn("MEAN", collected_types)
+
+
+class TestCheckPerfResultTestCase(unittest.TestCase):
+    def test_all_metrics_pass(self):
+        thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
+            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
+                                          test_name="fake-test", value=10, bound_direction="upper")
+        ]
+        reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
+            cbr.ReportedMetric(test_name="fake-test", thread_level=1, metric_name="latency"):
+                CedarMetric(name="latency", type="LATENCY", value=1)
+        }
+        test_case = cbr.CheckPerfResultTestCase(
+            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
+            reported_metrics)
+
+        # We want to make sure this can run without any exceptions.
+        test_case.run_test()
+
+    def test_a_metric_fails(self):
+        thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
+            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
+                                          test_name="fake-test", value=10, bound_direction="upper")
+        ]
+        reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
+            cbr.ReportedMetric(test_name="fake-test", thread_level=1, metric_name="latency"):
+                CedarMetric(name="latency", type="LATENCY", value=11)
+        }
+        test_case = cbr.CheckPerfResultTestCase(
+            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
+            reported_metrics)
+
+        with self.assertRaisesRegex(ServerFailure, "threshold check"):
+            test_case.run_test()
+
+    def test_metric_doesnt_exist(self):
+        thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
+            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
+                                          test_name="fake-test", value=10, bound_direction="upper")
+        ]
+        reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
+            cbr.ReportedMetric(test_name="fake-test", thread_level=1, metric_name="instructions"):
+                CedarMetric(name="instructions", type="LATENCY", value=1)
+        }
+        test_case = cbr.CheckPerfResultTestCase(
+            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
+            reported_metrics)
+
+        with self.assertRaisesRegex(ServerFailure, "threshold check"):
+            test_case.run_test()
+
+    def test_thread_level_doesnt_exist(self):
+        thresholds_to_check: List[cbr.IndividualMetricThreshold] = [
+            cbr.IndividualMetricThreshold(metric_name="latency", thread_level=1,
+                                          test_name="fake-test", value=10, bound_direction="upper")
+        ]
+        reported_metrics: Dict[cbr.ReportedMetric, CedarMetric] = {
+            cbr.ReportedMetric(test_name="fake-test", thread_level=12, metric_name="latency"):
+                CedarMetric(name="latency", type="LATENCY", value=1)
+        }
+        test_case = cbr.CheckPerfResultTestCase(
+            logging.getLogger("hook_logger"), "my-test", None, None, None, thresholds_to_check,
+            reported_metrics)
+
+        with self.assertRaisesRegex(ServerFailure, "threshold check"):
+            test_case.run_test()

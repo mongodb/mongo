@@ -1,37 +1,73 @@
-"""Module for generating the test results file fed into the perf plugin."""
+"""Module for generating the test results file fed into Cedar and checking them against set thresholds."""
 
 import collections
 import datetime
 import json
 from typing import List, Dict, Any
 from dataclasses import dataclass
+from enum import Enum
+
+import yaml
 
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib.errors import CedarReportError
+from buildscripts.resmokelib.errors import CedarReportError, ServerFailure
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
 
+THRESHOLD_LOCATION = "etc/performance_thresholds.yml"
+LOCAL_VARIANT = "local"
 
-class CombineBenchmarkResults(interface.Hook):
-    """CombineBenchmarkResults class.
 
-    The CombineBenchmarkResults hook combines test results from
+class BoundDirection(str, Enum):
+    """Enum describing the two different values available to be set for thresholds."""
+
+    UPPER = "upper"
+    LOWER = "lower"
+
+
+@dataclass
+class IndividualMetricThreshold:
+    """A single check for a reported performance result."""
+
+    metric_name: str
+    thread_level: int
+    test_name: str
+    value: int
+    bound_direction: BoundDirection
+
+
+@dataclass(frozen=True, eq=True)
+class ReportedMetric:
+    """The unique values of a single performance report."""
+
+    test_name: str
+    metric_name: str
+    thread_level: int
+
+
+class GenerateAndCheckPerfResults(interface.Hook):
+    """GenerateAndCheckPerfResults class.
+
+    The GenerateAndCheckPerfResults hook combines test results from
     individual benchmark files to a single file. This is useful for
     generating the json file to feed into the Evergreen performance
     visualization plugin.
+
+    It also will check the performance results against any thresholds that are set for each benchmark.
+    If no thresholds are set for a test, this hook should always pass.
     """
 
-    DESCRIPTION = "Combine JSON results from individual benchmarks"
+    DESCRIPTION = "Combine JSON results from individual benchmarks and check their reported values against any thresholds set for them."
 
     IS_BACKGROUND = False
 
     def __init__(self, hook_logger, fixture):
-        """Initialize CombineBenchmarkResults."""
-        interface.Hook.__init__(self, hook_logger, fixture, CombineBenchmarkResults.DESCRIPTION)
+        """Initialize GenerateAndCheckPerfResults."""
+        interface.Hook.__init__(self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION)
         self.cedar_report_file = _config.CEDAR_REPORT_FILE
-
-        # Reports grouped by name without thread.
-        self.benchmark_reports = {}
+        self.variant = _config.EVERGREEN_VARIANT_NAME if _config.EVERGREEN_VARIANT_NAME is not None else LOCAL_VARIANT
+        self.cedar_reports: List[CedarTestReport] = []
+        self.performance_thresholds: Dict[str, Any] = {}
 
         self.create_time = None
         self.end_time = None
@@ -46,32 +82,89 @@ class CombineBenchmarkResults(interface.Hook):
 
         with open(bm_report_path, "r") as bm_report_file:
             bm_report_dict = json.load(bm_report_file)
-            self._parse_report(bm_report_dict)
+
+        # Reports grouped by name without thread.
+        benchmark_reports = self._parse_report(bm_report_dict)
+        # Flat list where results are separated by name and thread_level.
+        cedar_formatted_results = self._generate_cedar_report(benchmark_reports)
+
+        self.cedar_reports.extend(cedar_formatted_results)
+
+        self._check_pass_fail(benchmark_reports, cedar_formatted_results, test, test_report)
+
+    def _check_pass_fail(self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"],
+                         cedar_formatted_results: List[CedarTestReport], test, test_report):
+        """Check to see if any of the reported results violate any of the thresholds set."""
+        for test_name in benchmark_reports.keys():
+            variant_thresholds = self.performance_thresholds.get(test_name, None)
+            if variant_thresholds is None:
+                self.logger.info(
+                    f"No thresholds were set for {test_name}, skipping threshold check")
+                continue
+            test_thresholds = variant_thresholds.get(self.variant, None)
+            if test_thresholds is None:
+                self.logger.info(
+                    f"No thresholds were set for {test_name} on {self.variant}, skipping threshold check"
+                )
+                continue
+            # Transform the thresholds set into something we can more easily use.
+            metrics_to_check: List[IndividualMetricThreshold] = []
+            for item in test_thresholds:
+                thread_level = item["thread_level"]
+                for metric in item["metrics"]:
+                    metrics_to_check.append(
+                        IndividualMetricThreshold(test_name=test_name, thread_level=thread_level,
+                                                  metric_name=metric["name"], value=metric["value"],
+                                                  bound_direction=metric["bound_direction"]))
+            # Transform the reported performance results into something we can more easily use.
+            transformed_metrics: Dict[ReportedMetric, CedarMetric] = {}
+            for cedar_result in cedar_formatted_results:
+                for individual_metric in cedar_result.metrics:
+                    reported_metric = ReportedMetric(test_name=cedar_result.test_name,
+                                                     thread_level=cedar_result.thread_level,
+                                                     metric_name=individual_metric.name)
+                    if transformed_metrics.get(reported_metric, None) is not None:
+                        raise CedarReportError(
+                            f"Multiple values reported for the same metric: {reported_metric}")
+                    else:
+                        transformed_metrics[reported_metric] = individual_metric
+            # Add a dynamic resmoke test to make sure that the pass/fail results are reported correctly.
+            hook_test_case = CheckPerfResultTestCase.create_after_test(
+                self.logger, test, self, metrics_to_check, transformed_metrics)
+            hook_test_case.configure(self.fixture)
+            hook_test_case.run_dynamic_test(test_report)
 
     def before_suite(self, test_report):
         """Set suite start time."""
         self.create_time = datetime.datetime.now()
+
+        try:
+            with open(THRESHOLD_LOCATION) as fh:
+                self.performance_thresholds = yaml.safe_load(fh)["tests"]
+        except Exception:
+            self.logger.exception(
+                f"Could not load in the threshold file needed to check performance results. "
+                f"Trying to retrieve them from {THRESHOLD_LOCATION}.")
+            raise ServerFailure(
+                "Could not load the needed threshold information. Please make sure you are in the root of the mongo repo."
+            )
 
     def after_suite(self, test_report, teardown_flag=None):
         """Update test report."""
 
         self.end_time = datetime.datetime.now()
 
-        try:
-            cedar_report = self._generate_cedar_report()
-        except CedarReportError:
-            teardown_flag.set()
-            raise
-        else:
-            if self.cedar_report_file is not None:
-                with open(self.cedar_report_file, "w") as fh:
-                    json.dump(cedar_report, fh)
+        if self.cedar_report_file is not None:
+            dict_formatted_results = [result.as_dict() for result in self.cedar_reports]
+            with open(self.cedar_report_file, "w") as fh:
+                json.dump(dict_formatted_results, fh)
 
-    def _generate_cedar_report(self) -> List[dict]:
+    def _generate_cedar_report(
+            self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"]) -> List[CedarTestReport]:
         """Format the data to look like a cedar report."""
         cedar_report = []
 
-        for name, report in self.benchmark_reports.items():
+        for name, report in benchmark_reports.items():
             cedar_metrics = report.generate_cedar_metrics()
             for _, thread_metrics in cedar_metrics.items():
                 if report.check_dup_metric_names(thread_metrics):
@@ -81,19 +174,72 @@ class CombineBenchmarkResults(interface.Hook):
             for threads_count, thread_metrics in cedar_metrics.items():
                 test_report = CedarTestReport(test_name=name, thread_level=threads_count,
                                               metrics=thread_metrics)
-                cedar_report.append(test_report.as_dict())
+                cedar_report.append(test_report)
 
         return cedar_report
 
-    def _parse_report(self, report_dict):
+    def _parse_report(self, report_dict) -> Dict[str, "_BenchmarkThreadsReport"]:
         context = report_dict["context"]
+        # Reports grouped by name without thread.
+        benchmark_reports: Dict[str, "_BenchmarkThreadsReport"] = {}
 
         for benchmark_res in report_dict["benchmarks"]:
             bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res)
 
-            if bm_name_obj.base_name not in self.benchmark_reports:
-                self.benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
-            self.benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
+            if bm_name_obj.base_name not in benchmark_reports:
+                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
+            benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
+        return benchmark_reports
+
+
+class CheckPerfResultTestCase(interface.DynamicTestCase):
+    """CheckPerfResultTestCase class."""
+
+    def __init__(self, logger, test_name, description, base_test_name, hook,
+                 thresholds_to_check: List["IndividualMetricThreshold"],
+                 reported_metrics: Dict[ReportedMetric, CedarMetric]):
+        super().__init__(logger, test_name, description, base_test_name, hook)
+        self.thresholds_to_check: List["IndividualMetricThreshold"] = thresholds_to_check
+        self.reported_metrics: Dict[ReportedMetric, CedarMetric] = reported_metrics
+
+    def run_test(self):
+        """
+        Check the values reported by this performance run.
+
+        If any metric fails validation, the entire benchmark fails.
+        If any metric that has a threshold set is not found in the reported results, the entire benchmark will fail.
+        """
+        any_metric_has_failed = False
+
+        for metric_to_check in self.thresholds_to_check:
+            reported_metric = self.reported_metrics.get(
+                ReportedMetric(test_name=metric_to_check.test_name,
+                               thread_level=metric_to_check.thread_level,
+                               metric_name=metric_to_check.metric_name), None)
+            if reported_metric is None:
+                self.logger.error(
+                    f"One of the expected metrics was not able to be found in the performance results generated by this task. {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} did not report a metric called {metric_to_check.metric_name}."
+                )
+                any_metric_has_failed = True
+                continue
+            if (metric_to_check.bound_direction == BoundDirection.UPPER
+                    and metric_to_check.value < reported_metric.value) or (
+                        metric_to_check.bound_direction == BoundDirection.LOWER
+                        and metric_to_check.value > reported_metric.value):
+                if metric_to_check.bound_direction == BoundDirection.LOWER:
+                    self.logger.error(
+                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the set threshold of {metric_to_check.value}"
+                    )
+                    any_metric_has_failed = True
+                else:
+                    self.logger.error(
+                        f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is higher than the set threshold of {metric_to_check.value}"
+                    )
+                    any_metric_has_failed = True
+        if any_metric_has_failed:
+            raise ServerFailure(
+                f"One or more of the metrics reported by this task have failed the threshold check. Please resolve all of the issues called out above. These thresholds can be found in {THRESHOLD_LOCATION}"
+            )
 
 
 # Capture information from a Benchmark name in a logical format.
