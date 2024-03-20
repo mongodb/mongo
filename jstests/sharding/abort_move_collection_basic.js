@@ -28,10 +28,6 @@ let shard1 = st.shard1.shardName;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shard0}));
 
-// TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
-// registers the collection on the sharding catalog
-assert.commandWorked(st.s.getDB(dbName).runCommand({createUnsplittableCollection: collName}));
-
 const coll = mongos.getDB(dbName)[collName];
 for (let i = -5; i < 5; ++i) {
     assert.commandWorked(coll.insert({oldKey: i}));

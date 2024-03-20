@@ -304,6 +304,9 @@ structs:
             isFromCreateUnsplittableCollectionTestCommand:
                 description: "Temporary field to differentiate calls originating from the createUnsplittableCollection test command."
                 type: optionalBool
+            registerExistingCollectionInGlobalCatalog:
+                type: optionalBool
+                description: "True when instantiating a coordiantor to track an existing collection on the sharding catalog"
 
     CreateCollectionResponse:
         description: "Response of the create collection command"

@@ -3,7 +3,6 @@
  * @tags: [
  *   featureFlagReshardingImprovements,
  *   featureFlagMoveCollection,
- *   multiversion_incompatible,
  *   assumes_balancer_off,
  *   requires_fcv_80
  * ]
@@ -22,8 +21,6 @@ const kNumObjs = 3;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
-// TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
-// registers the collection on the sharding catalog
 assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl}));
 
 for (let i = 0; i < kNumObjs; ++i) {

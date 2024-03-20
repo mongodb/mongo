@@ -4,8 +4,6 @@
  * @tags: [
  *  requires_fcv_80,
  *  featureFlagMoveCollection,
- *  # TODO (SERVER-86295): remove this dependency once moving collections tracks them.
- *  featureFlagTrackUnshardedCollectionsUponCreation,
  *  assumes_balancer_off,
  *  requires_capped
  * ]

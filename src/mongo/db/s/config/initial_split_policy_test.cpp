@@ -229,12 +229,6 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
                        DBException,
                        ErrorCodes::InvalidOptions);
 
-    // Collection must be empty.
-    ASSERT_THROWS_CODE(create_collection_util::createPolicy(
-                           opCtx(), kCorrectShardKey, false, {}, 1, false, true, kShardId0),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
-
     auto singleChunksOnShardPolicy = create_collection_util::createPolicy(
         opCtx(), kCorrectShardKey, false, {}, 1, true, true /*unsplittable*/, kShardId0);
 

@@ -44,8 +44,8 @@ function runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, t
     // Reconnect after the connection was closed due to restart.
     reconnect(conn);
 
-    // TODO SERVER-86295: Remove the enableSharding command below once we start tracking unsharded
-    // collections before moving them.
+    // TODO SERVER-88213 Remove the enableSharding command below once transitionToShardedCluster
+    // registers databases
     assert.commandWorked(conn.adminCommand({enableSharding: dbName}));
 
     const docAfterUpgrade = conn.getDB(dbName).getCollection(collName).findOne({x: 1});

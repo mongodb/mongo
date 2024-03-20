@@ -178,10 +178,6 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
                 "Found non-trivial shard key while creating chunk policy for unsharded collection",
                 shardKeyPattern.getKeyPattern().toBSON().woCompare(
                     sharding_ddl_util::unsplittableCollectionShardKey().toBSON()) == 0);
-
-        uassert(ErrorCodes::InvalidOptions,
-                "Found non-empty collection while creating chunk policy for unsharded collection",
-                collectionIsEmpty);
     }
 
     // if unsplittable, the collection is always equivalent to a single chunk collection
@@ -562,6 +558,11 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
                                         const NamespaceString& targetNss,
                                         const ShardsvrCreateCollectionRequest& request,
                                         boost::optional<CollectionAcquisition>&& targetColl) {
+    if (request.getRegisterExistingCollectionInGlobalCatalog()) {
+        // No need to check for collection options when registering an existing collection
+        return;
+    }
+
     if (isUnsplittable(request)) {
         // Release Collection Acquisition and all associated locks
         targetColl.reset();
@@ -579,6 +580,11 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                                            const NamespaceString& targetNss,
                                            const ShardsvrCreateCollectionRequest& request,
                                            const CollectionRoutingInfo& cri) {
+    if (request.getRegisterExistingCollectionInGlobalCatalog()) {
+        // No need for checking the sharding catalog when tracking a collection for the first time
+        return;
+    }
+
     const auto& cm = cri.cm;
 
     tassert(
@@ -715,6 +721,13 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
         boost::optional<CollectionAcquisition> targetColl =
             boost::make_optional(acquireTargetCollection(opCtx, originalNss, request));
 
+        if (request.getRegisterExistingCollectionInGlobalCatalog()) {
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Namespace " << targetColl->nss().toStringForErrorMsg()
+                                  << " not found",
+                    targetColl->exists());
+        }
+
         if (!targetColl->exists()) {
             return boost::none;
         }
@@ -724,35 +737,18 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
 
         // Since the coordinator is holding the DDL lock for the collection we have the guarantee
         // that the collection can't be dropped concurrently.
-
         checkLocalCatalogCollectionOptions(opCtx, *optTargetNss, request, std::move(targetColl));
     }
 
     invariant(optTargetNss);
     const auto& targetNss = *optTargetNss;
     invariant(optTargetCollUUID);
-    const auto& targetCollUUID = *optTargetCollUUID;
 
     // 2. Check if the collection already registered in the sharding catalog with same options
-
     const auto cri = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, targetNss));
 
     if (!cri.cm.hasRoutingTable()) {
-        // TODO SERVER-77915: Once all collection will be tracked in the
-        // sharding catalog this should never happen.
-
-        if (isUnsplittable(request)) {
-            // The collection exists, is unsplittable, local options matches but is not registered
-            // in the sharding catalog.
-            //
-            // Exit from the coordinator and do not register the collection in the sharding catalog.
-
-            CreateCollectionResponse response(ShardVersion::UNSHARDED());
-            response.setCollectionUUID(targetCollUUID);
-            return response;
-        }
-
         // The collection is not tracked in the sharding catalog. We either
         // need to register it or to shard it. Proceed with the coordinator.
         return boost::none;
@@ -2062,13 +2058,18 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
 
     ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
 
-    _uuid = createCollectionAndIndexes(opCtx,
-                                       shardKeyPattern,
-                                       _request,
-                                       nss(),
-                                       _doc.getTranslatedRequestParams(),
-                                       *_doc.getOriginalDataShard(),
-                                       true /* isUpdatedCoordinatorDoc */);
+    if (_request.getRegisterExistingCollectionInGlobalCatalog()) {
+        // If the flag is set, we're guaranteed that at this point the collection already exists
+        _uuid = *sharding_ddl_util::getCollectionUUID(opCtx, nss());
+    } else {
+        _uuid = createCollectionAndIndexes(opCtx,
+                                           shardKeyPattern,
+                                           _request,
+                                           nss(),
+                                           _doc.getTranslatedRequestParams(),
+                                           *_doc.getOriginalDataShard(),
+                                           true /* isUpdatedCoordinatorDoc */);
+    }
 
     if (isSharded(_request)) {
         audit::logShardCollection(opCtx->getClient(),

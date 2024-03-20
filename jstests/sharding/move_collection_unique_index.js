@@ -5,7 +5,7 @@
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   featureFlagReshardingImprovements,
- *   requires_fcv_80
+ *   requires_fcv_80,
  * ]
  */
 
@@ -17,10 +17,6 @@ const kCollName = 'test';
 const nss = kDbName + '.' + kCollName;
 assert.commandWorked(
     st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
-
-// TODO (SERVER-86295) Replace createUnsplittableCollection with create once moveCollection
-// registers the collection on the sharding catalog
-assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kCollName}));
 
 assert.commandWorked(st.s.getCollection(nss).createIndex({oldKey: 1, a: 1, b: 1}, {unique: true}));
 

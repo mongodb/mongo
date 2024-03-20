@@ -180,14 +180,6 @@ function testWritingAgg({
  */
 function testConcurrentWriteAgg(
     {failpointName, writeAggSpec, nameOfCollToMove, expectedDestShard, mergeShard}) {
-    // TODO (SERVER-86295): Run this test when TrackUnshardedCollectionUponMoveCollection is enabled
-    // once we track a collection upon moveCollection.
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
-        jsTestLog("Skipping testConcurrentWriteAgg for " + tojson(writeAggSpec) +
-                  " since TrackUnshardedCollectionsUponCreation feature flag is disabled");
-        return;
-    }
-
     let failpoint = configureFailPoint(mergeShard.rs.getPrimary(), failpointName);
     let writingAgg = startParallelShell(
         funWithArgs(function(dbName, sourceCollName, writeAggSpec) {

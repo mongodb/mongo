@@ -56,8 +56,16 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request);
 
 /**
- * Creates the specified nss as an unsharded collection. Calls the above createCollection function
- * within a router loop.
+ * Creates a collection with the options specified in `request`. Calls the above createCollection
+ * function within a router loop.
+ */
+void createCollectionWithRouterLoop(OperationContext* opCtx,
+                                    const ShardsvrCreateCollection& request);
+
+
+/**
+ * Creates the specified nss as an unsharded collection. Calls the above
+ * createCollectionWithRouterLoop function.
  */
 void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceString& nss);
 

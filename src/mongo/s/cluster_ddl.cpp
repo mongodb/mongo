@@ -249,6 +249,16 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
         nss, createCollResp.getCollectionVersion(), dbInfo->getPrimary());
 }
 
+void createCollectionWithRouterLoop(OperationContext* opCtx,
+                                    const ShardsvrCreateCollection& request) {
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), request.getDbName());
+    router.route(opCtx,
+                 "cluster::createCollectionWithRouterLoop",
+                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                     cluster::createCollection(opCtx, request);
+                 });
+}
+
 void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceString& nss) {
     auto dbName = nss.dbName();
 
@@ -260,12 +270,7 @@ void createCollectionWithRouterLoop(OperationContext* opCtx, const NamespaceStri
     shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
     shardsvrCollCommand.setDbName(nss.dbName());
 
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
-    router.route(opCtx,
-                 "cluster::createCollectionWithRouterLoop",
-                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                     cluster::createCollection(opCtx, shardsvrCollCommand);
-                 });
+    createCollectionWithRouterLoop(opCtx, shardsvrCollCommand);
 }
 
 }  // namespace cluster
