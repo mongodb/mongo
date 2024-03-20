@@ -54,13 +54,22 @@ namespace sbe {
  */
 class BlockHashAggStage final : public HashAggBaseStage<BlockHashAggStage> {
 public:
+    struct BlockRowAccumulators {
+        std::unique_ptr<EExpression> blockAgg;
+        std::unique_ptr<EExpression> rowAgg;
+    };
+
+    // List of pairs, where the first part of the pair is a slot and second part of the pair
+    // is a struct of the form {blockAgg, rowAgg} containing the corresponding accumulators.
+    using BlockAndRowAggs = std::vector<std::pair<value::SlotId, BlockRowAccumulators>>;
+
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotVector groupSlotIds,
                       value::SlotId blockBitsetInSlotId,
                       value::SlotVector blockDataInSlotIds,
                       value::SlotVector accumulatorDataSlotIds,
                       value::SlotId accumulatorBitsetSlotId,
-                      AggExprTupleVector aggs,
+                      BlockAndRowAggs aggs,
                       bool allowDiskUse,
                       SlotExprPairVector mergingExprs,
                       PlanYieldPolicy* yieldPolicy,
@@ -141,8 +150,8 @@ private:
      */
     void runAccumulatorsElementWise();
 
-    // Returns false if we've run out of spilled keys, otherwise returns true.
-    bool getNextSpilledHelper();
+    // Returns the next accumulator key or boost::none if we've run out of spilled keys.
+    boost::optional<value::MaterializedRow> getNextSpilledHelper();
     PlanState getNextSpilled();
 
     /*
@@ -182,7 +191,7 @@ private:
      * input the block accumulator reads from, and is also the output that the row accumulator
      * writes to.
      */
-    AggExprTupleVector _aggs;
+    BlockAndRowAggs _blockRowAggs;
 
     SlotExprPairVector _mergingExprs;
 
@@ -197,8 +206,7 @@ private:
     std::vector<value::HeterogeneousBlock> _outAggBlocks;
 
     // Code for block and row accumulators.
-    std::vector<std::unique_ptr<vm::CodeFragment>> _initCodes;
-    std::vector<std::unique_ptr<vm::CodeFragment>> _blockAggCodes;
+    std::vector<std::unique_ptr<vm::CodeFragment>> _blockLevelAggCodes;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
     // Bytecode for the merging expressions, executed if partial aggregates are spilled to a record
@@ -206,11 +214,8 @@ private:
     std::vector<std::unique_ptr<vm::CodeFragment>> _mergingExprCodes;
 
     std::vector<std::unique_ptr<HashAggAccessor>> _rowAggHtAccessors;
-    value::MaterializedRow _outAggRowRecordStore{0};
-    std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _rowAggRSAccessors;
+    std::vector<std::unique_ptr<value::OwnedValueAccessor>> _rowAggRSAccessors;
     std::vector<std::unique_ptr<value::SwitchAccessor>> _rowAggAccessors;
-
-    value::MaterializedRow _outKeyRowRecordStore{0};
 
     // Hash table where we'll map groupby key to the accumulators.
     std::vector<std::unique_ptr<HashKeyAccessor>> _idHtAccessors;
@@ -231,8 +236,7 @@ private:
     // Partial aggregates that have been spilled and restored are passed into the bytecode in
     // '_mergingExprCodes' via '_spilledAccessors' so that they can be merged to compute the
     // final aggregate value.
-    value::MaterializedRow _spilledAggRow{0};
-    std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _spilledAccessors;
+    std::vector<value::ViewOfValueAccessor> _spilledAccessors;
     value::SlotAccessorMap _spilledAccessorMap;
 
     // Place to stash the next keys and values during the streaming phase. The record store cursor

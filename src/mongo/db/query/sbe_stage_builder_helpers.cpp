@@ -806,6 +806,8 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
 
     auto collatorSlot = state.getCollatorSlot();
 
+    StringData helperFn = isAscending ? "_internalLeast"_sd : "_internalGreatest"_sd;
+
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldExpr = fieldSlot ? b.makeVariable(*fieldSlot)
                                : b.makeFunction("getField"_sd,
@@ -819,14 +821,17 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
             fieldSlot ? boost::optional<sbe::FrameId>{} : boost::make_optional(state.frameId());
         auto var = fieldSlot ? fieldExpr.clone() : b.makeVariable(*frameId, 0);
 
-        auto helperArgs = SbExpr::makeSeq(std::move(var));
+        auto helperArgs = SbExpr::makeSeq(var.clone());
         if (collatorSlot) {
             helperArgs.emplace_back(makeVariable(*collatorSlot));
         }
 
-        StringData helperFn = isAscending ? "getSortKeyAsc"_sd : "getSortKeyDesc"_sd;
-
-        auto resultExpr = b.makeFunction(helperFn, std::move(helperArgs));
+        // According to MQL's sorting semantics, when a leaf field is an empty array we
+        // should use Undefined as the sort key.
+        auto resultExpr =
+            b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, var.clone())),
+                     b.makeFillEmptyUndefined(b.makeFunction(helperFn, std::move(helperArgs))),
+                     b.makeFillEmptyNull(var.clone()));
 
         if (!fieldSlot) {
             resultExpr =
@@ -862,13 +867,12 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
 
     // According to MQL's sorting semantics, when a non-leaf field is an empty array or does not
     // exist we should use Null as the sort key.
-    StringData helperFn = isAscending ? "getNonLeafSortKeyAsc"_sd : "getNonLeafSortKeyDesc"_sd;
-
     return b.makeLet(frameId,
                      std::move(binds),
-                     b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, std::move(var))),
-                              b.makeFunction(helperFn, std::move(helperArgs)),
-                              b.makeFillEmptyNull(std::move(resultVar))));
+                     b.makeFillEmptyNull(b.makeIf(
+                         b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, std::move(var))),
+                         b.makeFunction(helperFn, std::move(helperArgs)),
+                         std::move(resultVar))));
 }
 }  // namespace
 

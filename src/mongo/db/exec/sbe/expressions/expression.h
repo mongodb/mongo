@@ -140,17 +140,10 @@ using SlotExprPairVector = std::vector<SlotExprPair>;
 
 struct AggExprPair {
     std::unique_ptr<EExpression> init;
-    std::unique_ptr<EExpression> agg;
-};
-
-struct AggExprTuple {
-    std::unique_ptr<EExpression> init;
-    std::unique_ptr<EExpression> blockAgg;
-    std::unique_ptr<EExpression> agg;
+    std::unique_ptr<EExpression> acc;
 };
 
 using AggExprVector = std::vector<std::pair<value::SlotId, AggExprPair>>;
-using AggExprTupleVector = std::vector<std::pair<value::SlotId, AggExprTuple>>;
 
 template <typename T, typename... Args>
 inline std::unique_ptr<EExpression> makeE(Args&&... args) {

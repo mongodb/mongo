@@ -109,24 +109,12 @@ inline size_t estimate(const AggExprPair& expr) {
     if (expr.init) {
         size += expr.init->estimateSize();
     }
-    size += expr.agg->estimateSize();
+    size += expr.acc->estimateSize();
     return size;
 }
 
-inline size_t estimate(const AggExprTuple& tuple) {
-    size_t size = 0;
-
-    if (tuple.init) {
-        size += tuple.init->estimateSize();
-    }
-
-    if (tuple.blockAgg) {
-        size += tuple.blockAgg->estimateSize();
-    }
-
-    size += tuple.agg->estimateSize();
-
-    return size;
+inline size_t estimate(const BlockHashAggStage::BlockRowAccumulators& acc) {
+    return size_estimator::estimate(acc.blockAgg) + size_estimator::estimate(acc.rowAgg);
 }
 
 inline size_t estimate(const WindowStage::Window& window) {

@@ -201,7 +201,7 @@ public:
 
             auto accumulatorBitset = generateSlotId();
 
-            AggExprTupleVector aggs;
+            BlockHashAggStage::BlockAndRowAggs aggs;
 
             size_t scanSlotIdx = keySize + 1;
             for (const auto& [blockAcc, rowAcc, mergeAcc] : accNames) {
@@ -227,9 +227,9 @@ public:
                         stage_builder::makeFunction(rowAcc, makeE<EVariable>(internalSlot));
                 }
 
-                aggs.emplace_back(
-                    outputSlot,
-                    AggExprTuple{nullptr, std::move(blockAccFunc), std::move(rowAccFunc)});
+                aggs.emplace_back(outputSlot,
+                                  BlockHashAggStage::BlockRowAccumulators{std::move(blockAccFunc),
+                                                                          std::move(rowAccFunc)});
 
                 outputSlots.push_back(outputSlot);
 

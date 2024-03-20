@@ -505,11 +505,13 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     bool allowDiskUse,
     SbExprSbSlotVector mergingExprs,
     PlanYieldPolicy* yieldPolicy) {
+    using BlockAggExprPair = sbe::BlockHashAggStage::BlockRowAccumulators;
+
     tassert(8448607, "Expected at least one group by slot to be provided", gbs.size() > 0);
 
     const auto selectivityBitmapSlotId = selectivityBitmapSlot.getId();
 
-    sbe::AggExprTupleVector aggs;
+    sbe::BlockHashAggStage::BlockAndRowAggs blockRowAggs;
     SbSlotVector aggOutSlots;
 
     for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
@@ -518,17 +520,9 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
         aggOutSlots.emplace_back(sbSlot);
 
-        std::unique_ptr<sbe::EExpression> init, blockAgg, agg;
-        if (sbAggExpr.init) {
-            init = sbAggExpr.init.extractExpr(_state, varTypes);
-        }
-        if (sbAggExpr.blockAgg) {
-            blockAgg = sbAggExpr.blockAgg.extractExpr(_state, varTypes);
-        }
-        agg = sbAggExpr.agg.extractExpr(_state, varTypes);
-
-        aggs.emplace_back(sbSlot.getId(),
-                          sbe::AggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)});
+        auto exprPair = BlockAggExprPair{sbAggExpr.blockAgg.extractExpr(_state, varTypes),
+                                         sbAggExpr.agg.extractExpr(_state, varTypes)};
+        blockRowAggs.emplace_back(sbSlot.getId(), std::move(exprPair));
     }
 
     sbe::value::SlotVector groupBySlots;
@@ -561,7 +555,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
                                                std::move(blockAccArgSlots),
                                                std::move(accumulatorDataSlots),
                                                bitmapInternalSlot.getId(),
-                                               std::move(aggs),
+                                               std::move(blockRowAggs),
                                                allowDiskUse,
                                                std::move(mergingExprsVec),
                                                yieldPolicy,

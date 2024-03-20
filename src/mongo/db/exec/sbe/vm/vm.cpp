@@ -1112,8 +1112,6 @@ void CodeFragment::appendFail() {
     appendSimpleInstruction(Instruction::fail);
 }
 
-ByteCode::TopBottomArgs::~TopBottomArgs() {}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
                                                                   value::Value objValue,
                                                                   value::TypeTags fieldTag,
@@ -5803,117 +5801,55 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTypeMatch(ArityT
     return {false, value::TypeTags::Nothing, 0};
 }
 
-template <bool IsAscending, bool IsLeaf>
-std::pair<value::TypeTags, value::Value> builtinGetSortKeyImpl(value::TypeTags inputTag,
-                                                               value::Value inputVal,
-                                                               CollatorInterface* collator) {
-    if (!value::isArray(inputTag)) {
-        // If 'input' is not an array, return 'fillEmpty(input, null)'.
-        if (inputTag != value::TypeTags::Nothing) {
-            return {inputTag, inputVal};
-        } else {
-            return {value::TypeTags::Null, 0};
-        }
-    }
-
-    value::ArrayEnumerator arrayEnum(inputTag, inputVal);
-    if (arrayEnum.atEnd()) {
-        // If 'input' is an empty array, return Undefined or Null depending on whether 'IsLeaf'
-        // is true or false.
-        if constexpr (IsLeaf) {
-            return {sbe::value::TypeTags::bsonUndefined, 0};
-        } else {
-            return {sbe::value::TypeTags::Null, 0};
-        }
-    }
-
-    auto [accTag, accVal] = arrayEnum.getViewOfValue();
-    arrayEnum.advance();
-
-    // If we reach here, then 'input' is a non-empty array. Loop over the elements and find
-    // the minimum element (if IsAscending is true) or the maximum element (if IsAscending
-    // is false) and return it.
-    while (!arrayEnum.atEnd()) {
-        auto [itemTag, itemVal] = arrayEnum.getViewOfValue();
-        auto [tag, val] = value::compare3way(itemTag, itemVal, accTag, accVal, collator);
-
-        if (tag == value::TypeTags::Nothing) {
-            // The comparison returns Nothing if one of the arguments is Nothing or if a sort order
-            // cannot be determined: bail out immediately and return Null.
-            return {sbe::value::TypeTags::Null, 0};
-        }
-
-        if (tag == value::TypeTags::NumberInt32) {
-            int32_t cmp = value::bitcastTo<int32_t>(val);
-
-            if ((IsAscending && cmp < 0) || (!IsAscending && cmp > 0)) {
-                accTag = itemTag;
-                accVal = itemVal;
-            }
-        }
-
-        arrayEnum.advance();
-    }
-
-    return {accTag, accVal};
-}
-
-template <bool IsAscending, bool IsLeaf>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinMaxFromArray(ArityType arity,
+                                                                                Builtin f) {
     invariant(arity == 1 || arity == 2);
 
     CollatorInterface* collator = nullptr;
     if (arity == 2) {
-        auto [_, collTag, collVal] = getFromStack(1);
+        auto [collOwned, collTag, collVal] = getFromStack(1);
         if (collTag == value::TypeTags::collator) {
             collator = value::getCollatorView(collVal);
         }
     }
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
 
-    // If the argument is an array, find out the min/max value and place it in the stack. If it
-    // is Nothing or another simple type, treat it as the return value.
-    if (!value::isArray(inputTag)) {
-        if (inputTag != value::TypeTags::Nothing) {
-            return moveFromStack(0);
-        } else {
-            return {false, value::TypeTags::Null, 0};
-        }
+    // If the argument is an array, find out the min/max value and place it in the
+    // stack. If it is Nothing or another simple type, treat it as the return value.
+    if (!value::isArray(fieldTag)) {
+        return moveFromStack(0);
     }
 
-    auto [resultTag, resultVal] =
-        builtinGetSortKeyImpl<IsAscending, IsLeaf>(inputTag, inputVal, collator);
-
+    value::ArrayEnumerator arrayEnum(fieldTag, fieldVal);
+    if (arrayEnum.atEnd()) {
+        // The array is empty, return Nothing.
+        return {false, sbe::value::TypeTags::Nothing, 0};
+    }
+    auto [accTag, accVal] = arrayEnum.getViewOfValue();
+    arrayEnum.advance();
+    int sign_adjust = f == Builtin::internalLeast ? -1 : +1;
+    while (!arrayEnum.atEnd()) {
+        auto [itemTag, itemVal] = arrayEnum.getViewOfValue();
+        auto [tag, val] = value::compare3way(itemTag, itemVal, accTag, accVal, collator);
+        if (tag == value::TypeTags::Nothing) {
+            // The comparison returns Nothing if one of the arguments is Nothing or if a sort order
+            // cannot be determined: bail out immediately and return Nothing.
+            return {false, sbe::value::TypeTags::Nothing, 0};
+        } else if (tag == value::TypeTags::NumberInt32 &&
+                   (sign_adjust * value::bitcastTo<int>(val)) > 0) {
+            accTag = itemTag;
+            accVal = itemVal;
+        }
+        arrayEnum.advance();
+    }
     // If the array is owned by the stack, make a copy of the item, or it will become invalid after
     // the caller clears the array from it.
-    if (inputOwned) {
-        auto [copyTag, copyVal] = value::copyValue(resultTag, resultVal);
-        return {true, copyTag, copyVal};
-    } else {
-        return {false, resultTag, resultVal};
+    if (fieldOwned) {
+        std::tie(accTag, accVal) = value::copyValue(accTag, accVal);
     }
+    return {fieldOwned, accTag, accVal};
 }
-
-std::pair<value::TypeTags, value::Value> GetSortKeyAscFunctor::operator()(value::TypeTags tag,
-                                                                          value::Value val) const {
-    auto [skTag, skVal] = builtinGetSortKeyImpl<true, true>(tag, val, collator);
-    return value::copyValue(skTag, skVal);
-}
-
-std::pair<value::TypeTags, value::Value> GetSortKeyDescFunctor::operator()(value::TypeTags tag,
-                                                                           value::Value val) const {
-    auto [skTag, skVal] = builtinGetSortKeyImpl<false, true>(tag, val, collator);
-    return value::copyValue(skTag, skVal);
-}
-
-const value::ColumnOpInstanceWithParams<value::ColumnOpType::kNoFlags, GetSortKeyAscFunctor>
-    getSortKeyAscOp =
-        value::makeColumnOpWithParams<value::ColumnOpType::kNoFlags, GetSortKeyAscFunctor>();
-
-const value::ColumnOpInstanceWithParams<value::ColumnOpType::kNoFlags, GetSortKeyDescFunctor>
-    getSortKeyDescOp =
-        value::makeColumnOpWithParams<value::ColumnOpType::kNoFlags, GetSortKeyDescFunctor>();
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinObjectToArray(ArityType arity) {
     invariant(arity == 1);
@@ -5958,6 +5894,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinObjectToArray(Ar
     arrGuard.reset();
     return {true, arrTag, arrVal};
 }
+
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(ArityType arity) {
     invariant(arity == 1);
@@ -6102,8 +6039,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
     return {true, objTag, objVal};
 }
 
-std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
-ByteCode::multiAccState(value::TypeTags stateTag, value::Value stateVal) {
+std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool> multiAccState(
+    value::TypeTags stateTag, value::Value stateVal) {
     uassert(
         7548600, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
     auto state = value::getArrayView(stateVal);
@@ -6173,8 +6110,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNNeedsMo
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(needMoreInput)};
 }
 
-int32_t updateAndCheckMemUsage(
-    value::Array* state, int32_t memUsage, int32_t memAdded, int32_t memLimit, size_t idx) {
+int32_t updateAndCheckMemUsage(value::Array* state,
+                               int32_t memUsage,
+                               int32_t memAdded,
+                               int32_t memLimit,
+                               size_t idx = static_cast<size_t>(AggMultiElems::kMemUsage)) {
     memUsage += memAdded;
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream()
@@ -6404,23 +6344,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNFinalize
     return {true, outArrayTag, outArrayVal};
 }
 
-template <TopBottomSense Sense>
-int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
-                                   value::Array* array,
-                                   size_t maxSize,
-                                   int32_t memUsage,
-                                   int32_t memLimit,
-                                   TopBottomArgs& args) {
-    using Less =
-        std::conditional_t<Sense == TopBottomSense::kTop, SortPatternLess, SortPatternGreater>;
-
+template <typename Less>
+int32_t aggTopBottomNAdd(value::Array* state,
+                         value::Array* array,
+                         size_t maxSize,
+                         int32_t memUsage,
+                         int32_t memLimit,
+                         const SortSpec* sortSpec,
+                         std::pair<value::TypeTags, value::Value> key,
+                         std::pair<value::TypeTags, value::Value> output) {
     auto memAdded = [](std::pair<value::TypeTags, value::Value> key,
-                       std::pair<value::TypeTags, value::Value> value) {
+                       std::pair<value::TypeTags, value::Value> output) {
         return value::getApproximateSize(key.first, key.second) +
-            value::getApproximateSize(value.first, value.second);
+            value::getApproximateSize(output.first, output.second);
     };
 
-    auto less = Less(args.getSortSpec());
+    value::ValueGuard keyGuard{key.first, key.second};
+    value::ValueGuard outputGuard{output.first, output.second};
+    auto less = Less(sortSpec);
     auto keyLess = PairKeyComp(less);
     auto& heap = array->values();
 
@@ -6429,15 +6370,12 @@ int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
         value::ValueGuard pairGuard{pairTag, pairVal};
         auto pair = value::getArrayView(pairVal);
         pair->reserve(2);
+        keyGuard.reset();
+        pair->push_back(key.first, key.second);
+        outputGuard.reset();
+        pair->push_back(output.first, output.second);
 
-        auto [keyTag, keyVal] = args.getOwnedKey();
-        pair->push_back(keyTag, keyVal);
-
-        auto [valueTag, valueVal] = args.getOwnedValue();
-        pair->push_back(valueTag, valueVal);
-
-        memUsage = updateAndCheckMemUsage(
-            state, memUsage, memAdded({keyTag, keyVal}, {valueTag, valueVal}), memLimit);
+        memUsage = updateAndCheckMemUsage(state, memUsage, memAdded(key, output), memLimit);
 
         pairGuard.reset();
         array->push_back(pairTag, pairVal);
@@ -6450,28 +6388,18 @@ int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
         auto [worstTag, worstVal] = heap.front();
         auto worst = value::getArrayView(worstVal);
         auto worstKey = worst->getAt(0);
-
-        if (args.keySortsBefore(worstKey)) {
-            auto [keyTag, keyVal] = args.getOwnedKey();
-            value::ValueGuard keyGuard{keyTag, keyVal};
-
-            auto [valueTag, valueVal] = args.getOwnedValue();
-            value::ValueGuard valueGuard{valueTag, valueVal};
-
+        if (less(key, worstKey)) {
             memUsage = updateAndCheckMemUsage(state,
                                               memUsage,
                                               -memAdded(worst->getAt(0), worst->getAt(1)) +
-                                                  memAdded({keyTag, keyVal}, {valueTag, valueVal}),
+                                                  memAdded(key, output),
                                               memLimit);
 
             std::pop_heap(heap.begin(), heap.end(), keyLess);
-
             keyGuard.reset();
-            worst->setAt(0, keyTag, keyVal);
-
-            valueGuard.reset();
-            worst->setAt(1, valueTag, valueVal);
-
+            worst->setAt(0, key.first, key.second);
+            outputGuard.reset();
+            worst->setAt(1, output.first, output.second);
             std::push_heap(heap.begin(), heap.end(), keyLess);
         }
     }
@@ -6479,216 +6407,26 @@ int32_t ByteCode::aggTopBottomNAdd(value::Array* state,
     return memUsage;
 }
 
-int32_t ByteCode::aggTopNAdd(value::Array* state,
-                             value::Array* array,
-                             size_t maxSize,
-                             int32_t memUsage,
-                             int32_t memLimit,
-                             TopBottomArgs& args) {
-    return aggTopBottomNAdd<TopBottomSense::kTop>(state, array, maxSize, memUsage, memLimit, args);
-}
-
-int32_t ByteCode::aggBottomNAdd(value::Array* state,
-                                value::Array* array,
-                                size_t maxSize,
-                                int32_t memUsage,
-                                int32_t memLimit,
-                                TopBottomArgs& args) {
-    return aggTopBottomNAdd<TopBottomSense::kBottom>(
-        state, array, maxSize, memUsage, memLimit, args);
-}
-
-class ByteCode::TopBottomArgsDirect final : public ByteCode::TopBottomArgs {
-public:
-    TopBottomArgsDirect(TopBottomSense sense,
-                        SortSpec* sortSpec,
-                        FastTuple<bool, value::TypeTags, value::Value> key,
-                        FastTuple<bool, value::TypeTags, value::Value> value)
-        : TopBottomArgs(sense, sortSpec, false, false) {
-        setDirectKeyArg(key);
-        setDirectValueArg(value);
-    }
-
-    ~TopBottomArgsDirect() final = default;
-
-    bool keySortsBeforeImpl(std::pair<value::TypeTags, value::Value> item) final {
-        MONGO_UNREACHABLE_TASSERT(8448721);
-    }
-    std::pair<value::TypeTags, value::Value> getOwnedKeyImpl() final {
-        MONGO_UNREACHABLE_TASSERT(8448722);
-    }
-    std::pair<value::TypeTags, value::Value> getOwnedValueImpl() final {
-        MONGO_UNREACHABLE_TASSERT(8448723);
-    }
-};
-
-class ByteCode::TopBottomArgsFromStack final : public ByteCode::TopBottomArgs {
-public:
-    TopBottomArgsFromStack(TopBottomSense sense,
-                           SortSpec* sortSpec,
-                           bool decomposedKey,
-                           bool decomposedValue,
-                           ByteCode* bytecode,
-                           size_t keysStartOffset,
-                           size_t numKeys,
-                           size_t valuesStartOffset,
-                           size_t numValues)
-        : TopBottomArgs(sense, sortSpec, decomposedKey, decomposedValue),
-          _bytecode(bytecode),
-          _keysStartOffset(keysStartOffset),
-          _numKeys(numKeys),
-          _valuesStartOffset(valuesStartOffset),
-          _numValues(numValues) {
-        if (!_decomposedKey) {
-            setDirectKeyArg(_bytecode->moveFromStack(_keysStartOffset));
-        }
-        if (!_decomposedValue) {
-            setDirectValueArg(_bytecode->moveFromStack(_valuesStartOffset));
-        }
-    }
-
-    ~TopBottomArgsFromStack() final = default;
-
-protected:
-    bool keySortsBeforeImpl(std::pair<value::TypeTags, value::Value> item) final {
-        tassert(8448700, "Expected item to be an Array", item.first == value::TypeTags::Array);
-
-        const SortPattern& sortPattern = _sortSpec->getSortPattern();
-        tassert(8448701,
-                "Expected numKeys to be equal to number of sort pattern parts",
-                _numKeys == sortPattern.size());
-
-        auto itemArray = value::getArrayView(item.second);
-        tassert(8448702,
-                "Expected size of item array to be equal to number of sort pattern parts",
-                sortPattern.size() == itemArray->size());
-
-        if (_sense == TopBottomSense::kTop) {
-            for (size_t i = 0; i < sortPattern.size(); i++) {
-                auto [_, keyTag, keyVal] = _bytecode->getFromStack(_keysStartOffset + i);
-                auto [itemTag, itemVal] = itemArray->getAt(i);
-                bool isAscending = sortPattern[i].isAscending;
-                return isAscending
-                    ? sortsBefore<TopBottomSense::kTop>(keyTag, keyVal, itemTag, itemVal)
-                    : sortsBefore<TopBottomSense::kTop>(itemTag, itemVal, keyTag, keyVal);
-            }
-        } else {
-            for (size_t i = 0; i < sortPattern.size(); i++) {
-                auto [_, keyTag, keyVal] = _bytecode->getFromStack(_keysStartOffset + i);
-                auto [itemTag, itemVal] = itemArray->getAt(i);
-                bool isAscending = sortPattern[i].isAscending;
-                return isAscending
-                    ? sortsBefore<TopBottomSense::kBottom>(keyTag, keyVal, itemTag, itemVal)
-                    : sortsBefore<TopBottomSense::kBottom>(itemTag, itemVal, keyTag, keyVal);
-            }
-        }
-
-        return false;
-    }
-
-    std::pair<value::TypeTags, value::Value> getOwnedKeyImpl() final {
-        auto [keysArrTag, keysArrVal] = value::makeNewArray();
-        value::ValueGuard keysArrGuard{keysArrTag, keysArrVal};
-        auto keysArr = value::getArrayView(keysArrVal);
-
-        for (size_t i = 0; i < _numKeys; ++i) {
-            auto [keyTag, keyVal] = _bytecode->moveOwnedFromStack(_keysStartOffset + i);
-            keysArr->push_back(keyTag, keyVal);
-        }
-
-        keysArrGuard.reset();
-        return std::pair{keysArrTag, keysArrVal};
-    }
-
-    std::pair<value::TypeTags, value::Value> getOwnedValueImpl() final {
-        auto [valuesArrTag, valuesArrVal] = value::makeNewArray();
-        value::ValueGuard valuesArrGuard{valuesArrTag, valuesArrVal};
-        auto valuesArr = value::getArrayView(valuesArrVal);
-
-        for (size_t i = 0; i < _numValues; ++i) {
-            auto [valueTag, valueVal] = _bytecode->moveOwnedFromStack(_valuesStartOffset + i);
-            valuesArr->push_back(valueTag, valueVal);
-        }
-
-        valuesArrGuard.reset();
-        return std::pair{valuesArrTag, valuesArrVal};
-    }
-
-private:
-    ByteCode* _bytecode;
-    size_t _keysStartOffset;
-    size_t _numKeys;
-    size_t _valuesStartOffset;
-    size_t _numValues;
-};
-
-template <TopBottomSense Sense, bool ValueIsDecomposedArray>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNImpl(ArityType arity) {
-    using Less =
-        std::conditional_t<Sense == TopBottomSense::kTop, SortPatternLess, SortPatternGreater>;
-
-    auto [sortSpecOwned, sortSpecTag, sortSpecVal] = getFromStack(1);
-    tassert(8448703, "Argument must be of sortSpec type", sortSpecTag == value::TypeTags::sortSpec);
-    auto ss = value::getSortSpecView(sortSpecVal);
+template <typename Less>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomN(ArityType arity) {
+    auto [sortSpecOwned, sortSpecTag, sortSpecVal] = getFromStack(3);
+    tassert(5807024, "Argument must be of sortSpec type", sortSpecTag == value::TypeTags::sortSpec);
+    auto sortSpec = value::getSortSpecView(sortSpecVal);
 
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
-
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
         multiAccState(stateTag, stateVal);
+    auto key = moveOwnedFromStack(1);
+    auto output = moveOwnedFromStack(2);
 
-    size_t numKeys = 1;
-    bool keyIsDecomposed = false;
-    auto [_, numKeysTag, numKeysVal] = getFromStack(2);
-    if (numKeysTag == value::TypeTags::NumberInt32) {
-        numKeys = static_cast<size_t>(value::bitcastTo<int32_t>(numKeysVal));
-        keyIsDecomposed = true;
-    } else {
-        tassert(
-            8448704, "Expected numKeys to be Null or Int32", numKeysTag == value::TypeTags::Null);
-    }
-
-    constexpr size_t keysStartOffset = 3;
-    const size_t valuesStartOffset = keysStartOffset + numKeys;
-    const size_t numValues = ValueIsDecomposedArray ? arity - valuesStartOffset : 1;
-
-    if (!keyIsDecomposed && !ValueIsDecomposedArray) {
-        auto key = moveFromStack(keysStartOffset);
-        auto value = moveFromStack(valuesStartOffset);
-
-        TopBottomArgsDirect topBottomArgs{Sense, ss, key, value};
-
-        aggTopBottomNAdd<Sense>(state, array, maxSize, memUsage, memLimit, topBottomArgs);
-    } else {
-        TopBottomArgsFromStack topBottomArgs{Sense,
-                                             ss,
-                                             keyIsDecomposed,
-                                             ValueIsDecomposedArray,
-                                             this,
-                                             keysStartOffset,
-                                             numKeys,
-                                             valuesStartOffset,
-                                             numValues};
-
-        aggTopBottomNAdd<Sense>(state, array, maxSize, memUsage, memLimit, topBottomArgs);
-    }
+    aggTopBottomNAdd<Less>(state, array, maxSize, memUsage, memLimit, sortSpec, key, output);
 
     stateGuard.reset();
     return {true, stateTag, stateVal};
 }
 
-template <TopBottomSense Sense>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomN(ArityType arity) {
-    return builtinAggTopBottomNImpl<Sense, false>(arity);
-}
-
-template <TopBottomSense Sense>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNArray(
-    ArityType arity) {
-    return builtinAggTopBottomNImpl<Sense, true>(arity);
-}
-
-template <TopBottomSense Sense>
+template <typename Less>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNMerge(
     ArityType arity) {
     auto [sortSpecOwned, sortSpecTag, sortSpecVal] = getFromStack(2);
@@ -6715,13 +6453,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNMer
     for (auto [pairTag, pairVal] : array->values()) {
         auto pair = value::getArrayView(pairVal);
         auto key = pair->swapAt(0, value::TypeTags::Null, 0);
-        auto value = pair->swapAt(1, value::TypeTags::Null, 0);
-
-        TopBottomArgsDirect topBottomArgs{
-            Sense, sortSpec, {true, key.first, key.second}, {true, value.first, value.second}};
-
-        mergeMemUsage = aggTopBottomNAdd<Sense>(
-            mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, topBottomArgs);
+        auto output = pair->swapAt(1, value::TypeTags::Null, 0);
+        mergeMemUsage = aggTopBottomNAdd<Less>(mergeState,
+                                               mergeArray,
+                                               mergeMaxSize,
+                                               mergeMemUsage,
+                                               mergeMemLimit,
+                                               sortSpec,
+                                               key,
+                                               output);
     }
 
     mergeStateGuard.reset();
@@ -9126,6 +8866,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     return aggRemovableMinMaxNInitImpl(nullptr);
 }
 
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxNAdd(
     ArityType arity) {
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
@@ -9607,14 +9348,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinTypeMatch(arity);
         case Builtin::dateTrunc:
             return builtinDateTrunc(arity);
-        case Builtin::getSortKeyAsc:
-            return builtinGetSortKey<true /*IsAscending*/, true /*IsLeaf*/>(arity);
-        case Builtin::getSortKeyDesc:
-            return builtinGetSortKey<false /*IsAscending*/, true /*IsLeaf*/>(arity);
-        case Builtin::getNonLeafSortKeyAsc:
-            return builtinGetSortKey<true /*IsAscending*/, false /*IsLeaf*/>(arity);
-        case Builtin::getNonLeafSortKeyDesc:
-            return builtinGetSortKey<false /*IsAscending*/, false /*IsLeaf*/>(arity);
+        case Builtin::internalLeast:
+        case Builtin::internalGreatest:
+            return builtinMinMaxFromArray(arity, f);
         case Builtin::year:
             return builtinYear(arity);
         case Builtin::month:
@@ -9656,19 +9392,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::aggLastNFinalize:
             return builtinAggLastNFinalize(arity);
         case Builtin::aggTopN:
-            return builtinAggTopBottomN<TopBottomSense::kTop>(arity);
-        case Builtin::aggTopNArray:
-            return builtinAggTopBottomNArray<TopBottomSense::kTop>(arity);
+            return builtinAggTopBottomN<SortPatternLess>(arity);
         case Builtin::aggTopNMerge:
-            return builtinAggTopBottomNMerge<TopBottomSense::kTop>(arity);
+            return builtinAggTopBottomNMerge<SortPatternLess>(arity);
         case Builtin::aggTopNFinalize:
             return builtinAggTopBottomNFinalize(arity);
         case Builtin::aggBottomN:
-            return builtinAggTopBottomN<TopBottomSense::kBottom>(arity);
-        case Builtin::aggBottomNArray:
-            return builtinAggTopBottomNArray<TopBottomSense::kBottom>(arity);
+            return builtinAggTopBottomN<SortPatternGreater>(arity);
         case Builtin::aggBottomNMerge:
-            return builtinAggTopBottomNMerge<TopBottomSense::kBottom>(arity);
+            return builtinAggTopBottomNMerge<SortPatternGreater>(arity);
         case Builtin::aggBottomNFinalize:
             return builtinAggTopBottomNFinalize(arity);
         case Builtin::aggMaxN:
@@ -9812,14 +9544,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockAggCount(arity);
         case Builtin::valueBlockAggSum:
             return builtinValueBlockAggSum(arity);
-        case Builtin::valueBlockAggTopN:
-            return ByteCode::builtinValueBlockAggTopN(arity);
-        case Builtin::valueBlockAggTopNArray:
-            return ByteCode::builtinValueBlockAggTopNArray(arity);
-        case Builtin::valueBlockAggBottomN:
-            return ByteCode::builtinValueBlockAggBottomN(arity);
-        case Builtin::valueBlockAggBottomNArray:
-            return ByteCode::builtinValueBlockAggBottomNArray(arity);
         case Builtin::valueBlockDateDiff:
             return builtinValueBlockDateDiff(arity);
         case Builtin::valueBlockDateTrunc:
@@ -9874,10 +9598,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockMod(arity);
         case Builtin::valueBlockConvert:
             return builtinValueBlockConvert(arity);
-        case Builtin::valueBlockGetSortKeyAsc:
-            return builtinValueBlockGetSortKeyAsc(arity);
-        case Builtin::valueBlockGetSortKeyDesc:
-            return builtinValueBlockGetSortKeyDesc(arity);
         case Builtin::cellFoldValues_F:
             return builtinCellFoldValues_F(arity);
         case Builtin::cellFoldValues_P:
@@ -10142,14 +9862,10 @@ std::string builtinToString(Builtin b) {
             return "typeMatch";
         case Builtin::dateTrunc:
             return "dateTrunc";
-        case Builtin::getSortKeyAsc:
-            return "getSortKeyAsc";
-        case Builtin::getSortKeyDesc:
-            return "getSortKeyDesc";
-        case Builtin::getNonLeafSortKeyAsc:
-            return "getNonLeafSortKeyAsc";
-        case Builtin::getNonLeafSortKeyDesc:
-            return "getNonLeafSortKeyDesc";
+        case Builtin::internalLeast:
+            return "internalLeast";
+        case Builtin::internalGreatest:
+            return "internalGreatest";
         case Builtin::year:
             return "year";
         case Builtin::month:
@@ -10192,16 +9908,12 @@ std::string builtinToString(Builtin b) {
             return "aggLastNFinalize";
         case Builtin::aggTopN:
             return "aggTopN";
-        case Builtin::aggTopNArray:
-            return "aggTopNArray";
         case Builtin::aggTopNMerge:
             return "aggTopNMerge";
         case Builtin::aggTopNFinalize:
             return "aggTopNFinalize";
         case Builtin::aggBottomN:
             return "aggBottomN";
-        case Builtin::aggBottomNArray:
-            return "aggBottomNArray";
         case Builtin::aggBottomNMerge:
             return "aggBottomNMerge";
         case Builtin::aggBottomNFinalize:
@@ -10348,14 +10060,6 @@ std::string builtinToString(Builtin b) {
             return "valueBlockAggCount";
         case Builtin::valueBlockAggSum:
             return "valueBlockAggSum";
-        case Builtin::valueBlockAggTopN:
-            return "valueBlockAggTopN";
-        case Builtin::valueBlockAggTopNArray:
-            return "valueBlockAggTopNArray";
-        case Builtin::valueBlockAggBottomN:
-            return "valueBlockAggBottomN";
-        case Builtin::valueBlockAggBottomNArray:
-            return "valueBlockAggBottomNArray";
         case Builtin::valueBlockDateDiff:
             return "valueBlockDateDiff";
         case Builtin::valueBlockDateTrunc:
@@ -10410,10 +10114,6 @@ std::string builtinToString(Builtin b) {
             return "valueBlockMod";
         case Builtin::valueBlockConvert:
             return "valueBlockConvert";
-        case Builtin::valueBlockGetSortKeyAsc:
-            return "valueBlockGetSortKeyAsc";
-        case Builtin::valueBlockGetSortKeyDesc:
-            return "valueBlockGetSortKeyDesc";
         case Builtin::cellFoldValues_F:
             return "cellFoldValues_F";
         case Builtin::cellFoldValues_P:

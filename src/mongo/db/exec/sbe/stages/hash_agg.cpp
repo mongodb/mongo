@@ -112,7 +112,7 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
         if (expr.init) {
             initExpr = expr.init->clone();
         }
-        aggs.push_back(std::make_pair(slot, AggExprPair{std::move(initExpr), expr.agg->clone()}));
+        aggs.push_back(std::make_pair(slot, AggExprPair{std::move(initExpr), expr.acc->clone()}));
     }
 
     SlotExprPairVector mergingExprsClone;
@@ -211,7 +211,7 @@ void HashAggStage::prepare(CompileCtx& ctx) {
         }
         ctx.aggExpression = true;
         ctx.accumulator = _outAggAccessors.back().get();
-        _aggCodes.emplace_back(std::move(initCode), expr.agg->compile(ctx));
+        _aggCodes.emplace_back(std::move(initCode), expr.acc->compile(ctx));
         ctx.aggExpression = false;
 
         ++counter;
@@ -509,7 +509,7 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
         if (!_aggs.empty()) {
             BSONObjBuilder exprBuilder(bob.subobjStart("expressions"));
             for (auto&& [slot, expr] : _aggs) {
-                exprBuilder.append(str::stream() << slot, printer.print(expr.agg->debugPrint()));
+                exprBuilder.append(str::stream() << slot, printer.print(expr.acc->debugPrint()));
             }
 
             BSONObjBuilder initExprBuilder(bob.subobjStart("initExprs"));
@@ -594,7 +594,7 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
 
         DebugPrinter::addIdentifier(ret, slot);
         ret.emplace_back("=");
-        DebugPrinter::addBlocks(ret, expr.agg->debugPrint());
+        DebugPrinter::addBlocks(ret, expr.acc->debugPrint());
         if (expr.init) {
             ret.emplace_back(DebugPrinter::Block("init{`"));
             DebugPrinter::addBlocks(ret, expr.init->debugPrint());

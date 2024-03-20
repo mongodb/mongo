@@ -647,19 +647,6 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                     args[1].sourceCell};
         }
 
-        if (arity == 1 && (op.name() == "getSortKeyAsc"s || op.name() == "getSortKeyDesc"s) &&
-            TypeSignature::kBlockType.isSubset(args[0].typeSignature)) {
-            StringData blockFnName = op.name() == "getSortKeyAsc"s ? "valueBlockGetSortKeyAsc"_sd
-                                                                   : "valueBlockGetSortKeyDesc"_sd;
-
-            optimizer::ABTVector functionArgs;
-            functionArgs.emplace_back(std::move(*args[0].expr));
-
-            return {makeABTFunction(blockFnName, std::move(functionArgs)),
-                    args[0].typeSignature.include(TypeSignature::kNothingType),
-                    args[0].sourceCell};
-        }
-
         if (arity == 2 && op.name() == "isMember"s &&
             TypeSignature::kBlockType.isSubset(args[0].typeSignature)) {
             optimizer::ABTVector functionArgs;
