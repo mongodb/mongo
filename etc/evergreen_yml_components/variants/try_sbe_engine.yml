@@ -1,0 +1,82 @@
+# Build variant for testing the query engine with internalQueryFrameworkControl set to "trySbeEngine".
+
+variables:
+# THIS HAS COPIES IN evergreen.yml and misc_release.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE
+# IN THAT FILE.
+- &linux_arm64_generic_expansions
+  multiversion_platform: amazon2
+  multiversion_edition: enterprise
+  multiversion_architecture: aarch64
+  packager_arch: aarch64
+  packager_distro: amazon2
+  repo_edition: enterprise
+  large_distro_name: amazon2-arm64-large
+  core_analyzer_distro_name: amazon2-arm64-xlarge
+  num_scons_link_jobs_available: 0.99
+
+# THIS HAS COPIES IN misc_release.yml and evergreen.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE
+# IN THAT FILE.
+- &amazon_linux2_arm64_compile_variant_dependency
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+
+# THIS HAS COPIES IN evergreen.yml and misc_release.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE
+# IN THAT FILE.
+- &amazon_linux2_arm64_dynamic_expansions
+  <<: *linux_arm64_generic_expansions
+  compile_variant: *amazon_linux2_arm64_compile_variant_name
+
+buildvariants:
+- <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: amazon-linux2-arm64-try-sbe-engine
+  display_name: "Amazon Linux 2 arm64 Enterprise Query Patch Only (trySbeEngine)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  run_on:
+  - amazon2-arm64-small
+  stepback: true
+  expansions:
+    <<: *amazon_linux2_arm64_dynamic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    jstestfuzz_num_generated_files: 20
+    jstestfuzz_concurrent_num_files: 5
+    target_resmoke_time: 30
+    max_sub_suites: 3
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    test_flags: >-
+      --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
+      --excludeWithAnyTags=resource_intensive,sbe_incompatible
+  tasks:
+  - name: aggregation_mongos_passthrough
+  - name: aggregation_sharded_collections_passthrough
+  - name: aggregation_one_shard_sharded_collections
+  - name: aggregation
+  - name: aggregation_disabled_optimization
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: jsCore
+    distros:
+    - amazon2-arm64-large
+  - name: replica_sets_jscore_passthrough_gen
+  - name: sharded_collections_jscore_passthrough_gen
+  - name: sharding_jscore_passthrough
+  - name: aggregation_repeat_queries
+  - name: burn_in_tests_gen
+    depends_on:
+    - name: version_burn_in_gen
+      variant: generate-tasks-for-version
+      omit_generated_tasks: true
+    - name: archive_dist_test_debug
+      variant: *amazon_linux2_arm64_compile_variant_name
+  - name: multiversion_gen
+  - name: concurrency_gen
+  - name: concurrency_replication_gen
+  - name: concurrency_sharded_replication_gen

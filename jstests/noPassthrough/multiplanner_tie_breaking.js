@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   cqf_incompatible,
+ *   sbe_incompatible,
  * ]
  */
 

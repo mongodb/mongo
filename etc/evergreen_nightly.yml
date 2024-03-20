@@ -23,7 +23,8 @@ include:
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 # TODO: (SERVER-86211) Re-enable config shard evergreen variant.
 # - filename: etc/evergreen_yml_components/variants/config_shard.yml
-
+### Uncomment when using this file for a LTS or Rapid release branch. ###
+- filename: etc/evergreen_yml_components/variants/try_sbe_engine.yml
 
 parameters:
 - key: evergreen_config_file_path
