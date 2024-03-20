@@ -1040,6 +1040,9 @@ void OpDebug::report(OperationContext* opCtx,
 
     auto query = appendCommentField(opCtx, curop.opDescription());
     if (!query.isEmpty()) {
+        if (const auto shapeHash = CurOp::get(opCtx)->debug().queryShapeHash) {
+            pAttrs->addDeepCopy("queryShapeHash", shapeHash->toHexString());
+        }
         if (iscommand) {
             const Command* curCommand = curop.getCommand();
             if (curCommand) {
@@ -1391,6 +1394,9 @@ void OpDebug::append(OperationContext* opCtx,
     if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
+    if (const auto shapeHash = CurOp::get(opCtx)->debug().queryShapeHash) {
+        b.append("queryShapeHash", shapeHash->toHexString());
+    }
 
     switch (queryFramework) {
         case PlanExecutor::QueryFramework::kClassicOnly:
@@ -1697,6 +1703,11 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("planCacheKey", [](auto field, auto args, auto& b) {
         if (args.op.planCacheKey) {
             b.append(field, zeroPaddedHex(*args.op.planCacheKey));
+        }
+    });
+    addIfNeeded("queryShapeHash", [](auto field, auto args, auto& b) {
+        if (args.op.queryShapeHash) {
+            b.append(field, args.op.queryShapeHash->toHexString());
         }
     });
 

@@ -167,8 +167,8 @@ function runCommentParamTest({
         const expectStrings = [
             ',"comment":',
             checkLog.formatAsJsonLogLine(commentObj),
-            '"appName":"MongoDB Shell","command":{' +
-                ((cmdName === "getMore") ? '"' + cmdName + '"' : "")
+            '"appName":"MongoDB Shell",',
+            '"command":{' + ((cmdName === "getMore") ? '"' + cmdName + '"' : "")
         ];
 
         verifyLogContains(

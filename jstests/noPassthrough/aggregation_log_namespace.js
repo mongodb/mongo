@@ -10,12 +10,17 @@ import {
 // log for the aggregate command. The 'comment' parameter is used to match a log entry against
 // the aggregate command.
 function verifyLoggedNamespace({pipeline, comment}) {
+    function regexLiteral(string) {
+        return string.replace(/[.*+$^()\[\]{}\\]/g, "\\$&");
+    }
     assert.commandWorked(db.runCommand(
         {aggregate: source.getName(), comment: comment, pipeline: pipeline, cursor: {}}));
     checkLog.containsWithCount(
         conn,
-        `"appName":"MongoDB Shell",` +
-            `"command":{"aggregate":"${source.getName()}","comment":"${comment}"`,
+        RegExp(`"appName"\:"MongoDB Shell",` +
+               '.*' +  // leave some space for other keys
+               `"command"\:{"aggregate"\:"${regexLiteral(source.getName())}",` +
+               `"comment"\:"${regexLiteral(comment)}"`),
         1);
 }
 
