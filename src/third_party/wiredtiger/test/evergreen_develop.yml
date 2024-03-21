@@ -11,7 +11,7 @@ variables:
     additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
     HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     database: WTPerformanceDataDB
   tasks:
@@ -58,7 +58,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     doc_update_branches: develop,mongodb-7.0,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -69,7 +69,7 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-small
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     database: WTCodeStatisticsDB
     additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
@@ -86,7 +86,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compatibility-test-for-older-releases
@@ -98,7 +98,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compatibility-test-suite
@@ -109,7 +109,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compatibility-test-for-newer-releases

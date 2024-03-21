@@ -53,7 +53,7 @@ functions:
 
             # Utilize tcmalloc through preloading in the environment.
             #
-            if [[ ${ENABLE_TCMALLOC} -eq 1 ]]; then
+            if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
 
               # ASan is not designed to work with tcmalloc:
               # https://github.com/gperftools/gperftools/issues/810#issuecomment-230168100
@@ -297,7 +297,7 @@ functions:
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
           # Fetch the gperftools library if needed. This will also get tcmalloc.
-          if [[ ${ENABLE_TCMALLOC} -eq 1 ]] && [ ! -d "./automation-scripts" ]; then
+          if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]] && [ ! -d "./automation-scripts" ]; then
             is_cmake_build=true
             git clone git@github.com:wiredtiger/automation-scripts.git
             . automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
