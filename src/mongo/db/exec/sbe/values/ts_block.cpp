@@ -38,19 +38,65 @@
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
+#include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/itoa.h"
 
 namespace mongo::sbe::value {
 
+namespace {
+/**
+ * Used by the block-based decompressing API to decompress directly into vectors that are needed
+ * by other functions to construct blocks. The API requires all 'Containers' to implement
+ *'push_back' and 'back'.
+ **/
+class BlockBasedDecompressAdaptor {
+    using Element = sbe::bsoncolumn::SBEColumnMaterializer::Element;
+
+public:
+    BlockBasedDecompressAdaptor(std::vector<TypeTags>& tags, std::vector<Value>& vals)
+        : _tags(tags), _vals(vals){};
+
+    void push_back(const Element& e) {
+        // 'ElementStorage' and 'TsBlock' each assume they own the decompressed element. To avoid
+        // freeing the same elements twice, we will store a copy of the element in SBE.
+        // TODO SERVER-85256 stop copying 'e'.
+        auto [cpyTag, cpyVal] = value::copyValue(e.first, e.second);
+        _tags.push_back(cpyTag);
+        _vals.push_back(cpyVal);
+    }
+
+    Element back() {
+        return {_tags.back(), _vals.back()};
+    }
+
+    // TODO SERVER-85718 Enable when integrating interleaved mode.
+    // void appendPositionInfo(int32_t n) {
+    //     _positions.push_back(n);
+    // }
+
+private:
+    std::vector<TypeTags>& _tags;
+    std::vector<Value>& _vals;
+    // TODO SERVER-85718 Enable when integrating interleaved mode. This vector will hold the
+    // position information of the values.
+    // std::vector<int32_t> _positions;
+};
+}  // namespace
+
 TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest> pathReqs,
                                              StringData timeField)
-    : _pathReqs(std::move(pathReqs)), _timeField(timeField) {
+    : _pathReqs(std::move(pathReqs)),
+      _timeField(timeField),
+      // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+      _blockBasedDecompressionEnabled(
+          feature_flags::gBlockBasedDecodingAPI.isEnabledAndIgnoreFCVUnsafe()) {
 
     size_t idx = 0;
     for (auto& req : _pathReqs) {
@@ -142,6 +188,7 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
                                                       columnVal,
                                                       bucketVersion,
                                                       isTimeField,
+                                                      _blockBasedDecompressionEnabled,
                                                       controlMin,
                                                       controlMax));
         auto tsBlock = outBlocks.back().get();
@@ -177,7 +224,7 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
                 holds_alternative<CellBlock::Get>(_pathReqs[pathIdx].path[0]) &&
                 holds_alternative<CellBlock::Traverse>(_pathReqs[pathIdx].path[1]) &&
                 holds_alternative<CellBlock::Id>(_pathReqs[pathIdx].path[2]) &&
-                (tsBlock->tryHasNoArrays().get_value_or(false))) {
+                (tsBlock->hasNoObjsOrArrays())) {
                 // In this case the top level TsCellBlockForTopLevelField (representing the [Get
                 // <field> Id]) is identical to the path [Get <field> Traverse Id]. We make a top
                 // level cell block with an unowned pointer.
@@ -231,6 +278,7 @@ TsBlock::TsBlock(size_t ncells,
                  Value blockVal,
                  int bucketVersion,
                  bool isTimeField,
+                 bool blockBasedDecompressionEnabled,
                  std::pair<TypeTags, Value> controlMin,
                  std::pair<TypeTags, Value> controlMax)
     : _blockOwned(owned),
@@ -239,6 +287,7 @@ TsBlock::TsBlock(size_t ncells,
       _count(ncells),
       _bucketVersion(bucketVersion),
       _isTimeField(isTimeField),
+      _blockBasedDecompressionEnabled(blockBasedDecompressionEnabled),
       _controlMin(copyValue(controlMin.first, controlMin.second)),
       _controlMax(copyValue(controlMax.first, controlMax.second)) {
     invariant(_blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
@@ -285,24 +334,50 @@ void TsBlock::deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
 }
 
 void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
-                                    std::vector<Value>& deblockedVals) const {
+                                    std::vector<Value>& deblockedVals) {
     tassert(7796401,
             "Invalid BinDataType for BSONColumn",
             getBSONBinDataSubtype(TypeTags::bsonBinData, _blockVal) == BinDataType::Column);
-    BSONColumn blockColumn(
+
+    const auto binData =
         BSONBinData{value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
                     static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
-                    BinDataType::Column});
-    auto it = blockColumn.begin();
-    for (size_t i = 0; i < _count; ++i) {
-        // BSONColumn::Iterator decompresses values into its own buffer which is invalidated
-        // whenever the iterator advances, so we need to copy them out.
-        auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
-        auto [cpyTag, cpyVal] = value::copyValue(tag, val);
-        ++it;
+                    BinDataType::Column};
 
-        deblockedTags.push_back(cpyTag);
-        deblockedVals.push_back(cpyVal);
+    boost::optional<size_t> count = tryCount();
+    if (count) {
+        deblockedTags.reserve(*count);
+        deblockedVals.reserve(*count);
+    }
+
+    // If we can guarantee there are no arrays nor objects in this column, and the feature flag is
+    // enabled, use the faster block-based decoding API.
+    if (_blockBasedDecompressionEnabled && hasNoObjsOrArrays()) {
+        using SBEMaterializer = sbe::bsoncolumn::SBEColumnMaterializer;
+        mongo::bsoncolumn::BSONColumnBlockBased col(binData);
+        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
+        // The decoding API will put the decompressed elements directly into 'deblockedTags' and
+        // 'deblockedVals'.
+        BlockBasedDecompressAdaptor container(deblockedTags, deblockedVals);
+        col.decompress<SBEMaterializer, BlockBasedDecompressAdaptor>(container, allocator);
+        tassert(8751600,
+                "Must have same the number of decompressed tags and values",
+                deblockedTags.size() == deblockedVals.size());
+    } else {
+        // Use the old, less efficient decoder, if there may be objects or arrays.
+        BSONColumn blockColumn(binData);
+        auto it = blockColumn.begin();
+        for (size_t i = 0; i < _count; ++i) {
+            // BSONColumn::Iterator decompresses values into its own buffer which is invalidated
+            // whenever the iterator advances, so we need to copy them out.
+            auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
+            auto [cpyTag, cpyVal] = value::copyValue(tag, val);
+            ++it;
+
+            deblockedTags.push_back(cpyTag);
+            deblockedVals.push_back(cpyVal);
+        }
     }
 }
 
@@ -313,8 +388,13 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
     auto [cpyTag, cpyVal] = copyValue(_blockTag, _blockVal);
     ValueGuard guard(cpyTag, cpyVal);
     // The new copy must own the copied underlying buffer.
-    auto cpy = std::make_unique<TsBlock>(
-        _count, /*owned*/ true, cpyTag, cpyVal, _bucketVersion, _isTimeField);
+    auto cpy = std::make_unique<TsBlock>(_count,
+                                         /*owned*/ true,
+                                         cpyTag,
+                                         cpyVal,
+                                         _bucketVersion,
+                                         _isTimeField,
+                                         _blockBasedDecompressionEnabled);
     guard.reset();
 
     // TODO: This might not be necessary now that TsBlock doesn't really use _deblockedStorage
@@ -343,8 +423,8 @@ DeblockedTagVals TsBlock::deblock(boost::optional<DeblockedTagValStorage>& stora
 
 std::pair<TypeTags, Value> TsBlock::tryMin() const {
     // V1 and v3 buckets store the time field unsorted. In all versions, the control.min of the time
-    // field is rounded down. If computing the true minimum requires traversing the whole column,
-    // we just return Nothing.
+    // field is rounded down. If computing the true minimum requires traversing the whole column, we
+    // just return Nothing.
     if (_isTimeField) {
         if (isTimeFieldSorted()) {
             // control.min is only a lower bound for the time field but v2 buckets are sorted by

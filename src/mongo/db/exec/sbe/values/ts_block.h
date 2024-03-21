@@ -89,6 +89,9 @@ private:
     // A vector is needed in case multiple fields with the same prefix (e.g. a.b and a.c) are
     // requested.
     StringDataMap<std::vector<size_t>> _topLevelFieldToIdxes;
+
+    // True if the feature flag for block based decoding is enabled.
+    bool _blockBasedDecompressionEnabled;
 };
 
 /**
@@ -110,6 +113,7 @@ public:
             Value blockVal,
             int bucketVersion,
             bool isTimefield = false,
+            bool blockBasedDecompressEnabled = false,
             std::pair<TypeTags, Value> controlMin = {TypeTags::Nothing, Value{0u}},
             std::pair<TypeTags, Value> controlMax = {TypeTags::Nothing, Value{0u}});
 
@@ -125,17 +129,16 @@ public:
 
     DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override;
 
-    // Return whether or not any values of the field are arrays, otherwise return boost::none.
-    boost::optional<bool> tryHasNoArrays() {
-        if (isArray(_controlMin.first) || isArray(_controlMax.first)) {
-            return false;
-        } else if (_controlMin.first == _controlMax.first && !isArray(_controlMin.first) &&
-                   !isObject(_controlMin.first) && _controlMin.first != TypeTags::Nothing) {
+    // Returns true if none of the values in this block are arrays or objects. Returns false if
+    // any _may_ be arrays or objects.
+    bool hasNoObjsOrArrays() const {
+        if (_controlMin.first == _controlMax.first && !isArray(_controlMin.first) &&
+            !isObject(_controlMin.first) && _controlMin.first != TypeTags::Nothing) {
             // Checking !isArray after the initial if statement is redundant but this is the
             // explicit condition we are using to see if a field cannot contain any array values.
             return true;
         }
-        return boost::none;
+        return false;
     }
 
     boost::optional<size_t> tryCount() const override {
@@ -188,7 +191,7 @@ private:
      * Deblocks the values from a BSON column block.
      */
     void deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
-                               std::vector<Value>& deblockedVals) const;
+                               std::vector<Value>& deblockedVals);
 
     bool isTimeFieldSorted() const;
 
@@ -213,6 +216,9 @@ private:
 
     // true if all values in the block are non-nothing. Currently only true for timeField
     bool _isTimeField;
+
+    // True if the feature flag for block based decoding is enabled.
+    bool _blockBasedDecompressionEnabled;
 
     // Store the min and max found in the control field of a bucket
     std::pair<TypeTags, Value> _controlMin;

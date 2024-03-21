@@ -1830,6 +1830,7 @@ env.Library(
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
         'storage/key_string',
+        'storage/storage_options',
     ],
 )
 
