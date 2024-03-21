@@ -7,6 +7,7 @@ from collections import defaultdict
 from subprocess import check_output
 from typing import Optional
 from github import GithubIntegration
+import subprocess
 
 import requests
 
@@ -75,11 +76,23 @@ def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
         f"Could not find a valid commit hash from the {mongo_shell_path} mongo binary.")
 
 
-def get_old_yaml(commit_hash, expansions_file):
-    """Download BACKPORTS_REQUIRED_FILE from the old commit and return the yaml."""
+def get_git_file_content_locally(commit_hash: str) -> str:
+    """Retrieve the content of a file from a specific commit in a local Git repository."""
 
-    if not os.path.exists(expansions_file):
-        raise FileNotFoundError(f"The specified file does not exist: {expansions_file}")
+    git_command = ['git', 'show', f'{commit_hash}:{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}']
+
+    try:
+        result = subprocess.run(git_command, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as err:
+        raise RuntimeError(
+            f"Failed to retrieve file content using command: {' '.join(git_command)}. Error: {err.stderr}"
+        )
+
+
+def get_git_file_content_ci(commit_hash: str, expansions_file: str) -> str:
+    """Retrieve the content of a file from a specific commit in a Git repository in a CI environment."""
+
     expansions = read_config_file(expansions_file)
 
     # Obtain installation access tokens using app credentials
@@ -95,12 +108,24 @@ def get_old_yaml(commit_hash, expansions_file):
 
     # If the response was successful, no exception will be raised.
     response.raise_for_status()
+    return response.text
+
+
+def get_old_yaml(commit_hash, expansions_file):
+    """Download BACKPORTS_REQUIRED_FILE from the old commit and return the yaml."""
+
+    file_content = None
+    if not os.path.exists(expansions_file):
+        file_content = get_git_file_content_locally(commit_hash)
+    else:
+        file_content = get_git_file_content_ci(commit_hash, expansions_file)
 
     old_yaml_file = f"{commit_hash}_{BACKPORTS_REQUIRED_FILE}"
     temp_dir = tempfile.mkdtemp()
     temp_old_yaml_file = os.path.join(temp_dir, old_yaml_file)
+
     with open(temp_old_yaml_file, "w") as fileh:
-        fileh.write(response.text)
+        fileh.write(file_content)
 
     backports_required_old = read_yaml_file(temp_old_yaml_file)
     return backports_required_old
