@@ -738,6 +738,9 @@ public:
           _result{std::make_unique<ResultType>()} {
         invariant(_cq);
         _plannerParams = plannerOptions;
+        if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2))) {
+            _queryStringForDebugLog = _cq->toStringShort();
+        }
     }
 
     /**
@@ -754,7 +757,7 @@ public:
                         2,
                         "Collection does not exist. Using EOF plan",
                         logAttrs(_cq->nss()),
-                        "canonicalQuery"_attr = redact(_cq->toStringShort()));
+                        "canonicalQuery"_attr = redact(_queryStringForDebugLog));
 
             auto solution = std::make_unique<QuerySolution>();
             solution->setRoot(std::make_unique<EofNode>());
@@ -790,7 +793,7 @@ public:
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
-                        "query"_attr = redact(_cq->toStringShort()));
+                        "query"_attr = redact(_queryStringForDebugLog));
             return buildSubPlan();
         }
 
@@ -816,7 +819,7 @@ public:
                     LOGV2_DEBUG(20925,
                                 2,
                                 "Using fast count",
-                                "query"_attr = redact(_cq->toStringShort()),
+                                "query"_attr = redact(_queryStringForDebugLog),
                                 "planSummary"_attr = result->getPlanSummary());
                     return std::move(result);
                 }
@@ -834,7 +837,7 @@ public:
             LOGV2_DEBUG(20926,
                         2,
                         "Only one plan is available",
-                        "query"_attr = redact(_cq->toStringShort()),
+                        "query"_attr = redact(_queryStringForDebugLog),
                         "planSummary"_attr = result->getPlanSummary());
             return std::move(result);
         }
@@ -931,6 +934,10 @@ protected:
     bool _plannerParamsInitialized = false;
     // In-progress result value of the prepare() call.
     std::unique_ptr<ResultType> _result;
+
+    // Cached result of CanonicalQuery::toStringShort(). Only populated when logging verbosity is
+    // high enough to enable messages that need it.
+    std::string _queryStringForDebugLog;
 };
 
 /**
@@ -972,7 +979,7 @@ protected:
         LOGV2_DEBUG(20922,
                     2,
                     "Using classic engine idhack",
-                    "canonicalQuery"_attr = redact(_cq->toStringShort()));
+                    "canonicalQuery"_attr = redact(_queryStringForDebugLog));
 
         auto result = releaseResult();
         std::unique_ptr<PlanStage> stage =
@@ -1069,7 +1076,7 @@ protected:
                         LOGV2_DEBUG(5968201,
                                     2,
                                     "Using fast count",
-                                    "query"_attr = redact(_cq->toStringShort()));
+                                    "query"_attr = redact(_queryStringForDebugLog));
                     }
 
                     result = releaseResult();
