@@ -49,6 +49,7 @@ variables:
 buildvariants:
 - name: &windows-compile-required windows-compile-required
   display_name: "! Windows Enterprise Compile"
+  tags: ["bazel_check"]
   run_on:
   - windows-vsCurrent-xxlarge
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.

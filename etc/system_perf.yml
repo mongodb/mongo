@@ -1258,6 +1258,7 @@ buildvariants:
     display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64 NEW"
     modules: *modules
     cron: "0 0 * * 4" # 00:00 on Thursday
+    tags: ["bazel_check"]
     expansions:
       platform: linux
       project_dir: *project_dir

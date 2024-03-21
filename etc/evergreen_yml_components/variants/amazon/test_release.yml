@@ -102,6 +102,7 @@ buildvariants:
 - name: amazon2023
   display_name: Amazon Linux 2023
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   run_on:
   - amazon2023.0-small
   expansions:
@@ -224,6 +225,7 @@ buildvariants:
 - name: amazon2023-arm64
   display_name: Amazon Linux 2023 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   run_on:
   - amazon2023.0-arm64-small
   expansions:

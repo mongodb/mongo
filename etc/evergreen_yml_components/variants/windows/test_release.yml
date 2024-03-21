@@ -45,6 +45,7 @@ buildvariants:
 - name: enterprise-windows
   display_name: "Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   run_on:
   - windows-vsCurrent-small
   expansions:

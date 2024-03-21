@@ -67,6 +67,7 @@ buildvariants:
   display_name: "~ Enterprise macOS arm64"
   run_on:
   - macos-1100-arm64
+  tags: ["bazel_check"]
   expansions:
     compile_variant: *enterprise-macos-arm64
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm

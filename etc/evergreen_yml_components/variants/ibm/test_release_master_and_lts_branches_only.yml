@@ -11,6 +11,7 @@ buildvariants:
   run_on:
   - rhel81-power8-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+  tags: ["bazel_check"]
   stepback: false
   expansions: &enterprise-rhel-81-ppc64le-expansions-template
     additional_package_targets: >-
@@ -54,6 +55,7 @@ buildvariants:
 - <<: *enterprise-rhel-81-ppc64le-template
   name: enterprise-rhel-81-ppc64le-dynamic
   display_name: Enterprise RHEL 8.1 PPC64LE Shared
+  tags: ["bazel_check"]
   expansions:
     <<: *enterprise-rhel-81-ppc64le-expansions-template
     has_packages: false
@@ -78,6 +80,7 @@ buildvariants:
   run_on:
   - rhel83-zseries-small
   cron: "0 4 * * 0"
+  tags: ["bazel_check"]
   stepback: false
   expansions: &enterprise-rhel-83-s390x-expansions-template
     additional_package_targets: >-
@@ -118,6 +121,7 @@ buildvariants:
 - <<: *enterprise-rhel-83-s390x-template
   name: enterprise-rhel-83-s390x-dynamic
   display_name: Enterprise RHEL 8.3 s390x Shared
+  tags: ["bazel_check"]
   expansions:
     <<: *enterprise-rhel-83-s390x-expansions-template
     has_packages: false

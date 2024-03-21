@@ -76,6 +76,7 @@ buildvariants:
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
   display_name: "! Amazon Linux 2 arm64 Crypt Compile"
+  tags: ["bazel_check"]
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-crypt-compile
@@ -86,6 +87,7 @@ buildvariants:
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
   display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis"
+  tags: ["bazel_check"]
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
     clang_tidy_toolchain: v4
@@ -110,6 +112,7 @@ buildvariants:
 - name: &commit-queue commit-queue
   display_name: "~ Commit Queue"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+  tags: ["bazel_check"]
   run_on:
     - amazon2-arm64-small
   stepback: false

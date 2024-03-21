@@ -77,6 +77,7 @@ buildvariants:
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
   display_name: "* Amazon Linux 2 arm64 Enterprise Stitch Compile"
+  tags: ["bazel_check"]
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
     compile_variant: *amazon-linux2-arm64-stitch-compile
