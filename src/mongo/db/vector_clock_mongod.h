@@ -46,14 +46,15 @@ namespace mongo {
 namespace {
 
 class VectorClockMongoD : public VectorClockMutable,
-                          public ReplicaSetAwareService<VectorClockMongoD> {
+                          public ReplicaSetAwareService<VectorClockMongoD>,
+                          public std::enable_shared_from_this<VectorClockMongoD> {
     VectorClockMongoD(const VectorClockMongoD&) = delete;
     VectorClockMongoD& operator=(const VectorClockMongoD&) = delete;
 
 public:
     static VectorClockMongoD* get(ServiceContext* serviceContext);
 
-    VectorClockMongoD() = default;
+    VectorClockMongoD(ServiceContext* ctx);
     ~VectorClockMongoD() override = default;
 
 private:
@@ -120,7 +121,7 @@ private:
      */
     SharedSemiFuture<void> _enqueueWaiterAndScheduleLoopIfNeeded(stdx::unique_lock<Mutex> ul,
                                                                  VectorTime time);
-    Future<void> _doWhileQueueNotEmptyOrError(ServiceContext* service);
+    Future<void> _doWhileQueueNotEmptyOrError();
 
     // Protects the shared state below
     Mutex _mutex = MONGO_MAKE_LATCH("VectorClockMongoD::_mutex");
@@ -141,6 +142,8 @@ private:
     // Queue ordered in increasing order of the VectorTimes, which are waiting to be persisted
     using Queue = std::map<ComparableVectorTime, std::unique_ptr<SharedPromise<void>>>;
     Queue _queue;
+
+    ServiceContext* _serviceContext;
 };
 
 }  // namespace
