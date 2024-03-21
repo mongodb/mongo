@@ -32,8 +32,8 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
-#include "mongo/db/query/stage_builder_util.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -184,6 +184,30 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
 
     LOGV2_DEBUG(
         8523404, 5, "Recovering SBE plan from the cache", "decisionReads"_attr = decisionReads);
+
+    const auto& foreignHashJoinCollections = planStageData.staticData->foreignHashJoinCollections;
+    if (!plannerData.cq->cqPipeline().empty() && !foreignHashJoinCollections.empty()) {
+        // We'd like to check if there is any foreign collection in the hash_lookup stage
+        // that is no longer eligible for using a hash_lookup plan. In this case we
+        // invalidate the cache and immediately replan without ever running a trial period.
+        const auto& secondaryCollectionsInfo = plannerData.plannerParams.secondaryCollectionsInfo;
+
+        for (const auto& foreignCollection : foreignHashJoinCollections) {
+            const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
+            tassert(8832902,
+                    "Foreign collection must be present in the collections info",
+                    collectionInfo != secondaryCollectionsInfo.end());
+            tassert(8832901, "Foreign collection must exist", collectionInfo->second.exists);
+
+            if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
+                return replan(std::move(plannerData),
+                              str::stream() << "Foreign collection "
+                                            << foreignCollection.toStringForErrorMsg()
+                                            << " is not eligible for hash join anymore",
+                              /* shouldCache */ true);
+            }
+        }
+    }
 
     const bool isPinnedCacheEntry = !decisionReads.has_value();
     if (isPinnedCacheEntry) {
