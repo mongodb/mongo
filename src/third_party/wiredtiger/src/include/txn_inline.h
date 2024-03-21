@@ -316,19 +316,25 @@ __wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bo
  *     Apply the correct start and durable timestamps to the page delete structure.
  */
 static WT_INLINE void
-__txn_op_delete_commit_apply_page_del_timestamp(WT_SESSION_IMPL *session, WT_REF *ref)
+__txn_op_delete_commit_apply_page_del_timestamp(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
 {
     WT_PAGE_DELETED *page_del;
     WT_TXN *txn;
+    wt_timestamp_t commit_timestamp;
 
     txn = session->txn;
     page_del = ref->page_del;
+    commit_timestamp = commit ? txn->first_commit_timestamp : txn->commit_timestamp;
 
     WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
+    /*
+     * Prepared commit doesn't go through this code path. Therefore, we set the durable timestamp
+     * the same as the commit timestamp.
+     */
     if (page_del != NULL && page_del->timestamp == WT_TS_NONE) {
-        page_del->timestamp = txn->commit_timestamp;
-        page_del->durable_timestamp = txn->durable_timestamp;
+        page_del->timestamp = commit_timestamp;
+        page_del->durable_timestamp = commit_timestamp;
     }
 }
 
@@ -337,13 +343,15 @@ __txn_op_delete_commit_apply_page_del_timestamp(WT_SESSION_IMPL *session, WT_REF
  *     Apply the correct start and durable timestamps to any updates in the page del update list.
  */
 static WT_INLINE void
-__wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
 {
     WT_TXN *txn;
     WT_UPDATE **updp;
+    wt_timestamp_t commit_timestamp;
     uint8_t previous_state;
 
     txn = session->txn;
+    commit_timestamp = commit ? txn->first_commit_timestamp : txn->commit_timestamp;
 
     /* Lock the ref to ensure we don't race with page instantiation. */
     WT_REF_LOCK(session, ref, &previous_state);
@@ -369,13 +377,25 @@ __wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref
         WT_ASSERT(session, previous_state == WT_REF_MEM);
         WT_ASSERT(session, ref->page != NULL && ref->page->modify != NULL);
         if ((updp = ref->page->modify->inst_updates) != NULL)
-            for (; *updp != NULL; ++updp) {
-                (*updp)->start_ts = txn->commit_timestamp;
-                (*updp)->durable_ts = txn->durable_timestamp;
+            /*
+             * If we have already set the timestamp, no need to set the timestamp again. We have
+             * either set the timestamp on all the updates, or we have set the timestamp on none of
+             * the updates.
+             */
+            if (*updp != NULL && (*updp)->start_ts == WT_TS_NONE) {
+                /*
+                 * Prepared commit doesn't go through this code path. Therefore, we set the durable
+                 * timestamp the same as the commit timestamp.
+                 */
+                do {
+                    (*updp)->start_ts = commit_timestamp;
+                    (*updp)->durable_ts = commit_timestamp;
+                    ++updp;
+                } while (*updp != NULL);
             }
     }
 
-    __txn_op_delete_commit_apply_page_del_timestamp(session, ref);
+    __txn_op_delete_commit_apply_page_del_timestamp(session, ref, commit);
 
     WT_REF_UNLOCK(ref, previous_state);
 }
@@ -406,10 +426,11 @@ __txn_should_assign_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
  *     existing timestamp.
  */
 static WT_INLINE void
-__wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
+__wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit)
 {
     WT_TXN *txn;
     WT_UPDATE *upd;
+    wt_timestamp_t commit_timestamp;
 
     txn = session->txn;
 
@@ -431,16 +452,17 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
         }
     } else {
         if (op->type == WT_TXN_OP_REF_DELETE)
-            __wt_txn_op_delete_commit_apply_timestamps(session, op->u.ref);
+            __wt_txn_op_delete_commit_apply_timestamps(session, op->u.ref, commit);
         else {
-            /*
-             * The timestamp is in the update for operations other than truncate. Both commit and
-             * durable timestamps need to be updated.
-             */
+            commit_timestamp = commit ? txn->first_commit_timestamp : txn->commit_timestamp;
             upd = op->u.op_upd;
+            /*
+             * Prepared commit doesn't go through this code path. Therefore, we set the durable
+             * timestamp the same as the commit timestamp.
+             */
             if (upd->start_ts == WT_TS_NONE) {
-                upd->start_ts = txn->commit_timestamp;
-                upd->durable_ts = txn->durable_timestamp;
+                upd->start_ts = commit_timestamp;
+                upd->durable_ts = commit_timestamp;
             }
         }
     }
@@ -483,7 +505,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
     WT_ASSERT(session, !WT_IS_HS((S2BT(session))->dhandle));
 
     upd->txnid = session->txn->id;
-    __wt_txn_op_set_timestamp(session, op);
+    __wt_txn_op_set_timestamp(session, op, false);
 
     return (0);
 }
@@ -512,7 +534,7 @@ __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
     ref->page_del->txnid = txn->id;
 
     if (__txn_should_assign_timestamp(session, op))
-        __txn_op_delete_commit_apply_page_del_timestamp(session, op->u.ref);
+        __txn_op_delete_commit_apply_page_del_timestamp(session, op->u.ref, false);
 
     if (__wt_log_op(session))
         WT_ERR(__wt_txn_log_op(session, NULL));
