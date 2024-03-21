@@ -50,14 +50,15 @@ namespace mongo {
 namespace {
 
 class VectorClockMongoD : public VectorClockMutable,
-                          public ReplicaSetAwareService<VectorClockMongoD> {
+                          public ReplicaSetAwareService<VectorClockMongoD>,
+                          public std::enable_shared_from_this<VectorClockMongoD> {
     VectorClockMongoD(const VectorClockMongoD&) = delete;
     VectorClockMongoD& operator=(const VectorClockMongoD&) = delete;
 
 public:
     static VectorClockMongoD* get(ServiceContext* serviceContext);
 
-    VectorClockMongoD();
+    VectorClockMongoD(ServiceContext* ctx);
     virtual ~VectorClockMongoD();
 
 private:
@@ -145,7 +146,7 @@ private:
      */
     SharedSemiFuture<void> _enqueueWaiterAndScheduleLoopIfNeeded(stdx::unique_lock<Mutex> ul,
                                                                  VectorTime time);
-    Future<void> _doWhileQueueNotEmptyOrError(ServiceContext* service);
+    Future<void> _doWhileQueueNotEmptyOrError();
 
     // Protects the shared state below
     Mutex _mutex = MONGO_MAKE_LATCH("VectorClockMongoD::_mutex");
@@ -166,9 +167,12 @@ private:
     // Queue ordered in increasing order of the VectorTimes, which are waiting to be persisted
     using Queue = std::map<ComparableVectorTime, std::unique_ptr<SharedPromise<void>>>;
     Queue _queue;
+
+    ServiceContext* _serviceContext;
 };
 
-const auto vectorClockMongoDDecoration = ServiceContext::declareDecoration<VectorClockMongoD>();
+const auto vectorClockMongoDDecoration =
+    ServiceContext::declareDecoration<std::shared_ptr<VectorClockMongoD>>();
 
 const ReplicaSetAwareServiceRegistry::Registerer<VectorClockMongoD>
     vectorClockMongoDServiceRegisterer("VectorClockMongoD-ReplicaSetAwareServiceRegistration");
@@ -177,16 +181,20 @@ const ServiceContext::ConstructorActionRegisterer vectorClockMongoDRegisterer(
     "VectorClockMongoD-VectorClockRegistration",
     {},
     [](ServiceContext* service) {
-        VectorClockMongoD::registerVectorClockOnServiceContext(
-            service, &vectorClockMongoDDecoration(service));
+        VectorClockMongoD::registerVectorClockOnServiceContext(service,
+                                                               VectorClockMongoD::get(service));
     },
     {});
 
 VectorClockMongoD* VectorClockMongoD::get(ServiceContext* serviceContext) {
-    return &vectorClockMongoDDecoration(serviceContext);
+    auto& clock = vectorClockMongoDDecoration(serviceContext);
+    if (!clock) {
+        clock = std::make_shared<VectorClockMongoD>(serviceContext);
+    }
+    return clock.get();
 }
 
-VectorClockMongoD::VectorClockMongoD() = default;
+VectorClockMongoD::VectorClockMongoD(ServiceContext* ctx) : _serviceContext(ctx) {}
 
 VectorClockMongoD::~VectorClockMongoD() = default;
 
@@ -312,18 +320,19 @@ SharedSemiFuture<void> VectorClockMongoD::_enqueueWaiterAndScheduleLoopIfNeeded(
         auto joinPreviousLoop(_currentWhileLoop ? std::move(*_currentWhileLoop)
                                                 : Future<void>::makeReady());
 
-        _currentWhileLoop.emplace(std::move(joinPreviousLoop).onCompletion([this](auto) {
-            return _doWhileQueueNotEmptyOrError(vectorClockMongoDDecoration.owner(this));
-        }));
+        _currentWhileLoop.emplace(
+            std::move(joinPreviousLoop).onCompletion([this, _ = shared_from_this()](auto) {
+                return _doWhileQueueNotEmptyOrError();
+            }));
     }
 
     return it->second->getFuture();
 }
 
-Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* service) {
+Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError() {
     auto [p, f] = makePromiseFuture<VectorTime>();
     auto future = std::move(f)
-                      .then([this](VectorTime newDurableTime) {
+                      .then([this, _ = shared_from_this()](VectorTime newDurableTime) {
                           stdx::unique_lock ul(_mutex);
                           _durableTime.emplace(newDurableTime);
 
@@ -341,7 +350,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                           for (auto& p : promises)
                               p->emplaceValue();
                       })
-                      .onError([this](Status status) {
+                      .onError([this, _ = shared_from_this()](Status status) {
                           stdx::unique_lock ul(_mutex);
                           std::vector<Queue::value_type::second_type> promises;
                           for (auto it = _queue.begin(); it != _queue.end();) {
@@ -353,7 +362,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                           for (auto& p : promises)
                               p->setError(status);
                       })
-                      .onCompletion([this, service](auto) {
+                      .onCompletion([this, _ = shared_from_this()](auto) {
                           {
                               stdx::lock_guard lg(_mutex);
                               if (_queue.empty()) {
@@ -361,18 +370,18 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                                   return Future<void>::makeReady();
                               }
                           }
-                          return _doWhileQueueNotEmptyOrError(service);
+                          return _doWhileQueueNotEmptyOrError();
                       });
 
     // Blocking work to recover and/or persist the current vector time
-    ExecutorFuture<void>(Grid::get(service)->getExecutorPool()->getFixedExecutor())
-        .then([this, service] {
+    ExecutorFuture<void>(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
+        .then([this, _ = shared_from_this()] {
             auto mustRecoverDurableTime = [&] {
                 stdx::lock_guard lg(_mutex);
                 return !_durableTime;
             }();
 
-            ThreadClient tc("VectorClockStateOperation", service);
+            ThreadClient tc("VectorClockStateOperation", _serviceContext);
 
             {
                 stdx::lock_guard<Client> lk(*tc.get());
@@ -406,7 +415,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
 
             return vectorTime;
         })
-        .getAsync([this, promise = std::move(p)](StatusWith<VectorTime> swResult) mutable {
+        .getAsync([promise = std::move(p)](StatusWith<VectorTime> swResult) mutable {
             promise.setFrom(std::move(swResult));
         });
 
