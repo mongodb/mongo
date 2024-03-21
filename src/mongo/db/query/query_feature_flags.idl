@@ -116,7 +116,7 @@ feature_flags:
     featureFlagSbeBlockHashAgg:
       description: "Feature flag to enable Block Hash Aggregation for TS queries SBE"
       cpp_varname: gFeatureFlagSbeBlockHashAgg
-      default: false
+      default: true
       shouldBeFCVGated: false
 
     featureFlagClassicRuntimePlanningForSbe:

@@ -26,7 +26,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null}},
                 {$project: {_id: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "Count",
@@ -35,7 +35,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$count: "count"},
                 {$project: {_id: 1, count: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "Count_FilterHalf",
@@ -50,7 +50,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$count: "count"},
                 {$project: {_id: 1, count: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinWithoutId",
@@ -59,7 +59,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null, a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinWithoutIdAllPass",
@@ -68,7 +68,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null, a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_Min",
@@ -76,7 +76,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, a: {$min: '$y'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MaxWithoutId",
@@ -85,7 +85,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null, a: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MaxWithoutIdAllPass",
@@ -94,7 +94,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null, a: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_Max",
@@ -102,7 +102,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, a: {$max: '$y'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinAndMaxWithoutId",
@@ -111,7 +111,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinAndMaxWithoutIdAllPass",
@@ -120,7 +120,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinAndMax",
@@ -128,7 +128,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MinWithoutId",
@@ -137,7 +137,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: '$x', a: {$min: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_Min",
@@ -145,7 +145,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$min: '$y'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MaxWithoutId",
@@ -154,7 +154,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: '$x', a: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_Max",
@@ -162,7 +162,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$max: '$y'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MinAndMaxWithoutId",
@@ -171,7 +171,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MinAndMax",
@@ -179,7 +179,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateTrunc_MinAndMax",
@@ -194,7 +194,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateAdd_Min",
@@ -208,7 +208,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: '$a'}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateAddAndDateDiff_Min",
@@ -249,7 +249,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: '$a'}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateSubtractAndDateDiff_Min",
@@ -324,7 +324,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 0, a: 1, b: 1, c: 1, d: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MaxAndMinOfDateAddDateSubtractDateTrunc",
@@ -347,7 +347,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 0, a: 1, b: 1, c: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateTruncAndDateAdd_MinAndMax",
@@ -369,7 +369,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateTruncAndDateSubtract_MinAndMax",
@@ -392,7 +392,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateDiffAndDateAdd_Min",
@@ -414,7 +414,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinOfDateDiff_InvalidDate",
@@ -437,7 +437,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$project: {_id: 0, a: 1}}
             ],
             expectedErrorCode: 7157922,
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_MinOfDateAdd_MissingAmount",
@@ -491,7 +491,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByFilteredComputedDateDiff_MinPlusMax",
@@ -523,27 +523,27 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MinWithoutId_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}, {$project: {_id: 0, a: 1}}],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_Min_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MaxWithoutId_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}, {$project: {_id: 0, a: 1}}],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_Max_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MinAndMaxWithoutId_NoFilter",
@@ -551,12 +551,12 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 0, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_MinAndMax_NoFilter",
             pipeline: [{$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateTrunc_MinAndMax_NoFilter",
@@ -570,7 +570,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateTruncAndDateDiff_MinAndMax_NoFilter",
@@ -593,7 +593,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByDateTruncAndMeta_MinAndMax_NoFilter",
@@ -610,7 +610,7 @@ export function blockProcessingTestCases(timeFieldName,
                 },
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMeta_MinAndMax_NoFilter",
@@ -636,7 +636,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: {x: '$x', y: '$y'}, a: {$min: '$z'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_Min",
@@ -644,7 +644,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: {x: '$x', y: '$y'}, a: {$min: '$z'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_MaxWithoutId",
@@ -653,7 +653,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$group: {_id: {x: '$x', y: '$y'}, a: {$max: '$z'}}},
                 {$project: {_id: 0, a: 1}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_Max",
@@ -661,7 +661,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: {x: '$x', y: '$y'}, a: {$max: '$z'}}}
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_MultipleMinsAndMaxs",
@@ -677,7 +677,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMetaIndexKey_MinWithoutId",
@@ -745,7 +745,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZ_OutputVariable",
@@ -759,7 +759,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopAndBottomSortByZ_OutputOneElemArray",
@@ -773,7 +773,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZ_OutputOneElemArray",
@@ -787,7 +787,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopAndBottomSortByZ_OutputTwoElemArray",
@@ -801,7 +801,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZ_OutputTwoElemArray",
@@ -815,7 +815,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopAndBottomSortByZ_OutputVariable",
@@ -829,7 +829,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZ_OutputVariable",
@@ -843,7 +843,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopAndBottomSortByZ_OutputOneElemArray",
@@ -857,7 +857,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZ_OutputOneElemArray",
@@ -871,7 +871,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopAndBottomSortByZ_OutputTwoElemArray",
@@ -885,7 +885,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZ_OutputTwoElemArray",
@@ -899,7 +899,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZ_OutputVariable",
@@ -913,7 +913,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputVariable",
@@ -927,7 +927,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZ_OutputOneElemArray",
@@ -941,7 +941,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputOneElemArray",
@@ -955,7 +955,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZ_OutputTwoElemArray",
@@ -969,7 +969,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputTwoElemArray",
@@ -983,7 +983,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopAndBottomSortByZAndW_OutputVariable",
@@ -997,7 +997,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputVariable",
@@ -1011,7 +1011,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopAndBottomSortByZAndW_OutputOneElemArray",
@@ -1025,7 +1025,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputOneElemArray",
@@ -1039,7 +1039,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopAndBottomSortByZAndW_OutputTwoElemArray",
@@ -1053,7 +1053,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
@@ -1067,7 +1067,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopAndBottomSortByZAndW_OutputVariable",
@@ -1081,7 +1081,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZAndW_OutputVariable",
@@ -1095,7 +1095,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopAndBottomSortByZAndW_OutputOneElemArray",
@@ -1109,7 +1109,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZAndW_OutputOneElemArray",
@@ -1123,7 +1123,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopAndBottomSortByZAndW_OutputTwoElemArray",
@@ -1137,7 +1137,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
@@ -1151,7 +1151,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputVariable",
@@ -1165,7 +1165,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputVariable",
@@ -1179,7 +1179,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputOneElemArray",
@@ -1193,7 +1193,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputOneElemArray",
@@ -1207,7 +1207,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputTwoElemArray",
@@ -1221,7 +1221,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
@@ -1235,7 +1235,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputEmptyArray",
@@ -1249,7 +1249,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputEmptyArray",
@@ -1263,7 +1263,7 @@ export function blockProcessingTestCases(timeFieldName,
                     }
                 }
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
             name: "GroupByMetaSubField",
@@ -1368,7 +1368,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}, computedField: 999}},
                 {$group: {_id: "$computedField", a: {$min: "$y"}}},
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
     ];
 }
