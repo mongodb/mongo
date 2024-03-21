@@ -3,7 +3,10 @@
  * queries that result in different BSON types to ensure the results are the same.
  */
 
-import {blockProcessingTestCases} from "jstests/libs/block_processing_test_cases.js";
+import {
+    blockProcessingTestCases,
+    generateMetaVals
+} from "jstests/libs/block_processing_test_cases.js";
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
 const scalarConn = MongoRunner.runMongod();
@@ -28,7 +31,7 @@ const scalarColl = scalarDb.timeseries_group_bson_types;
 const bpColl = bpDb.timeseries_group_bson_types;
 
 const timeFieldName = 't';
-const metaFieldName = 'm';
+const metaFieldName = 'meta';
 
 scalarColl.drop();
 bpColl.drop();
@@ -57,7 +60,7 @@ leafsMinusUndefined.push([[{a: 1}, {a: 2}], [{a: 3}, {a: 4}]]);
 // Push different types of data. Different meta fields, different permutations of leafs data in data
 // fields.
 const tsData = [];
-for (const meta of leafsMinusUndefined) {
+for (const meta of leafsMinusUndefined + generateMetaVals()) {
     let time = 0;
     for (const data of leafsMinusUndefined) {
         tsData.push({

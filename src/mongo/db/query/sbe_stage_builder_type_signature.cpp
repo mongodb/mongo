@@ -96,6 +96,17 @@ TypeSignature TypeSignature::kStringType = getTypeSignature(sbe::value::TypeTags
                                                             sbe::value::TypeTags::StringBig,
                                                             sbe::value::TypeTags::bsonString);
 
+std::string TypeSignature::debugString() const {
+    if (*this == kAnyType) {
+        return "kAnyType";
+    }
+    if (*this == kAnyScalarType) {
+        return "kAnyScalarType";
+    }
+
+    return std::bitset<sizeof(MaskType) * 8>(typesMask).to_string();
+}
+
 bool TypeSignature::canCompareWith(TypeSignature other) const {
     auto lhsTypes = getBSONTypesFromSignature(*this);
     auto rhsTypes = getBSONTypesFromSignature(other);

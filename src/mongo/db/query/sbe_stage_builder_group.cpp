@@ -167,6 +167,71 @@ StringMap<const ExpressionFieldPath*> collectFieldPaths(const GroupNode* groupNo
     return groupFieldMap;
 }
 
+namespace {
+struct PartitionedFieldPathExprs {
+    StringDataMap<const ExpressionFieldPath*> exprsOnBlockSlots;
+    StringDataMap<const ExpressionFieldPath*> exprsOnScalarSlots;
+};
+
+/*
+ * Returns whether or not the given field path expression references a block. Assumes
+ * that we are in block mode.
+ */
+bool doesExpressionReferenceBlock(const PlanStageSlots& outputs,
+                                  const ExpressionFieldPath& expressionFieldPath) {
+    tassert(8829002, "Expected outputs to have block output", outputs.hasBlockOutput());
+
+    if (expressionFieldPath.getVariableId() != Variables::kRootId) {
+        return false;
+    }
+
+    auto& fieldPath = expressionFieldPath.getFieldPath();
+
+    // The first component should be $$CURRENT.
+    tassert(
+        8829001, "Field path should have more than one component", fieldPath.getPathLength() > 1);
+
+    // Top level field is at index 1.
+    auto firstComponent = fieldPath.getFieldName(1);
+
+    // Since we're in block mode, the child MUST provide this kField, as there is no result
+    // obj.  Note: in the future, it may be possible that the child provides the full
+    // kPathExpr, but not the kField for the top level. This code will have to handle that
+    // case.
+
+    auto outputSlot =
+        outputs.get(PlanStageReqs::UnownedSlotName(PlanStageReqs::kField, firstComponent));
+
+    // Skip any field path expressions on blocks. Those will be computed after block_to_row.
+    if (outputSlot.typeSig &&
+        (*outputSlot.typeSig)
+            .containsAny(TypeSignature::kBlockType.include(TypeSignature::kCellType))) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Splits the given map of field path expressions into those which refer to block fields and those
+ * which refer to scalar fields.
+ */
+MONGO_COMPILER_NOINLINE
+PartitionedFieldPathExprs partitionFieldPathExprsByBlock(
+    PlanStageSlots& outputs, const StringMap<const ExpressionFieldPath*>& groupFieldMapIn) {
+
+    PartitionedFieldPathExprs out;
+    for (auto& [fieldStr, expressionFieldPath] : groupFieldMapIn) {
+        if (doesExpressionReferenceBlock(outputs, *expressionFieldPath)) {
+            out.exprsOnBlockSlots.emplace(fieldStr, expressionFieldPath);
+        } else {
+            out.exprsOnScalarSlots.emplace(fieldStr, expressionFieldPath);
+        }
+    }
+    return out;
+}
+}  // namespace
+
 /**
  * Given a list of field path expressions used in the group-by ('_id') and accumulator expressions
  * of a $group, populate a slot in 'outputs' for each path found. Each slot is bound to an SBE
@@ -178,7 +243,7 @@ SbStage projectFieldPathsToPathExprSlots(
     const GroupNode& groupNode,
     SbStage stage,
     PlanStageSlots& outputs,
-    const StringMap<const ExpressionFieldPath*>& groupFieldMap) {
+    const StringDataMap<const ExpressionFieldPath*>& groupFieldMap) {
     SbBuilder b(state, groupNode.nodeId());
 
     SbExprOptSbSlotVector projects;
@@ -201,6 +266,53 @@ SbStage projectFieldPathsToPathExprSlots(
         }
     }
 
+    return stage;
+}
+/**
+ * Ensure that all kPathExpr reqs are available in slots.
+ */
+MONGO_COMPILER_NOINLINE
+SbStage makePathExprsAvailableInSlots(
+    StageBuilderState& state,
+    const GroupNode& groupNode,
+    SbStage stage,
+    PlanStageSlots& outputs,
+    const StringMap<const ExpressionFieldPath*>& groupFieldMapIn) {
+
+    if (groupFieldMapIn.empty()) {
+        // No work to do.
+        return stage;
+    }
+
+    SbBuilder b(state, groupNode.nodeId());
+
+    if (outputs.hasBlockOutput()) {
+        // We are currently running in block mode. Some slots will contain blocks, and others may
+        // contain scalars. The scalar slots contain values common to the entire block, like the
+        // timeseries 'meta' field.
+
+        // First we compute the field path expressions for any expressions which are on scalars. We
+        // want to do these before we close the block processing pipeline.
+
+        auto [blockFieldPathExprs, nonBlockFieldPathExprs] =
+            partitionFieldPathExprsByBlock(outputs, groupFieldMapIn);
+
+        stage = projectFieldPathsToPathExprSlots(
+            state, groupNode, std::move(stage), outputs, nonBlockFieldPathExprs);
+
+        stage = buildBlockToRow(std::move(stage), state, outputs);
+
+        // Now that we've done the block to row, evaluate the path
+        // expressions for the slots that were blocks, and are now scalars.
+        stage = projectFieldPathsToPathExprSlots(
+            state, groupNode, std::move(stage), outputs, blockFieldPathExprs);
+    } else {
+        // We have to convert to StringDataMap to call projectFieldPathsToPathExprSlots().
+        StringDataMap<const ExpressionFieldPath*> groupFieldMap;
+        groupFieldMap.insert(groupFieldMapIn.begin(), groupFieldMapIn.end());
+        stage = projectFieldPathsToPathExprSlots(
+            state, groupNode, std::move(stage), outputs, groupFieldMap);
+    }
     return stage;
 }
 
@@ -1179,20 +1291,13 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
 
     tassert(5851601, "GROUP should have had group-by key expression", idExpr);
 
-    // Collect all the ExpressionFieldPaths referenced by from 'groupNode'.
-    StringMap<const ExpressionFieldPath*> groupFieldMap = collectFieldPaths(groupNode);
+    {
+        // Collect all the ExpressionFieldPaths referenced by from 'groupNode'.
+        StringMap<const ExpressionFieldPath*> groupFieldMap = collectFieldPaths(groupNode);
 
-    // If 'groupFieldMap' is not empty, then we evaluate all of the ExpressionFieldPaths in
-    // 'groupFieldMap', project the results to slots, and finally we put the slots into
-    // 'childOutputs' as kPathExpr slots.
-    if (!groupFieldMap.empty()) {
-        // At present, the kPathExpr optimization is not compatible with block processing, so
-        // when 'groupFieldMap' isn't empty we need to close the block processing pipeline here.
-        if (childOutputs.hasBlockOutput()) {
-            stage = buildBlockToRow(std::move(stage), _state, childOutputs);
-        }
-
-        stage = projectFieldPathsToPathExprSlots(
+        // Evaluate all of the ExpressionFieldPaths in 'groupFieldMap', project the results to
+        // slots, and put the slots into 'childOutputs' as kPathExpr slots.
+        stage = makePathExprsAvailableInSlots(
             _state, *groupNode, std::move(stage), childOutputs, groupFieldMap);
     }
 

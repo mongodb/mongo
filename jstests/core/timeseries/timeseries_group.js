@@ -19,7 +19,10 @@ import "jstests/libs/sbe_assert_error_override.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
-import {blockProcessingTestCases} from "jstests/libs/block_processing_test_cases.js";
+import {
+    blockProcessingTestCases,
+    generateMetaVals
+} from "jstests/libs/block_processing_test_cases.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
 import {checkSbeStatus, kSbeDisabled, kSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
@@ -30,7 +33,7 @@ TimeseriesTest.run((insert) => {
     let collNotTs = db.timeseries_group_not_ts;
 
     const timeFieldName = 'time';
-    const metaFieldName = 'measurement';
+    const metaFieldName = 'meta';
 
     coll.drop();
     collNotTs.drop();
@@ -44,7 +47,7 @@ TimeseriesTest.run((insert) => {
     // Populate 'coll' and 'collNotTs' with the same set of documents.
     const Inf = Infinity;
     const str = "a somewhat long string";
-    const metaVals = ["foo", "bar", "baz"];
+    const metaVals = generateMetaVals();
     const xVals = [null, undefined, 42, -12.345, NaN, "789", "antidisestablishmentarianism"];
     const yVals = [0, 73.73, -Inf, "blah", str, undefined, null];
 

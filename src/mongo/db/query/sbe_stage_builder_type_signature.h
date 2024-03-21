@@ -56,6 +56,10 @@ struct TypeSignature {
     TypeSignature(AllTypesTag) noexcept
         : typesMask((1ull << static_cast<size_t>(sbe::value::TypeTags::TypeTagsMax)) - 1u) {}
 
+    bool operator==(const TypeSignature& o) const {
+        return o.typesMask == typesMask;
+    }
+
     // Return whether this signature is a strict subset of the other signature.
     bool isSubset(TypeSignature other) const {
         return (typesMask & other.typesMask) == typesMask;
@@ -86,6 +90,8 @@ struct TypeSignature {
     // Return whether all the types in this signature can be safely compared with all the types in
     // the other signature.
     bool canCompareWith(TypeSignature other) const;
+
+    std::string debugString() const;
 
     // Simple bitmask using one bit for each enum in the TypeTags definition.
     MaskType typesMask = 0;

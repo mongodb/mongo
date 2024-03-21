@@ -1,8 +1,18 @@
 /*
  * Test cases and common TS queries that use block processing.
  */
+export function generateMetaVals() {
+    const metaVals = ["foo", {region: "us", series: 123}, {region: "eu", series: 456}];
+    return metaVals;
+}
+
 export function blockProcessingTestCases(
     timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, sbeFullEnabled) {
+    const dateMidPoint = new Date((dateLowerBound.getTime() + dateUpperBound.getTime()) / 2);
+
+    // You can name the meta field whatever you want, as long as it's 'meta'.
+    assert.eq(metaFieldName, "meta");
+
     return [
         {
             name: "GroupByNull",
@@ -563,7 +573,7 @@ export function blockProcessingTestCases(
                     $group: {
                         _id: {
                             date: {$dateTrunc: {date: "$time", unit: "minute", binSize: 1}},
-                            symbol: "$measurement"
+                            symbol: "$meta"
                         },
                         a: {$min: '$y'},
                         b: {$max: '$y'}
@@ -576,7 +586,7 @@ export function blockProcessingTestCases(
         {
             name: "GroupByMeta_MinAndMax_NoFilter",
             pipeline: [
-                {$group: {_id: "$measurement", a: {$min: '$y'}, b: {$max: '$y'}}},
+                {$group: {_id: "$meta", a: {$min: '$y'}, b: {$max: '$y'}}},
                 {$project: {_id: 1, a: 1, b: 1}}
             ],
             usesBlockProcessing: false
@@ -1217,5 +1227,92 @@ export function blockProcessingTestCases(
             ],
             usesBlockProcessing: sbeFullEnabled
         },
+        {
+            name: "GroupByMetaSubField",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$meta.region", a: {$min: "$x"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByMetaSubFields",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: {region: "$meta.region", series: "$meta.series"}, a: {$min: "$x"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByMetaSubFields",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: {region: "$meta.region", series: "$meta.series"}, a: {$min: "$x"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByMetaSubFieldExpression",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {region: {$ifNull: ["$meta.region", "foo"]}, series: "$meta.series"},
+                        a: {$min: "$x"}
+                    }
+                },
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByMetaNonExistent",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$meta.NON_EXISTENT", a: {$min: "$x"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByExpressionOnMetaNonExistent",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: {$toLower: "$meta.NON_EXISTENT"}, a: {$min: "$x"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByMetaAndMeasurement",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: {region: "$meta.region", y: "$y"}, a: {$min: "$x"}}},
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByMetaAndTime",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {
+                    $group: {
+                        _id: {
+                            region: "$meta.region",
+                            time: {$dateTrunc: {date: "$time", unit: "hour"}}
+                        },
+                        a: {$min: "$x"},
+                        b: {$max: "$y"}
+                    }
+                },
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByXMinOfMeta",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
+                {$group: {_id: "$x", a: {$min: "$meta.series"}}},
+            ],
+            usesBlockProcessing: false
+        },
+
     ];
 }

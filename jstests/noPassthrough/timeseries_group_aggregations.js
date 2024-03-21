@@ -49,11 +49,17 @@ const dateLowerBound = new Date(datePrefix);
 const allFields = ['t', 'm', 'a', 'b'];
 const tsData = [];
 const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-for (let m = 0; m < 10; m++) {
+for (let metaIdx = 0; metaIdx < 10; metaIdx++) {
+    const metaDoc = {metaA: metaIdx, metaB: metaIdx / 2};
+
     let currentDate = 0;
     for (let i = 0; i < 10; i++) {
-        tsData.push(
-            {t: new Date(datePrefix + currentDate - 100), m: m, a: 10 - i, b: alphabet.charAt(i)});
+        tsData.push({
+            t: new Date(datePrefix + currentDate - 100),
+            m: metaDoc,
+            a: 10 - i,
+            b: alphabet.charAt(i)
+        });
         currentDate += 25;
     }
 }
@@ -73,13 +79,32 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
     };
     classicResults.sort(cmpFn);
     bpResults.sort(cmpFn);
-    assert.eq(classicResults, bpResults, {pipeline});
+
+    function errFn() {
+        jsTestLog(classicColl.explain().aggregate(pipeline, {allowDiskUse}));
+        jsTestLog(bpColl.explain().aggregate(pipeline, {allowDiskUse}));
+
+        return "Got different results for pipeline " + tojson(pipeline);
+    }
+    assert.eq(classicResults, bpResults, errFn);
+}
+
+// Cut down a path to just the top level.
+function topLevelField(path) {
+    let pos = path.search('.');
+    if (pos === -1) {
+        return path;
+    }
+    return path.substr(0, pos);
 }
 
 // Create $project stages.
 const projectStages = [
     {stage: {$project: {t: '$t'}}, uses: ['t'], produces: ['t']},
     {stage: {$project: {m: '$m'}}, uses: ['m'], produces: ['m']},
+
+    // This is banned until SERVER-87961 is resolved.
+    //{stage: {$project: {m: '$m.metaA'}}, uses: ['m'], produces: ['m']},
     {stage: {$project: {a: '$a'}}, uses: ['a'], produces: ['a']}
 ];
 for (const includeField of [0, 1]) {
@@ -104,14 +129,15 @@ for (const includeField of [0, 1]) {
 const matchStages = [];
 const matchComparisons = [
     {field: 't', comp: dateLowerBound},
-    {field: 'm', comp: 5},
+    {field: 'm', comp: {metaA: 1, metaB: 1}},
+    {field: 'm.metaA', comp: 6},
     {field: 'a', comp: 2},
 ];
 for (const matchComp of matchComparisons) {
     for (const comparator of ['$lt', '$gt', '$lte', '$gte', '$eq']) {
         matchStages.push({
             stage: {$match: {[matchComp.field]: {[comparator]: matchComp.comp}}},
-            uses: [matchComp.field],
+            uses: [topLevelField(matchComp.field)],
             produces: allFields
         });
     }
@@ -123,6 +149,7 @@ const groupStages = [
     // Add some compound key cases since we don't want to try every combination.
     {stage: {$group: {_id: {t: '$t', m: '$m'}, gb: {$min: '$a'}}}, uses: ['t', 'm', 'a']},
     {stage: {$group: {_id: {a: '$a', m: '$m'}, gb: {$avg: '$t'}}}, uses: ['t', 'm', 'a']},
+    {stage: {$group: {_id: {a: '$a', m: '$m.metaB'}, gb: {$avg: '$t'}}}, uses: ['t', 'm', 'a']},
     // Date trunc example.
     {
         stage: {$group: {_id: {$dateTrunc: {date: "$t", unit: "hour"}}, gb: {$max: '$a'}}},
@@ -130,9 +157,9 @@ const groupStages = [
     },
 ];
 
-for (const groupKey of [null, 't', 'm', 'a']) {
+for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
     const dollarGroupKey = groupKey === null ? null : '$' + groupKey;
-    for (const accumulatorData of ['t', 'm', 'a']) {
+    for (const accumulatorData of ['t', 'm', 'm.metaA', 'a']) {
         const dollarAccumulatorData = accumulatorData === null ? null : '$' + accumulatorData;
         for (const accumulator of ['$min', '$max', '$sum']) {
             if (groupKey !== accumulatorData) {
@@ -182,10 +209,17 @@ function runAggregations(allowDiskUse, forceSpilling) {
      * We choose to put the $group at the end to prune our search space and because stages after
      * $group won't ever use block processing.
      */
+    let numPipelinesRun = 0;
     for (let i1 = 0; i1 < projectMatchStages.length; i1++) {
         const stage1 = projectMatchStages[i1];
         for (let i2 = 0; i2 < projectMatchStages.length; i2++) {
             const stage2 = projectMatchStages[i2];
+
+            // If these two stages don't match, skip running the query.
+            if (!stageRequirementsMatch(stage1, stage2)) {
+                continue;
+            }
+
             // Don't put the same stage twice in a row, it'll just be deduplicated in pipeline
             // optimization.
             if (i1 === i2) {
@@ -194,16 +228,19 @@ function runAggregations(allowDiskUse, forceSpilling) {
             for (const groupStage of groupStages) {
                 // Any prior stage doesn't satify the requirements of a following stage, don't run
                 // the query.
-                if (!stageRequirementsMatch(stage1, stage2) ||
-                    !stageRequirementsMatch(stage1, groupStage) ||
+                if (!stageRequirementsMatch(stage1, groupStage) ||
                     !stageRequirementsMatch(stage2, groupStage)) {
                     continue;
                 }
                 const pipeline = [stage1.stage, stage2.stage, groupStage.stage];
                 compareClassicAndBP(pipeline, allowDiskUse);
+                ++numPipelinesRun;
             }
         }
     }
+
+    jsTestLog(`Ran ${numPipelinesRun} pipelines with allowDisk=${allowDiskUse},
+                forceSpilling=${forceSpilling}`);
 }
 
 // Run with different combinations of allowDiskUse and force spilling.

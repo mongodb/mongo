@@ -205,6 +205,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::valueBlock:
             stream << "ValueBlock";
             break;
+        case TypeTags::cellBlock:
+            stream << "CellBlock";
+            break;
         default:
             stream << "unknown tag";
             break;
