@@ -901,6 +901,17 @@ structs:
                 type: optionalBool
                 stability: stable
 
+    StructWithNewRequiredUnstableField:
+        description: "contains a new, required unstable field"
+        fields:
+            oldField:
+                type: string
+                stability: stable
+            newField:
+                type: string
+                stability: unstable
+                optional: false
+
 commands:
     invalidAPIVersionNew:
         description: "new command fails because of invalid API version"
@@ -986,6 +997,20 @@ commands:
             newlyAddedStableParam:
                 type: string
                 unstable: false
+
+    newUnstableRequiredParameterAdded:
+        description: "new command fails because it adds a new parameter as a required unstable field"
+        command_name: newUnstableRequiredParameterAdded
+        namespace: ignored
+        cpp_name: newUnstableRequiredParameterAdded
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newlyAddedStableParam:
+                type: string
+                stability: unstable
+                optional: false
 
     commandParameterUnstable:
         description: "new stability command parameter fails because it is stable
@@ -3268,3 +3293,13 @@ commands:
         strict: true
         api_version: "1"
         reply_type: BoolToOptionalBoolStruct
+
+    commandWithNewRequiredUnstableFieldInType:
+        description: "new command adds a required unstable field type"
+        command_name: commandWithNewRequiredUnstableFieldInType
+        namespace: type
+        type: StructWithNewRequiredUnstableField
+        cpp_name: commandWithNewRequiredUnstableFieldInType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply

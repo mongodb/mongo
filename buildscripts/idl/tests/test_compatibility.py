@@ -1526,7 +1526,25 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_type_field_added_as_stable_error), "newStableTypeFieldAdded")
 
-        self.assertEqual(error_collection.count(), 215)
+        new_type_field_added_as_unstable_required_error = error_collection.get_error_by_command_name(
+            "commandWithNewRequiredUnstableFieldInType")
+        self.assertTrue(
+            new_type_field_added_as_unstable_required_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_UNSTABLE_REQUIRED)
+        self.assertRegex(
+            str(new_type_field_added_as_unstable_required_error),
+            "commandWithNewRequiredUnstableFieldInType")
+
+        new_param_field_added_as_unstable_required_error = error_collection.get_error_by_command_name(
+            "newUnstableRequiredParameterAdded")
+        self.assertTrue(
+            new_param_field_added_as_unstable_required_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_UNSTABLE_REQUIRED)
+        self.assertRegex(
+            str(new_param_field_added_as_unstable_required_error),
+            "newUnstableRequiredParameterAdded")
+
+        self.assertEqual(error_collection.count(), 217)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""

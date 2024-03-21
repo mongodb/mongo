@@ -452,6 +452,7 @@ structs:
             addedUnstableTypeField:
                 type: string
                 stability: unstable
+                optional: true
 
     AddedInternalTypeFieldStruct:
         description: "This struct contains a field that is added and internal in the new version"
@@ -459,6 +460,7 @@ structs:
             addedInternalTypeField:
                 type: string
                 stability: internal
+                optional: true
 
     KeptUnstableTypeFieldStruct:
         description: "This struct contains a field that is unstable in the new version and also
@@ -911,6 +913,7 @@ commands:
             newUnstableParam:
                 type: string
                 stability: unstable
+                optional: true
 
     keptUnstableCommandParameter:
         description: "new command has an unstable parameter that also
@@ -2321,3 +2324,17 @@ commands:
                 optional: true
                 stability: stable
         reply_type: ReplyWithNewNestedArrayTypeField
+
+    commandWithUnstableRequiredParameter:
+        description: "the same unstable required field is present in both versions of the command"
+        command_name: commandWithUnstableRequiredParameter
+        namespace: ignored
+        cpp_name: commandWithUnstableRequiredParameter
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            unstableRequiredParam:
+                type: string
+                stability: unstable
+                optional: false

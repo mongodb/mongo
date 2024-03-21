@@ -1244,6 +1244,10 @@ def check_command_params_or_type_struct_fields(
                     cmd_name, new_field.name, new_idl_file_path, new_struct.name,
                     is_command_parameter)
 
+            if is_unstable(new_field.stability) and not new_field_optional:
+                ctxt.add_new_param_or_type_field_added_as_unstable_required_error(
+                    cmd_name, new_field.name, new_idl_file_path, is_command_parameter)
+
             # Check that a new field does not have an unallowed use of 'any' as the bson_serialization_type.
             any_allow_name: str = (cmd_name + "-param-" + new_field.name
                                    if is_command_parameter else cmd_name)

@@ -129,6 +129,8 @@ ERROR_ID_UNSTABLE_COMMAND_TYPE_FIELD_CHANGED_TO_STABLE = "ID0085"
 ERROR_ID_NEW_REPLY_FIELD_ADDED_AS_STABLE = "ID0086"
 ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_STABLE = "ID0087"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_STABLE = "ID0088"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_UNSTABLE_REQUIRED = "ID0089"
+ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_UNSTABLE_REQUIRED = "ID0090"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -1146,6 +1148,21 @@ class IDLCompatibilityContext(object):
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_STABLE, command_name,
                 ("The command '%s' has newly-added type '%s' which may not be defined as stable "
                  "unless that addition is explicitly allowed.") % (command_name, field_name), file)
+
+    def add_new_param_or_type_field_added_as_unstable_required_error(
+            self, command_name: str, field_name: str, file: str,
+            is_command_parameter: bool) -> None:
+        """Add an error that a new unstable command param or type field may not be added as required."""
+        if is_command_parameter:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_UNSTABLE_REQUIRED, command_name,
+                ("The command '%s' has newly-added unstable param field '%s' which should be optional."
+                 ) % (command_name, field_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_UNSTABLE_REQUIRED, command_name,
+                ("The command '%s' has newly-added unstable type field '%s' which should be optional."
+                 ) % (command_name, field_name), file)
 
 
 def _assert_unique_error_messages() -> None:
