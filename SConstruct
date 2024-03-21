@@ -2165,6 +2165,7 @@ else:
 
 if env['MONGO_ALLOCATOR'] == "tcmalloc-google":
     env.Append(CPPDEFINES=["ABSL_ALLOCATOR_NOTHROW"])
+    env.Append(CXXFLAGS=['-faligned-new=8'])
 
 if has_option("cache"):
     if has_option("gcov"):
