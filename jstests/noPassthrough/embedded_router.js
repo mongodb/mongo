@@ -3,8 +3,7 @@
  * the router port to `config.mongos`.
  *
  * @tags: [
- *    featureFlagRouterPort,
- *    requires_fcv_80,
+ *    featureFlagEmbeddedRouter,
  * ]
  */
 

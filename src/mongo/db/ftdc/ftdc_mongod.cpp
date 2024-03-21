@@ -170,12 +170,14 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
         registerMongoDCollectors,
     };
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
-    const bool multiServiceFTDCSchema =
-        feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledAndIgnoreFCVUnsafe();
+    // (Ignore FCV check): these two feature flags are not FCV-gated.
+    const bool gEmbeddedRouter = feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafe();
+    const bool gMultiserviceFTDCSchema =
+        feature_flags::gMultiserviceFTDCSchema.isEnabledAndIgnoreFCVUnsafe();
 
-    const UseMultiServiceSchema multiversionSchema{
-        serviceContext->getService(ClusterRole::RouterServer) && multiServiceFTDCSchema};
+    const UseMultiserviceSchema multiversionSchema{
+        serviceContext->getService(ClusterRole::RouterServer) && gEmbeddedRouter &&
+        gMultiserviceFTDCSchema};
 
     if (multiversionSchema) {
         registerFns.emplace_back(registerMongoSCollectors);

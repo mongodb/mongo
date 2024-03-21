@@ -40,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
@@ -233,10 +234,18 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();
-    // Serverless clusters don't support sharding, so they should only ever use the Shard service
-    // and associated ServiceEntryPoint.
-    if (!gMultitenancySupport && session->isFromRouterPort()) {
-        service = _svcCtx->getService(ClusterRole::RouterServer);
+    // Serverless clusters don't support sharding, so they should only ever use
+    // the Shard service and associated ServiceEntryPoint.
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !gMultitenancySupport) {
+        bool isEmbeddedRouter = serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) &&
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
+        if (isEmbeddedRouter && session->isFromRouterPort()) {
+            service = _svcCtx->getService(ClusterRole::RouterServer);
+        }
     }
 
     auto uniqueClient = service->makeClient(getClientThreadName(*session), session);

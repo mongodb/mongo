@@ -10,7 +10,7 @@ import {Thread} from "jstests/libs/parallelTester.js";
 
 function getDiagnosticData(mongos) {
     let db = mongos.getDB('admin');
-    const stats = verifyGetDiagnosticData(db).router;
+    const stats = verifyGetDiagnosticData(db);
     assert(stats.hasOwnProperty('networkInterfaceStats'));
     return stats.networkInterfaceStats;
 }

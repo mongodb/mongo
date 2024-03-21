@@ -5,7 +5,7 @@
         embedded_router: 1
         mongod_options:
           set_parameters:
-            featureFlagRouterPort: 1
+            featureFlagEmbeddedRouter: 1
 
 # Contains overrides specific to the concurrency/FSM suites when run against an embedded router.
 # Deletes mongos_options from the config (since mongoses don't run on embedded router fixtures)

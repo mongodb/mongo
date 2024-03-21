@@ -23,7 +23,8 @@ export function setParameter(adminDb, obj) {
  * Returns whether the FTDC file format should follow the new format or not.
  */
 export function hasMultiserviceFTDCSchema(adminDb) {
-    return FeatureFlagUtil.isPresentAndEnabled(adminDb, "MultiServiceLogAndFTDCFormat") &&
+    return FeatureFlagUtil.isEnabled(adminDb, "EmbeddedRouter") &&
+        FeatureFlagUtil.isEnabled(adminDb, "MultiserviceFTDCSchema") &&
         (isMongos(adminDb) || isClusterNode(adminDb));
 }
 
@@ -48,8 +49,7 @@ export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserv
             sleep(500);
         } else {
             // Check for a few common properties to ensure we got data
-            if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema ||
-                TestData.testingReplicaSetEndpoint) {
+            if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema) {
                 const hasKnownData =
                     (data.hasOwnProperty("shard") && data.shard.hasOwnProperty("serverStatus")) ||
                     (data.hasOwnProperty("router") && data.router.hasOwnProperty("serverStatus"))
@@ -95,7 +95,7 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
 
     const topology = DiscoverTopology.findConnectedNodes(adminDb.getMongo());
     if (topology.type === Topology.kShardedCluster &&
-        FeatureFlagUtil.isPresentAndEnabled(adminDb, "MultiServiceLogAndFTDCFormat") && !isMongos) {
+        FeatureFlagUtil.isPresentAndEnabled(adminDb, "EmbeddedRouter") && !isMongos) {
         assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 400);
     } else {
         assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 200);

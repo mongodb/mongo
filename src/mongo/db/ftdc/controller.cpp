@@ -255,12 +255,12 @@ void FTDCController::doLoop(Service* service) noexcept {
             // FTDC
             if (!_mgr) {
                 auto swMgr = FTDCFileManager::create(
-                    &_config, _path, &_rotateCollectors, client, _multiServiceSchema);
+                    &_config, _path, &_rotateCollectors, client, _multiserviceSchema);
 
                 _mgr = uassertStatusOK(std::move(swMgr));
             }
 
-            auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
+            auto collectSample = _periodicCollectors.collect(client, _multiserviceSchema);
 
             Status s = _mgr->writeSampleAndRotateIfNeeded(
                 client, std::get<0>(collectSample), std::get<1>(collectSample));

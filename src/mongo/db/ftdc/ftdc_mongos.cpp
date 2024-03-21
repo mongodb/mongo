@@ -154,11 +154,14 @@ void startMongoSFTDC(ServiceContext* serviceContext) {
         }
     }
 
+    // TODO (SERVER-87249): remove after the internal router is enabled by default (hardcode to
+    // `true`).
     // (Ignore FCV check): This code is only executed in mongoS, and they're not FCV-gated anyway.
-    const UseMultiServiceSchema multiServiceSchema{
-        feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledAndIgnoreFCVUnsafe()};
+    const UseMultiserviceSchema multiserviceSchema{
+        feature_flags::gMultiserviceFTDCSchema.isEnabledAndIgnoreFCVUnsafe() &&
+        feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafe()};
 
-    startFTDC(serviceContext, directory, startMode, {registerMongoSCollectors}, multiServiceSchema);
+    startFTDC(serviceContext, directory, startMode, {registerMongoSCollectors}, multiserviceSchema);
 }
 
 void stopMongoSFTDC() {

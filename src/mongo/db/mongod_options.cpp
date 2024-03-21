@@ -712,7 +712,8 @@ Status storeMongodOptions(const moe::Environment& params) {
         serverGlobalParams.clusterRole += ClusterRole::RouterServer;
 
         if (params.count("net.routerPort")) {
-            if (feature_flags::gRouterPort.isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
+            if (feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(
+                    fcvSnapshot)) {
                 serverGlobalParams.routerPort = params["net.routerPort"].as<int>();
             }
         }

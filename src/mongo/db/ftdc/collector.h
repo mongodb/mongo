@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-enum UseMultiServiceSchema : bool {};
+enum UseMultiserviceSchema : bool {};
 
 /**
  * BSON Collector interface
@@ -145,7 +145,7 @@ public:
      *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
-    std::tuple<BSONObj, Date_t> collect(Client* client, UseMultiServiceSchema multiServiceSchema);
+    std::tuple<BSONObj, Date_t> collect(Client* client, UseMultiserviceSchema multiserviceSchema);
 
 private:
     // collection of collectors

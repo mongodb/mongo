@@ -2,10 +2,7 @@
  * Tests that as long as the replica set endpoint enabled, the connection to a standalone or replica
  * set works across upgrade and downgrade.
  *
- * @tags: [
- *    featureFlagRouterPort,
- *    requires_fcv_80,
- * ]
+ * @tags: [featureFlagEmbeddedRouter]
  */
 
 import "jstests/multiVersion/libs/multi_rs.js";

@@ -72,10 +72,10 @@ executor:
       verbose: ''
     per_mongod_options:
       - set_parameters:
-          featureFlagRouterPort: true
+          featureFlagEmbeddedRouter: true
           featureFlagReplicaSetEndpoint: true
       - set_parameters:
-          featureFlagRouterPort: false
+          featureFlagEmbeddedRouter: false
           featureFlagReplicaSetEndpoint: false
     per_sharded_cluster_options:
       - embedded_router: 1

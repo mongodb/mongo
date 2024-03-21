@@ -15,7 +15,7 @@ const st = new ShardingTest({
 });
 
 const admin = st.s0.getDB('admin');
-const stats = verifyGetDiagnosticData(admin).router.connPoolStats;
+const stats = verifyGetDiagnosticData(admin).connPoolStats;
 jsTestLog(`Diagnostic connection pool stats: ${tojson(stats)}`);
 
 assert(stats.hasOwnProperty('totalInUse'));

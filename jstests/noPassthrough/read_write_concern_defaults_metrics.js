@@ -3,14 +3,6 @@
 // @tags: [requires_sharding]
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
-const Topology = {
-    Shard: "shard",
-    MongoS: "mongos",
-    Config: "config",
-    Standalone: "standalone",
-    ReplicaSet: "rs",
-};
-
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatus(conn,
                             {expectedRC, expectedWC, expectNoDefaultsDocument, expectNothing},
@@ -109,18 +101,12 @@ function testServerStatus(conn, isImplicitDefaultWCMajority) {
     verifyServerStatus(conn, {expectNoDefaultsDocument: true}, isImplicitDefaultWCMajority);
 }
 
-function testFTDC(conn, topology, ftdcDirPath, expectNothingOnRotation = false) {
+function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
     //
     // The periodic samples used for FTDC shouldn't include the default read write concerns.
     //
-    let latestPeriodicFTDC = verifyGetDiagnosticData(conn.getDB("admin"));
 
-    if (topology === Topology.MongoS) {
-        latestPeriodicFTDC = latestPeriodicFTDC.router;
-    } else if (topology === Topology.Shard || topology === Topology.Config) {
-        latestPeriodicFTDC = latestPeriodicFTDC.shard;
-    }
-
+    const latestPeriodicFTDC = verifyGetDiagnosticData(conn.getDB("admin"));
     assert.hasFields(latestPeriodicFTDC, ["serverStatus"]);
     assert.eq(undefined,
               latestPeriodicFTDC.serverStatus.defaultRWConcern,
@@ -154,19 +140,8 @@ function testFTDC(conn, topology, ftdcDirPath, expectNothingOnRotation = false) 
 
     if (expectNothingOnRotation) {
         assert.eq(undefined, firstMetadataObj.doc.getDefaultRWConcern, tojson(ftdcData[0].doc));
-        if (topology === Topology.Shard) {
-            assert.eq(undefined,
-                      firstMetadataObj.doc.common.getDefaultRWConcern,
-                      tojson(ftdcData[0].doc));
-        }
     } else {
-        let getDefaultRWConcernDoc = {};
-        if (topology === Topology.ReplicaSet || topology === Topology.Standalone) {
-            getDefaultRWConcernDoc = firstMetadataObj.doc;
-        } else {
-            getDefaultRWConcernDoc = firstMetadataObj.doc.common;
-        }
-        assert.hasFields(getDefaultRWConcernDoc, ["getDefaultRWConcern"]);
+        assert.hasFields(firstMetadataObj.doc, ["getDefaultRWConcern"]);
     }
 }
 
@@ -185,17 +160,18 @@ jsTestLog("Testing sharded cluster...");
     });
 
     testServerStatus(st.s, true /* isImplicitDefaultWCMajority */);
-    testFTDC(st.s, Topology.MongoS, testPathMongos);
+    testFTDC(st.s, testPathMongos);
+
     testServerStatus(st.configRS.getPrimary(), true /* isImplicitDefaultWCMajority */);
-    testFTDC(st.configRS.getPrimary(), Topology.Shard, testPathConfig);
+    testFTDC(st.configRS.getPrimary(), testPathConfig);
 
     // Set a default before verifying it isn't included by shards.
     assert.commandWorked(
         st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
     verifyServerStatus(
         st.rs0.getPrimary(), {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
-    testFTDC(
-        st.rs0.getPrimary(), Topology.Shard, testPathShard, true /* expectNothingOnRotation */);
+    testFTDC(st.rs0.getPrimary(), testPathShard, true /* expectNothingOnRotation */);
+
     st.stop();
 }
 
@@ -208,7 +184,7 @@ jsTestLog("Testing plain replica set...");
     rst.initiate();
 
     testServerStatus(rst.getPrimary(), true /* isImplicitDefaultWCMajority */);
-    testFTDC(rst.getPrimary(), Topology.ReplicaSet, testPath);
+    testFTDC(rst.getPrimary(), testPath);
 
     rst.stopSet();
 }
@@ -230,7 +206,7 @@ jsTestLog("Testing standalone server...");
         MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: testPath}});
 
     verifyServerStatus(standalone, {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
-    testFTDC(standalone, Topology.Standalone, testPath, true /* expectNothingOnRotation */);
+    testFTDC(standalone, testPath, true /* expectNothingOnRotation */);
 
     MongoRunner.stopMongod(standalone);
 }

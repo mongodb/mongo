@@ -2,10 +2,10 @@
  * Tests that CRUD and DDL commands work correctly when the replica set endpoint is used.
  *
  * @tags: [
- *   requires_fcv_80,
- *   featureFlagRouterPort,
+ *   requires_fcv_73,
+ *   featureFlagEmbeddedRouter,
  *   featureFlagSecurityToken,
- *   requires_persistence,
+ *   requires_persistence
  * ]
  */
 

@@ -54,6 +54,7 @@
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_uptime_reporter.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
@@ -151,7 +152,10 @@ void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
         const std::string hostName(getHostNameCached());
         const std::string instanceId(prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
         const Timer upTimeTimer;
-        bool isEmbeddedRouter = serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
+        bool isEmbeddedRouter =
+            feature_flags::gEmbeddedRouter.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
 
         while (!globalInShutdownDeprecated()) {
             reportStatus(opCtx.get(), instanceId, hostName, created, upTimeTimer, isEmbeddedRouter);

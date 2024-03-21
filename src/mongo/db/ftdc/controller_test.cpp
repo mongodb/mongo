@@ -55,8 +55,8 @@ namespace {
 
 class FTDCControllerTest : public FTDCTest {
 protected:
-    void testFull(UseMultiServiceSchema multiServiceSchema);
-    void testStartAsDisabled(UseMultiServiceSchema multiServiceSchema);
+    void testFull(UseMultiserviceSchema multiserviceSchema);
+    void testStartAsDisabled(UseMultiserviceSchema multiserviceSchema);
 };
 
 class FTDCMetricsCollectorMockTee : public FTDCCollectorInterface {
@@ -179,7 +179,7 @@ void insertNewSchemaDocuments(std::vector<BSONObj>& allDocs,
 }
 
 // Test a run of the controller and the data it logs to log file
-void FTDCControllerTest::testFull(UseMultiServiceSchema multiServiceSchema) {
+void FTDCControllerTest::testFull(UseMultiserviceSchema multiserviceSchema) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
@@ -191,7 +191,7 @@ void FTDCControllerTest::testFull(UseMultiServiceSchema multiServiceSchema) {
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    FTDCController c(dir, config, multiServiceSchema);
+    FTDCController c(dir, config, multiserviceSchema);
 
     auto c1 = std::make_unique<FTDCMetricsCollectorMock2>();
     auto c2 = std::make_unique<FTDCMetricsCollectorMockRotate>();
@@ -219,7 +219,7 @@ void FTDCControllerTest::testFull(UseMultiServiceSchema multiServiceSchema) {
     ASSERT_EQUALS(docsRotate.size(), 1UL);
 
     std::vector<BSONObj> allDocs;
-    if (multiServiceSchema) {
+    if (multiserviceSchema) {
         insertNewSchemaDocuments(allDocs, docsRotate, "shard");
         insertNewSchemaDocuments(allDocs, docsPeriodic, "common");
     } else {
@@ -237,11 +237,11 @@ void FTDCControllerTest::testFull(UseMultiServiceSchema multiServiceSchema) {
 }
 
 TEST_F(FTDCControllerTest, TestFullSingleServiceSchema) {
-    testFull(UseMultiServiceSchema{false});
+    testFull(UseMultiserviceSchema{false});
 }
 
 TEST_F(FTDCControllerTest, TestFullMultiserviceSchema) {
-    testFull(UseMultiServiceSchema{true});
+    testFull(UseMultiserviceSchema{true});
 }
 
 // Test we can start and stop the controller in quick succession, make sure it succeeds without
@@ -258,7 +258,7 @@ TEST_F(FTDCControllerTest, TestStartStop) {
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    FTDCController c(dir, config, UseMultiServiceSchema{true});
+    FTDCController c(dir, config, UseMultiserviceSchema{true});
 
     c.start(getClient()->getService());
 
@@ -267,7 +267,7 @@ TEST_F(FTDCControllerTest, TestStartStop) {
 
 // Test we can start the controller as disabled, the directory is empty, and then we can succesfully
 // enable it
-void FTDCControllerTest::testStartAsDisabled(UseMultiServiceSchema multiServiceSchema) {
+void FTDCControllerTest::testStartAsDisabled(UseMultiserviceSchema multiserviceSchema) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
@@ -283,7 +283,7 @@ void FTDCControllerTest::testStartAsDisabled(UseMultiServiceSchema multiServiceS
 
     auto c1Ptr = c1.get();
 
-    FTDCController c(dir, config, multiServiceSchema);
+    FTDCController c(dir, config, multiserviceSchema);
 
     c.addPeriodicCollector(std::move(c1), ClusterRole::ShardServer);
 
@@ -306,7 +306,7 @@ void FTDCControllerTest::testStartAsDisabled(UseMultiServiceSchema multiServiceS
     ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodic.size(), 50UL);
 
     std::vector<BSONObj> allDocs;
-    if (multiServiceSchema) {
+    if (multiserviceSchema) {
         insertNewSchemaDocuments(allDocs, docsPeriodic, "shard");
     } else {
         allDocs.insert(allDocs.end(), docsPeriodic.cbegin(), docsPeriodic.cend());
@@ -322,11 +322,11 @@ void FTDCControllerTest::testStartAsDisabled(UseMultiServiceSchema multiServiceS
 }
 
 TEST_F(FTDCControllerTest, TestStartAsDisabledSingleServiceSchema) {
-    testStartAsDisabled(UseMultiServiceSchema{false});
+    testStartAsDisabled(UseMultiserviceSchema{false});
 }
 
 TEST_F(FTDCControllerTest, TestStartAsDisabledMultiserviceSchema) {
-    testStartAsDisabled(UseMultiServiceSchema{true});
+    testStartAsDisabled(UseMultiserviceSchema{true});
 }
 
 }  // namespace
