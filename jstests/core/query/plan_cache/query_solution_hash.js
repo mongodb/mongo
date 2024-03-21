@@ -44,31 +44,47 @@ function getCachedSolutionHash() {
  * the second time the query is cached, it has the same hash.
  */
 function sameHashAfterCacheDrop(queryFunc) {
+    jsTestLog("Testing: " + tojson(queryFunc));
     coll.getPlanCache().clear();
     for (let i = 0; i < 5; i++) {
         queryFunc(1).toArray();
     }
-    // If there's no cache entry, or multiple, we move on.
-    if (coll.getPlanCache().list().length !== 1) {
+    // If there's no cache entry, we move on. This can happen if the classic engine is used for a
+    // query, and only one solution is considered.
+    if (coll.getPlanCache().list().length == 0) {
+        jsTestLog("Returning early");
         return;
     }
+    assert.eq(1,
+              coll.getPlanCache().list().length,
+              () => "Found unexpected number of entries in plan cache. Expecting one. Found: " +
+                  tojson(coll.getPlanCache().list()));
+
+    const beforePlanCache = coll.getPlanCache().list();
     const hash = getCachedSolutionHash();
 
     coll.getPlanCache().clear();
     for (let i = 0; i < 5; i++) {
         queryFunc(2).toArray();
     }
-    if (coll.getPlanCache().list().length !== 1) {
-        return;
-    }
-    assert.eq(hash, getCachedSolutionHash(), () => tojson(coll.getPlanCache().list()));
+    assert.eq(1,
+              coll.getPlanCache().list().length,
+              () => "Found unexpected number of entries in plan cache. Expecting one. Found: " +
+                  tojson(coll.getPlanCache().list()));
+
+    assert.eq(hash,
+              getCachedSolutionHash(),
+              () => "With param=1, plan cache was: " + tojson(beforePlanCache) +
+                  ". With param=2, plan cache is: " + tojson(coll.getPlanCache().list()));
 }
 
 function testSameSolutionHash() {
     const queries = [
         (param) => coll.find({a: param, b: 1}),
+        (param) => coll.find({a: param, b: param}),
         (param) => coll.find({a: param}, {b: 1}),
         () => coll.find({}, {a: 1, b: 1}),
+        (param) => coll.find({a: {$size: param}}),
         (param) => coll.aggregate([{$match: {a: param, b: 1}}]),
         () => coll.aggregate([{$project: {_id: 0, a: 1, b: 1}}]),
         (param) => coll.aggregate([{$match: {a: param, b: 1}}, {$project: {_id: 0, a: 1, b: 1}}]),

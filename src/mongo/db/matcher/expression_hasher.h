@@ -33,12 +33,28 @@
 
 namespace mongo {
 /**
+ * Describes whether we include parameter IDs or values from the query in the hash.
+ */
+enum HashValuesOrParams {
+    // Hash parameter IDs where parameters are present. If parameters are not present, hash values.
+    kHashParamIds = 1 << 1,
+    // Hash values from the query.
+    kHashValues = 1 << 2,
+};
+
+struct MatchExpressionHashParams {
+    // 'maxNumberOfInElementsToHash' is the maximum number of equalities or regexes to hash to avoid
+    // performance issues related to hashing of large '$in's.
+    const size_t maxNumberOfInElementsToHash;
+    const HashValuesOrParams hashValuesOrParams;
+};
+
+/**
  * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
  * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes. 'maxNumberOfInElementsToHash' is the maximum number of equalities
- * or regexes to hash to avoid performance issues related to hashing of large '$in's.
+ * any $jsonSchema-related nodes.
  */
-size_t calculateHash(const MatchExpression& expr, size_t maxNumberOfInElementsToHash);
+size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParams& params);
 
 /**
  * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
@@ -46,19 +62,17 @@ size_t calculateHash(const MatchExpression& expr, size_t maxNumberOfInElementsTo
  * will tassert() if provided an input that contains any $jsonSchema-related nodes.
  */
 struct MatchExpressionHasher {
-    /**
-     * 'maxNumberOfInElementsToHash' is the maximum number of equalities or regexes to hash to avoid
-     * performance issues related to hashing of large '$in's.
-     */
-    explicit MatchExpressionHasher(size_t maxNumberOfInElementsToHash = 20)
-        : _maxNumberOfInElementsToHash(maxNumberOfInElementsToHash) {}
+    explicit MatchExpressionHasher(MatchExpressionHashParams params =
+                                       MatchExpressionHashParams{20,
+                                                                 HashValuesOrParams::kHashValues})
+        : _params(std::move(params)) {}
 
     size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr, _maxNumberOfInElementsToHash);
+        return calculateHash(*expr, _params);
     }
 
 private:
-    const size_t _maxNumberOfInElementsToHash;
+    const MatchExpressionHashParams _params;
 };
 
 /**

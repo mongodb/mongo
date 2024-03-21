@@ -326,11 +326,21 @@ struct QuerySolutionNode {
         return state;
     }
 
+    /**
+     * Hashes a QuerySolutionNode using parameter IDs rather than concrete values wherever
+     * parameters are present. This allows us to determine whether different query solutions, when
+     * parameterized, correspond to the same solution. Used for populating "isCached" in explain.
+     */
     virtual void hash(absl::HashState state) const {
         state = absl::HashState::combine(std::move(state), getType());
         if (filter) {
-            state =
-                absl::HashState::combine(std::move(state), MatchExpressionHasher{}(filter.get()));
+            // When hashing the filter, we need to use parameter IDs rather than the concrete values
+            // from the query.
+            state = absl::HashState::combine(
+                std::move(state),
+                MatchExpressionHasher{MatchExpressionHashParams{
+                    20 /*maxNumberOfInElementsToHash*/,
+                    HashValuesOrParams::kHashParamIds /* hashValuesOrParams*/}}(filter.get()));
         }
         for (const auto& child : children) {
             state = absl::HashState::combine(std::move(state), *child.get());
@@ -566,15 +576,6 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     IndexBounds getIndexBounds() const;
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
-
-    void hash(absl::HashState state) const override {
-        // For a collscan plan, the QuerySolutionNode::filter attribute will have the values from
-        // the query rather than be parameterized. So including the filter in the hash would create
-        // inconsistent hashes.
-        state = absl::HashState::combine(std::move(state), getType());
-        state =
-            absl::HashState::combine_contiguous(std::move(state), children.data(), children.size());
-    }
 
     // Name of the namespace.
     NamespaceString nss;

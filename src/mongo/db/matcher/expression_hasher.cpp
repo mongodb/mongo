@@ -116,9 +116,10 @@ H AbslHashValue(H h, const BSONElement& el) {
 template <typename H>
 class MatchExpressionHashVisitor final : public MatchExpressionConstVisitor {
 public:
-    MatchExpressionHashVisitor(H hashState, size_t maxNumberOfInElementsToHash)
+    MatchExpressionHashVisitor(H hashState, const MatchExpressionHashParams& hashParams)
         : _hashState(std::move(hashState)),
-          _maxNumberOfInElementsToHash(maxNumberOfInElementsToHash) {}
+          _params(hashParams),
+          _hashParamIds(_params.hashValuesOrParams & HashValuesOrParams::kHashParamIds) {}
 
     void visit(const BitsAllClearMatchExpression* expr) final {
         visitBitTest(expr);
@@ -152,57 +153,86 @@ public:
     void visit(const InMatchExpression* expr) final {
         // `equivalent()` function compares $in using values of type, path, hasNull, collator,
         // regexes, and equalities fields.
-
         hashCombineTypeAndPath(expr);
         combine(expr->hasNull());
         hashCombineCollator(expr->getCollator());
 
-        // Hash the size of equalities's list and up to a maximum of 'maxNumberOfHashedElements'
-        // evenly chosen equalities.
-        BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                     expr->getCollator());
-        const auto& equalities = expr->getEqualities();
-        const size_t eqStep =
-            std::max(static_cast<size_t>(1), equalities.size() / _maxNumberOfInElementsToHash);
-        combine(equalities.size());
-        for (size_t i = 0; i < equalities.size(); i += eqStep) {
-            combine(eltCmp.hash(equalities[i]));
-        }
+        if (_hashParamIds && expr->getInputParamId()) {
+            // There cannot be regexes when InMatchExpression is parameterized.
+            combine(expr->getInputParamId().get());
+        } else {
+            // Hash the size of equalities's list and up to a maximum of 'maxNumberOfHashedElements'
+            // evenly chosen equalities.
+            BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                         expr->getCollator());
+            const auto& equalities = expr->getEqualities();
+            const size_t eqStep = std::max(static_cast<size_t>(1),
+                                           equalities.size() / _params.maxNumberOfInElementsToHash);
+            combine(equalities.size());
+            for (size_t i = 0; i < equalities.size(); i += eqStep) {
+                combine(eltCmp.hash(equalities[i]));
+            }
 
-        // Hash the size of regexes's list and up to a maximum of 'maxNumberOfHashedElements'
-        // evenly chosen regexes.
-        const auto& regexes = expr->getRegexes();
-        const size_t regStep =
-            std::max(static_cast<size_t>(1), regexes.size() / _maxNumberOfInElementsToHash);
-        combine(regexes.size());
-        for (size_t i = 0; i < regexes.size(); i += regStep) {
-            combine(calculateHash(*regexes[i].get(), _maxNumberOfInElementsToHash));
+            // Hash the size of regexes's list and up to a maximum of 'maxNumberOfHashedElements'
+            // evenly chosen regexes.
+            const auto& regexes = expr->getRegexes();
+            const size_t regStep = std::max(static_cast<size_t>(1),
+                                            regexes.size() / _params.maxNumberOfInElementsToHash);
+            combine(regexes.size());
+            for (size_t i = 0; i < regexes.size(); i += regStep) {
+                combine(calculateHash(*regexes[i].get(), _params));
+            }
         }
     }
 
     void visit(const ModMatchExpression* expr) final {
-        // `equivalent()` function does not use DivisorInputParamId and RemainderInputParamId.
         hashCombineTypeAndPath(expr);
-        combine(expr->getDivisor(), expr->getRemainder());
+
+        if (_hashParamIds && expr->getDivisorInputParamId()) {
+            // Either both parameter IDs are set, or neither are.
+            combine(expr->getDivisorInputParamId().get(), expr->getRemainderInputParamId().get());
+        } else {
+            // `equivalent()` function does not use DivisorInputParamId and RemainderInputParamId.
+            combine(expr->getDivisor(), expr->getRemainder());
+        }
     }
 
     void visit(const RegexMatchExpression* expr) final {
-        // `equivalent()` function uses values of path, regex, and flags fields. `getString()`
-        // function returns value of regex field.
         hashCombineTypeAndPath(expr);
-        combine(expr->getString(), expr->getFlags());
+
+        if (_hashParamIds && expr->getSourceRegexInputParamId()) {
+            // Either both parameter IDs are set, or neither are.
+            combine(expr->getSourceRegexInputParamId().get(),
+                    expr->getCompiledRegexInputParamId().get());
+        } else {
+            // `equivalent()` function does not use SourceRegexInputParamId or
+            // CompiledRegexInputParamId. `getString()` function returns value of regex field.
+            combine(expr->getString());
+        }
+
+        combine(expr->getFlags());
     }
 
     void visit(const SizeMatchExpression* expr) final {
-        // `getData()` returns value of size field.
         hashCombineTypeAndPath(expr);
-        combine(expr->getData());
+
+        if (_hashParamIds && expr->getInputParamId()) {
+            combine(expr->getInputParamId().get());
+        } else {
+            // `equivalent()` function does not use InputParamId. `getData()` returns value of size
+            // field.
+            combine(expr->getData());
+        }
     }
 
     void visit(const TypeMatchExpression* expr) final {
-        // Only values of path, and typeSet fields are used by `equivalent()` function.
         hashCombineTypeAndPath(expr);
-        combine(expr->typeSet());
+        if (_hashParamIds && expr->getInputParamId()) {
+            combine(expr->getInputParamId().get());
+        } else {
+            // `equivalent()` function does not use InputParamId.
+            combine(expr->typeSet());
+        }
     }
 
     void visit(const WhereMatchExpression* expr) final {
@@ -384,26 +414,34 @@ private:
     }
 
     void visitBitTest(const BitTestMatchExpression* expr) {
-        // BitPositionsParamId, BitMaskParamId, and BitMask are not hashed because they are not used
-        // in `equivalent()` function.
         hashCombineTypeAndPath(expr);
 
-        // `equivalent()` function compares sorted bitPositions.
-        auto bitPositions = expr->getBitPositions();
-        std::sort(bitPositions.begin(), bitPositions.end());
-        combine(bitPositions);
+        if (_hashParamIds && expr->getBitPositionsParamId()) {
+            // Either both parameter IDs are set, or neither are.
+            combine(expr->getBitPositionsParamId().get(), expr->getBitMaskParamId().get());
+        } else {
+            // `equivalent()` function does not use the parameter IDs or BitMask.
+            // `equivalent()` function compares sorted bitPositions.
+            auto bitPositions = expr->getBitPositions();
+            std::sort(bitPositions.begin(), bitPositions.end());
+            combine(bitPositions);
+        }
     }
 
     void visitComparison(const ComparisonMatchExpressionBase* expr) {
-        // InputParamId is not hashed because it is not used in `equivalent()` function.
-
-        // Please, keep BSONElementComparator consistent with
-        // `ComparisonMatchExpressionBase::equivalent()`.
-        const StringDataComparator* stringComparator = expr->getCollator();
-        BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                     stringComparator);
         hashCombineTypeAndPath(expr);
-        combine(eltCmp.hash(expr->getData()));
+
+        if (_hashParamIds && expr->getInputParamId()) {
+            combine(expr->getInputParamId().get());
+        } else {
+            // Please, keep BSONElementComparator consistent with
+            // `ComparisonMatchExpressionBase::equivalent()`.
+            const StringDataComparator* stringComparator = expr->getCollator();
+            BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                         stringComparator);
+            combine(eltCmp.hash(expr->getData()));
+        }
+
         hashCombineCollator(expr->getCollator());
     }
 
@@ -414,7 +452,11 @@ private:
 
     void visitWhere(const WhereMatchExpressionBase* expr) {
         hashCombineTypeAndPath(expr);
-        combine(expr->getCode());
+        if (_hashParamIds && expr->getInputParamId()) {
+            combine(expr->getInputParamId().get());
+        } else {
+            combine(expr->getCode());
+        }
     }
 
     template <typename... Ts>
@@ -424,26 +466,27 @@ private:
 
     H _hashState;
 
-    const size_t _maxNumberOfInElementsToHash;
+    const MatchExpressionHashParams& _params;
+    const bool _hashParamIds;
 };
 
 /**
  * A utility struct used to pass additional parameters to the MatchExpression's hasher.
  */
-struct MatchExpressionHashParams {
+struct AbslHashValueParams {
     const MatchExpression& exprToHash;
-    size_t maxNumberOfInElementsToHash;
+    const MatchExpressionHashParams& params;
 };
 
 template <typename H>
-H AbslHashValue(H h, const MatchExpressionHashParams& toHash) {
-    MatchExpressionHashVisitor<H> visitor{std::move(h), toHash.maxNumberOfInElementsToHash};
+H AbslHashValue(H h, const AbslHashValueParams& toHash) {
+    MatchExpressionHashVisitor<H> visitor{std::move(h), toHash.params};
     MatchExpressionWalker walker{&visitor, nullptr, nullptr};
     tree_walker::walk<true, MatchExpression>(&toHash.exprToHash, &walker);
     return std::move(visitor.extractHashState());
 }
 
-size_t calculateHash(const MatchExpression& expr, size_t maxNumberOfInElementsToHash) {
-    return absl::Hash<MatchExpressionHashParams>{}({expr, maxNumberOfInElementsToHash});
+size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParams& params) {
+    return absl::Hash<AbslHashValueParams>{}({expr, params});
 }
 }  // namespace mongo
