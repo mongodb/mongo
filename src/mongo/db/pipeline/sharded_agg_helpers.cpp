@@ -848,16 +848,10 @@ bool isRequiredToReadLocalData(const ShardTargetingPolicy& shardTargetingPolicy,
                                const NamespaceString& ns) {
     // Certain namespaces are shard-local; that is, they exist independently on every shard. For
     // these namespaces, a local cursor should always be used.
-    // TODO SERVER-59957: use NamespaceString::isPerShardNamespace instead.
-    auto shouldAlwaysAttachLocalCursorForNamespace = [](const NamespaceString& ns) {
-        return (ns.isLocalDB() || ns.isConfigDotCacheDotChunks() ||
-                ns.isReshardingLocalOplogBufferCollection() ||
-                ns == NamespaceString::kConfigImagesNamespace ||
-                ns.isChangeStreamPreImagesCollection());
-    };
+    const bool shouldAlwaysAttachLocalCursorForNamespace = ns.isShardLocalNamespace();
 
     return shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
-        shouldAlwaysAttachLocalCursorForNamespace(ns);
+        shouldAlwaysAttachLocalCursorForNamespace;
 }
 
 /**

@@ -82,11 +82,6 @@ Value DocumentSourceListSampledQueries::serialize(const SerializationOptions& op
 DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
     if (_pipeline == nullptr) {
         auto foreignExpCtx = pExpCtx->copyWith(NamespaceString::kConfigSampledQueriesNamespace);
-        MakePipelineOptions opts;
-        // For a sharded cluster, disallow shard targeting since we want to fetch the
-        // config.sampledQueries documents on this replica set not the ones on the config server.
-        opts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
-
         std::vector<BSONObj> stages;
         if (auto& nss = _spec.getNamespace()) {
             uassertStatusOK(validateNamespace(*nss));
@@ -96,7 +91,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
                                              *nss, SerializationContext::stateDefault()))));
         }
         try {
-            _pipeline = Pipeline::makePipeline(stages, foreignExpCtx, opts);
+            _pipeline = Pipeline::makePipeline(stages, foreignExpCtx);
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             LOGV2(7807800,
                   "Failed to create aggregation pipeline to list sampled queries",

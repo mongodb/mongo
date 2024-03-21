@@ -93,8 +93,8 @@ namespace {
 void writeToLocalShard(OperationContext* opCtx,
                        const BatchedCommandRequest& batchedCommandRequest) {
     tassert(8144401,
-            "Forbidden to write directly to local shard unless namespace is always untracked",
-            batchedCommandRequest.getNS().isNamespaceAlwaysUntracked());
+            "Forbidden to write directly to local shard unless namespace is always shard local",
+            batchedCommandRequest.getNS().isShardLocalNamespace());
     tassert(8144402,
             "Explicit write concern required for internal cluster operation",
             batchedCommandRequest.hasWriteConcern());
