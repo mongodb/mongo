@@ -6,7 +6,6 @@
  * @tags: [
  *   featureFlagTransitionToCatalogShard,
  *   requires_fcv_70,
- *   temp_disabled_embedded_router_uncategorized,
  * ]
  */
 const st = new ShardingTest({shards: 2, configShard: true});

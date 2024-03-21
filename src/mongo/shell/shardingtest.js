@@ -1843,32 +1843,30 @@ var ShardingTest = function ShardingTest(params) {
         // router ports if not.
         if (isEmbeddedRouterMode) {
             print("Connecting to embedded routers...");
+
+            // TODO (SERVER-87462): Randomize the list of routers to choose after adding shards from
+            // the router port.
+
+            // Make sure to push one configsvr router port as the first one so it will be the one
+            // responsible to run the addShard commands, extend all sh methods and stop the
+            // balancer.
+
             let allShardNodes = this._rs.map(r => r.test.nodes).flat();
-            let configNodes = [];
             if (!isConfigShardMode) {
-                configNodes = this.configRS.nodes;
+                allShardNodes = allShardNodes.concat(this.configRS.nodes);
             }
 
-            const numNodes = allShardNodes.length + configNodes.length;
-            assert(numNodes >= numMongos,
+            assert(allShardNodes.length >= numMongos,
                    'Need at least numMongos total mongod nodes in the cluster');
 
             if (!randomSeedAlreadySet) {
                 Random.setRandomFixtureSeed();
             }
 
-            let shuffledNodes = [];
-            if (isConfigShardMode) {
-                shuffledNodes = Array.shuffle(allShardNodes);
-            } else {
-                // Make sure to push one configsvr router port as the first one so it will be the
-                // one responsible to run the addShard commands.
-                let allNodes = configNodes.concat(allShardNodes);
-                let configNode = allNodes[0];
-                allNodes.shift();
-                shuffledNodes = Array.shuffle(allNodes);
-                shuffledNodes.unshift(configNode);
-            }
+            const shuffledNodes = Array.shuffle(allShardNodes);
+            const index = shuffledNodes.findIndex(node => node === this.configRS.nodes[0]);
+            const configNode = shuffledNodes.splice(index, 1)[0];
+            shuffledNodes.unshift(configNode);
 
             let routerNodes = shuffledNodes.slice(0, numMongos);
             let i = 0;
