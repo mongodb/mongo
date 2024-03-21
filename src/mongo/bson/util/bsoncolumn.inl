@@ -64,6 +64,9 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
                     materialize(last, reference, buffer);
                 }
             },
+            [&buffer]() {
+                buffer.appendLast();
+            },
             [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
@@ -216,6 +219,9 @@ const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
             prev,
             [&buffer](int64_t v) {
                 uassert(8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
+                buffer.appendLast();
+            },
+            [&buffer]() {
                 buffer.appendLast();
             },
             [&buffer]() { buffer.appendMissing(); });

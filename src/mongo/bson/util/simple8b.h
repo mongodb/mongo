@@ -354,16 +354,28 @@ static constexpr uint64_t kSingleZero = 0xE;
 
 /**
  * Visits all values in sequence with provided callbacks
- * visit - a callback for receiving values, it is expected to accept
- *         a newly decoded value and a last value
+ * visit - a callback for receiving all non-missing values (including 0)
  * visitMissing - a callback for receiving missing
+ * visitZero - should have identical behavior to visit(0), may be used
+ *             to provide a more efficient implementation of this case
  */
+template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
+inline void visitAll(const char* buffer,
+                     size_t size,
+                     uint64_t& prevNonRLE,
+                     const Visit& visit,
+                     const VisitZero& visitZero,
+                     const VisitMissing& visitMissing);
+
 template <typename T, typename Visit, typename VisitMissing>
 inline void visitAll(const char* buffer,
                      size_t size,
                      uint64_t& prevNonRLE,
                      const Visit& visit,
-                     const VisitMissing& visitMissing);
+                     const VisitMissing& visitMissing) {
+    visitAll<T>(
+        buffer, size, prevNonRLE, visit, [&visit]() { visit(0); }, visitMissing);
+}
 
 /**
  * Calculates the sum for multiple simple8b blocks in a buffer. 'prevNonRLE' should be initialized
