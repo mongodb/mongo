@@ -5269,7 +5269,9 @@ buildvariants:
     - name: test-prepare-hs03-hook-timestamp
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
+      distros: ubuntu2004-large
     - name: long-test
+      distros: ubuntu2004-large
     - name: unit-test-extra-long
       distros: ubuntu2004-large
     - name: static-wt-build-test
@@ -5278,6 +5280,7 @@ buildvariants:
     - name: format-mirror-test
     - name: format-smoke-test
     - name: format-failure-configs-test
+      distros: ubuntu2004-large
     - name: ".data-validation-stress-test"
     - name: catch2-unittest-test
     - name: s3-tiered-storage-extensions-test
@@ -5432,6 +5435,7 @@ buildvariants:
     - name: ".stress-test-3"
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
+      distros: ubuntu2004-medium
     - name: ".stress-test-sanitizer"
       run_on:
       - ubuntu2004-medium
@@ -5633,15 +5637,19 @@ buildvariants:
     - name: unit-test
     - name: fops
     - name: format-failure-configs-test
+      distros: ubuntu2004-arm64-large
     - name: linux-directio
+      distros: ubuntu2004-arm64-large
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-extra-long
       distros: ubuntu2004-arm64-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
+      distros: ubuntu2004-arm64-large
     - name: wtperf-test
     - name: long-test
+      distros: ubuntu2004-arm64-large
     - name: configure-combinations
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
@@ -5672,7 +5680,9 @@ buildvariants:
     - name: unit-test
     - name: fops
     - name: format-failure-configs-test
+      distros: amazon2-arm64-large
     - name: linux-directio
+      distros: amazon2-arm64-large
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-extra-long
@@ -5717,11 +5727,14 @@ buildvariants:
     - name: format-smoke-test
     - name: fops
     - name: linux-directio
+      distros: ubuntu2004-large
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
+      distros: ubuntu2004-large
     - name: long-test
+      distros: ubuntu2004-large
     - name: configure-combinations
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
@@ -5742,11 +5755,14 @@ buildvariants:
     - name: format-smoke-test
     - name: fops
     - name: linux-directio
+      distros: ubuntu2004-arm64-large
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
+      distros: ubuntu2004-arm64-large
     - name: long-test
+      distros: ubuntu2004-arm64-large
     - name: configure-combinations
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
@@ -5814,6 +5830,7 @@ buildvariants:
     - name: ".stress-test-3"
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
+      distros: ubuntu2004-medium
     - name: format-abort-recovery-stress-test
     - name: compile
     - name: ".cppsuite-stress-test"
