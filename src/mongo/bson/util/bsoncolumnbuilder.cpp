@@ -566,6 +566,10 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
             }
 
             current.scaleIndex = d64.scaleIndex;
+            uassert(8827801,
+                    "Unexpected control for type in BSONColumn",
+                    current.scaleIndex == Simple8bTypeUtil::kMemoryAsInteger ||
+                        lastUncompressed.type() == NumberDouble);
         } else {
             // Helper to determine if we may only encode zero deltas
             auto zeroDeltaOnly = [&]() {

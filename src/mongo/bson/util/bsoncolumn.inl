@@ -52,7 +52,10 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
 
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
 
-        simple8b::visitAll<Encoding>(ptr + 1, size, prev,
+        simple8b::visitAll<Encoding>(
+            ptr + 1,
+            size,
+            prev,
             [&materialize, &buffer, &reference, &last](const Encoding v) {
                 if (v == 0)
                     buffer.appendLast();
@@ -61,9 +64,7 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
                     materialize(last, reference, buffer);
                 }
             },
-            [&buffer]() {
-                buffer.appendMissing();
-            });
+            [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
     }
@@ -90,16 +91,18 @@ const char* BSONColumnBlockBased::decompressAllDeltaPrimitive(const char* ptr,
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
         uassert(8762800,
                 "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
+                bsoncolumn::scaleIndexForControlByte(control) ==
+                    Simple8bTypeUtil::kMemoryAsInteger);
 
-        simple8b::visitAll<Encoding>(ptr + 1, size, prev,
+        simple8b::visitAll<Encoding>(
+            ptr + 1,
+            size,
+            prev,
             [&materialize, &buffer, &reference, &last](const Encoding v) {
                 last = expandDelta(last, v);
                 materialize(last, reference, buffer);
             },
-            [&buffer]() {
-                buffer.appendMissing();
-            });
+            [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
     }
@@ -128,17 +131,19 @@ const char* BSONColumnBlockBased::decompressAllDeltaOfDelta(const char* ptr,
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
         uassert(8762801,
                 "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
+                bsoncolumn::scaleIndexForControlByte(control) ==
+                    Simple8bTypeUtil::kMemoryAsInteger);
 
-        simple8b::visitAll<int64_t>(ptr + 1, size, prev,
+        simple8b::visitAll<int64_t>(
+            ptr + 1,
+            size,
+            prev,
             [&materialize, &lastlast, &buffer, &reference, &last](int64_t v) {
                 lastlast = expandDelta(lastlast, v);
                 last = expandDelta(last, lastlast);
                 materialize(last, reference, buffer);
             },
-            [&buffer]() {
-                buffer.appendMissing();
-            });
+            [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
     }
@@ -170,15 +175,16 @@ const char* BSONColumnBlockBased::decompressAllDouble(const char* ptr,
         uassert(8295701, "Invalid double encoding in BSON Column", encodedDouble);
         lastValue = *encodedDouble;
 
-        simple8b::visitAll<int64_t>(ptr + 1, size, prev,
+        simple8b::visitAll<int64_t>(
+            ptr + 1,
+            size,
+            prev,
             [&last, &buffer, &scaleIndex, &lastValue](int64_t v) {
                 lastValue = expandDelta(lastValue, v);
                 last = Simple8bTypeUtil::decodeDouble(lastValue, scaleIndex);
                 buffer.append(last);
             },
-            [&buffer]() {
-                buffer.appendMissing();
-            });
+            [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
     }
@@ -201,16 +207,18 @@ const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
         uassert(8762803,
                 "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
+                bsoncolumn::scaleIndexForControlByte(control) ==
+                    Simple8bTypeUtil::kMemoryAsInteger);
 
-        simple8b::visitAll<int64_t>(ptr + 1, size, prev,
+        simple8b::visitAll<int64_t>(
+            ptr + 1,
+            size,
+            prev,
             [&buffer](int64_t v) {
                 uassert(8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
                 buffer.appendLast();
             },
-            [&buffer]() {
-                buffer.appendMissing();
-            });
+            [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
     }
@@ -236,7 +244,8 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
         uassert(8762804,
                 "Invalid control byte in BSON Column",
-                bsoncolumn::scaleIndexForControlByte(control) != bsoncolumn::kInvalidScaleIndex);
+                bsoncolumn::scaleIndexForControlByte(control) ==
+                    Simple8bTypeUtil::kMemoryAsInteger);
         Simple8b<uint64_t> s8b(ptr + 1, size);
         for (auto it = s8b.begin(); it != s8b.end(); ++it) {
             buffer.appendMissing();

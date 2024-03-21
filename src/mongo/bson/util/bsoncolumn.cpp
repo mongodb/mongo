@@ -482,6 +482,10 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
                           Simple8bTypeUtil::encodeDouble(lastValue._numberDouble(), d64.scaleIndex);
                       uassert(6067607, "Invalid double encoding in BSON Column", encoded);
                       d64.lastEncodedValue = *encoded;
+                  } else {
+                      uassert(8827800,
+                              "Unexpected control for type in BSONColumn",
+                              d64.scaleIndex == Simple8bTypeUtil::kMemoryAsInteger);
                   }
 
                   // We can read the last known value from the decoder iterator even as it has
