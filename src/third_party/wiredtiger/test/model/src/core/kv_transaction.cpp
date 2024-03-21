@@ -211,12 +211,6 @@ kv_transaction::set_commit_timestamp(timestamp_t commit_timestamp)
      */
     _commit_timestamp = commit_timestamp;
     _durable_timestamp = commit_timestamp;
-
-    /* Apply the commit timestamp to any non-timestamped updates. */
-    for (const auto &u : _nontimestamped_updates)
-        _database.table(u->table_name())
-          ->fix_timestamps(u->key(), _id, _commit_timestamp, _durable_timestamp);
-    _nontimestamped_updates.clear();
 }
 
 /*

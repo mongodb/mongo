@@ -153,10 +153,10 @@ test_transaction_basic(void)
     testutil_check(table->insert(txn1, key3, value6));
     txn1->commit(50);
 
-    testutil_assert(table->get(key1, 42) == value4);
+    testutil_assert(table->get(key1, 50) == value4);
     testutil_assert(table->get(key2, 42) == value5);
     testutil_assert(table->get(key3, 44) == value6);
-    testutil_assert(table->get(key1, 42 - 1) != value4);
+    testutil_assert(table->get(key1, 50 - 1) != value4);
     testutil_assert(table->get(key2, 42 - 1) != value5);
     testutil_assert(table->get(key3, 44 - 1) != value6);
 
@@ -178,17 +178,18 @@ test_transaction_basic(void)
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value1));
     txn1->set_commit_timestamp(65);
-    table->insert(txn1, key1, value4);
+    model_testutil_assert_exception(table->insert(txn1, key1, value4),
+      model::wiredtiger_abort_exception); /* WT aborts at checkpoint. */
     txn1->commit(70);
-    testutil_assert(table->get(key1, 65) == value4);
-    testutil_assert(table->get(key1, 70) == value4);
+    testutil_assert(table->get(key1, 65) == value3);
+    testutil_assert(table->get(key1, 70) == value1);
 
     /* Roll back a transaction. */
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value2));
     testutil_check(table->insert(txn1, key2, value2));
     txn1->rollback();
-    testutil_assert(table->get(key1) == value4);
+    testutil_assert(table->get(key1) == value1);
     testutil_assert(table->get(key2) == value5);
 
     /* Reset the transaction snapshot. */
@@ -198,9 +199,9 @@ test_transaction_basic(void)
     txn1->commit(80);
     txn2->reset_snapshot();
     testutil_assert(table->get(txn2, key1) == value3);
-    testutil_check(table->insert(txn2, key1, value5));
+    testutil_check(table->insert(txn2, key1, value4));
     txn2->commit(90);
-    testutil_assert(table->get(key1) == value5);
+    testutil_assert(table->get(key1) == value4);
 }
 
 /*
@@ -313,7 +314,8 @@ test_transaction_basic_wt(void)
     wt_model_txn_begin_both(txn1, session1);
     wt_model_txn_insert_both(table, uri, txn1, session1, key1, value1);
     wt_model_txn_set_timestamp_both(txn1, session1, 65);
-    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value4);
+    // Cannot insert key 1 at timestamp 65: Reconciliation would trigger abort.
+    // wt_txn_insert(session1, uri, key1, value4);
     wt_model_txn_commit_both(txn1, session1, 70);
     wt_model_assert(table, uri, key1, 65);
     wt_model_assert(table, uri, key1, 70);
@@ -333,7 +335,7 @@ test_transaction_basic_wt(void)
     wt_model_txn_commit_both(txn1, session1, 80);
     wt_model_txn_reset_snapshot_both(txn2, session2);
     wt_model_txn_assert(table, uri, txn2, session2, key1);
-    wt_model_txn_insert_both(table, uri, txn2, session2, key1, value5); /* No conflict. */
+    wt_model_txn_insert_both(table, uri, txn2, session2, key1, value4); /* No conflict. */
     wt_model_txn_commit_both(txn2, session2, 90);
     wt_model_assert(table, uri, key1);
 
