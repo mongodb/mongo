@@ -163,8 +163,8 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             whenMatched: whenMatchedMode,
             whenNotMatched: whenNotMatchedMode
         },
-        failpoint: "setYieldAllLocksHang",
-        failpointData: {namespace: source.getFullName()}
+        failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
+        failpointData: {nss: source.getFullName()}
     });
     testEpochChangeDuringAgg({
         mergeSpec: {
@@ -173,8 +173,8 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             whenNotMatched: whenNotMatchedMode,
             on: "sk"
         },
-        failpoint: "setYieldAllLocksHang",
-        failpointData: {namespace: source.getFullName()}
+        failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
+        failpointData: {nss: source.getFullName()}
     });
 });
 
