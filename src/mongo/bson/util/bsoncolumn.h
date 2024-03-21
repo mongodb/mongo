@@ -526,7 +526,7 @@ public:
         _collection.push_back(_last);
     }
 
-    void append(const StringData& val) {
+    void append(StringData val) {
         _last = CMaterializer::materialize(*_allocator, val);
         _collection.push_back(_last);
     }

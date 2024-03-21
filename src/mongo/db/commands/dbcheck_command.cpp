@@ -1249,7 +1249,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
     OperationContext* opCtx,
     const CollectionPtr& collection,
-    const StringData& indexName,
+    StringData indexName,
     const key_string::Value& keyString,
     const BSONObj& keyStringBson,
     const int64_t numKeysInSnapshot,

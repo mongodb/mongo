@@ -42,6 +42,7 @@
 #include "MongoRandCheck.h"
 #include "MongoStdAtomicCheck.h"
 #include "MongoStdOptionalCheck.h"
+#include "MongoStringDataConstRefCheck.h"
 #include "MongoTraceCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
 #include "MongoUnstructuredLogCheck.h"
@@ -81,6 +82,8 @@ public:
         CheckFactories.registerCheck<MongoRandCheck>("mongo-rand-check");
         CheckFactories.registerCheck<MongoPolyFillCheck>("mongo-polyfill-check");
         CheckFactories.registerCheck<MongoNoUniqueAddressCheck>("mongo-no-unique-address-check");
+        CheckFactories.registerCheck<MongoStringDataConstRefCheck>(
+            "mongo-stringdata-const-ref-check");
     }
 };
 

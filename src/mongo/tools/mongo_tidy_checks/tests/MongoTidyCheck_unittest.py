@@ -158,7 +158,8 @@ class MongoTidyTests(unittest.TestCase):
                 """))
         prohibited_types = ["day", "day", "month", "year", "month_day", "month", "day", "day"]
         self.expected_output = [
-            f"Illegal use of prohibited type 'std::chrono::{t}'." for t in prohibited_types]
+            f"Illegal use of prohibited type 'std::chrono::{t}'." for t in prohibited_types
+        ]
         self.run_clang_tidy()
 
     def test_MongoStdOptionalCheck(self):
@@ -375,12 +376,52 @@ class MongoTidyTests(unittest.TestCase):
                 WarningsAsErrors: '*'
                 """))
 
-        self.expected_output =[
+        self.expected_output = [
             "error: Use of rand or srand, use <random> or PseudoRandom instead. [mongo-rand-check,-warnings-as-errors]\n    srand(time(0));",
             "error: Use of rand or srand, use <random> or PseudoRandom instead. [mongo-rand-check,-warnings-as-errors]\n    int random_number = rand();",
         ]
 
         self.run_clang_tidy()
+
+    def test_MongoStringDataConstRefCheck1(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-stringdata-const-ref-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Prefer passing StringData by value.",
+        ]
+
+        self.run_clang_tidy()
+
+    def test_MongoStringDataConstRefCheck2(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-stringdata-const-ref-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Prefer passing StringData by value.",
+        ]
+
+        self.run_clang_tidy()
+
+    def test_MongoStringDataConstRefCheck3(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-stringdata-const-ref-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "",
+        ]
+
+        self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 
