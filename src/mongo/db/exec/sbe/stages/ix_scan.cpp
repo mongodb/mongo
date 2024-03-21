@@ -554,6 +554,8 @@ void SimpleIndexScanStage::open(bool reOpen) {
         auto& highKey = *getSeekKeyHigh();
         _pointBound = getSeekKeyLow().compareWithoutDiscriminator(highKey) == 0 &&
             highKey.computeElementCount(*_ordering) == _entry->descriptor()->getNumFields();
+
+        _cursor->setEndPosition(highKey);
     } else if (_seekKeyLow) {
         auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
         const auto msgTagLow = tagLow;
@@ -640,21 +642,6 @@ bool SimpleIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& ke
         return false;
     }
 
-    if (auto seekKeyHigh = getSeekKeyHigh(); seekKeyHigh) {
-        auto cmp = key->keyString.compare(*seekKeyHigh);
-
-        if (_forward) {
-            if (cmp > 0) {
-                _scanState = ScanState::kFinished;
-                return false;
-            }
-        } else {
-            if (cmp < 0) {
-                _scanState = ScanState::kFinished;
-                return false;
-            }
-        }
-    }
     // Note: we may in the future want to bump 'keysExamined' for comparisons to a key that result
     // in the stage returning EOF.
     ++_specificStats.keysExamined;
