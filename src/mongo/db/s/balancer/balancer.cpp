@@ -139,33 +139,6 @@ private:
     boost::optional<string> _errMsg;
 };
 
-/**
- * Occasionally prints a log message with shard versions if the versions are not the same
- * in the cluster.
- */
-void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
-    static const auto& majorMinorRE = *new pcrecpp::RE(R"re(^(\d+)\.(\d+)\.)re");
-    auto&& vii = VersionInfoInterface::instance();
-    auto hasMyVersion = [&](auto&& stat) {
-        int major;
-        int minor;
-        return majorMinorRE.PartialMatch(pcrecpp::StringPiece(stat.mongoVersion), &major, &minor) &&
-            major == vii.majorVersion() && minor == vii.minorVersion();
-    };
-
-    // If we're all the same version, don't message
-    if (std::all_of(clusterStats.begin(), clusterStats.end(), hasMyVersion))
-        return;
-
-    BSONObjBuilder shardVersions;
-    for (const auto& stat : clusterStats)
-        shardVersions << stat.shardId << stat.mongoVersion;
-    LOGV2_WARNING(21875,
-                  "Multiversion cluster detected",
-                  "localVersion"_attr = vii.version(),
-                  "shardVersions"_attr = shardVersions.done());
-}
-
 const auto _balancerDecoration = ServiceContext::declareDecoration<Balancer>();
 
 const ReplicaSetAwareServiceRegistry::Registerer<Balancer> _balancerRegisterer("Balancer");
@@ -463,11 +436,6 @@ void Balancer::_mainThread() {
                         "Start balancing round",
                         "waitForDelete"_attr = balancerConfig->waitForDelete(),
                         "secondaryThrottle"_attr = balancerConfig->getSecondaryThrottle().toBSON());
-
-            static Occasionally sampler;
-            if (sampler.tick()) {
-                warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
-            }
 
             // Split chunk to match zones boundaries
             {
