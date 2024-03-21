@@ -31,20 +31,20 @@ if (!isTrackingUnsplittableCollections) {
     const kColl = "coll"
     const kBucket = "system.buckets.coll"
 
-    function createWorked(collName, tsOptions = {}) {
+    function createWorked(nss, tsOptions = {}) {
         if (Object.keys(tsOptions).length === 0) {
-            assert.commandWorked(db.createCollection(collName));
+            assert.commandWorked(db.createCollection(nss));
         } else {
-            assert.commandWorked(db.createCollection(collName, {timeseries: tsOptions}));
+            assert.commandWorked(db.createCollection(nss, {timeseries: tsOptions}));
         }
-        return db.getCollection(collName);
+        return db.getCollection(nss);
     }
 
-    function createFailed(collName, tsOptions, errorCode) {
+    function createFailed(nss, tsOptions, errorCode) {
         if (Object.keys(tsOptions).length === 0) {
-            assert.commandFailedWithCode(db.createCollection(collName), errorCode);
+            assert.commandFailedWithCode(db.createCollection(nss), errorCode);
         } else {
-            let res = db.createCollection(collName, {timeseries: tsOptions});
+            let res = db.createCollection(nss, {timeseries: tsOptions});
             assert.commandFailedWithCode(res, errorCode);
         }
     }
@@ -100,10 +100,14 @@ if (!isTrackingUnsplittableCollections) {
 
         jsTest.log("Case collection: standard / collection: bucket timeseries.");
         runTest(() => {
-            createWorked(kColl);
-            // TODO SERVER-85855 creating bucket timeseries for a collection already created should
-            // fail.
+            let coll = createWorked(kColl);
+            // TODO SERVER-85855 creating bucket timeseries for a collection already created works,
+            // but it will redirect all the insertion into the bucket collection. Replace
+            // createWorked with createFailed once this bug is fixed. We expect now the bucket
+            // namespace to fail attempting to creating the view.
             createWorked(kBucket, tsOptions);
+
+            assert.commandFailed(coll.insert({x: 1}));
         });
     }
 
@@ -130,7 +134,6 @@ if (!isTrackingUnsplittableCollections) {
             createWorked(kColl, tsOptions);
             createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
         });
-
         jsTest.log("Case collection: timeseries / collection: bucket.");
         runTest(() => {
             createWorked(kColl, tsOptions);
@@ -140,16 +143,7 @@ if (!isTrackingUnsplittableCollections) {
         jsTest.log("Case collection: timeseries / collection: bucket timeseries.");
         runTest(() => {
             createWorked(kColl, tsOptions);
-            // TODO SERVER-88265 creation of bucket namespace when the bucket already exists with
-            // same ts options should work
             createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
-        });
-
-        jsTest.log(
-            "Case collection: timeseries / collection: bucket timeseries with different options.");
-        runTest(() => {
-            createWorked(kColl, tsOptions);
-            createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
         });
     }
 
@@ -193,31 +187,18 @@ if (!isTrackingUnsplittableCollections) {
         jsTest.log("Case collection: bucket timeseries / collection: standard.");
         runTest(() => {
             createWorked(kBucket, tsOptions)
-            // TODO SERVER-85855 creating a normal collection with an already created bucket
-            // timeseries should fail.
-            createWorked(kColl);
+            // TODO SERVER-85855 creating a collection with an already created bucket timeseries
+            // works, but it will redirect all the insertion into the bucket collection. Replace
+            // createWorked with createFailed once this bug is fixed and the related view is created
+            // by the operation above
+            let coll = createWorked(kColl);
+            assert.commandFailed(coll.insert({x: 1}));
         });
 
         jsTest.log("Case collection: bucket timeseries / collection: timeseries.");
         runTest(() => {
             createWorked(kBucket, tsOptions)
-            // TODO SERVER-88265 creating a timeseries collection when the bucket namespace already
-            // exists should work and create the missing timeseries view
             createFailed(kColl, tsOptions, ErrorCodes.NamespaceExists);
-        });
-
-        jsTest.log(
-            "Case collection: bucket timeseries / collection: timeseries with different options.");
-        runTest(() => {
-            createWorked(kBucket, tsOptions)
-            createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
-        });
-
-        jsTest.log(
-            "Case collection: bucket timeseries / collection: bucket timeseries with different options.");
-        runTest(() => {
-            createWorked(kBucket, tsOptions)
-            createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
         });
 
         jsTest.log("Case collection: bucket timeseries / collection: bucket.");
@@ -230,8 +211,9 @@ if (!isTrackingUnsplittableCollections) {
         runTest(
             () => {
                 createWorked(kBucket, tsOptions);
-                // TODO SERVER-88265 creating the same bucket collection with same options should
-                // work
+                // Creating 2 times a bucket timeseries will fail with NamespaceExist instead of
+                // being idempotent
+                // TODO SERVER-85855 replace createFailed with createWorked
                 createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
             },
             // On 7.0 this test case used to correclty behave as idempotent operation.
