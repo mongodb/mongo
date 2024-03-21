@@ -995,18 +995,6 @@ public:
                                       unsigned long long progressMeterTotal = 0,
                                       int secondsBetween = 3);
 
-    /**
-     * Captures stats on the locker after transaction resources are unstashed to the operation
-     * context to be able to correctly ignore stats from outside this CurOp instance.
-     */
-    void updateStatsOnTransactionUnstash();
-
-    /**
-     * Captures stats on the locker that happened during this CurOp instance before transaction
-     * resources are stashed. Also cleans up stats taken when transaction resources were unstashed.
-     */
-    void updateStatsOnTransactionStash();
-
     /*
      * Gets the message for FailPoints used.
      */
@@ -1062,7 +1050,7 @@ public:
 
     void setGenericCursor_inlock(GenericCursor gc);
 
-    SingleThreadedLockStats getLockStatsBase() const {
+    boost::optional<SingleThreadedLockStats> getLockStatsBase() const {
         return _lockStatsBase;
     }
 
@@ -1091,7 +1079,6 @@ private:
                                          TickSource::Tick endTime) const;
 
     Milliseconds _sumBlockedTimeTotal();
-
     /**
      * Handles failpoints that check whether a command has completed or not.
      * Used for testing purposes instead of the getLog command.
@@ -1153,26 +1140,12 @@ private:
 
     std::string _planSummary;
 
-    // The lock stats being reported on the locker that accrued outside of this operation. This
-    // includes the snapshot of lock stats taken when this CurOp instance is pushed to a CurOpStack
-    // or the snapshot of lock stats taken when transaction resources are unstashed to this
-    // operation context.
-    SingleThreadedLockStats _lockStatsBase;
+    // The snapshot of lock stats taken when this CurOp instance is pushed to a
+    // CurOpStack.
+    boost::optional<SingleThreadedLockStats> _lockStatsBase;
 
-    // The snapshot of lock stats taken when transaction resources are stashed. This captures the
-    // locker activity that happened on this operation before the locker is released back to
-    // transaction resources.
-    SingleThreadedLockStats _lockStatsOnceStashed;
-
-    // The ticket wait times being reported on the locker that accrued outside of this operation.
-    // This includes ticket wait times already accrued when the CurOp instance is pushed to a
-    // CurOpStack or ticket wait times on locker when transaction resources are unstashed to this
-    // operation context.
-    Microseconds _ticketWaitBase{0};
-
-    // The ticket wait times that accrued during this operation captured before the locker is
-    // released back to transaction resources and stashed.
-    Microseconds _ticketWaitWhenStashed{0};
+    // The time accrued waiting for tickets when this CurOp instance is pushed to a CurOpStack.
+    Microseconds _ticketWaitTimeAtStart{0};
 
     SharedUserAcquisitionStats _userAcquisitionStats{std::make_shared<UserAcquisitionStats>()};
 
