@@ -166,7 +166,7 @@ function runStandaloneTest() {
 }
 
 function runReplicaSetTest() {
-    const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

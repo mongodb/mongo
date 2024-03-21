@@ -9,7 +9,7 @@ import "jstests/multiVersion/libs/verify_versions.js";
 function runReplicaSet() {
     let fcvDoc;
 
-    const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latestFCV}});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: "latest"}});
 
     rst.startSet();
     rst.initiate();

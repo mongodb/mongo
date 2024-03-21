@@ -49,7 +49,7 @@ const runStandaloneTest = function() {
 
 const runReplicaSetTest = function() {
     jsTestLog("Starting replica set test");
-    const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest}});
     rst.startSet();
     rst.initiate();
     let primary = rst.getPrimary();

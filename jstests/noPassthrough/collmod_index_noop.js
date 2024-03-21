@@ -14,7 +14,7 @@
 
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
-const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: "latest"}});
+const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: "latest"}});
 rst.startSet();
 rst.initiate();
 

@@ -208,7 +208,7 @@ function runReplicaSetTest(downgradeVersion) {
     let secondaryAdminDB;
 
     // 'latest' binary replica set.
-    rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});
+    rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest}});
     rst.startSet();
     rst.initiate();
     primaryAdminDB = rst.getPrimary().getDB("admin");
@@ -383,7 +383,7 @@ function runReplicaSetTest(downgradeVersion) {
     rst.stopSet();
 
     // Test idempotency for setFeatureCompatibilityVersion.
-    rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});
+    rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest}});
     rst.startSet();
     rst.initiate();
 
