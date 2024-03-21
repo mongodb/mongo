@@ -127,9 +127,9 @@ def fork_for_tests(concurrency_num=CPU_COUNT):
                 test = ProtocolTestCase(stream)
                 result.append(test)
                 pids.append(pid)
-            # Monitor our children to prevent leaving <defunct> processes around.
-            wait_thread = Thread(target = wait_for_children, args = (pids, ))
-            wait_thread.start()
+        # Monitor our children to prevent leaving <defunct> processes around.
+        wait_thread = Thread(target = wait_for_children, args = (pids, ))
+        wait_thread.start()
         return result
     return do_fork
 
