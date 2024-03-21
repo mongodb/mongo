@@ -507,29 +507,6 @@ public:
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;
 
-    enum class CommandType {
-        kNotCommand,
-        kCreate,
-        kRenameCollection,
-        kDbCheck,
-        kDrop,
-        kCollMod,
-        kApplyOps,
-        kDropDatabase,
-        kEmptyCapped,
-        kCreateIndexes,
-        kStartIndexBuild,
-        kCommitIndexBuild,
-        kAbortIndexBuild,
-        kDropIndexes,
-        kCommitTransaction,
-        kAbortTransaction,
-        kImportCollection,
-        kModifyCollectionShardingIndexCatalog,
-        kCreateGlobalIndex,
-        kDropGlobalIndex,
-    };
-
     // Get the in-memory size in bytes of a ReplOperation.
     static size_t getDurableReplOperationSize(const DurableReplOperation& op);
 
@@ -584,7 +561,7 @@ public:
      * and so this method will always return false for them.
      */
     bool isPartialTransaction() const {
-        if (getCommandType() != CommandType::kApplyOps) {
+        if (getCommandType() != CommandTypeEnum::kApplyOps) {
             return false;
         }
         return getObject()[ApplyOpsCommandInfoBase::kPartialTxnFieldName].booleanSafe();
@@ -599,7 +576,7 @@ public:
      * Returns if this is a prepared 'commitTransaction' oplog entry.
      */
     bool isPreparedCommit() const {
-        return getCommandType() == DurableOplogEntry::CommandType::kCommitTransaction;
+        return getCommandType() == CommandTypeEnum::kCommitTransaction;
     }
 
     /**
@@ -611,7 +588,7 @@ public:
         // chain of a large unprepared transcation, it will abort this transaction and write an
         // 'abortTransaction' oplog entry, even though it is an unprepared transcation. In this
         // case, the entry will have a null prevOpTime.
-        if (getCommandType() != DurableOplogEntry::CommandType::kAbortTransaction) {
+        if (getCommandType() != CommandTypeEnum::kAbortTransaction) {
             return false;
         }
         auto prevOptime = getPrevWriteOpTimeInTransaction();
@@ -639,7 +616,7 @@ public:
      * prepared transaction or a non-final applyOps in a transaction.
      */
     bool isTerminalApplyOps() const {
-        return getCommandType() == DurableOplogEntry::CommandType::kApplyOps && !shouldPrepare() &&
+        return getCommandType() == CommandTypeEnum::kApplyOps && !shouldPrepare() &&
             !isPartialTransaction();
     }
 
@@ -707,7 +684,7 @@ public:
     /**
      * Returns the type of command of the oplog entry. If it is not a command, returns kNotCommand.
      */
-    CommandType getCommandType() const;
+    CommandTypeEnum getCommandType() const;
 
     /**
      * Returns the size of the original document used to create this DurableOplogEntry.
@@ -732,17 +709,17 @@ public:
 
 private:
     BSONObj _raw;  // Owned.
-    CommandType _commandType = CommandType::kNotCommand;
+    CommandTypeEnum _commandType = CommandTypeEnum::kNotCommand;
 };
 
-DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField);
+CommandTypeEnum parseCommandType(const BSONObj& objectField);
 
 /**
  * Data structure that holds a DurableOplogEntry and other different run time state variables.
  */
 class OplogEntry {
 public:
-    using CommandType = DurableOplogEntry::CommandType;
+    using CommandType = CommandTypeEnum;
     static constexpr auto k_idFieldName = DurableOplogEntry::k_idFieldName;
     static constexpr auto kDestinedRecipientFieldName =
         DurableOplogEntry::kDestinedRecipientFieldName;

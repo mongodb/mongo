@@ -416,6 +416,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 return Status::OK();
             }
+            case OplogEntry::CommandType::kDeleteIndexes:
             case OplogEntry::CommandType::kDropIndexes: {
                 // Example drop indexes objects
                 //     o: {

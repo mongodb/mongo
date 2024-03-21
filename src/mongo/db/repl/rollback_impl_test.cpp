@@ -2530,7 +2530,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnUnknownOplogEntryCommandType
     ASSERT_OK(_insertOplogEntry(unknownCmdOp.first));
 
     const StringData err(
-        "Unknown oplog entry command type: unknownCommand Object field: { unknownCommand: 1 }");
+        "Enumeration value 'unknownCommand' for field 'commandString' is not a valid value.");
     ASSERT_THROWS_CODE_AND_WHAT(
         _rollback->runRollback(_opCtx.get()), DBException, ErrorCodes::BadValue, err);
 }

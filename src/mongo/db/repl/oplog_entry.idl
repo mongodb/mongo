@@ -75,6 +75,32 @@ enums:
         values:
             kLegacyMultiOpType: 0
             kApplyOpsAppliedSeparately: 1
+    CommandType:
+        description: "The type of the command in an oplog entry"
+        type: string
+        values:
+            kNotCommand: ""
+            kCreate: "create"
+            kRenameCollection: "renameCollection"
+            kDbCheck: "dbCheck"
+            kDrop: "drop"
+            kCollMod: "collMod"
+            kApplyOps: "applyOps"
+            kDropDatabase: "dropDatabase"
+            kEmptyCapped: "emptycapped"
+            kCreateIndexes: "createIndexes"
+            kStartIndexBuild: "startIndexBuild"
+            kCommitIndexBuild: "commitIndexBuild"
+            kAbortIndexBuild: "abortIndexBuild"
+            kDropIndexes: "dropIndexes"
+            # TODO SERVER-87911: Remove 'deleteIndexes' as CommandType.
+            kDeleteIndexes: "deleteIndexes"
+            kCommitTransaction: "commitTransaction"
+            kAbortTransaction: "abortTransaction"
+            kImportCollection: "importCollection"
+            kModifyCollectionShardingIndexCatalog: "modifyCollectionShardingIndexCatalog"
+            kCreateGlobalIndex: "createGlobalIndex"
+            kDropGlobalIndex: "dropGlobalIndex"
 
 types:
     zeroOneManyStmtId:
