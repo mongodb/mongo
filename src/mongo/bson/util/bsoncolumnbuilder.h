@@ -412,40 +412,15 @@ public:
 
 private:
     /**
-     * Internal mode this BSONColumnBuilder is in.
-     */
-    enum class Mode {
-        // Regular mode without interleaving. Appended elements are treated as scalars.
-        kRegular,
-        // Interleaved mode where the reference object is being determined. New sub fields are
-        // attempted to be merged in to the existing reference object candidate.
-        kSubObjDeterminingReference,
-        // Interleaved mode with a fixed reference object. Any incompatible sub fields in appended
-        // objects must exit interleaved mode.
-        kSubObjAppending
-    };
-
-    /**
      * Internal state of the BSONColumnBuilder. Can be copied to restore a previous state after
      * finalize.
      */
     struct InternalState {
         explicit InternalState(Allocator);
 
-        // TODO (SERVER-87887): Use default copy constructor.
-        InternalState(InternalState&);
-        InternalState(InternalState&&) = default;
-
-        // TODO (SERVER-87887): Use default copy assignment operator.
-        InternalState& operator=(InternalState&);
-        InternalState& operator=(InternalState&&) = default;
-
         MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator allocator;
 
-        Mode mode = Mode::kRegular;
-
-        // Encoding state for kRegular mode
-        bsoncolumn::EncodingState<BufBuilderType, Allocator> regular;
+        using Regular = bsoncolumn::EncodingState<BufBuilderType, Allocator>;
 
         struct SubObjState {
             using ControlBlock = std::pair<ptrdiff_t, size_t>;
@@ -483,22 +458,52 @@ private:
             InterleavedControlBlockWriter controlBlockWriter();
         };
 
-        // Encoding states when in sub-object compression mode. There should be one encoding state
-        // per scalar field in '_referenceSubObj'.
-        std::vector<SubObjState,
-                    typename std::allocator_traits<Allocator>::template rebind_alloc<SubObjState>>
-            subobjStates;
+        struct Interleaved {
+            enum class Mode {
+                // The reference object is being determined. New sub fields are attempted to be
+                // merged in to the existing reference object candidate.
+                kDeterminingReference,
+                // Fixed reference object. Any incompatible sub fields in appended objects must exit
+                // interleaved mode.
+                kAppending,
+            };
 
-        // Reference object that is used to match object hierarchy to encoding states. Appending
-        // objects for sub-object compression need to check their hierarchy against this object.
-        BSONObjType referenceSubObj;
-        BSONType referenceSubObjType = BSONType::EOO;
+            explicit Interleaved(Allocator);
 
-        // Buffered BSONObj when determining reference object. Will be compressed when this is
-        // complete and we transition into kSubObjAppending.
-        std::vector<BSONObjType,
-                    typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObjType>>
-            bufferedObjElements;
+            // TODO (SERVER-87887): Use default copy constructor.
+            Interleaved(const Interleaved&);
+            Interleaved(Interleaved&&) = default;
+
+            // TODO (SERVER-87887): Use default copy assignment operator.
+            Interleaved& operator=(const Interleaved&);
+            Interleaved& operator=(Interleaved&&) = default;
+
+            // TODO (SERVER-87887): Remove allocator.
+            MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator allocator;
+
+            Mode mode = Mode::kDeterminingReference;
+
+            // Encoding states when in sub-object compression mode. There should be one encoding
+            // state per scalar field in '_referenceSubObj'.
+            std::vector<
+                SubObjState,
+                typename std::allocator_traits<Allocator>::template rebind_alloc<SubObjState>>
+                subobjStates;
+
+            // Reference object that is used to match object hierarchy to encoding states. Appending
+            // objects for sub-object compression need to check their hierarchy against this object.
+            BSONObjType referenceSubObj;
+            BSONType referenceSubObjType = BSONType::EOO;
+
+            // Buffered BSONObj when determining reference object. Will be compressed when this is
+            // complete and we transition into kSubObjAppending.
+            std::vector<
+                BSONObjType,
+                typename std::allocator_traits<Allocator>::template rebind_alloc<BSONObjType>>
+                bufferedObjElements;
+        };
+
+        std::variant<Regular, Interleaved> state;
 
         // Current offset of the binary relative to previous intermediate() calls.
         int offset = 0;

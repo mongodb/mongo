@@ -607,10 +607,11 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
 template <class BufBuilderType, class BSONObjType, class Allocator>
 void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::reopen(
     BSONColumnBuilder& builder, Allocator allocator) const {
+    auto& regular = std::get<typename InternalState::Regular>(builder._is.state);
     // When the binary ends with an uncompressed element it is simple to re-initialize the
     // compressor
     if (!current.control) {
-        auto& encoder = std::get<Encoder64>(builder._is.regular._encoder);
+        auto& encoder = std::get<Encoder64>(regular._encoder);
         // Set last double in previous block (if any).
         encoder.lastValueInPrevBlock = last.lastAtEndOfBlock;
 
@@ -625,21 +626,15 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::re
     }
 
     if (!uses128bit(lastUncompressed.type())) {
-        auto& encoder = std::get<Encoder64>(builder._is.regular._encoder);
+        auto& encoder = std::get<Encoder64>(regular._encoder);
         encoder.scaleIndex = current.scaleIndex;
 
-        _reopen64BitTypes(builder._is.regular,
-                          encoder,
-                          builder._bufBuilder,
-                          builder._is.offset,
-                          builder._is.lastControl);
+        _reopen64BitTypes(
+            regular, encoder, builder._bufBuilder, builder._is.offset, builder._is.lastControl);
     } else {
-        auto& encoder = builder._is.regular._encoder.template emplace<Encoder128>(allocator);
-        _reopen128BitTypes(builder._is.regular,
-                           encoder,
-                           builder._bufBuilder,
-                           builder._is.offset,
-                           builder._is.lastControl);
+        auto& encoder = regular._encoder.template emplace<Encoder128>(allocator);
+        _reopen128BitTypes(
+            regular, encoder, builder._bufBuilder, builder._is.offset, builder._is.lastControl);
     }
 
     builder._is.lastBufLength = builder._bufBuilder.len();
@@ -1258,44 +1253,41 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_append
 template <class BufBuilderType, class BSONObjType, class Allocator>
 BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::InternalState(Allocator a)
     : allocator(a),
-      regular(allocator),
-      subobjStates(allocator),
-      referenceSubObj(TrackableBSONObj{BSONObj{}}, allocator),
-      bufferedObjElements(allocator),
+      state(std::in_place_type_t<Regular>{}, allocator),
       lastControl(bsoncolumn::kInvalidControlByte) {}
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
-BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::InternalState(
-    InternalState& other)
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::Interleaved::Interleaved(
+    Allocator a)
+    : allocator(a),
+      subobjStates(allocator),
+      referenceSubObj(TrackableBSONObj{BSONObj{}}, allocator),
+      bufferedObjElements(allocator) {}
+
+template <class BufBuilderType, class BSONObjType, class Allocator>
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::InternalState::
+    Interleaved::Interleaved(const Interleaved& other)
     : allocator(other.allocator),
       mode(other.mode),
-      regular(other.regular),
       subobjStates(other.subobjStates),
       referenceSubObj(TrackableBSONObj{other.referenceSubObj.get().get()}, allocator),
       referenceSubObjType(other.referenceSubObjType),
-      bufferedObjElements(copyBufferedObjElements(other.bufferedObjElements, allocator)),
-      offset(other.offset),
-      lastBufLength(other.lastBufLength),
-      lastControl(other.lastControl) {}
+      bufferedObjElements(copyBufferedObjElements(other.bufferedObjElements, allocator)) {}
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
-typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState&
-BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::operator=(
-    InternalState& other) {
+typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::Interleaved&
+BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalState::Interleaved::operator=(
+    const Interleaved& other) {
     if (&other == this) {
         return *this;
     }
 
     allocator = other.allocator;
     mode = other.mode;
-    regular = other.regular;
     subobjStates = other.subobjStates;
     referenceSubObj = {TrackableBSONObj{other.referenceSubObj.get().get()}, allocator};
     referenceSubObjType = other.referenceSubObjType;
     bufferedObjElements = copyBufferedObjElements(other.bufferedObjElements, allocator);
-    offset = other.offset;
-    lastBufLength = other.lastBufLength;
-    lastControl = other.lastControl;
 
     return *this;
 }
@@ -1331,7 +1323,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BSONColumnBuilder(con
     // decompress and append all data.
     if (!helper.scan(binary, size)) {
         _bufBuilder.reset();
-        _is.regular = EncodingState<BufBuilderType, Allocator>{allocator};
+        _is.state.template emplace<typename InternalState::Regular>(allocator);
 
         BSONColumn decompressor(binary, size);
         for (auto&& elem : decompressor) {
@@ -1355,10 +1347,11 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::append(BSONElement el
 
     if ((type != Object && type != Array) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
-        if (_is.mode != Mode::kRegular) {
+        if (std::holds_alternative<typename InternalState::Interleaved>(_is.state)) {
             _flushSubObjMode();
         }
-        _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
+        std::get<typename InternalState::Regular>(_is.state).append(
+            elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
         return *this;
     }
 
@@ -1384,9 +1377,9 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
     auto obj = elem.value.Obj();
     bool containsScalars = _containsScalars(obj);
 
-    if (_is.mode == Mode::kRegular) {
+    if (auto* regular = std::get_if<typename InternalState::Regular>(&_is.state)) {
         if (!containsScalars) {
-            _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
+            regular->append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -1394,14 +1387,18 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
         return *this;
     }
 
+    // Use a pointer here so that it can get reassigned below in case we need to restart subobj
+    // compression.
+    auto* interleaved = &std::get<typename InternalState::Interleaved>(_is.state);
+
     // Different types on root is not allowed
-    if (type != _is.referenceSubObjType) {
+    if (type != interleaved->referenceSubObjType) {
         _flushSubObjMode();
         _startDetermineSubObjReference(obj, type);
         return *this;
     }
 
-    if (_is.mode == Mode::kSubObjDeterminingReference) {
+    if (interleaved->mode == InternalState::Interleaved::Mode::kDeterminingReference) {
         // We are in DeterminingReference mode, check if this current object is compatible and merge
         // in any new fields that are discovered.
         uint32_t numElementsReferenceObj = 0;
@@ -1409,9 +1406,9 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
                                                                    const BSONElement& elem) {
             ++numElementsReferenceObj;
         };
-        if (!traverseLockStep(_is.referenceSubObj.get().get(), obj, perElementLockStep)) {
+        if (!traverseLockStep(interleaved->referenceSubObj.get().get(), obj, perElementLockStep)) {
             BSONObj merged = [&] {
-                return mergeObj(_is.referenceSubObj.get().get(), obj);
+                return mergeObj(interleaved->referenceSubObj.get().get(), obj);
             }();
             if (merged.isEmptyPrototype()) {
                 // If merge failed, flush current sub-object compression and start over.
@@ -1420,23 +1417,27 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
                 // If we only contain empty subobj (no value elements) then append in regular mode
                 // instead of re-starting subobj compression.
                 if (!containsScalars) {
-                    _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
+                    std::get<typename InternalState::Regular>(_is.state).append(
+                        elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
                     return *this;
                 }
 
-                _is.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
-                _is.bufferedObjElements.emplace_back(
-                    TrackableBSONObj{_is.referenceSubObj.get().get()}, _is.allocator);
-                _is.mode = Mode::kSubObjDeterminingReference;
+                interleaved =
+                    &_is.state.template emplace<typename InternalState::Interleaved>(_is.allocator);
+                interleaved->referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
+                interleaved->referenceSubObjType = type;
+                interleaved->bufferedObjElements.emplace_back(
+                    TrackableBSONObj{interleaved->referenceSubObj.get().get()}, _is.allocator);
                 return *this;
             }
-            _is.referenceSubObj = {TrackableBSONObj{merged}, _is.allocator};
+            interleaved->referenceSubObj = {TrackableBSONObj{merged}, _is.allocator};
         }
 
         // If we've buffered twice as many objects as we have sub-elements we will achieve good
         // compression so use the currently built reference.
-        if (numElementsReferenceObj * 2 >= _is.bufferedObjElements.size()) {
-            _is.bufferedObjElements.emplace_back(TrackableBSONObj{obj.getOwned()}, _is.allocator);
+        if (numElementsReferenceObj * 2 >= interleaved->bufferedObjElements.size()) {
+            interleaved->bufferedObjElements.emplace_back(TrackableBSONObj{obj.getOwned()},
+                                                          _is.allocator);
             return *this;
         }
 
@@ -1448,7 +1449,8 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
         // If we were not compatible restart subobj compression unless our object contain no value
         // fields (just empty subobjects)
         if (!containsScalars) {
-            _is.regular.append(elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
+            std::get<typename InternalState::Regular>(_is.state).append(
+                elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -1459,22 +1461,24 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendObj(Element el
 template <class BufBuilderType, class BSONObjType, class Allocator>
 BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>&
 BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::skip() {
-    if (_is.mode == Mode::kRegular) {
-        _is.regular.skip(_bufBuilder, NoopControlBlockWriter{});
+    if (auto* regular = std::get_if<typename InternalState::Regular>(&_is.state)) {
+        regular->skip(_bufBuilder, NoopControlBlockWriter{});
         return *this;
     }
 
+    auto& interleaved = std::get<typename InternalState::Interleaved>(_is.state);
+
     // If the reference object contain any empty subobjects we need to end interleaved mode as
     // skipping in all substreams would not be encoded as skipped root object.
-    if (_hasEmptyObj(_is.referenceSubObj.get().get())) {
+    if (_hasEmptyObj(interleaved.referenceSubObj.get().get())) {
         _flushSubObjMode();
         return skip();
     }
 
-    if (_is.mode == Mode::kSubObjDeterminingReference) {
-        _is.bufferedObjElements.emplace_back(TrackableBSONObj{BSONObj()}, _is.allocator);
+    if (interleaved.mode == InternalState::Interleaved::Mode::kDeterminingReference) {
+        interleaved.bufferedObjElements.emplace_back(TrackableBSONObj{BSONObj()}, _is.allocator);
     } else {
-        for (auto&& subobj : _is.subobjStates) {
+        for (auto&& subobj : interleaved.subobjStates) {
             subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
         }
     }
@@ -1497,7 +1501,14 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::intermediate() {
     int identicalBytes = 0;
     // Save some state related to last control byte so we can see how it changes after finalize() is
     // called.
-    ptrdiff_t controlOffset = _is.regular._controlByteOffset;
+    ptrdiff_t controlOffset =
+        visit(OverloadedVisitor{[](const typename InternalState::Regular& regular) {
+                                    return regular._controlByteOffset;
+                                },
+                                [](const typename InternalState::Interleaved&) {
+                                    return kNoSimple8bControl;
+                                }},
+              _is.state);
     uint8_t lastControlByte =
         controlOffset != kNoSimple8bControl ? *(_bufBuilder.buf() + controlOffset) : 0;
 
@@ -1523,7 +1534,7 @@ BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::intermediate() {
         auto buffer = BufBuilderType{_is.allocator, static_cast<size_t>(length - controlOffset)};
         buffer.appendChar(lastControlByte);
         buffer.appendBuf(_bufBuilder.buf() + controlOffset + 1, length - controlOffset - 1);
-        newState.regular._controlByteOffset = 0;
+        std::get<typename InternalState::Regular>(newState.state)._controlByteOffset = 0;
         newState.offset += controlOffset;
         newState.lastBufLength = length - controlOffset;
 
@@ -1566,8 +1577,8 @@ BSONBinData BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::finalize(
     // We may only finalize when we have the full binary
     invariant(_is.offset == 0);
 
-    if (_is.mode == Mode::kRegular) {
-        _is.regular.flush(_bufBuilder, NoopControlBlockWriter{});
+    if (auto* regular = std::get_if<typename InternalState::Regular>(&_is.state)) {
+        regular->flush(_bufBuilder, NoopControlBlockWriter{});
     } else {
         _flushSubObjMode();
     }
@@ -1592,14 +1603,17 @@ int BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::numInterleavedSta
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
 BSONElement BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::last() const {
-    if (_is.mode != Mode::kRegular) {
-        return {};
-    }
-
-    return BSONElement(_is.regular._prev.data(),
-                       /*field name size including null terminator*/ 1,
-                       /*total size*/ _is.regular._prev.size(),
-                       BSONElement::TrustedInitTag{});
+    return visit(OverloadedVisitor{[](const typename InternalState::Regular& regular) {
+                                       return BSONElement{
+                                           regular._prev.data(),
+                                           /*field name size including null terminator*/ 1,
+                                           /*total size*/ static_cast<int>(regular._prev.size()),
+                                           BSONElement::TrustedInitTag{}};
+                                   },
+                                   [](const typename InternalState::Interleaved&) {
+                                       return BSONElement{};
+                                   }},
+                 _is.state);
 }
 
 namespace bsoncolumn {
@@ -2310,6 +2324,8 @@ typename BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::InternalStat
 template <class BufBuilderType, class BSONObjType, class Allocator>
 bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendSubElements(
     const BSONObj& obj) {
+    auto& interleaved = std::get<typename InternalState::Interleaved>(_is.state);
+
     // Check if added object is compatible with selected reference object. Collect a flat vector of
     // all elements while we are doing this.
     std::vector<BSONElement> flattenedAppendedObj;
@@ -2317,15 +2333,15 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_appendSubElemen
     auto perElement = [&flattenedAppendedObj](const BSONElement& ref, const BSONElement& elem) {
         flattenedAppendedObj.push_back(elem);
     };
-    if (!traverseLockStep(_is.referenceSubObj.get().get(), obj, perElement)) {
+    if (!traverseLockStep(interleaved.referenceSubObj.get().get(), obj, perElement)) {
         _flushSubObjMode();
         return false;
     }
 
     // We should have received one callback for every sub-element in reference object. This should
     // match number of encoding states setup previously.
-    invariant(flattenedAppendedObj.size() == _is.subobjStates.size());
-    auto statesIt = _is.subobjStates.begin();
+    invariant(flattenedAppendedObj.size() == interleaved.subobjStates.size());
+    auto statesIt = interleaved.subobjStates.begin();
     auto subElemIt = flattenedAppendedObj.begin();
     auto subElemEnd = flattenedAppendedObj.end();
 
@@ -2346,39 +2362,42 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_startDetermineS
     const BSONObj& obj, BSONType type) {
     // Start sub-object compression. Enter DeterminingReference mode, we use this first Object
     // as the first reference
-    _is.regular.flush(_bufBuilder, NoopControlBlockWriter{});
-    _is.regular = bsoncolumn::EncodingState<BufBuilderType, Allocator>{_is.allocator};
+    std::get<typename InternalState::Regular>(_is.state).flush(_bufBuilder,
+                                                               NoopControlBlockWriter{});
 
-    _is.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
-    _is.referenceSubObjType = type;
-    _is.bufferedObjElements.emplace_back(TrackableBSONObj{_is.referenceSubObj.get().get()},
-                                         _is.allocator);
-    _is.mode = Mode::kSubObjDeterminingReference;
+    auto& interleaved =
+        _is.state.template emplace<typename InternalState::Interleaved>(_is.allocator);
+    interleaved.referenceSubObj = {TrackableBSONObj{obj.getOwned()}, _is.allocator};
+    interleaved.referenceSubObjType = type;
+    interleaved.bufferedObjElements.emplace_back(
+        TrackableBSONObj{interleaved.referenceSubObj.get().get()}, _is.allocator);
 }
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
 void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_finishDetermineSubObjReference() {
+    auto& interleaved = std::get<typename InternalState::Interleaved>(_is.state);
+
     // Done determining reference sub-object. Write this control byte and object to stream.
     const char interleavedStartControlByte = [&] {
-        return _is.referenceSubObjType == Object
+        return interleaved.referenceSubObjType == Object
             ? bsoncolumn::kInterleavedStartControlByte
             : bsoncolumn::kInterleavedStartArrayRootControlByte;
     }();
     _bufBuilder.appendChar(interleavedStartControlByte);
-    _bufBuilder.appendBuf(_is.referenceSubObj.get().get().objdata(),
-                          _is.referenceSubObj.get().get().objsize());
+    _bufBuilder.appendBuf(interleaved.referenceSubObj.get().get().objdata(),
+                          interleaved.referenceSubObj.get().get().objsize());
     ++_numInterleavedStartWritten;
 
     // Initialize all encoding states. We do this by traversing in lock-step between the reference
     // object and first buffered element. We can use the fact if sub-element exists in reference to
     // determine if we should start with a zero delta or skip.
-    auto perElement = [this](const BSONElement& ref, const BSONElement& elem) {
+    auto perElement = [this, &interleaved](const BSONElement& ref, const BSONElement& elem) {
         // Set a valid 'previous' into the encoding state to avoid a full
         // literal to be written when we append the first element. We want this
         // to be a zero delta as the reference object already contain this
         // literal.
-        _is.subobjStates.emplace_back(_is.allocator);
-        auto& subobj = _is.subobjStates.back();
+        interleaved.subobjStates.emplace_back(_is.allocator);
+        auto& subobj = interleaved.subobjStates.back();
         subobj.state._storePrevious(ref);
         subobj.state._initializeFromPrevious(_is.allocator);
         if (!elem.eoo()) {
@@ -2388,30 +2407,33 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_finishDetermine
         }
     };
 
-    invariant(traverseLockStep(
-        _is.referenceSubObj.get().get(), _is.bufferedObjElements.front().get().get(), perElement));
-    _is.mode = Mode::kSubObjAppending;
+    invariant(traverseLockStep(interleaved.referenceSubObj.get().get(),
+                               interleaved.bufferedObjElements.front().get().get(),
+                               perElement));
+    interleaved.mode = InternalState::Interleaved::Mode::kAppending;
 
     // Append remaining buffered objects.
-    auto it = _is.bufferedObjElements.begin() + 1;
-    auto end = _is.bufferedObjElements.end();
+    auto it = interleaved.bufferedObjElements.begin() + 1;
+    auto end = interleaved.bufferedObjElements.end();
     for (; it != end; ++it) {
         // The objects we append here should always be compatible with our reference object. If they
         // are not then there is a bug somewhere.
         invariant(_appendSubElements(it->get().get()));
     }
-    _is.bufferedObjElements.clear();
+    interleaved.bufferedObjElements.clear();
 }
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
 void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_flushSubObjMode() {
-    if (_is.mode == Mode::kSubObjDeterminingReference) {
+    auto& interleaved = std::get<typename InternalState::Interleaved>(_is.state);
+
+    if (interleaved.mode == InternalState::Interleaved::Mode::kDeterminingReference) {
         _finishDetermineSubObjReference();
     }
 
     // Flush all EncodingStates, this will cause them to write out all their elements that is
     // captured by the controlBlockWriter.
-    for (auto&& subobj : _is.subobjStates) {
+    for (auto&& subobj : interleaved.subobjStates) {
         subobj.state.flush(subobj.buffer, subobj.controlBlockWriter());
     }
 
@@ -2433,7 +2455,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_flushSubObjMode
         }
     };
     std::vector<HeapElement> heap;
-    for (uint32_t i = 0; i < _is.subobjStates.size(); ++i) {
+    for (uint32_t i = 0; i < interleaved.subobjStates.size(); ++i) {
         heap.emplace_back(i);
     }
 
@@ -2446,7 +2468,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_flushSubObjMode
         std::pop_heap(heap.begin(), heap.end(), std::greater<>{});
         // And we take out control blocks in FIFO order from this encoding state
         auto& top = heap.back();
-        auto& slot = _is.subobjStates[top.encoderIndex];
+        auto& slot = interleaved.subobjStates[top.encoderIndex];
         const char* controlBlock =
             slot.buffer.buf() + slot.controlBlocks.at(top.controlBlockIndex).first;
         size_t size = slot.controlBlocks.at(top.controlBlockIndex).second;
@@ -2469,8 +2491,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::_flushSubObjMode
     }
     // All control blocks written, write EOO to end the interleaving and cleanup.
     _bufBuilder.appendChar(EOO);
-    _is.subobjStates.clear();
-    _is.mode = Mode::kRegular;
+    _is.state.template emplace<typename InternalState::Regular>(_is.allocator);
 }
 
 template <class BufBuilderType, class BSONObjType, class Allocator>
@@ -2486,15 +2507,32 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateI
         }
     }
 
+    // Validate intermediate data
+    if (_is.offset != other._is.offset) {
+        return false;
+    }
+    if (_is.lastBufLength != other._is.lastBufLength) {
+        return false;
+    }
+    if (_is.lastControl != other._is.lastControl) {
+        return false;
+    }
+
     // Validate internal state of regular mode
-    if (_is.mode != other._is.mode) {
+    auto* regular = std::get_if<typename InternalState::Regular>(&_is.state);
+    auto* otherRegular = std::get_if<typename InternalState::Regular>(&other._is.state);
+    if (static_cast<bool>(regular) != static_cast<bool>(otherRegular)) {
         return false;
     }
-    if (_is.regular._controlByteOffset != other._is.regular._controlByteOffset) {
+    if (!regular) {
+        // Currently we don't check the interleaved state.
+        return true;
+    }
+    if (regular->_controlByteOffset != otherRegular->_controlByteOffset) {
         return false;
     }
-    if (auto encoder = std::get_if<Encoder64>(&_is.regular._encoder)) {
-        auto encoderOther = std::get_if<Encoder64>(&other._is.regular._encoder);
+    if (auto encoder = std::get_if<Encoder64>(&regular->_encoder)) {
+        auto encoderOther = std::get_if<Encoder64>(&otherRegular->_encoder);
         if (!encoderOther) {
             return false;
         }
@@ -2528,8 +2566,8 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateI
         }
 
 
-    } else if (auto encoder = std::get_if<Encoder128>(&_is.regular._encoder)) {
-        auto encoderOther = std::get_if<Encoder128>(&other._is.regular._encoder);
+    } else if (auto encoder = std::get_if<Encoder128>(&regular->_encoder)) {
+        auto encoderOther = std::get_if<Encoder128>(&otherRegular->_encoder);
         if (!encoderOther) {
             return false;
         }
@@ -2545,20 +2583,10 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::isInternalStateI
         return false;
     }
 
-    if (_is.regular._prev != other._is.regular._prev) {
+    if (regular->_prev != otherRegular->_prev) {
         return false;
     }
 
-    // Validate intermediate data
-    if (_is.offset != other._is.offset) {
-        return false;
-    }
-    if (_is.lastBufLength != other._is.lastBufLength) {
-        return false;
-    }
-    if (_is.lastControl != other._is.lastControl) {
-        return false;
-    }
     return true;
 }
 
