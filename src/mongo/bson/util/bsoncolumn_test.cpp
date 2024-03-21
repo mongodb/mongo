@@ -60,9 +60,7 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
 
-using namespace mongo::bsoncolumn;
-
-namespace mongo {
+namespace mongo::bsoncolumn {
 namespace {
 
 void assertBinaryEqual(BSONBinData finalizedColumn, const BufBuilder& buffer) {
@@ -8319,4 +8317,4 @@ TEST_F(BSONColumnTest, TestCollector) {
 
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::bsoncolumn

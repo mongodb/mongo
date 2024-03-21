@@ -60,7 +60,6 @@
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
-using namespace bsoncolumn;
 
 /**
  * The BSONColumn class represents an implementation to interpret a BSONElement of BinDataType 7,
@@ -88,6 +87,8 @@ using namespace bsoncolumn;
  */
 class BSONColumn {
 public:
+    using ElementStorage = bsoncolumn::ElementStorage;
+
     BSONColumn(const char* buffer, size_t size);
     explicit BSONColumn(BSONElement bin);
     explicit BSONColumn(BSONBinData bin);

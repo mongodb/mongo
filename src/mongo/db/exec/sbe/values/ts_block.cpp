@@ -355,7 +355,7 @@ void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
     if (_blockBasedDecompressionEnabled && hasNoObjsOrArrays()) {
         using SBEMaterializer = sbe::bsoncolumn::SBEColumnMaterializer;
         mongo::bsoncolumn::BSONColumnBlockBased col(binData);
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new mongo::bsoncolumn::ElementStorage()};
 
         // The decoding API will put the decompressed elements directly into 'deblockedTags' and
         // 'deblockedVals'.

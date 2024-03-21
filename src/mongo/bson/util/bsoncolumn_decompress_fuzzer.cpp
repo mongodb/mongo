@@ -44,7 +44,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // Set up both APIs.
     BSONColumn column(Data, Size);
     BSONColumnBlockBased block(Data, Size);
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
     std::vector<BSONElement> iteratorElems = {};
     std::vector<BSONElement> blockBasedElems = {};
     std::string blockBasedError;
