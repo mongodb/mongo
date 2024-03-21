@@ -304,8 +304,8 @@ def print_summary():
             print(f'{ts.files_changed} changed {changed}: differs by {ts.bytes} bytes in {ts.gran_blocks} changed granularity blocks')
             pct20_blocks = round(abs(ts.pct20 / ts.gran_blocks * 100))
             pct80_blocks = round(abs(ts.pct80 / ts.gran_blocks * 100))
-            print(f'{n}: smallest 20%: {pct20_blocks} of {ts.gran_blocks} changed blocks ({pct20_blocks}%) differ by {pct20} bytes or less of {granularity}')
-            print(f'{n}: largest 80%: {pct80_blocks} of {ts.gran_blocks} changed blocks ({pct80_blocks}%) differ by {pct80} bytes or more of {granularity}')
+            print(f'{n}: smallest 20%: {ts.pct20} of {ts.gran_blocks} changed blocks ({pct20_blocks}%) differ by {pct20} bytes or less of {granularity}')
+            print(f'{n}: largest 80%: {ts.pct80} of {ts.gran_blocks} changed blocks ({pct80_blocks}%) differ by {pct80} bytes or more of {granularity}')
 
 #
 # This is the wrapper function to compare two backup directories. This function
