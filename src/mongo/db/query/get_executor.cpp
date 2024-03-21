@@ -1189,6 +1189,11 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
         return false;
     }
 
+    if (cq.nss().isTimeseriesBucketsCollection() && cq.cqPipeline().empty()) {
+        // TS queries only use SBE when there's a pipeline.
+        return false;
+    }
+
     // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
     // compatible.
     SbeCompatibility minRequiredCompatibility =

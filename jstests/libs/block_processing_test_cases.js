@@ -6,8 +6,13 @@ export function generateMetaVals() {
     return metaVals;
 }
 
-export function blockProcessingTestCases(
-    timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, sbeFullEnabled) {
+export function blockProcessingTestCases(timeFieldName,
+                                         metaFieldName,
+                                         datePrefix,
+                                         dateUpperBound,
+                                         dateLowerBound,
+                                         featureFlagsAllowBlockHashAgg,
+                                         sbeFullEnabled) {
     const dateMidPoint = new Date((dateLowerBound.getTime() + dateUpperBound.getTime()) / 2);
 
     // You can name the meta field whatever you want, as long as it's 'meta'.
@@ -693,10 +698,19 @@ export function blockProcessingTestCases(
             usesBlockProcessing: false
         },
         {
-            name: "GroupWithProjectedOutFieldInAccumulator",
+            name: "MatchMetaGroupWithProjectedOutFieldInAccumulator",
             pipeline: [
                 {$project: {_id: 0}},
                 {$match: {[metaFieldName]: "foo"}},
+                {$group: {_id: null, minY: {$min: "$y"}}},
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
+            name: "MatchTimeGroupWithProjectedOutFieldInAccumulator",
+            pipeline: [
+                {$project: {_id: 0}},
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, minY: {$min: "$y"}}},
             ],
             usesBlockProcessing: sbeFullEnabled
@@ -1337,6 +1351,24 @@ export function blockProcessingTestCases(
             ],
             usesBlockProcessing: false
         },
-
+        {
+            name: "GroupByComputedField",
+            pipeline: [
+                {
+                    $addFields: {
+                        computedField: {
+                            $cond: [
+                                {$and: [{$isNumber: '$a'}, {$isNumber: '$b'}]},
+                                {$add: ['$a', '$b']},
+                                null
+                            ]
+                        }
+                    }
+                },
+                {$match: {[timeFieldName]: {$lt: dateMidPoint}, computedField: 999}},
+                {$group: {_id: "$computedField", a: {$min: "$y"}}},
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
     ];
 }

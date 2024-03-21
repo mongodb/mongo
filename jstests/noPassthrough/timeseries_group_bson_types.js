@@ -160,7 +160,7 @@ function runTestCases(allowDiskUse, forceSpilling) {
         internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
     }));
     let testcases = blockProcessingTestCases(
-        timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, false);
+        timeFieldName, metaFieldName, datePrefix, dateUpperBound, dateLowerBound, false, false);
     // Filter out tests with known accepted differences between SBE and Classic.
     for (const test of testcases) {
         compareScalarAndBlockProcessing(test, allowDiskUse);

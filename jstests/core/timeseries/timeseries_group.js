@@ -24,7 +24,12 @@ import {
     generateMetaVals
 } from "jstests/libs/block_processing_test_cases.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js"
-import {checkSbeStatus, kSbeDisabled, kSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {
+    checkSbeFullFeatureFlagEnabled,
+    checkSbeStatus,
+    kSbeDisabled,
+    kSbeFullyEnabled
+} from "jstests/libs/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
@@ -114,6 +119,8 @@ TimeseriesTest.run((insert) => {
 
     // Block based $group is guarded behind (SbeFull || SbeBlockHashAgg) && TimeSeriesInSbe.
     const sbeStatus = checkSbeStatus(db);
+
+    const sbeFullyEnabled = checkSbeFullFeatureFlagEnabled(db);
     const featureFlagsAllowBlockHashAgg =
         // SBE can't be disabled altogether.
         (sbeStatus != kSbeDisabled) &&
@@ -145,7 +152,8 @@ TimeseriesTest.run((insert) => {
                                                    datePrefix,
                                                    dateUpperBound,
                                                    dateLowerBound,
-                                                   featureFlagsAllowBlockHashAgg);
+                                                   featureFlagsAllowBlockHashAgg,
+                                                   sbeFullyEnabled);
 
         for (let testcase of testcases) {
             const name = testcase.name + " (allowDiskUse=" + allowDiskUseStr + ")";
@@ -198,7 +206,7 @@ TimeseriesTest.run((insert) => {
             if (usesBlockProcessing) {
                 // Verify that we have an SBE plan, and verify that "block_group" appears in the
                 // plan.
-                assert.eq(engineUsed, "sbe");
+                assert.eq(engineUsed, "sbe", testcaseAndExplainFn("Expected to use SBE"));
 
                 assert(sbePlan.includes("block_group"),
                        testcaseAndExplainFn("Expected explain to use block processing"));

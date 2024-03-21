@@ -36,11 +36,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_internal_replace_root.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -283,12 +285,93 @@ bool pruneTrailingUnwind(std::vector<boost::intrusive_ptr<DocumentSource>>& stag
 }
 
 /**
+ * Prohibits pushing down $_internalUnpackBucket when it's not followed by a specific, allowed
+ * sequence of stages. We permit the following sequences of stages following the
+ * internalUnpackBucketStage:
+ * - $group
+ * - $match -> $group
+ * - $match -> $project
+ * - $addFields -> $match -> $group
+ */
+void removeUnpackBucketFollowedByUnsupportedStages(
+    std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
+    auto itr =
+        std::find_if(stagesForPushdown.begin(), stagesForPushdown.end(), [](const auto& stage) {
+            return dynamic_cast<DocumentSourceInternalUnpackBucket*>(stage.get());
+        });
+    if (itr == stagesForPushdown.end()) {
+        return;
+    }
+
+    auto unpackStage = dynamic_cast<DocumentSourceInternalUnpackBucket*>(itr->get());
+    invariant(unpackStage);
+    size_t unpackStageIdx = itr - stagesForPushdown.begin();
+
+    if (unpackStageIdx + 1 == stagesForPushdown.size()) {
+        // If this is the last stage, it must have a filter.
+        // For this stage to report itself as SBE compatible, there must also be an
+        // inclusion projection.
+        if (unpackStage->eventFilter()) {
+            return;
+        } else {
+            stagesForPushdown.pop_back();
+            return;
+        }
+    }
+
+    // Initial $match(es) will get absorbed into the $_internalUnpackbucket.
+
+    // Helper for trimming off the remaining stages.
+    auto trimFrom = [&stagesForPushdown](size_t idx) {
+        stagesForPushdown.erase(stagesForPushdown.begin() + idx, stagesForPushdown.end());
+    };
+
+    // If the next stage is a $group, we push it down and trim the rest.
+    if (dynamic_cast<DocumentSourceGroupBase*>(stagesForPushdown[unpackStageIdx + 1].get())) {
+        trimFrom(unpackStageIdx + 2);
+        return;
+    }
+
+    // If the next stage is $addFields, followed by $match, followed by $group, then we push
+    // these down and trim the rest.
+    auto internalProjectionStage = dynamic_cast<DocumentSourceInternalProjection*>(
+        stagesForPushdown[unpackStageIdx + 1].get());
+    if (unpackStageIdx + 3 < stagesForPushdown.size() && internalProjectionStage &&
+        internalProjectionStage->spec().getPolicies() == InternalProjectionPolicyEnum::kAddFields &&
+        dynamic_cast<DocumentSourceMatch*>(stagesForPushdown[unpackStageIdx + 2].get()) &&
+        dynamic_cast<DocumentSourceGroupBase*>(stagesForPushdown[unpackStageIdx + 3].get())) {
+        trimFrom(unpackStageIdx + 4);
+        return;
+    }
+
+    // If the next stage is $project and we have an event filter then this is a $match-$project
+    // query which we push down, then trim the rest.
+    if (internalProjectionStage &&
+        internalProjectionStage->projection().type() == projection_ast::ProjectType::kInclusion &&
+        unpackStage->eventFilter()) {
+        trimFrom(unpackStageIdx + 2);
+        return;
+    }
+
+    // Otherwise, we found an $_internalUnpackBucket, but the following stages are not supported,
+    // so we don't push anything into SBE.
+    stagesForPushdown.clear();
+    return;
+}
+
+/**
  * After copying as many pipeline stages as possible into the 'stagesForPushdown' pipeline, this
  * second pass takes off any stages that may not benefit from execution in SBE.
  */
 void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
                          SbeCompatibility minRequiredCompatibility,
                          bool allStagesPushedDown) {
+    // First, scan the list of stages for pushdown, and remove an unpack bucket (plus anything
+    // following) if it's followed by unsupported stages.
+    if (minRequiredCompatibility > SbeCompatibility::requiresSbeFull) {
+        removeUnpackBucketFollowedByUnsupportedStages(stagesForPushdown);
+    }
+
     bool pruned = false;       // have any stages been pruned?
     bool prunedThisIteration;  // were any stages pruned in the current loop iteration?
     do {
@@ -406,8 +489,9 @@ bool findSbeCompatibleStagesForPushdown(
 
     const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
+    const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
         queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
+    const bool isTimeseriesCollection = cq->nss().isTimeseriesBucketsCollection();
 
     auto meetsRequirements = [&minRequiredCompatibility, &cq](SbeCompatibility stageCompatibility) {
         return stageCompatibility >= minRequiredCompatibility;
@@ -428,9 +512,12 @@ bool findSbeCompatibleStagesForPushdown(
             !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
             !collections.isAnySecondaryNamespaceAViewOrNotFullyLocal(),
 
-        .transform = meetsRequirements(SbeCompatibility::requiresTrySbe),
+        // We're allowed to push down transforms if trySbeEngine is on, or we're querying a time
+        // series collection. If we're querying a time series collection, an InternalUnpackBucket
+        // stage must be pushed down for any later stages to also be pushed down.
+        .transform = meetsRequirements(SbeCompatibility::requiresTrySbe) || isTimeseriesCollection,
 
-        .match = meetsRequirements(SbeCompatibility::requiresTrySbe),
+        .match = meetsRequirements(SbeCompatibility::requiresTrySbe) || isTimeseriesCollection,
 
         .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
 

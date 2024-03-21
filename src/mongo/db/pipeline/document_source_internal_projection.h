@@ -89,6 +89,10 @@ public:
         return _projection;
     }
 
+    const DocumentSourceInternalProjectionSpec& spec() const {
+        return _stageSpec;
+    }
+
 private:
     GetNextResult doGetNext() final;
 
