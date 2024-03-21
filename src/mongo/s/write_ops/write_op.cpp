@@ -209,7 +209,8 @@ void WriteOp::targetWrites(OperationContext* opCtx,
             if (!feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 (isNonTargetedWriteWithoutShardKeyWithExactId &&
-                 !*isNonTargetedWriteWithoutShardKeyWithExactId)) {
+                 !*isNonTargetedWriteWithoutShardKeyWithExactId) ||
+                (!isNonTargetedWriteWithoutShardKeyWithExactId)) {
                 endpoint.shardVersion->setPlacementVersionIgnored();
             }
         }

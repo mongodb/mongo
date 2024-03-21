@@ -2,7 +2,7 @@
  * Tests deleteOne with id without shard key uses PM-3190 for retryable
  * writes and doesn't for transactions.
  *
- * @tags: [featureFlagUpdateOneWithIdWithoutShardKey, requires_fcv_73]
+ * @tags: [requires_fcv_80]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

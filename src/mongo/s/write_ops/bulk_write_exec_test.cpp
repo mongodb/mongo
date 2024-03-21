@@ -3320,9 +3320,6 @@ protected:
 
 // Test that if all shards return n=0 we consider the write complete.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatch) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -3480,9 +3477,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchBatched) {
 // Test that if all shards return n=0 we consider the write complete.
 // Same as the previous test but uses bulkWrite errorsOnly mode.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyMode) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto req = request;
     req.setErrorsOnly(true);
     auto op = BulkWriteOp(_opCtx, req);
@@ -3639,9 +3633,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyModeBatc
 // Test that if the first shard returns n=0 and the second shard returns n=1 we do not use response
 // from the last shard.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatch) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -3803,9 +3794,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchBatched) {
 // Test that if the first shard returns n=0 and the second shard returns n=1 we do not use response
 // from the last shard. Same as the previous test but uses bulkWrite errorsOnly mode.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyMode) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto req = request;
     req.setErrorsOnly(true);
     auto op = BulkWriteOp(_opCtx, req);
@@ -3958,9 +3946,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyModeB
 // from the last shard. Same as the SecondShardFindMatch test, but ensures we correctly
 // extract 'n' for deletes as well as updates.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDelete) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto request = BulkWriteCommandRequest(
         {
             BulkWriteDeleteOp(0, BSON("_id" << 1)),
@@ -4125,9 +4110,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDeleteBatche
 
 // Test that if the first shard returns n=1 we do not use response from the other two shards.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatch) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4159,9 +4141,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatch) {
 // Test that if the first shard returns n=1 we do not use response from the other two shards
 // and we correctly report a WC error.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4195,9 +4174,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
 // Test that if 2 shards receive n=0 and then one shard receives a retryable error (e.g.
 // StaleConfig) we will re-target all shards on retry.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4355,9 +4331,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorBatched) {
 // Test that if 2 shards receive n=0 and then one shard receives a retryable error (e.g.
 // StaleConfig) we will discard any write concern errors from the first round of processing.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4550,9 +4523,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableErrorBatched) {
 }
 
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4625,9 +4595,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndRetryableError) {
 // Test that if 2 shards receive n=0 and then one shard receives a non-retryable error we consider
 // the write failed.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4782,9 +4749,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorMatched)
 // Test that if 2 shards receive n=0 and WC Errors and then one shard receives a non-retryable error
 // we consider the write failed and we report the WC errors.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -4945,9 +4909,6 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableErrorBatched) {
 // Test that if one shard receives a non-retryable error but then another shard receives an n=1
 // response we consider the write a success.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableError) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
-
     auto op = BulkWriteOp(_opCtx, request);
 
     TargetedBatchMap targeted;
@@ -5843,8 +5804,6 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
 
 // Tests that all pending shard requests are awaited for writes without shard key with _id.
 TEST_F(BulkWriteExecTest, BulkWriteWriteWriteWithoutShardKeyWithIdAwaitsAllShardResponses) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagUpdateOneWithIdWithoutShardKey", true);
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
     ShardEndpoint endpoint0(
         kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);

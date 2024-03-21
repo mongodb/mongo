@@ -2357,9 +2357,6 @@ protected:
 };
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneSingleShardIsOrdinary) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2392,9 +2389,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneSingleShardIsOrdi
 
 TEST_F(WriteWithoutShardKeyWithIdFixture,
        UpdateOneReplacementStyleIsNotWriteWithoutShardKeyWithId) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(kNss);
         // Replacement style update.
@@ -2414,9 +2408,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture,
 }
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcast) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2458,9 +2449,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcast) {
 }
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatching) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     BatchedCommandRequest updateRequest([&] {
         write_ops::UpdateCommandRequest updateOp(kNss);
         // Op style update.
@@ -2495,9 +2483,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatching) {
 
 // Test that an Ordinary write is not batched with WriteWithoutShardKeyWithId
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithTargetedOp) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     BatchedCommandRequest updateRequest([&] {
         write_ops::UpdateCommandRequest updateOp(kNss);
         // Op style update.
@@ -2533,9 +2518,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithTargeted
 
 // Test that a single shard targeted write is not WriteWithoutShardKeyWithId
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithSingleShard) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     BatchedCommandRequest updateRequest([&] {
         write_ops::UpdateCommandRequest updateOp(kNss);
         // Op style update.
@@ -2567,9 +2549,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneUnorderedBatchingWithSingleSh
 }
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcastWithNoMatch) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2623,9 +2602,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcastWithNoMa
 
 TEST_F(WriteWithoutShardKeyWithIdFixture,
        UpdateOneAndDeleteBroadcastNoMatchWithNonRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2677,9 +2653,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture,
 
 TEST_F(WriteWithoutShardKeyWithIdFixture,
        UpdateOneAndDeleteOneBroadcastMatchWithNonRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2732,9 +2705,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture,
 
 TEST_F(WriteWithoutShardKeyWithIdFixture,
        UpdateOneAndDeleteOneBroadcastNoMatchWithRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2825,9 +2795,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture,
 }
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcastMatchWithRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -2895,9 +2862,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneAndDeleteOneBroadcastMatchWit
 }
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneBroadcastNoMatchWithStaleDBError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(kNss);
         // Op style update.
@@ -2946,9 +2910,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateOneBroadcastNoMatchWithStaleDBEr
 
 TEST_F(WriteWithoutShardKeyWithIdFixture,
        UpdateOrDeleteInTransactionIsNotWriteWithoutShardKeyWithIdWriteType) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     std::vector<BatchedCommandRequest*> requests;
 
     BatchedCommandRequest updateRequest([&] {
@@ -3003,9 +2964,6 @@ TEST_F(WriteWithoutShardKeyWithIdFixture,
 }
 
 TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateRetriedAfterWCError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     BatchedCommandRequest updateRequest([&] {
         write_ops::UpdateCommandRequest updateOp(kNss);
         // Op style update.

@@ -1,13 +1,8 @@
 /**
  * Tests that concurrent retryable updateOne operation with _id without shard key and chunk
- * migration for the chunk being updated doesn't cause zero updates when
- * featureFlagUpdateOneWithIdWithoutShardKey is enabled.
+ * migration for the chunk being updated doesn't cause zero updates.
  *
- * @tags: [
- *   featureFlagUpdateOneWithIdWithoutShardKey,
- *   requires_fcv_73,
- *   temp_disabled_embedded_router_mongo_bridge,
- * ]
+ * @tags: [requires_fcv_80, temp_disabled_embedded_router_mongo_bridge]
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 

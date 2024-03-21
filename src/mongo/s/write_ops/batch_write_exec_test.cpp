@@ -2164,9 +2164,6 @@ TEST_F(BatchWriteExecTest, PartialTenantMigrationErrorUnorderedOp) {
  * Tests the scenario where 1st and 2nd shards return n = 0.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatch) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -2315,9 +2312,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatch) {
  * Tests the scenario where 1st shard returns n=1 and 2nd shard write is pending.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatch) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -2472,9 +2466,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatch) 
  * Tests the scenario where 1st shard returns non-retryable error and 2nd shard returns n = 0.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchNonRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -2613,9 +2604,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchNonR
 }
 
 TEST_F(BatchWriteExecTest, BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -2731,9 +2719,6 @@ TEST_F(BatchWriteExecTest, BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErro
 
 TEST_F(BatchWriteExecTest,
        BatchedUpdateOneWithIdWithoutShardKeyWriteConcernErrorsWithRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -2887,9 +2872,6 @@ TEST_F(BatchWriteExecTest,
  * to retry of the broadcast protocol.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3061,9 +3043,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetr
  * shard's response is pending.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNonRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3243,9 +3222,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNo
  * shard's response is pending.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3431,9 +3407,6 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRe
  * Tests the scenario where all shards return non-retryable errors.
  */
 TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyNonRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3549,9 +3522,6 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyNonRetryableError) {
  * error from first shard only for one write.
  */
 TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleNonRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3667,9 +3637,6 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleNonRetryab
  * error from first shard only for one write.
  */
 TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleRetryableError) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3817,9 +3784,6 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedSingleRetryableE
  * error from first shard for both writes.
  */
 TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedMultipleRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
@@ -3970,9 +3934,6 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyBatchedMultipleRetryabl
  */
 TEST_F(BatchWriteExecTest,
        UpdateOneWithIdWithoutShardKeyBatchedSingleNonRetryableAndRetryableErrors) {
-    RAIIServerParameterControllerForTest _featureFlagController{
-        "featureFlagUpdateOneWithIdWithoutShardKey", true};
-
     const static OID epoch = OID::gen();
     const static Timestamp timestamp{2};
 
