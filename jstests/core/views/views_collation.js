@@ -218,9 +218,9 @@ assert.commandFailedWithCode(viewsDB.runCommand({
 }),
                              ErrorCodes.OptionNotSupportedOnView);
 
-// Insert a document on "simpleCollection" because on sharded deployments, for certain collection
-// placements, $lookup will never even attempt to read from the view if the outer collection has no
-// document. TODO SERVER-81936 Can probably remove this insert.
+// Insert a document on "simpleCollection" because on sharded deployments, if the the outer
+// collection and the inner collection are on 2 different shards, $lookup will never even attempt to
+// read from the view if the outer collection has no document.
 assert.commandWorked(viewsDB["simpleCollection"].insert({x: 1}));
 
 assert.commandFailedWithCode(viewsDB.runCommand({
@@ -320,6 +320,12 @@ assert.commandFailedWithCode(viewsDB.runCommand({
     collation: {locale: "zh"}
 }),
                              ErrorCodes.OptionNotSupportedOnView);
+
+// Insert a document on "filCollection" because on sharded deployments, if the the outer collection
+// and the inner collection are on 2 different shards, $lookup will never even attempt to read from
+// the view if the outer collection has no document.
+assert.commandWorked(viewsDB["filCollection"].insert({x: 1}));
+
 assert.commandFailedWithCode(viewsDB.runCommand({
     aggregate: "filCollection",
     pipeline: [makeNestedLookupFilView("filCollection")],

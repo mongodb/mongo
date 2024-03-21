@@ -281,20 +281,35 @@ bool isSharded(const ShardsvrCreateCollectionRequest& request) {
 // 'collation' parameter to succeed (as an acknowledge of what specified in points 1. and 2.)
 // 5. In case of unsplittable collection, simply return the same collator as specified in the
 // request
+
+/*
+ * Parse + serialization of the input bson to apply the Collation's class default values. This
+ * ensure both sharding and local catalog to store the same collation's values.
+ */
+BSONObj normalizeCollation(OperationContext* opCtx, const BSONObj& collation) {
+    auto collator = uassertStatusOK(
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
+    if (!collator) {
+        // In case of simple collation, makeFromBSON returns a null pointer.
+        return BSONObj();
+    }
+    return collator->getSpec().toBSON();
+}
+
 BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const boost::optional<BSONObj>& collationInRequest,
                                        bool isUnsplittable) {
     if (isUnsplittable) {
         if (collationInRequest) {
-            return *collationInRequest;
+            return normalizeCollation(opCtx, *collationInRequest);
         } else {
             return BSONObj();
         }
     }
 
     // Ensure the collation is valid. Currently we only allow the simple collation.
-    std::unique_ptr<CollatorInterface> requestedCollator = nullptr;
+    auto requestedCollator = CollatorInterface::cloneCollator(kSimpleCollator);
     if (collationInRequest) {
         const auto& collationBson = collationInRequest.value();
         requestedCollator = uassertStatusOK(
@@ -302,7 +317,7 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The collation for shardCollection must be {locale: 'simple'}, "
                               << "but found: " << collationBson,
-                !requestedCollator);
+                CollatorInterface::isSimpleCollator(requestedCollator.get()));
     }
 
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -318,11 +333,11 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
         return nullptr;
     }();
 
-    if (!requestedCollator && !actualCollator)
+    if (!requestedCollator && !actualCollator) {
         return BSONObj();
+    }
 
-    auto actualCollation = actualCollator->getSpec();
-    auto actualCollatorBSON = actualCollation.toBSON();
+    auto actualCollatorBSON = actualCollator->getSpec().toBSON();
 
     if (!collationInRequest) {
         auto actualCollatorFilter =
@@ -332,10 +347,9 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
                 str::stream() << "If no collation was specified, the collection collation must be "
                                  "{locale: 'simple'}, "
                               << "but found: " << actualCollatorBSON,
-                !actualCollatorFilter);
+                CollatorInterface::isSimpleCollator(actualCollatorFilter.get()));
     }
-
-    return actualCollatorBSON;
+    return normalizeCollation(opCtx, actualCollatorBSON);
 }
 
 /*
@@ -345,7 +359,6 @@ Status createCollectionLocally(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const ShardsvrCreateCollectionRequest& request) {
     auto cmd = create_collection_util::makeCreateCommand(opCtx, nss, request);
-
     BSONObj createRes;
     DBDirectClient localClient(opCtx);
     // Forward the api check rules enforced by the client
@@ -1160,6 +1173,11 @@ boost::optional<UUID> createCollectionAndIndexes(
 
     shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, nss, shardKeyPattern);
 
+    // The shard key index for unsplittable collection { _id : 1 } is already implicitly created
+    // for unsplittable collections.
+    if (isUnsplittable(request)) {
+        return *sharding_ddl_util::getCollectionUUID(opCtx, nss);
+    }
     auto indexCreated = false;
     if (request.getImplicitlyCreateIndex().value_or(true)) {
         indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(

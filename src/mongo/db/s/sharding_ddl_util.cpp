@@ -748,6 +748,7 @@ std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOn
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& collectionUuid,
+    const BSONObj& defaultCollation,
     const ShardId& shardId) {
     const auto unsplittableShardKeyPattern = ShardKeyPattern(unsplittableCollectionShardKey());
     const auto initialChunks = SingleChunkOnPrimarySplitPolicy().createFirstChunks(
@@ -762,6 +763,7 @@ std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOn
                                collectionUuid,
                                unsplittableCollectionShardKey().toBSON());
     coll.setUnsplittable(true);
+    coll.setDefaultCollation(defaultCollation);
 
     return getOperationsToCreateOrShardCollectionOnShardingCatalog(
         coll, initialChunks.chunks, placementVersion, {shardId});

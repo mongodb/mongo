@@ -256,7 +256,10 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     }
 
     // Check shardKey index inconsistencies.
-    if (catalogUUID == localUUID) {
+    // Skip the check in case of unsplittable collections as we don't strictly require an index on
+    // the shard key for unsplittable collections.
+    const bool isSharded = !catalogColl.getUnsplittable();
+    if (catalogUUID == localUUID && isSharded) {
         _checkShardKeyIndexInconsistencies(
             opCtx, nss, shardId, catalogColl.getKeyPattern().toBSON(), localColl, inconsistencies);
     }

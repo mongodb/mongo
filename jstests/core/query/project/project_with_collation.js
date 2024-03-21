@@ -54,7 +54,7 @@ function runQueryWithCollation(testColl, collationToUse) {
         query: {_id: 1, str: 'A', elemMatch: {$elemMatch: {str: "a"}}},
         fields: {_id: 1, 'elemMatch.$': 1, updated: 1},
         update: {$set: {updated: true}},
-        collation: collationToUse
+        collation: collationToUse ? collationToUse : {}
     });
     assert.docEq(findAndUpdateOutput, {_id: 1, elemMatch: [{str: "A"}]});
 
@@ -62,7 +62,7 @@ function runQueryWithCollation(testColl, collationToUse) {
         query: {_id: 0, str: 'A'},
         fields: {_id: 1, str: 1, sortedArray: {$sortArray: {input: "$array", sortBy: {str: 1}}}},
         update: {$set: {updated: true}},
-        collation: collationToUse,
+        collation: collationToUse ? collationToUse : {},
         new: true
     });
     assert.docEq(findAndUpdateWithSortArrayOutput,
@@ -72,7 +72,7 @@ function runQueryWithCollation(testColl, collationToUse) {
         query: {_id: 1, str: 'A', elemMatch: {$elemMatch: {str: "a"}}},
         fields: {_id: 1, 'elemMatch.$': 1, updated: 1},
         remove: true,
-        collation: collationToUse,
+        collation: collationToUse ? collationToUse : {}
     });
     assert.docEq(findAndRemoveOutput, {_id: 1, elemMatch: [{str: "A"}], updated: true});
 
@@ -80,7 +80,7 @@ function runQueryWithCollation(testColl, collationToUse) {
         query: {_id: 0, str: 'A'},
         fields: {_id: 1, str: 1, sortedArray: {$sortArray: {input: "$array", sortBy: {str: 1}}}},
         remove: true,
-        collation: collationToUse
+        collation: collationToUse ? collationToUse : {}
     });
     assert.docEq(findAndRemoveWithSortArrayOutput,
                  {_id: 0, str: "a", sortedArray: [{str: "A"}, {str: "a"}, {str: "b"}, {str: "B"}]});
@@ -96,7 +96,7 @@ runQueryWithCollation(noCollationColl, collation);
 // Tests to verify that the projection code inherits collection level collation in the absence of
 // query level collation.
 collWithCollation = setupCollection(collation);
-runQueryWithCollation(collWithCollation, null);
+runQueryWithCollation(collWithCollation);
 
 // The output of this should not depend on the collection level collation and simple collation
 // should be applied always.

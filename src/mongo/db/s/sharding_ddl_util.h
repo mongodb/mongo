@@ -341,6 +341,7 @@ std::vector<BatchedCommandRequest> getOperationsToCreateUnsplittableCollectionOn
     OperationContext* opCtx,
     const NamespaceString& nss,
     const UUID& collectionUuid,
+    const BSONObj& defaultCollation,
     const ShardId& shardId);
 
 }  // namespace sharding_ddl_util
