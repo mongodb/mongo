@@ -37,8 +37,6 @@ selector:
   - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
   - jstests/core/**/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
   # The following tests fail because explain expect a different plan query when collections live on separate shards
-  # TODO: SERVER-83351 Investigate if this tests can be rewritten to support sharded-cluster scenarios
-  - jstests/core/query/plan_cache/plan_cache_list_plans.js
   # This test expects sharded collections to be sharded across multiple shards.
   - jstests/core/administrative/current_op/currentop_shell.js
   # The following tests fail because they count indexes. These counts do not take into account the
@@ -90,10 +88,6 @@ selector:
 
   # The following tags are excluded specifically for this suite.
   - config_shard_incompatible
-  # TODO: SERVER-83878 Support tracking unsharded timeseries collections in the sharding catalog
-  - requires_timeseries
-  # TODO: SERVER-81937 Enable transaction tests
-  - uses_transactions
   # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
   - assumes_balancer_off
 
