@@ -146,7 +146,7 @@ feature_flags:
         description: "Feature flag to enable slow operation logging based on time working rather
         than total latency"
         cpp_varname: gFeatureFlagLogSlowOpsBasedOnTimeWorking
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagQERangeV2:
         description: "Queryable Encryption Range V2"
