@@ -1028,7 +1028,7 @@ tasks:
 
 buildvariants:
   - name: task_generation
-    display_name: Task Generation
+    display_name: " * Task Generation"
     cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
     modules: *modules
     expansions:
@@ -1180,7 +1180,7 @@ buildvariants:
   ###
   # New compiles
   - name: amazon2-x86-compile
-    display_name: Compile for Amazon Linux 2 x86 NEW
+    display_name: "* Compile for Amazon Linux 2 x86 NEW"
     modules: *modules
     expansions:
       platform: linux
@@ -1205,7 +1205,7 @@ buildvariants:
             variant: amazon2-x86-compile
 
   - name: amazon2-x86-openssl111-compile
-    display_name: Compile for Amazon Linux 2 x86 OpenSSL 1.1.1
+    display_name: "* Compile for Amazon Linux 2 x86 OpenSSL 1.1.1"
     modules: *modules
     expansions:
       platform: linux
@@ -1230,7 +1230,7 @@ buildvariants:
             variant: amazon2-x86-openssl111-compile
 
   - name: amazon2-arm64-compile
-    display_name: Compile for Amazon Linux 2 arm64 NEW
+    display_name: "* Compile for Amazon Linux 2 arm64 NEW"
     modules: *modules
     expansions:
       platform: linux
@@ -1255,7 +1255,7 @@ buildvariants:
             variant: amazon2-arm64-compile
 
   - name: amazon2-arm64-mongocrypt-shlib-compile
-    display_name: Compile mongo_crypt_v1.so for Amazon Linux 2 arm64 NEW
+    display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64 NEW"
     modules: *modules
     cron: "0 0 * * 4" # 00:00 on Thursday
     expansions:
@@ -1287,7 +1287,7 @@ buildvariants:
       - name: compile_mongocrypt_shlib
 
   - name: amazon2-x86-streams-compile
-    display_name: Compile Streams for Amazon Linux 2 x86 NEW
+    display_name: "* Compile Streams for Amazon Linux 2 x86 NEW"
     modules: *modules
     expansions:
       platform: linux
@@ -1313,7 +1313,7 @@ buildvariants:
             variant: amazon2-x86-streams-compile
 
   - name: al2023-arm64-compile
-    display_name: Compile for Al2023 arm64 NEW
+    display_name: "* Compile for Al2023 arm64 NEW"
     modules: *modules
     expansions:
       platform: linux

@@ -93,7 +93,7 @@ variables:
 buildvariants:
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-atlas-M60-real.arm.aws.2023-11
-    display_name: PERF M60-Atlas ReplSet ARM AWS 2023-11
+    display_name: M60-Atlas ReplSet ARM AWS 2023-11
     cron: &cron_sunday_thursday "0 0 * * 0,4"
     modules: *perf_modules
     expansions:
@@ -136,7 +136,7 @@ buildvariants:
 
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-atlas-M60-real.intel.azure.2023-11
-    display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
+    display_name: M60-Atlas ReplSet Intel Azure 2023-11
     cron: *cron_sunday_thursday
     modules: *perf_modules
     expansions:
@@ -178,7 +178,7 @@ buildvariants:
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-standalone.arm.aws.2023-11
-    display_name: PERF Standalone ARM AWS 2023-11
+    display_name: Standalone ARM AWS 2023-11
     cron: &linux-standalone-cron "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
     modules: *perf_modules
     expansions:
@@ -228,7 +228,7 @@ buildvariants:
 
   - <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
     name: perf-shard-lite-fle.arm.aws.2023-11
-    display_name: PERF Shard Lite FLE ARM AWS 2023-11
+    display_name: Shard Lite FLE ARM AWS 2023-11
     cron: *cron_sunday_thursday
     modules: *perf_modules
     expansions:
@@ -256,7 +256,7 @@ buildvariants:
   - &shard-baseline
     <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-shard.arm.aws.2023-11
-    display_name: PERF 3-Shard Cluster ARM AWS 2023-11
+    display_name: 3-Shard Cluster ARM AWS 2023-11
     cron: &linux-3-shard-cron "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
     expansions: &shard-baseline-expansions
@@ -301,7 +301,7 @@ buildvariants:
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-3-node-replSet.arm.aws.2023-11
-    display_name: PERF 3-Node ReplSet ARM AWS 2023-11
+    display_name: 3-Node ReplSet ARM AWS 2023-11
     cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
     modules: *perf_modules
     expansions:
@@ -386,7 +386,7 @@ buildvariants:
 
   - <<: *amazon2_x86_compile_variant_dependency
     name: perf-3-node-replSet-intel.intel.aws.2023-11
-    display_name: PERF 3-Node ReplSet Intel AWS 2023-11
+    display_name: 3-Node ReplSet Intel AWS 2023-11
     cron: *linux-3-node-cron
     modules: *perf_modules
     expansions:
@@ -436,7 +436,7 @@ buildvariants:
   # losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-2-node-replSet-initialsync.arm.aws.2023-11
-    display_name: PERF 2-Node ReplSet Initial Sync ARM AWS 2023-11
+    display_name: Initial Sync 2-Node ReplSet ARM AWS 2023-11
     cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *perf_modules
     expansions:
@@ -460,7 +460,7 @@ buildvariants:
 
   - <<: *amazon_linux2_arm64_compile_variant_dependency
     name: perf-mongo-perf-standalone.arm.aws.2023-11
-    display_name: PERF Mongo-Perf Standalone inMemory ARM AWS 2023-11
+    display_name: Mongo-Perf Standalone inMemory ARM AWS 2023-11
     modules: *perf_modules
     cron: &linux-mongo-perf-cron "0 0 * * 0,2,3,4,5"
     expansions: &standalone-arm-expansions
@@ -512,7 +512,7 @@ buildvariants:
   - &linux-mongo-perf-standalone-intel
     <<: *amazon2_x86_compile_variant_dependency
     name: perf-mongo-perf-standalone.intel.aws.2023-11
-    display_name: PERF Mongo-Perf Standalone inMemory Intel AWS 2023-11
+    display_name: Mongo-Perf Standalone inMemory Intel AWS 2023-11
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *perf_modules
     expansions: &standalone-intel-expansions
