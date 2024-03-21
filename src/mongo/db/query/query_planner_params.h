@@ -163,6 +163,9 @@ struct QueryPlannerParams {
         // avoid a CLUSTEREDIDX_SCAN which comes built into a collection scan when the collection is
         // clustered.
         STRICT_NO_TABLE_SCAN = 1 << 12,
+
+        // Set this to ignore the query settings imposed constraints over plan selection.
+        IGNORE_QUERY_SETTINGS = 1 << 13,
     };
 
     /**
@@ -175,7 +178,6 @@ struct QueryPlannerParams {
         const MultipleCollectionAccessor& collections;
         size_t plannerOptions;
         bool flipDistinctScanDirection;
-        bool ignoreQuerySettings;
     };
 
     /**
@@ -200,7 +202,6 @@ struct QueryPlannerParams {
         const CanonicalQuery& canonicalQuery;
         const MultipleCollectionAccessor& collections;
         size_t plannerOptions = DEFAULT;
-        bool ignoreQuerySettings;
         boost::optional<TraversalPreference> traversalPreference = boost::none;
     };
 
@@ -240,8 +241,7 @@ struct QueryPlannerParams {
         }
         fillOutPlannerParamsForExpressQuery(
             args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
-        fillOutMainCollectionPlannerParams(
-            args.opCtx, args.canonicalQuery, args.collections, args.ignoreQuerySettings);
+        fillOutMainCollectionPlannerParams(args.opCtx, args.canonicalQuery, args.collections);
     }
 
     /**
@@ -265,8 +265,7 @@ struct QueryPlannerParams {
      */
     void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
                                                   const CanonicalQuery& canonicalQuery,
-                                                  const MultipleCollectionAccessor& collections,
-                                                  bool shouldIgnoreQuerySettings);
+                                                  const MultipleCollectionAccessor& collections);
 
 
     // See Options enum above.
@@ -361,17 +360,14 @@ private:
      */
     void fillOutMainCollectionPlannerParams(OperationContext* opCtx,
                                             const CanonicalQuery& canonicalQuery,
-                                            const MultipleCollectionAccessor& collections,
-                                            bool shouldIgnoreQuerySettings = true);
+                                            const MultipleCollectionAccessor& collections);
 
     /**
      * Applies query settings to the main collection if applicable. If not, tries to apply index
      * filters.
      */
     void applyQuerySettingsOrIndexFiltersForMainCollection(
-        const CanonicalQuery& canonicalQuery,
-        const MultipleCollectionAccessor& collections,
-        bool shouldIgnoreQuerySettings);
+        const CanonicalQuery& canonicalQuery, const MultipleCollectionAccessor& collections);
 
     /**
      * If query supports index filters, filters params.indices according to the configuration. In

@@ -157,7 +157,6 @@ protected:
                 .canonicalQuery = canonicalQuery,
                 .collections = collections,
                 .plannerOptions = QueryPlannerParams::DEFAULT,
-                .ignoreQuerySettings = true,
                 .traversalPreference = boost::none,
             },
         };

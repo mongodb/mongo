@@ -143,7 +143,6 @@ public:
                 .canonicalQuery = *cq,
                 .collections = collectionsAccessor,
                 .plannerOptions = QueryPlannerParams::DEFAULT,
-                .ignoreQuerySettings = true,
             },
         };
 

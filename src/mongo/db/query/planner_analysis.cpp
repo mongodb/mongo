@@ -955,7 +955,8 @@ QueryPlannerAnalysis::determineLookupStrategy(
         return boost::none;
     }();
 
-    // TODO: SERVER-85242: Ensure the robustness of the 'QuerySettings' fallback mechanism.
+    // TODO SERVER-86400 Throw 'ErrorCodes::NoQueryExecutionPlans' if 'NO_TABLE_SCAN' option is set
+    // for HashJoin and NestedLoopJoin.
     if (foreignIndex) {
         return {EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex)};
     } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {

@@ -1354,6 +1354,21 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
+    // Helper function for creating query planner parameters, with and without query settings. This
+    // will be later used to ensure that queries can safely retry the planning process if the
+    // application of the settings lead to a failure in generating the plan.
+    auto makeQueryPlannerParams = [&](size_t options) -> QueryPlannerParams {
+        return QueryPlannerParams{
+            QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = opCtx,
+                .canonicalQuery = *canonicalQuery,
+                .collections = collections,
+                .plannerOptions = options,
+                .traversalPreference = traversalPreference,
+            },
+        };
+    };
+
     // First try to use the express id point query fast path.
     const auto& mainColl = collections.getMainCollection();
     const auto expressEligibility = isExpressEligible(opCtx, mainColl, *canonicalQuery);
@@ -1370,20 +1385,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     // The query might still be eligible for express execution via the index equality fast path.
     // However, that requires the full set of planner parameters for the main collection to be
     // available and creating those now allows them to be reused for subsequent strategies if
-    // the express one fails.
-    QueryPlannerParams plannerParams{
-        QueryPlannerParams::ArgsForSingleCollectionQuery{
-            .opCtx = opCtx,
-            .canonicalQuery = *canonicalQuery,
-            .collections = collections,
-            .plannerOptions = plannerOptions,
-            .ignoreQuerySettings = false,
-            .traversalPreference = std::move(traversalPreference),
-        },
-    };
+    // the express index equality one fails.
+    auto paramsForSingleCollectionQuery = makeQueryPlannerParams(plannerOptions);
     if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
         if (auto expressParams = tryGetExpressIndexEqualityParams(
-                opCtx, collections, *canonicalQuery, plannerParams)) {
+                opCtx, collections, *canonicalQuery, paramsForSingleCollectionQuery)) {
             planCacheCounters.incrementClassicSkippedCounter();
             auto expressExecutor = PlanExecutorExpress::makeExecutor(std::move(canonicalQuery),
                                                                      std::move(*expressParams));
@@ -1410,7 +1416,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     //     * SBE, with classic planner.
     //     * SBE, with SBE planner.
     //     * Classic, with classic planner.
-    auto planner = [&]() -> std::unique_ptr<PlannerInterface> {
+    auto makePlanner = [&](QueryPlannerParams plannerParams) -> std::unique_ptr<PlannerInterface> {
         // Prioritize using SBE if allowed. This implies having a query with greater compatibility
         // levels than the configured thresholds.
         if (auto sbeParams = tryGetSbeParams(
@@ -1421,7 +1427,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
             // planner parameters.
             finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
             plannerParams.fillOutSecondaryCollectionsPlannerParams(
-                opCtx, *canonicalQuery, collections, /* shouldIgnoreQuerySettings */ false);
+                opCtx, *canonicalQuery, collections);
 
             // And finally return either a classic or SBE runtime planner.
             return useClassicRuntimePlanner ? getClassicPlannerForSbe(opCtx,
@@ -1448,8 +1454,33 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         // Default to using the classic executor with the classic runtime planner.
         return getClassicPlanner(
             opCtx, collections, canonicalQuery.get(), yieldPolicy, std::move(plannerParams));
-    }();
+    };
 
+    auto planner = [&] {
+        try {
+            // First try the single collection query parameters, as these would have been generated
+            // with query settings if present.
+            return makePlanner(std::move(paramsForSingleCollectionQuery));
+        } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
+            // The planner failed to generate a viable plan. Remove the query settings and retry if
+            // any are present. Otherwise just propagate the exception.
+            const auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
+            const bool hasQuerySettings = querySettings.getIndexHints().has_value();
+            if (!hasQuerySettings) {
+                throw;
+            }
+            LOGV2_DEBUG(8524200,
+                        2,
+                        "Encountered planning error while running with query settings. Retrying "
+                        "without query settings.",
+                        "query"_attr = canonicalQuery->toStringForErrorMsg(),
+                        "querySettings"_attr = querySettings,
+                        "reason"_attr = exception.reason(),
+                        "code"_attr = exception.codeString());
+            return makePlanner(
+                makeQueryPlannerParams(plannerOptions | QueryPlannerParams::IGNORE_QUERY_SETTINGS));
+        }
+    }();
     auto exec = planner->makeExecutor(std::move(canonicalQuery));
     setCurOpQueryFramework(exec.get());
     return std::move(exec);
@@ -1697,7 +1728,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             .opCtx = opCtx,
             .canonicalQuery = *cq,
             .collections = collections,
-            .ignoreQuerySettings = true,
         },
     };
     ClassicPrepareExecutionHelper helper{
@@ -1856,7 +1886,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                                  .opCtx = opCtx,
                                                  .canonicalQuery = *cq,
                                                  .collections = collections,
-                                                 .ignoreQuerySettings = true,
                                              },
                                          }};
     auto result = uassertStatusOK(helper.prepare());
@@ -2106,7 +2135,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
             .canonicalQuery = *cq,
             .collections = collections,
             .plannerOptions = plannerOptions,
-            .ignoreQuerySettings = true,
         },
     };
     ClassicPrepareExecutionHelper helper{
@@ -2370,14 +2398,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
             "distinct command is not eligible for bonsai",
             !isEligibleForBonsai(opCtx, collectionPtr, canonicalQuery));
 
-    auto getQuerySolution = [&](bool ignoreQuerySettings) -> std::unique_ptr<QuerySolution> {
-        QueryPlannerParams plannerParams(
-            QueryPlannerParams::ArgsForDistinct{opCtx,
-                                                canonicalDistinct,
-                                                collections,
-                                                plannerOptions,
-                                                flipDistinctScanDirection,
-                                                ignoreQuerySettings});
+    auto getQuerySolution = [&](size_t options) -> std::unique_ptr<QuerySolution> {
+        QueryPlannerParams plannerParams(QueryPlannerParams::ArgsForDistinct{
+            opCtx,
+            canonicalDistinct,
+            collections,
+            options,
+            flipDistinctScanDirection,
+        });
 
         // Can't create a DISTINCT_SCAN stage if no suitable indexes are present.
         if (plannerParams.indices.empty()) {
@@ -2386,10 +2414,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
         return createDistinctScanSolution(
             canonicalDistinct, plannerParams, flipDistinctScanDirection);
     };
-    auto soln = getQuerySolution(/* ignoreQuerySettings */ false);
+    auto soln = getQuerySolution(plannerOptions);
     if (!soln) {
         // Try again this time without query settings applied.
-        soln = getQuerySolution(/* ignoreQuerySettings */ true);
+        soln = getQuerySolution(plannerOptions | QueryPlannerParams::IGNORE_QUERY_SETTINGS);
     }
     if (!soln) {
         return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};

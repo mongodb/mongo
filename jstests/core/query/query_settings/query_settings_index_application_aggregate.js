@@ -80,8 +80,7 @@ function testAggregateQuerySettingsApplicationWithoutSecondaryCollections(collOr
     });
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
-    // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
-    // qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
 }
 
@@ -133,8 +132,7 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     // NOTE: The fallback is not tested when hinting secondary collections, as instead of fallback,
     // hash join or nlj will be used.
     // TODO: SERVER-86400 Add support for $natural hints on secondary collections.
-    // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
-    // qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
@@ -176,9 +174,8 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
     // different pipelines.
     qstests.assertQuerySettingsWithCursorHints(aggregateCmd, mainNs, secondaryNs);
 
-    // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
-    // qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
-    // qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
+    qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallback(aggregateCmd, secondaryNs);
 
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);

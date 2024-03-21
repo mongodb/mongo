@@ -63,8 +63,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 
     // Construct the equivalent query settings, remove the hint from the original command object and
     // build the representative query.
-    // TODO SERVER-85242 Remove the '$natural' hints once the fallback is re-implemented.
-    const allowedIndexes = [innerCmd.hint, {$natural: 1}, {$natural: -1}];
+    const allowedIndexes = [innerCmd.hint];
     delete innerCmd.hint;
     const commandType = getCommandType(innerCmd);
 

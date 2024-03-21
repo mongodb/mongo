@@ -20,13 +20,7 @@ const db = st.s.getDB("test");
 // Creating the collection, because some sharding passthrough suites are failing when explain
 // command is issued on the nonexistent database and collection.
 const collName = jsTestName();
-const coll = assertDropAndRecreateCollection(db, collName);
-
-// TODO SERVER-85242 Remove once the fallback mechanism is re-implemented.
-assert.commandWorked(coll.createIndex({a: 1}));
-for (let i = 0; i < 10; i++) {
-    coll.insert({a: i});
-}
+assertDropAndRecreateCollection(db, collName);
 
 const primaryQSU = new QuerySettingsUtils(db, collName);
 const query = primaryQSU.makeFindQueryInstance({filter: {a: 1}});

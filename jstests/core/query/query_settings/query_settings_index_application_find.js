@@ -66,8 +66,7 @@ function testFindQuerySettingsApplication(collOrViewName) {
     qstests.assertQuerySettingsIndexApplication(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsIgnoreCursorHints(querySettingsFindQuery, ns);
-    // TODO SERVER-85242 Re-enable once the fallback mechanism is reimplemented.
-    // qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
+    qstests.assertQuerySettingsFallback(querySettingsFindQuery, ns);
     qstests.assertQuerySettingsCommandValidation(querySettingsFindQuery, ns);
 }
 

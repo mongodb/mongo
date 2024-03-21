@@ -672,6 +672,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::STRICT_NO_TABLE_SCAN:
                 ss << "STRICT_NO_TABLE_SCAN ";
                 break;
+            case QueryPlannerParams::IGNORE_QUERY_SETTINGS:
+                ss << "IGNORE_QUERY_SETTINGS ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;

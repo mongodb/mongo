@@ -193,7 +193,6 @@ public:
                 .canonicalQuery = canonicalQuery,
                 .collections = collections,
                 .plannerOptions = QueryPlannerParams::DEFAULT,
-                .ignoreQuerySettings = true,
             },
         };
     }
