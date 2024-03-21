@@ -338,7 +338,8 @@ struct __wt_session_impl {
 #define WT_GEN_HAS_SNAPSHOT 2 /* Snapshot generation */
 #define WT_GEN_HAZARD 3       /* Hazard pointer */
 #define WT_GEN_SPLIT 4        /* Page splits */
-#define WT_GENERATIONS 5      /* Total generation manager entries */
+#define WT_GEN_TXN_COMMIT 5   /* Commit generation */
+#define WT_GENERATIONS 6      /* Total generation manager entries */
     wt_shared volatile uint64_t generations[WT_GENERATIONS];
 
     /*

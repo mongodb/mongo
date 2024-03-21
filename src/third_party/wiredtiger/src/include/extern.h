@@ -2615,7 +2615,8 @@ static WT_INLINE void __wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *
 static WT_INLINE void __wt_timer_evaluate_ms(
   WT_SESSION_IMPL *session, WT_TIMER *start_time, uint64_t *time_diff_ms);
 static WT_INLINE void __wt_timer_start(WT_SESSION_IMPL *session, WT_TIMER *start_time);
-static WT_INLINE void __wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag);
+static WT_INLINE void __wt_timing_stress(
+  WT_SESSION_IMPL *session, uint32_t flag, struct timespec *tsp);
 static WT_INLINE void __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_tree_modify_set(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_txn_cursor_op(WT_SESSION_IMPL *session);

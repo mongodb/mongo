@@ -1670,12 +1670,37 @@ __txn_mod_compare(const void *a, const void *b)
 }
 
 /*
+ * __txn_check_if_stable_has_moved_ahead_commit_ts --
+ *     Check if the stable timestamp has moved ahead of the commit timestamp.
+ */
+static int
+__txn_check_if_stable_has_moved_ahead_commit_ts(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_TXN *txn;
+    WT_TXN_GLOBAL *txn_global;
+
+    conn = S2C(session);
+    txn = session->txn;
+    txn_global = &conn->txn_global;
+
+    if (txn_global->has_stable_timestamp && txn->first_commit_timestamp != WT_TS_NONE &&
+      txn_global->stable_timestamp >= txn->first_commit_timestamp)
+        WT_RET_MSG(session, EINVAL,
+          "Rollback the transaction because the stable timestamp has moved ahead of the commit "
+          "timestamp.");
+
+    return (0);
+}
+
+/*
  * __wt_txn_commit --
  *     Commit the current transaction.
  */
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+    struct timespec tsp;
     WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -1853,7 +1878,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  * the total mod_count.
                  */
                 if ((i * 36) % txn->mod_count == 0)
-                    __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION_1);
+                    __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION_1, NULL);
 
 #ifdef HAVE_DIAGNOSTIC
                 ++prepare_count;
@@ -1883,6 +1908,27 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, txn->prepare_count == prepare_count);
     txn->prepare_count = 0;
 #endif
+
+    /* Add a 2 second wait to simulate commit transaction slowness. */
+    tsp.tv_sec = 2;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_COMMIT_TRANSACTION_SLOW, &tsp);
+
+    /*
+     * There is a possible scenario where the checkpoint can miss the normal transactions updates to
+     * include whose stable timestamps are ahead of the commit timestamp. This could happen when the
+     * stable timestamps moves ahead of commit timestamp after the timestamp validity check in
+     * commit transaction.
+     *
+     * Rollback the updates of the transactions whose commit timestamp have moved ahead of the
+     * stable timestamp. Enter the commit generation for transactions whose commit timestamps are
+     * behind stable timestamp and let the checkpoint drain for the transactions that are currently
+     * committing to include in the checkpoint.
+     */
+    if (!prepare) {
+        __wt_session_gen_enter(session, WT_GEN_TXN_COMMIT);
+        WT_ERR(__txn_check_if_stable_has_moved_ahead_commit_ts(session));
+    }
 
     /*
      * Note: we're going to commit: nothing can fail after this point. Set a check, it's too easy to
@@ -1935,6 +1981,11 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         candidate_durable_timestamp = txn->commit_timestamp;
 
     __wt_txn_release(session);
+
+    /* Leave the commit generation after snapshot is released. */
+    if (!prepare)
+        __wt_session_gen_leave(session, WT_GEN_TXN_COMMIT);
+
     if (locked)
         __wt_readunlock(session, &txn_global->visibility_rwlock);
 
@@ -1989,6 +2040,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     return (0);
 
 err:
+    /*
+     * Leave the commit generation in the error case.
+     */
+    if (!prepare)
+        __wt_session_gen_leave(session, WT_GEN_TXN_COMMIT);
+
     if (cursor != NULL)
         WT_TRET(cursor->close(cursor));
 

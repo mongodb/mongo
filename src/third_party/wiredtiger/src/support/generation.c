@@ -34,6 +34,8 @@ __gen_name(int which)
         return ("hazard");
     case WT_GEN_SPLIT:
         return ("split");
+    case WT_GEN_TXN_COMMIT:
+        return ("commit");
     default:
         break;
     }

@@ -874,6 +874,9 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
 
     __wt_writeunlock(session, &txn_global->rwlock);
 
+    /* Wait for the commit generation to drain before bumping the snapshot. */
+    __wt_gen_next_drain(session, WT_GEN_TXN_COMMIT);
+
     /*
      * Refresh our snapshot here, doing so prevents us from racing with the stable timestamp moving
      * ahead of current snapshot. i.e. if the stable timestamp moves after we begin the checkpoint
