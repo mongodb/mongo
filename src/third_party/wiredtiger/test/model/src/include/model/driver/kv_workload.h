@@ -868,7 +868,7 @@ struct kv_workload_operation {
      *     Create a new workload operation.
      */
     inline kv_workload_operation(operation::any &&operation, size_t seq_no = k_no_seq_no)
-        : operation(operation), seq_no(seq_no){};
+        : operation(std::move(operation)), seq_no(seq_no){};
 };
 
 /*

@@ -46,7 +46,7 @@ void
 kv_table_item::add_update(std::shared_ptr<kv_update> update, bool must_exist, bool must_not_exist)
 {
     std::lock_guard lock_guard(_lock);
-    add_update_nolock(update, must_exist, must_not_exist);
+    add_update_nolock(std::move(update), must_exist, must_not_exist);
 }
 
 /*
@@ -219,7 +219,7 @@ kv_table_item::exists() const
 bool
 kv_table_item::exists(kv_checkpoint_ptr checkpoint) const
 {
-    return get(checkpoint) != NONE;
+    return get(std::move(checkpoint)) != NONE;
 }
 
 /*

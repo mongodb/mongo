@@ -84,7 +84,7 @@ public:
     {
         if (_iterator != _data.begin())
             throw model_exception("The cursor is not at the beginning");
-        _ckpt = ckpt;
+        _ckpt = std::move(ckpt);
     }
 
     /*
@@ -136,7 +136,7 @@ public:
       WT_CONNECTION *connection, kv_checkpoint_ptr ckpt = kv_checkpoint_ptr(nullptr)) noexcept
     {
         try {
-            verify(connection, ckpt);
+            verify(connection, std::move(ckpt));
         } catch (...) {
             return false;
         }

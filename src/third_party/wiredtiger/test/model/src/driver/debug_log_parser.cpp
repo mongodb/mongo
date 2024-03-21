@@ -358,9 +358,10 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
             auto &ckpt_metadata_map = _txn_ckpt_metadata[txn->id()];
             auto i = ckpt_metadata_map.find(ckpt_name);
             if (i == ckpt_metadata_map.end())
-                ckpt_metadata_map[ckpt_name] = m;
+                ckpt_metadata_map[ckpt_name] = std::move(m);
             else
-                ckpt_metadata_map[ckpt_name] = config_map::merge(ckpt_metadata_map[ckpt_name], m);
+                ckpt_metadata_map[ckpt_name] =
+                  config_map::merge(ckpt_metadata_map[ckpt_name], std::move(m));
         }
 
         /* Unsupported system URI. */
@@ -409,7 +410,7 @@ debug_log_parser::metadata_checkpoint_apply(
           write_gen, k_txn_max, k_txn_max, std::vector<uint64_t>());
 
     /* Create the checkpoint. */
-    _database.create_checkpoint(name.c_str(), snapshot, stable_timestamp);
+    _database.create_checkpoint(name.c_str(), std::move(snapshot), stable_timestamp);
 }
 
 /*
@@ -433,7 +434,7 @@ debug_log_parser::apply(kv_transaction_ptr txn, const row_put &op)
     data_value value = data_value::unpack(op.value, table->value_format());
 
     /* Perform the operation. */
-    int ret = table->insert(txn, key, value);
+    int ret = table->insert(std::move(txn), key, value);
     if (ret != 0)
         throw wiredtiger_exception(ret);
 }
@@ -456,7 +457,7 @@ debug_log_parser::apply(kv_transaction_ptr txn, const row_remove &op)
     data_value key = data_value::unpack(op.key, table->key_format());
 
     /* Perform the operation. */
-    int ret = table->remove(txn, key);
+    int ret = table->remove(std::move(txn), key);
     if (ret != 0)
         throw wiredtiger_exception(ret);
 }
@@ -510,7 +511,7 @@ debug_log_parser::apply(kv_transaction_ptr txn, const row_truncate &op)
         stop = data_value::unpack(op.stop, table->key_format());
 
     /* Perform the operation. */
-    int ret = table->truncate(txn, start, stop);
+    int ret = table->truncate(std::move(txn), start, stop);
     if (ret != 0)
         throw wiredtiger_exception(ret);
 }
@@ -663,7 +664,7 @@ from_debug_log_helper(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, W
             }
         }
 
-        args.parser.commit_transaction(txn);
+        args.parser.commit_transaction(std::move(txn));
         break;
     }
 
@@ -814,7 +815,7 @@ debug_log_parser::from_json(kv_database &database, const char *path)
             }
 
             /* Commit/finalize the transaction. */
-            parser.commit_transaction(txn);
+            parser.commit_transaction(std::move(txn));
             continue;
         }
 

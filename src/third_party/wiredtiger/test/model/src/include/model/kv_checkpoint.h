@@ -48,7 +48,7 @@ public:
      */
     inline kv_checkpoint(
       const char *name, kv_transaction_snapshot_ptr snapshot, timestamp_t stable_timestamp) noexcept
-        : _name(name), _snapshot(snapshot), _stable_timestamp(stable_timestamp)
+        : _name(name), _snapshot(std::move(snapshot)), _stable_timestamp(stable_timestamp)
     {
     }
 

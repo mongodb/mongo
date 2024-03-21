@@ -353,7 +353,7 @@ kv_workload_runner_wt::do_operation(const operation::create_table &op)
     std::string uri = std::string("table:") + op.name;
     ret = session->create(session, uri.c_str(), config_str.c_str());
     if (ret == 0)
-        add_table_uri(op.table_id, uri);
+        add_table_uri(op.table_id, std::move(uri));
     return ret;
 }
 

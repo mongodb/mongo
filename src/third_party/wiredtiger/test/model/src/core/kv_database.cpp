@@ -245,7 +245,7 @@ kv_database::rollback_to_stable(timestamp_t timestamp, kv_transaction_snapshot_p
     std::lock_guard lock_guard1(_tables_lock);
     std::lock_guard lock_guard2(_transactions_lock);
 
-    rollback_to_stable_nolock(timestamp, snapshot);
+    rollback_to_stable_nolock(timestamp, std::move(snapshot));
 }
 
 /*

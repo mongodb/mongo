@@ -83,7 +83,7 @@ kv_workload_generator::kv_workload_generator(kv_workload_generator_spec spec, ui
 kv_workload_generator::sequence_traversal::sequence_traversal(
   std::deque<kv_workload_sequence_ptr> &sequences,
   std::function<bool(kv_workload_sequence &)> barrier_fn)
-    : _sequences(sequences), _barrier_fn(barrier_fn)
+    : _sequences(sequences), _barrier_fn(std::move(barrier_fn))
 {
     for (kv_workload_sequence_ptr &seq : _sequences)
         _per_sequence_state.emplace(seq.get(), new sequence_state(seq.get()));
@@ -160,7 +160,7 @@ kv_workload_generator::sequence_traversal::complete_all()
             }
         }
 
-    _runnable = new_runnable;
+    _runnable = std::move(new_runnable);
     if (_runnable.empty())
         advance_barrier();
 }

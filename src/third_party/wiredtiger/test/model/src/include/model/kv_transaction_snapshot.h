@@ -73,7 +73,7 @@ public:
      */
     inline kv_transaction_snapshot_by_exclusion(
       txn_id_t exclude_after, std::unordered_set<txn_id_t> &&exclude_ids)
-        : _exclude_after(exclude_after), _exclude_ids(exclude_ids)
+        : _exclude_after(exclude_after), _exclude_ids(std::move(exclude_ids))
     {
     }
 

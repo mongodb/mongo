@@ -146,7 +146,8 @@ public:
     inline kv_transaction_guard(kv_transaction_ptr txn,
       timestamp_t commit_timestamp = k_timestamp_none,
       timestamp_t durable_timestamp = k_timestamp_none) noexcept
-        : _txn(txn), _commit_timestamp(commit_timestamp), _durable_timestamp(durable_timestamp){};
+        : _txn(std::move(txn)), _commit_timestamp(commit_timestamp),
+          _durable_timestamp(durable_timestamp){};
 
     /*
      * kv_transaction_guard::~kv_transaction_guard --
@@ -416,7 +417,7 @@ public:
      * at_cleanup::at_cleanup --
      *     Create the cleanup object.
      */
-    inline at_cleanup(std::function<void()> fn) : _fn(fn){};
+    inline at_cleanup(std::function<void()> fn) : _fn(std::move(fn)){};
 
     /* Delete the copy constructor. */
     at_cleanup(const at_cleanup &) = delete;

@@ -103,7 +103,7 @@ public:
     inline bool
     exists_opt(kv_checkpoint_ptr checkpoint) const
     {
-        return checkpoint ? exists(checkpoint) : exists();
+        return checkpoint ? exists(std::move(checkpoint)) : exists();
     }
 
     /*
