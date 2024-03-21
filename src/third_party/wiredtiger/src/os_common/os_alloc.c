@@ -9,31 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * On systems with poor default allocators for allocations greater than 16 KB, we provide an option
- * to use TCMalloc explicitly. This is important on Windows which does not have a builtin mechanism
- * to replace C run-time memory management functions with alternatives.
- */
-#ifdef HAVE_LIBTCMALLOC
-/*
- * Include the TCMalloc header with the "-Wundef" diagnostic flag disabled. Compiling with strict
- * (where the 'Wundef' diagnostic flag is enabled), generates compilation errors where the
- * '__cplusplus' CPP macro is not defined. This being employed by the TCMalloc header to
- * differentiate C & C++ compilation environments. We don't want to define '__cplusplus' when
- * compiling C sources.
- */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wundef"
-#include <gperftools/tcmalloc.h>
-#pragma GCC diagnostic pop
-
-#define calloc tc_calloc
-#define malloc tc_malloc
-#define realloc tc_realloc
-#define posix_memalign tc_posix_memalign
-#define free tc_free
-#endif
-
-/*
  * __wt_calloc --
  *     ANSI calloc function.
  */

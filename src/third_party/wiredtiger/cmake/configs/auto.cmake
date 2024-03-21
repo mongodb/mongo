@@ -290,13 +290,6 @@ config_lib(
     HEADER "sodium.h"
 )
 
-config_lib(
-    HAVE_LIBTCMALLOC
-    "tcmalloc library exists."
-    LIB "tcmalloc"
-    HEADER "gperftools/tcmalloc.h"
-)
-
 config_compile(
     HAVE_PTHREAD_COND_MONOTONIC
     "If pthread condition variables support monotonic clocks."

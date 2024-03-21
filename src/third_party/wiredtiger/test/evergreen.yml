@@ -51,7 +51,18 @@ functions:
               export LD_LIBRARY_PATH=$WT_BUILDDIR
             fi
 
-            if ! [[ "${ENABLE_TCMALLOC}" =~ "ENABLE_TCMALLOC=0" ]]; then
+            # Utilize tcmalloc through preloading in the environment.
+            #
+            if [[ ${ENABLE_TCMALLOC} -eq 1 ]]; then
+
+              # ASan is not designed to work with tcmalloc:
+              # https://github.com/gperftools/gperftools/issues/810#issuecomment-230168100
+              #
+              if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
+                echo "Do not enable tcmalloc for ASan builds."
+                exit 1
+              fi
+
               export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_TOPDIR/TCMALLOC_LIB/lib"
               export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
             fi
@@ -211,10 +222,8 @@ functions:
         # Note that the config flags are resolved prior to changing to cmake_build directory.
         DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_BUILD_TYPE|} \
           ${CMAKE_INSTALL_PREFIX|-DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL} \
-          ${CMAKE_PREFIX_PATH|-DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"} \
           ${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} \
           ${ENABLE_LAZYFS|} \
-          ${ENABLE_TCMALLOC|} \
           ${NONSTANDALONE|} \
           ${ENABLE_SHARED|} \
           ${ENABLE_STATIC|} \
@@ -288,7 +297,7 @@ functions:
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
           # Fetch the gperftools library if needed. This will also get tcmalloc.
-          if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}" =~ "ENABLE_TCMALLOC=1" ]] && [ ! -d "./automation-scripts" ]; then
+          if [[ ${ENABLE_TCMALLOC} -eq 1 ]] && [ ! -d "./automation-scripts" ]; then
             is_cmake_build=true
             git clone git@github.com:wiredtiger/automation-scripts.git
             . automation-scripts/evergreen/find_gperftools.sh ${s3_access_key} ${s3_secret_key} ${build_variant} $is_cmake_build
@@ -1414,7 +1423,7 @@ variables:
         export LD_LIBRARY_PATH=""
         export DYLD_LIBRARY_PATH=$WT_BUILDDIR
       # Must disable TCMALLOC as it may be picked up locally and its not on all hosts.
-      ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+      ENABLE_TCMALLOC: 0
     tasks:
       - name: compile
       - name: make-check-test
@@ -2007,7 +2016,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: test/csuite
-          extra_args: -LE "long_running" -j ${num_jobs}
+          extra_args: -LE "long_running" ${extra_args} -j ${num_jobs}
 
   - name: csuite-timestamp-abort-test-s3
     commands:
@@ -5247,7 +5256,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000 -C cache_size=100MB
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
@@ -5308,13 +5317,16 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 0
     additional_env_vars: |
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    # FIXME-WT-12646: Exclude backup corruption test from csuite and remove once ASAN memory leak is investigated
+    extra_args: -E "wt12015_backup_corruption"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest"
+    # FIXME-WT-12646: Exclude backup corruption test and remove once ASAN memory leak is investigated
+    - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
 
@@ -5325,7 +5337,7 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     additional_env_vars: |
       export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
@@ -5343,7 +5355,7 @@ buildvariants:
     # Compile with clang so we test that path for the catch2 unittests.
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_PYTHON=0 -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5363,7 +5375,7 @@ buildvariants:
     # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     additional_env_vars: |
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
@@ -5396,7 +5408,7 @@ buildvariants:
     # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     additional_env_vars: export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5416,7 +5428,7 @@ buildvariants:
   run_on:
   - ubuntu2004-wt-build
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: ".pull_request_compilers"
@@ -5426,7 +5438,7 @@ buildvariants:
   run_on:
   - ubuntu2004-small
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5451,7 +5463,7 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-large
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5470,7 +5482,7 @@ buildvariants:
   # We run on medium as small has too small a disk.
   - ubuntu2004-medium
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compile
@@ -5482,7 +5494,7 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-large
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compile
@@ -5501,7 +5513,7 @@ buildvariants:
   run_on:
   - rhel80-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     additional_env_vars: export LD_PRELOAD="/usr/local/lib/libeatmydata.so:$LD_PRELOAD"
     cmake_generator: "Unix Makefiles"
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake
@@ -5529,7 +5541,7 @@ buildvariants:
   run_on:
   - windows-2022-small
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     # Remove the default configurations for the toolchain, install prefix and number of jobs.
     CMAKE_TOOLCHAIN_FILE:
     CMAKE_INSTALL_PREFIX:
@@ -5559,7 +5571,7 @@ buildvariants:
   - ubuntu2204-large
   batchtime: 4320 # 3 days
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     # Must disable ZSTD as its not available on the big endian platform (we generate the data files used for those tests here).
     posix_configure_flags: -DENABLE_ZSTD=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -5575,7 +5587,7 @@ buildvariants:
   - rhel80-zseries-build
   batchtime: 4320 # 3 days
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_ZSTD=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5595,7 +5607,7 @@ buildvariants:
     # Use quarter of the vCPUs to avoid OOM kill failure and disk issues on this variant.
     num_jobs: $(echo $(grep -c ^processor /proc/cpuinfo) / 4 | bc)
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_STRICT=0
   tasks:
     - name: compile
@@ -5612,7 +5624,7 @@ buildvariants:
   - rhel80-zseries-test
   batchtime: 120 # 2 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     # Use half number of vCPU to avoid OOM kill failure
     num_jobs: $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
   tasks:
@@ -5629,7 +5641,7 @@ buildvariants:
   - ubuntu2004-arm64-small
   batchtime: 1440 # 24 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
     - name: compile
@@ -5669,7 +5681,7 @@ buildvariants:
   - amazon2-arm64-small
   batchtime: 1440 # 24 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: "Unix Makefiles"
   # Using large distro for a few tests here as more memory is required.
@@ -5702,7 +5714,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -5717,7 +5729,7 @@ buildvariants:
   - ubuntu2004-small
   batchtime: 720 # 12 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
@@ -5745,7 +5757,7 @@ buildvariants:
   - ubuntu2004-arm64-small
   batchtime: 720 # 12 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
+    ENABLE_TCMALLOC: 0
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
@@ -5773,7 +5785,7 @@ buildvariants:
   - ubuntu2004-test
   batchtime: 1440 # 24 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5789,7 +5801,7 @@ buildvariants:
   - ubuntu2004-arm64-large
   batchtime: 1440 # 24 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
@@ -5802,7 +5814,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000 -C cache_size=100MB
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
@@ -5820,7 +5832,7 @@ buildvariants:
   run_on:
   - ubuntu2004-small
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
@@ -5842,7 +5854,7 @@ buildvariants:
   run_on:
   - ubuntu2004-small
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
@@ -5863,7 +5875,7 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-large
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
@@ -5890,7 +5902,7 @@ buildvariants:
   run_on:
   - ubuntu2004-arm64-small
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
@@ -5914,7 +5926,7 @@ buildvariants:
   - amazon2-arm64-small
   batchtime: 1440 # 24 hours
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
+    ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: "Unix Makefiles"
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
