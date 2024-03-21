@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"
 
 namespace mongo {
 class IngressAdmissionController {
 public:
+    explicit IngressAdmissionController();
+
     /**
      * Returns the reference to IngressAdmissionController associated with the operation's service
      * context.
@@ -66,6 +70,15 @@ public:
      * size changes.
      */
     static Status onUpdateTicketPoolSize(int newValue);
+
+    /**
+     * Initialize the IngressAdmissionController after the ServiceContext is constructed. This will
+     * be called automatically during static initialization.
+     */
+    void init();
+
+private:
+    std::unique_ptr<SemaphoreTicketHolder> _ticketHolder{nullptr};
 };
 
 }  // namespace mongo

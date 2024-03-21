@@ -40,4 +40,4 @@ server_parameters:
     cpp_varname: gIngressAdmissionControllerTicketPoolSize
     cpp_vartype: AtomicWord<int32_t>
     on_update: IngressAdmissionController::onUpdateTicketPoolSize
-    default: 500
+    default: 1000000
