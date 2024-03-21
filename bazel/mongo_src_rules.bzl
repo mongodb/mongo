@@ -560,6 +560,12 @@ FLOATING_POINT_COPTS = select({
     "//bazel/config:compiler_type_msvc": ["/fp:strict"],
 })
 
+IMPLICIT_FALLTHROUGH_COPTS = select({
+    "//bazel/config:compiler_type_clang": ["-Wimplicit-fallthrough"],
+    "//bazel/config:compiler_type_gcc": ["-Wimplicit-fallthrough=5"],
+    "//conditions:default": [],
+})
+
 EXTRA_GLOBAL_LIBS_LINKFLAGS = select({
     "@platforms//os:linux": [
         "-lm",
@@ -598,6 +604,10 @@ DEBUG_DEFINES = select({
     "//bazel/config:dbg_enabled": ["MONGO_CONFIG_DEBUG_BUILD"],
     "//conditions:default": ["NDEBUG"],
 })
+
+PCRE2_DEFINES = ["PCRE2_STATIC"]
+
+SAFEINT_DEFINES = ["SAFEINT_USE_INTRINSICS=0"]
 
 LINKER_ERROR_MESSAGE = (
     "\nError:\n" +
@@ -896,6 +906,9 @@ GCC_OR_CLANG_LINKFLAGS = select({
 
         # If possible with the current linker, mark relocations as read-only.
         "-Wl,-z,relro",
+
+        # Disable TBAA optimization
+        "-fno-strict-aliasing",
     ],
     "//conditions:default": [],
 })
@@ -927,14 +940,15 @@ DEDUPE_SYMBOL_LINKFLAGS = select({
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES + \
                        THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES + \
                        WINDOWS_DEFINES + TCMALLOC_DEFINES + LINUX_DEFINES + GCC_OPT_DEFINES + BOOST_DEFINES + \
-                       ABSEIL_DEFINES
+                       ABSEIL_DEFINES + PCRE2_DEFINES + SAFEINT_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \
                      THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + LINUX_OPT_COPTS + \
                      GCC_OR_CLANG_WARNINGS_COPTS + GCC_OR_CLANG_GENERAL_COPTS + \
                      FLOATING_POINT_COPTS + MACOS_WARNINGS_COPTS + CLANG_WARNINGS_COPTS + \
-                     CLANG_FNO_LIMIT_DEBUG_INFO + COMPRESS_DEBUG_COPTS + DEBUG_TYPES_SECTION_FLAGS
+                     CLANG_FNO_LIMIT_DEBUG_INFO + COMPRESS_DEBUG_COPTS + DEBUG_TYPES_SECTION_FLAGS + \
+                     IMPLICIT_FALLTHROUGH_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + \
                          UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS + \
