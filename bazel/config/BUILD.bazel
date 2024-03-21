@@ -211,6 +211,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "not_macos",
+    match_any = [
+        "@platforms//os:linux",
+        "@platforms//os:windows",
+    ],
+)
+
+selects.config_setting_group(
     name = "not_s390x",
     match_any = [
         "@platforms//cpu:aarch64",
@@ -526,6 +534,7 @@ selects.config_setting_group(
     match_all = [
         ":_linker_auto",
         "@platforms//cpu:s390x",
+        "@platforms//os:linux",
     ],
 )
 
@@ -534,6 +543,7 @@ selects.config_setting_group(
     match_all = [
         ":_linker_auto",
         ":not_s390x",
+        "@platforms//os:linux",
     ],
 )
 
@@ -562,6 +572,14 @@ selects.config_setting_group(
     match_all = [
         ":linker_lld",
         ":not_s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linker_default",
+    match_all = [
+        ":_linker_auto",
+        ":not_linux",
     ],
 )
 

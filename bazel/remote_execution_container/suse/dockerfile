@@ -1,5 +1,7 @@
 # Image used by bazel remote execution hosts.
 
-FROM opensuse/leap:15
+FROM opensuse/leap:15.2
+
+RUN zypper install -y glibc-devel libfl2
 
 CMD ["/bin/bash"]

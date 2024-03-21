@@ -615,6 +615,7 @@ LINKER_ERROR_MESSAGE = (
 )
 
 LINKER_LINKFLAGS = select({
+    "//bazel/config:linker_default": [],
     "//bazel/config:linker_gold": ["-fuse-ld=gold"],
     "//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
 }, no_match_error = LINKER_ERROR_MESSAGE)
@@ -890,7 +891,7 @@ DEBUG_TYPES_SECTION_FLAGS = select({
 })
 
 GCC_OR_CLANG_LINKFLAGS = select({
-    "//bazel/config:gcc_or_clang": [
+    "//bazel/config:linux_gcc_or_clang": [
         # Explicitly enable GNU build id's if the linker supports it.
         "-Wl,--build-id",
 

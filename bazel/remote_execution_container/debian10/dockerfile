@@ -2,6 +2,6 @@
 
 FROM debian:10
 
-RUN apt-get update && apt-get install -y build-essential
+RUN apt-get update && apt-get install -y build-essential libfl2
 
 CMD ["/bin/bash"]
