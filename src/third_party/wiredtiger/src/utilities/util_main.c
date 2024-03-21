@@ -49,7 +49,7 @@ usage(void)
       "database directory", "-L", "turn logging off for debug-mode", "-m", "run verify on metadata",
       "-p",
       "disable pre-fetching on the connection (use this option when dumping/verifying corrupted "
-      "data",
+      "data)",
       "-R", "run recovery (if recovery configured)", "-r",
       "access the database via a readonly connection", "-S",
       "run salvage recovery (if recovery configured)", "-V", "display library version and exit",
