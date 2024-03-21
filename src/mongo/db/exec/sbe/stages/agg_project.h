@@ -51,7 +51,7 @@ namespace mongo::sbe {
 class AggProjectStage final : public PlanStage {
 public:
     AggProjectStage(std::unique_ptr<PlanStage> input,
-                    value::SlotMap<AggExprPair> aggExprPairs,
+                    AggExprVector aggExprPairs,
                     PlanNodeId planNodeId,
                     bool participateInTrialRunTracking = true);
 
@@ -74,7 +74,7 @@ protected:
     }
 
 private:
-    const value::SlotMap<AggExprPair> _projects;
+    const AggExprVector _projects;
 
     // The following four vectors store the output slotId, vm codes for initialisation and
     // aggregation and the output slot accessor for each AggExpr at approprate index so

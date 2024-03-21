@@ -36,7 +36,7 @@
 namespace mongo {
 namespace sbe {
 AggProjectStage::AggProjectStage(std::unique_ptr<PlanStage> input,
-                                 value::SlotMap<AggExprPair> aggExprPairs,
+                                 AggExprVector aggExprPairs,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
     : PlanStage("agg_project"_sd, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
@@ -45,9 +45,9 @@ AggProjectStage::AggProjectStage(std::unique_ptr<PlanStage> input,
 }
 
 std::unique_ptr<PlanStage> AggProjectStage::clone() const {
-    value::SlotMap<AggExprPair> projects;
+    AggExprVector projects;
     for (auto& [k, v] : _projects) {
-        projects.emplace(k, AggExprPair{v.init ? v.init->clone() : nullptr, v.agg->clone()});
+        projects.emplace_back(k, AggExprPair{v.init ? v.init->clone() : nullptr, v.agg->clone()});
     }
     return std::make_unique<AggProjectStage>(_children[0]->clone(),
                                              std::move(projects),
@@ -130,7 +130,7 @@ std::unique_ptr<PlanStageStats> AggProjectStage::getStats(bool includeDebugInfo)
     if (includeDebugInfo) {
         DebugPrinter printer;
         BSONObjBuilder bob;
-        value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
+        for (const auto& [slot, expr] : _projects) {
             auto printBlock = expr.agg->debugPrint();
             if (expr.init) {
                 printBlock.emplace_back(DebugPrinter::Block("init{`"));
@@ -138,7 +138,7 @@ std::unique_ptr<PlanStageStats> AggProjectStage::getStats(bool includeDebugInfo)
                 printBlock.emplace_back(DebugPrinter::Block("`}"));
             }
             bob.append(str::stream() << slot, printer.print(printBlock));
-        });
+        }
         ret->debugInfo = BSON("projections" << bob.obj());
     }
 
@@ -155,7 +155,7 @@ std::vector<DebugPrinter::Block> AggProjectStage::debugPrint() const {
 
     ret.emplace_back("[`");
     bool first = true;
-    value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
+    for (const auto& [slot, expr] : _projects) {
         if (!first) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
@@ -169,7 +169,7 @@ std::vector<DebugPrinter::Block> AggProjectStage::debugPrint() const {
             ret.emplace_back(DebugPrinter::Block("`}"));
         }
         first = false;
-    });
+    }
     ret.emplace_back("`]");
 
     DebugPrinter::addNewLine(ret);

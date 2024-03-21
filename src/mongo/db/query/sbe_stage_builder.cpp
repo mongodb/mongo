@@ -4355,16 +4355,18 @@ const Expression* getNExprFromAccumulatorN(const WindowFunctionStatement& wfStmt
     }
 }
 
-std::unique_ptr<sbe::EExpression> getDefaultValueExpr(const WindowFunctionStatement& wfStmt) {
+SbExpr getDefaultValueExpr(StageBuilderState& state, const WindowFunctionStatement& wfStmt) {
+    SbExprBuilder b(state);
+
     if (wfStmt.expr->getOpName() == "$shift") {
         auto defaultVal =
             dynamic_cast<window_function::ExpressionShift*>(wfStmt.expr.get())->defaultVal();
 
         if (defaultVal) {
             auto val = sbe::value::makeValue(*defaultVal);
-            return makeConstant(val.first, val.second);
+            return b.makeConstant(val.first, val.second);
         } else {
-            return makeNullConstant();
+            return b.makeNullConstant();
         }
     } else {
         MONGO_UNREACHABLE;
@@ -4417,66 +4419,66 @@ std::tuple<bool, PlanStageReqs, PlanStageReqs> computeChildReqsForWindow(
 
 class WindowStageBuilder {
 public:
-    using SlotId = sbe::value::SlotId;
-    using SlotVector = sbe::value::SlotVector;
-    using StringDataEExprMap = StringDataMap<std::unique_ptr<sbe::EExpression>>;
     using BuildOutput =
-        std::tuple<SbStage, std::vector<std::string>, SlotVector, StringMap<SlotId>>;
+        std::tuple<SbStage, std::vector<std::string>, SbSlotVector, StringMap<SbSlot>>;
 
     WindowStageBuilder(StageBuilderState& state,
                        const PlanStageReqs& forwardingReqs,
                        const PlanStageSlots& outputs,
                        const WindowNode* wn,
-                       const CanonicalQuery& cq,
-                       boost::optional<SlotId> collatorSlot,
-                       SlotVector sv)
-        : _state(state),
-          _slotIdGenerator(*state.slotIdGenerator),
+                       ExpressionContext* expCtx,
+                       bool allowDiskUse,
+                       SbSlotVector currSlotsIn)
+        : state(state),
           forwardingReqs(forwardingReqs),
           outputs(outputs),
-          rootSlotOpt(outputs.getResultObjIfExists()),
           windowNode(wn),
-          _cq(cq),
-          collatorSlot(collatorSlot),
+          expCtx(expCtx),
+          allowDiskUse(allowDiskUse),
           b(state, wn->nodeId()),
-          currSlots(std::move(sv)),
-          boundTestingSlots(_slotIdGenerator.generateMultiple(currSlots.size())) {}
+          currSlots(std::move(currSlotsIn)) {
+        // Initialize 'boundTestingSlots'.
+        boundTestingSlots.reserve(currSlots.size());
+        for (size_t i = 0; i < currSlots.size(); ++i) {
+            boundTestingSlots.emplace_back(SbSlot{state.slotId()});
+        }
+    }
 
     BuildOutput build(SbStage stage);
 
-    size_t ensureSlotInBuffer(SlotId slot) {
+    size_t ensureSlotInBuffer(SbSlot slot) {
         for (size_t i = 0; i < currSlots.size(); i++) {
-            if (slot == currSlots[i]) {
+            if (slot.getId() == currSlots[i].getId()) {
                 return i;
             }
         }
         currSlots.push_back(slot);
-        boundTestingSlots.push_back(_slotIdGenerator.generate());
+        boundTestingSlots.push_back(SbSlot{state.slotId()});
         for (auto& frameFirstSlots : windowFrameFirstSlots) {
-            frameFirstSlots.push_back(_slotIdGenerator.generate());
+            frameFirstSlots.push_back(SbSlot{state.slotId()});
         }
         for (auto& frameLastSlots : windowFrameLastSlots) {
-            frameLastSlots.push_back(_slotIdGenerator.generate());
+            frameLastSlots.push_back(SbSlot{state.slotId()});
         }
         return currSlots.size() - 1;
     }
 
     size_t registerFrameFirstSlots() {
-        windowFrameFirstSlots.push_back(SlotVector());
+        windowFrameFirstSlots.push_back(SbSlotVector{});
         auto& frameFirstSlots = windowFrameFirstSlots.back();
         frameFirstSlots.clear();
         for (size_t i = 0; i < currSlots.size(); i++) {
-            frameFirstSlots.push_back(_slotIdGenerator.generate());
+            frameFirstSlots.push_back(SbSlot{state.slotId()});
         }
         return windowFrameFirstSlots.size() - 1;
     }
 
     size_t registerFrameLastSlots() {
-        windowFrameLastSlots.push_back(SlotVector());
+        windowFrameLastSlots.push_back(SbSlotVector{});
         auto& frameLastSlots = windowFrameLastSlots.back();
         frameLastSlots.clear();
         for (size_t i = 0; i < currSlots.size(); i++) {
-            frameLastSlots.push_back(_slotIdGenerator.generate());
+            frameLastSlots.push_back(SbSlot{state.slotId()});
         }
         return windowFrameLastSlots.size() - 1;
     }
@@ -4485,14 +4487,15 @@ public:
         // Get stages for partition by.
         size_t partitionSlotCount = 0;
         if (windowNode->partitionBy) {
-            auto partitionSlot = _slotIdGenerator.generate();
+            auto partitionSlot = SbSlot{state.slotId()};
             ensureSlotInBuffer(partitionSlot);
             partitionSlotCount++;
+            auto rootSlotOpt = outputs.getResultObjIfExists();
             auto partitionExpr =
-                generateExpression(_state, windowNode->partitionBy->get(), rootSlotOpt, outputs);
+                generateExpression(state, windowNode->partitionBy->get(), rootSlotOpt, outputs);
 
             // Assert partition slot is not an array.
-            auto frameId = _state.frameId();
+            auto frameId = state.frameId();
             auto partitionName = SbVar{frameId, 0};
             partitionExpr = b.makeLet(
                 frameId,
@@ -4504,10 +4507,9 @@ public:
                         "An expression used to partition cannot evaluate to value of type array"),
                     partitionName));
 
-            stage = sbe::makeProjectStage(std::move(stage),
-                                          windowNode->nodeId(),
-                                          partitionSlot,
-                                          partitionExpr.extractExpr(_state));
+            auto [outStage, _] =
+                b.makeProject(std::move(stage), std::pair(std::move(partitionExpr), partitionSlot));
+            stage = std::move(outStage);
         }
 
         return {std::move(stage), partitionSlotCount};
@@ -4521,68 +4523,76 @@ public:
     }
 
     // Calculate slot for document position based window bounds, and add corresponding stages.
-    std::tuple<SbStage, SlotId, SlotId> getDocumentBoundSlot(SbStage stage) {
+    std::tuple<SbStage, SbSlot, SbSlot> getDocumentBoundSlot(SbStage stage) {
         if (!documentBoundSlot) {
-            documentBoundSlot = _slotIdGenerator.generate();
-            sbe::value::SlotMap<sbe::AggExprPair> aggExprPairs;
-            aggExprPairs.emplace(
-                *documentBoundSlot,
-                sbe::AggExprPair{nullptr, makeFunction("sum", makeInt32Constant(1))});
-            stage = sbe::makeS<sbe::AggProjectStage>(
-                std::move(stage), std::move(aggExprPairs), windowNode->nodeId());
+            documentBoundSlot = SbSlot{state.slotId()};
+
+            SbAggExprVector sbAggExprs;
+            sbAggExprs.emplace_back(
+                SbAggExpr{SbExpr{} /*init*/,
+                          SbExpr{} /*blockAgg*/,
+                          b.makeFunction("sum", b.makeInt32Constant(1)) /*agg*/},
+                *documentBoundSlot);
+
+            auto [outStage, _] = b.makeAggProject(std::move(stage), std::move(sbAggExprs));
+            stage = std::move(outStage);
         }
         auto documentBoundSlotIdx = ensureSlotInBuffer(*documentBoundSlot);
         return {std::move(stage), *documentBoundSlot, boundTestingSlots[documentBoundSlotIdx]};
     }
 
-    std::tuple<SbStage, SlotId, SlotId> getSortBySlot(SbStage stage) {
+    std::tuple<SbStage, SbSlot, SbSlot> getSortBySlot(SbStage stage) {
         if (!sortBySlot) {
-            sortBySlot = _slotIdGenerator.generate();
+            sortBySlot = SbSlot{state.slotId()};
             tassert(7914602,
                     "Expected to have a single sort component",
                     windowNode->sortBy && windowNode->sortBy->size() == 1);
             const auto& part = windowNode->sortBy->front();
-            auto expCtx = _cq.getExpCtxRaw();
+
+            auto rootSlotOpt = outputs.getResultObjIfExists();
             auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
                 expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
-            auto sortByExpr = generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, outputs)
-                                  .extractExpr(_state);
-            stage = makeProjectStage(
-                std::move(stage), windowNode->nodeId(), *sortBySlot, std::move(sortByExpr));
+
+            auto sortByExpr = generateExpression(state, fieldPathExpr.get(), rootSlotOpt, outputs);
+
+            auto [outStage, _] =
+                b.makeProject(std::move(stage), std::pair(std::move(sortByExpr), *sortBySlot));
+            stage = std::move(outStage);
         }
         auto sortBySlotIdx = ensureSlotInBuffer(*sortBySlot);
         return {std::move(stage), *sortBySlot, boundTestingSlots[sortBySlotIdx]};
     }
 
     // Calculate slot for range and time range based window bounds
-    std::tuple<SbStage, SlotId, SlotId> getRangeBoundSlot(SbStage stage,
+    std::tuple<SbStage, SbSlot, SbSlot> getRangeBoundSlot(SbStage stage,
                                                           boost::optional<TimeUnit> unit) {
-        auto projectRangeBoundSlot = [&](StringData typeCheckFn,
-                                         std::unique_ptr<sbe::EExpression> failExpr) {
-            auto slot = _slotIdGenerator.generate();
+        auto projectRangeBoundSlot = [&](StringData typeCheckFn, SbExpr failExpr) {
+            auto slot = state.slotId();
             auto [outStage, sortBySlot, _] = getSortBySlot(std::move(stage));
             stage = std::move(outStage);
 
-            auto checkType = makeLocalBind(
-                _state.frameIdGenerator,
-                [&](sbe::EVariable input) {
-                    return sbe::makeE<sbe::EIf>(makeFunction(typeCheckFn, input.clone()),
-                                                input.clone(),
-                                                std::move(failExpr));
-                },
-                makeFillEmptyNull(makeVariable(sortBySlot)));
+            auto frameId = state.frameIdGenerator->generate();
+            auto sortByVar = SbVar{frameId, 0};
+            auto binds = SbExpr::makeSeq(b.makeFillEmptyNull(b.makeVariable(sortBySlot)));
 
-            stage = makeProjectStage(
-                std::move(stage), windowNode->nodeId(), slot, std::move(checkType));
+            auto checkType = b.makeLet(
+                frameId,
+                std::move(binds),
+                b.makeIf(b.makeFunction(typeCheckFn, sortByVar), sortByVar, std::move(failExpr)));
+
+            auto [projectStage, __] =
+                b.makeProject(std::move(stage), std::pair(std::move(checkType), slot));
+            stage = std::move(projectStage);
+
             return slot;
         };
+
         if (unit) {
             if (!timeRangeBoundSlot) {
                 timeRangeBoundSlot = projectRangeBoundSlot(
                     "isDate",
-                    sbe::makeE<sbe::EFail>(
-                        ErrorCodes::Error{7956500},
-                        "Invalid range: Expected the sortBy field to be a date"));
+                    b.makeFail(ErrorCodes::Error{7956500},
+                               "Invalid range: Expected the sortBy field to be a date"));
             }
             auto timeRangeBoundSlotIdx = ensureSlotInBuffer(*timeRangeBoundSlot);
             return {
@@ -4591,9 +4601,8 @@ public:
             if (!rangeBoundSlot) {
                 rangeBoundSlot = projectRangeBoundSlot(
                     "isNumber",
-                    sbe::makeE<sbe::EFail>(
-                        ErrorCodes::Error{7993103},
-                        "Invalid range: Expected the sortBy field to be a number"));
+                    b.makeFail(ErrorCodes::Error{7993103},
+                               "Invalid range: Expected the sortBy field to be a number"));
             }
             auto rangeBoundSlotIdx = ensureSlotInBuffer(*rangeBoundSlot);
             return {std::move(stage), *rangeBoundSlot, boundTestingSlots[rangeBoundSlotIdx]};
@@ -4641,19 +4650,22 @@ public:
         return removable;
     }
 
-    std::tuple<SbStage, StringDataEExprMap, StringDataEExprMap> generateArgs(
+    std::tuple<SbStage, StringDataMap<SbExpr>, StringDataMap<SbExpr>> generateArgs(
         SbStage stage, const WindowFunctionStatement& outputField, bool removable) {
+        auto rootSlotOpt = outputs.getResultObjIfExists();
+        auto collatorSlot = state.getCollatorSlot();
+
         // Get init expression arg for relevant functions
         auto getUnitArg = [&](window_function::ExpressionWithUnit* expr) {
             auto unit = expr->unitInMillis();
             if (unit) {
-                return makeInt64Constant(*unit);
+                return b.makeInt64Constant(*unit);
             } else {
-                return makeNullConstant();
+                return b.makeNullConstant();
             }
         };
         auto initExprArgs = [&]() {
-            StringDataMap<std::unique_ptr<sbe::EExpression>> initExprArgs;
+            StringDataMap<SbExpr> initExprArgs;
             if (outputField.expr->getOpName() == AccumulatorExpMovingAvg::kName) {
                 auto alpha = [&]() {
                     auto emaExpr = dynamic_cast<window_function::ExpressionExpMovingAvg*>(
@@ -4664,43 +4676,39 @@ public:
                         return emaExpr->getAlpha().get();
                     }
                 }();
-                initExprArgs.emplace(Accum::kInput, makeDecimalConstant(alpha));
+                initExprArgs.emplace(Accum::kInput, b.makeDecimalConstant(alpha));
             } else if (outputField.expr->getOpName() == AccumulatorIntegral::kName) {
                 initExprArgs.emplace(Accum::kInput,
                                      getUnitArg(dynamic_cast<window_function::ExpressionWithUnit*>(
                                          outputField.expr.get())));
             } else if (isAccumulatorN(outputField)) {
                 auto nExprPtr = getNExprFromAccumulatorN(outputField);
-                initExprArgs.emplace(
-                    Accum::kMaxSize,
-                    generateExpression(_state, nExprPtr, rootSlotOpt, outputs).extractExpr(_state));
-                initExprArgs.emplace(Accum::kIsGroupAccum,
-                                     makeConstant(sbe::value::TypeTags::Boolean,
-                                                  sbe::value::bitcastFrom<bool>(false)));
+                initExprArgs.emplace(Accum::kMaxSize,
+                                     generateExpression(state, nExprPtr, rootSlotOpt, outputs));
+                initExprArgs.emplace(Accum::kIsGroupAccum, b.makeBoolConstant(false));
             }
             return initExprArgs;
         }();
 
-        StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs;
+        StringDataMap<SbExpr> argExprs;
         auto accName = outputField.expr->getOpName();
 
-        auto getArgExprFromSBEExpression = [&](std::unique_ptr<sbe::EExpression> argExpr) {
-            if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
-                ensureSlotInBuffer(varExpr->getSlotId());
+        auto getArgExprFromSbExpr = [&](SbExpr argExpr) {
+            if (argExpr.isSlotExpr()) {
+                ensureSlotInBuffer(argExpr.toSlot());
                 return argExpr;
-            } else if (argExpr->as<sbe::EConstant>()) {
+            } else if (argExpr.isConstantExpr()) {
                 return argExpr;
             } else {
-                auto argSlot = _slotIdGenerator.generate();
-                windowArgProjects.emplace_back(argSlot, std::move(argExpr));
+                auto argSlot = SbSlot{state.slotId()};
+                windowArgProjects.emplace_back(std::move(argExpr), argSlot);
                 ensureSlotInBuffer(argSlot);
-                return makeVariable(argSlot);
+                return SbExpr{argSlot};
             }
         };
         auto getArgExpr = [&](Expression* arg) {
-            auto argExpr =
-                generateExpression(_state, arg, rootSlotOpt, outputs).extractExpr(_state);
-            return getArgExprFromSBEExpression(std::move(argExpr));
+            auto argExpr = generateExpression(state, arg, rootSlotOpt, outputs);
+            return getArgExprFromSbExpr(std::move(argExpr));
         };
         if (accName == "$covarianceSamp" || accName == "$covariancePop") {
             if (auto expr = dynamic_cast<ExpressionArray*>(outputField.expr->input().get());
@@ -4717,64 +4725,62 @@ public:
                 auto bson = BSON("x" << array[0] << "y" << array[1]);
                 auto [argXTag, argXVal] =
                     sbe::bson::convertFrom<false /* View */>(bson.getField("x"));
-                argExprs.emplace(Accum::kCovarianceX, makeConstant(argXTag, argXVal));
+                argExprs.emplace(Accum::kCovarianceX, b.makeConstant(argXTag, argXVal));
                 auto [argYTag, argYVal] =
                     sbe::bson::convertFrom<false /* View */>(bson.getField("y"));
-                argExprs.emplace(Accum::kCovarianceY, makeConstant(argYTag, argYVal));
+                argExprs.emplace(Accum::kCovarianceY, b.makeConstant(argYTag, argYVal));
             } else {
-                argExprs.emplace(Accum::kCovarianceX, makeConstant(sbe::value::TypeTags::Null, 0));
-                argExprs.emplace(Accum::kCovarianceY, makeConstant(sbe::value::TypeTags::Null, 0));
+                argExprs.emplace(Accum::kCovarianceX, b.makeNullConstant());
+                argExprs.emplace(Accum::kCovarianceY, b.makeNullConstant());
             }
         } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
             auto [outStage, sortBySlot, _] = getSortBySlot(std::move(stage));
             stage = std::move(outStage);
 
             argExprs.emplace(Accum::kInput, getArgExpr(outputField.expr->input().get()));
-            argExprs.emplace(Accum::kSortBy, makeVariable(sortBySlot));
+            argExprs.emplace(Accum::kSortBy, b.makeVariable(sortBySlot));
         } else if (accName == "$rank" || accName == "$denseRank") {
             auto isAscending = windowNode->sortBy->front().isAscending;
             argExprs.emplace(Accum::kInput, getArgExpr(outputField.expr->input().get()));
-            argExprs.emplace(Accum::kIsAscending,
-                             makeConstant(sbe::value::TypeTags::Boolean,
-                                          sbe::value::bitcastFrom<bool>(isAscending)));
+            argExprs.emplace(Accum::kIsAscending, b.makeBoolConstant(isAscending));
         } else if (isTopBottomN(outputField)) {
             tassert(8155715, "Root slot should be set", rootSlotOpt);
 
-            auto sortSpecExpr = sbe::makeE<sbe::EVariable>(_state.getSortSpecSlot(&outputField));
+            auto sortSpecExpr = b.makeVariable(state.getSortSpecSlot(&outputField));
 
             if (removable) {
-                auto key = collatorSlot ? makeFunction("generateSortKey",
-                                                       std::move(sortSpecExpr),
-                                                       makeVariable(*rootSlotOpt),
-                                                       makeVariable(*collatorSlot))
-                                        : makeFunction("generateSortKey",
-                                                       std::move(sortSpecExpr),
-                                                       makeVariable(*rootSlotOpt));
+                auto key = collatorSlot ? b.makeFunction("generateSortKey",
+                                                         std::move(sortSpecExpr),
+                                                         b.makeVariable(*rootSlotOpt),
+                                                         b.makeVariable(*collatorSlot))
+                                        : b.makeFunction("generateSortKey",
+                                                         std::move(sortSpecExpr),
+                                                         b.makeVariable(*rootSlotOpt));
 
-                argExprs.emplace(Accum::kSortBy, getArgExprFromSBEExpression(std::move(key)));
+                argExprs.emplace(Accum::kSortBy, getArgExprFromSbExpr(std::move(key)));
             } else {
-                argExprs.emplace(Accum::kSortSpec, sortSpecExpr->clone());
+                argExprs.emplace(Accum::kSortSpec, sortSpecExpr.clone());
 
                 // Build the key expression
-                auto key = collatorSlot ? makeFunction("generateCheapSortKey",
-                                                       std::move(sortSpecExpr),
-                                                       makeVariable(*rootSlotOpt),
-                                                       makeVariable(*collatorSlot))
-                                        : makeFunction("generateCheapSortKey",
-                                                       std::move(sortSpecExpr),
-                                                       makeVariable(*rootSlotOpt));
+                auto key = collatorSlot ? b.makeFunction("generateCheapSortKey",
+                                                         std::move(sortSpecExpr),
+                                                         b.makeVariable(*rootSlotOpt),
+                                                         b.makeVariable(*collatorSlot))
+                                        : b.makeFunction("generateCheapSortKey",
+                                                         std::move(sortSpecExpr),
+                                                         b.makeVariable(*rootSlotOpt));
                 argExprs.emplace(Accum::kSortBy,
-                                 makeFunction("sortKeyComponentVectorToArray", std::move(key)));
+                                 b.makeFunction("sortKeyComponentVectorToArray", std::move(key)));
             }
 
             if (auto expObj = dynamic_cast<ExpressionObject*>(outputField.expr->input().get())) {
                 for (auto& [key, value] : expObj->getChildExpressions()) {
                     if (key == AccumulatorN::kFieldNameOutput) {
                         auto outputExpr =
-                            generateExpression(_state, value.get(), rootSlotOpt, outputs);
-                        argExprs.emplace(Accum::kValue,
-                                         getArgExprFromSBEExpression(
-                                             makeFillEmptyNull(outputExpr.extractExpr(_state))));
+                            generateExpression(state, value.get(), rootSlotOpt, outputs);
+                        argExprs.emplace(
+                            Accum::kValue,
+                            getArgExprFromSbExpr(b.makeFillEmptyNull(std::move(outputExpr))));
                         break;
                     }
                 }
@@ -4789,8 +4795,8 @@ public:
                 if (outputField.ok()) {
                     auto [outputTag, outputVal] =
                         sbe::bson::convertFrom<false /* View */>(outputField);
-                    auto outputExpr = makeConstant(outputTag, outputVal);
-                    argExprs.emplace(Accum::kValue, makeFillEmptyNull(std::move(outputExpr)));
+                    auto outputExpr = b.makeConstant(outputTag, outputVal);
+                    argExprs.emplace(Accum::kValue, b.makeFillEmptyNull(std::move(outputExpr)));
                 }
             } else {
                 tasserted(8155717,
@@ -4812,54 +4818,53 @@ public:
                                         const WindowFunctionStatement& outputField,
                                         const Accum::Op& acc,
                                         bool removable,
-                                        StringDataEExprMap initExprArgs,
-                                        const StringDataEExprMap& argExprs,
-                                        sbe::WindowStage::Window& window) {
+                                        StringDataMap<SbExpr> initExprArgs,
+                                        const StringDataMap<SbExpr>& argExprs,
+                                        SbWindow& window) {
         // Create init/add/remove expressions.
-        auto cloneExprMap = [](const StringDataMap<std::unique_ptr<sbe::EExpression>>& exprMap) {
-            StringDataMap<std::unique_ptr<sbe::EExpression>> exprMapClone;
+        auto cloneExprMap = [](const StringDataMap<SbExpr>& exprMap) {
+            StringDataMap<SbExpr> exprMapClone;
             for (auto& [argName, argExpr] : exprMap) {
-                exprMapClone.emplace(argName, argExpr->clone());
+                exprMapClone.emplace(argName, argExpr.clone());
             }
             return exprMapClone;
         };
         if (removable) {
             if (initExprArgs.size() == 0) {
-                window.initExprs = buildWindowInit(_state, outputField, collatorSlot);
+                window.initExprs = buildWindowInit(state, outputField);
             } else {
-                window.initExprs =
-                    buildWindowInit(_state, outputField, std::move(initExprArgs), collatorSlot);
+                window.initExprs = buildWindowInit(state, outputField, std::move(initExprArgs));
             }
             if (argExprs.size() == 1) {
-                window.addExprs = buildWindowAdd(
-                    _state, outputField, argExprs.begin()->second->clone(), collatorSlot);
-                window.removeExprs = buildWindowRemove(
-                    _state, outputField, argExprs.begin()->second->clone(), collatorSlot);
-            } else {
                 window.addExprs =
-                    buildWindowAdd(_state, outputField, cloneExprMap(argExprs), collatorSlot);
-                window.removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
+                    buildWindowAdd(state, outputField, argExprs.begin()->second.clone());
+                window.removeExprs =
+                    buildWindowRemove(state, outputField, argExprs.begin()->second.clone());
+            } else {
+                window.addExprs = buildWindowAdd(state, outputField, cloneExprMap(argExprs));
+                window.removeExprs = buildWindowRemove(state, outputField, cloneExprMap(argExprs));
             }
         } else {
             if (initExprArgs.size() == 0) {
-                window.initExprs = buildInitializeForWindowFunc(acc, _state);
+                window.initExprs = buildInitializeForWindowFunc(acc, state);
             } else {
                 window.initExprs =
-                    buildInitializeForWindowFunc(acc, std::move(initExprArgs), _state);
+                    buildInitializeForWindowFunc(acc, std::move(initExprArgs), state);
             }
+
             if (argExprs.size() == 1) {
                 window.addExprs =
-                    buildAccumulatorForWindowFunc(acc, argExprs.begin()->second->clone(), _state);
+                    buildAccumulatorForWindowFunc(acc, argExprs.begin()->second.clone(), state);
             } else {
-                window.addExprs =
-                    buildAccumulatorForWindowFunc(acc, cloneExprMap(argExprs), _state);
+                window.addExprs = buildAccumulatorForWindowFunc(acc, cloneExprMap(argExprs), state);
             }
-            window.removeExprs =
-                std::vector<std::unique_ptr<sbe::EExpression>>{window.addExprs.size()};
+
+            window.removeExprs = SbExpr::Vector{};
+            window.removeExprs.resize(window.addExprs.size());
         }
 
         for (size_t i = 0; i < window.initExprs.size(); i++) {
-            window.windowExprSlots.push_back(_slotIdGenerator.generate());
+            window.windowExprSlots.emplace_back(SbSlot{state.slotId()});
         }
 
         tassert(7914601,
@@ -4894,13 +4899,13 @@ public:
     SbStage generateBoundExprs(SbStage stage,
                                const WindowFunctionStatement& outputField,
                                const WindowBounds& windowBounds,
-                               sbe::WindowStage::Window& window) {
-        auto makeOffsetBoundExpr = [&](SlotId boundSlot,
+                               SbWindow& window) {
+        auto makeOffsetBoundExpr = [&](SbSlot boundSlot,
                                        std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
                                            {sbe::value::TypeTags::Nothing, 0},
                                        boost::optional<TimeUnit> unit = boost::none) {
             if (offset.first == sbe::value::TypeTags::Nothing) {
-                return makeVariable(boundSlot);
+                return b.makeVariable(boundSlot);
             }
             if (unit) {
                 auto [unitTag, unitVal] = sbe::value::makeNewString(serializeTimeUnit(*unit));
@@ -4911,47 +4916,47 @@ public:
                     offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
                 unitGuard.reset();
                 timezoneGuard.reset();
-                return makeFunction("dateAdd",
-                                    makeVariable(*_state.getTimeZoneDBSlot()),
-                                    makeVariable(boundSlot),
-                                    makeConstant(unitTag, unitVal),
-                                    makeConstant(longOffsetTag, longOffsetVal),
-                                    makeConstant(timezoneTag, timezoneVal));
+                return b.makeFunction("dateAdd",
+                                      b.makeVariable(*state.getTimeZoneDBSlot()),
+                                      b.makeVariable(boundSlot),
+                                      b.makeConstant(unitTag, unitVal),
+                                      b.makeConstant(longOffsetTag, longOffsetVal),
+                                      b.makeConstant(timezoneTag, timezoneVal));
             } else {
-                return makeBinaryOp(sbe::EPrimBinary::add,
-                                    makeVariable(boundSlot),
-                                    makeConstant(offset.first, offset.second));
+                return b.makeBinaryOp(sbe::EPrimBinary::add,
+                                      b.makeVariable(boundSlot),
+                                      b.makeConstant(offset.first, offset.second));
             }
         };
-        auto makeLowBoundExpr = [&](SlotId boundSlot,
-                                    SlotId boundTestingSlot,
+        auto makeLowBoundExpr = [&](SbSlot boundSlot,
+                                    SbSlot boundTestingSlot,
                                     std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
                                         {sbe::value::TypeTags::Nothing, 0},
                                     boost::optional<TimeUnit> unit = boost::none) {
             // Use three way comparison to compare special values like NaN.
-            return makeBinaryOp(sbe::EPrimBinary::greaterEq,
-                                makeBinaryOp(sbe::EPrimBinary::cmp3w,
-                                             makeVariable(boundTestingSlot),
-                                             makeOffsetBoundExpr(boundSlot, offset, unit)),
-                                makeConstant(sbe::value::TypeTags::NumberInt32, 0));
+            return b.makeBinaryOp(sbe::EPrimBinary::greaterEq,
+                                  b.makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                                                 b.makeVariable(boundTestingSlot),
+                                                 makeOffsetBoundExpr(boundSlot, offset, unit)),
+                                  b.makeInt32Constant(0));
         };
-        auto makeHighBoundExpr = [&](SlotId boundSlot,
-                                     SlotId boundTestingSlot,
+        auto makeHighBoundExpr = [&](SbSlot boundSlot,
+                                     SbSlot boundTestingSlot,
                                      std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
                                          {sbe::value::TypeTags::Nothing, 0},
                                      boost::optional<TimeUnit> unit = boost::none) {
             // Use three way comparison to compare special values like NaN.
-            return makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                makeBinaryOp(sbe::EPrimBinary::cmp3w,
-                                             makeVariable(boundTestingSlot),
-                                             makeOffsetBoundExpr(boundSlot, offset, unit)),
-                                makeConstant(sbe::value::TypeTags::NumberInt32, 0));
+            return b.makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                  b.makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                                                 b.makeVariable(boundTestingSlot),
+                                                 makeOffsetBoundExpr(boundSlot, offset, unit)),
+                                  b.makeInt32Constant(0));
         };
         auto makeLowUnboundedExpr = [&](const WindowBounds::Unbounded&) {
-            window.lowBoundExpr = nullptr;
+            window.lowBoundExpr = SbExpr{};
         };
         auto makeHighUnboundedExpr = [&](const WindowBounds::Unbounded&) {
-            window.highBoundExpr = nullptr;
+            window.highBoundExpr = SbExpr{};
         };
         auto makeLowCurrentExpr = [&](const WindowBounds::Current&) {
             auto [outStage, lowBoundSlot, lowBoundTestingSlot] =
@@ -5020,54 +5025,53 @@ public:
         if (outputField.expr->getOpName() == "$linearFill") {
             tassert(7971215, "expected a single initExpr", window.initExprs.size() == 1);
             window.highBoundExpr =
-                makeFunction("aggLinearFillCanAdd", makeVariable(window.windowExprSlots[0]));
+                b.makeFunction("aggLinearFillCanAdd", b.makeVariable(window.windowExprSlots[0]));
         }
 
         return stage;
     }
 
-    SlotId generateFinalExpr(const WindowFunctionStatement& outputField,
+    SbExpr generateFinalExpr(const WindowFunctionStatement& outputField,
                              const Accum::Op& acc,
                              bool removable,
-                             StringDataEExprMap argExprs,
-                             const sbe::WindowStage::Window& window) {
+                             StringDataMap<SbExpr> argExprs,
+                             SbWindow& window) {
         using ExpressionWithUnit = window_function::ExpressionWithUnit;
 
         // Build extra arguments for finalize expressions.
-        auto getModifiedExpr = [&](std::unique_ptr<sbe::EExpression> argExpr,
-                                   SlotVector& newSlots) {
-            if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
-                auto idx = ensureSlotInBuffer(varExpr->getSlotId());
-                return makeVariable(newSlots[idx]);
-            } else if (argExpr->as<sbe::EConstant>()) {
-                return argExpr->clone();
+        auto getModifiedExpr = [&](SbExpr argExpr, SbSlotVector& newSlots) {
+            if (argExpr.isSlotExpr()) {
+                auto idx = ensureSlotInBuffer(argExpr.toSlot());
+                return b.makeVariable(newSlots[idx]);
+            } else if (argExpr.isConstantExpr()) {
+                return argExpr.clone();
             } else {
                 MONGO_UNREACHABLE;
             }
         };
 
-        StringDataMap<std::unique_ptr<sbe::EExpression>> finalArgExprs;
+        StringDataMap<SbExpr> finalArgExprs;
         if (outputField.expr->getOpName() == "$derivative") {
             auto u = dynamic_cast<ExpressionWithUnit*>(outputField.expr.get())->unitInMillis();
-            auto unit = u ? makeInt64Constant(*u) : makeNullConstant();
+            auto unit = u ? b.makeInt64Constant(*u) : b.makeNullConstant();
 
             auto it = argExprs.find(Accum::kInput);
             tassert(7993401,
                     str::stream() << "Window function expects '" << Accum::kInput << "' argument",
                     it != argExprs.end());
-            auto inputExpr = it->second->clone();
+            auto inputExpr = it->second.clone();
             it = argExprs.find(Accum::kSortBy);
             tassert(7993402,
                     str::stream() << "Window function expects '" << Accum::kSortBy << "' argument",
                     it != argExprs.end());
-            auto sortByExpr = it->second->clone();
+            auto sortByExpr = it->second.clone();
 
             auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
             auto& frameLastSlots = windowFrameLastSlots[*windowFrameLastSlotIdx.back()];
-            auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
-            auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
-            auto frameFirstSortBy = getModifiedExpr(sortByExpr->clone(), frameFirstSlots);
-            auto frameLastSortBy = getModifiedExpr(sortByExpr->clone(), frameLastSlots);
+            auto frameFirstInput = getModifiedExpr(inputExpr.clone(), frameFirstSlots);
+            auto frameLastInput = getModifiedExpr(inputExpr.clone(), frameLastSlots);
+            auto frameFirstSortBy = getModifiedExpr(sortByExpr.clone(), frameFirstSlots);
+            auto frameLastSortBy = getModifiedExpr(sortByExpr.clone(), frameLastSlots);
             finalArgExprs.emplace(Accum::kUnit, std::move(unit));
             finalArgExprs.emplace(Accum::kInputFirst, std::move(frameFirstInput));
             finalArgExprs.emplace(Accum::kInputLast, std::move(frameLastInput));
@@ -5079,20 +5083,20 @@ public:
                     argExprs.size() == 1);
             auto it = argExprs.begin();
             auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
-            auto inputExpr = it->second->clone();
-            auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
+            auto inputExpr = it->second.clone();
+            auto frameFirstInput = getModifiedExpr(inputExpr.clone(), frameFirstSlots);
             finalArgExprs.emplace(Accum::kInput, std::move(frameFirstInput));
-            finalArgExprs.emplace(Accum::kDefaultVal, makeNullConstant());
+            finalArgExprs.emplace(Accum::kDefaultVal, b.makeNullConstant());
         } else if (outputField.expr->getOpName() == "$last" && removable) {
             tassert(8085503,
                     str::stream() << "Window function $last expects 1 argument",
                     argExprs.size() == 1);
             auto it = argExprs.begin();
-            auto inputExpr = it->second->clone();
+            auto inputExpr = it->second.clone();
             auto& frameLastSlots = windowFrameLastSlots[*windowFrameLastSlotIdx.back()];
-            auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
+            auto frameLastInput = getModifiedExpr(inputExpr.clone(), frameLastSlots);
             finalArgExprs.emplace(Accum::kInput, std::move(frameLastInput));
-            finalArgExprs.emplace(Accum::kDefaultVal, makeNullConstant());
+            finalArgExprs.emplace(Accum::kDefaultVal, b.makeNullConstant());
         } else if (outputField.expr->getOpName() == "$linearFill") {
             finalArgExprs = std::move(argExprs);
         } else if (outputField.expr->getOpName() == "$shift") {
@@ -5105,32 +5109,27 @@ public:
             tassert(8293501, "$shift is expected to be removable", removable);
             auto it = argExprs.begin();
             auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
-            auto inputExpr = it->second->clone();
-            auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
+            auto inputExpr = it->second.clone();
+            auto frameFirstInput = getModifiedExpr(inputExpr.clone(), frameFirstSlots);
             finalArgExprs.emplace(Accum::kInput, std::move(frameFirstInput));
-            finalArgExprs.emplace(Accum::kDefaultVal, getDefaultValueExpr(outputField));
+            finalArgExprs.emplace(Accum::kDefaultVal, getDefaultValueExpr(state, outputField));
         } else if (isTopBottomN(outputField) && !removable) {
             finalArgExprs.emplace(Accum::kSortSpec,
-                                  sbe::makeE<sbe::EVariable>(_state.getSortSpecSlot(&outputField)));
+                                  b.makeVariable(state.getSortSpecSlot(&outputField)));
         }
 
         // Build finalize expressions.
-        std::unique_ptr<sbe::EExpression> finalExpr;
+        SbExpr finalExpr;
         if (removable) {
             finalExpr = finalArgExprs.size() > 0
-                ? buildWindowFinalize(_state,
-                                      outputField,
-                                      window.windowExprSlots,
-                                      std::move(finalArgExprs),
-                                      collatorSlot)
-                : buildWindowFinalize(_state, outputField, window.windowExprSlots, collatorSlot);
+                ? buildWindowFinalize(
+                      state, outputField, window.windowExprSlots, std::move(finalArgExprs))
+                : buildWindowFinalize(state, outputField, window.windowExprSlots);
         } else {
             finalExpr = finalArgExprs.size() > 0
                 ? buildFinalizeForWindowFunc(
-                      acc, std::move(finalArgExprs), _state, window.windowExprSlots)
-                      .extractExpr(_state)
-                : buildFinalizeForWindowFunc(acc, _state, window.windowExprSlots)
-                      .extractExpr(_state);
+                      acc, std::move(finalArgExprs), state, window.windowExprSlots)
+                : buildFinalizeForWindowFunc(acc, state, window.windowExprSlots);
         }
 
         // Deal with empty window for finalize expressions.
@@ -5138,69 +5137,63 @@ public:
             StringData accExprName = outputField.expr->getOpName();
 
             if (accExprName == "$sum") {
-                return makeConstant(sbe::value::TypeTags::NumberInt32, 0);
+                return b.makeInt32Constant(0);
             } else if (accExprName == "$push" || accExprName == AccumulatorAddToSet::kName) {
                 auto [tag, val] = sbe::value::makeNewArray();
-                return makeConstant(tag, val);
+                return b.makeConstant(tag, val);
             } else if (accExprName == "$shift") {
-                return getDefaultValueExpr(outputField);
+                return getDefaultValueExpr(state, outputField);
             } else {
-                return makeConstant(sbe::value::TypeTags::Null, 0);
+                return b.makeNullConstant();
             }
         }();
 
         if (finalExpr) {
-            finalExpr = sbe::makeE<sbe::EIf>(
-                makeFunction("exists", makeVariable(window.windowExprSlots[0])),
-                std::move(finalExpr),
-                std::move(emptyWindowExpr));
+            finalExpr =
+                b.makeIf(b.makeFunction("exists", b.makeVariable(window.windowExprSlots[0])),
+                         std::move(finalExpr),
+                         std::move(emptyWindowExpr));
         } else {
-            finalExpr = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                                     makeVariable(window.windowExprSlots[0]),
-                                     std::move(emptyWindowExpr));
+            finalExpr = b.makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                                       b.makeVariable(window.windowExprSlots[0]),
+                                       std::move(emptyWindowExpr));
         }
-        auto finalSlot = _slotIdGenerator.generate();
-        windowFinalProjects.emplace_back(finalSlot, std::move(finalExpr));
-        windowFinalSlots.push_back(finalSlot);
 
-        return finalSlot;
+        return finalExpr;
     }
 
 private:
-    StageBuilderState& _state;
-    sbe::value::SlotIdGenerator& _slotIdGenerator;
+    StageBuilderState& state;
     const PlanStageReqs& forwardingReqs;
     const PlanStageSlots& outputs;
-    boost::optional<SbSlot> rootSlotOpt;
     const WindowNode* windowNode;
-    const CanonicalQuery& _cq;
-    boost::optional<SlotId> collatorSlot;
+    ExpressionContext* expCtx;
+    const bool allowDiskUse;
     SbBuilder b;
 
-    SlotVector currSlots;
-    SlotVector boundTestingSlots;
-    std::vector<SlotVector> windowFrameFirstSlots;
-    std::vector<SlotVector> windowFrameLastSlots;
+    SbSlotVector currSlots;
+    SbSlotVector boundTestingSlots;
+    std::vector<SbSlotVector> windowFrameFirstSlots;
+    std::vector<SbSlotVector> windowFrameLastSlots;
 
     // Calculate slot for document position based window bounds, and add corresponding stages.
-    boost::optional<SlotId> documentBoundSlot;
+    boost::optional<SbSlot> documentBoundSlot;
 
     // Calculate sort-by slot, and add corresponding stages.
-    boost::optional<SlotId> sortBySlot;
+    boost::optional<SbSlot> sortBySlot;
 
     // Calculate slot for range and time range based window bounds
-    boost::optional<SlotId> rangeBoundSlot;
-    boost::optional<SlotId> timeRangeBoundSlot;
+    boost::optional<SbSlot> rangeBoundSlot;
+    boost::optional<SbSlot> timeRangeBoundSlot;
 
     std::vector<boost::optional<size_t>> windowFrameFirstSlotIdx;
     std::vector<boost::optional<size_t>> windowFrameLastSlotIdx;
 
     // We project window function input arguments in order to avoid repeated evaluation
     // for both add and remove expressions.
-    sbe::SlotExprPairVector windowArgProjects;
+    SbExprOptSbSlotVector windowArgProjects;
 
-    sbe::value::SlotVector windowFinalSlots;
-    sbe::SlotExprPairVector windowFinalProjects;
+    SbExpr::Vector windowFinalExprs;
 };
 
 WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
@@ -5216,8 +5209,7 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
 
     // Creating window definitions, including the slots and expressions for the bounds and
     // accumulators.
-    std::vector<sbe::WindowStage::Window> windows;
-    StringMap<SlotId> outputPathMap;
+    std::vector<SbWindow> windows;
 
     for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
         auto& outputField = windowNode->outputFields[i];
@@ -5234,7 +5226,7 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
             generateArgs(std::move(stage), outputField, removable);
         stage = std::move(outStage);
 
-        sbe::WindowStage::Window window{};
+        SbWindow window{};
 
         // Create init/add/remove expressions.
         stage = generateInitsAddsAndRemoves(std::move(stage),
@@ -5252,22 +5244,16 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
         stage = generateBoundExprs(std::move(stage), outputField, windowBounds, window);
 
         // Build extra arguments for finalize expressions.
-        auto finalSlot =
-            generateFinalExpr(outputField, acc, removable, std::move(argExprs), window);
+        windowFinalExprs.emplace_back(
+            generateFinalExpr(outputField, acc, removable, std::move(argExprs), window));
 
         // Append the window definition to the end of the 'windows' vector.
         windows.emplace_back(std::move(window));
-
-        // If 'outputField' is not a dotted path, add 'outputField' and its corresponding slot
-        // to 'outputPathMap'.
-        if (outputField.fieldName.find('.') == std::string::npos) {
-            outputPathMap.emplace(outputField.fieldName, finalSlot);
-        }
     }
 
     if (windowArgProjects.size() > 0) {
-        stage = sbe::makeS<sbe::ProjectStage>(
-            std::move(stage), std::move(windowArgProjects), windowNode->nodeId());
+        auto [outStage, _] = b.makeProject(std::move(stage), std::move(windowArgProjects));
+        stage = std::move(outStage);
     }
 
     // Assign frame first/last slots to window definitions.
@@ -5283,20 +5269,35 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
     }
 
     // Calculate sliding window.
-    stage = sbe::makeS<sbe::WindowStage>(std::move(stage),
-                                         std::move(currSlots),
-                                         std::move(boundTestingSlots),
-                                         partitionSlotCount,
-                                         std::move(windows),
-                                         collatorSlot,
-                                         _cq.getExpCtx()->allowDiskUse,
-                                         windowNode->nodeId());
+    stage = b.makeWindow(std::move(stage),
+                         std::move(currSlots),
+                         std::move(boundTestingSlots),
+                         partitionSlotCount,
+                         std::move(windows),
+                         state.getCollatorSlot(),
+                         allowDiskUse);
+
+    SbExprOptSbSlotVector windowFinalProjects;
+    for (auto& expr : windowFinalExprs) {
+        windowFinalProjects.emplace_back(std::move(expr), boost::none);
+    }
 
     // Get final window outputs.
-    stage = sbe::makeS<sbe::ProjectStage>(
-        std::move(stage), std::move(windowFinalProjects), windowNode->nodeId());
+    auto [finalProjectStage, windowFinalSlots] =
+        b.makeProject(std::move(stage), std::move(windowFinalProjects));
 
-    return {std::move(stage),
+    // Build 'outputPathMap'.
+    StringMap<SbSlot> outputPathMap;
+    for (size_t i = 0; i < windowNode->outputFields.size(); ++i) {
+        // If 'outputField' is not a dotted path, add 'outputField' and its corresponding slot
+        // to 'outputPathMap'.
+        auto& outputField = windowNode->outputFields[i];
+        if (outputField.fieldName.find('.') == std::string::npos) {
+            outputPathMap.emplace(outputField.fieldName, windowFinalSlots[i]);
+        }
+    }
+
+    return {std::move(finalProjectStage),
             std::move(windowFields),
             std::move(windowFinalSlots),
             std::move(outputPathMap)};
@@ -5314,14 +5315,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto stage = std::move(childStageOutput.first);
     auto outputs = std::move(childStageOutput.second);
 
-    auto collatorSlot = _state.getCollatorSlot();
+    // Initially we populate 'currSlots' with the slots from '_data->metadataSlots'.
+    SbSlotVector currSlots;
+    for (auto slotId : _data->metadataSlots.getSlotVector()) {
+        currSlots.emplace_back(SbSlot{slotId});
+    }
 
-    auto sv = _data->metadataSlots.getSlotVector();
+    ExpressionContext* expCtx = _cq.getExpCtxRaw();
+    const bool allowDiskUse = _cq.getExpCtx()->allowDiskUse;
 
     // Create a WindowStageBuilder and call the build() method on it. This will generate all
     // the SBE expressions and SBE stages needed to implement the window stage.
     WindowStageBuilder builder(
-        _state, forwardingReqs, outputs, windowNode, _cq, collatorSlot, std::move(sv));
+        _state, forwardingReqs, outputs, windowNode, expCtx, allowDiskUse, std::move(currSlots));
 
     auto [outStage, windowFields, windowFinalSlots, outputPathMap] =
         builder.build(std::move(stage));

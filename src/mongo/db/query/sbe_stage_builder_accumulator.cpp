@@ -85,84 +85,75 @@ const StringData kAccumulatorCountName = "$count"_sd;
 Inputs::~Inputs() {}
 
 template <typename... Ts>
-auto decodeNamedExprsMap(StringDataMap<std::unique_ptr<sbe::EExpression>> args,
-                         Ts&&... expectedParamNames) {
+auto decodeNamedExprsMap(StringDataMap<SbExpr> args, Ts&&... expectedParamNames) {
     auto extractArg = [&](const auto& expectedParamName) {
         auto it = args.find(expectedParamName);
         uassert(8679700,
                 str::stream() << "Expected parameter not found: " << expectedParamName,
                 it != args.end());
 
-        return SbExpr{std::move(it->second)};
+        return std::move(it->second);
     };
 
     return std::tuple(extractArg(expectedParamNames)...);
 }
 
-AccumSingleInput::AccumSingleInput(StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumSingleInput::AccumSingleInput(StringDataMap<SbExpr> args) {
     std::tie(inputExpr) = decodeNamedExprsMap(std::move(args), kInput);
 }
 
-AccumAggsAvgInputs::AccumAggsAvgInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumAggsAvgInputs::AccumAggsAvgInputs(StringDataMap<SbExpr> args) {
     std::tie(inputExpr, count) = decodeNamedExprsMap(std::move(args), kInput, kCount);
 }
 
-AccumCovarianceInputs::AccumCovarianceInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumCovarianceInputs::AccumCovarianceInputs(StringDataMap<SbExpr> args) {
     std::tie(covarianceX, covarianceY) =
         decodeNamedExprsMap(std::move(args), kCovarianceX, kCovarianceY);
 }
 
-AccumRankInputs::AccumRankInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumRankInputs::AccumRankInputs(StringDataMap<SbExpr> args) {
     std::tie(inputExpr, isAscending) = decodeNamedExprsMap(std::move(args), kInput, kIsAscending);
 }
 
-AccumIntegralInputs::AccumIntegralInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumIntegralInputs::AccumIntegralInputs(StringDataMap<SbExpr> args) {
     std::tie(inputExpr, sortBy) = decodeNamedExprsMap(std::move(args), kInput, kSortBy);
 }
 
-AccumLinearFillInputs::AccumLinearFillInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumLinearFillInputs::AccumLinearFillInputs(StringDataMap<SbExpr> args) {
     std::tie(inputExpr, sortBy) = decodeNamedExprsMap(std::move(args), kInput, kSortBy);
 }
 
-AccumTopBottomNInputs::AccumTopBottomNInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+AccumTopBottomNInputs::AccumTopBottomNInputs(StringDataMap<SbExpr> args) {
     std::tie(value, sortBy, sortSpec) =
         decodeNamedExprsMap(std::move(args), kValue, kSortBy, kSortSpec);
 }
 
-InitAccumNInputs::InitAccumNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+InitAccumNInputs::InitAccumNInputs(StringDataMap<SbExpr> args) {
     std::tie(maxSize, isGroupAccum) = decodeNamedExprsMap(std::move(args), kMaxSize, kIsGroupAccum);
 }
 
-InitExpMovingAvgInputs::InitExpMovingAvgInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+InitExpMovingAvgInputs::InitExpMovingAvgInputs(StringDataMap<SbExpr> args) {
     std::tie(inputExpr) = decodeNamedExprsMap(std::move(args), kInput);
 }
 
-InitIntegralInputs::InitIntegralInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+InitIntegralInputs::InitIntegralInputs(StringDataMap<SbExpr> args) {
     std::tie(inputExpr) = decodeNamedExprsMap(std::move(args), kInput);
 }
 
-FinalizeTopBottomNInputs::FinalizeTopBottomNInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+FinalizeTopBottomNInputs::FinalizeTopBottomNInputs(StringDataMap<SbExpr> args) {
     std::tie(sortSpec) = decodeNamedExprsMap(std::move(args), kSortSpec);
 }
 
-FinalizeDerivativeInputs::FinalizeDerivativeInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+FinalizeDerivativeInputs::FinalizeDerivativeInputs(StringDataMap<SbExpr> args) {
     std::tie(unit, inputFirst, sortByFirst, inputLast, sortByLast) = decodeNamedExprsMap(
         std::move(args), kUnit, kInputFirst, kSortByFirst, kInputLast, kSortByLast);
 }
 
-FinalizeLinearFillInputs::FinalizeLinearFillInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+FinalizeLinearFillInputs::FinalizeLinearFillInputs(StringDataMap<SbExpr> args) {
     std::tie(sortBy) = decodeNamedExprsMap(std::move(args), kSortBy);
 }
 
-CombineAggsTopBottomNInputs::CombineAggsTopBottomNInputs(
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+CombineAggsTopBottomNInputs::CombineAggsTopBottomNInputs(StringDataMap<SbExpr> args) {
     std::tie(sortSpec) = decodeNamedExprsMap(std::move(args), kSortSpec);
 }
 
@@ -174,59 +165,74 @@ using BuildFnType =
 template <typename ReturnT, typename... Args>
 using BuildNoInputsFnType = std::function<ReturnT(const Op&, StageBuilderState&, Args...)>;
 
-// Define std::function types for functions whose inputs are passed in via 'unique_ptr<T>'
-// (where 'T' is a class derived from the Inputs base class).
+// std::function type for buildAccumExprs() with inputs and without inputs.
+using BuildAccumExprsNoInputsFn = BuildNoInputsFnType<InputsPtr>;
+
 template <typename T>
 using BuildAccumExprsFnType = BuildFnType<InputsPtr, T>;
+
+using BuildAccumExprsFn = BuildAccumExprsFnType<Inputs>;
+
+// std::function type for buildAccumBlockExprs() with inputs and without inputs.
+using BuildAccumBlockExprsNoInputsFn =
+    BuildNoInputsFnType<boost::optional<Accum::AccumBlockExprs>, const PlanStageSlots&>;
 
 template <typename T>
 using BuildAccumBlockExprsFnType =
     BuildFnType<boost::optional<Accum::AccumBlockExprs>, T, const PlanStageSlots&>;
 
+using BuildAccumBlockExprsFn = BuildAccumBlockExprsFnType<Inputs>;
+
+// std::function type for buildAccumAggs() with inputs and without inputs.
+using BuildAccumAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
+
 template <typename T>
 using BuildAccumAggsFnType = BuildFnType<SbExpr::Vector, T>;
+
+using BuildAccumAggsFn = BuildAccumAggsFnType<Inputs>;
+
+// std::function type for buildAccumBlockAggs() with inputs and without inputs.
+using BuildAccumBlockAggsNoInputsFn =
+    BuildNoInputsFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, SbSlot>;
 
 template <typename T>
 using BuildAccumBlockAggsFnType =
     BuildFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, T, SbSlot>;
 
+using BuildAccumBlockAggsFn = BuildAccumBlockAggsFnType<Inputs>;
+
+// std::function type for buildInit() with inputs and without inputs.
+using BuildInitNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
+
 template <typename T>
 using BuildInitFnType = BuildFnType<SbExpr::Vector, T>;
+
+using BuildInitFn = BuildInitFnType<Inputs>;
+
+// std::function type for buildFinalize() with inputs and without inputs.
+using BuildFinalizeNoInputsFn = BuildNoInputsFnType<SbExpr, const SbSlotVector&>;
 
 template <typename T>
 using BuildFinalizeFnType = BuildFnType<SbExpr, T, const SbSlotVector&>;
 
+using BuildFinalizeFn = BuildFinalizeFnType<Inputs>;
+
+// std::function type for buildCombineAggs() with inputs and without inputs.
+using BuildCombineAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector, const SbSlotVector&>;
+
 template <typename T>
 using BuildCombineAggsFnType = BuildFnType<SbExpr::Vector, T, const SbSlotVector&>;
 
-// Define std::function types for functions that don't take any inputs.
-using BuildAccumExprsNoInputsFn = BuildNoInputsFnType<InputsPtr>;
-using BuildAccumBlockExprsNoInputsFn =
-    BuildNoInputsFnType<boost::optional<Accum::AccumBlockExprs>, const PlanStageSlots&>;
-using BuildAccumAggsNoInputsFn = BuildNoInputsFnType<std::vector<BlockAggAndRowAgg>>;
-using BuildAccumBlockAggsNoInputsFn =
-    BuildNoInputsFnType<boost::optional<std::vector<BlockAggAndRowAgg>>, SbSlot>;
-using BuildInitNoInputsFn = BuildNoInputsFnType<SbExpr::Vector>;
-using BuildFinalizeNoInputsFn = BuildNoInputsFnType<SbExpr, const SbSlotVector&>;
-using BuildCombineAggsNoInputsFn = BuildNoInputsFnType<SbExpr::Vector, const SbSlotVector&>;
-
-// Define std::function types for functions whose inputs are passed in via 'InputsPtr'
-// (aka 'unique_ptr<Inputs>').
-using BuildAccumExprsFn = BuildAccumExprsFnType<Inputs>;
-using BuildAccumBlockExprsFn = BuildAccumBlockExprsFnType<Inputs>;
-using BuildAccumAggsFn = BuildAccumAggsFnType<Inputs>;
-using BuildAccumBlockAggsFn = BuildAccumBlockAggsFnType<Inputs>;
-using BuildInitFn = BuildInitFnType<Inputs>;
-using BuildFinalizeFn = BuildFinalizeFnType<Inputs>;
 using BuildCombineAggsFn = BuildCombineAggsFnType<Inputs>;
 
+// Helper function for casting InputsPtr to a derived class type.
 template <typename T>
 std::unique_ptr<T> castInputsTo(InputsPtr inputs) {
     // Try casting 'inputs.get()' to T* and check if the cast was succeesful.
     const bool castSuccessful = inputs && dynamic_cast<T*>(inputs.get()) != nullptr;
 
     constexpr bool isConstructibleFromNamedExprsMap =
-        std::is_constructible_v<T, StringDataMap<std::unique_ptr<sbe::EExpression>>>;
+        std::is_constructible_v<T, StringDataMap<SbExpr>>;
 
     // If the cast failed and the expected type is constructible from a named expr map,
     // check if 'inputs' is a NamedExprsMapWrapper.
@@ -1529,7 +1535,7 @@ boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsSingleInput(
 
 boost::optional<Accum::AccumBlockExprs> buildAccumBlockExprsNoInputs(
     const Op& acc, StageBuilderState& state, const PlanStageSlots& outputs) {
-    // Initialize 'accumBlockExprs' to be an empty vector and return it.
+    // Default construct a 'AccumBlockExprs' and return it.
     boost::optional<Accum::AccumBlockExprs> accumBlockExprs;
     accumBlockExprs.emplace();
     return accumBlockExprs;
@@ -1868,14 +1874,6 @@ static const StringDataMap<OpInfo> accumOpInfoMap = {
      OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsRank),
             .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
 
-    // Sum
-    {AccumulatorSum::kName,
-     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
-            .buildAccumAggs = makeBuildFn(&buildAccumAggsSum),
-            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsSum),
-            .buildFinalize = makeBuildFn(&buildFinalizeSum),
-            .buildCombineAggs = makeBuildFn(&buildCombineAggsSum)}},
-
     // StdDevPop
     {AccumulatorStdDevPop::kName,
      OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsStdDev),
@@ -1887,6 +1885,14 @@ static const StringDataMap<OpInfo> accumOpInfoMap = {
      OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsStdDev),
             .buildFinalize = makeBuildFn(&buildFinalizeStdDevSamp),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsStdDev)}},
+
+    // Sum
+    {AccumulatorSum::kName,
+     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
+            .buildAccumAggs = makeBuildFn(&buildAccumAggsSum),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsSum),
+            .buildFinalize = makeBuildFn(&buildFinalizeSum),
+            .buildCombineAggs = makeBuildFn(&buildCombineAggsSum)}},
 
     // Top
     {AccumulatorTop::getName(),

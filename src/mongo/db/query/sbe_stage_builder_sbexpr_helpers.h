@@ -208,10 +208,26 @@ public:
             getEPrimBinaryOp(logicOp), std::move(leaves), _state);
     }
 
-protected:
-    std::unique_ptr<sbe::EExpression> extractExpr(SbExpr& e);
+    std::unique_ptr<sbe::EExpression> lower(SbExpr& e, const VariableTypes* varTypes = nullptr) {
+        return e.extractExpr(_state, varTypes);
+    }
 
-    sbe::EExpression::Vector extractExpr(SbExpr::Vector& sbExprs);
+    sbe::EExpression::Vector lower(SbExpr::Vector& sbExprs,
+                                   const VariableTypes* varTypes = nullptr);
+
+    sbe::value::SlotId lower(SbSlot s, const VariableTypes* = nullptr) {
+        return s.getId();
+    }
+
+    boost::optional<sbe::value::SlotId> lower(boost::optional<SbSlot> s,
+                                              const VariableTypes* = nullptr) {
+        return s ? boost::make_optional(s->getId()) : boost::none;
+    }
+
+    sbe::value::SlotVector lower(const SbSlotVector& sbSlots, const VariableTypes* = nullptr);
+
+    sbe::SlotExprPairVector lower(SbExprSbSlotVector& sbSlotSbExprVec,
+                                  const VariableTypes* varTypes = nullptr);
 
     StageBuilderState& _state;
 };
@@ -221,6 +237,8 @@ protected:
  */
 class SbBuilder : public SbExprBuilder {
 public:
+    using SbExprBuilder::lower;
+
     SbBuilder(StageBuilderState& state, PlanNodeId nodeId)
         : SbExprBuilder(state), _nodeId(nodeId) {}
 
@@ -390,6 +408,70 @@ public:
         bool allowDiskUse,
         SbExprSbSlotVector mergingExprs,
         PlanYieldPolicy* yieldPolicy);
+
+    std::tuple<SbStage, SbSlotVector> makeAggProject(SbStage stage, SbAggExprVector sbAggExprs) {
+        return makeAggProject(std::move(stage), nullptr, std::move(sbAggExprs));
+    }
+
+    std::tuple<SbStage, SbSlotVector> makeAggProject(SbStage stage,
+                                                     const VariableTypes& varTypes,
+                                                     SbAggExprVector sbAggExprs) {
+        return makeAggProject(std::move(stage), &varTypes, std::move(sbAggExprs));
+    }
+
+    std::tuple<SbStage, SbSlotVector> makeAggProject(SbStage stage,
+                                                     const VariableTypes* varTypes,
+                                                     SbAggExprVector sbAggExprs);
+
+    SbStage makeWindow(SbStage stage,
+                       const SbSlotVector& currSlots,
+                       const SbSlotVector& boundTestingSlots,
+                       size_t partitionSlotCount,
+                       std::vector<SbWindow> windows,
+                       boost::optional<sbe::value::SlotId> collatorSlot,
+                       bool allowDiskUse) {
+        return makeWindow(std::move(stage),
+                          nullptr,
+                          currSlots,
+                          boundTestingSlots,
+                          partitionSlotCount,
+                          std::move(windows),
+                          collatorSlot,
+                          allowDiskUse);
+    }
+
+    SbStage makeWindow(SbStage stage,
+                       const VariableTypes& varTypes,
+                       const SbSlotVector& currSlots,
+                       const SbSlotVector& boundTestingSlots,
+                       size_t partitionSlotCount,
+                       std::vector<SbWindow> windows,
+                       boost::optional<sbe::value::SlotId> collatorSlot,
+                       bool allowDiskUse) {
+        return makeWindow(std::move(stage),
+                          &varTypes,
+                          currSlots,
+                          boundTestingSlots,
+                          partitionSlotCount,
+                          std::move(windows),
+                          collatorSlot,
+                          allowDiskUse);
+    }
+
+    SbStage makeWindow(SbStage stage,
+                       const VariableTypes* varTypes,
+                       const SbSlotVector& currSlots,
+                       const SbSlotVector& boundTestingSlots,
+                       size_t partitionSlotCount,
+                       std::vector<SbWindow> windows,
+                       boost::optional<sbe::value::SlotId> collatorSlot,
+                       bool allowDiskUse);
+
+protected:
+    sbe::WindowStage::Window lower(SbWindow& sbWindow, const VariableTypes* varTypes = nullptr);
+
+    std::vector<sbe::WindowStage::Window> lower(std::vector<SbWindow>& sbWindows,
+                                                const VariableTypes* varTypes = nullptr);
 
     PlanNodeId _nodeId;
 };

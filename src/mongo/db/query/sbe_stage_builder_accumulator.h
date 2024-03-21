@@ -211,7 +211,7 @@ extern const std::vector<std::string> kAccumulatorTopBottomNParams;
 struct AccumSingleInput : public Inputs {
     AccumSingleInput(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
 
-    AccumSingleInput(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumSingleInput(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
 };
@@ -220,7 +220,7 @@ struct AccumAggsAvgInputs : public Inputs {
     AccumAggsAvgInputs(SbExpr inputExpr, SbExpr count)
         : inputExpr(std::move(inputExpr)), count(std::move(count)) {}
 
-    AccumAggsAvgInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumAggsAvgInputs(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
     SbExpr count;
@@ -230,7 +230,7 @@ struct AccumCovarianceInputs : public Inputs {
     AccumCovarianceInputs(SbExpr covarianceX, SbExpr covarianceY)
         : covarianceX(std::move(covarianceX)), covarianceY(std::move(covarianceY)) {}
 
-    AccumCovarianceInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumCovarianceInputs(StringDataMap<SbExpr> args);
 
     SbExpr covarianceX;
     SbExpr covarianceY;
@@ -240,7 +240,7 @@ struct AccumRankInputs : public Inputs {
     AccumRankInputs(SbExpr inputExpr, SbExpr isAscending)
         : inputExpr(std::move(inputExpr)), isAscending(std::move(isAscending)) {}
 
-    AccumRankInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumRankInputs(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
     SbExpr isAscending;
@@ -250,7 +250,7 @@ struct AccumIntegralInputs : public Inputs {
     AccumIntegralInputs(SbExpr inputExpr, SbExpr sortBy)
         : inputExpr(std::move(inputExpr)), sortBy(std::move(sortBy)) {}
 
-    AccumIntegralInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumIntegralInputs(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
     SbExpr sortBy;
@@ -260,7 +260,7 @@ struct AccumLinearFillInputs : public Inputs {
     AccumLinearFillInputs(SbExpr inputExpr, SbExpr sortBy)
         : inputExpr(std::move(inputExpr)), sortBy(std::move(sortBy)) {}
 
-    AccumLinearFillInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumLinearFillInputs(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
     SbExpr sortBy;
@@ -270,7 +270,7 @@ struct AccumTopBottomNInputs : public Inputs {
     AccumTopBottomNInputs(SbExpr value, SbExpr sortBy, SbExpr sortSpec)
         : value(std::move(value)), sortBy(std::move(sortBy)), sortSpec(std::move(sortSpec)) {}
 
-    AccumTopBottomNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    AccumTopBottomNInputs(StringDataMap<SbExpr> args);
 
     SbExpr value;
     SbExpr sortBy;
@@ -298,7 +298,7 @@ struct InitAccumNInputs : public Inputs {
     InitAccumNInputs(SbExpr maxSize, SbExpr isGroupAccum)
         : maxSize(std::move(maxSize)), isGroupAccum(std::move(isGroupAccum)) {}
 
-    InitAccumNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    InitAccumNInputs(StringDataMap<SbExpr> args);
 
     SbExpr maxSize;
     SbExpr isGroupAccum;
@@ -307,7 +307,7 @@ struct InitAccumNInputs : public Inputs {
 struct InitExpMovingAvgInputs : public Inputs {
     InitExpMovingAvgInputs(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
 
-    InitExpMovingAvgInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    InitExpMovingAvgInputs(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
 };
@@ -315,7 +315,7 @@ struct InitExpMovingAvgInputs : public Inputs {
 struct InitIntegralInputs : public Inputs {
     InitIntegralInputs(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
 
-    InitIntegralInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    InitIntegralInputs(StringDataMap<SbExpr> args);
 
     SbExpr inputExpr;
 };
@@ -323,7 +323,7 @@ struct InitIntegralInputs : public Inputs {
 struct FinalizeTopBottomNInputs : public Inputs {
     FinalizeTopBottomNInputs(SbExpr sortSpec) : sortSpec(std::move(sortSpec)) {}
 
-    FinalizeTopBottomNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    FinalizeTopBottomNInputs(StringDataMap<SbExpr> args);
 
     SbExpr sortSpec;
 };
@@ -337,7 +337,7 @@ struct FinalizeDerivativeInputs : public Inputs {
           inputLast(std::move(inputLast)),
           sortByLast(std::move(sortByLast)) {}
 
-    FinalizeDerivativeInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    FinalizeDerivativeInputs(StringDataMap<SbExpr> args);
 
     SbExpr unit;
     SbExpr inputFirst;
@@ -349,7 +349,7 @@ struct FinalizeDerivativeInputs : public Inputs {
 struct FinalizeLinearFillInputs : public Inputs {
     FinalizeLinearFillInputs(SbExpr sortBy) : sortBy(std::move(sortBy)) {}
 
-    FinalizeLinearFillInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    FinalizeLinearFillInputs(StringDataMap<SbExpr> args);
 
     SbExpr sortBy;
 };
@@ -357,7 +357,7 @@ struct FinalizeLinearFillInputs : public Inputs {
 struct CombineAggsTopBottomNInputs : public Inputs {
     CombineAggsTopBottomNInputs(SbExpr sortSpec) : sortSpec(std::move(sortSpec)) {}
 
-    CombineAggsTopBottomNInputs(StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+    CombineAggsTopBottomNInputs(StringDataMap<SbExpr> args);
 
     SbExpr sortSpec;
 };
@@ -367,10 +367,9 @@ struct CombineAggsTopBottomNInputs : public Inputs {
 // converted to use subclasses of Accum::Inputs, we can delete this wrapper (and any assoicated
 // logic needed to make it work).
 struct NamedExprsMapWrapper : public Inputs {
-    NamedExprsMapWrapper(StringDataMap<std::unique_ptr<sbe::EExpression>> args)
-        : args(std::move(args)) {}
+    NamedExprsMapWrapper(StringDataMap<SbExpr> args) : args(std::move(args)) {}
 
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args;
+    StringDataMap<SbExpr> args;
 };
 }  // namespace Accum
 }  // namespace mongo::stage_builder

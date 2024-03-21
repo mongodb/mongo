@@ -246,16 +246,6 @@ auto makeAggExprVector(Ts&&... pack) {
     return v;
 }
 
-template <typename... Ts>
-auto makeAggExprSlotMap(Ts&&... pack) {
-    value::SlotMap<AggExprPair> v;
-    if constexpr (sizeof...(pack) > 0) {
-        v.reserve(sizeof...(Ts) / 3);
-        detail::makeAggExprPairHelper(v, std::forward<Ts>(pack)...);
-    }
-    return v;
-}
-
 /**
  * This is a constant expression. It assumes the ownership of the input constant.
  */

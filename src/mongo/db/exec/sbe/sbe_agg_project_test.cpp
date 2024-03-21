@@ -60,7 +60,7 @@ TEST_F(AggProjectStageTest, SimpleCountTest) {
         auto outSlot = generateSlotId();
         auto aggProject = makeS<AggProjectStage>(
             std::move(scanStage),
-            makeAggExprSlotMap(
+            makeAggExprVector(
                 outSlot,
                 nullptr,
                 stage_builder::makeFunction("sum",
@@ -89,7 +89,7 @@ TEST_F(AggProjectStageTest, SimpleSumTest) {
         auto outSlot = generateSlotId();
         auto aggProject = makeS<AggProjectStage>(
             std::move(scanStage),
-            makeAggExprSlotMap(
+            makeAggExprVector(
                 outSlot,
                 nullptr,
                 stage_builder::makeFunction("sum", stage_builder::makeVariable(scanSlot))),
@@ -115,7 +115,7 @@ TEST_F(AggProjectStageTest, SumWithInitTest) {
         auto outSlot = generateSlotId();
         auto aggProject = makeS<AggProjectStage>(
             std::move(scanStage),
-            makeAggExprSlotMap(
+            makeAggExprVector(
                 outSlot,
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(100)),
                 stage_builder::makeFunction("sum", stage_builder::makeVariable(scanSlot))),

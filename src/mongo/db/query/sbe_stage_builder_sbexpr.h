@@ -620,6 +620,17 @@ struct SbAggExpr {
 
 using SbAggExprVector = std::vector<std::pair<SbAggExpr, boost::optional<SbSlot>>>;
 
+struct SbWindow {
+    SbSlotVector windowExprSlots;
+    SbSlotVector frameFirstSlots;
+    SbSlotVector frameLastSlots;
+    SbExpr::Vector initExprs;
+    SbExpr::Vector addExprs;
+    SbExpr::Vector removeExprs;
+    SbExpr lowBoundExpr;
+    SbExpr highBoundExpr;
+};
+
 inline void addVariableTypesHelper(VariableTypes& varTypes, SbSlot slot) {
     if (auto typeSig = slot.getTypeSignature()) {
         varTypes[getABTVariableName(slot)] = *typeSig;

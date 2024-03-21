@@ -42,101 +42,83 @@ class Op;
 /**
  * Build a list of window function init functions.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+SbExpr::Vector buildWindowInit(StageBuilderState& state, const WindowFunctionStatement& stmt);
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+SbExpr::Vector buildWindowInit(StageBuilderState& state,
+                               const WindowFunctionStatement& stmt,
+                               StringDataMap<SbExpr> args);
 
 /**
  * Build a list of window function add functions.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    std::unique_ptr<sbe::EExpression> arg,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+SbExpr::Vector buildWindowAdd(StageBuilderState& state,
+                              const WindowFunctionStatement& stmt,
+                              SbExpr arg);
 
 /**
  * Similar to above but takes multiple arguments.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+SbExpr::Vector buildWindowAdd(StageBuilderState& state,
+                              const WindowFunctionStatement& stmt,
+                              StringDataMap<SbExpr> args);
 
 /**
  * Build a list of window function remove functions.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    std::unique_ptr<sbe::EExpression> arg,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+SbExpr::Vector buildWindowRemove(StageBuilderState& state,
+                                 const WindowFunctionStatement& stmt,
+                                 SbExpr arg);
 
 /**
  * Similar to above but takes multiple arguments.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+SbExpr::Vector buildWindowRemove(StageBuilderState& state,
+                                 const WindowFunctionStatement& stmt,
+                                 StringDataMap<SbExpr> args);
 
 /**
  * Build a window function finalize functions from the list of intermediate values.
  */
-std::unique_ptr<sbe::EExpression> buildWindowFinalize(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    sbe::value::SlotVector values,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+SbExpr buildWindowFinalize(StageBuilderState& state,
+                           const WindowFunctionStatement& stmt,
+                           SbSlotVector values);
 
 /**
  * Similar to above but takes multiple arguments.
  */
-std::unique_ptr<sbe::EExpression> buildWindowFinalize(
-    StageBuilderState& state,
-    const WindowFunctionStatement& stmt,
-    sbe::value::SlotVector values,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> arg,
-    boost::optional<sbe::value::SlotId> collatorSlots);
+SbExpr buildWindowFinalize(StageBuilderState& state,
+                           const WindowFunctionStatement& stmt,
+                           SbSlotVector values,
+                           StringDataMap<SbExpr> args);
 
 /**
  * Given an Accum::Op 'acc' and a single input expression ('input'), these functions
  * generate the accumulate expressions for 'acc'.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorForWindowFunc(
-    const Accum::Op& acc, std::unique_ptr<sbe::EExpression> input, StageBuilderState& state);
+SbExpr::Vector buildAccumulatorForWindowFunc(const Accum::Op& acc,
+                                             SbExpr input,
+                                             StageBuilderState& state);
 
 /**
  * Given an Accum::Op 'acc' and a set of input expressions ('inputs'), these functions
  * generate the accumulate expressions for 'acc'.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorForWindowFunc(
-    const Accum::Op& acc,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> inputs,
-    StageBuilderState& state);
+SbExpr::Vector buildAccumulatorForWindowFunc(const Accum::Op& acc,
+                                             StringDataMap<SbExpr> inputs,
+                                             StageBuilderState& state);
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeForWindowFunc(const Accum::Op& acc,
-                                                                            StageBuilderState&);
+SbExpr::Vector buildInitializeForWindowFunc(const Accum::Op& acc, StageBuilderState&);
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeForWindowFunc(
-    const Accum::Op& acc,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
-    StageBuilderState&);
+SbExpr::Vector buildInitializeForWindowFunc(const Accum::Op& acc,
+                                            StringDataMap<SbExpr> argExprs,
+                                            StageBuilderState&);
 
 SbExpr buildFinalizeForWindowFunc(const Accum::Op& acc,
                                   StageBuilderState& state,
-                                  const sbe::value::SlotVector& aggSlots);
+                                  const SbSlotVector& aggSlots);
 
 SbExpr buildFinalizeForWindowFunc(const Accum::Op& acc,
-                                  StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+                                  StringDataMap<SbExpr> argExprs,
                                   StageBuilderState& state,
-                                  const sbe::value::SlotVector& aggSlots);
+                                  const SbSlotVector& aggSlots);
 }  // namespace mongo::stage_builder

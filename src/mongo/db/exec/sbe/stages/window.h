@@ -76,9 +76,9 @@ public:
         value::SlotVector windowExprSlots;
         value::SlotVector frameFirstSlots;
         value::SlotVector frameLastSlots;
-        std::vector<std::unique_ptr<EExpression>> initExprs;
-        std::vector<std::unique_ptr<EExpression>> addExprs;
-        std::vector<std::unique_ptr<EExpression>> removeExprs;
+        EExpression::Vector initExprs;
+        EExpression::Vector addExprs;
+        EExpression::Vector removeExprs;
         std::unique_ptr<EExpression> lowBoundExpr;
         std::unique_ptr<EExpression> highBoundExpr;
     };
