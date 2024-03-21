@@ -949,7 +949,7 @@ BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& 
     BSONObjIterator i(o);
     while (i.more()) {
         auto elem = i.next();
-        _fields.at(x++) = {elem.fieldNameStringData(), elem.size()};
+        _fields[x++] = {elem.fieldNameStringData(), elem.size()};
     }
     std::sort(_fields.begin(), _fields.end(), cmp);
     _cur = 0;

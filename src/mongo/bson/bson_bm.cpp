@@ -105,6 +105,22 @@ void BM_arrayLookup(benchmark::State& state) {
     state.SetBytesProcessed(totalBytes);
 }
 
+void BM_bsonIteratorSortedConstruction(benchmark::State& state) {
+    BSONArrayBuilder builder;
+    auto len = state.range(0);
+    auto totalBytes = len * 0;
+    for (auto j = 0; j < len; j++)
+        builder.append(j);
+    BSONObj array = builder.done();
+
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(BSONObjIteratorSorted(array));
+        totalBytes += array.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
 void BM_validate(benchmark::State& state) {
     BSONArrayBuilder builder;
     auto len = state.range(0);
@@ -152,6 +168,7 @@ void BM_validate_contents(benchmark::State& state) {
 
 BENCHMARK(BM_arrayBuilder)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_arrayLookup)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_bsonIteratorSortedConstruction)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_validate)->Ranges({{{1}, {1'000}}});
 BENCHMARK(BM_validate_contents)->Ranges({{{1}, {1'000}}});
 
