@@ -284,21 +284,34 @@ public:
         const auto options = parseGetParameterOptions(cmdObj.firstElement());
         const bool all = options.getAllParameters();
 
+        // If the "setAt" option has been set, then only include the parameter in the
+        // response if it matches the parameter's settability. If the "setAt" option has
+        // been omitted, then include all requested parameters.
+        boost::optional<SetAtOptionEnum> setAtOption = options.getSetAt();
+        bool isOptionRequestingRuntime =
+            setAtOption && (setAtOption.value() == SetAtOptionEnum::kRuntime);
+        bool isOptionRequestingStartup =
+            setAtOption && (setAtOption.value() == SetAtOptionEnum::kStartup);
+
         int before = result.len();
 
         const ServerParameter::Map& m = ServerParameterSet::getNodeParameterSet()->getMap();
         for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
             if (i->second->isEnabled() && (all || cmdObj.hasElement(i->first.c_str()))) {
-                if (options.getShowDetails()) {
-                    BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
-                    i->second->append(opCtx, &detailBob, "value", boost::none);
-                    detailBob.appendBool("settableAtRuntime",
-                                         i->second->allowedToChangeAtRuntime());
-                    detailBob.appendBool("settableAtStartup",
-                                         i->second->allowedToChangeAtStartup());
-                    detailBob.doneFast();
-                } else {
-                    i->second->append(opCtx, &result, i->second->name(), boost::none);
+                if (!setAtOption ||
+                    (isOptionRequestingRuntime && i->second->allowedToChangeAtRuntime()) ||
+                    (isOptionRequestingStartup && i->second->allowedToChangeAtStartup())) {
+                    if (options.getShowDetails()) {
+                        BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
+                        i->second->append(opCtx, &detailBob, "value", boost::none);
+                        detailBob.appendBool("settableAtRuntime",
+                                             i->second->allowedToChangeAtRuntime());
+                        detailBob.appendBool("settableAtStartup",
+                                             i->second->allowedToChangeAtStartup());
+                        detailBob.doneFast();
+                    } else {
+                        i->second->append(opCtx, &result, i->second->name(), boost::none);
+                    }
                 }
             }
         }

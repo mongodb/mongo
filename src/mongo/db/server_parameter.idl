@@ -33,6 +33,14 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
+enums:
+    SetAtOption:
+        description: "SetAt option value"
+        type: string
+        values:
+            kStartup: "startup"
+            kRuntime: "runtime"
+
 # Options for the getParameter command. Describes the object "options" when the command is run as 
 # {getParameter: <options>}
 structs:
@@ -43,6 +51,13 @@ structs:
         description: 'Return metadata about the server parameter along with its current value'
         type: safeBool
         default: false
+      setAt:
+        description: >- 
+            Can be set to "runtime" or "startup". If set to "startup", then only startup-settable
+            parameters are returned from the requested ones. If set to "runtime", then only
+            runtime-settable parameters are returned from the requested ones.
+        type: SetAtOption
+        optional: true
       allParameters:
         description: 'Return all server parameters, not just the ones specified'
         type: safeBool
