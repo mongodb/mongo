@@ -72,6 +72,16 @@ static const char *boolean_value[2] = {"false", "true"};
     "ignore_prepare=%s,roundup_timestamps=(prepared=%s,read=%s),no_timestamp=%s"
 
 /*
+ * This structure is used to pass information to the benchmark thread.
+ */
+typedef struct {
+    TEST_OPTS *test_opts;
+    const char *compiled_config;
+    const char **compiled_config_array;
+    uint64_t *nsecs;
+} THREAD_OPTS;
+
+/*
  * begin_transaction_slow --
  *     This is considered a typical implementation that a caller for begin_transaction will use. We
  *     incur the cost of formatting the configuration string on every call.
@@ -226,18 +236,15 @@ begin_transaction_null(WT_SESSION *session)
  *     Run the test with or without configuration compilation.
  */
 static void
-do_config_run(TEST_OPTS *opts, int variant, const char *compiled, const char **compiled_array,
-  bool check, uint64_t *nsec)
+do_config_run(WT_SESSION *session, uint32_t variant, const char *compiled,
+  const char **compiled_array, bool check, uint64_t *nsec)
 {
     struct timespec before, after;
     WT_RAND_STATE rnd;
-    WT_SESSION *session;
     WT_TXN *txn;
     uint32_t r;
     u_int i, ignore_prepare;
     bool roundup_prepared, roundup_read, no_timestamp;
-
-    session = opts->session;
 
     /* Initialize the RNG. */
     __wt_random_init(&rnd);
@@ -309,6 +316,33 @@ do_config_run(TEST_OPTS *opts, int variant, const char *compiled, const char **c
 }
 
 /*
+ * benchmark_thread --
+ *     An individual thread doing the benchmark.
+ */
+static void *
+benchmark_thread(void *thread_arg)
+{
+    THREAD_OPTS *thread_opts;
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    uint32_t variant;
+    u_int runs;
+
+    thread_opts = (THREAD_OPTS *)thread_arg;
+    conn = thread_opts->test_opts->conn;
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+    /* Run the test, alternating the variants of tests. */
+    for (runs = 0; runs < N_RUNS; ++runs)
+        for (variant = 0; variant < N_VARIANTS; ++variant) {
+            do_config_run(session, variant, thread_opts->compiled_config,
+              thread_opts->compiled_config_array, runs == 0, &thread_opts->nsecs[variant]);
+        }
+
+    return (NULL);
+}
+
+/*
  * main --
  *     The main entry point for a simple test/benchmark for compiling configuration strings.
  */
@@ -316,39 +350,61 @@ int
 main(int argc, char *argv[])
 {
     TEST_OPTS *opts, _opts;
-    uint64_t base_ns, ns, nsecs[N_VARIANTS];
-    int variant, runs;
+    THREAD_OPTS *thread_opts;
+    uint64_t base_ns, ns, *nsecs, total_nsecs;
+    uint32_t i, nthreads, variant;
     const char *compiled_config, **compiled_config_array;
+    pthread_t *tids;
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
+    nthreads = (u_int)opts->nthreads;
+    if (nthreads == 0)
+        nthreads = 1; /* default value */
+
     testutil_recreate_dir(opts->home);
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
-    testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &opts->session));
 
     begin_transaction_medium_init();
     begin_transaction_fast_init(opts->conn, &compiled_config);
     begin_transaction_fast_alternate_init(opts->conn, &compiled_config_array);
 
-    memset(nsecs, 0, sizeof(nsecs));
-
-    /* Run the test, alternating the variants of tests. */
-    for (runs = 0; runs < N_RUNS; ++runs)
-        for (variant = 0; variant < N_VARIANTS; ++variant) {
-            do_config_run(
-              opts, variant, compiled_config, compiled_config_array, runs == 0, &nsecs[variant]);
-        }
+    nsecs = dcalloc(N_VARIANTS * nthreads, sizeof(*nsecs));
+    thread_opts = dcalloc(nthreads, sizeof(*thread_opts));
+    tids = dcalloc(nthreads, sizeof(*tids));
 
     printf("number of calls: %d\n", N_CALLS * N_RUNS);
-    base_ns = ns = nsecs[0] / (N_CALLS * N_RUNS);
+    printf("number of threads: %" PRIu32 "\n", nthreads);
+
+    for (i = 0; i < nthreads; ++i) {
+        thread_opts[i].test_opts = opts;
+        thread_opts[i].compiled_config = compiled_config;
+        thread_opts[i].compiled_config_array = compiled_config_array;
+        thread_opts[i].nsecs = &nsecs[i * N_VARIANTS];
+        pthread_create(&tids[i], NULL, benchmark_thread, &thread_opts[i]);
+    }
+    for (i = 0; i < nthreads; ++i)
+        pthread_join(tids[i], NULL);
+
+    base_ns = 0;
     for (variant = 0; variant < N_VARIANTS; ++variant) {
-        ns = nsecs[variant] / (N_CALLS * N_RUNS);
-        printf("variant %d: %s, nsec per begin/rollback pair = %" PRIu64 ", vs baseline = %f\n",
+        total_nsecs = 0;
+        for (i = 0; i < nthreads; ++i)
+            total_nsecs += nsecs[i * N_VARIANTS + variant];
+        ns = total_nsecs / (N_CALLS * N_RUNS * nthreads);
+        if (variant == 0)
+            base_ns = ns;
+
+        printf("variant %" PRIu32 ": %s, nsec per begin/rollback pair = %" PRIu64
+               ", vs baseline = %f\n",
           variant, descriptions[variant], ns, ((double)base_ns) / ns);
     }
 
     testutil_cleanup(opts);
+    free(nsecs);
+    free(thread_opts);
+    free(tids);
     return (EXIT_SUCCESS);
 }
