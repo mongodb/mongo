@@ -5322,10 +5322,10 @@ buildvariants:
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-    # FIXME-WT-12646: Exclude backup corruption test from csuite and remove once ASAN memory leak is investigated
+    # Exclude this test for ASan builds, as it results in a false positives owing
+    # to deliberate killing of processes to invoke corruption.
     extra_args: -E "wt12015_backup_corruption"
   tasks:
-    # FIXME-WT-12646: Exclude backup corruption test and remove once ASAN memory leak is investigated
     - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
