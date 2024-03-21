@@ -557,7 +557,7 @@ TEST_F(BlockHashAggStageTest, CountCompoundKey) {
                         {4});
 }
 
-// TODO SERVER-85371 Revisit input sizes if kMaxNumPartitionsForTokenizedPath changes.
+// TODO SERVER-85731 Revisit input sizes if kMaxNumPartitionsForTokenizedPath changes.
 TEST_F(BlockHashAggStageTest, SumCompoundKeysMissingKey) {
     // Each entry is ID followed by bitset followed by a block of data.
     // Mix high partition rows with low partition.
