@@ -142,7 +142,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
         return;
     }
 
-    if (_queryStatsKeyHash && opCtx) {
+    if (_queryStatsKey && opCtx) {
         query_stats::writeQueryStats(opCtx,
                                      _queryStatsKeyHash,
                                      std::move(_queryStatsKey),
