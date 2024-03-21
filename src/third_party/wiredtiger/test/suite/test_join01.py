@@ -49,6 +49,10 @@ class test_join01(wttest.WiredTigerTestCase):
         ('bloom1=1000', dict(joincfg1=',strategy=bloom,count=1000')),
         ('bloom1=10000', dict(joincfg1=',strategy=bloom,count=10000')),
     ]
+    projection_scen = [
+        ('no-projection', dict(do_proj=False)),
+        ('projection', dict(do_proj=True))
+    ]
     nested_scen = [
         ('simple', dict(do_nested=False)),
         ('nested', dict(do_nested=True))
@@ -64,7 +68,7 @@ class test_join01(wttest.WiredTigerTestCase):
         ('order=3', dict(join_order=3)),
     ]
     scenarios = make_scenarios(type_scen, bloom0_scen, bloom1_scen,
-                               nested_scen, stats_scen,
+                               projection_scen, nested_scen, stats_scen,
                                order_scen, prune=50, prunelong=1000)
 
     # We need statistics for these tests.
@@ -80,7 +84,7 @@ class test_join01(wttest.WiredTigerTestCase):
         return [s, rs, sort3]
 
     # Common function for testing iteration of join cursors
-    def iter_common(self, jc, do_nested, join_order):
+    def iter_common(self, jc, do_proj, do_nested, join_order):
         # See comments in join_common()
         # The order that the results are seen depends on
         # the ordering of the joins.  Specifically, the first
@@ -106,7 +110,11 @@ class test_join01(wttest.WiredTigerTestCase):
         while jc.next() == 0:
             [k] = jc.get_keys()
             i = k - 1
-            [v0,v1,v2] = jc.get_values()
+            if do_proj:  # our projection reverses the values and adds the key
+                [v2,v1,v0,kproj] = jc.get_values()
+                self.assertEquals(k, kproj)
+            else:
+                [v0,v1,v2] = jc.get_values()
             self.assertEquals(self.gen_values(i), [v0,v1,v2])
             if len(expect) == 0 or i != expect[0]:
                 self.tty('ERROR: ' + str(i) + ' is not next in: ' +
@@ -128,6 +136,8 @@ class test_join01(wttest.WiredTigerTestCase):
             'join: index:join01:index2: ' + statdesc ]
         if self.ref == 'index':
             expectstats.append('join: index:join01:index0: ' + statdesc)
+        elif self.do_proj:
+            expectstats.append('join: table:join01(v2,v1,v0,k): ' + statdesc)
         else:
             expectstats.append('join: table:join01: ' + statdesc)
         self.check_stats(statcur, expectstats)
@@ -194,11 +204,12 @@ class test_join01(wttest.WiredTigerTestCase):
     def test_join(self):
         joincfg0 = self.joincfg0
         joincfg1 = self.joincfg1
+        do_proj = self.do_proj
         do_nested = self.do_nested
         do_stats = self.do_stats
         join_order = self.join_order
         #self.tty('join_common(' + joincfg0 + ',' + joincfg1 + ',' +
-        #         ',' + str(do_nested) + ',' +
+        #         str(do_proj) + ',' + str(do_nested) + ',' +
         #         str(do_stats) + ',' + str(join_order) + ')')
 
         closeme = []
@@ -217,17 +228,24 @@ class test_join01(wttest.WiredTigerTestCase):
             c.insert()
         c.close()
 
+        if do_proj:
+            proj_suffix = '(v2,v1,v0,k)'  # Reversed values plus key
+        else:
+            proj_suffix = ''            # Default projection (v0,v1,v2)
 
         # We join on index2 first, not using bloom indices.
         # This defines the order that items are returned.
         # index2 sorts multiples of 3 first (see gen_values())
         # and by using 'gt' and key 99, we'll skip multiples of 3,
         # and examine primary keys 2,5,8,...,95,98,1,4,7,...,94,97.
-        jc = self.session.open_cursor('join:table:join01', None, None)
-        c2 = self.session.open_cursor('index:join01:index2', None, None)
+        jc = self.session.open_cursor('join:table:join01' + proj_suffix,
+                                      None, None)
+        # Adding a projection to a reference cursor should be allowed.
+        c2 = self.session.open_cursor('index:join01:index2(v1)', None, None)
         c2.set_key(99)   # skips all entries w/ primary key divisible by three
         self.assertEquals(0, c2.search())
         self.session_record_join(jc, c2, 'compare=gt', 0, joins)
+
         # Then select all the numbers 0-99 whose string representation
         # sort >= '60'.
         if self.ref == 'index':
@@ -241,12 +259,12 @@ class test_join01(wttest.WiredTigerTestCase):
 
         # Then select all numbers whose reverse string representation
         # is in '20' < x < '40'.
-        c1a = self.session.open_cursor('index:join01:index1', None, None)
+        c1a = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1a.set_key('21')
         self.assertEquals(0, c1a.search())
         self.session_record_join(jc, c1a, 'compare=gt' + joincfg1, 2, joins)
 
-        c1b = self.session.open_cursor('index:join01:index1', None, None)
+        c1b = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1b.set_key('41')
         self.assertEquals(0, c1b.search())
         self.session_record_join(jc, c1b, 'compare=lt' + joincfg1, 2, joins)
@@ -264,6 +282,8 @@ class test_join01(wttest.WiredTigerTestCase):
             # that will get AND-ed into our existing join.  The expected
             # result is   [73, 82, 83, 92].
             #
+            # We don't specify the projection here, it should be picked up
+            # from the 'enclosing' join.
             nest1 = self.session.open_cursor('join:table:join01', None, None)
             nest2 = self.session.open_cursor('join:table:join01', None, None)
 
@@ -291,19 +311,19 @@ class test_join01(wttest.WiredTigerTestCase):
             self.session_record_join(jc, nest1, None, 3, joins)
 
         self.session_play_joins(joins, join_order)
-        self.iter_common(jc, do_nested, join_order)
+        self.iter_common(jc, do_proj, do_nested, join_order)
         if do_stats:
             self.stats(jc, 0)
         jc.reset()
-        self.iter_common(jc, do_nested, join_order)
+        self.iter_common(jc, do_proj, do_nested, join_order)
         if do_stats:
             self.stats(jc, 1)
         jc.reset()
-        self.iter_common(jc, do_nested, join_order)
+        self.iter_common(jc, do_proj, do_nested, join_order)
         if do_stats:
             self.stats(jc, 2)
         jc.reset()
-        self.iter_common(jc, do_nested, join_order)
+        self.iter_common(jc, do_proj, do_nested, join_order)
 
         jc.close()
         c2.close()

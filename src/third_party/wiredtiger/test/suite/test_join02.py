@@ -179,15 +179,16 @@ class test_join02(wttest.WiredTigerTestCase):
         c.close()
 
         # Use the primary table in one of the joins.
+        # Use various projections, which should not matter for ref cursors
         c0a = self.session.open_cursor('table:join02', None, None)
-        c0b = self.session.open_cursor('table:join02', None, None)
-        c1a = self.session.open_cursor('index:join02:index1', None, None)
+        c0b = self.session.open_cursor('table:join02(v4)', None, None)
+        c1a = self.session.open_cursor('index:join02:index1(v0)', None, None)
         c1b = self.session.open_cursor('index:join02:index1', None, None)
         c2a = self.session.open_cursor('index:join02:index2', None, None)
         c2b = self.session.open_cursor('index:join02:index2', None, None)
-        c3a = self.session.open_cursor('index:join02:index3', None, None)
-        c3b = self.session.open_cursor('index:join02:index3', None, None)
-        c4a = self.session.open_cursor('index:join02:index4', None, None)
+        c3a = self.session.open_cursor('index:join02:index3(v4)', None, None)
+        c3b = self.session.open_cursor('index:join02:index3(v0)', None, None)
+        c4a = self.session.open_cursor('index:join02:index4(v1)', None, None)
 
         # Attach extra properties to each cursor.  For cursors that
         # may appear on the 'left' side of a range CA < x < CB,
