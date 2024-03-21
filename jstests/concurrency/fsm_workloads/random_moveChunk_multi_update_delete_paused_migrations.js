@@ -8,6 +8,7 @@
  * @tags: [
  * requires_sharding,
  * assumes_balancer_off,
+ * incompatible_with_concurrency_simultaneous,
  * featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
  * requires_fcv_80
  * ];
@@ -62,6 +63,22 @@ function createDeleteBatch(self) {
     return deletes;
 }
 
+function getPauseMigrationsClusterParameter(db) {
+    const response = assert.commandWorked(
+        db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+    return response.clusterParameters[0].enabled;
+}
+
+function setPauseMigrationsClusterParameter(db, cluster, enabled) {
+    assert.commandWorked(
+        db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled}}}));
+
+    cluster.executeOnMongosNodes((db) => {
+        // Ensure all mongoses have refreshed cluster parameter after being set.
+        assert.soon(() => {return getPauseMigrationsClusterParameter(db) === enabled});
+    });
+}
+
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
@@ -73,21 +90,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
-        assert.commandWorked(db.adminCommand(
-            {setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
+        setPauseMigrationsClusterParameter(db, cluster, true);
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
         assert(migrationsAreAllowed(db, collName));
+        setPauseMigrationsClusterParameter(db, cluster, false);
     };
 
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
-
-        // Ensure mongos for this thread has refreshed cluster parameter after being set.
-        assert.commandWorked(
-            db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
 
         this.expectedCount = 0;
         findFirstBatch(db, collName, {tid: this.tid}, 1000).forEach(doc => {
@@ -138,8 +151,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
     };
 
-    // TODO SERVER-85866: Set moveChunk weight to 0.2.
-    const weights = {moveChunk: 0.0, multiUpdate: 0.35, multiDelete: 0.35, verify: 0.1};
+    const weights = {moveChunk: 0.2, multiUpdate: 0.35, multiDelete: 0.35, verify: 0.1};
     $config.transitions = {
         init: weights,
         moveChunk: weights,
