@@ -21,26 +21,6 @@ See the following for more details:
 - @ref cursor_log
 - @ref cursor_join
 
-@section cursor_projections Projections
-
-Cursors on tables and indices can return a subset of columns.  This is done by
-listing the column names in parenthesis in the <code>uri</code> parameter to
-WT_SESSION::open_cursor.  Only the fields from the listed columns are returned
-by WT_CURSOR::get_value.
-
-The @ex_ref{ex_schema.c} example creates a table where the value format is
-\c "5sHq", where the initial string is the country, the short is a year,
-and the long is a population.  The following example lists just the country
-and year columns from the table record values:
-
-@snippet ex_schema.c Return a subset of values from the table
-
-This is particularly useful with index cursors, because if all columns in
-the projection are available in the index (including primary key columns,
-which are the values of the index), the data can be read from the index
-without accessing any column groups.  See @ref schema_index_projections for
-more information.
-
 @section cursors_eviction Cursors and Eviction
 
 Cursor positions hold resources that can inhibit the eviction of memory
@@ -80,12 +60,6 @@ The following example lists the table record
 values, using raw mode:
 
 @snippet ex_schema.c List the records in the table using raw mode.
-
-Raw mode can be used in combination with projections.  The following
-example lists just the country and year columns from the table record
-values, using raw mode:
-
-@snippet ex_schema.c Return a subset of values from the table using raw mode
 
 @section metadata Reading WiredTiger Metadata
 

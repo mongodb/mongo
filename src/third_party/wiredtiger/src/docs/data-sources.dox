@@ -103,9 +103,7 @@ WT_SESSION::create method.
 
 A cursor opened on an index has the specified index columns as its key,
 accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns
-default to returning the value columns from the table, but this can be
-overridden by configuring a projection cursor (see @ref cursor_projections),
-which can access the table key columns or a subset of the value columns.
+default to returning the value columns from the table.
 
 @subsection data_statistics Statistics Data
 
