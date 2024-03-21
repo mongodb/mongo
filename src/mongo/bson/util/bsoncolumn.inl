@@ -373,18 +373,21 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                     buffer.template append<BSONBinData>(literal);
                     int size;
                     const char* binary = literal.binData(size);
-                    ptr = decompressAllDelta<BSONBinData, int128_t, Buffer>(
-                        ptr,
-                        end,
-                        buffer,
-                        Simple8bTypeUtil::encodeBinary(binary, size).value_or(0),
-                        literal,
-                        [](const int128_t v, const BSONElement& ref, Buffer& buffer) {
-                            char data[16];
-                            size_t size = ref.valuestrsize();
-                            Simple8bTypeUtil::decodeBinary(v, data, size);
-                            buffer.append(BSONBinData(data, size, ref.binDataType()));
-                        });
+                    if (size <= 16) {
+                        ptr = decompressAllDelta<BSONBinData, int128_t, Buffer>(
+                            ptr,
+                            end,
+                            buffer,
+                            Simple8bTypeUtil::encodeBinary(binary, size).value_or(0),
+                            literal,
+                            [&size](const int128_t v, const BSONElement& ref, Buffer& buffer) {
+                                char data[16];
+                                Simple8bTypeUtil::decodeBinary(v, data, size);
+                                buffer.append(BSONBinData(data, size, ref.binDataType()));
+                            });
+                    } else {
+                        ptr = decompressAllLiteral(ptr, end, buffer);
+                    }
                     break;
                 }
                 case Code:
