@@ -509,6 +509,15 @@ bool handleError(OperationContext* opCtx,
             oss.setShardingOperationFailedStatus(ex.toStatus());
         }
 
+        // Fail the write for direct shard operations so that a RetryableWriteError label
+        // can be returned and the write can be retried by the driver. The retry should succeed
+        // because a command failing with StaleConfig triggers sharding metadata refresh in the
+        // ScopedOperationCompletionShardingActions destructor.
+        if (!OperationShardingState::isComingFromRouter(opCtx) &&
+            ex.code() == ErrorCodes::StaleConfig && opCtx->isRetryableWrite()) {
+            throw;
+        }
+
         // For routing errors, it is guaranteed that all subsequent operations will fail
         // with the same cause, so don't try doing any more operations. The command reply serializer
         // will handle repeating this error for unordered writes.

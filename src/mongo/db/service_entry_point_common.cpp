@@ -399,15 +399,17 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
         return;
     }
 
-    auto errorLabels = getErrorLabels(opCtx,
-                                      sessionOptions,
-                                      commandName,
-                                      code,
-                                      wcCode,
-                                      isInternalClient,
-                                      false /* isMongos */,
-                                      lastOpBeforeRun,
-                                      lastOpAfterRun);
+    auto errorLabels =
+        getErrorLabels(opCtx,
+                       sessionOptions,
+                       commandName,
+                       code,
+                       wcCode,
+                       isInternalClient,
+                       false /* isMongos */,
+                       OperationShardingState::isComingFromRouter(opCtx) /* isComingFromRouter */,
+                       lastOpBeforeRun,
+                       lastOpAfterRun);
     commandBodyFieldsBob->appendElements(errorLabels);
 
     const auto isNotPrimaryError =
@@ -2021,6 +2023,16 @@ void ExecCommandDatabase::_commandExec() {
 
                 if (inCriticalSection) {
                     _execContext.behaviors.handleReshardingCriticalSectionMetrics(opCtx, *sce);
+                }
+
+                // Fail the direct shard operation so that a RetryableWriteError label can be
+                // returned and the write can be retried by the driver. The retry should succeed
+                // because a command failing with StaleConfig triggers sharding metadata refresh in
+                // the ScopedOperationCompletionShardingActions destructor.
+                auto fromRouter = OperationShardingState::isComingFromRouter(opCtx);
+                if (opCtx->isRetryableWrite() && !fromRouter &&
+                    ex.code() == ErrorCodes::StaleConfig) {
+                    throw;
                 }
 
                 const auto refreshed = _execContext.behaviors.refreshCollection(opCtx, *sce);
