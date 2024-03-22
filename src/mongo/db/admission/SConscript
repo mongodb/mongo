@@ -12,7 +12,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
@@ -51,6 +50,7 @@ env.Library(
 env.Library(
     target='execution_control',
     source=[
+        'admission_server_status_section.cpp',
         'concurrency_adjustment_validator.cpp',
         'execution_control_parameters.idl',
         'execution_control_init.cpp',
@@ -66,20 +66,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/processinfo',
-    ],
-)
-
-env.Library(
-    target='admission_server_status_section',
-    source=[
-        'admission_server_status_section.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/db/service_context',
-        'ingress_admission_control',
-        'ticketholder_manager',
     ],
 )
 
