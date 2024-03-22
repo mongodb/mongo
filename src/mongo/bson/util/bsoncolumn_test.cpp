@@ -3331,6 +3331,90 @@ TEST_F(BSONColumnTest, RepeatInvalidString) {
     verifyDecompression(binData, {elem, elemInvalid, elemInvalid});
 }
 
+TEST_F(BSONColumnTest, EmptyStringAfterUnencodable) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString(""_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendLiteral(expected, elems[1]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, UnencodableStringWithZeroDelta) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString("\0"_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, uint128_t(0));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, EmptyStringAfterUnencodableDelta) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems = {
+        createElementString("\0"_sd), createElementString("\0"_sd), createElementString(""_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, uint128_t(0));
+    appendLiteral(expected, elems[2]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, EmptyStringAfterUnencodableLiteralAndDelta) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems = {
+        createElementString("\0"_sd), createElementString("a"_sd), createElementString(""_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    // As the literal is unencodable it will be considered to have a 0 encoding. We take this from
+    // the last element that is empty string.
+    appendSimple8bBlocks128(expected, deltaString(elems.begin() + 1, elems.end(), elems.back()), 1);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, StringMultiType) {
     BSONColumnBuilder cb;
     // Add decimals first

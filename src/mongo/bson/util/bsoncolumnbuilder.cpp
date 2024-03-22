@@ -459,6 +459,7 @@ private:
     BSONElement lastUncompressed;
     int64_t lastUncompressedEncoded64;
     int128_t lastUncompressedEncoded128;
+    bool lastLiteralUnencodable = false;
     ControlBlock current;
     ControlBlock last;
 };
@@ -475,6 +476,7 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
 
     // Last encountered non-RLE block during binary scan
     uint64_t lastNonRLE = simple8b::kSingleZero;
+    int128_t lastNonZeroDeltaForUnencodable{0};
 
     while (pos != end) {
         uint8_t control = *pos;
@@ -482,6 +484,13 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
         // Stop at end terminal
         if (control == 0) {
             ++pos;
+
+            // If the last literal was unencodable we need to adjust its last encoding. Unencodable
+            // string literals allow non-zero deltas to follow.
+            if (lastLiteralUnencodable && lastNonZeroDeltaForUnencodable != 0) {
+                lastUncompressedEncoded128 = lastNonZeroDeltaForUnencodable;
+            }
+
             return true;
         }
 
@@ -504,6 +513,7 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
             lastNonRLE = simple8b::kSingleZero;
             current.control = nullptr;
             last.control = nullptr;
+            lastLiteralUnencodable = false;
 
             if (!uses128bit(lastUncompressed.type())) {
                 auto& d64 = std::get<BSONColumn::Iterator::DecodingState::Decoder64>(state.decoder);
@@ -515,6 +525,14 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
                 auto& d128 =
                     std::get<BSONColumn::Iterator::DecodingState::Decoder128>(state.decoder);
                 lastUncompressedEncoded128 = d128.lastEncodedValue;
+
+                // Check if the string literal is encodable or not.
+                if (lastUncompressed.type() == String || lastUncompressed.type() == Code) {
+                    lastLiteralUnencodable =
+                        !Simple8bTypeUtil::encodeString(lastUncompressed.valueStringData())
+                             .has_value();
+                    lastNonZeroDeltaForUnencodable = 0;
+                }
             }
 
             pos += element.size();
@@ -595,9 +613,26 @@ bool BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::sc
             } else {
                 auto& d128 =
                     std::get<BSONColumn::Iterator::DecodingState::Decoder128>(state.decoder);
-                d128.lastEncodedValue =
-                    expandDelta(d128.lastEncodedValue,
-                                simple8b::sum<int128_t>(pos + 1, blocksSize, lastNonRLE));
+                if (!lastLiteralUnencodable) {
+                    d128.lastEncodedValue =
+                        expandDelta(d128.lastEncodedValue,
+                                    simple8b::sum<int128_t>(pos + 1, blocksSize, lastNonRLE));
+                } else {
+                    // If our literal is unencodable we need to also maintain the last non-zero
+                    // value. So we cannot use the optimized sum() function and rather have to visit
+                    // all values.
+                    simple8b::visitAll<int128_t>(
+                        pos + 1,
+                        blocksSize,
+                        lastNonRLE,
+                        [&](int128_t delta) {
+                            if (delta != 0) {
+                                lastNonZeroDeltaForUnencodable = delta;
+                            }
+                            d128.lastEncodedValue = expandDelta(d128.lastEncodedValue, delta);
+                        },
+                        []() {});
+                }
             }
         }
 
@@ -1111,8 +1146,11 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
     auto allocator = BSONColumn(nullptr, 1).release();
     regular._storePrevious([&]() {
         // Zero delta is repeat of last uncompressed literal, avoid materialization (which might
-        // not be possible depending on value of last uncompressed literal).
-        if (d128.lastEncodedValue == lastUncompressedEncoded128) {
+        // not be possible depending on value of last uncompressed literal). If our literal was
+        // unencodable we need to force materialization as zero delta may no longer mean repeat of
+        // last literal.
+        if (d128.lastEncodedValue == lastUncompressedEncoded128 &&
+            !(lastLiteralUnencodable && lastUncompressedEncoded128 != 0)) {
             return lastUncompressed;
         }
         return d128.materialize(*allocator, lastUncompressed, ""_sd);
