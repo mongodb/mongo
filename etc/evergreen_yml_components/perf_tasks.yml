@@ -1,5 +1,5 @@
 functions:
-  f_dsi_run_workload:
+  f_dsi_run_workload: &dsi_run_func # this function replaces f_run_dsi_workload
     - command: git.get_project
       params:
         directory: src/mongo
@@ -33,6 +33,8 @@ functions:
       type: test
       params:
         script: ./src/dsi/run-dsi determine_failure -m TEST
+
+  f_run_dsi_workload: *dsi_run_func # Do not use this function. It is deprecated.
 
   ## Schedule Tasks ##
   f_schedule_tasks:
@@ -209,6 +211,13 @@ tasks:
       - func: f_dsi_run_workload
         vars:
           test_control: "ycsb.2023-09"
+
+  - name: ycsb.load
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb.load"
 
   - name: ycsb_60GB.2023-09
     priority: 5
@@ -1302,6 +1311,6 @@ tasks:
     priority: 5
     exec_timeout_secs: 216000 # 2.5 days
     commands:
-      - func: f_run_dsi_workload
+      - func: f_dsi_run_workload
         vars:
           test_control: "resharding-3shard-snapshot-update.2023-10"
