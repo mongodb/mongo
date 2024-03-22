@@ -31,7 +31,8 @@ buildvariants:
     distros:
     - ubuntu1804-large
 
-- name: ubuntu2204
+- &ubuntu2204-template
+  name: &ubuntu2204 ubuntu2204
   display_name: Ubuntu 22.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -69,6 +70,15 @@ buildvariants:
     - ubuntu2204-large
   - name: .development_critical !.incompatible_community
   - name: .release_critical !.incompatible_community
+
+- <<: *ubuntu2204-template
+  name: ubuntu2204-powercycle
+  display_name: Ubuntu 22.04 Powercycle
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: *ubuntu2204
+  tasks:
+  - name: .powercycle
 
 - name: ubuntu2004
   display_name: Ubuntu 20.04
