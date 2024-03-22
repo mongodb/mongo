@@ -667,7 +667,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
         auto& apiParams = APIParameters::get(opCtx);
         auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
-        auto appName = clientMetadata->getApplicationName().toString();
+        auto appName = clientMetadata->getApplicationName();
         apiVersionMetrics.update(appName, apiParams);
     }
 

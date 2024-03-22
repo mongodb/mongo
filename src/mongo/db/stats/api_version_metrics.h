@@ -56,15 +56,14 @@ public:
     // 384KB, as it is stored for 24 hours.
     static constexpr int KMaxNumOfSavedAppNames = KMaxNumOfOutputAppNames * 3;
 
-    using APIVersionMetricsMap =
-        stdx::unordered_map<std::string, stdx::unordered_map<std::string, Date_t>>;
+    using APIVersionMetricsMap = StringMap<StringMap<Date_t>>;
 
     static APIVersionMetrics& get(ServiceContext* svc);
 
     APIVersionMetrics() = default;
 
     // Update the timestamp for the API version used by the application.
-    void update(const std::string& appName, const APIParameters& apiParams);
+    void update(StringData appName, const APIParameters& apiParams);
 
     void appendAPIVersionMetricsInfo(BSONObjBuilder* b);
 

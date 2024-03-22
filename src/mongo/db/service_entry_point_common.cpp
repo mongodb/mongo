@@ -1590,7 +1590,7 @@ void ExecCommandDatabase::_initiateCommand() {
     if (auto clientMetadata = ClientMetadata::get(client)) {
         auto& apiParams = APIParameters::get(opCtx);
         auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
-        auto appName = clientMetadata->getApplicationName().toString();
+        auto appName = clientMetadata->getApplicationName();
         apiVersionMetrics.update(appName, apiParams);
     }
 
