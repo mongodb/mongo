@@ -510,5 +510,15 @@ bool isMoveCollection(boost::optional<ProvenanceEnum> provenance) {
          provenance.get() == ProvenanceEnum::kBalancerMoveCollection);
 }
 
+std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName) {
+    return std::make_shared<ThreadPool>([&] {
+        ThreadPool::Options options;
+        options.poolName = poolName;
+        options.minThreads = 0;
+        options.maxThreads = 1;
+        return options;
+    }());
+}
+
 }  // namespace resharding
 }  // namespace mongo

@@ -373,5 +373,10 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
  */
 bool isMoveCollection(boost::optional<ProvenanceEnum> provenance);
 
+/**
+ * Helper function to create a thread pool for _markKilledExecutor member of resharding POS.
+ */
+std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName);
+
 }  // namespace resharding
 }  // namespace mongo
