@@ -1378,4 +1378,39 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
         opCtx, "shardCollection.end", originalNss().ns(), collectionDetail.obj());
 }
 
+ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor = executor, status, anchor = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                opCtx, getNewSession(opCtx), **executor);
+
+            if (_doc.getTranslatedRequestParams()) {
+                // The new behaviour of committing transactionally is not feature flag protected. It
+                // could happen that the coordinator is run the first time on a primary with an
+                // older binary and, after persisting the chunk entries, a new primary with a newer
+                // binary takes over. Therefore, if the collection can be found locally but is not
+                // yet tracked on the config server, then we clean up the config.chunks collection.
+
+                auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+                auto cri = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                          nss()));
+                if (uuid && !cri.cm.isSharded()) {
+                    cleanupPartialChunksFromPreviousAttempt(opCtx, *uuid, getNewSession(opCtx));
+                }
+            }
+
+            // The critical section might have been taken by a migration, we force to skip the
+            // invariant check and we do nothing in case it was taken.
+            _releaseCriticalSections(opCtx, false /* throwIfReasonDiffers */);
+        });
+}
+
 }  // namespace mongo
