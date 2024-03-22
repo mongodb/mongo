@@ -278,7 +278,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def _all_mongo_d_s_t(self):
         """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
-        return sum([node._all_mongo_d_s_t() for node in self.nodes], [])
+        nodes = sum([node._all_mongo_d_s_t() for node in self.nodes], [])
+
+        if self.initial_sync_node:
+            nodes.extend(self.initial_sync_node._all_mongo_d_s_t())
+
+        return nodes
 
     def _all_mongots(self):
         """Return a list of all `mongot` `Process` instances in this fixture."""
