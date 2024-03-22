@@ -22,10 +22,11 @@ import {
     getWinningPlanFromExplain,
     isCollscan
 } from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = "index_filter_catalog_independent";
 const coll = db[collName];
-coll.drop();
+assertDropAndRecreateCollection(db, collName, {});
 
 /*
  * Check that there's one index filter on the given query which allows only 'indexes'.
