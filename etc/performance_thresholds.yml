@@ -1,9 +1,9 @@
 ########################################################################################################
 #            This file contains thresholds for performance tests run by resmoke. These correspond to   #
-#            the GenerateAndCheckPerfResults hook. Thresholds are set on a per variant basis - `local` #
-#            is for when running outside of Evergreen.                                                 #
+#            the GenerateAndCheckPerfResults hook. Thresholds are set on a per variant basis.          #
+#            Make sure to set the --variantName flag when running benchmarks in resmoke.               #
 #                                                                                                      #
-#            Each entry should follow the format below                                           #
+#            Each entry should follow the format below                                                 #
 ########################################################################################################
 #
 # tests:
@@ -44,25 +44,14 @@
 
 tests:
   ServiceEntryPointCommonBenchmarkFixture/BM_SEP_PING:
-    local:
-      - thread_level: 1
-        metrics:
-          - name: instructions_per_iteration_mean
-            value: 1000000000000000
-            bound_direction: upper
-      - thread_level: 32
-        metrics:
-          - name: instructions_per_iteration_mean
-            value: 1000000000000000
-            bound_direction: upper
     al2023-arm64-sep-benchmark:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 1000000000000000
+            value: 37669.8910134
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 1000000000000000
+            value: 37720.2487121
             bound_direction: upper

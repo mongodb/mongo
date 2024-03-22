@@ -15,7 +15,6 @@ from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.util.cedar_report import CedarMetric, CedarTestReport
 
 THRESHOLD_LOCATION = "etc/performance_thresholds.yml"
-LOCAL_VARIANT = "local"
 
 
 class BoundDirection(str, Enum):
@@ -65,7 +64,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
         """Initialize GenerateAndCheckPerfResults."""
         interface.Hook.__init__(self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION)
         self.cedar_report_file = _config.CEDAR_REPORT_FILE
-        self.variant = _config.EVERGREEN_VARIANT_NAME if _config.EVERGREEN_VARIANT_NAME is not None else LOCAL_VARIANT
+        self.variant = _config.EVERGREEN_VARIANT_NAME
         self.cedar_reports: List[CedarTestReport] = []
         self.performance_thresholds: Dict[str, Any] = {}
 
@@ -95,6 +94,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
     def _check_pass_fail(self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"],
                          cedar_formatted_results: List[CedarTestReport], test, test_report):
         """Check to see if any of the reported results violate any of the thresholds set."""
+        if self.variant is None:
+            self.logger.info(
+                "No variant information was given to resmoke. Please set the --variantName flag to let resmoke know what thresholds to use when checking."
+            )
+            return
         for test_name in benchmark_reports.keys():
             variant_thresholds = self.performance_thresholds.get(test_name, None)
             if variant_thresholds is None:
