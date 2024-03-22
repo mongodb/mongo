@@ -34,25 +34,26 @@ const kBucket = "system.buckets.coll"
 
 var db = st.getDB(kDbName);
 
-function createWorked(nss, tsOptions = {}) {
+function createWorked(collName, tsOptions = {}) {
     if (Object.keys(tsOptions).length === 0) {
-        assert.commandWorked(db.createCollection(nss));
+        assert.commandWorked(db.createCollection(collName));
     } else {
-        assert.commandWorked(db.createCollection(nss, {timeseries: tsOptions}));
+        assert.commandWorked(db.createCollection(collName, {timeseries: tsOptions}));
     }
-    return db.getCollection(nss);
+    return db.getCollection(collName);
 }
 
-function createFailed(nss, tsOptions, errorCode) {
+function createFailed(collName, tsOptions, errorCode) {
     if (Object.keys(tsOptions).length === 0) {
-        assert.commandFailedWithCode(db.createCollection(nss), errorCode);
+        assert.commandFailedWithCode(db.createCollection(collName), errorCode);
     } else {
-        assert.commandFailedWithCode(db.createCollection(nss, {timeseries: tsOptions}), errorCode);
+        assert.commandFailedWithCode(db.createCollection(collName, {timeseries: tsOptions}),
+                                     errorCode);
     }
 }
 
-function shardCollectionWorked(coll, tsOptions = {}) {
-    let nss = kDbName + "." + coll
+function shardCollectionWorked(collName, tsOptions = {}) {
+    let nss = kDbName + "." + collName
     if (Object.keys(tsOptions).length === 0) {
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {x: 1}}));
     }
@@ -60,11 +61,11 @@ function shardCollectionWorked(coll, tsOptions = {}) {
         assert.commandWorked(
             st.s.adminCommand({shardCollection: nss, key: {timestamp: 1}, timeseries: tsOptions}));
     }
-    return db.getCollection(nss);
+    return db.getCollection(collName);
 }
 
-function shardCollectionFailed(coll, tsOptions, errorCode) {
-    let nss = kDbName + "." + coll
+function shardCollectionFailed(collName, tsOptions, errorCode) {
+    let nss = kDbName + "." + collName
     if (Object.keys(tsOptions).length === 0) {
         assert.commandFailedWithCode(st.s.adminCommand({shardCollection: nss, key: {x: 1}}),
                                      errorCode);
@@ -100,6 +101,8 @@ function runTest(testCase, minRequiredVersion = null) {
     runTest(
         () => {
             createWorked(kColl);
+            // TODO SERVER-85838 sharding a collection with timeseries options when the collection
+            // already exists and is not timeseries should fail
             shardCollectionWorked(kColl, tsOptions);
         },
         // On 7.0 this test case used to wrongly fail with NamespaceExists.
@@ -151,27 +154,22 @@ function runTest(testCase, minRequiredVersion = null) {
         shardCollectionFailed(kColl, {}, 5914001);
     });
 
+    jsTest.log(
+        "Case collection: bucket timeseries / collection: sharded timeseries different options.");
+    runTest(() => {
+        createWorked(kBucket, tsOptions);
+        shardCollectionFailed(kColl, tsOptions2, 5731500);
+    });
+
     jsTest.log("Case collection: bucket timeseries / collection: sharded timeseries.");
     runTest(
         () => {
             createWorked(kBucket, tsOptions);
             let coll = shardCollectionWorked(kColl, tsOptions);
 
-            // TODO SERVER-85855 remove all the code below once creating a timeseries bucket
-            // collection will create the related view. Before the fix, the shardCollection returns
-            // a pointer to a "test.test.coll" which doesn't exist. An invalid insert afterwords
-            // will work and create the collection as unsharded. After the fix, we expect this case
-            // to behave same as sharding an existing timeseries collection.
-            assert.commandWorked(coll.insert({x: 1}));
-            let listCollections = db.runCommand({listCollections: 1}).cursor.firstBatch;
-            listCollections.sort((a, b) => a.name < b.name);  // collection name alphabetic order
-
-            assert.eq(2, listCollections.length);
-            assert.eq(kBucket, listCollections[1].name);
-            // note the collection name is "test.coll and not just coll"
-            assert.eq("test.coll", listCollections[0].name);
+            assert.commandWorked(coll.insert({timestamp: ISODate()}));
         },
-        // TODO SERVER-85855 On 7.0 this test case used to cause a primary node crash.
+        // TODO BACKPORT-19329 On 7.0 this test case used to cause a primary node crash.
         "7.1"  // minRequiredVersion
     );
 }
@@ -206,12 +204,10 @@ function runTest(testCase, minRequiredVersion = null) {
 
     jsTest.log("Case collection: sharded standard / collection: bucket timeseries.");
     runTest(() => {
-        let coll = shardCollectionWorked(kColl);
+        shardCollectionWorked(kColl);
+        // TODO SERVER-85855 creating a bucket timeseries when the main namespace already exists
+        // and is not timeseries should fail
         createWorked(kBucket, tsOptions);
-
-        coll.insert({x: 1})
-        var docs = coll.find().toArray();
-        assert.eq(1, docs.length);
     });
 
     jsTest.log("Case collection: sharded standard / collection: sharded standard.");
@@ -259,6 +255,8 @@ function runTest(testCase, minRequiredVersion = null) {
     jsTest.log("Case collection: sharded timeseries / collection: bucket timeseries.");
     runTest(() => {
         shardCollectionWorked(kColl, tsOptions);
+        // TODO SERVER-88265 creation of the bucket namespace when the collection already exists and
+        // is timeseries should work
         createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
     });
 
