@@ -595,7 +595,9 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     batchedRequest.evaluateAndReplaceLetParams(opCtx);
 
     // Append the write concern from the opCtx extracted during command setup.
-    batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
+    if (!batchedRequest.hasWriteConcern()) {
+        batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
+    }
 
     // Write ops are never allowed to have writeConcern inside transactions. Normally
     // disallowing WC on non-terminal commands in a transaction is handled earlier, during
