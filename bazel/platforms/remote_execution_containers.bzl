@@ -28,20 +28,20 @@ REMOTE_EXECUTION_CONTAINERS = {
         "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:f15c8a55d414b442694bacf76862461f9aff7f45c670dcfd65081ac07f6bccfa",
     },
     "ubuntu18_arm64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:d4d594c61803b3ac598fe5941f658cc571c50e047a99958ffff7d468ee1d5d87
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:d4d594c61803b3ac598fe5941f658cc571c50e047a99958ffff7d468ee1d5d87",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:cd93eb90e1175a1151d61063379c4e353a0b0bcdca9cc789c1d70ee4405ecdb5
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:cd93eb90e1175a1151d61063379c4e353a0b0bcdca9cc789c1d70ee4405ecdb5",
     },
     "ubuntu18_amd64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:d4d594c61803b3ac598fe5941f658cc571c50e047a99958ffff7d468ee1d5d87
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:d4d594c61803b3ac598fe5941f658cc571c50e047a99958ffff7d468ee1d5d87",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:cd93eb90e1175a1151d61063379c4e353a0b0bcdca9cc789c1d70ee4405ecdb5
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:cd93eb90e1175a1151d61063379c4e353a0b0bcdca9cc789c1d70ee4405ecdb5",
     },
     "ubuntu20_arm64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:930d0f625a36476a445c124a18ef836ad540c2dfd4a7b0186afc234ad0fdf793
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:930d0f625a36476a445c124a18ef836ad540c2dfd4a7b0186afc234ad0fdf793",
     },
     "ubuntu20_amd64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:930d0f625a36476a445c124a18ef836ad540c2dfd4a7b0186afc234ad0fdf793
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:930d0f625a36476a445c124a18ef836ad540c2dfd4a7b0186afc234ad0fdf793",
     },
     "ubuntu22_arm64": {
         # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:a249a6b5d6c3356d469006f66b671a26439738d104b1c79515715adee4aabe7a
@@ -53,21 +53,21 @@ REMOTE_EXECUTION_CONTAINERS = {
     },
     "rhel7_arm64": {
         # rhel 8 container
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3",
     },
     "rhel7_amd64": {
         # rhel 8 container
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3",
     },
     "rhel8_arm64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3",
     },
     "rhel8_amd64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:7dbe732fa0334a8346717fea7fdc6084e548e4fac20e1119ddfecc7f5ce3a118",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:6338b3e20896ec43b6fc8817041cb04ce254b6d2642b0a1b031f7656e4ec5bd3",
     },
     "rhel9_arm64": {
         # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:0279c4488ea18a99692014431cc65336c6f45f1cea5f42bae04904072722a647
@@ -86,19 +86,19 @@ REMOTE_EXECUTION_CONTAINERS = {
         "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:c8dbe594cf001d1705f32364565ac12784db7d36c0651df324443feffdec32ac",
     },
     "debian10_arm64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:cac85010f3e9be4e8f59144067e1f045e4b8941e25e171c4589c161bdbfb270b
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:cac85010f3e9be4e8f59144067e1f045e4b8941e25e171c4589c161bdbfb270b",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:fc0b6da13852aeab3a8ad8e5b4bec7bd2a643a8a96fe46d8a31658cdce9d2902
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:fc0b6da13852aeab3a8ad8e5b4bec7bd2a643a8a96fe46d8a31658cdce9d2902",
     },
     "debian10_amd64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:cac85010f3e9be4e8f59144067e1f045e4b8941e25e171c4589c161bdbfb270b
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:cac85010f3e9be4e8f59144067e1f045e4b8941e25e171c4589c161bdbfb270b",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:fc0b6da13852aeab3a8ad8e5b4bec7bd2a643a8a96fe46d8a31658cdce9d2902
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:fc0b6da13852aeab3a8ad8e5b4bec7bd2a643a8a96fe46d8a31658cdce9d2902",
     },
     "debian12_arm64": {
         # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:e635adfa8998e97a24bb6632c108c7c11faf464c6327b4e14fac045a21aa342e
         "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:e635adfa8998e97a24bb6632c108c7c11faf464c6327b4e14fac045a21aa342e",
     },
     "debian12_amd64": {
-        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:e635adfa8998e97a24bb6632c108c7c11faf464c6327b4e14fac045a21aa342e
-        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:e635adfa8998e97a24bb6632c108c7c11faf464c6327b4e14fac045a21aa342e",
+        # https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:bbdc5829c76913e0efc443ea24a2c73eef4227d46716e3dd938452325426e26f
+        "container-image": "docker://quay.io/mongodb/bazel-remote-execution@sha256:bbdc5829c76913e0efc443ea24a2c73eef4227d46716e3dd938452325426e26f",
     },
 }
