@@ -604,10 +604,16 @@ TEST(SortedDataInterface, InsertAndSeekKeyString) {
         auto ksEntry1 = cursor->seekForKeyString(keyString1WithoutRecordId);
         ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1), 0);
         ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2), -1);
+        auto kvEntry1 = cursor->seekForKeyValueView(keyString1WithoutRecordId);
+        ASSERT(!kvEntry1.isEmpty());
+        ASSERT_EQUALS(ksEntry1->keyString.compare(kvEntry1.getValueCopy()), 0);
 
         auto ksEntry2 = cursor->seekForKeyString(keyString2WithoutRecordId);
         ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2), 0);
         ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1), 1);
+        auto kvEntry2 = cursor->seekForKeyValueView(keyString2WithoutRecordId);
+        ASSERT(!kvEntry2.isEmpty());
+        ASSERT_EQUALS(ksEntry2->keyString.compare(kvEntry2.getValueCopy()), 0);
     }
 }
 

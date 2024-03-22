@@ -190,6 +190,21 @@ TEST(SortedDataInterface, ExhaustKeyStringCursor) {
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->nextKeyString());
     }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
+        for (int i = 0; i < nToInsert; i++) {
+            auto entry = cursor->nextKeyValueView();
+            ASSERT(!entry.isEmpty());
+            ASSERT_EQ(entry.getValueCopy(), keyStrings.at(i));
+        }
+        ASSERT(cursor->nextKeyValueView().isEmpty());
+
+        // Cursor at EOF should remain at EOF when advanced
+        ASSERT(cursor->nextKeyValueView().isEmpty());
+    }
 }
 
 // Call advance() on a reverse cursor until it is exhausted.
@@ -285,6 +300,22 @@ TEST(SortedDataInterface, ExhaustKeyStringCursorReversed) {
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->nextKeyString());
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
+            sorted->newCursor(opCtx.get(), false));
+        for (int i = nToInsert - 1; i >= 0; i--) {
+            auto entry = cursor->nextKeyValueView();
+            ASSERT(!entry.isEmpty());
+            ASSERT_EQ(entry.getValueCopy(), keyStrings.at(i));
+        }
+        ASSERT(cursor->nextKeyValueView().isEmpty());
+
+        // Cursor at EOF should remain at EOF when advanced
+        ASSERT(cursor->nextKeyValueView().isEmpty());
     }
 }
 

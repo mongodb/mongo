@@ -81,9 +81,8 @@ BSONObj toBsonAndCheckKeySize(const key_string::BuilderBase<T>& ks, Ordering ord
     auto KeyStringBuilderSize = ks.getSize();
 
     // Validate size of the key in key_string::Builder.
-    ASSERT_EQUALS(
-        KeyStringBuilderSize,
-        key_string::getKeySize(ks.getBuffer(), KeyStringBuilderSize, ord, ks.getTypeBits()));
+    ASSERT_EQUALS(KeyStringBuilderSize,
+                  key_string::getKeySize(ks.getBuffer(), KeyStringBuilderSize, ord, ks.version));
     return key_string::toBson(ks.getBuffer(), KeyStringBuilderSize, ord, ks.getTypeBits());
 }
 
@@ -92,7 +91,7 @@ BSONObj toBsonAndCheckKeySize(const key_string::Value& ks, Ordering ord) {
 
     // Validate size of the key in key_string::Value.
     ASSERT_EQUALS(KeyStringSize,
-                  key_string::getKeySize(ks.getBuffer(), KeyStringSize, ord, ks.getTypeBits()));
+                  key_string::getKeySize(ks.getBuffer(), KeyStringSize, ord, ks.getVersion()));
     return key_string::toBson(ks.getBuffer(), KeyStringSize, ord, ks.getTypeBits());
 }
 
@@ -280,7 +279,7 @@ TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
     // No exceptions should be thrown.
     key_string::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits());
     key_string::decodeDiscriminator(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
-    key_string::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+    key_string::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.version);
 }
 
 TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
@@ -295,7 +294,7 @@ TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
     // No exceptions should be thrown.
     key_string::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits());
     key_string::decodeDiscriminator(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
-    key_string::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+    key_string::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.version);
 }
 
 TEST_F(KeyStringBuilderTest, EmbeddedNullString) {

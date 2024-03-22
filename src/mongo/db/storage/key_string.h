@@ -94,8 +94,8 @@ MONGO_STATIC_ASSERT(RecordId::kBigStrMaxSize < 1 << (7 * kRecordIdStrEncodedSize
 class TypeBits {
 public:
     // See comments in getBuffer() about short/long encoding schemes.
-    static const uint8_t kMaxBytesForShortEncoding = 127;
-    static const uint8_t kPrefixBytes = 5;
+    static const int8_t kMaxBytesForShortEncoding = 127;
+    static const int8_t kPrefixBytes = 5;
     static const uint8_t kStoredDecimalExponentBits = 6;
     static const uint32_t kStoredDecimalExponentMask = (1U << kStoredDecimalExponentBits) - 1;
 
@@ -168,13 +168,13 @@ public:
         // Case 3 & 4: size byte(s) + data bytes.
         return isLongEncoding() ? _buf.buf() : (getDataBuffer() - 1);
     }
-    size_t getSize() const {
+    int32_t getSize() const {
         if (_isAllZeros) {  // Case 1
             dassert(getDataBufferLen() == 0 || getDataBuffer()[0] == 0);
             return 1;
         }
 
-        uint32_t rawSize = getDataBufferLen();
+        int32_t rawSize = getDataBufferLen();
         dassert(rawSize >= 1);                      // 0 should be handled as isAllZeros.
         if (rawSize > kMaxBytesForShortEncoding) {  // Case 4
             return rawSize + kPrefixBytes;
@@ -261,6 +261,7 @@ public:
         virtual uint8_t readStringLike() = 0;
         virtual uint8_t readNumeric() = 0;
         virtual uint8_t readZero() = 0;
+        virtual Version version() const = 0;
 
         // Given a decimal zero type between kDecimalZero0xxx and kDecimal5xxx, read the
         // remaining 12 bits and return which of the 24576 decimal zeros to produce.
@@ -279,7 +280,13 @@ public:
         /**
          * Passed in TypeBits must outlive this Reader instance.
          */
-        explicit Reader(const TypeBits& typeBits) : _curBit(0), _typeBits(typeBits) {}
+        explicit Reader(const char* data, int32_t size, Version version, bool isAllZeroes)
+            : _data(data), _size(size), _curBit(0), _version(version), _isAllZeros(isAllZeroes) {}
+        explicit Reader(const TypeBits& typeBits)
+            : Reader(typeBits.getDataBuffer(),
+                     typeBits.getDataBufferLen(),
+                     typeBits.version,
+                     typeBits._isAllZeros) {}
         ~Reader() override = default;
 
         uint8_t readStringLike() final;
@@ -288,12 +295,19 @@ public:
         uint32_t readDecimalZero(uint8_t zeroType) final;
         uint8_t readDecimalExponent() final;
 
+        Version version() const override {
+            return _version;
+        }
+
     protected:
         uint8_t readBit() final;
 
     private:
-        uint32_t _curBit;
-        const TypeBits& _typeBits;
+        const char* _data;
+        int32_t _size;
+        int32_t _curBit;
+        Version _version;
+        bool _isAllZeros;
     };
 
     /**
@@ -316,6 +330,10 @@ public:
         uint32_t readDecimalZero(uint8_t zeroType) final;
         uint8_t readDecimalExponent() final;
 
+        Version version() const final {
+            return _reader.version();
+        }
+
         std::string getExplain() const {
             return _explain.ss.str();
         }
@@ -330,12 +348,27 @@ public:
         str::stream _explain;
     };
 
+    /**
+     * Get a Reader on top of a buffer without copying it. This reader can then be passed to
+     * toBson() in place of a TypeBits object that owns a buffer copy.
+     * The position pointer of `buf` is advanced to the end of the TypeBits.
+     */
+    static Reader getReaderFromBuffer(Version version, BufReader* buf) {
+        if (!buf->remaining()) {
+            // This means AllZeros state was encoded as an empty buffer.
+            return Reader(nullptr, 0, version, true);
+        }
+
+        int32_t size = readSizeFromBuffer(buf);
+        return Reader(static_cast<const char*>(buf->skip(size)), size, version, size == 0);
+    }
+
     Version version;
 
 private:
-    static uint32_t readSizeFromBuffer(BufReader* reader);
+    static int32_t readSizeFromBuffer(BufReader* reader);
 
-    void setRawSize(uint32_t size);
+    void setRawSize(int32_t size);
 
     const char* getDataBuffer() const {
         return _buf.buf() + kPrefixBytes;
@@ -343,7 +376,7 @@ private:
     char* getDataBuffer() {
         return _buf.buf() + kPrefixBytes;
     }
-    uint32_t getDataBufferLen() const {
+    int32_t getDataBufferLen() const {
         return _buf.len() - kPrefixBytes;
     }
 
@@ -1057,7 +1090,7 @@ inline typename std::enable_if<isKeyString<T>::value, std::ostream&>::type opera
  * Given a KeyString which may or may not have a RecordId, returns the length of the section without
  * the RecordId. More expensive than sizeWithoutRecordId(Long|Str)AtEnd
  */
-size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits);
+size_t getKeySize(const char* buffer, size_t len, Ordering ord, Version version);
 
 /**
  * Decodes the given KeyString buffer into it's BSONObj representation. This is marked as
@@ -1068,9 +1101,15 @@ size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& 
  */
 BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
 BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& types) noexcept;
+BSONObj toBson(StringData data, Ordering ord, StringData typeBitsRawBuffer, Version version);
 BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
 void toBsonSafe(
     const char* buffer, size_t len, Ordering ord, const TypeBits& types, BSONObjBuilder& builder);
+void toBsonSafe(const char* buffer,
+                size_t len,
+                Ordering ord,
+                TypeBits::ReaderBase& typeBitsReader,
+                BSONObjBuilder& builder);
 Discriminator decodeDiscriminator(const char* buffer,
                                   size_t len,
                                   Ordering ord,
@@ -1095,19 +1134,25 @@ RecordId decodeRecordIdStrAtEnd(const void* buf, size_t size);
 /**
  * Given a KeyString with a RecordId in the long format, returns the length of the section without
  * the RecordId.
+ * If a RecordId pointer is provided, also decode the RecordId into the pointer.
  */
-size_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize);
+int32_t sizeWithoutRecordIdLongAtEnd(const void* bufferRaw,
+                                     size_t bufSize,
+                                     RecordId* recordId = nullptr);
 
 /**
  * Given a KeyString with a RecordId in the string format, returns the length of the section without
  * the RecordId.
+ * If a RecordId pointer is provided, also decode the RecordId into the pointer.
  */
-size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize);
+int32_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw,
+                                    size_t bufSize,
+                                    RecordId* recordId = nullptr);
 
 /**
  * Given a KeyString, returns the length of the section without the discriminator.
  */
-size_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize);
+int32_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize);
 
 /**
  * Decodes a RecordId, consuming all bytes needed from reader.
