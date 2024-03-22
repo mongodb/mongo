@@ -117,7 +117,7 @@ function testFn(timeseries, failFn) {
             st.rs0.getPrimary().getDB('config')['agg_temp_collections'].count();
 
         return tempCollections.length === 0 && garbageCollectionEntries === 0;
-    });
+    }, "Timeout hit while waiting for temporary collections to be garbage collected", 60000);
 }
 
 jsTest.log("Running test with normal collection and SIGKILL");
