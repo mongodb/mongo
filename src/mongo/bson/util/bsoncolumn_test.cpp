@@ -236,7 +236,9 @@ public:
     }
 
     static uint64_t deltaInt64(BSONElement val, BSONElement prev) {
-        return Simple8bTypeUtil::encodeInt64(val.Long() - prev.Long());
+        return Simple8bTypeUtil::encodeInt64(
+            static_cast<long long>(static_cast<unsigned long long>(val.Long()) -
+                                   static_cast<unsigned long long>(prev.Long())));
     }
 
     static uint64_t deltaDouble(BSONElement val, BSONElement prev, double scaleFactor) {
