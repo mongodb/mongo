@@ -200,9 +200,6 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
   - name: .jscore .common !.sharding
   - name: jsCore_auth
   - name: jsCore_column_store_indexes

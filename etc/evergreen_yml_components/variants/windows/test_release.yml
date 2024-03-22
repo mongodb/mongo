@@ -42,7 +42,8 @@ buildvariants:
   - name: .development_critical !.incompatible_community !.incompatible_windows
   - name: .release_critical !.incompatible_community !.incompatible_windows !publish_packages
 
-- name: enterprise-windows
+- &enterprise-windows-template
+  name: &enterprise-windows enterprise-windows
   display_name: "Enterprise Windows"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   tags: ["bazel_check"]
@@ -89,3 +90,16 @@ buildvariants:
     - windows-vsCurrent-xxlarge
   - name: .development_critical !.incompatible_windows
   - name: .release_critical !.incompatible_windows !publish_packages
+
+# This variant is owned by the security team and is special
+# because these tests require specific distro to run on
+- <<: *enterprise-windows-template
+  name: enterprise-windows-security
+  display_name: Enterprise Windows Security
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: *enterprise-windows
+  tasks:
+  - name: external_auth_windows
+    distros:
+    - windows-2016-dc
