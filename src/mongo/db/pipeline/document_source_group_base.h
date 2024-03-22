@@ -219,13 +219,6 @@ protected:
     virtual void serializeAdditionalFields(
         MutableDocument& out, const SerializationOptions& opts = SerializationOptions{}) const {};
 
-    /**
-     * Returns true iff rewriteGroupAsTransformOnFirstDocument() returns a non-null value.
-     */
-    bool isEligibleForTransformOnFirstDocument(
-        GroupFromFirstDocumentTransformation::ExpectedInput& expectedInput,
-        std::string& groupId) const;
-
     GroupProcessor _groupProcessor;
 
 private:

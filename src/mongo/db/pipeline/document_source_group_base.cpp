@@ -383,18 +383,17 @@ bool DocumentSourceGroupBase::canRunInParallelBeforeWriteStage(
     return true;
 }
 
-bool DocumentSourceGroupBase::isEligibleForTransformOnFirstDocument(
-    GroupFromFirstDocumentTransformation::ExpectedInput& expectedInput,
-    std::string& groupId) const {
+std::unique_ptr<GroupFromFirstDocumentTransformation>
+DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
     const auto& idExpressions = _groupProcessor.getIdExpressions();
     if (idExpressions.size() != 1) {
         // This transformation is only intended for $group stages that group on a single field.
-        return false;
+        return nullptr;
     }
 
     auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(idExpressions.front().get());
     if (!fieldPathExpr || fieldPathExpr->isVariableReference()) {
-        return false;
+        return nullptr;
     }
 
     const auto fieldPath = fieldPathExpr->getFieldPath();
@@ -406,29 +405,19 @@ bool DocumentSourceGroupBase::isEligibleForTransformOnFirstDocument(
         tassert(5943200,
                 "Optimization attempted on group by always-dissimilar system variable",
                 fieldPath.getFieldName(0) == "CURRENT" || fieldPath.getFieldName(0) == "ROOT");
-        return false;
+        return nullptr;
     }
 
-    groupId = fieldPath.tail().fullPath();
+    const auto groupId = fieldPath.tail().fullPath();
 
     // We do this transformation only if there are all $first, all $last, or no accumulators.
+    GroupFromFirstDocumentTransformation::ExpectedInput expectedInput;
     const auto& accumulatedFields = _groupProcessor.getAccumulationStatements();
     if (accsNeedSameDoc(accumulatedFields, AccumulatorDocumentsNeeded::kFirstDocument)) {
         expectedInput = GroupFromFirstDocumentTransformation::ExpectedInput::kFirstDocument;
     } else if (accsNeedSameDoc(accumulatedFields, AccumulatorDocumentsNeeded::kLastDocument)) {
         expectedInput = GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument;
     } else {
-        return false;
-    }
-
-    return true;
-}
-
-std::unique_ptr<GroupFromFirstDocumentTransformation>
-DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
-    std::string groupId;
-    GroupFromFirstDocumentTransformation::ExpectedInput expectedInput;
-    if (!isEligibleForTransformOnFirstDocument(expectedInput, groupId)) {
         return nullptr;
     }
 
@@ -442,12 +431,12 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
         idField = ExpressionFieldPath::deprecatedCreate(pExpCtx.get(), groupId);
     } else {
         invariant(idFieldNames.size() == 1);
-        idField = ExpressionObject::create(
-            pExpCtx.get(), {{idFieldNames.front(), _groupProcessor.getIdExpressions().front()}});
+        idField = ExpressionObject::create(pExpCtx.get(),
+                                           {{idFieldNames.front(), idExpressions.front()}});
     }
     fields.emplace_back("_id", idField);
 
-    for (auto&& accumulator : _groupProcessor.getAccumulationStatements()) {
+    for (auto&& accumulator : accumulatedFields) {
         fields.emplace_back(accumulator.fieldName, accumulator.expr.argument);
 
         // Since we don't attempt this transformation for non-$first/$last accumulators,

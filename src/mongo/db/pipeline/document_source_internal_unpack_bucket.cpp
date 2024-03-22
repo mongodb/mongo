@@ -1649,41 +1649,6 @@ void DocumentSourceInternalUnpackBucket::addVariableRefs(std::set<Variables::Id>
     }
 }
 
-namespace {
-// For now, we only support adjacent $sort + $group for the top-k sort optimization.
-std::pair<DocumentSourceSort*, DocumentSourceGroup*> getSortAndGroup(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    if (std::next(itr) == container->end() || std::next(std::next(itr)) == container->end()) {
-        return {nullptr, nullptr};
-    }
-
-    auto prospectiveSortItr = std::next(itr);
-    auto prospectiveSort = dynamic_cast<DocumentSourceSort*>(prospectiveSortItr->get());
-    if (!prospectiveSort) {
-        return {nullptr, nullptr};
-    }
-
-    auto prospectiveGroupItr = std::next(prospectiveSortItr);
-    auto prospectiveGroup = dynamic_cast<DocumentSourceGroup*>(prospectiveGroupItr->get());
-    if (!prospectiveGroup) {
-        return {prospectiveSort, nullptr};
-    }
-
-    return {prospectiveSort, prospectiveGroup};
-}
-}  // namespace
-
-bool DocumentSourceInternalUnpackBucket::tryToAbsorbTopKSortIntoGroup(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    auto [prospectiveSort, prospectiveGroup] = getSortAndGroup(itr, container);
-    if (!prospectiveSort || !prospectiveGroup) {
-        return false;
-    }
-
-    return prospectiveGroup->tryToAbsorbTopKSort(
-        prospectiveSort, /*prospectiveSortItr=*/std::next(itr), container);
-}
-
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -1729,10 +1694,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                 }
             }
         }
-    }
-
-    if (tryToAbsorbTopKSortIntoGroup(itr, container)) {
-        return itr;
     }
 
     // Attempt to push geoNear on the metaField past $_internalUnpackBucket.

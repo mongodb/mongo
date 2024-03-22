@@ -174,13 +174,13 @@ struct AccumulationExpression {
     boost::intrusive_ptr<Expression> argument;
 
     // A no argument function object that can be called to create an AccumulatorState.
-    AccumulatorState::Factory factory;
+    const AccumulatorState::Factory factory;
 
     // The name of the accumulator expression. It is the caller's responsibility to make sure the
     // memory this points to does not get freed. This can best be accomplished by passing in a
     // pointer to a string constant. This StringData is always required to point to a valid
     // null-terminated string.
-    StringData name;
+    const StringData name;
 };
 
 /**

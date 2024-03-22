@@ -32,6 +32,9 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -39,7 +42,6 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group_base.h"
-#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 
@@ -78,14 +80,6 @@ public:
 
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
-
-    // The $sort/$group with $first/$last is rewritten to use $top/$bottom in $group so that $sort
-    // is absorbed into $group. Currently this rewrite is only invoked from time-series.
-    //
-    // TODO SERVER-28980 will lift the restriction.
-    bool tryToAbsorbTopKSort(DocumentSourceSort* prospectiveSort,
-                             Pipeline::SourceContainer::iterator prospectiveSortItr,
-                             Pipeline::SourceContainer* container);
 
 protected:
     GetNextResult doGetNext() final;
@@ -139,8 +133,6 @@ private:
     GetNextResult performBlockingGroupSelf(GetNextResult input);
 
     bool _groupsReady;
-
-    const size_t _maxFirstLastRewrites;
 };
 
 }  // namespace mongo
