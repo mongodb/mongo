@@ -259,8 +259,13 @@ feature_flags:
         default: true
         version: 7.1
         shouldBeFCVGated: true
-    featureFlagBlockBasedDecodingAPI:
-        description: "Enable support for decompressing BSON columns using the block based API"
-        cpp_varname: feature_flags::gBlockBasedDecodingAPI
+    featureFlagBlockBasedDecodingScalarAPI:
+        description: "Enable support for decompressing BSON columns using the block based scalar API"
+        cpp_varname: feature_flags::gBlockBasedDecodingScalarAPI
+        default: false
+        shouldBeFCVGated: false
+    featureFlagBlockBasedDecodingPathAPI:
+        description: "Enable support for decompressing BSON columns using the block based Path API"
+        cpp_varname: feature_flags::gBlockBasedDecodingPathAPI
         default: false
         shouldBeFCVGated: false

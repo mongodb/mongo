@@ -96,7 +96,7 @@ TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest>
       _timeField(timeField),
       // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
       _blockBasedDecompressionEnabled(
-          feature_flags::gBlockBasedDecodingAPI.isEnabledAndIgnoreFCVUnsafe()) {
+          feature_flags::gBlockBasedDecodingScalarAPI.isEnabledAndIgnoreFCVUnsafe()) {
 
     size_t idx = 0;
     for (auto& req : _pathReqs) {
