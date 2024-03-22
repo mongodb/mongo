@@ -172,11 +172,17 @@ private:
     static std::string serializeForCommands(const NamespaceString& ns,
                                             const SerializationContext& context);
 
-    static NamespaceString deserializeForStorage(boost::optional<TenantId> tenantId, StringData ns);
+    static NamespaceString deserializeForStorage(boost::optional<TenantId> tenantId,
+                                                 StringData db,
+                                                 StringData coll);
 
     static NamespaceString deserializeForCommands(boost::optional<TenantId> tenantId,
-                                                  StringData ns,
+                                                  StringData db,
+                                                  StringData coll,
                                                   const SerializationContext& context);
+
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData db,
+                                                                           StringData coll);
 };
 
 }  // namespace mongo

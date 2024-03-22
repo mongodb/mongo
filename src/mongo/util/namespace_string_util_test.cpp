@@ -362,6 +362,188 @@ TEST(NamespaceStringUtilTest, ParseNSSWithTenantId) {
     ASSERT_EQ(*nss.tenantId(), tenantId);
 }
 
+TEST(NamespaceStringUtilTest, ParseNSSWithUnderscoreAfterDbPortion) {
+    for (const bool multitenancy : {true, false}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
+        // no tenant, "foo.bar"
+        {
+            NamespaceString nss =
+                NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode("foo.bar");
+            ASSERT_EQ(nss.ns_forTest(), "foo.bar");
+            ASSERT_EQ(nss.toStringWithTenantId_forTest(), "foo.bar");
+            ASSERT_EQ(nss.tenantId(), boost::none);
+        }
+
+        // '_' positioned after '.'. Ex: foo.123_bar
+        {
+            TenantId tenantId(OID::gen());
+            std::string nssWithTenantStr = str::stream() << "foo." << tenantId.toString() << "_bar";
+            NamespaceString nss =
+                NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+                    nssWithTenantStr);
+            ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+            ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+            ASSERT_EQ(nss.tenantId(), boost::none);
+        }
+
+        // '_' positioned after db but before '.'. Ex: foo_123.bar
+        {
+            TenantId tenantId(OID::gen());
+            std::string nssWithTenantStr = str::stream() << "foo_" << tenantId.toString() << ".bar";
+            NamespaceString nss =
+                NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+                    nssWithTenantStr);
+            ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+            ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+            ASSERT_EQ(nss.tenantId(), boost::none);
+        }
+
+        // '_' positioned after coll. Ex: foo.bar_123
+        {
+            TenantId tenantId(OID::gen());
+            std::string nssWithTenantStr = str::stream() << "foo"
+                                                         << ".bar_" << tenantId.toString();
+            NamespaceString nss =
+                NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+                    nssWithTenantStr);
+            ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+            ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+            ASSERT_EQ(nss.tenantId(), boost::none);
+        }
+    }
+}
+
+TEST(NamespaceStringUtilTest, ParseNSSWithTenantIdAndUnderscoreAfterDbPortionMultitenancyOff) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    // no tenant
+    {
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode("foo.bar");
+        ASSERT_EQ(nss.ns_forTest(), "foo.bar");
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), "foo.bar");
+        ASSERT_EQ(nss.tenantId(), boost::none);
+    }
+
+    // '_' positioned after db and '.'. Ex: 123_foo.456_bar
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_foo." << rightSideTenantId.toString() << "_bar";
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), boost::none);
+    }
+
+    // '_' positioned after tenantId. Ex: 123_456_foo.bar
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_" << rightSideTenantId.toString() << "_foo.bar";
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), boost::none);
+    }
+
+    // '_' positioned after db but before '.'. Ex: 123_foo_456.bar
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_foo_" << rightSideTenantId.toString() << ".bar";
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), boost::none);
+    }
+
+    // '_' positioned after coll. Ex: 123_foo.bar_456
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_foo.bar_" << rightSideTenantId.toString();
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), boost::none);
+    }
+}
+
+TEST(NamespaceStringUtilTest, ParseNSSWithTenantIdAndUnderscoreAfterDbPortionMultitenancyOn) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    // no tenant
+    {
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode("foo.bar");
+        ASSERT_EQ(nss.ns_forTest(), "foo.bar");
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), "foo.bar");
+        ASSERT_EQ(nss.tenantId(), boost::none);
+    }
+
+    // '_' positioned after db and '.'. Ex: 123_foo.456_bar
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_foo." << rightSideTenantId.toString() << "_bar";
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(),
+                  (str::stream() << "foo." << rightSideTenantId.toString() << "_bar"));
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+    }
+
+    // '_' positioned after tenantId. Ex: 123_456_foo.bar
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_" << rightSideTenantId.toString() << "_foo.bar";
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(), (str::stream() << rightSideTenantId.toString() << "_foo.bar"));
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+    }
+
+    // '_' positioned after db but before '.'. Ex: 123_foo_456.bar
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_foo_" << rightSideTenantId.toString() << ".bar";
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(),
+                  (str::stream() << "foo_" << rightSideTenantId.toString() << ".bar"));
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+    }
+
+    // '_' positioned after coll. Ex: 123_foo.bar_456
+    {
+        TenantId tenantId(OID::gen());
+        TenantId rightSideTenantId(OID::gen());
+        std::string nssWithTenantStr = str::stream()
+            << tenantId.toString() << "_foo.bar_" << rightSideTenantId.toString();
+        NamespaceString nss =
+            NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nssWithTenantStr);
+        ASSERT_EQ(nss.ns_forTest(), (str::stream() << "foo.bar_" << rightSideTenantId.toString()));
+        ASSERT_EQ(nss.toStringWithTenantId_forTest(), nssWithTenantStr);
+        ASSERT_EQ(nss.tenantId(), tenantId);
+    }
+}
+
 TEST(NamespaceStringUtilTest, ParseFailPointData) {
     // Test fail point data only has name space.
     {

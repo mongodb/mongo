@@ -160,6 +160,11 @@ public:
         return isAdminDB() || isConfigDB() || isLocalDB();
     }
 
+    static bool isInternalDb(StringData db) {
+        return db == DatabaseName::kAdmin.db(omitTenant) ||
+            db == DatabaseName::kLocal.db(omitTenant) || db == DatabaseName::kConfig.db(omitTenant);
+    }
+
     /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.
      *
