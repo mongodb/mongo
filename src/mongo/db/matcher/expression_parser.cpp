@@ -143,6 +143,9 @@ void disableSBEForUnsupportedExpressions(const boost::intrusive_ptr<ExpressionCo
 void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          AndMatchExpression* root,
                          std::unique_ptr<MatchExpression> newNode) {
+    // TODO SERVER-87587 Remove the call to disableSBE when support for numeric paths
+    // in index filters is restored (and other similar issues have been tracked)
+    disableSBEForUnsupportedExpressions(expCtx, newNode.get());
     root->add(std::move(newNode));
 }
 }  // namespace
