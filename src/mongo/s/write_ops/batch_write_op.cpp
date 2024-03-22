@@ -469,7 +469,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             // Handle time-series retryable updates using the two phase write protocol only when
             // there is more than one shard that owns chunks.
             if (isTimeseriesRetryableUpdate) {
-                writeWithoutShardKeyOrId &= targeter.getNShardsOwningChunks() > 1;
+                writeWithoutShardKeyOrId &= writes.size() > 1;
             }
             if (writeWithoutShardKeyOrId) {
                 // Writes without shard key should be in their own batch.
