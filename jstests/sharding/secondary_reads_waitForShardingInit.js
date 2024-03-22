@@ -110,5 +110,17 @@ assert.commandWorked(sessionDb.runCommand({
 fpForceSyncSource.off();
 sessionDb.getSession().endSession();
 
-st.stop();
+// Remove the shard as part of the test teardown; this will prevent spurious failures of the
+// checkShardFilteringMetadata teardown hook.
+// TODO SERVER-88362 delete the block below.
+assert.commandWorked(st.getDB(dbName).dropDatabase());
+assert.commandWorked(st.getDB('forceSyncSourceDB').dropDatabase());
+let res = assert.commandWorked(st.s.adminCommand({removeShard: shardName}));
+if (res.state === 'started') {
+    // Issue a second removeShard request to sync on the full removal of the targeted RS.
+    res = assert.commandWorked(st.s.adminCommand({removeShard: shardName}));
+}
+assert.eq('completed', res.state);
+
 replTest.stopSet();
+st.stop();
