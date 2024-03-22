@@ -466,15 +466,23 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
 }
 
 /**
- * Checks if we can create a single interval index scan plan. Creation of the single interval index
- * scan plans is preferred due to lower query latency as a result of faster plan recovery from the
- * cache. The rule for checking if 'iets' resolve to a single interval is as follows:
+ * Represents the kinds of interval(s) required for an index scan: a single point interval, a single
+ * range interval, or multiple intervals.
+ */
+enum class IntervalsRequired { EqualityInterval, SingleRangeInterval, MultiInterval };
+
+/**
+ * Checks what kind of intervals are required for the index scan plan, i.e., if we can create a
+ * single interval index scan plan. Creation of the single interval index scan plans is preferred
+ * due to lower query latency as a result of faster plan recovery from the cache. The rule for
+ * checking if 'iets' resolve to a single interval is as follows:
  * - an optional sequence of '$eq' or constant point intervals followed by
  * - an optional single interval of a comparison match expression or a constant interval or an
  * intersection of two such nodes followed by
  * - an optional sequence of unbounded intervals [MinKey, MaxKey].
  */
-bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tree::IET>& iets) {
+IntervalsRequired canGenerateSingleIntervalIndexScan(
+    const std::vector<interval_evaluation_tree::IET>& iets) {
     // Represents different allowed states while checking if the 'iets' could be represented as a
     // single interval.
     enum class State { EqOrConstPoint, ComparisonOrConstRange, UnboundedInterval };
@@ -506,12 +514,12 @@ bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tr
                 } else if (isComparisonOrSingleConst(iet) || isSimpleIntersection) {
                     currentState = State::ComparisonOrConstRange;
                 } else {
-                    return false;
+                    return IntervalsRequired::MultiInterval;
                 }
                 break;
             case State::ComparisonOrConstRange:
                 if (!isMinToMax) {
-                    return false;
+                    return IntervalsRequired::MultiInterval;
                 }
 
                 // Transition to the next state as we allow only one bounded range, after that all
@@ -520,32 +528,38 @@ bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tr
                 break;
             case State::UnboundedInterval:
                 if (!isMinToMax) {
-                    return false;
+                    return IntervalsRequired::MultiInterval;
                 }
                 break;
         }
     }
 
-    return true;
+    return currentState == State::EqOrConstPoint ? IntervalsRequired::EqualityInterval
+                                                 : IntervalsRequired::SingleRangeInterval;
 }
 }  // namespace
+
+bool ietsArePointInterval(const std::vector<interval_evaluation_tree::IET>& iets) {
+    return canGenerateSingleIntervalIndexScan(iets) == IntervalsRequired::EqualityInterval;
+}
 
 std::tuple<std::unique_ptr<sbe::PlanStage>,
            PlanStageSlots,
            boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
-generateSingleIntervalIndexScan(StageBuilderState& state,
-                                const CollectionPtr& collection,
-                                const std::string& indexName,
-                                const BSONObj& keyPattern,
-                                bool forward,
-                                std::unique_ptr<key_string::Value> lowKey,
-                                std::unique_ptr<key_string::Value> highKey,
-                                sbe::IndexKeysInclusionSet indexKeysToInclude,
-                                sbe::value::SlotVector indexKeySlots,
-                                const PlanStageReqs& reqs,
-                                PlanYieldPolicy* yieldPolicy,
-                                PlanNodeId planNodeId,
-                                bool lowPriority) {
+generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
+                                        const CollectionPtr& collection,
+                                        const std::string& indexName,
+                                        const BSONObj& keyPattern,
+                                        bool forward,
+                                        std::unique_ptr<key_string::Value> lowKey,
+                                        std::unique_ptr<key_string::Value> highKey,
+                                        sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                        sbe::value::SlotVector indexKeySlots,
+                                        const PlanStageReqs& reqs,
+                                        PlanYieldPolicy* yieldPolicy,
+                                        PlanNodeId planNodeId,
+                                        bool lowPriority,
+                                        bool isPointInterval) {
     auto slotIdGenerator = state.slotIdGenerator;
     tassert(6584701,
             "Either both lowKey and highKey are specified or none of them are",
@@ -585,8 +599,9 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     // If low and high keys are provided in the runtime environment, then we need to create
     // a cfilter stage on top of project in order to be sure that the single interval
     // exists (the interval may be empty), in which case the index scan plan should simply
-    // return EOF.
-    if (shouldRegisterLowHighKeyInRuntimeEnv) {
+    // return EOF. This does not apply when the interval is a point interval, since the interval
+    // should always exist in that case.
+    if (shouldRegisterLowHighKeyInRuntimeEnv && !isPointInterval) {
         stage = sbe::makeS<sbe::FilterStage<true /*IsConst*/, false /*IsEof*/>>(
             std::move(stage),
             makeBinaryOp(sbe::EPrimBinary::logicAnd,
@@ -721,20 +736,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         // If we have just a single interval, we can construct a simplified sub-tree.
         auto&& [lowKey, highKey] = intervals[0];
 
+        const bool isPointInterval = *lowKey == *highKey;
         std::tie(stage, outputs, std::ignore) =
-            generateSingleIntervalIndexScan(state,
-                                            collection,
-                                            indexName,
-                                            keyPattern,
-                                            ixn->direction == 1,
-                                            std::move(lowKey),
-                                            std::move(highKey),
-                                            fieldAndSortKeyBitset,
-                                            fieldAndSortKeySlots,
-                                            reqs,
-                                            yieldPolicy,
-                                            ixn->nodeId(),
-                                            ixn->lowPriority);
+            generateSingleIntervalIndexScanAndSlots(state,
+                                                    collection,
+                                                    indexName,
+                                                    keyPattern,
+                                                    ixn->direction == 1,
+                                                    std::move(lowKey),
+                                                    std::move(highKey),
+                                                    fieldAndSortKeyBitset,
+                                                    fieldAndSortKeySlots,
+                                                    reqs,
+                                                    yieldPolicy,
+                                                    ixn->nodeId(),
+                                                    ixn->lowPriority,
+                                                    isPointInterval);
     } else if (intervals.size() > 1) {
         // If we were able to decompose multi-interval index bounds into a number of single-interval
         // bounds, we can also built an optimized sub-tree to perform an index scan.
@@ -919,22 +936,24 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
 
     // Whenever possible we should prefer building simplified single interval index scan plans in
     // order to get the best performance.
-    if (canGenerateSingleIntervalIndexScan(ixn->iets)) {
+    if (auto intervalsRequired = canGenerateSingleIntervalIndexScan(ixn->iets);
+        intervalsRequired != IntervalsRequired::MultiInterval) {
         boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>> indexScanBoundsSlots;
-        std::tie(stage, outputs, indexScanBoundsSlots) =
-            generateSingleIntervalIndexScan(state,
-                                            collection,
-                                            indexName,
-                                            keyPattern,
-                                            forward,
-                                            nullptr,
-                                            nullptr,
-                                            fieldAndSortKeyBitset,
-                                            outputFieldAndSortKeySlots,
-                                            reqs,
-                                            yieldPolicy,
-                                            ixn->nodeId(),
-                                            false /* lowPriority */);
+        std::tie(stage, outputs, indexScanBoundsSlots) = generateSingleIntervalIndexScanAndSlots(
+            state,
+            collection,
+            indexName,
+            keyPattern,
+            forward,
+            nullptr,
+            nullptr,
+            fieldAndSortKeyBitset,
+            outputFieldAndSortKeySlots,
+            reqs,
+            yieldPolicy,
+            ixn->nodeId(),
+            false /* lowPriority */,
+            intervalsRequired == IntervalsRequired::EqualityInterval /* isPointInterval */);
         recordIdSlot = outputs.get(PlanStageSlots::kRecordId).slotId;
         tassert(6484702,
                 "lowKey and highKey runtime environment slots must be present",

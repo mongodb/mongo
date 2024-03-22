@@ -82,6 +82,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds.
+ * 'isPointInterval' indicates if the single interval is a point interval.
  *
  * In case when the 'lowKey'/'lowKeySlot' and 'highKey' are not specified, slots will be registered
  * for them in the runtime environment and their slot ids returned as a pair in the third element of
@@ -93,19 +94,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 std::tuple<std::unique_ptr<sbe::PlanStage>,
            PlanStageSlots,
            boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
-generateSingleIntervalIndexScan(StageBuilderState& state,
-                                const CollectionPtr& collection,
-                                const std::string& indexName,
-                                const BSONObj& keyPattern,
-                                bool forward,
-                                std::unique_ptr<key_string::Value> lowKey,
-                                std::unique_ptr<key_string::Value> highKey,
-                                sbe::IndexKeysInclusionSet indexKeysToInclude,
-                                sbe::value::SlotVector indexKeySlots,
-                                const PlanStageReqs& reqs,
-                                PlanYieldPolicy* yieldPolicy,
-                                PlanNodeId planNodeId,
-                                bool lowPriority);
+generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
+                                        const CollectionPtr& collection,
+                                        const std::string& indexName,
+                                        const BSONObj& keyPattern,
+                                        bool forward,
+                                        std::unique_ptr<key_string::Value> lowKey,
+                                        std::unique_ptr<key_string::Value> highKey,
+                                        sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                        sbe::value::SlotVector indexKeySlots,
+                                        const PlanStageReqs& reqs,
+                                        PlanYieldPolicy* yieldPolicy,
+                                        PlanNodeId planNodeId,
+                                        bool lowPriority,
+                                        bool isPointInterval);
 
 std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleIntervalIndexScan(
     StageBuilderState& state,
@@ -159,4 +161,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     PlanYieldPolicy* yieldPolicy,
     bool doIndexConsistencyCheck,
     bool needsCorruptionCheck);
+
+/**
+ * Checks if 'iets' resolves to a single point interval. It must be a sequence of '$eq' or constant
+ * point intervals.
+ */
+bool ietsArePointInterval(const std::vector<interval_evaluation_tree::IET>& iets);
+
 }  // namespace mongo::stage_builder

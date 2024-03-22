@@ -1172,6 +1172,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         collection->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
 
     std::unique_ptr<key_string::Value> lowKey, highKey;
+    bool isPointInterval = false;
     if (csn->iets.empty()) {
         std::tie(lowKey, highKey) =
             makeKeyStringPair(csn->startKey,
@@ -1181,22 +1182,26 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                               indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
                               indexAccessMethod->getSortedDataInterface()->getOrdering(),
                               true /* forward */);
+        isPointInterval = *lowKey == *highKey;
+    } else {
+        isPointInterval = ietsArePointInterval(csn->iets);
     }
 
     auto [stage, planStageSlots, indexScanBoundsSlots] =
-        generateSingleIntervalIndexScan(_state,
-                                        collection,
-                                        indexName,
-                                        indexDescriptor->keyPattern(),
-                                        true /* forward */,
-                                        std::move(lowKey),
-                                        std::move(highKey),
-                                        {} /* indexKeysToInclude */,
-                                        {} /* indexKeySlots */,
-                                        reqs,
-                                        _yieldPolicy,
-                                        csn->nodeId(),
-                                        false /* lowPriority */);
+        generateSingleIntervalIndexScanAndSlots(_state,
+                                                collection,
+                                                indexName,
+                                                indexDescriptor->keyPattern(),
+                                                true /* forward */,
+                                                std::move(lowKey),
+                                                std::move(highKey),
+                                                {} /* indexKeysToInclude */,
+                                                {} /* indexKeySlots */,
+                                                reqs,
+                                                _yieldPolicy,
+                                                csn->nodeId(),
+                                                false /* lowPriority */,
+                                                isPointInterval);
 
     if (!csn->iets.empty()) {
         tassert(7681500,
