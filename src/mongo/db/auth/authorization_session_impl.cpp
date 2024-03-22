@@ -204,7 +204,7 @@ void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
     } else {
         // For non-security token users, check if expiration has passed and move session into
         // expired state if so.
-        if (_expirationTime &&
+        if (_authenticatedUser && _expirationTime &&
             _expirationTime.value() <= opCtx->getServiceContext()->getFastClockSource()->now()) {
             _expiredUserName = std::exchange(_authenticatedUser, boost::none).value()->getName();
             _expirationTime = boost::none;
