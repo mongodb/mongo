@@ -18,6 +18,7 @@
  * 0) Start ReplSet with special params:
  *     - lower read ticket concurrency
  *     - increase yielding
+ *     - hang the TTL Monitor
  * 1) Insert kNumDocs documents.
  * 2) Kick off many parallel readers that perform long collection scans that are subject to yields.
  * 3) Wait for many parallel read shells to run.
@@ -52,7 +53,8 @@ const replTest = new ReplSetTest({
             storageEngineConcurrentReadTransactions: kNumReadTickets,
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
-            internalQueryExecYieldIterations: 1
+            internalQueryExecYieldIterations: 1,
+            "failpoint.hangTTLMonitorBetweenPasses": tojson({mode: "alwaysOn"}),
         }
     }
 });
@@ -95,6 +97,7 @@ function queuedLongReadsFunc(id) {
 // 0) Start ReplSet with special params:
 //     - lower read ticket concurrency
 //     - increase yielding
+//     - hang TTL Monitor
 replTest.startSet();
 replTest.initiate();
 let primary = replTest.getPrimary();
