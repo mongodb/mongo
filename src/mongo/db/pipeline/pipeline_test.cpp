@@ -1631,6 +1631,106 @@ TEST(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnID) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnCompoundIDIndirectly) {
+    std::string inputPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}, a: {$first: '$a'}, b: {$last: '$b'}}}, "
+        " {$match: {$or: [{a: {$lt: 4}}, {b: 4}]}}]";
+    std::string outputPipe =
+        "[{$match: {$or: [{b: {$eq: 4}}, {a: {$lt: 4}}]}}, "
+        " {$group: {_id: {a: '$a', b: '$b'}, a: {$first: '$a'}, b: {$last: '$b'}}}]";
+    std::string serializedPipe =
+        "[{$match: {$or: [{a: {$lt: 4}}, {b: {$eq: 4}}]}}, "
+        " {$group: {_id: {a: '$a', b: '$b'}, a: {$first: '$a'}, b: {$last: '$b'}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnIDIndirectly) {
+    auto operators = {"$first", "$last", "$min", "$max"};
+    for (auto& op : operators) {
+        std::string inputPipe = std::string("[{$group : {_id:'$a', b: {") + op +
+            ": '$a'}}}, "
+            " {$match: {b : 4}}]";
+        std::string outputPipe = std::string("[{$match: {a:{$eq : 4}}}, ") +
+            " {$group:{_id:'$a', b: {" + op + ": '$a'}}}]";
+        std::string serializedPipe = std::string("[{$match: {a:{$eq : 4}}}, ") +
+            " {$group:{_id:'$a', b: {" + op + ": '$a'}}}]";
+        assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    }
+}
+
+TEST(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnIDIndirectlyRoot) {
+    auto operators = {"$first", "$last", "$min", "$max"};
+    for (auto& op : operators) {
+        std::string inputPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$$ROOT'}}}, "
+            " {$match: {'b.a' : 4}}]";
+        std::string outputPipe = std::string("[{$match: {a: {$eq : 4}}}, ") +
+            " {$group:{_id:'$a', b: {" + op + ": '$$ROOT'}}}]";
+        std::string serializedPipe = std::string("[{$match: {a: {$eq : 4}}}, ") +
+            " {$group:{_id:'$a', b: {" + op + ": '$$ROOT'}}}]";
+        assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    }
+}
+
+TEST(PipelineOptimizationTest, GroupShouldntSwapWithMatchIfFilteringOnIDIndirectlyRootNonID) {
+    auto operators = {"$first", "$last", "$min", "$max"};
+    for (auto& op : operators) {
+        std::string inputPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$$ROOT'}}}, "
+            " {$match: {'b.b' : 4}}]";
+        std::string outputPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$$ROOT'}}}, "
+            " {$match: {'b.b' : {$eq: 4}}}]";
+        std::string serializedPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$$ROOT'}}}, "
+            " {$match: {'b.b' : 4}}]";
+        assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    }
+}
+
+TEST(PipelineOptimizationTest, GroupShouldntSwapWithMatchIfFilteringOnNonIDIndirectly) {
+    auto operators = {"$first", "$last", "$min", "$max"};
+    for (auto& op : operators) {
+        std::string inputPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$a'}}}, "
+            " {$match: {'b.b' : 4}}]";
+        std::string outputPipe = std::string("[{$match: {'a.b' : {$eq: 4}}}, ") +
+            " {$group : {_id: '$a', b: {" + op + ": '$a'}}}]";
+        std::string serializedPipe = std::string("[{$match: {'a.b' : {$eq: 4}}}, ") +
+            " {$group : {_id: '$a', b: {" + op + ": '$a'}}}]";
+        assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    }
+}
+
+TEST(PipelineOptimizationTest, GroupShouldntSwapWithMatchIfFilteringOnIDSubpathIndirectlyRoot) {
+    auto operators = {"$first", "$last", "$min", "$max"};
+    for (auto& op : operators) {
+        std::string inputPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$$ROOT'}}}, "
+            " {$match: {'b.a.c' : 4}}]";
+        std::string outputPipe = std::string("[{$match: {'a.c' : {$eq: 4}}}, ") +
+            " {$group : {_id: '$a', b: {" + op + ": '$$ROOT'}}}]";
+        std::string serializedPipe = std::string("[{$match: {'a.c' : {$eq: 4}}}, ") +
+            " {$group : {_id: '$a', b: {" + op + ": '$$ROOT'}}}]";
+        assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    }
+}
+
+TEST(PipelineOptimizationTest, GroupShouldntSwapWithMatchIfFilteringOnIDSubpathIndirectly) {
+    auto operators = {"$first", "$last", "$min", "$max"};
+    for (auto& op : operators) {
+        std::string inputPipe = std::string("[{$group : {_id: '$a', b: {") + op +
+            ": '$a'}}}, "
+            " {$match: {'b.a.c' : 4}}]";
+        std::string outputPipe = std::string("[{$match: {'a.a.c' : {$eq: 4}}}, ") +
+            " {$group : {_id: '$a', b: {" + op + ": '$a'}}}]";
+        std::string serializedPipe = std::string("[{$match: {'a.a.c' : {$eq: 4}}}, ") +
+            " {$group : {_id: '$a', b: {" + op + ": '$a'}}}]";
+        assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+    }
+}
+
 TEST(PipelineOptimizationTest, GroupShouldSwapWithMatchOnExprIfFilteringOnID) {
     std::string inputPipe =
         "[{$group: {_id: '$a'}}, "

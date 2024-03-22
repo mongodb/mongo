@@ -161,8 +161,13 @@ struct AccumulationExpression {
     AccumulationExpression(boost::intrusive_ptr<Expression> initializer,
                            boost::intrusive_ptr<Expression> argument,
                            AccumulatorState::Factory factory,
-                           StringData name)
-        : initializer(initializer), argument(argument), factory(factory), name(name) {
+                           StringData name,
+                           bool groupMatchOptimizationEligible = false)
+        : initializer(initializer),
+          argument(argument),
+          factory(factory),
+          name(name),
+          groupMatchOptimizationEligible(groupMatchOptimizationEligible) {
         invariant(this->initializer);
         invariant(this->argument);
     }
@@ -181,6 +186,8 @@ struct AccumulationExpression {
     // pointer to a string constant. This StringData is always required to point to a valid
     // null-terminated string.
     StringData name;
+
+    bool groupMatchOptimizationEligible;
 };
 
 /**
@@ -194,6 +201,23 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
     return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }, AccName::kName};
+}
+
+/**
+ * A default parser for any accumulator that only takes a single expression as an argument and is
+ * eligible for a match to be pushed ahead if the match is on the id field(s). Returns nthe
+ * expression to be evaluated by the accumulator and an AccumulatorState::Factory.
+ */
+template <class AccName>
+AccumulationExpression genericParseSingleExpressionAccumulatorGroupMatchEligible(
+    ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
+    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
+    auto argument = Expression::parseOperand(expCtx, elem, vps);
+    return {initializer,
+            argument,
+            [expCtx]() { return AccName::create(expCtx); },
+            AccName::kName,
+            true};
 }
 
 /**

@@ -39,7 +39,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(first, genericParseSingleExpressionAccumulator<AccumulatorFirst>);
+REGISTER_ACCUMULATOR(first,
+                     genericParseSingleExpressionAccumulatorGroupMatchEligible<AccumulatorFirst>);
 
 void AccumulatorFirst::processInternal(const Value& input, bool merging) {
     /* only remember the first value seen */

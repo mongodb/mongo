@@ -225,6 +225,8 @@ DocumentSource::GetModPathsReturn DocumentSourceGroupBase::getModifiedPaths() co
     // We preserve none of the fields, but any fields referenced as part of the group key are
     // logically just renamed.
     StringMap<std::string> renames;
+    StringSet idFields;
+    std::vector<std::string> listIdFields;
     const auto& idFieldNames = _groupProcessor.getIdFieldNames();
     const auto& idExpressions = _groupProcessor.getIdExpressions();
     for (std::size_t i = 0; i < idExpressions.size(); ++i) {
@@ -233,6 +235,32 @@ DocumentSource::GetModPathsReturn DocumentSourceGroupBase::getModifiedPaths() co
         auto computedPaths = idExp->getComputedPaths(pathToPutResultOfExpression);
         for (auto&& rename : computedPaths.renames) {
             renames[rename.first] = rename.second;
+            idFields.insert(rename.second);
+            listIdFields.push_back(rename.second);
+        }
+    }
+
+    const auto& accumulatedFields = _groupProcessor.getAccumulationStatements();
+    for (auto&& accumulatedField : accumulatedFields) {
+        const auto& accumulationExpr = accumulatedField.expr;
+        if (accumulationExpr.groupMatchOptimizationEligible) {
+            const auto& expr = accumulationExpr.argument.get();
+            auto& pathToPutResultOfExpression = accumulatedField.fieldName;
+            auto fieldPath = dynamic_cast<ExpressionFieldPath*>(expr);
+            if (fieldPath && fieldPath->isROOT()) {
+                for (auto&& idField : listIdFields) {
+                    // renames[to] = from
+                    renames[pathToPutResultOfExpression + "." + idField] = idField;
+                }
+            } else {
+                auto computedPaths = expr->getComputedPaths(pathToPutResultOfExpression);
+                for (auto&& rename : computedPaths.renames) {
+                    if (idFields.contains(rename.second)) {
+                        // renames[to] = from
+                        renames[rename.first] = rename.second;
+                    }
+                }
+            }
         }
     }
 
