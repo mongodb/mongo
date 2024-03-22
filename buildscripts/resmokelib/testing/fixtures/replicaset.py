@@ -643,7 +643,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         running = all(node.is_running() for node in self.nodes)
 
         if self.initial_sync_node:
-            running = self.initial_sync_node.is_running() or running
+            running = self.initial_sync_node.is_running() and running
 
         return running
 
