@@ -52,6 +52,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_cursor.h"
@@ -1234,6 +1235,34 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnFor
 
     cancelSource.cancel();
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingTxnClonerTest, DoNotAddDeadEndSentinelTwice) {
+    auto opCtx = operationContext();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    auto txnRecord = SessionTxnRecord::parse(
+        IDLParserContext{"ReshardingTxnClonerTest::DoNotAddDeadEndSentinelTwice"}, makeTxn());
+
+    DBDirectClient client(opCtx);
+    auto filter = fromjson(fmt::format(
+        R"(
+            {{
+                lsid: {{ $eq: {} }},
+                o2: {{ $eq: {} }}
+            }}
+        )",
+        tojson(txnRecord.getSessionId().toBSON()),
+        tojson(TransactionParticipant::kDeadEndSentinel)));
+
+    auto getSentinelCount = [&] {
+        return client.count(NamespaceString::kRsOplogNamespace, filter);
+    };
+
+    ASSERT_EQ(getSentinelCount(), 0);
+    cloner.doOneRecord(opCtx, txnRecord);
+    ASSERT_EQ(getSentinelCount(), 1);
+    cloner.doOneRecord(opCtx, txnRecord);
+    ASSERT_EQ(getSentinelCount(), 1);
 }
 
 }  // namespace

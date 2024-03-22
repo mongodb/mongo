@@ -217,6 +217,12 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
 
     return resharding::data_copy::withSessionCheckedOut(
         opCtx, sessionId, txnNumber, boost::none /* stmtId */, [&] {
+            // If the TransactionParticipant is flagged as having an incomplete history, then the
+            // dead end sentinel is already present in the oplog.
+            if (TransactionParticipant::get(opCtx).hasIncompleteHistory()) {
+                return;
+            }
+
             resharding::data_copy::updateSessionRecord(opCtx,
                                                        TransactionParticipant::kDeadEndSentinel,
                                                        {kIncompleteHistoryStmtId},
