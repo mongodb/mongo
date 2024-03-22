@@ -196,6 +196,9 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                    opCtx, getNewSession(opCtx), **executor);
+
                 const auto [localCollUuid, defaultCollator] = [&]() {
                     auto collection = acquireCollectionMaybeLockFree(
                         opCtx,
