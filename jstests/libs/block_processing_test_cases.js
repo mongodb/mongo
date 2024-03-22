@@ -1325,6 +1325,258 @@ export function blockProcessingTestCases(timeFieldName,
             usesBlockProcessing: featureFlagsAllowBlockHashAgg
         },
         {
+            name: "GroupByNull_TopAndBottomSortByPAndQ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: "$p"}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByPAndQ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByPAndQ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByPAndQ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByNull_TopAndBottomSortByPAndQ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByNull_TopNAndBottomNSortByPAndQ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: null,
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByPAndQ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: "$p"}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByPAndQ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByPAndQ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByPAndQ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_TopAndBottomSortByPAndQ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_TopNAndBottomNSortByPAndQ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: "$x",
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByPAndQ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: "$p"}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByPAndQ_OutputVariable",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByPAndQ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByPAndQ_OutputOneElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_TopAndBottomSortByPAndQ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_TopNAndBottomNSortByPAndQ_OutputTwoElemArray",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {
+                    $group: {
+                        _id: {x: "$x", y: "$y"},
+                        a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}}
+                    }
+                }
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputEmptyArray",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},

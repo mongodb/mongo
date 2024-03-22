@@ -63,6 +63,8 @@ TimeseriesTest.run((insert) => {
     let nextDateOffset = 0;
     let zSeed = 1234;
     let wSeed = 5767;
+    let p = 0;
+    let q = 0;
 
     for (let i = 0; i < 5; ++i) {
         const documents = [];
@@ -102,6 +104,8 @@ TimeseriesTest.run((insert) => {
                     if (w !== undefined) {
                         doc.w = w;
                     }
+                    doc.p = p;
+                    doc.q = q;
 
                     documents.push(doc);
 
@@ -109,6 +113,10 @@ TimeseriesTest.run((insert) => {
                     nextDateOffset = (nextDateOffset + 5) % 199;
                     zSeed = (zSeed + 997) % 9967;
                     wSeed = (wSeed + 991) % 9973;
+                    q = (q + 1) % 20;
+                    if (q == 0) {
+                        p = p + 1;
+                    }
                 }
             }
         }

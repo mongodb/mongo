@@ -589,19 +589,21 @@ public:
             for (size_t i = 0; i < sortPattern.size(); i++) {
                 auto [keyTag, keyVal] = _keys[i][_blockIndex];
                 auto [itemTag, itemVal] = itemArray->getAt(i);
-                bool isAscending = sortPattern[i].isAscending;
-                return isAscending
-                    ? sortsBefore<TopBottomSense::kTop>(keyTag, keyVal, itemTag, itemVal)
-                    : sortsBefore<TopBottomSense::kTop>(itemTag, itemVal, keyTag, keyVal);
+                int32_t cmp = compare<TopBottomSense::kTop>(keyTag, keyVal, itemTag, itemVal);
+
+                if (cmp != 0) {
+                    return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
+                }
             }
         } else {
             for (size_t i = 0; i < sortPattern.size(); i++) {
                 auto [keyTag, keyVal] = _keys[i][_blockIndex];
                 auto [itemTag, itemVal] = itemArray->getAt(i);
-                bool isAscending = sortPattern[i].isAscending;
-                return isAscending
-                    ? sortsBefore<TopBottomSense::kBottom>(keyTag, keyVal, itemTag, itemVal)
-                    : sortsBefore<TopBottomSense::kBottom>(itemTag, itemVal, keyTag, keyVal);
+                int32_t cmp = compare<TopBottomSense::kBottom>(keyTag, keyVal, itemTag, itemVal);
+
+                if (cmp != 0) {
+                    return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
+                }
             }
         }
 

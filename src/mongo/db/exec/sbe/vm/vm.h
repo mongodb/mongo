@@ -2400,18 +2400,19 @@ public:
 
 protected:
     template <TopBottomSense Sense>
-    static bool sortsBefore(value::TypeTags leftElemTag,
-                            value::Value leftElemVal,
-                            value::TypeTags rightElemTag,
-                            value::Value rightElemVal) {
+    static int32_t compare(value::TypeTags leftElemTag,
+                           value::Value leftElemVal,
+                           value::TypeTags rightElemTag,
+                           value::Value rightElemVal) {
         auto [cmpTag, cmpVal] =
             value::compareValue(leftElemTag, leftElemVal, rightElemTag, rightElemVal);
 
         if (cmpTag == value::TypeTags::NumberInt32) {
             int32_t cmp = value::bitcastTo<int32_t>(cmpVal);
-            return Sense == TopBottomSense::kTop ? cmp < 0 : cmp > 0;
+            return Sense == TopBottomSense::kTop ? cmp : -cmp;
         }
-        return false;
+
+        return 0;
     }
 
     virtual bool keySortsBeforeImpl(std::pair<value::TypeTags, value::Value> item) = 0;
