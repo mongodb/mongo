@@ -119,7 +119,7 @@ public:
     }
 
     NamespaceString tempReshardingNs() const {
-        return resharding::constructTemporaryReshardingNss(_ns.db_forSharding(), _collUUID);
+        return resharding::constructTemporaryReshardingNss(_ns, _collUUID);
     }
 
     const UUID& indexUUID() const {

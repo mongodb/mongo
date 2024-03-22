@@ -1404,7 +1404,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
-    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db_forTest(), existingUuid);
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss, existingUuid);
 
     ReshardDoneCatchUpChangeEventO2Field o2Field{temporaryNs, reshardingUuid};
     auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,

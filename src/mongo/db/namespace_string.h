@@ -109,6 +109,10 @@ public:
     // Prefix for temporary resharding collection.
     static constexpr StringData kTemporaryReshardingCollectionPrefix = "system.resharding."_sd;
 
+    // Prefix for temporary timeseries resharding collection.
+    static constexpr StringData kTemporaryTimeseriesReshardingCollectionPrefix =
+        "system.buckets.resharding."_sd;
+
     // Prefix for time-series buckets collection.
     static constexpr StringData kTimeseriesBucketsCollectionPrefix = "system.buckets."_sd;
 

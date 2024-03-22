@@ -148,20 +148,22 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
     return RecipientShardEntry{std::move(shardId), std::move(recipientCtx)};
 }
 
-NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid) {
+NamespaceString constructTemporaryReshardingNss(const NamespaceString& nss,
+                                                const UUID& sourceUuid) {
+    auto tempCollPrefix = nss.isTimeseriesBucketsCollection()
+        ? NamespaceString::kTemporaryTimeseriesReshardingCollectionPrefix
+        : NamespaceString::kTemporaryReshardingCollectionPrefix;
     return NamespaceStringUtil::deserialize(
         boost::none,
-        db,
-        fmt::format(
-            "{}{}", NamespaceString::kTemporaryReshardingCollectionPrefix, sourceUuid.toString()),
+        nss.db_forSharding(),
+        fmt::format("{}{}", tempCollPrefix, sourceUuid.toString()),
         SerializationContext::stateDefault());
 }
 
 std::set<ShardId> getRecipientShards(OperationContext* opCtx,
                                      const NamespaceString& sourceNss,
                                      const UUID& reshardingUUID) {
-    const auto& tempNss =
-        constructTemporaryReshardingNss(sourceNss.db_forSharding(), reshardingUUID);
+    const auto& tempNss = constructTemporaryReshardingNss(sourceNss, reshardingUUID);
     auto* catalogCache = Grid::get(opCtx)->catalogCache();
     auto [cm, _] = catalogCache->getTrackedCollectionRoutingInfo(opCtx, tempNss);
 

@@ -137,12 +137,12 @@ public:
     }
 
     CommonReshardingMetadata createCommonReshardingMetadata(const UUID& operationId) {
-        CommonReshardingMetadata metadata{operationId,
-                                          kTestNamespace,
-                                          getSourceCollectionId(),
-                                          resharding::constructTemporaryReshardingNss(
-                                              kTestNamespace.db_forTest(), getSourceCollectionId()),
-                                          kShardKey};
+        CommonReshardingMetadata metadata{
+            operationId,
+            kTestNamespace,
+            getSourceCollectionId(),
+            resharding::constructTemporaryReshardingNss(kTestNamespace, getSourceCollectionId()),
+            kShardKey};
         metadata.setStartTime(getClockSource()->now() - kRunningTime);
         return metadata;
     }

@@ -87,6 +87,11 @@ export var ReshardingTest = class {
         this._tempNs = undefined;
         /** @private */
         this._primaryShardName = undefined;
+        /** @private */
+        this._underlyingSourceNs = undefined;
+        // For timeseries resharding.
+        /** @private */
+        this._bucketNs = undefined;
 
         // Properties set by startReshardingInBackground() and withReshardingInBackground().
         /** @private */
@@ -286,23 +291,41 @@ export var ReshardingTest = class {
     /**
      * Creates an unsharded collection with unsplittable: true
      */
-    createUnshardedCollection({ns, primaryShardName = this.donorShardNames[0]}) {
+    createUnshardedCollection({ns, primaryShardName = this.donorShardNames[0], collOptions = {}}) {
         this._ns = ns;
         this._currentShardKey = Object.assign({_id: 1});
         const [dbName, collName] = getDBNameAndCollNameFromFullNamespace(ns);
 
         assert.commandWorked(
             this._st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
-        assert.commandWorked(this._st.s.getDB(dbName).runCommand({create: collName}));
+        assert.commandWorked(
+            this._st.s.getDB(dbName).runCommand(Object.merge({create: collName}, collOptions)));
 
         const sourceCollection = this._st.s.getCollection(ns);
         const sourceDB = sourceCollection.getDB();
 
         this._primaryShardName = primaryShardName;
 
-        this._sourceCollectionUUID = getUUIDFromListCollections(sourceDB, collName);
+        let tempCollNamePrefix = "system.resharding";
+        if (collOptions.timeseries !== undefined) {
+            let bucketCollName = `system.buckets.${sourceCollection.getName()}`;
+
+            let bucketUUID = getUUIDFromListCollections(sourceDB, bucketCollName);
+
+            assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
+
+            this._bucketNs = `${sourceDB.getName()}.${bucketCollName}`;
+            this._sourceCollectionUUID = bucketUUID;
+
+            tempCollNamePrefix = "system.buckets.resharding";
+            this._underlyingSourceNs = this._bucketNs;
+        } else {
+            this._sourceCollectionUUID = getUUIDFromListCollections(sourceDB, collName);
+            this._underlyingSourceNs = this._ns;
+        }
+
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
-        this._tempNs = `${sourceDB.getName()}.system.resharding.${sourceCollectionUUIDString}`;
+        this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 
         return sourceCollection;
     }
@@ -314,8 +337,13 @@ export var ReshardingTest = class {
      * {min: <shardKeyValue0>, max: <shardKeyValue1>, shard: <shardName>} objects. The chunks must
      * form a partition of the {shardKey: MinKey} --> {shardKey: MaxKey} space.
      */
-    createShardedCollection(
-        {ns, shardKeyPattern, chunks, primaryShardName = this.donorShardNames[0]}) {
+    createShardedCollection({
+        ns,
+        shardKeyPattern,
+        chunks,
+        primaryShardName = this.donorShardNames[0],
+        collOptions = {}
+    }) {
         this._ns = ns;
         this._currentShardKey = Object.assign({}, shardKeyPattern);
 
@@ -331,13 +359,30 @@ export var ReshardingTest = class {
         this._primaryShardName = primaryShardName;
 
         CreateShardedCollectionUtil.shardCollectionWithChunks(
-            sourceCollection, shardKeyPattern, chunks);
+            sourceCollection, shardKeyPattern, chunks, collOptions);
 
-        this._sourceCollectionUUID =
-            getUUIDFromListCollections(sourceDB, sourceCollection.getName());
+        let tempCollNamePrefix = "system.resharding";
+        if (collOptions.timeseries !== undefined) {
+            let bucketCollName = `system.buckets.${sourceCollection.getName()}`;
+
+            let bucketUUID = getUUIDFromListCollections(sourceDB, bucketCollName);
+
+            assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
+
+            this._bucketNs = `${sourceDB.getName()}.${bucketCollName}`;
+            this._sourceCollectionUUID = bucketUUID;
+
+            tempCollNamePrefix = "system.buckets.resharding";
+            this._underlyingSourceNs = this._bucketNs;
+        } else {
+            this._sourceCollectionUUID =
+                getUUIDFromListCollections(sourceDB, sourceCollection.getName());
+            this._underlyingSourceNs = this._ns;
+        }
+
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
 
-        this._tempNs = `${sourceDB.getName()}.system.resharding.${sourceCollectionUUIDString}`;
+        this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 
         return sourceCollection;
     }
@@ -644,7 +689,7 @@ export var ReshardingTest = class {
     _findMoveCollectionCommandOp() {
         const filter = {
             type: "op",
-            "originatingCommand.reshardCollection": this._ns,
+            "originatingCommand.reshardCollection": this._underlyingSourceNs,
             "provenance": "moveCollection"
         };
 
@@ -657,7 +702,7 @@ export var ReshardingTest = class {
     _findUnshardCollectionCommandOp() {
         const filter = {
             type: "op",
-            "originatingCommand.reshardCollection": this._ns,
+            "originatingCommand.reshardCollection": this._underlyingSourceNs,
             "provenance": "unshardCollection"
         };
 
@@ -878,8 +923,10 @@ export var ReshardingTest = class {
         // The "available" read concern level won't block this find cmd behind the critical section.
         // Tests for resharding are not expected to have unowned documents in the collection being
         // resharded.
-        const nsCursor =
-            this._st.s.getCollection(this._ns).find().readConcern("available").sort({_id: 1});
+        const nsCursor = this._st.s.getCollection(this._underlyingSourceNs)
+                             .find()
+                             .readConcern("available")
+                             .sort({_id: 1});
         const tempNsCursor = this._st.s.getCollection(this._tempNs).find().sort({_id: 1});
 
         const diff = ((diff) => {
@@ -972,8 +1019,10 @@ export var ReshardingTest = class {
                   "expected there to not be any config.chunks entry for the temporary" +
                       " resharding collection");
 
-        const collEntry = this._st.config.collections.findOne({_id: this._ns});
-        assert.neq(null, collEntry, `didn't find config.collections entry for ${this._ns}`);
+        const collEntry = this._st.config.collections.findOne({_id: this._underlyingSourceNs});
+        assert.neq(null,
+                   collEntry,
+                   `didn't find config.collections entry for ${this._underlyingSourceNs}`);
 
         if (expectedErrorCode === ErrorCodes.OK) {
             assert.eq(this._newShardKey,
@@ -1000,7 +1049,7 @@ export var ReshardingTest = class {
             `expected the temporary resharding collection to not exist, but found it does on ${
                 recipient.shardName}`);
 
-        const collInfo = recipient.getCollection(this._ns).exists();
+        const collInfo = recipient.getCollection(this._underlyingSourceNs).exists();
         const isAlsoDonor = this._donorShards().includes(recipient);
         if (expectedErrorCode === ErrorCodes.OK) {
             assert.neq(null,
@@ -1067,7 +1116,7 @@ export var ReshardingTest = class {
 
     /** @private */
     _checkDonorPostState(donor, expectedErrorCode) {
-        const collInfo = donor.getCollection(this._ns).exists();
+        const collInfo = donor.getCollection(this._underlyingSourceNs).exists();
         const isAlsoRecipient =
             this._recipientShards().includes(donor) || donor.shardName === this._primaryShardName;
         if (expectedErrorCode === ErrorCodes.OK && !isAlsoRecipient) {

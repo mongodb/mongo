@@ -7,6 +7,8 @@
  */
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 TestData.skipCheckShardFilteringMetadata = true;
 
 // Connections.
@@ -158,17 +160,21 @@ function assertRangeMatch(savedRange, paramRange) {
 
 // Check reshardCollection commands are disabled for time-series collection.
 (function checkReshardCollectionCommand() {
-    createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
-    // Command is not supported on the time-series view namespace.
-    assert.commandFailedWithCode(
-        mongo.s0.adminCommand(
-            {reshardCollection: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-        [ErrorCodes.NotImplemented]);
-    assert.commandFailedWithCode(
-        mongo.s0.adminCommand(
-            {reshardCollection: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
-        ErrorCodes.NotImplemented);
-    dropTimeSeriesColl();
+    if (!FeatureFlagUtil.isPresentAndEnabled(mongo.s.getDB('admin'), 'ReshardingForTimeseries')) {
+        createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1}});
+        // Command is not supported on the time-series view namespace.
+        assert.commandFailedWithCode(
+            mongo.s0.adminCommand(
+                {reshardCollection: viewNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
+            [ErrorCodes.NotImplemented]);
+        assert.commandFailedWithCode(
+            mongo.s0.adminCommand(
+                {reshardCollection: bucketNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
+            ErrorCodes.NotImplemented);
+        dropTimeSeriesColl();
+    } else {
+        jsTestLog(`Skipping resharding for timeseries not implemented test.`);
+    }
 })();
 
 // Check checkShardingIndex works for the correct key pattern on the bucket namespace,

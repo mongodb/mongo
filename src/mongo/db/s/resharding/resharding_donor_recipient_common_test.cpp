@@ -102,7 +102,7 @@ public:
         NamespaceString::createNamespaceString_forTest("db", "foo");
 
     const NamespaceString kTemporaryReshardingNss =
-        resharding::constructTemporaryReshardingNss("db", kExistingUUID);
+        resharding::constructTemporaryReshardingNss(kOriginalNss, kExistingUUID);
     const std::string kOriginalShardKey = "oldKey";
     const BSONObj kOriginalShardKeyPattern = BSON(kOriginalShardKey << 1);
     const std::string kReshardingKey = "newKey";
@@ -690,10 +690,10 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
     OperationContext* opCtx = operationContext();
     NamespaceString sourceNss1 = NamespaceString::createNamespaceString_forTest("db", "one");
     NamespaceString tempReshardingNss1 =
-        resharding::constructTemporaryReshardingNss(sourceNss1.db_forTest(), UUID::gen());
+        resharding::constructTemporaryReshardingNss(sourceNss1, UUID::gen());
     NamespaceString sourceNss2 = NamespaceString::createNamespaceString_forTest("db", "two");
     NamespaceString tempReshardingNss2 =
-        resharding::constructTemporaryReshardingNss(sourceNss2.db_forTest(), UUID::gen());
+        resharding::constructTemporaryReshardingNss(sourceNss2, UUID::gen());
     ShardId shardId1 = ShardId{"recipient1"};
     ShardId shardId2 = ShardId{"recipient2"};
     ReshardingDonorDocument doc1 =

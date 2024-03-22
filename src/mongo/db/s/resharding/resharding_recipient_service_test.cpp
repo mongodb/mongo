@@ -318,7 +318,7 @@ public:
             UUID::gen(),
             sourceNss,
             sourceUUID,
-            resharding::constructTemporaryReshardingNss(sourceNss.db_forTest(), sourceUUID),
+            resharding::constructTemporaryReshardingNss(sourceNss, sourceUUID),
             newShardKeyPattern());
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 
@@ -773,7 +773,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss =
-        resharding::constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
+        resharding::constructTemporaryReshardingNss(doc.getSourceNss(), doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest() << "o2.reshardDoneCatchUp"
@@ -819,7 +819,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
 
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss =
-        resharding::constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
+        resharding::constructTemporaryReshardingNss(doc.getSourceNss(), doc.getSourceUUID());
 
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
     findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest() << "o2.shardCollection"

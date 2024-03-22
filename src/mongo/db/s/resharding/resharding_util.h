@@ -241,8 +241,9 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
  * namespace components.
  *
  *      <db>.system.resharding.<existing collection's UUID>
+ * or   <db>.system.buckets.resharding.<existing collection's UUID> for a timeseries source ns.
  */
-NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid);
+NamespaceString constructTemporaryReshardingNss(const NamespaceString& nss, const UUID& sourceUuid);
 
 /**
  * Gets the recipient shards for a resharding operation.

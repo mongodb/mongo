@@ -384,7 +384,8 @@ bool NamespaceString::isReshardingConflictStashCollection() const {
 }
 
 bool NamespaceString::isTemporaryReshardingCollection() const {
-    return coll().startsWith(kTemporaryReshardingCollectionPrefix);
+    return coll().startsWith(kTemporaryTimeseriesReshardingCollectionPrefix) ||
+        coll().startsWith(kTemporaryReshardingCollectionPrefix);
 }
 
 bool NamespaceString::isTimeseriesBucketsCollection() const {
