@@ -1,7 +1,7 @@
-import atexit
-import functools
+import errno
 import getpass
 import hashlib
+from io import StringIO
 import json
 import os
 import distro
@@ -11,14 +11,13 @@ import shlex
 import shutil
 import stat
 import subprocess
+import textwrap
 import threading
-import time
 from typing import List, Dict, Set, Tuple, Any
 import urllib.request
 import requests
 from retry import retry
 import sys
-import socket
 
 import SCons
 
@@ -104,8 +103,8 @@ class Globals:
     # environment variables to set when invoking bazel
     bazel_env_variables: Dict[str, str] = {}
 
-    # Flag to signal that the bazel build thread should die and/or is not running
-    kill_bazel_thread_flag: bool = False
+    # Flag to signal that scons is ready to build, but needs to wait on bazel
+    waiting_on_bazel_flag: bool = False
 
 
 def bazel_debug(msg: str):
@@ -180,64 +179,18 @@ def bazel_target_emitter(
 
 def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.Node.Node],
                          source: List[SCons.Node.Node]):
-    def check_bazel_target_done(bazel_target: str) -> bool:
-        """
-        Check the done queue and pull off the desired target if it exists.
-
-        bazel_target: the target we are looking for
-        return: True to stop waiting, False if we should keep waiting
-
-        Note that this function will signal True to indicate a shutdown/failure case. SCons main build
-        thread will be waiting for this action to complete before shutting down, so we need to
-        to stop being blocked so scons will proceed to shutdown.
-        """
-
-        if bazel_target in Globals.bazel_targets_done:
-            bazel_debug(f"Removing {bazel_target} from done targets: {Globals.bazel_targets_done}")
-            Globals.bazel_targets_done.remove(bazel_target)
-            return True
-
-        # Because of the tight while loop this function is used in, we put
-        # an exit condition here.
-        if Globals.kill_bazel_thread_flag:
-            return True
-
-        return False
-
-    bazel_output = Globals.scons2bazel_targets[target[0].path.replace('\\', '/')]['bazel_output']
-    bazel_target = Globals.scons2bazel_targets[target[0].path.replace('\\', '/')]['bazel_target']
-    bazel_debug(f"Checking if {bazel_output} is done...")
-
-    # put the target into the work queue the poll until its
-    # been placed into the done queue
-    bazel_debug(f"A builder put {bazel_target} into the work queue.")
-    pred = functools.partial(check_bazel_target_done, bazel_target)
-    start_time = time.time()
-    Globals.bazel_targets_work_queue.put(bazel_target)
-
-    bazel_debug(f"Waiting to remove {bazel_target} from done targets.")
-    with Globals.bazel_target_done_CV:
-        Globals.bazel_target_done_CV.wait_for(predicate=pred)
-
-    if Globals.kill_bazel_thread_flag:
-        # scons expects actions to return non-zero value on failure
-        return 1
-
-    bazel_debug(
-        f"Bazel done with {bazel_target} in {'{0:.2f}'.format(time.time() - start_time)} seconds.")
 
     # now copy all the targets out to the scons tree, note that target is a
     # list of nodes so we need to stringify it for copyfile
     for t in target:
         s = Globals.scons2bazel_targets[t.path.replace('\\', '/')]['bazel_output']
-        bazel_debug(f"Copying {s} from bazel tree to {t} in the scons tree.")
         shutil.copy(s, str(t))
         os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
 
 
 BazelCopyOutputsAction = SCons.Action.FunctionAction(
     bazel_builder_action,
-    {"cmdstr": "Asking bazel to build $TARGET", "varlist": ['BAZEL_FLAGS_STR']},
+    {"cmdstr": "Copying $TARGET from bazel build directory.", "varlist": ['BAZEL_FLAGS_STR']},
 )
 
 
@@ -270,97 +223,73 @@ def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Envi
     }
 
 
-def bazel_batch_build_thread(log_dir: str) -> None:
-    """This thread continuelly runs bazel when ever new targets are found."""
+def bazel_build_thread_func(log_dir: str, verbose: bool) -> None:
+    """This thread runs the bazel build up front."""
 
-    # the set of targets which bazel has already built.
-    bazel_built_targets = set()
-    bazel_batch_count = 0
-
-    print_start_time = time.time()
-    start_time = time.time()
-
+    temp_stdout = StringIO()
+    done_with_temp = False
     os.makedirs(log_dir, exist_ok=True)
 
+    if verbose:
+        extra_args = []
+    else:
+        extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
+
+    bazel_cmd = Globals.bazel_base_build_command + extra_args + ['//src/...']
+    bazel_debug(f"BAZEL_COMMAND: {' '.join(bazel_cmd)}")
+    print("Starting bazel build thread...")
+
     try:
-        while not Globals.kill_bazel_thread_flag:
+        import pty
+        parent_fd, child_fd = pty.openpty()  # provide tty
+        bazel_proc = subprocess.Popen(bazel_cmd, stdin=child_fd, stdout=child_fd,
+                                      stderr=subprocess.STDOUT,
+                                      env={**os.environ.copy(), **Globals.bazel_env_variables})
 
-            # SCons must (try to) make sure that all currently running build tasks come to compeletion,
-            # so that it can correctly transcribe the state of a given node to the SConsign file.
-            # Therefore it takes control over many signals which would end scons process (i.e. SIGINT),
-            # we need to make sure that we break out of this loop and free our CVs which the scons
-            # main build thread will be waiting on to complete, otherwise that will cause scons to
-            # wait forever.
-            if SCons.Script.Main.jobs and SCons.Script.Main.jobs.were_interrupted():
-                Globals.kill_bazel_thread_flag = True
-                bazel_debug("TaskMaster not running, shutting down bazel thread.")
-                break
-
-            if time.time() - print_start_time > 10.0:
-                print_start_time = time.time()
-                bazel_debug(
-                    f"Bazel batch thread has built {len(bazel_built_targets)} targets so far.")
-
-            targets_to_build = set()
-            while not Globals.bazel_targets_work_queue.empty():
-                # this thread should be the only thing pulling off the work queue, so if it was
-                # not empty, it must still be not empty when we perform the get. We intend
-                # for the get_nowait to raise Empty exception as a hard fail if previously
-                # stated assumption was incorrect.
-                target = Globals.bazel_targets_work_queue.get_nowait()
-                if target not in bazel_built_targets:
-                    bazel_debug(f"Bazel batch thread found {target} to build")
-                    bazel_built_targets.add(target)
-                    targets_to_build.add(target)
-
-            if targets_to_build:
-                bazel_debug(
-                    f"BAZEL_COMMAND: {' '.join(Globals.bazel_base_build_command + list(targets_to_build))}"
-                )
-                start_time = time.time()
-                bazel_proc = subprocess.run(
-                    Globals.bazel_base_build_command + list(targets_to_build),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                    env={**os.environ.copy(), **Globals.bazel_env_variables})
-                bazel_debug(
-                    f"Bazel build completed in {'{0:.2f}'.format(time.time() - start_time)} seconds and built {targets_to_build}."
-                )
-
-                # If we have a failure always print the bazel output, if
-                # bazel succeeded to build, only print output with bazel debug
-                # on.
-                if bazel_proc.returncode:
-                    print(bazel_proc.stdout)
+        os.close(child_fd)
+        try:
+            while True:
+                try:
+                    data = os.read(parent_fd, 512)
+                except OSError as e:
+                    if e.errno != errno.EIO:
+                        raise
+                    break  # EIO means EOF on some systems
                 else:
-                    bazel_debug(bazel_proc.stdout)
+                    if not data:  # EOF
+                        break
 
-                bazel_batch_count += 1
-                with open(os.path.join(log_dir, f"bazel_build_{bazel_batch_count}.log"), "w") as f:
-                    f.write(' '.join(Globals.bazel_base_build_command + list(targets_to_build)))
-                    f.write(bazel_proc.stdout)
+                    if Globals.waiting_on_bazel_flag:
+                        if not done_with_temp:
+                            done_with_temp = True
+                            temp_stdout.seek(0)
+                            sys.stdout.write(temp_stdout.read())
+                        sys.stdout.write(data.decode())
+                    else:
 
-                for t in targets_to_build:
-                    # Always put the targets we attempt to build into done
-                    # even if bazel failed to build. If bazel failed to build,
-                    # scons will report the particular target failed when it goes
-                    # to copy it out of the bazel tree.
-                    # NOTE: it would be nice if we had a way to bubble up the particular
-                    # bazel target log, this would require some way to
-                    # parse it from bazel logs.
-                    Globals.bazel_targets_done.add(t)
-                    bazel_debug(f"Bazel batch thread adding {t} to done queue.")
+                        temp_stdout.write(data.decode())
+        finally:
+            os.close(parent_fd)
+            if bazel_proc.poll() is None:
+                bazel_proc.kill()
+            bazel_proc.wait()
 
-                with Globals.bazel_target_done_CV:
-                    Globals.bazel_target_done_CV.notify_all()
-
+    except ImportError:
+        bazel_proc = subprocess.Popen(bazel_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                      env={**os.environ.copy(), **Globals.bazel_env_variables})
+        while True:
+            line = bazel_proc.stdout.readline()
+            if not line:
+                break
+            if Globals.waiting_on_bazel_flag:
+                if not done_with_temp:
+                    done_with_temp = True
+                    temp_stdout.seek(0)
+                    sys.stdout.write(temp_stdout.read())
+                sys.stdout.write(line.decode())
             else:
-                time.sleep(1)
 
-    except Exception as exc:
-        Globals.kill_bazel_thread_flag = True
-        with Globals.bazel_target_done_CV:
-            Globals.bazel_target_done_CV.notify_all()
-        raise exc
+                temp_stdout.write(line.decode())
 
 
 def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
@@ -742,16 +671,20 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         if env.GetOption('ninja') == "disabled":
 
-            def shutdown_bazel_builer():
-                Globals.kill_bazel_thread_flag = True
-
-            atexit.register(shutdown_bazel_builer)
-
             # ninja will handle the build so do not launch the bazel batch thread
-            bazel_build_thread = threading.Thread(target=bazel_batch_build_thread,
-                                                  args=(env.Dir("$BUILD_ROOT/scons/bazel").path, ))
-            bazel_build_thread.daemon = True
+            bazel_build_thread = threading.Thread(
+                target=bazel_build_thread_func, args=(env.Dir("$BUILD_ROOT/scons/bazel").path,
+                                                      env["VERBOSE"]))
             bazel_build_thread.start()
+
+            def wait_for_bazel(env):
+                nonlocal bazel_build_thread
+                Globals.waiting_on_bazel_flag = True
+                print("SCons done, switching to bazel build thread...")
+
+                bazel_build_thread.join()
+
+            env.AddMethod(wait_for_bazel, "WaitForBazel")
         else:
             env.NinjaRule("BAZEL_COPY_RULE", "$env$cmd", description="Copy from Bazel",
                           pool="local_pool")

@@ -1242,6 +1242,7 @@ tasks:
         --link-model=dynamic-sdk
         --enable-http-client=off
         --ssl=off
+        BAZEL_INTEGRATION_DEBUG=1
         ${crypt_task_compile_flags}
         DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
   - command: subprocess.exec

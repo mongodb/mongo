@@ -112,6 +112,6 @@ if args.verbose:
     print(f"{' '.join(ninja_build_info['bazel_cmd'] + targets_to_build)}")
     extra_args = []
 else:
-    extra_args = ["--ui_event_filters=-info,-debug,-warning,-stderr,-stdout"]
+    extra_args = ["--output_filter=DONT_MATCH_ANYTHING"]
 bazel_proc = subprocess.run(ninja_build_info['bazel_cmd'] + extra_args + targets_to_build,
                             check=True)

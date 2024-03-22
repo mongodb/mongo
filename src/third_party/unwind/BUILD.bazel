@@ -57,6 +57,7 @@ mongo_cc_library(
                "dist/src/mi/strerror.c",
            ] + select({
                "@platforms//os:linux": ["dist/src/os-linux.c"],
+               "//conditions:default": [],
            }) +
            select({
                "@platforms//cpu:aarch64": [
@@ -132,6 +133,7 @@ mongo_cc_library(
                    "dist/src/s390x/is_fpreg.c",
                    "dist/src/s390x/regname.c",
                ],
+               "//conditions:default": [],
            }) + select({
         "@platforms//cpu:aarch64": [
             "dist/src/aarch64/getcontext.S",
@@ -145,6 +147,7 @@ mongo_cc_library(
             "dist/src/s390x/getcontext.S",
             "dist/src/s390x/setcontext.S",
         ],
+        "//conditions:default": [],
     }),
     hdrs = glob([
         "**/*.h",
@@ -175,11 +178,13 @@ mongo_cc_library(
             "-Isrc/third_party/unwind/platform/linux_s390x/build/include",
             "-Isrc/third_party/unwind/dist/include/tdep-s390x",
         ],
+        "//conditions:default": [],
     }) + select({
         "@//bazel/config:compiler_type_clang": [
             "-Wno-header-guard",
         ],
         "@//bazel/config:compiler_type_gcc": ["-Wno-uninitialized"],
+        "//conditions:default": [],
     }) + select({
         ":clang_arm64": [
             "-Wno-absolute-value",
@@ -192,4 +197,5 @@ mongo_cc_library(
         # Grant access to nonstandard gnu c functions, which the dist autoconf build script is also setting.
         "_GNU_SOURCE",
     ],
+    target_compatible_with = ["@platforms//os:linux"],
 )

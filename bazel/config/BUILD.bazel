@@ -572,6 +572,7 @@ selects.config_setting_group(
     match_all = [
         ":linker_lld",
         ":not_s390x",
+        ":not_macos",
     ],
 )
 
@@ -840,6 +841,14 @@ selects.config_setting_group(
     match_all = [
         ":non_system_allocator_enabled",
         ":dbg_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "tcmalloc_google_local_build",
+    match_all = [
+        ":local_build_enabled",
+        "//bazel/platforms:kernel_version_4_4_or_greater",
     ],
 )
 

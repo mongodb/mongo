@@ -1126,7 +1126,7 @@ def mongo_cc_library(
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
-        }),
+        }) + target_compatible_with,
     )
 
     native.cc_library(
@@ -1163,7 +1163,7 @@ def mongo_cc_library(
         target_compatible_with = select({
             "//bazel/config:linkstatic_disabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
-        }),
+        }) + target_compatible_with,
         dynamic_deps = deps,
     )
 
