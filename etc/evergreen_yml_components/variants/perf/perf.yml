@@ -2081,7 +2081,6 @@ buildvariants:
     - name: time_series_sort_high_value
     - name: tsbs_query
     - name: array_traversal_high_value
-    - name: filter_with_complex_logical_expression_high_value
     - name: tsbs_query
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -2114,7 +2113,6 @@ buildvariants:
     - name: time_series_sort_high_value
     - name: tsbs_query
     - name: array_traversal_high_value
-    - name: filter_with_complex_logical_expression_high_value
     - name: tsbs_query
     - name: mongos_workloads
 
@@ -2298,7 +2296,6 @@ buildvariants:
     - name: time_series_sort_high_value
       cron: *high-value-workload-cron
     - name: array_traversal_high_value
-    - name: filter_with_complex_logical_expression_high_value
     - name: mongos_workloads
 
 # Variant which runs a single shard cluster with a config
@@ -2393,5 +2390,4 @@ buildvariants:
     - name: time_series_sort_high_value
       cron: *high-value-workload-cron
     - name: array_traversal_high_value
-    - name: filter_with_complex_logical_expression_high_value
     - name: mongos_workloads

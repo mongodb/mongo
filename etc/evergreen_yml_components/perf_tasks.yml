@@ -742,14 +742,6 @@ tasks:
           test_control: ycsb_like_queryable_encrypt1_cfdefault
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/encrypted/YCSBLikeQueryableEncrypt1Cfdefault.yml
 
-  - name: filter_with_complex_logical_expression_high_value
-    priority: 5
-    commands:
-      - func: f_dsi_run_workload
-        vars:
-          test_control: filter_with_complex_logical_expression
-          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/FilterWithComplexLogicalExpression.yml
-
   - name: array_traversal_high_value
     priority: 5
     commands:
