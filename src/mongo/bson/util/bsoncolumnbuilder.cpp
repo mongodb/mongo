@@ -1137,16 +1137,23 @@ boost::optional<T> BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::Bi
     _setupRLEForOverflowDetector(Simple8bBuilder<T>& overflowDetector,
                                  const char* s8bBlock,
                                  int index) {
-    for (; index >= 0; --index) {
+    // Limit the search for a non-skip value. If we go above 60 without overflow then we consider
+    // skip to be the last value for RLE as it would be the only one eligible for RLE.
+    constexpr int kMaxNumSkipInNonRLEBlock = 60;
+    for (int numSkips = 0; index >= 0 && numSkips < kMaxNumSkipInNonRLEBlock; --index) {
         const char* block = s8bBlock + sizeof(uint64_t) * index + 1;
         bool rle = (ConstDataView(block).read<LittleEndian<uint64_t>>() &
                     simple8b_internal::kBaseSelectorMask) == simple8b_internal::kRleSelector;
-        // Skip this operation for RLE blocks as they do not contain any distinct values.
+        // Abort this operation when an RLE block is found, they are handled in a separate code
+        // path.
         if (rle) {
-            continue;
+            break;
         }
         Simple8b<T> s8b(block, sizeof(uint64_t));
-        for (auto&& elem : s8b) {
+        for (auto it = s8b.begin(), end = s8b.end();
+             it != end && numSkips < kMaxNumSkipInNonRLEBlock;
+             ++it) {
+            const auto& elem = *it;
             if (elem) {
                 // We do not need to use the actual last value for RLE when determining overflow
                 // point later. We can use the first value we discover when performing this
@@ -1158,6 +1165,7 @@ boost::optional<T> BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::Bi
                 overflowDetector.setLastForRLE(elem);
                 return elem;
             }
+            ++numSkips;
         }
     }
     // We did not find any value, so use skip as RLE. It is important that we use 'none' to

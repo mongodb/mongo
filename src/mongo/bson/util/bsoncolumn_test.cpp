@@ -305,8 +305,12 @@ public:
     static std::vector<boost::optional<uint64_t>> deltaInt64(It begin, It end, BSONElement prev) {
         std::vector<boost::optional<uint64_t>> deltas;
         for (; begin != end; ++begin) {
-            deltas.push_back(deltaInt64(*begin, prev));
-            prev = *begin;
+            if (!begin->eoo()) {
+                deltas.push_back(deltaInt64(*begin, prev));
+                prev = *begin;
+            } else {
+                deltas.push_back(boost::none);
+            }
         }
         return deltas;
     }
@@ -3637,6 +3641,34 @@ TEST_F(BSONColumnTest, SimpleOneValueRLE) {
     auto binData = cb.finalize();
 
     verifyBinary(binData, expected, true);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, SkipRLEWithMoreSkips) {
+    BSONColumnBuilder cb;
+
+    // This test is creating skips that's encoded as RLE where the first non-skip value is before
+    // the RLE block.
+    std::vector<BSONElement> elems = {createElementInt64(38), createElementInt64(40)};
+    for (int i = 0; i < 140; ++i) {
+        elems.push_back(BSONElement());
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0010);
+    appendSimple8bBlocks64(
+        expected, deltaInt64(elems.begin() + 1, elems.begin() + 21, elems.front()), 1);
+    appendSimple8bRLE(expected, 120);
+    appendSimple8bBlock64(expected, boost::none);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
 }
 
