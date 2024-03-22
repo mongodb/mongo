@@ -43,7 +43,10 @@ export const $config = (function() {
         return count;
     }
 
-    let data = {numChunks: 20, documentsPerChunk: 5, CRUDMutex: 'CRUDMutex'};
+    // Keep data less then 64 (internalInsertMaxBatchSize) to avoid insertMany to yield while
+    // inserting. This might cause an rename to execute during the insertMany and post-assertions
+    // checks to fail.
+    let data = {numChunks: 20, documentsPerChunk: 3, CRUDMutex: 'CRUDMutex'};
 
     /**
      * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
@@ -233,8 +236,9 @@ export const $config = (function() {
                 tid = Random.randInt(this.threadCount);
 
             const targetThreadColl = threadCollectionName(collName, tid);
-            jsTestLog('CRUD state tid:' + tid + ' currentTid:' + this.tid +
-                      ' collection:' + targetThreadColl);
+            const threadInfos =
+                'tid:' + tid + ' currentTid:' + this.tid + ' collection:' + targetThreadColl;
+            jsTestLog('CRUD state ' + threadInfos);
             const coll = db[targetThreadColl];
 
             const generation = new Date().getTime();
@@ -249,8 +253,7 @@ export const $config = (function() {
 
             mutexLock(db, tid, targetThreadColl);
             try {
-                jsTestLog('CRUD - Insert tid:' + tid + ' currentTid:' + this.tid +
-                          ' collection:' + targetThreadColl);
+                jsTestLog('CRUD - Insert ' + threadInfos);
                 // Check if insert succeeded
                 var res = insertBulkOp.execute();
                 assert.commandWorked(res);
@@ -260,10 +263,9 @@ export const $config = (function() {
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 // If a concurrent rename came in, then either the full operation succeded (meaning
                 // there will be 0 documents left) or the insert came in first.
-                assert(currentDocs === numDocs || currentDocs === 0);
+                assert.contains(currentDocs, [0, numDocs], threadInfos)
 
-                jsTestLog('CRUD - Update tid:' + tid + ' currentTid:' + this.tid +
-                          ' collection:' + targetThreadColl);
+                jsTestLog('CRUD - Update ' + threadInfos);
                 res = coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});
                 if (res.hasWriteError()) {
                     var err = res.getWriteError();
@@ -275,15 +277,14 @@ export const $config = (function() {
                     }
                     throw err;
                 }
-                assert.commandWorked(res);
+                assert.commandWorked(res, threadInfos);
 
                 // Delete Data
-                jsTestLog('CRUD - Remove tid:' + tid + ' currentTid:' + this.tid +
-                          ' collection:' + targetThreadColl);
+                jsTestLog('CRUD - Remove ' + threadInfos);
                 // Check if delete succeeded
                 coll.remove({generation: generation}, {multi: true});
                 // Check guarantees IF NO CONCURRENT DROP is running.
-                assert.eq(countDocuments(coll, {generation: generation}), 0);
+                assert.eq(countDocuments(coll, {generation: generation}), 0, threadInfos);
             } finally {
                 mutexUnlock(db, tid, targetThreadColl);
             }
