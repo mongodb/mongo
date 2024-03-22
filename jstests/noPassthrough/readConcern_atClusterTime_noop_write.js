@@ -6,7 +6,6 @@
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLastOpTime} from "jstests/replsets/rslib.js";
 
 const conn = MongoRunner.runMongod();
@@ -20,23 +19,12 @@ MongoRunner.stopMongod(conn);
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1},
+    rs: {nodes: 2},
     other: {
         mongosOptions:
             {setParameter: {"failpoint.disableShardingUptimeReporting": "{mode: 'alwaysOn'}"}}
     }
 });
-
-// TODO (SERVER-87461) Re-enable this test when track unsharded is enabled
-const isMultiversion =
-    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
-if (isMultiversion ||
-    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"),
-                                        "TrackUnshardedCollectionsUponCreation")) {
-    jsTest.log("Skipping test since featureFlagTrackUnshardedCollectionsUponCreation is enabled");
-    st.stop();
-    quit();
-}
 
 // Create database "test0" on shard 0.
 const testDB0 = st.s.getDB("test0");
@@ -50,12 +38,24 @@ assert.commandWorked(
     testDB1.adminCommand({enableSharding: testDB1.getName(), primaryShard: st.shard1.shardName}));
 assert.commandWorked(testDB1.createCollection("coll1"));
 
-const PropagationPreferenceOptions = Object.freeze({kShard: 0, kConfig: 1});
+// we wait for the refresh spawned by shardCollection to complete. This is to prevent the clock of
+// any shard from being ticked by an ongoing refresh while executing the test.
+for (let conn of [st.rs0.getPrimary(), st.rs1.getPrimary()]) {
+    let curOps = [];
+    assert.soon(() => {
+        curOps = conn.getDB("admin")
+                     .aggregate([
+                         {$currentOp: {allUsers: true}},
+                         {$match: {"command._flushRoutingTableCacheUpdates": {$exists: true}}}
+                     ])
+                     .toArray();
+        return curOps.length == 0;
+    }, "Timed out waiting for create refreshes to finish, found: " + tojson(curOps));
+}
 
-let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPreference) => {
+let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl) => {
     const fromDBFromMongos = st.s.getDB(fromDbName);
     const toDBFromMongos = st.s.getDB(toDbName);
-    const configFromMongos = st.s.getDB("config");
 
     const oplog = toRS.getPrimary().getCollection("local.oplog.rs");
     let findRes = oplog.findOne({o: {$eq: {"noop write for afterClusterTime read concern": 1}}});
@@ -67,15 +67,15 @@ let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPr
     assert(res.hasOwnProperty("operationTime"), tojson(res));
     let clusterTime = res.operationTime;
 
-    // Propagate 'clusterTime' to toRS or the config server. This ensures that its next
-    // write will be at time >= 'clusterTime'. We cannot use toDBFromMongos to propagate
-    // 'clusterTime' to the config server, because mongos only routes to the config server
-    // for the 'config' and 'admin' databases.
-    if (propagationPreference == PropagationPreferenceOptions.kConfig) {
-        configFromMongos.coll1.find().itcount();
-    } else {
-        toDBFromMongos.coll1.find().itcount();
+    let toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
+    // In case 'from' shard has a clock already ahead of the 'to' shard, the entire test can be
+    // skipped as the no-op write won't be executed.
+    if (timestampCmp(toRSOpTime, clusterTime) >= 0) {
+        return;
     }
+    // Propagate 'clusterTime' to toRS. This ensures that its next write will be at time >=
+    // 'clusterTime'.
+    toDBFromMongos.getCollection(toColl).find().itcount();
 
     // Attempt a snapshot read at 'clusterTime' on toRS. Test that it performs a noop write
     // to advance its lastApplied optime past 'clusterTime'. The snapshot read itself may
@@ -94,7 +94,7 @@ let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPr
         assert.commandWorked(toRSSession.commitTransaction_forTesting());
     }
 
-    const toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
+    toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
 
     assert.gte(toRSOpTime, clusterTime);
 
@@ -106,6 +106,9 @@ let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPr
 // Test noop write. Read from the destination shard.
 //
 
-testNoopWrite("test0", "coll0", st.rs1, "test1", "coll1", PropagationPreferenceOptions.kShard);
+// The test requires the "to" shard to have its clock ahead the "from" shard, otherwise it early
+// exits. Run the test both sides to make sure to execute the test at least once.
+testNoopWrite("test0", "coll0", st.rs1, "test1", "coll1");
+testNoopWrite("test1", "coll1", st.rs0, "test0", "coll0");
 
 st.stop();
