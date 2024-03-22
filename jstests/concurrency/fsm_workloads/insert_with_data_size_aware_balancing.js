@@ -7,10 +7,19 @@
  *   requires_sharding,
  *   assumes_balancer_on,
  *   antithesis_incompatible,
+ *   resource_intensive,
  *  ]
  */
+
+const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
+const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
+const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
+
+const maxChunkSizeMB = slowTestVariant ? 8 : 10;
+const collectionBalancedTimeoutMS =
+    slowTestVariant ? 10 * 60 * 1000 /* 10min */ : 5 * 60 * 1000 /* 5min */;
+
 const bigString = 'X'.repeat(1024 * 1024 - 30);  // Almost 1MB, to create documents of exactly 1MB
-const maxChunkSizeMB = 10;
 const dbNames = ['db0', 'db1'];
 const collNames = ['collA', 'collB', 'collC'];
 
@@ -30,7 +39,7 @@ function getRandomCollName(tid) {
 export const $config = (function() {
     let states = {
         /*
-         * Insert into a test collection a random amount of documents (up to 10MB per iteration)
+         * Insert into a test collection a random amount of documents
          */
         insert: function(db, collName, connCache) {
             const dbName = getRandomDbName(this.tid);
@@ -51,7 +60,7 @@ export const $config = (function() {
     let defaultBalancerShouldReturnRandomMigrations;
 
     /*
-     * Create sharded collections with random maxChunkSizeMB (betwen 1MB and 10MB)
+     * Create sharded collections with random maxChunkSizeMB
      */
     let setup = function(db, collName, cluster) {
         cluster.executeOnConfigNodes((db) => {
@@ -121,7 +130,7 @@ export const $config = (function() {
 
                 // Wait for collection to be considered balanced
                 sh.awaitCollectionBalance(
-                    coll, 5 * 60000 /* 5min timeout */, 1000 /* 1s interval */);
+                    coll, collectionBalancedTimeoutMS, 1000 /* 1s interval */);
                 sh.verifyCollectionIsBalanced(coll);
             }
 
