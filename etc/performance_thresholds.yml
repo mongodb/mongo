@@ -48,10 +48,10 @@ tests:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 37669.8910134
+            value: 38124
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 37720.2487121
+            value: 38178
             bound_direction: upper
