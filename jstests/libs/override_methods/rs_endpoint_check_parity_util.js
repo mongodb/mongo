@@ -43,15 +43,6 @@ function checkCanRun(dbName, commandName, commandObj) {
                     "to inconsistent metadata and cause the CheckMetadataConsistencyInBackground " +
                     "hook to fail");
     }
-    if (typeof commandObj[commandName] === "string" &&
-        commandObj[commandName].includes("system.resharding.") &&
-        !readCommandNames.has(commandName)) {
-        // TODO (SERVER-86487): Writing to system.resharding.* collection is allowed when
-        // featureFlagTrackUnshardedCollectionsUponCreation is enabled and leads to
-        // incomplete placement metadata.
-        throw Error("Cannot write to a resharding temporary collection since it would result in " +
-                    "a collection with incomplete placement metadata");
-    }
 }
 
 /**
