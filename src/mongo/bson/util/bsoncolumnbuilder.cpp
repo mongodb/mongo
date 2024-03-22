@@ -677,7 +677,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
     // Current overflow point
     int currIndex;
     // Pending RLE block in current control when overflow has not happened yet.
-    int pendingRle;
+    int pendingRle = -1;
     if (rle) {
         // If the last block ends with RLE we just need to look for the last non-RLE block to
         // discover the overflow point. The last value for RLE will be the actual last in this block
@@ -694,6 +694,12 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         // When RLE is setup we append as many values as we can to detect when we overflow
         std::tie(currIndex, pendingRle) = _appendUntilOverflow(
             s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
+    }
+
+    // If we have pending RLE but no more control blocks to consider then set last for RLE to 0 as
+    // the binary begins with RLE.
+    if (!overflow && !last.control && pendingRle != -1) {
+        lastForS8b = 0;
     }
 
     // If we have not yet overflowed then continue the same operation from the previous
@@ -966,7 +972,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
 
     boost::optional<uint128_t> lastForS8b;
     int currIndex;
-    int pendingRle;
+    int pendingRle = -1;
     if (rle) {
         // If the last block ends with RLE we just need to look for the last non-RLE block to
         // discover the overflow point. The last value for RLE will be the actual last in this block
@@ -983,6 +989,12 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
         // When RLE is setup we append as many values as we can to detect when we overflow
         std::tie(currIndex, pendingRle) = _appendUntilOverflow(
             s8bBuilder, encoder.simple8bBuilder, overflow, lastForS8b, control, currNumBlocks - 1);
+    }
+
+    // If we have pending RLE but no more control blocks to consider then set last for RLE to 0 as
+    // the binary begins with RLE.
+    if (!overflow && !last.control && pendingRle != -1) {
+        lastForS8b = 0;
     }
 
     // If we have not yet overflowed then continue the same operation from the previous

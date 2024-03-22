@@ -3662,6 +3662,34 @@ TEST_F(BSONColumnTest, DateAllIdenticalRLENoOverflow) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, RLEBeginningWithDifferentValAfterNoOverflow) {
+    BSONColumnBuilder cb;
+
+    BSONElement e = createElementInt64(37);
+
+    // Add enough elements to fill an RLE block
+    std::vector<BSONElement> elems(simple8b_internal::kRleMultiplier + 1, e);
+
+    // Add a different value after RLE.
+    elems.push_back(createElementInt64(38));
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bRLE(expected, simple8b_internal::kRleMultiplier);
+    appendSimple8bBlock64(expected, deltaInt64(elems[elems.size() - 1], elems[elems.size() - 2]));
+    appendEOO(expected);
+
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 
 TEST_F(BSONColumnTest, NonZeroRLETwoControlBlocks) {
     BSONColumnBuilder cb;
