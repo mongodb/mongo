@@ -4159,6 +4159,37 @@ TEST_F(BSONColumnTest, RLEFirstInControlAfterMixedValueBlockWithMoreDifferent128
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, RLELargeValueExtendedSelector) {
+    BSONColumnBuilder cb;
+
+    // This test creates an RLE block containing large values that do not fit in the base selector.
+    // Ensure the correct selector states are set for binary reopen of this binary.
+    uint64_t val = 0;
+    uint64_t delta = 0x3F00000000000000;
+    std::vector<BSONElement> elems;
+    // Add extra value so they are not all the same
+    elems.push_back(createElementInt64(val));
+    for (int i = 0; i < 125; ++i, val += delta) {
+        elems.push_back(createElementInt64(val));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0001);
+    appendSimple8bBlocks64(
+        expected, deltaInt64(elems.begin() + 1, elems.begin() + 6, elems.front()), 1);
+    appendSimple8bRLE(expected, 120);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyColumnReopenFromBinary(reinterpret_cast<const char*>(binData.data), binData.length);
+}
+
 TEST_F(BSONColumnTest, Interleaved) {
     BSONColumnBuilder cb;
 

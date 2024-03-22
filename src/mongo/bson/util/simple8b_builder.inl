@@ -245,6 +245,11 @@ void Simple8bBuilder<T, Allocator>::flush(F&& writeFn) {
 template <typename T, class Allocator>
 void Simple8bBuilder<T, Allocator>::setLastForRLE(boost::optional<T> val) {
     _lastValueInPrevWord = val;
+    if (val) {
+        auto pendingValue = _calculatePendingValue(*val);
+        invariant(pendingValue);
+        invariant(_doesIntegerFitInCurrentWord(*pendingValue));
+    }
 }
 
 template <typename T, class Allocator>
@@ -409,8 +414,11 @@ void Simple8bBuilder<T, Allocator>::_appendSkip(bool tryRle, F&& writeFn) {
 template <typename T, class Allocator>
 template <class F>
 void Simple8bBuilder<T, Allocator>::_handleRleTermination(F&& writeFn) {
-    if (_rleCount == 0)
+    if (_rleCount == 0) {
+        // Reset in case we terminate RLE without appending an identical value
+        isSelectorPossible.fill(true);
         return;
+    }
 
     // Try to create a RLE Simple8b word.
     _appendRleEncoding(writeFn);
