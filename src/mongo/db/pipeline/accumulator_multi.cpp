@@ -470,17 +470,30 @@ Document AccumulatorTopBottomN<sense, single>::serialize(
     if constexpr (!single) {
         args.addField(kFieldNameN, Value(initializer->serialize(options)));
     }
-    auto serializedArg = argument->serialize(options);
 
-    // If 'argument' contains a field named 'output', this means that we are serializing the
-    // accumulator's original output expression under the field name 'output'. Otherwise, we are
-    // serializing a custom argument under the field name 'output'. For instance, a merging $group
-    // will provide an argument that merges multiple partial groups.
-    if (auto output = serializedArg[kFieldNameOutput]; !output.missing()) {
-        args.addField(kFieldNameOutput, Value(output));
+    // If 'argument' is either an ExpressionObject or an ExpressionConstant of object type, then
+    // we are serializing the original expression under the 'output' field of the object. Otherwise,
+    // we're serializing a custom expression for merging group.
+    if (auto argObj = dynamic_cast<ExpressionObject*>(argument.get())) {
+        bool foundOutputField = false;
+        for (auto& child : argObj->getChildExpressions()) {
+            if (child.first == kFieldNameOutput) {
+                auto output = child.second->serialize(options);
+                args.addField(kFieldNameOutput, output);
+                foundOutputField = true;
+                break;
+            }
+        }
+        tassert(7773700, "'output' field should be present.", foundOutputField);
+    } else if (auto argConst = dynamic_cast<ExpressionConstant*>(argument.get())) {
+        auto output = argConst->getValue().getDocument()[kFieldNameOutput];
+        tassert(7773701, "'output' field should be present.", !output.missing());
+        args.addField(kFieldNameOutput, output);
     } else {
+        auto serializedArg = argument->serialize(options);
         args.addField(kFieldNameOutput, serializedArg);
     }
+
     args.addField(kFieldNameSortBy,
                   Value(_sortPattern.serialize(
                       SortPattern::SortKeySerialization::kForPipelineSerialization, options)));
