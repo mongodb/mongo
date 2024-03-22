@@ -299,10 +299,14 @@ class _BenchmarkThreadsReport(object):
     BENCHMARK_METRICS_TO_GATHER = {
         "latency":
             BenchmarkMetricInfo(local_name="cpu_time", cedar_name="latency_per_op",
-                                cedar_metric_type="LATENCY"), "instructions_per_iteration":
-                                    BenchmarkMetricInfo(local_name="instructions_per_iteration",
-                                                        cedar_name="instructions_per_iteration",
-                                                        cedar_metric_type="LATENCY")
+                                cedar_metric_type="LATENCY"),
+        "instructions_per_iteration":
+            BenchmarkMetricInfo(local_name="instructions_per_iteration",
+                                cedar_name="instructions_per_iteration",
+                                cedar_metric_type="LATENCY"),
+        "cycles_per_iteration":
+            BenchmarkMetricInfo(local_name="cycles_per_iteration",
+                                cedar_name="cycles_per_iteration", cedar_metric_type="LATENCY"),
     }
 
     # Map benchmark metric type to the type in Cedar

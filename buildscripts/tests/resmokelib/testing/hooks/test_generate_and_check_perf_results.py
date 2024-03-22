@@ -70,6 +70,25 @@ _BM_REPORT_WITH_INSTRUCTIONS_MEAN = {
     "aggregate_name": "mean"
 }
 
+_BM_REPORT_WITH_CYCLES_1 = {
+    "name": "BM_Name1/arg1/arg with space", "run_type": "iteration", "repetition_index": 0,
+    "threads": 1, "iterations": 1000, "real_time": 1204, "cpu_time": 1305, "bytes_per_second": 1406,
+    "items_per_second": 1507, "custom_counter_1": 1608, "cycles_per_iteration": 101
+}
+
+_BM_REPORT_WITH_CYCLES_2 = {
+    "name": "BM_Name1/arg1/arg with space", "run_type": "iteration", "repetition_index": 0,
+    "threads": 2, "iterations": 1000, "real_time": 1202, "cpu_time": 1303, "bytes_per_second": 1404,
+    "items_per_second": 1505, "custom_counter_1": 1606, "cycles_per_iteration": 100
+}
+
+_BM_REPORT_WITH_CYCLES_MEAN = {
+    "name": "BM_Name1/arg1/arg with space_mean", "run_type": "aggregate", "repetition_index": 0,
+    "threads": 2, "iterations": 1000, "real_time": 1202, "cpu_time": 1303, "bytes_per_second": 1404,
+    "items_per_second": 1505, "custom_counter_1": 1606, "cycles_per_iteration": 100,
+    "aggregate_name": "mean"
+}
+
 _BM_MEAN_REPORT = {
     "name": "BM_Name1/arg1/arg with space_mean",
     "run_type": "aggregate",
@@ -261,6 +280,26 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_INSTRUCTIONS_MEAN),
             _BM_REPORT_WITH_INSTRUCTIONS_MEAN)
+        self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
+
+        cedar_metrics = self.bm_threads_report.generate_cedar_metrics()
+
+        self.assertIn(1, cedar_metrics)
+        self.assertEqual(len(cedar_metrics[1]), 2)
+        collected_types = (m.type for m in cedar_metrics[2])
+        self.assertIn("LATENCY", collected_types)
+        self.assertIn("MEAN", collected_types)
+
+    def test_generate_cedar_report_with_cycles(self):
+        self.bm_threads_report.add_report(
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_1),
+            _BM_REPORT_WITH_CYCLES_1)
+        self.bm_threads_report.add_report(
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_2),
+            _BM_REPORT_WITH_CYCLES_2)
+        self.bm_threads_report.add_report(
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_WITH_CYCLES_MEAN),
+            _BM_REPORT_WITH_CYCLES_MEAN)
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 
         cedar_metrics = self.bm_threads_report.generate_cedar_metrics()
