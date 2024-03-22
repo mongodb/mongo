@@ -461,6 +461,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/server_status_servers',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/default_max_time_ms_cluster_parameter',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
         '$BUILD_DIR/mongo/db/process_health/fault_manager',

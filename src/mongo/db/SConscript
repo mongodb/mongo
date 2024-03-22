@@ -469,6 +469,18 @@ env.Library(
 )
 
 env.Library(
+    target='default_max_time_ms_cluster_parameter',
+    source=[
+        'default_max_time_ms_cluster_parameter.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        'server_base',
+        'server_feature_flags',
+    ],
+)
+
+env.Library(
     target='change_stream_options',
     source=[
         'change_stream_options.idl',
@@ -2495,6 +2507,7 @@ env.Library(
         'curop_metrics',
         'dbdirectclient',
         'dbhelpers',
+        'default_max_time_ms_cluster_parameter',
         'exec/working_set',
         'feature_compatibility_version_metrics',
         'ftdc/ftdc_mongod',
