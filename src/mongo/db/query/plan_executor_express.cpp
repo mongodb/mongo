@@ -160,6 +160,7 @@ PlanExecutorExpress::PlanExecutorExpress(std::unique_ptr<CanonicalQuery> cq,
                               << ", index name: " << *_indexName,
                 descriptor);
         _entry = descriptor->getEntry();
+        _planExplainer.setKeyPattern(descriptor->keyPattern());
     } else if (!_isClusteredOnId) {
         auto descriptor = _coll.getCollectionPtr()->getIndexCatalog()->findIdIndex(_opCtx);
         tassert(8623701,
@@ -168,6 +169,7 @@ PlanExecutorExpress::PlanExecutorExpress(std::unique_ptr<CanonicalQuery> cq,
                 descriptor);
         _entry = descriptor->getEntry();
         _indexName.emplace("_id_");
+        _planExplainer.setKeyPattern(descriptor->keyPattern());
     }
 }
 

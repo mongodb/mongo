@@ -121,7 +121,7 @@ const verifyHasBoundsAndFindsN = function(coll, expected, predicate, queryCollat
         ? assert.commandWorked(coll.find(predicate).explain())
         : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
     const queryPlan = getWinningPlan(getQueryPlanner(res));
-    if (queryPlan.stage != "EXPRESS") {  // simple _id queries don't use COLLSCAN
+    if (queryPlan.stage != "EXPRESS_CLUSTERED_IXSCAN") {  // simple _id queries don't use COLLSCAN
         const min = assert(queryPlan.minRecord, "No min bound " + tojson({res, queryPlan}));
         const max = assert(queryPlan.maxRecord, "No max bound " + tojson({res, queryPlan}));
         assert.eq(min, max, "COLLSCAN bounds are not equal");

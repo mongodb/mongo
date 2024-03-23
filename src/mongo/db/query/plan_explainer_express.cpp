@@ -49,10 +49,13 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
     BSONObjBuilder bob;
 
     bob.append("isCached", false);
-    bob.append("stage", getPlanSummary());
+    bob.append("stage", getStageName());
     PlanSummaryStats stats;
     getSummaryStats(&stats);
 
+    if (_keyPattern) {
+        bob.append("keyPattern", _keyPattern.get());
+    }
     if (!stats.indexesUsed.empty()) {
         bob.append("indexName", *stats.indexesUsed.begin());
     }

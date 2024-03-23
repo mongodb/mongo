@@ -54,7 +54,14 @@ public:
     }
 
     std::string getPlanSummary() const override {
-        return "EXPRESS";
+        StringBuilder s;
+        s << getStageName();
+        if (_keyPattern) {
+            // KeyPattern::toString() is faster and produces different output compared to
+            // BSONObj::toString(). KeyPattern will return "{ a: 1 }" instead of "{ a: 1.0 }".
+            s << " " << KeyPattern{_keyPattern.get()};
+        }
+        return s.str();
     }
 
     void getSummaryStats(PlanSummaryStats* statsOut) const override;
@@ -78,10 +85,22 @@ public:
         return _isClusteredOnId;
     }
 
+    void setKeyPattern(const BSONObj& keyPattern) {
+        _keyPattern.emplace(keyPattern);
+    }
+
 private:
+    std::string getStageName() const {
+        if (_isClusteredOnId) {
+            return "EXPRESS_CLUSTERED_IXSCAN";
+        }
+        return "EXPRESS_IXSCAN";
+    }
+
     const mongo::CommonStats* _stats;
     const bool _isClusteredOnId;
     const boost::optional<const std::string>& _indexName;
+    boost::optional<const BSONObj&> _keyPattern;
 };
 
 }  // namespace mongo

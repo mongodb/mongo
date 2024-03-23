@@ -53,7 +53,7 @@ export let assertQueryUsesIndex = function(coll, query, indexName) {
         stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "IXSCAN");
     } else {
         assert(isExpress(coll.getDB(), res), tojson(res));
-        stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "EXPRESS");
+        stage = getPlanStage(getWinningPlan(getQueryPlanner(res)), "EXPRESS_IXSCAN");
     }
     assert.eq(
         stage.indexName, indexName, "Expecting index scan on " + indexName + ": " + tojson(res));

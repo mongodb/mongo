@@ -220,7 +220,7 @@ if (isShardedColl) {
     assert(!isExpress(db, explain), tojson(explain));
 } else {
     assert(isExpress(db, explain), tojson(explain));
-    let express = getPlanStage(getWinningPlan(getQueryPlanner(explain)), "EXPRESS");
+    let express = getPlanStage(getWinningPlan(getQueryPlanner(explain)), "EXPRESS_IXSCAN");
     assert(express && express.indexName == "a_1_b_1", tojson(explain));
 }
 
@@ -241,7 +241,7 @@ if (!isShardedColl && !FixtureHelpers.isStandalone(db) &&
         explain = assert.commandWorked(
             db.runCommand({explain: {find: coll.getName(), filter: {a: 1}, limit: 1}}));
         assert(isExpress(db, explain), tojson(explain));
-        let express = getPlanStage(getWinningPlan(getQueryPlanner(explain)), "EXPRESS");
+        let express = getPlanStage(getWinningPlan(getQueryPlanner(explain)), "EXPRESS_IXSCAN");
         assert(express && express.indexName == "a_1_b_1_c_1", tojson(explain));
     });
 

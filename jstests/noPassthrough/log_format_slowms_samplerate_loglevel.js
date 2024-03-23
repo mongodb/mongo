@@ -176,7 +176,7 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
                 command: "find",
                 find: coll.getName(),
                 comment: logFormatTestComment,
-                planSummary: "EXPRESS",
+                planSummary: "EXPRESS_IXSCAN { _id: 1 }",
                 cursorExhausted: 1,
                 keysExamined: 1,
                 docsExamined: 1,
