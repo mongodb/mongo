@@ -31,9 +31,12 @@
 
 #include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/ticketholder_test_fixture.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace {
