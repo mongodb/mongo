@@ -122,6 +122,14 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         return;
 
     const auto& nss = collection->ns();
+
+    if (nss.isTemporaryReshardingCollection()) {
+        // Don't do capped deletes if this is a temporary resharding collection since that could
+        // lead to multi-timestamp violation. The recipient shard will apply the capped delete oplog
+        // entries from the donor shard anyway.
+        return;
+    }
+
     auto& ccs = cappedCollectionState(*collection->getSharedDecorations());
 
     stdx::unique_lock<Latch> cappedFirstRecordMutex(ccs.cappedFirstRecordMutex, stdx::defer_lock);
