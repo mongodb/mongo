@@ -216,7 +216,8 @@ protected:
                          OperationContext* opCtx,
                          BSONObjBuilder* out,
                          LogicalTime time,
-                         Component component) const = 0;
+                         Component component,
+                         bool isInternal) const = 0;
         virtual LogicalTime in(ServiceContext* service,
                                OperationContext* opCtx,
                                const GossipedVectorClockComponents& timepoints,
@@ -330,7 +331,8 @@ private:
     bool _gossipOutComponent(OperationContext* opCtx,
                              BSONObjBuilder* out,
                              const LogicalTimeArray& time,
-                             Component component) const;
+                             Component component,
+                             bool isInternal) const;
 
     /**
      * Called in order to input a Component time into the given LogicalTimeArray from the given

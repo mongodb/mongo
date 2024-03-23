@@ -72,6 +72,11 @@ rst2.initiate();
 const rst1Primary = rst1.getPrimary();
 const rst2Primary = rst2.getPrimary();
 
+// Binaries earlier than 8.0 fail to parse a missing signature.
+// TODO SERVER-88458: Remove.
+const canAlwaysParseMissingClusterTimeSignature =
+    !jsTest.options().useRandomBinVersionsWithinReplicaSet;
+
 createUsers(rst1Primary);
 createUsers(rst2Primary);
 
@@ -95,12 +100,41 @@ const rst2TestDB = rst2Primary.getDB(kDbName);
     jsTest.log("rst1's clusterTime " + tojson(rst1ClusterTime));
     jsTest.log("rst2's clusterTime " + tojson(rst2ClusterTime));
 
+    // External clients always receive cluster time signatures.
+    assert(rst1ClusterTime.hasOwnProperty("clusterTime") &&
+               rst1ClusterTime.hasOwnProperty("signature"),
+           tojson(rst1ClusterTime));
+    assert(rst2ClusterTime.hasOwnProperty("clusterTime") &&
+               rst2ClusterTime.hasOwnProperty("signature"),
+           tojson(rst2ClusterTime));
+
     // A key's keyId is generated as the node's current clusterTime's Timestamp so it is possible
     // for the keyId for rst2ClusterTime to match the key on rst1, and in that case the command
     // would fail with TimeProofMismatch instead of KeyNotFound.
     assert.commandFailedWithCode(
         rst1TestDB.runCommand({find: kCollName, $clusterTime: rst2ClusterTime}),
         [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
+
+    // Sending no signature without the advanceClusterTime privilege fails because this is treated
+    // the same as sending the dummy signature with keyId 0.
+
+    // Make a copy so anything with a reference to the original cluster time isn't affected.
+    let clusterTimeCopy = Object.extend({}, rst2ClusterTime);
+    delete clusterTimeCopy.signature;
+    assert(!clusterTimeCopy.hasOwnProperty("signature"), tojson(clusterTimeCopy));
+    assert(rst2ClusterTime.hasOwnProperty("signature"), tojson(rst2ClusterTime));
+
+    if (canAlwaysParseMissingClusterTimeSignature) {
+        assert.commandFailedWithCode(
+            rst1TestDB.runCommand({find: kCollName, $clusterTime: clusterTimeCopy}),
+            ErrorCodes.KeyNotFound);
+    } else {
+        // We test with mixed version replica sets. An 8.0 binary primary can parse the signature
+        // and will fail like above, but a lower binary will fail to parse.
+        assert.commandFailedWithCode(
+            rst1TestDB.runCommand({find: kCollName, $clusterTime: clusterTimeCopy}),
+            [ErrorCodes.NoSuchKey, ErrorCodes.KeyNotFound]);
+    }
 
     rst1TestDB.logout();
     rst2TestDB.logout();
@@ -123,7 +157,35 @@ const rst2TestDB = rst2Primary.getDB(kDbName);
     jsTest.log("rst1's clusterTime " + tojson(rst1ClusterTime));
     jsTest.log("rst2's clusterTime " + tojson(rst2ClusterTime));
 
+    // External clients always receive cluster time signatures.
+    assert(rst1ClusterTime.hasOwnProperty("clusterTime") &&
+               rst1ClusterTime.hasOwnProperty("signature"),
+           tojson(rst1ClusterTime));
+    assert(rst2ClusterTime.hasOwnProperty("clusterTime") &&
+               rst2ClusterTime.hasOwnProperty("signature"),
+           tojson(rst2ClusterTime));
+
     assert.commandWorked(rst1TestDB.runCommand({find: kCollName, $clusterTime: rst2ClusterTime}));
+
+    // Sending no signature without the advanceClusterTime privilege fails because this is treated
+    // the same as sending the dummy signature with keyId 0.
+
+    // Make a copy so anything with a reference to the original cluster time isn't affected.
+    let clusterTimeCopy = Object.extend({}, rst2ClusterTime);
+    delete clusterTimeCopy.signature;
+    assert(!clusterTimeCopy.hasOwnProperty("signature"), tojson(clusterTimeCopy));
+    assert(rst2ClusterTime.hasOwnProperty("signature"), tojson(rst2ClusterTime));
+
+    if (canAlwaysParseMissingClusterTimeSignature) {
+        assert.commandWorked(
+            rst1TestDB.runCommand({find: kCollName, $clusterTime: clusterTimeCopy}));
+    } else {
+        // We test with mixed version replica sets. An 8.0 binary primary can parse the signature
+        // and will succeed like above, but a lower binary will fail to parse.
+        assert.commandWorkedOrFailedWithCode(
+            rst1TestDB.runCommand({find: kCollName, $clusterTime: clusterTimeCopy}),
+            ErrorCodes.NoSuchKey);
+    }
 
     rst1TestDB.logout();
     rst2TestDB.logout();

@@ -46,7 +46,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock.h"
@@ -57,6 +59,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace {
@@ -155,7 +158,8 @@ public:
              OperationContext* opCtx,
              BSONObjBuilder* out,
              LogicalTime time,
-             Component component) const override {
+             Component component,
+             bool isInternal) const override {
         out->append(_fieldName, time.asTimestamp());
         return true;
     }
@@ -202,11 +206,13 @@ public:
              OperationContext* opCtx,
              BSONObjBuilder* out,
              LogicalTime time,
-             Component component) const override {
+             Component component,
+             bool isInternal) const override {
         SignedLogicalTime signedTime;
 
-        if (opCtx && LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+        if (isInternal || (opCtx && LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx))) {
             // Authorized clients always receive a dummy-signed $clusterTime (and operationTime).
+            // Internal clients can always be considered authorized.
             signedTime = SignedLogicalTime(time, TimeProofService::TimeProof(), 0);
         } else {
             // Servers without validators (e.g. a shard server not yet added to a cluster) do not
@@ -235,13 +241,29 @@ public:
         BSONObjBuilder subObjBuilder(out->subobjStart(_fieldName));
         signedTime.getTime().asTimestamp().append(subObjBuilder.bb(), kClusterTimeFieldName);
 
-        BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart(kSignatureFieldName));
-        // Cluster time metadata is only written when the LogicalTimeValidator is set, which
-        // means the cluster time should always have a proof.
-        invariant(signedTime.getProof());
-        signedTime.getProof()->appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);
-        signatureObjBuilder.append(kSignatureKeyIdFieldName, signedTime.getKeyId());
-        signatureObjBuilder.doneFast();
+        // TODO SERVER-88458: Remove FCV check when all servers can be assumed to handle a missing
+        // signature.
+        //
+        // (Generic FCV reference): This is not a truly generic FCV reference and will be removed in
+        // the next release branch. It guards a message format change for the vector clock that
+        // isn't worth its own feature flag. This comment avoids a linter error.
+        auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+        // As an optimization, send no signature instead of a dummy signature. For legacy
+        // compatibility, external authorized clients always receive a signature.
+        auto shouldSkipSignature = isInternal && signedTime.getKeyId() == 0 &&
+            fcvSnapshot.isVersionInitialized() &&
+            fcvSnapshot.getVersion() == multiversion::GenericFCV::kLatest;
+
+        if (!shouldSkipSignature) {
+            BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart(kSignatureFieldName));
+            // Cluster time metadata is only written when the LogicalTimeValidator is set, which
+            // means the cluster time should always have a proof.
+            invariant(signedTime.getProof());
+            signedTime.getProof()->appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);
+            signatureObjBuilder.append(kSignatureKeyIdFieldName, signedTime.getKeyId());
+            signatureObjBuilder.doneFast();
+        }
 
         subObjBuilder.doneFast();
 
@@ -261,16 +283,20 @@ public:
         auto& clusterTime = *(timepoints.getDollarClusterTime());
         Timestamp ts = clusterTime.getClusterTime();
 
-        auto hashCDR = clusterTime.getSignature()->getHash();
-        auto hashLength = hashCDR.length();
-        auto rawBinSignature = reinterpret_cast<const unsigned char*>(hashCDR.data());
-        BSONBinData proofBinData(rawBinSignature, hashLength, BinDataType::BinDataGeneral);
-        auto proofStatus = SHA1Block::fromBinData(proofBinData);
+        // Parse the signature, treating no signature the same as a dummy signed proof.
+        auto proof = TimeProofService::TimeProof();
+        long long keyId = 0;
+        if (clusterTime.getSignature()) {
+            auto hashCDR = clusterTime.getSignature()->getHash();
+            auto hashLength = hashCDR.length();
+            auto rawBinSignature = reinterpret_cast<const unsigned char*>(hashCDR.data());
+            BSONBinData proofBinData(rawBinSignature, hashLength, BinDataType::BinDataGeneral);
+            proof = uassertStatusOK(SHA1Block::fromBinData(proofBinData));
 
-        long long keyId = clusterTime.getSignature()->getKeyId();
+            keyId = clusterTime.getSignature()->getKeyId();
+        }
 
-        auto signedTime =
-            SignedLogicalTime(LogicalTime(ts), std::move(proofStatus.getValue()), keyId);
+        auto signedTime = SignedLogicalTime(LogicalTime(ts), std::move(proof), keyId);
 
         if (!opCtx) {
             // If there's no opCtx then this must be coming from a reply, which must be internal,
@@ -292,8 +318,8 @@ public:
             }
         }
 
-        auto logicalTimeValidator = LogicalTimeValidator::get(service);
         if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            auto logicalTimeValidator = LogicalTimeValidator::get(service);
             if (!logicalTimeValidator) {
                 uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
                           "Cannot accept logicalTime: " + signedTime.getTime().toString() +
@@ -346,7 +372,8 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
     auto now = getTime();
     bool clusterTimeWasOutput = false;
     for (auto component : toGossip) {
-        clusterTimeWasOutput |= _gossipOutComponent(opCtx, outMessage, now._time, component);
+        clusterTimeWasOutput |=
+            _gossipOutComponent(opCtx, outMessage, now._time, component, isInternal);
     }
     return clusterTimeWasOutput;
 }
@@ -383,9 +410,10 @@ void VectorClock::gossipIn(OperationContext* opCtx,
 bool VectorClock::_gossipOutComponent(OperationContext* opCtx,
                                       BSONObjBuilder* out,
                                       const LogicalTimeArray& time,
-                                      Component component) const {
-    bool wasOutput =
-        _gossipFormatters[component]->out(_service, opCtx, out, time[component], component);
+                                      Component component,
+                                      bool isInternal) const {
+    bool wasOutput = _gossipFormatters[component]->out(
+        _service, opCtx, out, time[component], component, isInternal);
     return (component == Component::ClusterTime) ? wasOutput : false;
 }
 

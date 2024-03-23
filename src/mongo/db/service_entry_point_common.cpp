@@ -314,13 +314,6 @@ void generateErrorResponse(OperationContext* opCtx,
  * uninitialized cluster time.
  */
 LogicalTime getClientOperationTime(OperationContext* opCtx) {
-    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet = replCoord->getSettings().isReplSet();
-
-    if (!isReplSet) {
-        return LogicalTime();
-    }
-
     return LogicalTime(
         repl::ReplClientInfo::forClient(opCtx->getClient()).getMaxKnownOperationTime());
 }
@@ -335,8 +328,7 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
  */
 LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOperationTime) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet = replCoord->getSettings().isReplSet();
-    invariant(isReplSet);
+    dassert(replCoord->getSettings().isReplSet());
 
     auto operationTime = getClientOperationTime(opCtx);
     invariant(operationTime >= startOperationTime);
