@@ -27,26 +27,26 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/pipeline/document_source_group.h"
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <utility>
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
-
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/semantic_analysis.h"
 
 namespace mongo {
 
@@ -78,7 +78,9 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 
 DocumentSourceGroup::DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          boost::optional<int64_t> maxMemoryUsageBytes)
-    : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes), _groupsReady(false) {}
+    : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes),
+      _groupsReady(false),
+      _maxFirstLastRewrites(internalQueryMaxFirstLastRewrites.load()) {}
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -165,6 +167,122 @@ bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterato
     }
 
     return false;
+}
+
+namespace {
+template <TopBottomSense sense, bool single = true>
+AccumulationStatement makeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                     const SortPattern& sortPattern,
+                                     StringData fieldName,
+                                     boost::intrusive_ptr<Expression> origExpr) {
+    static_assert(
+        single,
+        "Neither $topN nor $bottomN are supported yet, kFieldNameN must be added to support them");
+
+    // To comply with any internal parsing logic for $top and $bottom accumulators, we need to
+    // compose a BSON object that represents the accumulator statement and then parse it.
+    BSONObjBuilder bob;
+    {
+        // This block opens {"fieldName": {...}}.
+        BSONObjBuilder accStmtObjBuilder(bob.subobjStart(fieldName));
+        {
+            // This block opens {"$top": {...}} or {"$bottom": {...}}. Converts $first to $top and
+            // $last to $bottom.
+            BSONObjBuilder accArgsBuilder(
+                accStmtObjBuilder.subobjStart(AccumulatorTopBottomN<sense, single>::getName()));
+
+            // {"$top": {"sortBy": ...}}
+            // The sort pattern for $top or $bottom accumulators is same as the sort pattern of the
+            // sort stage that is being absorbed.
+            accArgsBuilder.append(AccumulatorN::kFieldNameSortBy,
+                                  sortPattern.serialize({}).toBson());
+
+            // {"$top": {"sortBy": ..., "output": ...}}
+            // The output expression of the new $top or $bottom accumulator is same as the
+            // expression for $first and $last accumulators.
+            origExpr->serialize().addToBsonObj(&accArgsBuilder, AccumulatorN::kFieldNameOutput);
+
+            accArgsBuilder.doneFast();
+        }
+        accStmtObjBuilder.doneFast();
+    }
+    auto accStmtObj = bob.done();
+
+    return AccumulationStatement::parseAccumulationStatement(
+        pExpCtx.get(), accStmtObj[fieldName], pExpCtx->variablesParseState);
+}
+}  // namespace
+
+bool DocumentSourceGroup::tryToAbsorbTopKSort(
+    DocumentSourceSort* prospectiveSort,
+    Pipeline::SourceContainer::iterator prospectiveSortItr,
+    Pipeline::SourceContainer* container) {
+    invariant(prospectiveSort);
+
+    // If the $sort has a limit, we cannot absorb it into the $group since we know the selected
+    // documents for $limit for sure after all the input are processed.
+    if (prospectiveSort->getLimit()) {
+        return false;
+    }
+
+    auto sortPattern = prospectiveSort->getSortKeyPattern();
+    // Does not support sort by meta field(s).
+    for (auto&& sortPatternPart : sortPattern) {
+        if (sortPatternPart.expression) {
+            return false;
+        }
+    }
+
+    // We don't want to apply this optimization if this group can leverage DISTINCT_SCAN when we
+    // transform it to an internal $groupByDistinctScan.
+    std::string groupId;
+    GroupFromFirstDocumentTransformation::ExpectedInput expectedInput;
+    if (isEligibleForTransformOnFirstDocument(expectedInput, groupId)) {
+        return false;
+    }
+
+    // Collects all $first and $last accumulators. Does not support either $firstN or $lastN
+    // accumulators yet.
+    auto& accumulators = _groupProcessor.getMutableAccumulationStatements();
+    std::vector<size_t> firstLastAccumulatorIndices;
+    for (size_t i = 0; i < accumulators.size(); ++i) {
+        if (accumulators[i].expr.name == AccumulatorFirst::kName ||
+            accumulators[i].expr.name == AccumulatorLast::kName) {
+            firstLastAccumulatorIndices.push_back(i);
+        } else if (accumulators[i].expr.name == AccumulatorFirstN::kName ||
+                   accumulators[i].expr.name == AccumulatorLastN::kName ||
+                   accumulators[i].expr.name == AccumulatorMergeObjects::kName ||
+                   accumulators[i].expr.name == AccumulatorPush::kName) {
+            // If there's any $firstN, $lastN, $mergeObjects and/or $push accumulators which depends
+            // on the order, we cannot absorb the $sort into $group because they rely on the ordered
+            // input from $sort.
+            return false;
+        }
+    }
+
+    // There's nothing to optimize.
+    if (firstLastAccumulatorIndices.empty()) {
+        return false;
+    }
+
+    // TODO SERVER-88087 Improve the rewrite to support many $first/$last more efficiently.
+    if (firstLastAccumulatorIndices.size() > _maxFirstLastRewrites) {
+        return false;
+    }
+
+    for (auto i : firstLastAccumulatorIndices) {
+        if (accumulators[i].expr.name == AccumulatorFirst::kName) {
+            accumulators[i] = makeAccStmtFor<TopBottomSense::kTop>(
+                pExpCtx, sortPattern, accumulators[i].fieldName, accumulators[i].expr.argument);
+        } else if (accumulators[i].expr.name == AccumulatorLast::kName) {
+            accumulators[i] = makeAccStmtFor<TopBottomSense::kBottom>(
+                pExpCtx, sortPattern, accumulators[i].fieldName, accumulators[i].expr.argument);
+        }
+    }
+
+    container->erase(prospectiveSortItr);
+
+    return true;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBsonWithMaxMemoryUsage(

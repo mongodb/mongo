@@ -51,6 +51,7 @@ namespace {
 using OptimizePipeline = AggregationContextFixture;
 const auto kExplain = SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+
 TEST_F(OptimizePipeline, MixedMatchPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
