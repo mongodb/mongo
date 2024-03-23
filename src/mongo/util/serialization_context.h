@@ -60,7 +60,7 @@ struct SerializationContext {
      * where it is being called.  Use default if serialization and deserialization should only
      * depened on the state of the feature flags.
      */
-    enum class Source { Default, Command, Storage, Catalog };
+    enum class Source : uint8_t { Default, Command, Storage, Catalog };
 
     /**
      * The CallerType enum is currently only applicable to source = Command, and is used in
@@ -69,14 +69,14 @@ struct SerializationContext {
      * for example handle serialization for a request differently than serialization for a reply.
      */
 
-    enum class CallerType { None, Request, Reply };
+    enum class CallerType : uint8_t { None, Request, Reply };
 
     /**
      * Prefix is used to track whether or not upstream is sending us and thus expecting a prefixed
      * tenant ID in the reply.  This field in the request can either be true, false, or not present,
      * the latter represented by the default state.
      */
-    enum class Prefix { IncludePrefix, ExcludePrefix };
+    enum class Prefix : uint8_t { IncludePrefix, ExcludePrefix };
 
     SerializationContext(Source source = Source::Default,
                          CallerType callerType = CallerType::None,
