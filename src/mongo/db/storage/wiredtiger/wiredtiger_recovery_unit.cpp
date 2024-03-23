@@ -423,7 +423,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     // transaction on a RecoveryUnit to call setTimestamp() and another to call
     // setCommitTimestamp().
     _lastTimestampSet = boost::none;
-    _multiTimestampConstraintTracker = MultiTimestampConstraintTracker();
+    _multiTimestampConstraintTracker = {};
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
     _roundUpPreparedTimestamps = RoundUpPreparedTimestamps::kNoRound;
@@ -725,7 +725,7 @@ Timestamp WiredTigerRecoveryUnit::_getTransactionReadTimestamp() {
 }
 
 void WiredTigerRecoveryUnit::_updateMultiTimestampConstraint(Timestamp timestamp) {
-    std::stack<Timestamp>& timestampOrder = _multiTimestampConstraintTracker.timestampOrder;
+    auto& timestampOrder = _multiTimestampConstraintTracker.timestampOrder;
     if (!timestampOrder.empty() && timestampOrder.top() == timestamp) {
         // We're still on the same timestamp.
         return;

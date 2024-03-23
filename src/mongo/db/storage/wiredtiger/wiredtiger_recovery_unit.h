@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/container/inlined_vector.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -271,7 +272,11 @@ private:
         bool isTxnModified = false;
         bool txnHasNonTimestampedWrite = false;
         bool ignoreAllMultiTimestampConstraints = false;
-        std::stack<Timestamp> timestampOrder = {};
+
+        // Most operations only use one timestamp.
+        static constexpr auto kDefaultInit = 1;
+        std::stack<Timestamp, absl::InlinedVector<Timestamp, kDefaultInit>> timestampOrder;
+
     } _multiTimestampConstraintTracker;
 
     // Specifies which external source to use when setting read timestamps on transactions.
