@@ -680,6 +680,72 @@ TEST_F(BucketUnpackerTest, EraseMetaFromFieldSetAndDetermineIncludeMeta) {
     ASSERT_FALSE(unpacker.includeMetaField());
 }
 
+TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithInclusiveProject) {
+    auto bucket = fromjson(R"(
+{
+    control: {version: 1},
+    data: {
+        _id: {'0':4, '1':5, '2':6},
+        time: {'0':4, '1': 5, '2': 6}
+    }
+})");
+    std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
+    auto unpacker = makeBucketUnpacker(unpackerFields,
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
+
+    // Add fields to '_computedMetaProjFields'.
+    unpacker.addComputedMetaProjFields({"hello"_sd, "bye"_sd});
+    ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("hello"));
+    ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("bye"));
+
+    auto spec = unpacker.bucketSpec();
+    std::set<std::string> includeFields{kUserDefinedTimeName.toString(), "bye"};
+    spec.setFieldSet(includeFields);
+    spec.setBehavior(BucketSpec::Behavior::kInclude);
+
+    // This calls eraseUnneededComputedMetaProjFields().
+    unpacker.setBucketSpec(std::move(spec));
+    // As "hello" was not in the includes, it should be removed.
+    ASSERT_FALSE(unpacker.bucketSpec().computedMetaProjFields().contains("hello"));
+    // As "bye" was in the includes, it should still be in '_computedMetaProjFields'.
+    ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("bye"));
+}
+
+TEST_F(BucketUnpackerTest, EraseUnneededComputedMetaProjFieldsWithExclusiveProject) {
+    auto bucket = fromjson(R"(
+{
+    control: {version: 1},
+    data: {
+        _id: {'0':4, '1':5, '2':6},
+        time: {'0':4, '1': 5, '2': 6}
+    }
+})");
+    std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
+    auto unpacker = makeBucketUnpacker(unpackerFields,
+                                       BucketSpec::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
+
+    // Add fields to '_computedMetaProjFields'.
+    unpacker.addComputedMetaProjFields({"hello"_sd, "bye"_sd});
+    ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("hello"));
+    ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("bye"));
+
+    auto spec = unpacker.bucketSpec();
+    std::set<std::string> excludeFields{kUserDefinedTimeName.toString(), "bye"};
+    spec.setFieldSet(excludeFields);
+    spec.setBehavior(BucketSpec::Behavior::kExclude);
+
+    // This calls eraseUnneededComputedMetaProjFields().
+    unpacker.setBucketSpec(std::move(spec));
+    // As "hello" was not excluded, it should still exist.
+    ASSERT_TRUE(unpacker.bucketSpec().computedMetaProjFields().contains("hello"));
+    // As "bye" was in the excludes, it should be removed from '_computedMetaProjFields'.
+    ASSERT_FALSE(unpacker.bucketSpec().computedMetaProjFields().contains("bye"));
+}
+
 TEST_F(BucketUnpackerTest, DetermineIncludeTimeField) {
     auto bucket = fromjson(R"(
 {

@@ -908,7 +908,13 @@ TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldsInclu
     auto array = std::vector<Value>{};
     DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
         ->serializeToArray(array);
-    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
+
+    // Since fields in 'computedMetaProjFields' are not in 'include' they should be removed.
+    auto expectedBson = fromjson(
+        "{$_internalUnpackBucket: {include: [], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600}}");
+
+    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), expectedBson);
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldsIncludeWithCompute) {

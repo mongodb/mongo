@@ -275,8 +275,9 @@ private:
     // included in the materialized measurements.
     void eraseMetaFromFieldSetAndDetermineIncludeMeta();
 
-    // Erase computed meta projection fields if they are present in the exclusion field set.
-    void eraseExcludedComputedMetaProjFields();
+    // Erase computed meta projection fields if they are present in the exclusion field set or if
+    // they are not present in the inclusion set.
+    void eraseUnneededComputedMetaProjFields();
 
     BucketSpec _spec;
 

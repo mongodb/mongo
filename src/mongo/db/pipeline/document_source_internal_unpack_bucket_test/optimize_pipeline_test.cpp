@@ -1031,5 +1031,52 @@ TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
     ASSERT_EQ(serialized.size(), 4U);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized.back());
 }
+
+TEST_F(OptimizePipeline, ComputedMetaProjFieldsAreNotInInclusionProjection) {
+    auto pipeline = Pipeline::parse(
+        makeVector(
+            fromjson(
+                "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
+                "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['time', 'y']}}"),
+            fromjson("{$project: {time: 1, x: 1}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+
+    // The fields in 'computedMetaProjFields' that are not in the project should be removed.
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'time', 'x'], timeField: 'time', "
+                 "metaField: "
+                 "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['time']}}"),
+        serialized[0]);
+}
+
+TEST_F(OptimizePipeline, ComputedMetaProjectFieldsAfterInclusionGetsAddedToIncludes) {
+
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
+                            "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: []}}"),
+                   fromjson("{$project: {myMeta: 1}}"),
+                   fromjson("{$addFields: {newMeta: {$toUpper : '$myMeta'}}}")),
+        getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: {$toUpper: ['$meta']}}}"), serialized[0]);
+
+    // 'newMeta' field gets added to 'computedMetaProjFields' and to 'include'.
+    auto expectedSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['_id','newMeta', 'myMeta'], timeField: 'time', "
+        "metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}");
+    ASSERT_BSONOBJ_EQ(expectedSpecObj, serialized[1]);
+}
 }  // namespace
 }  // namespace mongo
