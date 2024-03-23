@@ -4833,7 +4833,7 @@ export const authCommandsLib = {
         },
         {
           testname: "findWithTerm",
-          command: {find: "foo", limit: -1, term: NumberLong(1)},
+          command: {find: "foo", limit: 1, term: NumberLong(1)},
           testcases: [
               {
                 runOnDb: firstDbName,

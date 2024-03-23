@@ -458,17 +458,16 @@ TEST_F(FindCommandTest, MirrorableKeys) {
                      BSON("skip" << 1),
                      BSON("limit" << 1),
                      BSON("batchSize" << 1),
-                     BSON("singleBatch" << true),
+                     BSON("singleBatch" << false),
                      BSON("comment"
                           << "This is a comment."),
                      BSON("maxTimeMS" << 100),
-                     BSON("readConcern"
-                          << "primary"),
+                     BSON("readConcern" << BSONObj()),
                      BSON("max" << BSONObj()),
                      BSON("min" << BSONObj()),
                      BSON("returnKey" << true),
                      BSON("showRecordId" << false),
-                     BSON("tailable" << false),
+                     BSON("tailable" << true),
                      BSON("oplogReplay" << true),
                      BSON("noCursorTimeout" << true),
                      BSON("awaitData" << true),
@@ -476,7 +475,7 @@ TEST_F(FindCommandTest, MirrorableKeys) {
                      BSON("collation" << BSONObj()),
                      BSON("shardVersion" << BSONObj()),
                      BSON("databaseVersion" << BSONObj()),
-                     BSON("encryptionInformation" << BSONObj())};
+                     BSON("encryptionInformation" << BSON("schema" << BSONObj::kEmptyObject))};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
     checkFieldNamesAreAllowed(mirroredObj);
