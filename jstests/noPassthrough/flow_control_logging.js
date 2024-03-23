@@ -7,6 +7,12 @@
  *   requires_replication,
  * ]
  */
+
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
+
 const replSet = new ReplSetTest({name: "flow_control_logging", nodes: 3});
 replSet.startSet({
     setParameter: {
@@ -24,10 +30,7 @@ replSet.startSet({
 replSet.initiate();
 
 // Stop replication which will pin the commit point.
-for (let sec of replSet.getSecondaries()) {
-    assert.commandWorked(sec.adminCommand(
-        {configureFailPoint: "pauseBatchApplicationAfterWritingOplogEntries", mode: "alwaysOn"}));
-}
+stopReplicationOnSecondaries(replSet);
 
 const timeoutMilliseconds = 30 * 1000;
 // The test has stopped replication and the primary's no-op writer is configured to create an
@@ -40,9 +43,6 @@ checkLog.containsWithAtLeastCount(replSet.getPrimary(),
                                   timeoutMilliseconds);
 
 // Restart replication so the replica set will shut down.
-for (let sec of replSet.getSecondaries()) {
-    assert.commandWorked(sec.adminCommand(
-        {configureFailPoint: "pauseBatchApplicationAfterWritingOplogEntries", mode: "off"}));
-}
+restartReplicationOnSecondaries(replSet);
 
 replSet.stopSet();

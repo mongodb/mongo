@@ -34,6 +34,7 @@ function unregisterIndex(rs, nss, name, uuid) {
 // Assert a secondary contains the number of documents specified by count.
 function assertSecondaryCount(rst, collection, query, count) {
     let matchCount = false;
+    rst.awaitReplication();
     rst.getSecondaries().forEach(function(secondary) {
         matchCount =
             matchCount || secondary.getCollection(collection).countDocuments(query) == count;

@@ -42,6 +42,9 @@ function enableFailPoint(node) {
     jsTest.log("enable failpoint " + node.host);
     assert.commandWorked(
         node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
+    // Wait for Oplog Applier to hang on the failpoint.
+    checkLog.contains(node,
+                      "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 }
 
 function disableFailPoint(node) {
@@ -67,7 +70,7 @@ secondaries.forEach(enableFailPoint);
 const reduceMajorityWriteLatency =
     FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
 var bufferCountBefore = (reduceMajorityWriteLatency)
-    ? secondary.getDB('foo').serverStatus().metrics.repl.buffer.apply.count
+    ? secondary.getDB('foo').serverStatus().metrics.repl.buffer.write.count
     : secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
 for (var i = 1; i < numDocuments; ++i) {
     assert.commandWorked(coll.insert({x: i}));
@@ -79,7 +82,7 @@ assert.soon(
     function() {
         var serverStatus = secondary.getDB('foo').serverStatus();
         var bufferCount = (reduceMajorityWriteLatency)
-            ? serverStatus.metrics.repl.buffer.apply.count
+            ? serverStatus.metrics.repl.buffer.write.count
             : serverStatus.metrics.repl.buffer.count;
         var bufferCountChange = bufferCount - bufferCountBefore;
         jsTestLog('Number of operations buffered on secondary since stopping applier: ' +

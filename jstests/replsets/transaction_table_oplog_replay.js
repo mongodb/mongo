@@ -11,6 +11,8 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 function runCommandsWithDifferentIds(primary, secondary, cmds) {
     // Disable oplog application to ensure the oplog entries come in the same batch.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
+    checkLog.contains(secondary,
+                      "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
     let responseTimestamps = [];
     cmds.forEach(function(cmd) {
@@ -43,6 +45,8 @@ function runCommandsWithDifferentIds(primary, secondary, cmds) {
 function runCommandsWithSameId(primary, secondary, cmds) {
     // Disable oplog application to ensure the oplog entries come in the same batch.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
+    checkLog.contains(secondary,
+                      "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
     let latestOpTimeTs = Timestamp();
     let highestTxnNumber = NumberLong(-1);

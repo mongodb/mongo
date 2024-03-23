@@ -347,11 +347,10 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
     BatchLimits batchLimits;
 
     while (true) {
-        globalFailPointRegistry().find("rsSyncApplyStop")->pauseWhileSet();
-
         // When featureFlagReduceMajorityWriteLatency is enabled, OplogWriter takes care of this.
         if (!feature_flags::gReduceMajorityWriteLatency.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            globalFailPointRegistry().find("rsSyncApplyStop")->pauseWhileSet();
             batchLimits.secondaryDelaySecsLatestTimestamp =
                 _calculateSecondaryDelaySecsLatestTimestamp();
         }

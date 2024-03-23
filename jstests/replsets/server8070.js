@@ -53,6 +53,8 @@ syncFrom(replSet.nodes[2], primary, replSet);
 
 jsTest.log("Stop 2's replication");
 member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+checkLog.contains(member2,
+                  "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
 jsTest.log("Do a few writes");
 for (var i = 0; i < 25; i++) {
@@ -65,6 +67,8 @@ waitForSameOplogPosition(primaryDB, member3, "node 3 failed to catch up to the p
 
 jsTest.log("Stop 3's replication");
 member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+checkLog.contains(member3,
+                  "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 // logLevel 3 will allow us to see each op the secondary pulls from the primary so that we can
 // determine whether or not all ops are actually being pulled
 member3.runCommand({setParameter: 1, logLevel: 3});
@@ -83,6 +87,8 @@ waitForSameOplogPosition(primaryDB, member2, "node 2 failed to catch up to the p
 
 jsTest.log("Stop 2's replication");
 member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+checkLog.contains(member2,
+                  "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
 jsTest.log("Do some writes - 2 & 3 should have up to write #75 in their buffers, but unapplied");
 for (var i = 50; i < 75; i++) {

@@ -5,6 +5,7 @@
  * ]
  */
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testName = "initial_sync_survives_restart";
 const rst = new ReplSetTest({name: testName, nodes: 1});
@@ -13,6 +14,16 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
+
+// TODO(SERVER-88447): Re-enable this test after determine whether to call
+// replCoord->finishRecoveryIfEligible in OplogWriter or OplogApplier.
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+if (isMultiversion || FeatureFlagUtil.isPresentAndEnabled(primary, "ReduceMajorityWriteLatency")) {
+    jsTest.log("Skipping test since featureFlagReduceMajorityWriteLatency is enabled.");
+    rst.stopSet();
+    quit();
+}
 
 // The default WC is majority and this test can't satisfy majority writes.
 assert.commandWorked(primary.adminCommand(

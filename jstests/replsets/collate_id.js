@@ -37,6 +37,8 @@ assert.commandWorked(primary.adminCommand(
 // on the secondary in a large batch.
 assert.commandWorked(
     secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+checkLog.contains(secondaryDB,
+                  "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
 assert.commandWorked(primaryDB.createCollection(primaryColl.getName(), caseInsensitive));
 

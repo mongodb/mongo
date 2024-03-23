@@ -159,7 +159,7 @@ void OplogWriterImpl::_run() {
         }
 
         // Transition to SECONDARY state, if possible.
-        // TODO (SERVER-87675): investigate if this should be called here.
+        // TODO (SERVER-88447): investigate if this should be called here.
         _replCoord->finishRecoveryIfEligible(opCtx);
 
         auto batch = _batcher.getNextBatch(opCtx, Seconds(1));

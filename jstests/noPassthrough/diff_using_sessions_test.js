@@ -34,6 +34,8 @@ assert.eq(diff, {docsWithDifferentContents: [], docsMissingOnSource: [], docsMis
 // the secondary to differ.
 assert.commandWorked(
     secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+checkLog.contains(secondaryDB,
+                  "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
 const expectedMissingOnSecondary = [{_id: 30.2, num: -1}, {_id: 70.4, num: -2}];
 const expectedMissingOnPrimary = [{_id: 10, num: 20}, {_id: 50, num: 100}];
