@@ -137,6 +137,55 @@ public:
     }
 };
 
+// A custom ValueBlock derived class to test only tryMin()/tryMax() path is exercised and deblock()
+// path is not
+class MinMaxTestBlock : public value::ValueBlock {
+public:
+    MinMaxTestBlock() = default;
+
+    MinMaxTestBlock(std::pair<value::TypeTags, value::Value> minVal,
+                    std::pair<value::TypeTags, value::Value> maxVal,
+                    size_t count)
+        : _minVal(minVal), _maxVal(maxVal), _count(count) {}
+
+    MinMaxTestBlock(const MinMaxTestBlock& o) : value::ValueBlock(o) {
+        _minVal = copyValue(o._minVal.first, o._minVal.second);
+        _minVal = copyValue(o._minVal.first, o._minVal.second);
+        _count = o._count;
+    }
+
+    ~MinMaxTestBlock() override {
+        value::releaseValue(_minVal.first, _minVal.second);
+        value::releaseValue(_maxVal.first, _maxVal.second);
+    }
+
+    boost::optional<size_t> tryCount() const override {
+        return _count;
+    }
+
+    value::DeblockedTagVals deblock(
+        boost::optional<value::DeblockedTagValStorage>& storage) override {
+        MONGO_UNREACHABLE_TASSERT(8836300);
+    }
+
+    std::unique_ptr<value::ValueBlock> clone() const override {
+        return std::make_unique<MinMaxTestBlock>(*this);
+    }
+
+    std::pair<value::TypeTags, value::Value> tryMin() const override {
+        return _minVal;
+    }
+
+    std::pair<value::TypeTags, value::Value> tryMax() const override {
+        return _maxVal;
+    }
+
+private:
+    std::pair<value::TypeTags, value::Value> _minVal = {value::TypeTags::Nothing, 0};
+    std::pair<value::TypeTags, value::Value> _maxVal = {value::TypeTags::Nothing, 0};
+    size_t _count = 0;
+};
+
 TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
@@ -1021,6 +1070,62 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
         auto [maxTag, maxVal] = value::makeNewString("abcdefgh"_sd);
         value::ValueGuard maxGuard(maxTag, maxVal);
         auto [t, v] = value::compareValue(runTag, runVal, maxTag, maxVal);
+
+        ASSERT_EQ(t, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
+    sbe::value::OwnedValueAccessor aggAccessor;
+    bindAccessor(&aggAccessor);
+
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor bitsetAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
+    MinMaxTestBlock block{makeInt32(10), makeInt32(50), 5};
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<MinMaxTestBlock*>(&block));
+
+    auto bitset = makeHeterogeneousBoolBlock({false, true, true, true, false});
+    bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
+                         value::bitcastFrom<value::ValueBlock*>(bitset.get()));
+
+    {
+        aggAccessor.reset(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(
+            "valueBlockAggMin",
+            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+        auto compiledMinExpr = compileAggExpression(*compiledExpr, &aggAccessor);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        auto expectedMin = makeInt32(-10);
+        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+
+        ASSERT_EQ(t, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
+    }
+
+    {
+        aggAccessor.reset(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100));
+
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(
+            "valueBlockAggMax",
+            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+
+        auto compiledMaxExpr = compileAggExpression(*compiledExpr, &aggAccessor);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledMaxExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        auto expectedMax = makeInt32(100);
+        auto [t, v] = value::compareValue(runTag, runVal, expectedMax.first, expectedMax.second);
 
         ASSERT_EQ(t, value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);

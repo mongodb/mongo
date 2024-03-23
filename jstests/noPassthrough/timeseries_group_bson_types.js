@@ -135,6 +135,23 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
         return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
     };
 
+    const normalizeNaN =
+        function(arg) {
+        if (Number.isNaN(arg)) {
+            return NumberDecimal("NaN");
+        } else if (arg !== null && (arg.constructor === Object || Array.isArray(arg))) {
+            let newArg = Array.isArray(arg) ? [] : {};
+            for (let prop in arg) {
+                newArg[prop] = normalizeNaN(arg[prop]);
+            }
+            return newArg;
+        }
+        return arg;
+    }
+
+    scalarResults = normalizeNaN(scalarResults);
+    bpResults = normalizeNaN(bpResults);
+
     scalarResults.sort(cmpFn);
     bpResults.sort(cmpFn);
     for (let i = 0; i < scalarResults.length; i++) {
@@ -145,10 +162,6 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
         for (const key of scalarKeys) {
             const scalarField = scalarResults[i][key];
             const bpField = bpResults[i][key];
-            // NaN is not equal to NaN.
-            if (isNaN(scalarField) && isNaN(bpField)) {
-                continue;
-            }
             assert.eq(scalarField, bpField, {name: test.name, index: i})
         }
     }

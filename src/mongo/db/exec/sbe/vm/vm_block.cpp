@@ -314,6 +314,23 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockAggMinMaxImpl
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
+    // If there is a valid accumulated value and the min(/max) value of the entire block is
+    // greater(/less) than the accumulated value then we can directly return the accumulated value
+    if (accTag != value::TypeTags::Nothing) {
+        auto [minOrMaxTag, minOrMaxVal] = less ? valueBlockIn->tryMin() : valueBlockIn->tryMax();
+        if (minOrMaxTag != value::TypeTags::Nothing) {
+            auto [cmpTag, cmpVal] = value::compare3way(minOrMaxTag, minOrMaxVal, accTag, accVal);
+            if (cmpTag == value::TypeTags::NumberInt32) {
+                int32_t cmp = value::bitcastTo<int32_t>(cmpVal);
+                if (less ? cmp >= 0 : cmp <= 0) {
+                    guard.reset();
+                    return {true, accTag, accVal};
+                }
+            }
+        }
+    }
+
+    // Evaluate the min/max value in the block taking into account the bitmap
     auto [resultOwned, resultTag, resultVal] =
         valueBlockMinMaxImpl<less>(valueBlockIn, bitsetBlock);
 
