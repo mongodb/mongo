@@ -78,6 +78,18 @@ tasks:
         --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_initial_sync
+  tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_initial_sync
+      resmoke_args: >-
+        --runAllFeatureFlagTests
+
+- <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
   tags: ["assigned_to_jira_team_devprod_correctness", "experimental", "antithesis"]
   commands:
