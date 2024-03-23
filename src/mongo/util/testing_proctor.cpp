@@ -42,24 +42,11 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/static_immortal.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
 namespace mongo {
-
-TestingProctor& TestingProctor::instance() {
-    static StaticImmortal<TestingProctor> proctor{};
-    return proctor.value();
-}
-
-bool TestingProctor::isEnabled() const {
-    uassert(ErrorCodes::NotYetInitialized,
-            "Cannot check whether testing diagnostics is enabled before it is initialized",
-            isInitialized());
-    return _diagnosticsEnabled.value();
-}
 
 void TestingProctor::setEnabled(bool enable) {
     if (!isInitialized()) {

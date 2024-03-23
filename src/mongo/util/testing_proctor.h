@@ -32,8 +32,11 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/static_immortal.h"
 
+namespace mongo {
 /**
  * Provides the apparatus to control the passive testing behavior and diagnostics. Testing
  * diagnostics can be controlled via the "testingDiagnosticsEnabled" server parameter, or
@@ -41,17 +44,25 @@ namespace mongo {
  */
 class TestingProctor {
 public:
-    static TestingProctor& instance();
+    static TestingProctor& instance() {
+        static StaticImmortal<TestingProctor> proctor{};
+        return proctor.value();
+    }
 
     bool isInitialized() const noexcept {
-        return _diagnosticsEnabled.has_value();
+        return MONGO_likely(_diagnosticsEnabled.has_value());
     }
 
     /**
      * Throws "ErrorCodes::NotYetInitialized" if called before any invocation of "setEnabled()" to
      * initialize "_diagnosticsEnabled".
      */
-    bool isEnabled() const;
+    bool isEnabled() const {
+        uassert(ErrorCodes::NotYetInitialized,
+                "Cannot check whether testing diagnostics is enabled before it is initialized",
+                isInitialized());
+        return MONGO_unlikely(_diagnosticsEnabled.value());
+    }
 
     /**
      * Enables/disables testing diagnostics. Once invoked for the first time during the lifetime of
