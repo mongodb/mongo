@@ -4,9 +4,8 @@
  * @tags: [
  *   requires_fcv_53,
  *   requires_replication,
+ *   disables_test_commands,
  *   does_not_support_stepdowns,
- *   # Tests running with experimental CQF behavior require test commands to be enabled.
- *   cqf_experimental_incompatible,
  * ]
  */
 import {ClusteredCappedUtils} from "jstests/libs/clustered_collections/clustered_capped_utils.js";

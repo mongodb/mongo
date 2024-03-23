@@ -1,8 +1,7 @@
 // Test that transactions run on secondaries do not change the serverStatus transaction metrics.
 // @tags: [
 //   uses_transactions,
-//   # Tests running with experimental CQF behavior require test commands to be enabled.
-//   cqf_experimental_incompatible,
+//   disables_test_commands,
 // ]
 TestData.enableTestCommands = false;
 TestData.authenticationDatabase = "local";

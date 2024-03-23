@@ -17,6 +17,7 @@
  * that it is therefore safe to ignore prepare conflicts during its execution.
  *
  * @tags: [
+ *   disables_test_commands,
  *   uses_prepare_transaction,
  *   uses_transactions,
  *   # TODO (SERVER-80568): Re-enable this test in multiversion suites once it has been fixed.

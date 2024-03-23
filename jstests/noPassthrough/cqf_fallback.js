@@ -1,6 +1,10 @@
 /**
  * Verify that expressions and operators are correctly routed to CQF where eligible. This decision
  * is based on several factors including the query text, collection metadata, etc..
+ *
+ * @tags: [
+ *   disables_test_commands,
+ * ]
  */
 import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 

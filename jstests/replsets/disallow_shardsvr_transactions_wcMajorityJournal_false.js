@@ -2,7 +2,10 @@
  * Test that transactions are not allowed on shard servers that have
  * writeConcernMajorityJournalDefault = false.
  *
- * @tags: [uses_transactions]
+ * @tags: [
+ *  disables_test_commands,
+ *  uses_transactions,
+ * ]
  */
 
 // A testing exemption was made to allow transactions on shard server even if

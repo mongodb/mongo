@@ -1,4 +1,10 @@
-// Verify error is produced when specifying an invalid set parameter.
+/**
+ * Verify error is produced when specifying an invalid set parameter.
+ *
+ * @tags: [
+ *   disables_test_commands,
+ * ]
+ */
 
 TestData.enableTestCommands = false;
 

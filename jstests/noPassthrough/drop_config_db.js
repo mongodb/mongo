@@ -1,7 +1,8 @@
 /*
  * Test that dropping the config DB does not crash the server.
- * Tests running with experimental CQF behavior require test commands to be enabled.
- * @tags: [cqf_experimental_incompatible]
+ * @tags: [
+ *   disables_test_commands,
+ * ]
  */
 TestData.enableTestCommands = false;
 

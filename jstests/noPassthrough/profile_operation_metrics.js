@@ -2,6 +2,7 @@
  * Tests that resource consumption metrics are reported in the profiler.
  *
  * @tags: [
+ *   assumes_no_old_format_indexes,
  *   requires_capped,
  *   requires_fcv_63,
  *   requires_replication,

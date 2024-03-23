@@ -3,6 +3,7 @@
  * is false.
  *
  * @tags: [
+ *   disables_test_commands,
  *   does_not_support_stepdowns,
  *   requires_replication,
  *   requires_sharding,

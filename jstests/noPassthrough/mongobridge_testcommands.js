@@ -3,10 +3,9 @@
  * enabled, and fail when disabled.
  *
  * @tags: [
+ *   disables_test_commands,
  *   requires_replication,
  *   requires_sharding,
- *   # Tests running with experimental CQF behavior require test commands to be enabled.
- *   cqf_experimental_incompatible,
  *   requires_mongobridge,
  * ]
  */

@@ -857,6 +857,47 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
 
+# This build variant injects old-format (pre-4.2) unique index keys for all new keys inserted into
+# a index. This should not change correctness or user-observable server behavior.
+- <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-80-64-bit-old-unique-index-format enterprise-rhel-80-64-bit-old-unique-index-format
+  display_name: "Enterprise RHEL 8.0 (old unique index format)"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+  run_on:
+  - rhel80-small
+  expansions:
+    <<: *linux_x86_generic_expansions
+    test_flags: >-
+      --mongodSetParameters="{'failpoint.WTIndexCreateUniqueIndexesInOldFormat': {mode: 'alwaysOn'}, 'failpoint.WTIndexInsertUniqueKeysInOldFormat': {mode: 'alwaysOn'}}"
+      --excludeWithAnyTags=disables_test_commands,assumes_no_old_format_indexes
+  tasks:
+  - name: .aggfuzzer
+  - name: .aggregation !.no_async !.feature_flag_guarded
+  - name: auth_gen
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .concurrency .common !.large
+  - name: .config_fuzzer !.large
+  - name: disk_wiredtiger
+  - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+  - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+  - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+  - name: jsCore
+  - name: jsCore_txns
+  - name: .multi_shard
+  - name: multiversion_auth_gen
+  - name: noPassthrough_gen
+  - name: .query_fuzzer
+  - name: .replica_sets !.large
+  - name: .resharding_fuzzer
+  - name: .rollbackfuzzer
+  - name: secondary_reads_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: .updatefuzzer
+  - name: v1index_jscore_passthrough_gen
+
 - name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
   display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"
   activate: false

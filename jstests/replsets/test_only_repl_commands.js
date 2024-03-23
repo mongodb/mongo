@@ -3,7 +3,8 @@
  *
  * @tags: [
  *   # TODO (SERVER-80568): Re-enable this test in multiversion suites once it has been fixed.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   disables_test_commands,
  * ]
  */
 
