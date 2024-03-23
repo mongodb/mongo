@@ -232,7 +232,7 @@ public:
      * the the result is equal to the given OrderedIntervalList.
      */
     static void assertIET(const std::vector<const MatchExpression*>& inputParamIdMap,
-                          const interval_evaluation_tree::Builder& ietBuilder,
+                          interval_evaluation_tree::Builder& ietBuilder,
                           const BSONElement& elt,
                           const IndexEntry& index,
                           const OrderedIntervalList& oil) {

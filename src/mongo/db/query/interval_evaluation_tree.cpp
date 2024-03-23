@@ -315,17 +315,21 @@ bool Builder::isEmpty() const {
 }
 
 void Builder::pop() {
+    tassert(8917803, "Cannot call pop() after calling done()", !_doneHasBeenCalled);
     tassert(6944101, "Intervals list is empty", !_intervals.empty());
     _intervals.pop();
 }
 
-boost::optional<IET> Builder::done() const {
+boost::optional<IET> Builder::done() {
+    tassert(8917802, "Cannot call done() more than once", !_doneHasBeenCalled);
+    _doneHasBeenCalled = true;
+
     if (_intervals.empty()) {
         return boost::none;
     }
 
     tassert(6334807, "All intervals should be merged into one", _intervals.size() == 1);
-    return _intervals.top();
+    return std::move(_intervals.top());
 }
 
 OrderedIntervalList evaluateIntervals(const IET& iet,

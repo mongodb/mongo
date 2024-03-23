@@ -239,10 +239,11 @@ public:
     bool isEmpty() const;
     void pop();
 
-    boost::optional<IET> done() const;
+    boost::optional<IET> done();
 
 private:
     std::stack<IET> _intervals;
+    bool _doneHasBeenCalled{false};
 };
 
 /**

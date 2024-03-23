@@ -1254,9 +1254,8 @@ void QueryPlannerAccess::finishLeafNode(
         auto ixScan = static_cast<IndexScanNode*>(node);
         ixScan->iets.reserve(ietBuilders.size());
         for (size_t i = 0; i < ietBuilders.size(); ++i) {
-            auto iet = ietBuilders[i].done();
-            if (iet) {
-                ixScan->iets.push_back(*iet);
+            if (auto iet = ietBuilders[i].done()) {
+                ixScan->iets.push_back(std::move(*iet));
             } else {
                 ixScan->iets.push_back(
                     interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
