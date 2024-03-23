@@ -302,7 +302,7 @@ add_option(
 
 add_option(
     'use-glibcxx-debug',
-    help='Enable the glibc++ debug implementations of the C++ standard libary',
+    help='Enable the glibc++ debug implementations of the C++ standard library',
     nargs=0,
 )
 
