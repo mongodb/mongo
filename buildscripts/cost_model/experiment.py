@@ -139,7 +139,7 @@ def extract_sbe_stages(df: pd.DataFrame) -> pd.DataFrame:
     def flatten_sbe_stages(explain):
         def traverse(node, stages):
             execution_time = node['executionTimeNanos']
-            children_fields = ['innerStage', 'outerStage', 'inputStage']
+            children_fields = ['innerStage', 'outerStage', 'inputStage', 'thenStage', 'elseStage']
             for field in children_fields:
                 if field in node and node[field]:
                     child = node[field]
