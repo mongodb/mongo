@@ -421,7 +421,10 @@ private:
 
     // Statement ids for the ops that had already been executed, thus were not executed in this
     // bulkWrite.
-    boost::optional<std::vector<StmtId>> _retriedStmtIds;
+    // Using an unordered_set to avoid tracking duplicate statement Ids for
+    // WriteType::WithoutShardKeyWithId, which may be retried multiple times and thus have their
+    // statement IDs appear in multiple responses from shards.
+    boost::optional<stdx::unordered_set<StmtId>> _retriedStmtIds;
 
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};

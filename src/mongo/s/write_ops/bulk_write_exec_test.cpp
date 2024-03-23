@@ -1417,7 +1417,7 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
     ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2u);
 
     // Test BulkWriteOp::noteChildBatchResponse with retriedStmtIds.
-    auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {2, 3});
+    auto reply = makeBWCommandReply({BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, {2, 3, 2});
     bulkWriteOp.noteChildBatchResponse(*targeted[shardIdA], reply, boost::none);
 
     targeted.clear();
@@ -1433,7 +1433,6 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
                                          response,
                                          ShardWCError(shardIdB, WriteConcernErrorDetail()),
                                          std::vector<StmtId>{4});
-
     ASSERT(bulkWriteOp.isFinished());
 
     auto replyInfo = bulkWriteOp.generateReplyInfo();
@@ -1442,6 +1441,9 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
     ASSERT_EQ(replyInfo.wcErrors, boost::none);
     ASSERT(replyInfo.retriedStmtIds.has_value());
     std::vector<StmtId> expectedRetriedStmtIds = {2, 3, 4};
+    // BulkWriteOp _retriedStmtIds is an unordered_set and must be sorted before comparing with
+    // expectedRetriedStmtIds.
+    std::sort(replyInfo.retriedStmtIds.value().begin(), replyInfo.retriedStmtIds.value().end());
     ASSERT_EQ(replyInfo.retriedStmtIds.value(), expectedRetriedStmtIds);
 }
 

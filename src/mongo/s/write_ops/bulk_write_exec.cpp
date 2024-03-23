@@ -907,6 +907,7 @@ BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest&
       _inTransaction(static_cast<bool>(TransactionRouter::get(opCtx))),
       _isRetryableWrite(opCtx->isRetryableWrite()) {
     _writeOps.reserve(_clientRequest.getOps().size());
+    _retriedStmtIds = stdx::unordered_set<StmtId>();
     for (size_t i = 0; i < _clientRequest.getOps().size(); ++i) {
         _writeOps.emplace_back(BatchItemRef(&_clientRequest, i), _inTransaction);
     }
@@ -1438,11 +1439,8 @@ void BulkWriteOp::noteChildBatchResponse(
 
     if (auto retriedStmtIds = commandReply.getRetriedStmtIds();
         retriedStmtIds && !retriedStmtIds->empty()) {
-        if (_retriedStmtIds) {
-            _retriedStmtIds->insert(
-                _retriedStmtIds->end(), retriedStmtIds->begin(), retriedStmtIds->end());
-        } else {
-            _retriedStmtIds = retriedStmtIds;
+        for (auto retriedStmtId : *retriedStmtIds) {
+            _retriedStmtIds->insert(retriedStmtId);
         }
     }
 }
@@ -1576,11 +1574,8 @@ void BulkWriteOp::noteWriteOpFinalResponse(
     }
 
     if (retriedStmtIds && !retriedStmtIds->empty()) {
-        if (_retriedStmtIds) {
-            _retriedStmtIds->insert(
-                _retriedStmtIds->end(), retriedStmtIds->begin(), retriedStmtIds->end());
-        } else {
-            _retriedStmtIds = retriedStmtIds;
+        for (auto retriedStmtId : *retriedStmtIds) {
+            _retriedStmtIds->insert(retriedStmtId);
         }
     }
 }
@@ -1691,11 +1686,16 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                 break;
         }
     }
-
+    std::vector<StmtId> retriedStmtIds;
+    if (_retriedStmtIds.has_value()) {
+        for (auto stmtId : *_retriedStmtIds) {
+            retriedStmtIds.emplace_back(stmtId);
+        }
+    }
     return {std::move(replyItems),
             summary,
             generateWriteConcernError(),
-            _retriedStmtIds,
+            retriedStmtIds,
             std::move(_stats)};
 }
 
