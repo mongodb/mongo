@@ -534,6 +534,7 @@ env.CppUnitTest(
         'shard_filterer_factory_mock.cpp',
         'sort_pattern_test.cpp',
         'util/deferred_test.cpp',
+        'util/hash_roaring_set_test.cpp',
         'util/memory_util_test.cpp',
         'view_response_formatter_test.cpp',
     ],

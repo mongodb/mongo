@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/recordid_deduplicator.h"
 #include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -204,7 +205,9 @@ private:
     // Keeps track of what work we need to do next.
     ScanState _scanState = ScanState::INITIALIZING;
 
-    // Could our index have duplicates?  If so, we use _returned to dedup.
+    // TODO SERVER-88337: keep only of deduplicator here.
+    // Could our index have duplicates?  If so, we use _recordIdDeduplicator or _returned to dedup.
+    std::unique_ptr<RecordIdDeduplicator> _recordIdDeduplicator;
     stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
 
     //

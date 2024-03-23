@@ -1297,6 +1297,34 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: true
 
+  internalUseRoaringBitmapsForRecordIDDeduplication:
+    description: "Use a hybrid container combining Hash Table and Roaring Bitmaps for RecordID deduplication."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalUseRoaringBitmapsForRecordIDDeduplication
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
+  internalRoaringBitmapsThreshold:
+    description: "The number of RecordIDs after which the hybrid container switches from hash table to Roaring Bitmaps."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalRoaringBitmapsThreshold
+    cpp_vartype: AtomicWord<int>
+    default: 1000000
+
+  internalRoaringBitmapsMinimalDensity:
+    description: "The minimal denstity required for the hybrid container to switch from hash table to Roaring Bitmaps."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalRoaringBitmapsMinimalDensity
+    cpp_vartype: AtomicDouble
+    default: 0.00001
+
+  internalRoaringBitmapsBatchSize:
+    description: "The batch size used for the data migration in the hybrid container."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalRoaringBitmapsBatchSize
+    cpp_vartype: AtomicWord<int>
+    default: 100
+
   internalQueryTdigestDelta:
     description: "Compaction parameter the for t-digest algorithm. Increasing delta might improve
      accuracy of the computed percentiles at the cost of using more memory (about 12KB per 1000 of
