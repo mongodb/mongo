@@ -604,6 +604,36 @@ bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
     return true;
 }
 
+IndexBoundsChecker::KeyState IndexBoundsChecker::checkKeyWithEndPosition(
+    const BSONObj& currentKey,
+    IndexSeekPoint* query,
+    key_string::Builder& endKey,
+    Ordering ord,
+    bool forward) {
+    auto state = checkKey(currentKey, query);
+    endKey.resetToEmpty(ord);
+    if (state == VALID && !_bounds->fields.back().isPoint()) {
+        auto size = _keyValues.size();
+        std::vector<const BSONElement*> out(size);
+        key_string::Discriminator discriminator;
+        for (size_t i = 0; i < size - 1; ++i) {
+            if (_keyValues[i]) {
+                endKey.appendBSONElement(_keyValues[i]);
+            }
+        }
+        const OrderedIntervalList& oil = _bounds->fields.back();
+        endKey.appendBSONElement(oil.intervals[_curInterval.back()].end);
+        if (oil.intervals[_curInterval.back()].endInclusive) {
+            discriminator = key_string::Discriminator::kInclusive;
+        } else {
+            discriminator = forward ? key_string::Discriminator::kExclusiveBefore
+                                    : key_string::Discriminator::kExclusiveAfter;
+        }
+        endKey.appendDiscriminator(discriminator);
+    }
+    return state;
+}
+
 IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, IndexSeekPoint* out) {
     MONGO_verify(_curInterval.size() > 0);
     out->keySuffix.resize(_curInterval.size());

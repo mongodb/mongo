@@ -297,6 +297,19 @@ public:
     KeyState checkKey(const BSONObj& currentKey, IndexSeekPoint* query);
 
     /**
+     * The function is same as above `checkKey` plus returning the end key position when the last
+     * field of the index is a range interval.
+     *
+     * The end key will be set to empty if KeyState is not VALID or the last field is not a range
+     * interval.
+     */
+    KeyState checkKeyWithEndPosition(const BSONObj& currentKey,
+                                     IndexSeekPoint* query,
+                                     key_string::Builder& endKey,
+                                     Ordering ord,
+                                     bool forward);
+
+    /**
      * Relative position of a key to an interval.
      * Exposed for testing only.
      */

@@ -12,7 +12,7 @@
 //   requires_fcv_63,
 // ]
 
-import {getOptimizer} from "jstests/libs/analyze_plan.js";
+import {getOptimizer, getPlanStages} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const t = db[jsTestName()];
@@ -142,4 +142,13 @@ switch (getOptimizer(keysExaminedRet.explain)) {
         // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
         // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
         break;
+}
+
+if (isSBEEnabled) {
+    const explain = t.find({a: {$gte: 1, $lt: 3}, b: {$gte: 1, $lt: 3}})
+                        .hint({a: 1, b: 1})
+                        .explain("executionStats");
+    const stage = getPlanStages(explain.executionStats.executionStages, "ixscan_generic");
+    assert.eq(1, stage.length, explain);
+    assert.eq(5, stage[0].keyCheckSkipped, stage);
 }

@@ -352,6 +352,10 @@ std::unique_ptr<PlanStageStats> IndexScanStageBase::getStats(bool includeDebugIn
         bob.appendNumber("keysExamined", static_cast<long long>(_specificStats.keysExamined));
         bob.appendNumber("seeks", static_cast<long long>(_specificStats.seeks));
         bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
+        if (_specificStats.keyCheckSkipped != 0) {
+            bob.appendNumber("keyCheckSkipped",
+                             static_cast<long long>(_specificStats.keyCheckSkipped));
+        }
         if (_indexKeySlot) {
             bob.appendNumber("indexKeySlot", static_cast<long long>(*_indexKeySlot));
         }
@@ -676,7 +680,8 @@ GenericIndexScanStage::GenericIndexScanStage(UUID collUuid,
                          yieldPolicy,
                          planNodeId,
                          participateInTrialRunTracking),
-      _params{std::move(params)} {}
+      _params{std::move(params)},
+      _endKey{_params.version} {}
 
 std::unique_ptr<PlanStage> GenericIndexScanStage::clone() const {
     sbe::GenericIndexScanStageParams params{_params.indexBounds->clone(),
@@ -750,9 +755,21 @@ boost::optional<KeyStringEntry> GenericIndexScanStage::seek() {
 }
 
 bool GenericIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& key) {
-    if (key && _checker) {
-        ++_specificStats.keysExamined;
+    if (!key) {
+        _scanState = ScanState::kFinished;
+        return false;
+    }
+    ++_specificStats.keysExamined;
 
+    if (!_endKey.isEmpty() &&
+        ((_forward && key->keyString.compare(_endKey) <= 0) ||
+         (!_forward && key->keyString.compare(_endKey) >= 0))) {
+        ++_specificStats.keyCheckSkipped;
+        _scanState = ScanState::kScanning;
+        return true;
+    }
+
+    if (_checker) {
         _keyBuffer.reset();
         BSONObjBuilder keyBuilder(_keyBuffer);
         key_string::toBsonSafe(key->keyString.getBuffer(),
@@ -762,7 +779,8 @@ bool GenericIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& k
                                keyBuilder);
         auto bsonKey = keyBuilder.done();
 
-        switch (_checker->checkKey(bsonKey, &_seekPoint)) {
+        switch (_checker->checkKeyWithEndPosition(
+            bsonKey, &_seekPoint, _endKey, _params.ord, _forward)) {
             case IndexBoundsChecker::VALID:
                 _scanState = ScanState::kScanning;
                 return true;

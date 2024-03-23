@@ -321,5 +321,7 @@ protected:
     IndexSeekPoint _seekPoint;
     std::unique_ptr<vm::CodeFragment> _indexBoundsCode;
     boost::optional<IndexBoundsChecker> _checker;
+    // The end position for current range, empty if currently not in a valid range.
+    key_string::Builder _endKey;
 };
 }  // namespace mongo::sbe

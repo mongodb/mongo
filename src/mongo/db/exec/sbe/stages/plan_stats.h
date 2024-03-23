@@ -162,6 +162,7 @@ struct IndexScanStats final : public SpecificStats {
 
     size_t seeks{0};
     size_t keysExamined{0};
+    size_t keyCheckSkipped{0};
     size_t numReads{0};
 };
 
