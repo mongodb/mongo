@@ -67,9 +67,11 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
             auto it = _builders.find(key);
             bool isInternalStateCorrect = it->second.isInternalStateIdentical(builderToCompareTo);
             if (!isInternalStateCorrect) {
-                LOGV2(10402,
-                      "Detected incorrect internal state when reopening from following binary: ",
-                      "binary"_attr = base64::encode(StringData(binData, binLength)));
+                LOGV2_OPTIONS(
+                    10402,
+                    logv2::LogTruncation::Disabled,
+                    "Detected incorrect internal state when reopening from following binary: ",
+                    "binary"_attr = base64::encode(StringData(binData, binLength)));
             }
             invariant(isInternalStateCorrect);
         }
