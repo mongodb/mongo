@@ -496,6 +496,9 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
+
+    // Stores the time the operation spent waiting for ingress admission control ticket
+    Microseconds waitForIngressAdmissionTicketDurationMicros{0};
 };
 
 /**
@@ -1077,6 +1080,10 @@ public:
         return _shouldOmitDiagnosticInformation;
     }
 
+    void setWaitingForIngressAdmission(WithLock, bool waiting) {
+        _waitingForIngressAdmission = waiting;
+    }
+
 private:
     class CurOpStack;
 
@@ -1188,6 +1195,9 @@ private:
     // We cannot use std::atomic in OpDebug since it is not copy assignable, but using a non-atomic
     // allows for a data race between stopWaitForWriteConcernTimer and curop::reportState.
     std::atomic<Milliseconds> _atomicWaitForWriteConcernDurationMillis{Milliseconds{0}};  // NOLINT
+
+    // True if waiting for ingress admission ticket
+    bool _waitingForIngressAdmission{false};
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};

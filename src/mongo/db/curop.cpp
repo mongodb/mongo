@@ -964,6 +964,11 @@ void CurOp::reportState(BSONObjBuilder* builder,
         }
     }
 
+    // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
+    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe()) {
+        builder->append("waitingForIngressAdmission", _waitingForIngressAdmission);
+    }
+
     if (auto start = _waitForWriteConcernStart.load(); start > 0) {
         auto end = _waitForWriteConcernEnd.load();
         auto elapsedTimeTotal = _atomicWaitForWriteConcernDurationMillis.load();
@@ -1289,6 +1294,12 @@ void OpDebug::report(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // workingMillis should always be present for any operation
         pAttrs->add("workingMillis", workingTimeMillis.count());
+    }
+
+    // (Ignore FCV check): This feature flag is not FCV gated (shouldBeFCVGated is false)
+    if (gFeatureFlagIngressAdmissionControl.isEnabledAndIgnoreFCVUnsafe() &&
+        waitForIngressAdmissionTicketDurationMicros > Microseconds::zero()) {
+        pAttrs->add("ingressAdmissionDuration", waitForIngressAdmissionTicketDurationMicros);
     }
 
     // durationMillis should always be present for any operation

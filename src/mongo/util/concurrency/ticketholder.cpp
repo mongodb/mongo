@@ -37,7 +37,6 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
@@ -45,8 +44,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(hangTicketRelease);
 
 namespace {
 void updateQueueStatsOnRelease(ServiceContext* serviceContext,
@@ -120,13 +117,6 @@ void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx,
     if (ticketPriority == AdmissionContext::Priority::kExempt) {
         updateQueueStatsOnRelease(_serviceContext, _exemptQueueStats, admCtx);
         return;
-    }
-
-    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
-        LOGV2(8435300,
-              "Hanging hangTicketRelease in _releaseToTicketPool() due to 'hangTicketRelease' "
-              "failpoint");
-        hangTicketRelease.pauseWhileSet();
     }
 
     auto& queueStats = _getQueueStatsToUse(ticketPriority);

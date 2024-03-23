@@ -58,6 +58,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(enableTestOnlyFlagforRSTL);
 MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
+MONGO_FAIL_POINT_DEFINE(hangTicketRelease);
 
 /**
  * Tracks global (across all clients) lock acquisition statistics, partitioned into multiple
@@ -1036,6 +1037,15 @@ bool Locker::_unlockImpl(LockRequestsMap::Iterator* it) {
 }
 
 void Locker::_releaseTicket() {
+    if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
+        if (_ticket && _ticket->getPriority() != AdmissionContext::Priority::kExempt) {
+            LOGV2(8435300,
+                  "Hanging hangTicketRelease in _releaseTicket() due to 'hangTicketRelease' "
+                  "failpoint");
+            hangTicketRelease.pauseWhileSet();
+        }
+    }
+
     _ticket.reset();
     _clientState.store(kInactive);
 }

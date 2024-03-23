@@ -292,16 +292,18 @@ public:
         }
     }
 
-    // TODO(SERVER-86112): Remove
-    static Ticket ephemeral(AdmissionContext& admissionContext) {
-        return Ticket(nullptr, &admissionContext);
-    }
-
     /**
      * Returns whether or not a ticket is being held.
      */
     bool valid() {
         return _ticketholder != nullptr;
+    }
+
+    /**
+     * Returns the ticket priority.
+     */
+    AdmissionContext::Priority getPriority() const {
+        return _priority;
     }
 
 private:
