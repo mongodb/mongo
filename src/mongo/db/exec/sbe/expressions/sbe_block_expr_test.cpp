@@ -45,6 +45,20 @@ namespace mongo::sbe {
 
 class SBEBlockExpressionTest : public EExpressionTestFixture {
 public:
+    /**
+     * Makes an SBE value::Array. Shadows the version in parent class EExpressionTestFixture which
+     * is for BSON arrays.
+     */
+    static TypedValue makeArray(std::vector<TypedValue> vals) {
+        auto [arrTag, arrVal] = value::makeNewArray();
+        value::ValueGuard guard(arrTag, arrVal);
+        for (auto [t, v] : vals) {
+            value::getArrayView(arrVal)->push_back(t, v);
+        }
+        guard.reset();
+        return {arrTag, arrVal};
+    }
+
     void assertBlockOfBool(value::TypeTags tag, value::Value val, std::vector<bool> expected) {
         std::vector<std::pair<value::TypeTags, value::Value>> tvPairs;
         for (auto b : expected) {
@@ -87,6 +101,10 @@ public:
                                      value::ValueBlock* bitsetBlock,
                                      value::ValueBlock* block,
                                      std::pair<value::TypeTags, value::Value> scalar);
+    void testBlockSum(sbe::value::OwnedValueAccessor& aggAccessor,
+                      std::vector<TypedValue> blockData,
+                      std::vector<bool> bitsetData,
+                      TypedValue expectedResult);
 
     enum class BlockType { HETEROGENEOUS = 0, MONOBLOCK, BOOLBLOCK };
 
@@ -737,9 +755,9 @@ TEST_F(SBEBlockExpressionTest, BlockCountTest) {
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>("valueBlockAggCount",
                                                        sbe::makeEs(makeE<EVariable>(bitsetSlot)));
-        auto compiledCountExpr = compileAggExpression(*compiledExpr, &aggAccessor);
+        auto compiledFinalExpr = compileAggExpression(*compiledExpr, &aggAccessor);
 
-        auto [runTag, runVal] = runCompiledExpression(compiledCountExpr.get());
+        auto [runTag, runVal] = runCompiledExpression(compiledFinalExpr.get());
 
         ASSERT_EQ(runTag, value::TypeTags::NumberInt64);
         auto expectedCount = makeInt64(count);
@@ -755,97 +773,133 @@ TEST_F(SBEBlockExpressionTest, BlockCountTest) {
     testCount({true, true, true, true, true, true}, 6);
 }
 
-TEST_F(SBEBlockExpressionTest, BlockSumTest) {
+TEST_F(SBEBlockExpressionTest, BlockAggSumTest) {
     sbe::value::OwnedValueAccessor aggAccessor;
     bindAccessor(&aggAccessor);
 
-    auto testSum = [&](std::vector<std::pair<value::TypeTags, value::Value>> blockData,
-                       std::vector<bool> bitsetData,
-                       std::pair<value::TypeTags, value::Value> expectedResult) {
-        ASSERT_EQ(blockData.size(), bitsetData.size());
-        value::ValueGuard expectedResultGuard(expectedResult);
-
-        value::ViewOfValueAccessor blockAccessor;
-        value::ViewOfValueAccessor bitsetAccessor;
-        auto blockSlot = bindAccessor(&blockAccessor);
-        auto bitsetSlot = bindAccessor(&bitsetAccessor);
-
-        value::HeterogeneousBlock block;
-        for (auto&& p : blockData) {
-            block.push_back(p);
-        }
-        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
-                            value::bitcastFrom<value::ValueBlock*>(&block));
-
-        auto bitset = makeHeterogeneousBoolBlock(bitsetData);
-        bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
-                             value::bitcastFrom<value::ValueBlock*>(bitset.get()));
-
-        auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockAggSum",
-            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
-
-        auto compiledCountExpr = compileAggExpression(*compiledExpr, &aggAccessor);
-
-        auto [runTag, runVal] = runCompiledExpression(compiledCountExpr.get());
-        value::ValueGuard guard(runTag, runVal);
-
-        ASSERT_EQ(runTag, expectedResult.first);
-        if (runTag != value::TypeTags::Nothing) {
-            auto [compTag, compVal] =
-                value::compareValue(runTag, runVal, expectedResult.first, expectedResult.second);
-
-            ASSERT_EQ(compTag, value::TypeTags::NumberInt32);
-            ASSERT_EQ(value::bitcastTo<int32_t>(compVal), 0);
-        }
-    };
-
     // Bitset is 0.
-    testSum({makeNothing(), makeNothing(), makeNothing(), makeNothing()},
-            {false, false, false, false},
-            {value::TypeTags::Nothing, 0});
+    testBlockSum(aggAccessor,
+                 {makeNothing(), makeNothing(), makeNothing(), makeNothing()},
+                 {false, false, false, false},
+                 {value::TypeTags::Nothing, 0});
     // All values are nothing
-    testSum({makeNothing(), makeNothing(), makeNothing()},
-            {true, true, false},
-            {value::TypeTags::Nothing, 0});
+    testBlockSum(aggAccessor,
+                 {makeNothing(), makeNothing(), makeNothing()},
+                 {true, true, false},
+                 {value::TypeTags::Nothing, 0});
     // Only int32.
-    testSum({makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
-            {false, false, true, true, false, true},
-            {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(9)});
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
+        {false, false, true, true, false, true},
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(9)});
     // Put the int64 last for type promotion at the end.
-    testSum({makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt64(4)},
-            {false, false, true, true, false, true},
-            {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(9)});
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt64(4)},
+        {false, false, true, true, false, true},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(9)});
     // Put the int64 first for early type promotion.
-    testSum({makeInt64(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
-            {true, false, true, true, false, true},
-            {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10)});
+    testBlockSum(
+        aggAccessor,
+        {makeInt64(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
+        {true, false, true, true, false, true},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10)});
     // Mix types with double.
-    testSum({makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeNothing(), makeInt64(4)},
-            {false, false, true, true, false, true},
-            {value::TypeTags::NumberDouble, value::bitcastFrom<double>(9)});
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeNothing(), makeInt64(4)},
+        {false, false, true, true, false, true},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(9)});
     // Mix types with Decimal128.
-    testSum(
+    testBlockSum(
+        aggAccessor,
         {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeDecimal("50"), makeInt64(4)},
         {false, false, true, true, true, true},
         makeDecimal("59"));
     // Mix types with Nothing.
-    testSum(
+    testBlockSum(
+        aggAccessor,
         {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeDecimal("50"), makeInt64(4)},
         {false, true, true, true, true, true},
         makeDecimal("59"));
     // One Decimal128, to test for memory leaks.
-    testSum({makeDecimal("50")}, {true}, makeDecimal("50"));
+    testBlockSum(aggAccessor, {makeDecimal("50")}, {true}, makeDecimal("50"));
     // A few Decimal128 values.
-    testSum({makeDecimal("50"),
-             makeDecimal("50"),
-             makeDecimal("50"),
-             makeDecimal("50"),
-             makeDecimal("50"),
-             makeDecimal("50")},
-            {false, true, true, true, true, true},
-            makeDecimal("250"));
-}
+    testBlockSum(aggAccessor,
+                 {makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50")},
+                 {false, true, true, true, true, true},
+                 makeDecimal("250"));
+}  // BlockAggSumTest
+
+TEST_F(SBEBlockExpressionTest, BlockAggDoubleDoubleSumTest) {
+    sbe::value::OwnedValueAccessor aggAccessor;
+    bindAccessor(&aggAccessor);
+
+    // Bitset is 0.
+    testBlockSum(aggAccessor,
+                 {makeNothing(), makeNothing(), makeNothing(), makeNothing()},
+                 {false, false, false, false},
+                 makeArray(makeInt32s({0, 0, 0})));
+    // All values are nothing
+    testBlockSum(aggAccessor,
+                 {makeNothing(), makeNothing(), makeNothing()},
+                 {true, true, false},
+                 makeArray(makeInt32s({0, 0, 0})));
+    // Only int32.
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
+        {false, false, true, true, false, true},
+        makeArray(makeInt32s({0, 9, 0})));
+    // Put the int64 last for type promotion at the end.
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt64(4)},
+        {false, false, true, true, false, true},
+        makeArray(makeInt32s({0, 9, 0})));
+    // Put the int64 first for early type promotion.
+    testBlockSum(
+        aggAccessor,
+        {makeInt64(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
+        {true, false, true, true, false, true},
+        makeArray(makeInt32s({0, 10, 0})));
+    // Mix types with double.
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeNothing(), makeInt64(4)},
+        {false, false, true, true, false, true},
+        makeArray(makeInt32s({0, 9, 0})));
+    // Mix types with Decimal128.
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeDecimal("50"), makeInt64(4)},
+        {false, false, true, true, true, true},
+        makeArray(makeInt32s({0, 9, 0, 50})));
+    // Mix types with Nothing.
+    testBlockSum(
+        aggAccessor,
+        {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeDecimal("50"), makeInt64(4)},
+        {false, true, true, true, true, true},
+        makeArray(makeInt32s({0, 9, 0, 50})));
+    // One Decimal128, to test for memory leaks.
+    testBlockSum(aggAccessor, {makeDecimal("50")}, {true}, makeArray(makeInt32s({0, 0, 0, 50})));
+    // A few Decimal128 values.
+    testBlockSum(aggAccessor,
+                 {makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50"),
+                  makeDecimal("50")},
+                 {false, true, true, true, true, true},
+                 makeArray(makeInt32s({0, 0, 0, 250})));
+}  // BlockAggDoubleDoubleSumTest
 
 TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
     sbe::value::OwnedValueAccessor aggAccessor;
@@ -2089,7 +2143,54 @@ void SBEBlockExpressionTest::testBlockScalarArithmeticOp(
             ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals()[i]);
         }
     }
-}
+}  // SBEBlockExpressionTest::testBlockScalarArithmeticOp
+
+void SBEBlockExpressionTest::testBlockSum(sbe::value::OwnedValueAccessor& aggAccessor,
+                                          std::vector<TypedValue> blockData,
+                                          std::vector<bool> bitsetData,
+                                          TypedValue expectedResult) {
+    ASSERT_EQ(blockData.size(), bitsetData.size());
+    value::ValueGuard expectedResultGuard(expectedResult);
+
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor bitsetAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
+    value::HeterogeneousBlock block;
+    for (auto&& p : blockData) {
+        block.push_back(p);
+    }
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto bitset = makeHeterogeneousBoolBlock(bitsetData);
+    bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
+                         value::bitcastFrom<value::ValueBlock*>(bitset.get()));
+
+    std::string blockAggFuncName;
+    if (expectedResult.first == sbe::value::TypeTags::Array) {
+        blockAggFuncName = "valueBlockAggDoubleDoubleSum";
+    } else {
+        blockAggFuncName = "valueBlockAggSum";
+    }
+    auto compiledExpr = sbe::makeE<sbe::EFunction>(
+        blockAggFuncName, sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+
+    auto compiledFinalExpr = compileAggExpression(*compiledExpr, &aggAccessor);
+
+    auto [runTag, runVal] = runCompiledExpression(compiledFinalExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    ASSERT_EQ(runTag, expectedResult.first);
+    if (runTag != value::TypeTags::Nothing) {
+        auto [compTag, compVal] =
+            value::compareValue(runTag, runVal, expectedResult.first, expectedResult.second);
+
+        ASSERT_EQ(compTag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(compVal), 0);
+    }
+}  // SBEBlockExpressionTest::testBlockSum
 
 TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
     StringData fnName{"valueBlockAdd"};

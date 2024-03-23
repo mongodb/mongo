@@ -162,7 +162,7 @@ TimeseriesTest.run((insert) => {
             const usesBlockProcessing = testcase.usesBlockProcessing;
 
             if (expectedErrorCode) {
-                assertErrorCode(coll, pipeline, expectedErrorCode);
+                assertErrorCode(coll, pipeline, expectedErrorCode, "Test case failed: " + name);
             } else {
                 // Issue the aggregate() query and collect the results.
                 const results = coll.aggregate(pipeline, options).toArray();

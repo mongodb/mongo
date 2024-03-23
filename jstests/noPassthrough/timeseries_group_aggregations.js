@@ -143,14 +143,23 @@ for (const matchComp of matchComparisons) {
     }
 }
 
-// Create $group stages.
+// Create $group stages, which include one $count stage.
 const groupStages = [
+    // $count.
     {stage: {$count: 'c'}, uses: []},
-    // Add some compound key cases since we don't want to try every combination.
+
+    // $group with single key cases for each target accumulator.
+    {stage: {$group: {_id: {m: '$m'}, gb: {$min: '$a'}}}, uses: ['m', 'a']},
+    {stage: {$group: {_id: {m: '$m'}, gb: {$max: '$a'}}}, uses: ['m', 'a']},
+    {stage: {$group: {_id: {m: '$m'}, gb: {$sum: '$a'}}}, uses: ['m', 'a']},
+    {stage: {$group: {_id: {m: '$m'}, gb: {$avg: '$a'}}}, uses: ['m', 'a']},
+
+    // $group with compound key cases since we don't want to try every combination.
     {stage: {$group: {_id: {t: '$t', m: '$m'}, gb: {$min: '$a'}}}, uses: ['t', 'm', 'a']},
     {stage: {$group: {_id: {a: '$a', m: '$m'}, gb: {$avg: '$t'}}}, uses: ['t', 'm', 'a']},
     {stage: {$group: {_id: {a: '$a', m: '$m.metaB'}, gb: {$avg: '$t'}}}, uses: ['t', 'm', 'a']},
-    // Date trunc example.
+
+    // $group with $dateTrunc.
     {
         stage: {$group: {_id: {$dateTrunc: {date: "$t", unit: "hour"}}, gb: {$max: '$a'}}},
         uses: ['t', 'a']
@@ -199,15 +208,15 @@ function runAggregations(allowDiskUse, forceSpilling) {
         internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling: forceSpilling
     }));
     /*
-     * Try all combinations of project and match stages followed by a groupby at the end. To avoid
-     * running unrealistic queries, we'll check what fields a stage needs to run. For example
-     * a {$match: {m: 1}} needs the "m" field to do anything useful. If we have:
+     * Try all combinations of $project and $match stages followed by a $group or $count at the end.
+     * To avoid running unrealistic queries, we'll check what fields a stage needs to run. For
+     * example a {$match: {m: 1}} needs the "m" field to do anything useful. If we have:
      *     [{$project: {a: 1}}, {$match: {m: 1}}]
-     * the $project removes "m" so this is not a realistic query.
-     * For this reason we mark each stage with what fields it uses and what it produces.
+     * the $project removes "m" so this is not a realistic query. For this reason we mark each stage
+     * with what fields it uses and what it produces.
      *
-     * We choose to put the $group at the end to prune our search space and because stages after
-     * $group won't ever use block processing.
+     * We choose to put the $group or $count at the end to prune our search space and because stages
+     * after these won't ever use block processing.
      */
     let numPipelinesRun = 0;
     for (let i1 = 0; i1 < projectMatchStages.length; i1++) {

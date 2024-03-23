@@ -563,6 +563,14 @@ struct BuiltinFn {
 
 /**
  * The map of recognized builtin functions.
+ *
+ * *************************************************************************************
+ * IMPORTANT:
+ *   Iff the third argument ('aggregate') to BuiltinFn{} is true, the actual arity
+ *   WILL BE INCREMENTED BY THE COMPILER (EFunction::compileDirect()) and it will push
+ *   an extra arg onto the stack (the accumulator value) for such fns. So an arityTest
+ *   fn with body {return n == 1} for the arity test really means an arity-2 function.
+ * *************************************************************************************
  */
 static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"dateDiff",
@@ -942,6 +950,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockAggCount, true}},
     {"valueBlockAggSum",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockAggSum, true}},
+    {"valueBlockAggDoubleDoubleSum",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockAggDoubleDoubleSum, true}},
     {"valueBlockAggTopN",
      BuiltinFn{[](size_t n) { return n >= 4; }, vm::Builtin::valueBlockAggTopN, true}},
     {"valueBlockAggTopNArray",
@@ -1270,6 +1280,7 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
 }  // namespace
 
 vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
+    // Built-in function compilations.
     if (auto it = kBuiltinFunctions.find(_name); it != kBuiltinFunctions.end()) {
         auto arity = _nodes.size();
         if (!it->second.arityTest(arity)) {
@@ -1340,8 +1351,9 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
         code.appendFunction(it->second.builtin, arity);
 
         return code;
-    }
+    }  // if built-in function
 
+    // Instruction compilations from here down.
     if (auto it = kInstrFunctions.find(_name); it != kInstrFunctions.end()) {
         if (it->second.arity != _nodes.size()) {
             uasserted(4822845,
@@ -1371,7 +1383,7 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
     }
 
     uasserted(4822847, str::stream() << "unknown function call: " << _name);
-}
+}  // compileDirect
 
 std::vector<DebugPrinter::Block> EFunction::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;

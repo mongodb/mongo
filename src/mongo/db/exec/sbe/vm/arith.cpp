@@ -381,7 +381,7 @@ void setStdDevArray(value::Value count, value::Value mean, value::Value m2, Arra
 }
 }  // namespace
 
-void ByteCode::aggDoubleDoubleSumImpl(value::Array* arr,
+void ByteCode::aggDoubleDoubleSumImpl(value::Array* accumulator,
                                       value::TypeTags rhsTag,
                                       value::Value rhsValue) {
     if (!isNumber(rhsTag)) {
@@ -391,17 +391,17 @@ void ByteCode::aggDoubleDoubleSumImpl(value::Array* arr,
     tassert(5755310,
             str::stream() << "The result slot must have at least "
                           << AggSumValueElems::kMaxSizeOfArray - 1
-                          << " elements but got: " << arr->size(),
-            arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
+                          << " elements but got: " << accumulator->size(),
+            accumulator->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
 
     // Only uses tag information from the kNonDecimalTotalTag element.
-    auto [nonDecimalTotalTag, _] = arr->getAt(AggSumValueElems::kNonDecimalTotalTag);
+    auto [nonDecimalTotalTag, _] = accumulator->getAt(AggSumValueElems::kNonDecimalTotalTag);
     tassert(5755311,
             "The nonDecimalTag can't be NumberDecimal",
             nonDecimalTotalTag != TypeTags::NumberDecimal);
     // Only uses values from the kNonDecimalTotalSum/kNonDecimalTotalAddend elements.
-    auto [sumTag, sum] = arr->getAt(AggSumValueElems::kNonDecimalTotalSum);
-    auto [addendTag, addend] = arr->getAt(AggSumValueElems::kNonDecimalTotalAddend);
+    auto [sumTag, sum] = accumulator->getAt(AggSumValueElems::kNonDecimalTotalSum);
+    auto [addendTag, addend] = accumulator->getAt(AggSumValueElems::kNonDecimalTotalAddend);
     tassert(5755312,
             "The sum and addend must be NumberDouble",
             sumTag == addendTag && sumTag == TypeTags::NumberDouble);
@@ -410,32 +410,33 @@ void ByteCode::aggDoubleDoubleSumImpl(value::Array* arr,
     auto nonDecimalTotal = DoubleDoubleSummation::create(value::bitcastTo<double>(sum),
                                                          value::bitcastTo<double>(addend));
 
-    if (auto nElems = arr->size(); nElems < AggSumValueElems::kMaxSizeOfArray) {
+    if (auto nElems = accumulator->size(); nElems < AggSumValueElems::kMaxSizeOfArray) {
         // We haven't seen any decimal value so far.
         if (auto totalTag = getWidestNumericalType(nonDecimalTotalTag, rhsTag);
             totalTag == TypeTags::NumberDecimal) {
-            // We have seen a decimal for the first time and start storing the total sum
-            // of decimal values into 'kDecimalTotal' element and the total sum of non-decimal
-            // values into 'kNonDecimalXXX' elements.
+            // Hit the first decimal. Start storing sum of decimal values into the 'kDecimalTotal'
+            // element and sum of non-decimal values into 'kNonDecimalXXX' elements.
             tassert(
                 5755313, "The arg value must be NumberDecimal", rhsTag == TypeTags::NumberDecimal);
 
-            setDecimalTotal(
-                nonDecimalTotalTag, nonDecimalTotal, value::bitcastTo<Decimal128>(rhsValue), arr);
+            setDecimalTotal(nonDecimalTotalTag,
+                            nonDecimalTotal,
+                            value::bitcastTo<Decimal128>(rhsValue),
+                            accumulator);
         } else {
             addNonDecimal(rhsTag, rhsValue, nonDecimalTotal);
-            setNonDecimalTotal(totalTag, nonDecimalTotal, arr);
+            setNonDecimalTotal(totalTag, nonDecimalTotal, accumulator);
         }
     } else {
-        // We've seen a decimal value. We've already started storing the total sum of decimal values
-        // into 'kDecimalTotal' element and the total sum of non-decimal values into
-        // 'kNonDecimalXXX' elements.
+        // We've already seen a decimal value so are using both the 'kDecimalTotal' element and the
+        // 'kNonDecimalXXX' elements in the accumulator.
         tassert(5755314,
                 str::stream() << "The result slot must have at most "
                               << AggSumValueElems::kMaxSizeOfArray
-                              << " elements but got: " << arr->size(),
+                              << " elements but got: " << accumulator->size(),
                 nElems == AggSumValueElems::kMaxSizeOfArray);
-        auto [decimalTotalTag, decimalTotalVal] = arr->getAt(AggSumValueElems::kDecimalTotal);
+        auto [decimalTotalTag, decimalTotalVal] =
+            accumulator->getAt(AggSumValueElems::kDecimalTotal);
         tassert(5755315,
                 "The decimalTotal must be NumberDecimal",
                 decimalTotalTag == TypeTags::NumberDecimal);
@@ -448,9 +449,9 @@ void ByteCode::aggDoubleDoubleSumImpl(value::Array* arr,
             addNonDecimal(rhsTag, rhsValue, nonDecimalTotal);
         }
 
-        setDecimalTotal(nonDecimalTotalTag, nonDecimalTotal, decimalTotal, arr);
+        setDecimalTotal(nonDecimalTotalTag, nonDecimalTotal, decimalTotal, accumulator);
     }
-}
+}  // aggDoubleDoubleSumImpl
 
 void ByteCode::aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
                                             value::TypeTags rhsTag,

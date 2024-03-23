@@ -621,15 +621,6 @@ export function blockProcessingTestCases(timeFieldName,
             usesBlockProcessing: false
         },
         {
-            name: "GroupByX_AvgWithoutId",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$avg: '$y'}}},
-                {$project: {_id: 0, a: 1}}
-            ],
-            usesBlockProcessing: false
-        },
-        {
             name: "GroupByXAndY_MinWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
@@ -697,6 +688,102 @@ export function blockProcessingTestCases(timeFieldName,
             ],
             usesBlockProcessing: false
         },
+
+        //
+        // $sum tests //////////////////////////////////////////////////////////////////////////////
+        //
+        {
+            name: "GroupByNull_Sum",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: null, a: {$sum: '$y'}}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "DateUpper_GroupByNull_Sum_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: null, a: {$sum: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "DateLower_GroupByNull_Sum_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
+                {$group: {_id: null, a: {$sum: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_Sum",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: '$x', a: {$sum: '$y'}}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_Sum_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: '$x', a: {$sum: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByX_MultipleSums",
+            pipeline: [{$group: {_id: '$x', a: {$sum: '$x'}, b: {$sum: '$y'}, c: {$sum: '$z'}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByXAndY_Sum_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: {x: '$x', y: '$y'}, a: {$sum: '$z'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+        },
+        {
+            name: "GroupByMetaSortKey_Sum_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: {$meta: 'sortKey'}, a: {$sum: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: false
+        },
+        {
+            name: "GroupByX_SumOfMetaSortKey_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: '$x', a: {$sum: {$meta: 'sortKey'}}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: false
+        },
+
+        //
+        // $avg tests //////////////////////////////////////////////////////////////////////////////
+        //
+        {
+            name: "GroupByX_Avg_Project",
+            pipeline: [
+                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                {$group: {_id: '$x', a: {$avg: '$y'}}},
+                {$project: {_id: 0, a: 1}}
+            ],
+            usesBlockProcessing: false
+        },
+
+        //
+        // Projected-out field tests ///////////////////////////////////////////////////////////////
+        //
         {
             name: "MatchMetaGroupWithProjectedOutFieldInAccumulator",
             pipeline: [

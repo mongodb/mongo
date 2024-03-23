@@ -38,7 +38,8 @@ namespace mongo {
  *
  * The array might contain up to four elements:
  * - The element at index `kNonDecimalTotalTag` keeps track of the widest type of the sum of
- * non-decimal values.
+ * non-decimal values. Only the tag half of this entry is used and represents the tag of the
+ * widest data type seen so far. The value half of the entry is garbage (nominally set to 0).
  * - The elements at indices `kNonDecimalTotalSum` and `kNonDecimalTotalAddend` together represent
  * non-decimal value which is the sum of all non-decimal values.
  * - The element at index `kDecimalTotal` is optional and represents the sum of all decimal values

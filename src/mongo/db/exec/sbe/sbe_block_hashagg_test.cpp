@@ -100,7 +100,7 @@ public:
     // a list of accumulator results.
     static void assertResultMatchesMap(TypedValue result,
                                        TestResultType expectedMap,
-                                       std::vector<size_t> expectedBlockSizes) {
+                                       std::vector<size_t> expectedOutputBlockSizes) {
         ASSERT_EQ(result.first, value::TypeTags::Array);
         auto resultArr = value::getArrayView(result.second);
 
@@ -112,7 +112,7 @@ public:
             // The first "row" in the vector stores the keys, and each subsequent row stores the
             // value of each accumulator. results[0][1] gives you the {tag, val} of the second key.
             // results[1][2] gives you the {tag, val} of the first accumlator for the third group.
-            auto results = unpackArrayOfBlocks(subArrVal, expectedBlockSizes[ebsIndex++]);
+            auto results = unpackArrayOfBlocks(subArrVal, expectedOutputBlockSizes[ebsIndex++]);
 
             // Iterate over each key.
             for (size_t rowIdx = 0; rowIdx < results[0].size(); ++rowIdx) {
@@ -182,9 +182,9 @@ public:
                                    size_t keySize,
                                    size_t numScanSlots,
                                    AccNamesVector accNames,
-                                   TestResultType expected,
-                                   std::vector<size_t> expectedBlockSizes,
-                                   bool spill) {
+                                   TestResultType expectedResultsMap,
+                                   std::vector<size_t> expectedOutputBlockSizes,
+                                   bool spillToDisk) {
         auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             value::SlotVector idSlots;
             value::SlotVector outputSlots;
@@ -246,38 +246,119 @@ public:
                                                      accDataSlots,
                                                      accumulatorBitset,
                                                      std::move(aggs),
-                                                     spill,
+                                                     spillToDisk /* allowDiskUse */,
                                                      std::move(mergingExprs),
                                                      nullptr /* yieldPolicy */,
                                                      kEmptyPlanNodeId,
                                                      true,
-                                                     spill);
+                                                     spillToDisk /* forceIncreasedSpilling */);
             return std::make_pair(outputSlots, std::move(outStage));
         };
 
         auto result = runTestMulti(numScanSlots, inputData.first, inputData.second, makeFn);
         value::ValueGuard resultGuard{result};
-        assertResultMatchesMap(result, expected, expectedBlockSizes);
-    }
+        assertResultMatchesMap(result, expectedResultsMap, expectedOutputBlockSizes);
+    }  // runBlockHashAggTestHelper
 
-    // Given the data input, the number of slots the stage requires, accumulators used, and
-    // expected output, runs the BlockHashAgg stage and asserts that we get correct results.
+    /**
+     * Given the data input, the number of slots the stage requires, accumulators used, and
+     * expected output, runs the BlockHashAgg stage and asserts that we get correct results.
+     * (SBE $group is implemented by sbe::BlockHashAggStage.)
+     *
+     * *******************************************************************************************
+     * IMPORTANT:
+     *    This tests the BlockHashAggStage in isolation and only supports scalar outputs from
+     *    single accumulator calls. Many accumulators (e.g. $sum) output a 3- or 4-value
+     *    accumulator Array, or even multiple such arrays (e.g. $avg), and require a "finalize"
+     *    step to convert these to a scalar. However, the finalize step is not part of
+     *    BlockHashAggStage but rather is a downstream step added by the stage builder. Thus
+     *    this unit test cannot be used with any accumulators that require a finalize step.
+     * *******************************************************************************************
+     *
+     * In the following Inputs section, [ ] is used to represent both SBE TypeTags::Array arrays and
+     * C++ std::vectors, as this is the most common way to denote vectors or arrays, whereas { }
+     * instead looks like it is trying to indicate a JSON object. (Note TypeTags::Array itself is a
+     * wrapper around a C++ std::vector.) The test cases themselves initialize these using C++
+     * literal array initializers, which confusingly use { }, as these really represent C++
+     * constructor calls. Hopefully this note will help avoid confusion.
+     *
+     * Inputs
+     *
+     *   inputData - A [tag, val] pair representing the inputs to the $group stage, where
+     *     tag - Always TypeTags::Array.
+     *     val - An array of arrays. Each child array represents a subset of docs for one group_id
+     *        and is of the form
+     *          [group_id, [bitset], [optional_field_A_vals], ... [optional_field_N_vals]]
+     *        where
+     *          group_id is the value of this subset's $group key.
+     *          [bitset] is an Array of booleans of the same length as the block indicating which
+     *            entries in the block should be included (true). The others (false) are filtered
+     *            out (by a $match expression).
+     *          [optional_field_X_vals], if present, is an Array of the same length as the block,
+     *            each of whose entries represents one value for field 'X' in a doc in this block.
+     *        In the code, "blocks" are 1D vectors, so each array of optional_field_X_vals is a
+     *        block and the bitset is a pseudo-block, but all of these are parallel with each other
+     *        from the same subset of docs. Note that a single group_id may also have more than one
+     *        child array representing it in 'inputData'.
+     *
+     *   keySize - If the $group key is a scalar, this is 1, else the key is multipart in the form
+     *     of a vector with K entries, in which case 'keySize' is set to K.
+     *
+     *   numScanSlots - The total number of distinct input sources. These are:
+     *       o Each component of the $group key
+     *       o The bitset
+     *       o Each field scanned from the input docs (== each non-$count accumulator)
+     *     $count does not add a slot as it consumes the bitset, whereas every other accumulator
+     *     consumes a scanned input field.
+     *
+     *   accNames - A vector of vectors. Each child vector represents one accumulator to be applied
+     *     to the input data and is of the form
+     *       [block_accumulator_fn_name, row_accumulator_fn_name, merge_accumulator_fn_name]
+     *     For example:
+     *       - The $min accumulator is represented by ["valueBlockAggMin", "min", "min"].
+     *       - The $count accumulator is represented by ["valueBlockAggCount", "count", "sum"].
+     *     The accumulators will be applied left-to-right to the fields included in 'inputData'
+     *     except that the $count accumulator always applies to the [bitset] Array, no matter where
+     *     or how many times it appears in the 'accNames' vector. I.e. the first non-$count
+     *     accumulator will apply to the first Array of field values, the second non-$count
+     *     accumulator will apply to the second Array of field values, and so on.
+     *
+     *   expectedResultsMap - Expected results in the form of a map from group_id to an array of
+     *     accumulator output values in the order the accumulators were specified, e.g.
+     *       [[group_id_0], [acc_0_resullt, acc_1_result, acc_2_result],
+     *        ...
+     *        [group_id_N], [acc_0_resullt, acc_1_result, acc_2_result]]
+     *
+     *   expectedOutputBlockSizes - A vector whose number of entries corresponds to the number of
+     *     output blocks the $group stage is expected to produce and whose 'i'th entry gives the
+     *     expected length of the 'i'th output block. This stage produces one output block entry per
+     *     unique group_id, and the stage's output block size is capped at
+     *     BlockHashAggStage::kBlockOutSize. Thus if there are more than 'kBlockOutSize' unique
+     *     group_ids, the stage will produce more than one output block. All but the last one will
+     *     be of size 'kBlockOutSize', while the last one may be smaller (anywhere in the range 1 to
+     *     'kBlockOutSize').
+     */
     void runBlockHashAggTest(TypedValue inputData,
                              size_t keySize,
                              size_t numScanSlots,
                              AccNamesVector accNames,
-                             TestResultType expected,
-                             std::vector<size_t> expectedBlockSizes) {
+                             TestResultType expectedResultsMap,
+                             std::vector<size_t> expectedOutputBlockSizes) {
         runBlockHashAggTestHelper(value::copyValue(inputData.first, inputData.second),
                                   keySize,
                                   numScanSlots,
                                   accNames,
-                                  expected,
-                                  expectedBlockSizes,
-                                  false);
-        runBlockHashAggTestHelper(
-            inputData, keySize, numScanSlots, accNames, expected, expectedBlockSizes, true);
-    }
+                                  expectedResultsMap,
+                                  expectedOutputBlockSizes,
+                                  false /* spillToDisk */);
+        runBlockHashAggTestHelper(inputData,
+                                  keySize,
+                                  numScanSlots,
+                                  accNames,
+                                  expectedResultsMap,
+                                  expectedOutputBlockSizes,
+                                  true /* spillToDisk */);
+    }  // runBlockHashAggTest
 
 private:
     std::unique_ptr<Lock::GlobalLock> _globalLock;

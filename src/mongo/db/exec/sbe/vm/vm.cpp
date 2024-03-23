@@ -1832,7 +1832,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDoubleS
 
     value::ValueGuard guard{accTag, accValue};
     tassert(5755317, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
-    auto accumulator = value::getArrayView(accValue);
+    value::Array* accumulator = value::getArrayView(accValue);
 
     if constexpr (merging) {
         aggMergeDoubleDoubleSumsImpl(accumulator, fieldTag, fieldValue);
@@ -9800,6 +9800,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockAggCount(arity);
         case Builtin::valueBlockAggSum:
             return builtinValueBlockAggSum(arity);
+        case Builtin::valueBlockAggDoubleDoubleSum:
+            return builtinValueBlockAggDoubleDoubleSum(arity);
         case Builtin::valueBlockAggTopN:
             return ByteCode::builtinValueBlockAggTopN(arity);
         case Builtin::valueBlockAggTopNArray:
@@ -10336,6 +10338,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockAggCount";
         case Builtin::valueBlockAggSum:
             return "valueBlockAggSum";
+        case Builtin::valueBlockAggDoubleDoubleSum:
+            return "valueBlockAggDoubleDoubleSum";
         case Builtin::valueBlockAggTopN:
             return "valueBlockAggTopN";
         case Builtin::valueBlockAggTopNArray:

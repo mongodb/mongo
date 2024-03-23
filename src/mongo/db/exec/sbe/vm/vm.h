@@ -729,6 +729,7 @@ enum class Builtin : uint16_t {
     valueBlockAggMax,
     valueBlockAggCount,
     valueBlockAggSum,
+    valueBlockAggDoubleDoubleSum,
     valueBlockAggTopN,
     valueBlockAggTopNArray,
     valueBlockAggBottomN,
@@ -766,7 +767,7 @@ enum class Builtin : uint16_t {
     cellFoldValues_F,
     cellFoldValues_P,
     cellBlockGetFlatValuesBlock,
-};
+};  // enum class Builtin
 
 std::string builtinToString(Builtin b);
 
@@ -2069,6 +2070,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggCount(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggSum(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggDoubleDoubleSum(
+        ArityType arity);
+
     template <TopBottomSense Sense, bool ValueIsArray>
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggTopBottomNImpl(
         ArityType arity);
@@ -2077,6 +2081,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggTopNArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggBottomNArray(
         ArityType arity);
+
     template <int operation>
     FastTuple<bool, value::TypeTags, value::Value> builtinBlockBlockArithmeticOperation(
         const value::TypeTags* bitsetTags,
@@ -2450,6 +2455,8 @@ private:
     ByteCode::GetFromStackFunctor _getFieldFn;
     size_t _numFields;
 };
+
+std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState();
 
 class InputFieldsOnlyCursor;
 class BsonObjWithInputFieldsCursor;

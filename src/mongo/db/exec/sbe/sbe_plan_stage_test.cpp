@@ -59,7 +59,8 @@ void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
     const auto equal = valueEquals(lhsTag, lhsVal, rhsTag, rhsVal);
     if (!equal) {
         std::stringstream ss;
-        ss << std::make_pair(lhsTag, lhsVal) << " != " << std::make_pair(rhsTag, rhsVal);
+        ss << "assertValuesEqual failure: " << std::make_pair(lhsTag, lhsVal)
+           << " != " << std::make_pair(rhsTag, rhsVal);
         LOGV2(5075401, "{msg}", "msg"_attr = ss.str());
     }
     ASSERT_TRUE(equal);

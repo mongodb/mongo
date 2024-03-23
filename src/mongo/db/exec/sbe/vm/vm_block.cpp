@@ -447,16 +447,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
     tassert(8625707,
             "Expected input argument to be of valueBlock type",
             inputTag == value::TypeTags::valueBlock);
-    auto* inputBlock = value::bitcastTo<value::ValueBlock*>(inputVal);
+    value::ValueBlock* inputBlock = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(1);
     tassert(8625708,
             "Expected bitset argument to be of valueBlock type",
             bitsetTag == value::TypeTags::valueBlock);
-    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+    value::ValueBlock* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
-    value::DeblockedTagVals block = inputBlock->extract();
-    value::DeblockedTagVals bitset = bitsetBlock->extract();
+    const value::DeblockedTagVals block = inputBlock->extract();
+    const value::DeblockedTagVals bitset = bitsetBlock->extract();
 
     tassert(
         8151801, "Expected block and bitset to be the same size", block.count() == bitset.count());
@@ -510,7 +510,53 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum
 
     // Return 'result' as the updated accumulator state.
     return {true, resultTag, resultVal};
-}
+}  // builtinValueBlockAggSum
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggDoubleDoubleSum(
+    ArityType arity) {
+    invariant(arity == 3);
+
+    // Input: next block to accumulate.
+    auto [blockOwned, blockTag, blockVal] = getFromStack(2);
+    tassert(8695107,
+            "Expected input argument to be of valueBlock type",
+            blockTag == value::TypeTags::valueBlock);
+    value::ValueBlock* inputBlock = value::bitcastTo<value::ValueBlock*>(blockVal);
+
+    // Input: bitset matching 'inputBlock'.
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(1);
+    tassert(8695108,
+            "Expected bitset argument to be of valueBlock type",
+            bitsetTag == value::TypeTags::valueBlock);
+    value::ValueBlock* inputBitset = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+
+    // Input-output: running accumulator result. moveOwnedFromStack() takes ownership by our local
+    // copy so we can do in-place updates to it.
+    auto [accTag, accValue] = moveOwnedFromStack(0);
+
+    // Initialize the accumulator if this is the first use of it.
+    if (accTag == value::TypeTags::Nothing) {
+        std::tie(accTag, accValue) = initializeDoubleDoubleSumState();
+    }
+
+    value::ValueGuard guard{accTag, accValue};
+    tassert(8695109, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
+    value::Array* accumulator = value::getArrayView(accValue);
+
+    const value::DeblockedTagVals block = inputBlock->extract();
+    const value::DeblockedTagVals bitset = inputBitset->extract();
+    tassert(
+        8695110, "Expected block and bitset to be the same size", block.count() == bitset.count());
+
+    for (size_t i = 0; i < block.count(); ++i) {
+        if (value::bitcastTo<bool>(bitset[i].second)) {
+            aggDoubleDoubleSumImpl(accumulator, block.tags()[i], block.vals()[i]);
+        }
+    }
+
+    guard.reset();
+    return {true, accTag, accValue};
+}  // builtinValueBlockAggDoubleDoubleSum
 
 class ByteCode::TopBottomArgsFromBlocks final : public ByteCode::TopBottomArgs {
 public:

@@ -300,7 +300,11 @@ struct OpInfo {
 };
 
 namespace {
-SbExpr wrapMinMaxArg(SbExpr arg, StageBuilderState& state) {
+/**
+ * Wraps an SbExpr in a let-if that resolves null, missing, and undefined values all to a
+ * TypeTags::Nothing constant, else retains the original value.
+ */
+SbExpr nullMissingUndefinedToNothing(SbExpr arg, StageBuilderState& state) {
     SbExprBuilder b(state);
 
     auto frameId = state.frameIdGenerator->generate();
@@ -312,10 +316,14 @@ SbExpr wrapMinMaxArg(SbExpr arg, StageBuilderState& state) {
     return b.makeLet(frameId, std::move(binds), std::move(e));
 }
 
+/**
+ * Used to create buildAccumExprs values for $min and $max, as these otherwise won't handle all the
+ * null, missing, undefined cases correctly.
+ */
 InputsPtr buildAccumExprsMinMax(const Op& acc,
                                 std::unique_ptr<AccumSingleInput> inputs,
                                 StageBuilderState& state) {
-    inputs->inputExpr = wrapMinMaxArg(std::move(inputs->inputExpr), state);
+    inputs->inputExpr = nullMissingUndefinedToNothing(std::move(inputs->inputExpr), state);
     return inputs;
 }
 
@@ -343,9 +351,9 @@ SbExpr::Vector buildCombineAggsMin(const Op& acc,
 
     SbExprBuilder b(state);
 
-    auto arg = wrapMinMaxArg(SbExpr{inputSlots[0]}, state);
+    SbExpr arg = nullMissingUndefinedToNothing(SbExpr{inputSlots[0]}, state);
 
-    auto collatorSlot = state.getCollatorSlot();
+    boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
         return SbExpr::makeSeq(b.makeFunction("collMin"_sd, SbVar{*collatorSlot}, std::move(arg)));
@@ -391,9 +399,9 @@ SbExpr::Vector buildCombineAggsMax(const Op& acc,
 
     SbExprBuilder b(state);
 
-    auto arg = wrapMinMaxArg(SbExpr{inputSlots[0]}, state);
+    SbExpr arg = nullMissingUndefinedToNothing(SbExpr{inputSlots[0]}, state);
 
-    auto collatorSlot = state.getCollatorSlot();
+    boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
 
     if (collatorSlot) {
         return SbExpr::makeSeq(b.makeFunction("collMax"_sd, SbVar{*collatorSlot}, std::move(arg)));
@@ -554,6 +562,24 @@ SbExpr::Vector buildAccumAggsSum(const Op& acc,
                                  StageBuilderState& state) {
     SbExprBuilder b(state);
     return SbExpr::makeSeq(b.makeFunction("aggDoubleDoubleSum", std::move(inputs->inputExpr)));
+}
+
+boost::optional<std::vector<BlockAggAndRowAgg>> buildAccumBlockAggsSum(
+    const Op& acc,
+    std::unique_ptr<AccumSingleInput> inputs,
+    StageBuilderState& state,
+    SbSlot bitmapInternalSlot) {
+    SbExprBuilder b(state);
+
+    SbExpr blockAgg = b.makeFunction(
+        "valueBlockAggDoubleDoubleSum"_sd, bitmapInternalSlot, inputs->inputExpr.clone());
+    SbExpr rowAgg = b.makeFunction("aggDoubleDoubleSum"_sd, std::move(inputs->inputExpr));
+
+    boost::optional<std::vector<BlockAggAndRowAgg>> pairs;
+    pairs.emplace();
+    pairs->emplace_back(BlockAggAndRowAgg{std::move(blockAgg), std::move(rowAgg)});
+
+    return pairs;
 }
 
 SbExpr::Vector buildCombineAggsSum(const Op& acc,
@@ -1776,7 +1802,9 @@ static const StringDataMap<OpInfo> accumOpInfoMap = {
 
     // Sum
     {AccumulatorSum::kName,
-     OpInfo{.buildAccumAggs = makeBuildFn(&buildAccumAggsSum),
+     OpInfo{.buildAccumBlockExprs = makeBuildFn(&buildAccumBlockExprsSingleInput),
+            .buildAccumAggs = makeBuildFn(&buildAccumAggsSum),
+            .buildAccumBlockAggs = makeBuildFn(&buildAccumBlockAggsSum),
             .buildFinalize = makeBuildFn(&buildFinalizeSum),
             .buildCombineAggs = makeBuildFn(&buildCombineAggsSum)}},
 

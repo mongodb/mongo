@@ -728,14 +728,14 @@ boost::optional<SbAggExprVector> generateAccumAggs(StageBuilderState& state,
     }
 
     return sbAggExprs;
-}
+}  // generateAccumAggs
 
 /**
  * This function generates a vector of SbAggExprs that correspond to the accumulators from
  * the specified GroupNode ('groupNode') and returns it.
  *
- * If 'genBlockAggs' is true, generateAllAccumAggs() accumulator may fail, in which case
- * it will return boost::none.
+ * If 'genBlockAggs' is true, generateAllAccumAggs() will fail if any of the accumulators do not
+ * support block mode, in which case it will return boost::none.
  */
 boost::optional<std::vector<SbAggExprVector>> generateAllAccumAggs(
     StageBuilderState& state,
@@ -771,7 +771,7 @@ boost::optional<std::vector<SbAggExprVector>> generateAllAccumAggs(
     }
 
     return sbAggExprs;
-}
+}  // generateAllAccumAggs
 
 /**
  * Generate a vector of (inputSlot, mergingExpression) pairs. The slot (whose id is allocated by
@@ -1272,7 +1272,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildGroup(const Query
     }
 
     return {std::move(stage), std::move(outputs)};
-}
+}  // SlotBasedStageBuilder::buildGroup
 
 /**
  * This function is called by buildGroup() and it contains most of the implementation for $group.
@@ -1293,7 +1293,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
         feature_flags::gFeatureFlagSbeBlockHashAgg.isEnabled(fcvSnapshot);
     const bool featureFlagsAllowBlockHashAgg = sbeFullEnabled || sbeBlockHashAggEnabled;
 
-    auto collatorSlot = _state.getCollatorSlot();
+    boost::optional<sbe::value::SlotId> collatorSlot = _state.getCollatorSlot();
     const auto& idExpr = groupNode->groupByExpression;
     const auto nodeId = groupNode->nodeId();
     SbBuilder b(_state, nodeId);
@@ -1597,5 +1597,5 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                    *groupNode,
                                    idIsSingleKey,
                                    std::move(idConstantValue));
-}
+}  // SlotBasedStageBuilder::buildGroupImpl
 }  // namespace mongo::stage_builder
