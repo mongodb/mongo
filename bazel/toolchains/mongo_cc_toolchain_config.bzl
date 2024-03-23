@@ -289,7 +289,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = all_compile_actions,
+                actions = all_compile_actions + all_link_actions,
                 flag_groups = [flag_group(flags = [
                     "-B{}".format(bin_dir)
                     for bin_dir in ctx.attr.bin_dirs

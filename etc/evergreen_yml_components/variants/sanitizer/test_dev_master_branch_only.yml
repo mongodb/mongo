@@ -748,6 +748,7 @@ buildvariants:
 - name: &enterprise-rhel80-unoptimized-64-bit enterprise-rhel80-unoptimized-64-bit
   display_name: "~ Enterprise RHEL 8.0 DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
   expansions:
     compile_flags: >-
       MONGO_DISTMOD=rhel80
@@ -756,6 +757,7 @@ buildvariants:
       --opt=off
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --detect-odr-violations
+      --linker=gold
       --link-model=dynamic
       --use-diagnostic-latches=on
     scons_cache_mode: all

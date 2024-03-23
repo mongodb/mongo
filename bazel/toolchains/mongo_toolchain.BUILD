@@ -23,12 +23,6 @@ COMMON_LINK_FLAGS = [
     "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
     "-Lexternal/mongo_toolchain/v4/lib",
     "-Lexternal/mongo_toolchain/v4/lib64",
-    "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
-    "-Bexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
-    "-Bexternal/mongo_toolchain/stow/llvm-v4/bin",
-    # Use the host system's glibc dynamic libraries
-    "-B/lib/{arch}-linux-gnu",
-    "-B/usr/lib/{arch}-linux-gnu",
 ]
 
 COMMON_INCLUDE_DIRECTORIES = [
@@ -57,6 +51,11 @@ mongo_cc_toolchain_config(
         # Make sure that the toolchain binaries are available
         "external/mongo_toolchain/v4/bin",
         "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
+        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
+        "external/mongo_toolchain/stow/llvm-v4/bin",
+        # Use the host system's glibc dynamic libraries
+        "/lib/{arch}-linux-gnu",
+        "/usr/lib/{arch}-linux-gnu",
     ],
     cxx_builtin_include_directories = COMMON_INCLUDE_DIRECTORIES + [
         # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
@@ -102,16 +101,19 @@ mongo_cc_toolchain_config(
         # Make sure that the toolchain binaries are available
         "external/mongo_toolchain/v4/bin",
         "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
+        "external/mongo_toolchain/stow/llvm-v4/lib/clang/12.0.1",
+        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
+        "external/mongo_toolchain/stow/llvm-v4/bin",
+        # Use the host system's glibc dynamic libraries
+        "/lib/{arch}-linux-gnu",
+        "/usr/lib/{arch}-linux-gnu",
     ],
     cxx_builtin_include_directories = COMMON_INCLUDE_DIRECTORIES + [
         # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
         "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/backward)%",
         "%package(@mongo_toolchain//stow/llvm-v4/lib/clang/12.0.1/include)%",
     ],
-    extra_ldflags = COMMON_LINK_FLAGS + [
-        # Make sure that our toolchain libraries are used for linking
-        "-Bexternal/mongo_toolchain/stow/llvm-v4/lib/clang/12.0.1",
-    ],
+    extra_ldflags = COMMON_LINK_FLAGS,
     tool_paths = {
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
         # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,

@@ -4657,6 +4657,9 @@ def doConfigure(myenv):
                 env.FatalError(
                     'The --detect-odr-violations flag is expected to only be reliable with --opt=off'
                 )
+            if linker_ld != "gold":
+                myenv.FatalError(
+                    "The --detect-odr-violations flag currently only works with --linker=gold")
             myenv.AddToLINKFLAGSIfSupported('-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would
