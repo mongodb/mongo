@@ -30,6 +30,7 @@
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -44,6 +45,10 @@ MeasurementMap::MeasurementMap(TrackingContext& trackingContext)
 void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                                   size_t numMeasurements) {
     for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
+        str::stream errMsg;
+        errMsg << "Compressed bucket contains uncompressed data field: " << key.toString();
+        massert(8830600, errMsg, columnValue.isBinData(BinDataType::Column));
+
         int binLength = 0;
         const char* binData = columnValue.binData(binLength);
 

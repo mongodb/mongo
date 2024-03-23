@@ -87,6 +87,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 namespace mongo::timeseries::bucket_catalog::internal {
 namespace {
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
@@ -480,7 +482,14 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         // Initialize BSONColumnBuilders from the compressed bucket data fields.
         try {
             bucket->measurementMap.initBuilders(dataObj, bucket->numCommittedMeasurements);
-        } catch (const AssertionException& ex) {
+        } catch (const DBException& ex) {
+            // TODO(SERVER-88075): Add dual-log messages for corruption.
+            LOGV2_WARNING(
+                8830601,
+                "Failed to decompress bucket for time-series insert upon reopening, will retry "
+                "insert on a new bucket",
+                "bucketId"_attr = bucket->bucketId.oid);
+            timeseries::bucket_catalog::freeze(catalog, collectionUUID, bucketId.oid);
             return Status(BucketCompressionFailure(collectionUUID, bucketId.oid), ex.reason());
         }
     }
