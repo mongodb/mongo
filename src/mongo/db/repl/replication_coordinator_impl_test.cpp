@@ -6769,7 +6769,7 @@ TEST_F(ReplCoordTest,
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 }
 
-TEST_F(ReplCoordTest, AdvanceCommitPointFromSyncSourceCanSetCommitPointToLastAppliedIgnoringTerm) {
+TEST_F(ReplCoordTest, AdvanceCommitPointFromSyncSourceCanSetCommitPointToLastWrittenIgnoringTerm) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -6783,16 +6783,40 @@ TEST_F(ReplCoordTest, AdvanceCommitPointFromSyncSourceCanSetCommitPointToLastApp
                        HostAndPort("node1", 12345));
     ASSERT_EQUALS(OpTime(), getReplCoord()->getLastCommittedOpTime());
 
-    OpTimeAndWallTime lastApplied = {OpTime({10, 1}, 1), Date_t() + Seconds(10)};
+    OpTimeAndWallTime lastWritten = {OpTime({10, 1}, 1), Date_t() + Seconds(10)};
     OpTimeAndWallTime commitPoint = {OpTime({15, 1}, 2), Date_t() + Seconds(15)};
-    replCoordSetMyLastWrittenOpTime(lastApplied.opTime, lastApplied.wallTime);
-    replCoordSetMyLastAppliedOpTime(lastApplied.opTime, lastApplied.wallTime);
+    replCoordSetMyLastWrittenOpTime(lastWritten.opTime, lastWritten.wallTime);
 
     const bool fromSyncSource = true;
     getReplCoord()->advanceCommitPoint(commitPoint, fromSyncSource);
 
-    // The commit point can be set to lastApplied, even though lastApplied is in a lower term.
-    ASSERT_EQUALS(lastApplied.opTime, getReplCoord()->getLastCommittedOpTime());
+    // The commit point will be set to lastWritten, even though lastWritten is in a lower term.
+    ASSERT_EQUALS(lastWritten.opTime, getReplCoord()->getLastCommittedOpTime());
+}
+
+TEST_F(ReplCoordTest, DoNotAdvanceCommitPointWithMismatchedTermIfNotFromSyncSource) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))
+                            << "protocolVersion" << 1),
+                       HostAndPort("node1", 12345));
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getLastCommittedOpTime());
+
+    OpTimeAndWallTime lastWritten = {OpTime({10, 1}, 1), Date_t() + Seconds(10)};
+    OpTimeAndWallTime commitPoint = {OpTime({15, 1}, 2), Date_t() + Seconds(15)};
+    replCoordSetMyLastWrittenOpTime(lastWritten.opTime, lastWritten.wallTime);
+
+    const bool fromSyncSource = false;
+    getReplCoord()->advanceCommitPoint(commitPoint, fromSyncSource);
+
+    // The commit point can not be set to lastWritten when its not from Sync Source.
+    ASSERT_NOT_EQUALS(lastWritten.opTime, getReplCoord()->getLastCommittedOpTime());
 }
 
 TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {

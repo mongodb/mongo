@@ -3031,15 +3031,15 @@ bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTim
     if (!_selfConfig().isArbiter() &&
         getMyLastWrittenOpTime().getTerm() != committedOpTime.opTime.getTerm()) {
         if (fromSyncSource) {
-            committedOpTime = std::min(committedOpTime, getMyLastAppliedOpTimeAndWallTime());
+            committedOpTime = std::min(committedOpTime, getMyLastWrittenOpTimeAndWallTime());
         } else {
             LOGV2_DEBUG(21824,
                         1,
-                        "Ignoring commit point with different term than my lastApplied, since it "
+                        "Ignoring commit point with different term than my lastWritten, since it "
                         "may not be on the same oplog branch as mine",
                         "committedOpTime"_attr = committedOpTime,
-                        "myLastAppliedOpTimeAndWallTime"_attr =
-                            getMyLastAppliedOpTimeAndWallTime());
+                        "myLastWrittenOpTimeAndWallTime"_attr =
+                            getMyLastWrittenOpTimeAndWallTime());
             return false;
         }
     }
