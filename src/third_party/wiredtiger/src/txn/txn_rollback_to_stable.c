@@ -1312,7 +1312,7 @@ __wt_rts_page_skip(
  */
 static void
 __rollback_progress_msg(WT_SESSION_IMPL *session, struct timespec rollback_start,
-  uint64_t rollback_count, uint64_t *rollback_msg_count, bool walk)
+  uint64_t rollback_count, uint64_t max_count, uint64_t *rollback_msg_count, bool walk)
 {
     struct timespec cur_time;
     uint64_t time_diff;
@@ -1331,9 +1331,9 @@ __rollback_progress_msg(WT_SESSION_IMPL *session, struct timespec rollback_start
         else
             __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
               "Rollback to stable has been running for %" PRIu64
-              " seconds and has inspected %" PRIu64
-              " files. For more detailed logging, enable WT_VERB_RTS",
-              time_diff, rollback_count);
+              " milliseconds and has inspected %" PRIu64 " files of %" PRIu64
+              ". For more detailed logging, enable WT_VERB_RTS",
+              time_diff, rollback_count, max_count);
         *rollback_msg_count = time_diff / WT_PROGRESS_MSG_PERIOD;
     }
 }
@@ -1359,7 +1359,7 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
     while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
               WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
       ref != NULL) {
-        __rollback_progress_msg(session, rollback_timer, 0, &rollback_msg_count, true);
+        __rollback_progress_msg(session, rollback_timer, 0, 0, &rollback_msg_count, true);
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
             WT_WITH_PAGE_INDEX(
               session, ret = __rollback_abort_fast_truncate(session, ref, rollback_timestamp));
@@ -1803,23 +1803,39 @@ __rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t ro
     struct timespec rollback_timer;
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    uint64_t rollback_count, rollback_msg_count;
+    uint64_t max_count, rollback_count, rollback_msg_count;
     const char *config, *uri;
+    bool have_cursor;
 
     /* Initialize the verbose tracking timer. */
     __wt_epoch(session, &rollback_timer);
-    rollback_count = 0;
+    max_count = rollback_count = 0;
     rollback_msg_count = 0;
 
     WT_RET(__wt_metadata_cursor(session, &cursor));
+    have_cursor = true;
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_key(cursor, &uri));
+        if (WT_BTREE_PREFIX(uri))
+            ++max_count;
+    }
+
+    WT_ERR_NOTFOUND_OK(ret, false);
+    WT_ERR(__wt_metadata_cursor_release(session, &cursor));
+    have_cursor = false;
+
+    WT_ERR(__wt_metadata_cursor(session, &cursor));
+    have_cursor = true;
+
     while ((ret = cursor->next(cursor)) == 0) {
         /* Log a progress message. */
-        __rollback_progress_msg(
-          session, rollback_timer, rollback_count, &rollback_msg_count, false);
-        ++rollback_count;
-
         WT_ERR(cursor->get_key(cursor, &uri));
         WT_ERR(cursor->get_value(cursor, &config));
+
+        if (WT_BTREE_PREFIX(uri))
+            ++rollback_count;
+        __rollback_progress_msg(
+          session, rollback_timer, rollback_count, max_count, &rollback_msg_count, false);
 
         F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
         ret = __rollback_to_stable_btree_apply(session, uri, config, rollback_timestamp);
@@ -1852,7 +1868,8 @@ __rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t ro
         WT_ERR(__rollback_to_stable_hs_final_pass(session, rollback_timestamp));
 
 err:
-    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    if (have_cursor)
+        WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     return (ret);
 }
 
