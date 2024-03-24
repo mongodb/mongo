@@ -366,6 +366,7 @@ experimental_optimizations = [
     'nofp',
     'nordyn',
     'sandybridge',
+    'tremont',
     'tbaa',
     'treevec',
     'vishidden',
@@ -3318,6 +3319,12 @@ if not env.TargetOSIs('windows', 'macOS') and (env.ToolchainIs('GCC', 'clang')):
             "-march=": "sandybridge",
             "-mtune=": "generic",
             "-mprefer-vector-width=": "128",
+        }
+        
+    if "tremont" in selected_experimental_optimizations:
+        default_targeting_flags_for_architecture["x86_64"] = {
+            "-march=": "tremont",
+            "-mtune=": "tremont",
         }
 
     default_targeting_flags = default_targeting_flags_for_architecture.get(env['TARGET_ARCH'])
