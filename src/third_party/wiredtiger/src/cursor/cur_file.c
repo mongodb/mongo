@@ -784,6 +784,9 @@ err:
         *cursorp = NULL;
     }
 
+    if (ret == 0 && bulk)
+        WT_STAT_CONN_INCR_ATOMIC(session, cursor_bulk_count);
+
     return (ret);
 }
 

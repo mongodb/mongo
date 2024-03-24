@@ -48,6 +48,7 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 
     /* Close the LSM cursor */
     WT_RET(__wt_clsm_close(cursor));
+    WT_STAT_CONN_DECR_ATOMIC(session, cursor_bulk_count);
 
     return (0);
 }
@@ -131,6 +132,8 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
     clsm->chunks[0]->cursor = bulk_cursor;
     /* LSM cursors are always raw */
     F_SET(bulk_cursor, WT_CURSTD_RAW);
+
+    WT_STAT_CONN_INCR_ATOMIC(session, cursor_bulk_count);
 
     return (0);
 }

@@ -340,6 +340,7 @@ conn_stats = [
     ##########################################
     # Cursor operations
     ##########################################
+    CursorStat('cursor_bulk_count', 'bulk cursor count', 'no_clear,no_scale'),
     CursorStat('cursor_cached_count', 'cached cursor count', 'no_clear,no_scale'),
     CursorStat('cursor_cache', 'cursor close calls that result in cache'),
     CursorStat('cursor_create', 'cursor create calls'),

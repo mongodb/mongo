@@ -1312,6 +1312,7 @@ static const char *const __stats_connection_desc[] = {
   "cursor: Total number of entries skipped by cursor prev calls",
   "cursor: Total number of entries skipped to position the history store cursor",
   "cursor: Total number of times a search near has exited due to prefix config",
+  "cursor: bulk cursor count",
   "cursor: cached cursor count",
   "cursor: cursor bulk loaded cursor insert calls",
   "cursor: cursor close calls that result in cache",
@@ -1891,6 +1892,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_prev_skip_total = 0;
     stats->cursor_skip_hs_cur_position = 0;
     stats->cursor_search_near_prefix_fast_paths = 0;
+    /* not clearing cursor_bulk_count */
     /* not clearing cursor_cached_count */
     stats->cursor_insert_bulk = 0;
     stats->cursor_cache = 0;
@@ -2485,6 +2487,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_skip_hs_cur_position += WT_STAT_READ(from, cursor_skip_hs_cur_position);
     to->cursor_search_near_prefix_fast_paths +=
       WT_STAT_READ(from, cursor_search_near_prefix_fast_paths);
+    to->cursor_bulk_count += WT_STAT_READ(from, cursor_bulk_count);
     to->cursor_cached_count += WT_STAT_READ(from, cursor_cached_count);
     to->cursor_insert_bulk += WT_STAT_READ(from, cursor_insert_bulk);
     to->cursor_cache += WT_STAT_READ(from, cursor_cache);
