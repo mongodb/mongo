@@ -235,7 +235,7 @@ public:
     inline std::shared_ptr<std::vector<std::string>>
     get_array(const char *key) const
     {
-        return std::get<std::shared_ptr<std::vector<std::string>>>(_map.find(key)->second);
+        return std::get<std::shared_ptr<std::vector<std::string>>>(get_raw(key));
     }
 
     /*
@@ -263,7 +263,7 @@ public:
     inline std::shared_ptr<config_map> const
     get_map(const char *key)
     {
-        return std::get<std::shared_ptr<config_map>>(_map.find(key)->second);
+        return std::get<std::shared_ptr<config_map>>(get_raw(key));
     }
 
     /*
@@ -273,7 +273,7 @@ public:
     inline std::string
     get_string(const char *key) const
     {
-        return std::get<std::string>(_map.find(key)->second);
+        return std::get<std::string>(get_raw(key));
     }
 
     /*
@@ -283,7 +283,7 @@ public:
     inline uint64_t
     get_bool(const char *key) const
     {
-        std::string v = std::get<std::string>(_map.find(key)->second);
+        std::string v = std::get<std::string>(get_raw(key));
         return v == "true" || v == "1";
     }
 
@@ -294,7 +294,7 @@ public:
     inline float
     get_float(const char *key) const
     {
-        return std::stof(std::get<std::string>(_map.find(key)->second));
+        return std::stof(std::get<std::string>(get_raw(key)));
     }
 
     /*
@@ -304,7 +304,7 @@ public:
     inline uint64_t
     get_uint64(const char *key) const
     {
-        std::istringstream stream(std::get<std::string>(_map.find(key)->second));
+        std::istringstream stream(std::get<std::string>(get_raw(key)));
         uint64_t v;
         stream >> v;
         return v;
@@ -317,7 +317,7 @@ public:
     inline uint64_t
     get_uint64_hex(const char *key) const
     {
-        std::istringstream stream(std::get<std::string>(_map.find(key)->second));
+        std::istringstream stream(std::get<std::string>(get_raw(key)));
         uint64_t v;
         stream >> std::hex >> v;
         return v;
@@ -342,6 +342,19 @@ private:
      *     Create a new instance of the config map.
      */
     inline config_map() noexcept {};
+
+    /*
+     * config_map::get_raw --
+     *     Get the raw value of a key from the config map; throw an exception if not found.
+     */
+    inline const value_t
+    get_raw(const std::string &key) const
+    {
+        auto iter = _map.find(key);
+        if (iter == _map.end())
+            throw std::runtime_error("No such key in the config map: " + key);
+        return iter->second;
+    }
 
     /*
      * config_map::parse_array --
