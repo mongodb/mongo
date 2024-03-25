@@ -54,18 +54,11 @@ class test_compact11(backup_base):
     def get_bg_compaction_running(self):
         return self.get_stat(stat.conn.background_compact_running)
 
+    def get_bg_compaction_success(self):
+        return self.get_stat(stat.conn.background_compact_success)
+
     def get_bytes_recovered(self):
         return self.get_stat(stat.conn.background_compact_bytes_recovered)
-
-    def get_files_compacted(self, uris):
-        files_compacted = 0
-        for uri in uris:
-            if self.get_pages_rewritten(uri) > 0:
-                files_compacted += 1
-        return files_compacted
-
-    def get_pages_rewritten(self, uri):
-        return self.get_stat(stat.dsrc.btree_compact_pages_rewritten, uri)
 
     def get_stat(self, stat, uri = None):
         if not uri:
@@ -161,12 +154,13 @@ class test_compact11(backup_base):
         for uri in files:
             bitmaps.append(self.parse_blkmods(uri))
 
-        # Turn on background compaction to allow the bitmap blocks to be modified
-        # from compact operation.
-        self.turn_on_bg_compact('free_space_target=1MB')
+        # Turn on background compaction to allow the bitmap blocks to be modified from compact
+        # operation. Only run compaction once to process each table and avoid overwriting stats.
+        self.turn_on_bg_compact('free_space_target=1MB,run_once=true')
 
         bytes_recovered = 0
-        while self.get_files_compacted(uris) < self.num_tables:
+        # Each pass on a file should be a success. Note that it does not mean the file is compacted.
+        while self.get_bg_compaction_success() < self.num_tables:
             new_bytes_recovered = self.get_bytes_recovered()
             if new_bytes_recovered != bytes_recovered:
                 # Update the incremental backup ID from the parent class.
@@ -181,9 +175,8 @@ class test_compact11(backup_base):
 
                 bytes_recovered = new_bytes_recovered
 
-
-        assert self.get_files_compacted(uris) == self.num_tables
-        self.pr(f'Compaction has compacted {self.num_tables} tables.')
+        self.pr(f'Compaction has compacted {self.get_bg_compaction_success()} tables.')
+        self.assertTrue(bytes_recovered > 0)
 
         # Compare all the incremental backups against the starting full backup. The idea is that
         # compact should not have changed the contents of the table.
