@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -91,7 +92,9 @@ public:
 
         Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                               bool inMultiDocumentTransaction) const override {
-            if (!inMultiDocumentTransaction || _foreignNss != nss) {
+            const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
+            if (!inMultiDocumentTransaction || _foreignNss != nss ||
+                gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
                 return Status::OK();
             }
 

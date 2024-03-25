@@ -445,15 +445,16 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
 }
 
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
-    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
+    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime, bool allowLocks) {
     try {
-        auto cm = uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, atClusterTime));
+        auto cm =
+            uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, atClusterTime, allowLocks));
         if (!cm.isSharded()) {
             // If the collection is unsharded, it cannot have global indexes so there is no need to
             // fetch the index information.
             return CollectionRoutingInfo{std::move(cm), boost::none};
         }
-        auto sii = _getCollectionIndexInfoAt(opCtx, nss);
+        auto sii = _getCollectionIndexInfoAt(opCtx, nss, allowLocks);
         return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
     } catch (const DBException& ex) {
         return ex.toStatus();

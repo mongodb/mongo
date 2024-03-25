@@ -860,13 +860,24 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
 
 StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
+    // When in a multi-document transaction, allow getting routing info from the
+    // CatalogCache even though locks may be held. The CatalogCache will throw
+    // CannotRefreshDueToLocksHeld if the entry is not already cached.
+    //
+    // Note that we only do this if we indeed hold a lock. Otherwise first executions on a mongos
+    // would cause this to unnecessarily throw a transient CannotRefreshDueToLocksHeld error. This
+    // would force the client to retry the entire transaction even if it hasn't yet executed
+    // anything.
+    const auto allowLocks =
+        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
+
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     invariant(catalogCache);
 
     auto argsAtClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     if (argsAtClusterTime) {
         return catalogCache->getCollectionRoutingInfoAt(
-            opCtx, nss, argsAtClusterTime->asTimestamp());
+            opCtx, nss, argsAtClusterTime->asTimestamp(), allowLocks);
     }
 
     // Return the latest routing table if not running in a transaction with snapshot level read
@@ -874,11 +885,11 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         if (auto atClusterTime = txnRouter.getSelectedAtClusterTime()) {
             return catalogCache->getCollectionRoutingInfoAt(
-                opCtx, nss, atClusterTime->asTimestamp());
+                opCtx, nss, atClusterTime->asTimestamp(), allowLocks);
         }
     }
 
-    return catalogCache->getCollectionRoutingInfo(opCtx, nss);
+    return catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks);
 }
 
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(

@@ -2105,11 +2105,11 @@ bool TransactionRouter::Router::_errorAllowsRetryOnStaleShardOrDb(const Status& 
         status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
 
     // We can retry on the first operation of stale config or db routing version error if there was
-    // only one participant in the transaction because there would only be one request sent, and at
-    // this point that request has finished so there can't be any outstanding requests that would
+    // at most one participant in the transaction because there would only be one request sent, and
+    // at this point that request has finished so there can't be any outstanding requests that would
     // race with a retry
     return (staleInfo || staleDB || shardCannotRefreshDueToLocksHeldInfo) &&
-        o().participants.size() == 1 && p().latestStmtId == p().firstStmtId;
+        o().participants.size() <= 1 && p().latestStmtId == p().firstStmtId;
 }
 
 Microseconds TransactionRouter::TimingStats::getDuration(TickSource* tickSource,

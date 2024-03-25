@@ -459,7 +459,9 @@ const char* DocumentSourceLookUp::getSourceName() const {
 }
 
 bool DocumentSourceLookUp::foreignShardedLookupAllowed() const {
-    return !pExpCtx->opCtx->inMultiDocumentTransaction();
+    const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
+    return !pExpCtx->opCtx->inMultiDocumentTransaction() ||
+        gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot);
 }
 
 void DocumentSourceLookUp::determineSbeCompatibility() {
@@ -669,7 +671,7 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
         expectUnshardedCollectionInScope;
 
     const auto allowForeignShardedColl = foreignShardedLookupAllowed();
-    if (!allowForeignShardedColl) {
+    if (!allowForeignShardedColl && !fromExpCtx->inMongos) {
         // Enforce that the foreign collection must be unsharded for lookup.
         expectUnshardedCollectionInScope =
             fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(

@@ -200,7 +200,8 @@ public:
      */
     StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoAt(OperationContext* opCtx,
                                                                  const NamespaceString& nss,
-                                                                 Timestamp atClusterTime);
+                                                                 Timestamp atClusterTime,
+                                                                 bool allowLocks = false);
 
     /**
      * Same as the getCollectionRoutingInfoAt call above, but returns the latest known routing

@@ -251,7 +251,9 @@ void DocumentSourceGraphLookUp::doDispose() {
 }
 
 bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
-    return !pExpCtx->opCtx->inMultiDocumentTransaction();
+    const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
+    return !pExpCtx->opCtx->inMultiDocumentTransaction() ||
+        gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot);
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -282,7 +284,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             expectUnshardedCollectionInScope;
 
         const auto allowForeignSharded = foreignShardedGraphLookupAllowed();
-        if (!allowForeignSharded) {
+        if (!allowForeignSharded && !_fromExpCtx->inMongos) {
             // Enforce that the foreign collection must be unsharded for $graphLookup.
             expectUnshardedCollectionInScope =
                 _fromExpCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
