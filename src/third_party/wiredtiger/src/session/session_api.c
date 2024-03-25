@@ -397,6 +397,18 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
     WT_STAT_CONN_DECR(session, session_open);
 
 #ifdef HAVE_DIAGNOSTIC
+    /*
+     * Unlock the thread_check mutex if we own it, this a bit of a cheeky workaround as there's one
+     * scenario where we enter this path and the mutex itself isn't locked anyway.
+     *
+     * Essentially if the caller enters through __session_close then they lock this mutex in the API
+     * enter macro. This code then destroys it prior to the associated unlock call in the API exit
+     * code. By placing the unlock here we avoid this destroy happening early.
+     *
+     * The connection close path goes through here too but doesn't go via __session_close, so we
+     * check if the caller owns the mutex before deciding to unlock it.
+     */
+    __wt_spin_unlock_if_owned(session, &session->thread_check.lock);
     __wt_spin_destroy(session, &session->thread_check.lock);
 #endif
 
