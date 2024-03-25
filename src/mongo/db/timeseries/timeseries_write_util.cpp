@@ -91,6 +91,7 @@
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
@@ -119,9 +120,6 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                                                      batch->bucketHandle.bucketId.oid),
                 "Failpoint-triggered data integrity check failure");
         }
-        // In testing, we want any failures within this check to invariant. In production,
-        // we want this to instead throw an exception.
-        bool isTestingProctorOn = TestingProctor::instance().isEnabled();
 
         auto data = docToWrite.getObjectField(kBucketDataFieldName);
 
@@ -138,6 +136,45 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
         StringDataMap<std::tuple<BSONColumn::Iterator, BSONColumn, StringData, size_t>>
             fieldsToDataAndNextCountMap;
 
+        using AddAttrsFn = std::function<void(logv2::DynamicAttributes&)>;
+        auto failed = [&sortedMeasurements, &batch, &docToWrite](StringData reason,
+                                                                 AddAttrsFn addAttrsWithoutData,
+                                                                 AddAttrsFn addAttrsWithData) {
+            logv2::DynamicAttributes attrs;
+            attrs.add("bucketId", batch->bucketHandle.bucketId.oid);
+            attrs.add("collectionUUID", batch->bucketHandle.bucketId.collectionUUID);
+            addAttrsWithoutData(attrs);
+
+            LOGV2_WARNING(8807500,
+                          "Failed data verification inserting into compressed column",
+                          "reason"_attr = reason,
+                          "bucketId"_attr = batch->bucketHandle.bucketId.oid,
+                          "collectionUUID"_attr = batch->bucketHandle.bucketId.collectionUUID);
+
+            attrs = {};
+            auto seqLogDataFields = [](const details::Measurement& measurement) {
+                return logv2::seqLog(measurement.dataFields);
+            };
+            auto measurementsAttr = logv2::seqLog(
+                boost::make_transform_iterator(sortedMeasurements.begin(), seqLogDataFields),
+                boost::make_transform_iterator(sortedMeasurements.end(), seqLogDataFields));
+            attrs.add("measurements", measurementsAttr);
+            auto bucketAttr = base64::encode(docToWrite.objdata(), docToWrite.objsize());
+            attrs.add("bucket", bucketAttr);
+            addAttrsWithData(attrs);
+
+            LOGV2_WARNING_OPTIONS(8807501,
+                                  logv2::LogTruncation::Disabled,
+                                  "Failed data verification inserting into compressed column",
+                                  attrs);
+
+            invariant(!TestingProctor::instance().isEnabled());
+            tasserted(
+                timeseries::BucketCompressionFailure(batch->bucketHandle.bucketId.collectionUUID,
+                                                     batch->bucketHandle.bucketId.oid),
+                "Failed data verification inserting into compressed column");
+        };
+
         // First, populate our map.
         for (auto&& [key, columnValue] : data) {
             int binLength = 0;
@@ -150,18 +187,13 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                 fieldsToDataAndNextCountMap.emplace(
                     key, std::make_tuple(it, std::move(c), StringData(binData, binLength), 0));
             } catch (const DBException& e) {
-                // TODO(SERVER-88075) add logging
-                // Invariant if we are in testing, throw an exception in production.
-                str::stream exceptionMessage;
-                exceptionMessage << "Encountered exception " << e.toString()
-                                 << " when iterating over BSONColumn binary "
-                                 << StringData(binData, binLength) << " while writing to document "
-                                 << base64::encode(docToWrite.toString());
-                invariant(!isTestingProctorOn, exceptionMessage);
-                uasserted(timeseries::BucketCompressionFailure(
-                              batch->bucketHandle.bucketId.collectionUUID,
-                              batch->bucketHandle.bucketId.oid),
-                          exceptionMessage);
+                failed(
+                    "exception",
+                    [&e](logv2::DynamicAttributes& attrs) { attrs.add("error", e); },
+                    [&binData, binLength](logv2::DynamicAttributes& attrs) {
+                        auto columnAttr = base64::encode(binData, binLength);
+                        attrs.add("column", columnAttr);
+                    });
             };
         }
         // Now, iterate through each measurement, and check if the value for each field of the
@@ -173,34 +205,29 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
         for (const auto& measurement : sortedMeasurements) {
             for (const BSONElement& elem : measurement.dataFields) {
                 auto measurementKey = elem.fieldNameStringData();
-                bool mapContainsKey = fieldsToDataAndNextCountMap.contains(measurementKey);
-                // TODO(SERVER-88075) add logging
-                // Invariant if we are in testing, throw an exception in production.
-                str::stream missingKeyMessage;
-                missingKeyMessage << "BSONColumn was missing key " << measurementKey;
-                invariant(mapContainsKey || !isTestingProctorOn, missingKeyMessage);
-                uassert(timeseries::BucketCompressionFailure(
-                            batch->bucketHandle.bucketId.collectionUUID,
-                            batch->bucketHandle.bucketId.oid),
-                        missingKeyMessage,
-                        mapContainsKey);
+                if (!fieldsToDataAndNextCountMap.contains(measurementKey)) {
+                    failed(
+                        "missing column",
+                        [](logv2::DynamicAttributes& attrs) {},
+                        [measurementKey](logv2::DynamicAttributes& attrs) {
+                            attrs.add("key", measurementKey);
+                        });
+                }
                 auto& [iterator, column, binaryString, nextCount] =
                     fieldsToDataAndNextCountMap.at(measurementKey);
-                BSONElement columnValue = *iterator;
-                bool areBinariesEqual = columnValue.binaryEqualValues(elem);
-                // TODO(SERVER-88075) add logging
-                // Invariant if we are in testing, throw an exception in production.
-                str::stream binariesDiffMessage;
-                binariesDiffMessage << "BSONColumn value " << columnValue
-                                    << " was not equal to expected measurement value " << elem
-                                    << " for key " << measurementKey << " for binary "
-                                    << base64::encode(binaryString);
-                invariant(areBinariesEqual || !isTestingProctorOn, binariesDiffMessage);
-                uassert(timeseries::BucketCompressionFailure(
-                            batch->bucketHandle.bucketId.collectionUUID,
-                            batch->bucketHandle.bucketId.oid),
-                        binariesDiffMessage,
-                        areBinariesEqual);
+                if (!iterator->binaryEqualValues(elem)) {
+                    failed(
+                        "value not matching expected",
+                        [](logv2::DynamicAttributes& attrs) {},
+                        [binaryString = binaryString, measurementKey, &iterator = iterator, elem](
+                            logv2::DynamicAttributes& attrs) {
+                            auto columnAttr = base64::encode(binaryString);
+                            attrs.add("column", columnAttr);
+                            attrs.add("key", measurementKey);
+                            attrs.add("value", *iterator);
+                            attrs.add("expected", elem);
+                        });
+                }
                 ++nextCount;
                 ++iterator;
             }
@@ -212,16 +239,18 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
                 // corresponding element in the column is a skip value.
                 if (nextCount < numIterations) {
                     invariant(nextCount == numIterations - 1);
-                    BSONElement val = *iterator;
-                    str::stream noEOOMessage;
-                    noEOOMessage << "Column value " << val << " was not equal to EOO for binary "
-                                 << binaryString;
-                    invariant(val.eoo() || !isTestingProctorOn, noEOOMessage);
-                    uassert(timeseries::BucketCompressionFailure(
-                                batch->bucketHandle.bucketId.collectionUUID,
-                                batch->bucketHandle.bucketId.oid),
-                            noEOOMessage,
-                            val.eoo());
+                    if (!iterator->eoo()) {
+                        failed(
+                            "value unexpectedly not EOO",
+                            [](logv2::DynamicAttributes& attrs) {},
+                            [binaryString = binaryString, key = key, &iterator = iterator](
+                                logv2::DynamicAttributes& attrs) {
+                                auto columnAttr = base64::encode(binaryString);
+                                attrs.add("column", columnAttr);
+                                attrs.add("key", key);
+                                attrs.add("value", *iterator);
+                            });
+                    }
                     ++iterator;
                     ++nextCount;
                 }

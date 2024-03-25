@@ -483,7 +483,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         try {
             bucket->measurementMap.initBuilders(dataObj, bucket->numCommittedMeasurements);
         } catch (const DBException& ex) {
-            // TODO(SERVER-88075): Add dual-log messages for corruption.
+            // TODO(SERVER-88529): Add dual-log messages for corruption.
             LOGV2_WARNING(
                 8830601,
                 "Failed to decompress bucket for time-series insert upon reopening, will retry "
