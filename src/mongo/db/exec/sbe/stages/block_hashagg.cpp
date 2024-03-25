@@ -912,6 +912,12 @@ std::unique_ptr<PlanStageStats> BlockHashAggStage::getStats(bool includeDebugInf
             }
         }
 
+        // Spilling stats.
+        bob.appendBool("usedDisk", _specificStats.usedDisk);
+        bob.appendNumber("spills", _specificStats.spills);
+        bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
+        bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
+
         ret->debugInfo = bob.obj();
     }
 
