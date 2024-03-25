@@ -158,6 +158,9 @@ class test_stat10(wttest.WiredTigerTestCase):
         column_rle = statscursor[stat.dsrc.btree_column_rle][2]
         column_tws = statscursor[stat.dsrc.btree_column_tws][2]
         overflow = statscursor[stat.dsrc.btree_overflow][2]
+        # Read backup stats even though backup isn't being used.
+        self.assertEqual(0, statscursor[stat.dsrc.backup_blocks_compressed][2])
+        self.assertEqual(0, statscursor[stat.dsrc.backup_blocks_uncompressed][2])
 
         statscursor.close()
 

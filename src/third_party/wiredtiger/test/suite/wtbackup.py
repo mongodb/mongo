@@ -52,8 +52,11 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     # Temporary directory used to verify consistent data between multiple incremental backups.
     home_tmp = "WT_TEST_TMP"
 
-    def get_stat(self, stat_name):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
+    def backup_get_stat(self, stat_name, uri = None):
+        if uri == None:
+            stat_cursor = self.session.open_cursor('statistics:', None, None)
+        else:
+            stat_cursor = self.session.open_cursor('statistics:file:' + uri, None, None)
         value = stat_cursor[stat_name][2]
         stat_cursor.close()
         return value
@@ -205,7 +208,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
                 config = 'incremental=(granularity=1M,enabled=true,this_id=ID0)'
             bkup_c = self.session.open_cursor('backup:', None, config)
         all_files = []
-        self.assertEqual(1, self.get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_cursor_open))
         # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.
         # If that changes then this, and the use of the duplicate below can change.
@@ -295,13 +298,14 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('Open incremental cursor with ' + config)
         # For each file listed, open a duplicate backup cursor and copy the blocks.
         incr_c = self.session.open_cursor(None, bkup_c, config)
-        self.assertEqual(1, self.get_stat(stat.conn.backup_dup_open))
-        # For consolidate
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_dup_open))
+        # Array of lengths used for consolidate.
         lens = []
         # We cannot use 'for newfile in incr_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.
         # If that changes then this, and the use of the duplicate below can change.
         did_work = False
+        first = True
         while incr_c.next() == 0:
             incrlist = incr_c.get_keys()
             offset = incrlist[0]
@@ -314,15 +318,46 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
                 # Copy the whole file.
                 self.copy_file(newfile, backup_incr_dir)
             else:
+                # We can count backup dsrc statistics in the range case. Initialize here.
+                if first:
+                    # Get connection statistic before walking the cursor.
+                    last_blocks = self.backup_get_stat(stat.conn.backup_blocks)
+                    last_comp = self.backup_get_stat(stat.dsrc.backup_blocks_compressed, newfile)
+                    last_uncomp = self.backup_get_stat(stat.dsrc.backup_blocks_uncompressed, newfile)
+                    first = False
                 # Copy the block range.
                 self.pr(f"Range copy file '{newfile}' offset {offset} len {size}")
                 self.range_copy(newfile, offset, size, backup_incr_dir, consolidate)
                 lens.append(size)
                 did_work = True
+                # Check backup stats.
+                blocks = self.backup_get_stat(stat.conn.backup_blocks)
+                blocks_diff = blocks - last_blocks
+                self.pr(f"{newfile}: Start {last_blocks} range copy end {blocks}, total blocks {blocks_diff}")
+
+                # Connection stats should track for compressed and uncompressed should
+                # track the total changed.
+                comp = self.backup_get_stat(stat.conn.backup_blocks_compressed)
+                uncomp = self.backup_get_stat(stat.conn.backup_blocks_uncompressed)
+                self.assertEqual(blocks, comp + uncomp)
+                # Now check the same data source stats. The change for this range copy
+                # should track the difference for this file.
+                comp = self.backup_get_stat(stat.dsrc.backup_blocks_compressed, newfile)
+                uncomp = self.backup_get_stat(stat.dsrc.backup_blocks_uncompressed, newfile)
+                comp_diff = comp - last_comp
+                uncomp_diff = uncomp - last_uncomp
+                self.assertEqual(blocks_diff, comp_diff + uncomp_diff)
+                last_blocks = blocks
+                last_comp = comp
+                last_uncomp = uncomp
         incr_c.close()
-        self.assertEqual(0, self.get_stat(stat.conn.backup_dup_open))
+        self.assertEqual(0, self.backup_get_stat(stat.conn.backup_dup_open))
         if did_work:
-            self.assertNotEqual(0, self.get_stat(stat.conn.backup_blocks))
+            blocks = self.backup_get_stat(stat.conn.backup_blocks)
+            self.assertNotEqual(0, blocks)
+            comp = self.backup_get_stat(stat.conn.backup_blocks_compressed)
+            uncomp = self.backup_get_stat(stat.conn.backup_blocks_uncompressed)
+            self.assertEqual(blocks, comp + uncomp)
         return lens
 
     #
@@ -335,7 +370,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         if log_cursor == None:
             config = 'target=("log:")'
             dupc = self.session.open_cursor(None, bkup_c, config)
-            self.assertEqual(1, self.get_stat(stat.conn.backup_dup_open))
+            self.assertEqual(1, self.backup_get_stat(stat.conn.backup_dup_open))
         dup_logs = []
         while dupc.next() == 0:
             newfile = dupc.get_key()
@@ -375,9 +410,9 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
 
         file_sizes = []
         file_names = []
-        self.assertEqual(1, self.get_stat(stat.conn.backup_cursor_open))
-        self.assertEqual(0, self.get_stat(stat.conn.backup_dup_open))
-        self.assertEqual(1, self.get_stat(stat.conn.backup_incremental))
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_cursor_open))
+        self.assertEqual(0, self.backup_get_stat(stat.conn.backup_dup_open))
+        self.assertEqual(1, self.backup_get_stat(stat.conn.backup_incremental))
 
         # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.

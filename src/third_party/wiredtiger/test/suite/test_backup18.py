@@ -73,10 +73,12 @@ class test_backup18(backup_base):
             None, None), 0), msg)
 
         # Open up the backup cursor.
+        def_gran = 16 * 1024 * 1024
         config = 'incremental=(enabled,this_id="ID1")'
         bkup_c = self.session.open_cursor('backup:', None, config)
         self.assertEqual(1, self.get_stat(stat.conn.backup_cursor_open))
         self.assertEqual(1, self.get_stat(stat.conn.backup_incremental))
+        self.assertEqual(def_gran, self.get_stat(stat.conn.backup_granularity))
 
         # Try to open the query cursor as a duplicate on the backup.
         msg = "/should be passed either/"

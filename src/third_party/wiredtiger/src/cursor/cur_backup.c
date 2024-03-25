@@ -71,6 +71,7 @@ __wt_backup_set_blkincr(
     /* Free any id already set. */
     __wt_free(session, blkincr->id_str);
     blkincr->granularity = conn->incr_granularity = granularity;
+    WT_STAT_CONN_SET(session, backup_granularity, granularity);
     WT_RET(__wt_strndup(session, id, id_len, &blkincr->id_str));
     WT_CONN_SET_INCR_BACKUP(conn);
     F_SET(blkincr, WT_BLKINCR_VALID);

@@ -133,6 +133,14 @@ class test_stat01(wttest.WiredTigerTestCase):
         self.assertEqual(values[0], 'btree: overflow pages')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
+
+        # Verify we can look at backup statistics without invoking backup.
+        values = cursor[stat.dsrc.backup_blocks_compressed]
+        val = self.statstr_to_int(values[1])
+        self.assertEqual(val, values[2])
+        values = cursor[stat.dsrc.backup_blocks_uncompressed]
+        val = self.statstr_to_int(values[1])
+        self.assertEqual(val, values[2])
         cursor.close()
 
         cursor = self.session.open_cursor(

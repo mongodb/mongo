@@ -17,6 +17,8 @@ static const char *const __stats_dsrc_desc[] = {
   "LSM: total size of bloom filters",
   "autocommit: retries for readonly operations",
   "autocommit: retries for update operations",
+  "backup: total modified incremental blocks with compressed data",
+  "backup: total modified incremental blocks without compressed data",
   "block-manager: allocations requiring file extension",
   "block-manager: blocks allocated",
   "block-manager: blocks freed",
@@ -374,6 +376,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->bloom_size = 0;
     stats->autocommit_readonly_retry = 0;
     stats->autocommit_update_retry = 0;
+    stats->backup_blocks_compressed = 0;
+    stats->backup_blocks_uncompressed = 0;
     stats->block_extension = 0;
     stats->block_alloc = 0;
     stats->block_free = 0;
@@ -686,6 +690,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->bloom_size += from->bloom_size;
     to->autocommit_readonly_retry += from->autocommit_readonly_retry;
     to->autocommit_update_retry += from->autocommit_update_retry;
+    to->backup_blocks_compressed += from->backup_blocks_compressed;
+    to->backup_blocks_uncompressed += from->backup_blocks_uncompressed;
     to->block_extension += from->block_extension;
     to->block_alloc += from->block_alloc;
     to->block_free += from->block_free;
@@ -1012,6 +1018,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->bloom_size += WT_STAT_READ(from, bloom_size);
     to->autocommit_readonly_retry += WT_STAT_READ(from, autocommit_readonly_retry);
     to->autocommit_update_retry += WT_STAT_READ(from, autocommit_update_retry);
+    to->backup_blocks_compressed += WT_STAT_READ(from, backup_blocks_compressed);
+    to->backup_blocks_uncompressed += WT_STAT_READ(from, backup_blocks_uncompressed);
     to->block_extension += WT_STAT_READ(from, block_extension);
     to->block_alloc += WT_STAT_READ(from, block_alloc);
     to->block_free += WT_STAT_READ(from, block_free);
@@ -1366,6 +1374,14 @@ static const char *const __stats_connection_desc[] = {
   "background-compact: background compact successful calls",
   "background-compact: background compact timeout",
   "background-compact: number of files tracked by background compaction",
+  "backup: backup cursor open",
+  "backup: backup duplicate cursor open",
+  "backup: backup granularity size",
+  "backup: incremental backup enabled",
+  "backup: opening the backup cursor in progress",
+  "backup: total modified incremental blocks",
+  "backup: total modified incremental blocks with compressed data",
+  "backup: total modified incremental blocks without compressed data",
   "block-cache: cached blocks updated",
   "block-cache: cached bytes updated",
   "block-cache: evicted blocks",
@@ -1676,24 +1692,19 @@ static const char *const __stats_connection_desc[] = {
   "connection: auto adjusting condition resets",
   "connection: auto adjusting condition wait calls",
   "connection: auto adjusting condition wait raced to update timeout and skipped updating",
-  "connection: backup cursor open",
-  "connection: backup duplicate cursor open",
   "connection: detected system time went backwards",
   "connection: files currently open",
   "connection: hash bucket array size for data handles",
   "connection: hash bucket array size general",
-  "connection: incremental backup enabled",
   "connection: memory allocations",
   "connection: memory frees",
   "connection: memory re-allocations",
   "connection: number of sessions without a sweep for 5+ minutes",
   "connection: number of sessions without a sweep for 60+ minutes",
-  "connection: opening the backup cursor in progress",
   "connection: pthread mutex condition wait calls",
   "connection: pthread mutex shared lock read-lock calls",
   "connection: pthread mutex shared lock write-lock calls",
   "connection: total fsync I/Os",
-  "connection: total modified incremental blocks",
   "connection: total read I/Os",
   "connection: total write I/Os",
   "cursor: Total number of deleted pages skipped during tree walk",
@@ -2117,6 +2128,14 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->background_compact_success = 0;
     stats->background_compact_timeout = 0;
     stats->background_compact_files_tracked = 0;
+    /* not clearing backup_cursor_open */
+    /* not clearing backup_dup_open */
+    stats->backup_granularity = 0;
+    /* not clearing backup_incremental */
+    /* not clearing backup_start */
+    stats->backup_blocks = 0;
+    stats->backup_blocks_compressed = 0;
+    stats->backup_blocks_uncompressed = 0;
     stats->block_cache_blocks_update = 0;
     stats->block_cache_bytes_update = 0;
     stats->block_cache_blocks_evicted = 0;
@@ -2408,24 +2427,19 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cond_auto_wait_reset = 0;
     stats->cond_auto_wait = 0;
     stats->cond_auto_wait_skipped = 0;
-    /* not clearing backup_cursor_open */
-    /* not clearing backup_dup_open */
     stats->time_travel = 0;
     /* not clearing file_open */
     /* not clearing buckets_dh */
     /* not clearing buckets */
-    /* not clearing backup_incremental */
     stats->memory_allocation = 0;
     stats->memory_free = 0;
     stats->memory_grow = 0;
     stats->no_session_sweep_5min = 0;
     stats->no_session_sweep_60min = 0;
-    /* not clearing backup_start */
     stats->cond_wait = 0;
     stats->rwlock_read = 0;
     stats->rwlock_write = 0;
     stats->fsync_io = 0;
-    stats->backup_blocks = 0;
     stats->read_io = 0;
     stats->write_io = 0;
     stats->cursor_tree_walk_del_page_skip = 0;
@@ -2817,6 +2831,14 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->background_compact_success += WT_STAT_READ(from, background_compact_success);
     to->background_compact_timeout += WT_STAT_READ(from, background_compact_timeout);
     to->background_compact_files_tracked += WT_STAT_READ(from, background_compact_files_tracked);
+    to->backup_cursor_open += WT_STAT_READ(from, backup_cursor_open);
+    to->backup_dup_open += WT_STAT_READ(from, backup_dup_open);
+    to->backup_granularity += WT_STAT_READ(from, backup_granularity);
+    to->backup_incremental += WT_STAT_READ(from, backup_incremental);
+    to->backup_start += WT_STAT_READ(from, backup_start);
+    to->backup_blocks += WT_STAT_READ(from, backup_blocks);
+    to->backup_blocks_compressed += WT_STAT_READ(from, backup_blocks_compressed);
+    to->backup_blocks_uncompressed += WT_STAT_READ(from, backup_blocks_uncompressed);
     to->block_cache_blocks_update += WT_STAT_READ(from, block_cache_blocks_update);
     to->block_cache_bytes_update += WT_STAT_READ(from, block_cache_bytes_update);
     to->block_cache_blocks_evicted += WT_STAT_READ(from, block_cache_blocks_evicted);
@@ -3166,24 +3188,19 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
     to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
     to->cond_auto_wait_skipped += WT_STAT_READ(from, cond_auto_wait_skipped);
-    to->backup_cursor_open += WT_STAT_READ(from, backup_cursor_open);
-    to->backup_dup_open += WT_STAT_READ(from, backup_dup_open);
     to->time_travel += WT_STAT_READ(from, time_travel);
     to->file_open += WT_STAT_READ(from, file_open);
     to->buckets_dh += WT_STAT_READ(from, buckets_dh);
     to->buckets += WT_STAT_READ(from, buckets);
-    to->backup_incremental += WT_STAT_READ(from, backup_incremental);
     to->memory_allocation += WT_STAT_READ(from, memory_allocation);
     to->memory_free += WT_STAT_READ(from, memory_free);
     to->memory_grow += WT_STAT_READ(from, memory_grow);
     to->no_session_sweep_5min += WT_STAT_READ(from, no_session_sweep_5min);
     to->no_session_sweep_60min += WT_STAT_READ(from, no_session_sweep_60min);
-    to->backup_start += WT_STAT_READ(from, backup_start);
     to->cond_wait += WT_STAT_READ(from, cond_wait);
     to->rwlock_read += WT_STAT_READ(from, rwlock_read);
     to->rwlock_write += WT_STAT_READ(from, rwlock_write);
     to->fsync_io += WT_STAT_READ(from, fsync_io);
-    to->backup_blocks += WT_STAT_READ(from, backup_blocks);
     to->read_io += WT_STAT_READ(from, read_io);
     to->write_io += WT_STAT_READ(from, write_io);
     to->cursor_tree_walk_del_page_skip += WT_STAT_READ(from, cursor_tree_walk_del_page_skip);

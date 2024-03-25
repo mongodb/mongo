@@ -75,19 +75,20 @@ struct __wt_cursor_backup {
     uint64_t granularity; /* Length, transfer size */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CURBACKUP_CKPT_FAKE 0x001u   /* Object has fake checkpoint */
-#define WT_CURBACKUP_CONSOLIDATE 0x002u /* Consolidate returned info on this object */
-#define WT_CURBACKUP_DUP 0x004u         /* Duplicated backup cursor */
-#define WT_CURBACKUP_EXPORT 0x008u      /* Special backup cursor for export operation */
-#define WT_CURBACKUP_FORCE_FULL 0x010u  /* Force full file copy for this cursor */
-#define WT_CURBACKUP_FORCE_STOP 0x020u  /* Force stop incremental backup */
-#define WT_CURBACKUP_HAS_CB_INFO 0x040u /* Object has checkpoint backup info */
-#define WT_CURBACKUP_INCR 0x080u        /* Incremental backup cursor */
-#define WT_CURBACKUP_INCR_INIT 0x100u   /* Cursor traversal initialized */
-#define WT_CURBACKUP_LOCKER 0x200u      /* Hot-backup started */
-#define WT_CURBACKUP_QUERYID 0x400u     /* Backup cursor for incremental ids */
-#define WT_CURBACKUP_RENAME 0x800u      /* Object had a rename */
-                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WT_CURBACKUP_CKPT_FAKE 0x0001u   /* Object has fake checkpoint */
+#define WT_CURBACKUP_COMPRESSED 0x0002u  /* Object uses compression */
+#define WT_CURBACKUP_CONSOLIDATE 0x0004u /* Consolidate returned info on this object */
+#define WT_CURBACKUP_DUP 0x0008u         /* Duplicated backup cursor */
+#define WT_CURBACKUP_EXPORT 0x0010u      /* Special backup cursor for export operation */
+#define WT_CURBACKUP_FORCE_FULL 0x0020u  /* Force full file copy for this cursor */
+#define WT_CURBACKUP_FORCE_STOP 0x0040u  /* Force stop incremental backup */
+#define WT_CURBACKUP_HAS_CB_INFO 0x0080u /* Object has checkpoint backup info */
+#define WT_CURBACKUP_INCR 0x0100u        /* Incremental backup cursor */
+#define WT_CURBACKUP_INCR_INIT 0x0200u   /* Cursor traversal initialized */
+#define WT_CURBACKUP_LOCKER 0x0400u      /* Hot-backup started */
+#define WT_CURBACKUP_QUERYID 0x0800u     /* Backup cursor for incremental ids */
+#define WT_CURBACKUP_RENAME 0x1000u      /* Object had a rename */
+                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 
