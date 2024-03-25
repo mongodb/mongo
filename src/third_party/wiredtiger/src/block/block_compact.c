@@ -19,7 +19,9 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 
     if (block->compact_session_id != WT_SESSION_ID_INVALID)
-        return (EBUSY);
+        WT_RET_MSG(session, EBUSY,
+          "Compaction already happening on data handle %s by session %" PRIu32, block->name,
+          session->id);
 
     /* Switch to first-fit allocation. */
     __wt_block_configure_first_fit(block, true);
