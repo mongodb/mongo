@@ -335,6 +335,22 @@ public:
     }
 
     template <typename It>
+    static std::vector<boost::optional<uint64_t>> deltaDoubleMemory(It begin,
+                                                                    It end,
+                                                                    BSONElement prev) {
+        std::vector<boost::optional<uint64_t>> deltas;
+        for (; begin != end; ++begin) {
+            if (!begin->eoo()) {
+                deltas.push_back(deltaDoubleMemory(*begin, prev));
+                prev = *begin;
+            } else {
+                deltas.push_back(boost::none);
+            }
+        }
+        return deltas;
+    }
+
+    template <typename It>
     static std::vector<boost::optional<uint128_t>> deltaString(It begin, It end, BSONElement prev) {
         std::vector<boost::optional<uint128_t>> deltas;
         for (; begin != end; ++begin) {
@@ -1841,6 +1857,65 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleNotPossible) {
     appendLiteral(expected, elems.front());
     appendSimple8bControl(expected, 0b1000, 0b0000);
     appendSimple8bBlock64(expected, deltaDoubleMemory(elems[1], elems[0]));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DoubleRescaleFirstRescaledIsSkip) {
+    BSONColumnBuilder cb;
+
+    // This test writes a simple8b of doubles where one skip is left in pending. The next value need
+    // a different scale factor and the test verifies we can handle this when the first rescaled
+    // value is a skip.
+    std::vector<BSONElement> elems = {createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      BSONElement(),
+                                      createElementDouble(-0.0001),
+                                      BSONElement(),
+                                      createElementDouble(-0.0001),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      createElementDouble(0.0),
+                                      BSONElement(),
+                                      createElementDouble(std::numeric_limits<double>::infinity())};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1100, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.begin() + 31, elems.front(), 10000.0), 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDoubleMemory(elems.begin() + 31, elems.end(), elems[30]), 1);
     appendEOO(expected);
 
     auto binData = cb.finalize();

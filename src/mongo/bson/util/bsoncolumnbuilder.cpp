@@ -811,7 +811,7 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
                     Simple8b<uint64_t> rescale(
                         control + 1, currNumBlocks * sizeof(uint64_t), lastForS8b);
                     bool possible = true;
-                    // Iterate until we find a non-skipped value
+                    // See if next value can be scaled using the old scale factor
                     for (auto&& elem : rescale) {
                         if (elem) {
                             // See if this value is possible to scale using the old scale factor
@@ -821,8 +821,8 @@ void BSONColumnBuilder<BufBuilderType, BSONObjType, Allocator>::BinaryReopen::_r
                                     last.scaleIndex)) {
                                 possible = false;
                             }
-                            break;
                         }
+                        break;
                     }
 
                     if (possible) {
