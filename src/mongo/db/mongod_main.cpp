@@ -221,6 +221,10 @@
 #include <sys/file.h>
 #endif
 
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+
 namespace mongo {
 
 using logv2::LogComponent;
@@ -1415,6 +1419,18 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 #endif
 }
 
+void disableMongodTHPUnderTestingEnvironment() {
+#ifdef __linux__
+    if (TestingProctor::instance().isEnabled()) {
+        if (prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) == -1) {
+            LOGV2_WARNING(8751800, "Could not disable THP on mongod");
+        } else {
+            LOGV2_INFO(8751801, "Successfully disabled THP on mongod");
+        }
+    }
+#endif
+}
+
 }  // namespace
 
 int mongod_main(int argc, char* argv[]) {
@@ -1436,6 +1452,8 @@ int mongod_main(int argc, char* argv[]) {
             "error"_attr = status);
         quickExit(EXIT_FAILURE);
     }
+
+    disableMongodTHPUnderTestingEnvironment();
 
     auto* service = [] {
         try {
