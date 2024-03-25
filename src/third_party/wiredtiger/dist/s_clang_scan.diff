@@ -18,7 +18,6 @@ wiredtiger/src/rollback_to_stable/rts_btree.c Value stored to 'txn_id_visible' i
 wiredtiger/src/schema/schema_create.c Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
 wiredtiger/src/schema/schema_drop.c Value stored to 'got_dhandle' is never read [deadcode.DeadStores]
 wiredtiger/src/schema/schema_worker.c Value stored to 'is_tiered' is never read [deadcode.DeadStores]
-wiredtiger/src/session/session_api.c Called function pointer is null (null dereference) [core.CallAndMessage]
 wiredtiger/src/session/session_dhandle.c Although the value stored to 'is_hs' is used in the enclosing expression, the value is never actually read from 'is_hs' [deadcode.DeadStores]
 wiredtiger/src/session/session_dhandle.c Although the value stored to 'is_reserved_name' is used in the enclosing expression, the value is never actually read from 'is_reserved_name' [deadcode.DeadStores]
 wiredtiger/src/session/session_dhandle.c Although the value stored to 'is_unnamed_ckpt' is used in the enclosing expression, the value is never actually read from 'is_unnamed_ckpt' [deadcode.DeadStores]

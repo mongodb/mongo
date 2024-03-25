@@ -1495,7 +1495,6 @@ int
 __wt_session_range_truncate(
   WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *start, WT_CURSOR *stop)
 {
-    WT_CURSOR_BTREE *cbt;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(orig_start_key);
     WT_DECL_ITEM(orig_stop_key);
@@ -1503,10 +1502,13 @@ __wt_session_range_truncate(
     WT_ITEM start_key, stop_key;
     WT_TRUNCATE_INFO *trunc_info, _trunc_info;
     int cmp;
-    bool local_start, log_op, log_trunc;
+    const char *actual_uri;
+    bool local_start, local_stop, log_op, log_trunc, needs_next_prev, supports_bounds;
 
+    actual_uri = NULL;
+    local_start = local_stop = log_trunc = false;
     orig_start_key = orig_stop_key = NULL;
-    local_start = log_trunc = false;
+    supports_bounds = true;
 
     /* Setup the truncate information structure */
     trunc_info = &_trunc_info;
@@ -1515,23 +1517,15 @@ __wt_session_range_truncate(
         F_SET(trunc_info, WT_TRUNC_EXPLICIT_START);
     if (uri == NULL && stop != NULL)
         F_SET(trunc_info, WT_TRUNC_EXPLICIT_STOP);
+
+    /* Find the actual URI, as the "uri" argument could be NULL. */
     if (uri != NULL) {
         WT_ASSERT(session, WT_BTREE_PREFIX(uri));
-        /*
-         * A URI file truncate becomes a range truncate where we set a start cursor at the
-         * beginning. We already know the NULL stop goes to the end of the range.
-         */
-        WT_ERR(__session_open_cursor((WT_SESSION *)session, uri, NULL, NULL, &start));
-        local_start = true;
-        WT_ERR_NOTFOUND_OK(start->next(start), true);
-        if (ret == WT_NOTFOUND) {
-            /*
-             * If there are no elements, there is nothing to do.
-             */
-            ret = 0;
-            goto done;
-        }
-    }
+        actual_uri = uri;
+    } else if (start != NULL)
+        actual_uri = start->internal_uri;
+    else if (stop != NULL)
+        actual_uri = stop->internal_uri;
 
     /*
      * Cursor truncate is only supported for some objects, check for a supporting compare method.
@@ -1540,6 +1534,21 @@ __wt_session_range_truncate(
         WT_ERR(__wt_bad_object_type(session, start->uri));
     if (stop != NULL && stop->compare == NULL)
         WT_ERR(__wt_bad_object_type(session, stop->uri));
+
+    /*
+     * Use temporary buffers to store the original start and stop keys. We track the original keys
+     * for writing the truncate operation in the write-ahead log.
+     */
+    if (start != NULL) {
+        WT_ERR(__wt_cursor_get_raw_key(start, &start_key));
+        WT_ERR(__wt_scr_alloc(session, 0, &orig_start_key));
+        WT_ERR(__wt_buf_set(session, orig_start_key, start_key.data, start_key.size));
+    }
+    if (stop != NULL) {
+        WT_ERR(__wt_cursor_get_raw_key(stop, &stop_key));
+        WT_ERR(__wt_scr_alloc(session, 0, &orig_stop_key));
+        WT_ERR(__wt_buf_set(session, orig_stop_key, stop_key.data, stop_key.size));
+    }
 
     /*
      * If both cursors are set, check they're correctly ordered with respect to each other. We have
@@ -1559,19 +1568,11 @@ __wt_session_range_truncate(
     }
 
     /*
-     * Use temporary buffers to store the original start and stop keys. We track the original keys
-     * for writing the truncate operation in the write-ahead log.
+     * If the start cursor does not exist, create a new one.
      */
-    if (!local_start && start != NULL) {
-        WT_ERR(__wt_cursor_get_raw_key(start, &start_key));
-        WT_ERR(__wt_scr_alloc(session, 0, &orig_start_key));
-        WT_ERR(__wt_buf_set(session, orig_start_key, start_key.data, start_key.size));
-    }
-
-    if (stop != NULL) {
-        WT_ERR(__wt_cursor_get_raw_key(stop, &stop_key));
-        WT_ERR(__wt_scr_alloc(session, 0, &orig_stop_key));
-        WT_ERR(__wt_buf_set(session, orig_stop_key, stop_key.data, stop_key.size));
+    if (start == NULL) {
+        WT_ERR(__session_open_cursor((WT_SESSION *)session, actual_uri, NULL, NULL, &start));
+        local_start = true;
     }
 
     /*
@@ -1583,55 +1584,99 @@ __wt_session_range_truncate(
     trunc_info->stop = stop;
     trunc_info->orig_start_key = orig_start_key;
     trunc_info->orig_stop_key = orig_stop_key;
-    if (uri != NULL)
-        trunc_info->uri = uri;
-    else if (start != NULL)
-        trunc_info->uri = start->internal_uri;
-    else {
-        WT_ASSERT(session, stop != NULL);
-        trunc_info->uri = stop->internal_uri;
-    }
+    trunc_info->uri = actual_uri;
+
+    /*
+     * Don't use bounded cursors for FLCS as it isn't supported, additionally skip using them for
+     * complex types such as column groups and indexes. We can't check support for those complex
+     * types at this abstraction level.
+     */
+    if (CUR2BT(start) == NULL || CUR2BT(start)->type == BTREE_COL_FIX)
+        supports_bounds = false;
+    if (stop != NULL && (CUR2BT(stop) == NULL || CUR2BT(stop)->type == BTREE_COL_FIX))
+        supports_bounds = false;
 
     /*
      * Truncate does not require keys actually exist so that applications can discard parts of the
-     * object's name space without knowing exactly what records currently appear in the object. For
-     * this reason, do a search-near, rather than a search. Additionally, we have to correct after
-     * calling search-near, to position the start/stop cursors on the next record greater than/less
-     * than the original key. If we fail to find a key in a search-near, there are no keys in the
-     * table. If we fail to move forward or backward in a range, there are no keys in the range. In
-     * either of those cases, we're done.
+     * object's name space without knowing exactly what records currently appear in the object. When
+     * possible use bounded cursors to position the start and stop cursors, if they aren't available
+     * then use search-near. Search-near is suboptimal, because it may return prepare conflicts
+     * outside of the truncate key range, as it will walk beyond the end key.
      *
      * No need to search the record again if it is already pointing to the btree.
      */
-    if (start != NULL && !F_ISSET(start, WT_CURSTD_KEY_INT))
-        if ((ret = start->search_near(start, &cmp)) != 0 ||
-          (cmp < 0 && (ret = start->next(start)) != 0)) {
-            WT_ERR_NOTFOUND_OK(ret, false);
-            log_trunc = true;
-            goto done;
+    if (!F_ISSET(start, WT_CURSTD_KEY_INT)) {
+        needs_next_prev = true;
+        if (supports_bounds) {
+            if (!local_start) {
+                /*
+                 * Use a new cursor, because at this level, we can't set bounds on a positioned
+                 * cursor, and at this abstraction level, we can't use WT_CURSOR_IS_POSITIONED to
+                 * fully check.
+                 */
+                WT_ERR(
+                  __session_open_cursor((WT_SESSION *)session, actual_uri, NULL, NULL, &start));
+                trunc_info->start = start;
+                local_start = true;
+            }
+            if (orig_start_key != NULL) {
+                __wt_cursor_set_raw_key(start, orig_start_key);
+                WT_ERR(start->bound(start, "bound=lower"));
+            }
+            if (orig_stop_key != NULL) {
+                __wt_cursor_set_raw_key(start, orig_stop_key);
+                WT_ERR(start->bound(start, "bound=upper"));
+            }
+        } else if (orig_start_key != NULL) {
+            WT_ERR_NOTFOUND_OK(start->search_near(start, &cmp), true);
+            if (ret == WT_NOTFOUND) {
+                ret = 0;
+                log_trunc = true;
+                goto done;
+            }
+            needs_next_prev = (cmp < 0);
         }
-    if (stop != NULL && !F_ISSET(stop, WT_CURSTD_KEY_INT))
-        if ((ret = stop->search_near(stop, &cmp)) != 0 ||
-          (cmp > 0 && (ret = stop->prev(stop)) != 0)) {
-            WT_ERR_NOTFOUND_OK(ret, false);
-            log_trunc = true;
-            goto done;
+        if (needs_next_prev) {
+            WT_ERR_NOTFOUND_OK(start->next(start), true);
+            if (ret == WT_NOTFOUND) {
+                /* If there are no elements, there is nothing to do. */
+                ret = 0;
+                log_trunc = true;
+                goto done;
+            }
         }
-
-    /*
-     * We always truncate in the forward direction because the underlying data structures can move
-     * through pages faster forward than backward. If we don't have a start cursor, create one and
-     * position it at the first record.
-     *
-     * If start is NULL, stop must not be NULL, but static analyzers have a hard time with that,
-     * test explicitly.
-     */
-    if (start == NULL && stop != NULL) {
-        WT_ERR(__session_open_cursor((WT_SESSION *)session, stop->uri, NULL, NULL, &start));
-        local_start = true;
-        WT_ERR(start->next(start));
-        /* Record new start cursor. */
-        trunc_info->start = start;
+    }
+    if (stop != NULL && !F_ISSET(stop, WT_CURSTD_KEY_INT)) {
+        needs_next_prev = true;
+        if (supports_bounds) {
+            WT_ERR(__session_open_cursor((WT_SESSION *)session, actual_uri, NULL, NULL, &stop));
+            trunc_info->stop = stop;
+            local_stop = true;
+            if (orig_start_key != NULL) {
+                __wt_cursor_set_raw_key(stop, orig_start_key);
+                WT_ERR(stop->bound(stop, "bound=lower"));
+            }
+            if (orig_stop_key != NULL) {
+                __wt_cursor_set_raw_key(stop, orig_stop_key);
+                WT_ERR(stop->bound(stop, "bound=upper"));
+            }
+        } else {
+            WT_ERR_NOTFOUND_OK(stop->search_near(stop, &cmp), true);
+            if (ret == WT_NOTFOUND) {
+                ret = 0;
+                log_trunc = true;
+                goto done;
+            }
+            needs_next_prev = (cmp > 0);
+        }
+        if (needs_next_prev) {
+            WT_ERR_NOTFOUND_OK(stop->prev(stop), true);
+            if (ret == WT_NOTFOUND) {
+                ret = 0;
+                log_trunc = true;
+                goto done;
+            }
+        }
     }
 
     /*
@@ -1659,12 +1704,11 @@ done:
          * session. Grab it from the start or stop cursor as needed.
          */
         dhandle = session->dhandle;
-        if (dhandle == NULL && start != NULL) {
-            cbt = (WT_CURSOR_BTREE *)start;
-            dhandle = cbt->dhandle;
-        } else if (dhandle == NULL && stop != NULL) {
-            cbt = (WT_CURSOR_BTREE *)stop;
-            dhandle = cbt->dhandle;
+        if (dhandle == NULL) {
+            if (start != NULL)
+                dhandle = ((WT_CURSOR_BTREE *)start)->dhandle;
+            else if (stop != NULL)
+                dhandle = ((WT_CURSOR_BTREE *)stop)->dhandle;
         }
         /* We have to have a dhandle from somewhere. */
         WT_ASSERT(session, dhandle != NULL);
@@ -1678,24 +1722,26 @@ done:
         }
     }
 err:
+    /* Clear temporary buffer that were storing the original start and stop keys. */
+    if (orig_start_key != NULL)
+        __wt_scr_free(session, &orig_start_key);
+    if (orig_stop_key != NULL)
+        __wt_scr_free(session, &orig_stop_key);
+
     /*
-     * Close any locally-opened start cursor.
+     * Close any locally-opened start and stop cursors.
      *
      * Reset application cursors, they've possibly moved and the application cannot use them. Note
      * that we can make it here with a NULL start cursor (e.g., if the truncate range is empty).
      */
     if (local_start)
         WT_TRET(start->close(start));
-    else if (start != NULL) {
-        /* Clear the temporary buffer that was storing the original start key. */
-        __wt_scr_free(session, &orig_start_key);
+    else if (start != NULL)
         WT_TRET(start->reset(start));
-    }
-    if (stop != NULL) {
-        /* Clear the temporary buffer that was storing the original stop key. */
-        __wt_scr_free(session, &orig_stop_key);
+    if (local_stop)
+        WT_TRET(stop->close(stop));
+    else if (stop != NULL)
         WT_TRET(stop->reset(stop));
-    }
     return (ret);
 }
 

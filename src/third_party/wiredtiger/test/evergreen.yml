@@ -5304,7 +5304,7 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
-    # FIXME-WT-12539
+    # FIXME-WT-12637
     #- name: model-test-long
     #  batchtime: 1440 # once a day
     - name: csuite-long-running
@@ -5671,7 +5671,7 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
-    # FIXME-WT-12539
+    # FIXME-WT-12637
     #- name: model-test-long
     #  batchtime: 1440 # once a day
 
