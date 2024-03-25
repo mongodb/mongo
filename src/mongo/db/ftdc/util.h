@@ -74,6 +74,13 @@ enum class FTDCType : std::int32_t {
      * See createBSONMetricChunkDocument
      */
     kMetricChunk = 1,
+
+    /**
+     * A periodic metadata document is composed of a header + a counter value + delta document
+     *
+     * See createBSONPeriodicMetadataDocument
+     */
+    kPeriodicMetadata = 2,
 };
 
 
@@ -161,6 +168,22 @@ BSONObj createBSONMetadataDocument(const BSONObj& metadata, Date_t date);
 BSONObj createBSONMetricChunkDocument(ConstDataRange buf, Date_t now);
 
 /**
+ * Create a BSON periodic metadata document for storage. The passed in document is embedded as
+ * doc field in the example below. For the _id field, the specified date is used.
+ *
+ * Example:
+ * {
+ *  "_id" : Date_t
+ *  "type" : 2
+ *  "count" : int32
+ *  "doc" : { ... }
+ * }
+ */
+BSONObj createBSONPeriodicMetadataDocument(const BSONObj& deltaDoc,
+                                           std::uint32_t count,
+                                           Date_t date);
+
+/**
  * Get the _id field of a BSON document
  */
 StatusWith<Date_t> getBSONDocumentId(const BSONObj& obj);
@@ -180,6 +203,11 @@ StatusWith<BSONObj> getBSONDocumentFromMetadataDoc(const BSONObj& obj);
  */
 StatusWith<std::vector<BSONObj>> getMetricsFromMetricDoc(const BSONObj& obj,
                                                          FTDCDecompressor* decompressor);
+
+/**
+ * Extract the delta count and the delta BSON from a BSON document
+ */
+StatusWith<std::pair<long long, BSONObj>> getDeltasFromPeriodicMetadataDoc(const BSONObj& obj);
 
 /**
  * Is this a type that FTDC find's interesting? I.e. is this a numeric or container type?

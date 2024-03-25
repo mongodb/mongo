@@ -73,8 +73,12 @@ public:
 
     /**
      * Returns the next document.
-     * Metadata documents are unowned.
+     * Metadata and periodic metadata documents are unowned.
      * Metric documents are owned.
+     *
+     * For periodic metadata documents, this returns the raw periodic metadata BSON parsed
+     * from the file. It does not reconstruct a full periodic metadata sample based on previous
+     * deltas, unlike metric documents.
      */
     std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t> next();
 
@@ -126,10 +130,13 @@ private:
     // Current set of metrics documents
     std::vector<BSONObj> _docs;
 
-    // _id of current metadata or metric chunk
+    // Type of the current document
+    FTDCBSONUtil::FTDCType _type;
+
+    // _id of current metadata, metric chunk, or periodic metadata
     Date_t _dateId;
 
-    // Current metadata document - unowned
+    // Current metadata or periodic metadata document - unowned
     BSONObj _metadata;
 
     // Parent document

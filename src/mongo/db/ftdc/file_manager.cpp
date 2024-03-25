@@ -340,6 +340,21 @@ Status FTDCFileManager::rotate(Client* client) {
     return openArchiveFile(client, swFile.getValue(), {});
 }
 
+Status FTDCFileManager::writePeriodicMetadataSampleAndRotateIfNeeded(Client* client,
+                                                                     const BSONObj& sample,
+                                                                     Date_t date) {
+    auto status = _writer.writePeriodicMetadataSample(sample, date);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (_writer.getSize() > _config->maxFileSizeBytes) {
+        return rotate(client);
+    }
+
+    return Status::OK();
+}
+
 Status FTDCFileManager::writeSampleAndRotateIfNeeded(Client* client,
                                                      const BSONObj& sample,
                                                      Date_t date) {

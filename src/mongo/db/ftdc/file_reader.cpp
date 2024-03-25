@@ -85,9 +85,9 @@ StatusWith<bool> FTDCFileReader::hasNext() {
 
             _dateId = swId.getValue();
 
-            FTDCBSONUtil::FTDCType type = swType.getValue();
+            _type = swType.getValue();
 
-            if (type == FTDCBSONUtil::FTDCType::kMetadata) {
+            if (_type == FTDCBSONUtil::FTDCType::kMetadata) {
                 _state = State::kMetadataDoc;
 
                 auto swMetadata = FTDCBSONUtil::getBSONDocumentFromMetadataDoc(_parent);
@@ -96,7 +96,7 @@ StatusWith<bool> FTDCFileReader::hasNext() {
                 }
 
                 _metadata = swMetadata.getValue();
-            } else if (type == FTDCBSONUtil::FTDCType::kMetricChunk) {
+            } else if (_type == FTDCBSONUtil::FTDCType::kMetricChunk) {
                 _state = State::kMetricChunk;
 
                 auto swDocs = FTDCBSONUtil::getMetricsFromMetricDoc(_parent, &_decompressor);
@@ -108,6 +108,15 @@ StatusWith<bool> FTDCFileReader::hasNext() {
 
                 // There is always at least the reference document
                 _pos = 0;
+            } else if (_type == FTDCBSONUtil::FTDCType::kPeriodicMetadata) {
+                _state = State::kMetadataDoc;
+
+                auto swDeltas = FTDCBSONUtil::getDeltasFromPeriodicMetadataDoc(_parent);
+                if (!swDeltas.isOK()) {
+                    return swDeltas.getStatus();
+                }
+
+                _metadata = swDeltas.getValue().second;
             }
 
             return {true};
@@ -139,12 +148,12 @@ std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t> FTDCFileReader::next(
 
     if (_state == State::kMetadataDoc) {
         return std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>(
-            FTDCBSONUtil::FTDCType::kMetadata, _metadata, _dateId);
+            _type, _metadata, _dateId);
     }
 
     if (_state == State::kMetricChunk) {
         return std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t>(
-            FTDCBSONUtil::FTDCType::kMetricChunk, _docs[_pos], _dateId);
+            _type, _docs[_pos], _dateId);
     }
 
     MONGO_UNREACHABLE;

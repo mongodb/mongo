@@ -70,6 +70,8 @@ const char kFTDCTypeField[] = "type";
 const char kFTDCDataField[] = "data";
 const char kFTDCDocField[] = "doc";
 
+const char kFTDCCountField[] = "count";
+
 const char kFTDCDocsField[] = "docs";
 
 const char kFTDCCollectStartField[] = "start";
@@ -456,6 +458,17 @@ BSONObj createBSONMetricChunkDocument(ConstDataRange buf, Date_t date) {
     return builder.obj();
 }
 
+BSONObj createBSONPeriodicMetadataDocument(const BSONObj& deltaDoc,
+                                           std::uint32_t count,
+                                           Date_t date) {
+    BSONObjBuilder builder;
+    builder.appendDate(kFTDCIdField, date);
+    builder.appendNumber(kFTDCTypeField, static_cast<int>(FTDCType::kPeriodicMetadata));
+    builder.appendNumber(kFTDCCountField, static_cast<long long>(count));
+    builder.appendObject(kFTDCDocField, deltaDoc.objdata(), deltaDoc.objsize());
+    return builder.obj();
+}
+
 StatusWith<Date_t> getBSONDocumentId(const BSONObj& obj) {
     BSONElement element;
 
@@ -476,7 +489,8 @@ StatusWith<FTDCType> getBSONDocumentType(const BSONObj& obj) {
     }
 
     if (static_cast<FTDCType>(value) != FTDCType::kMetricChunk &&
-        static_cast<FTDCType>(value) != FTDCType::kMetadata) {
+        static_cast<FTDCType>(value) != FTDCType::kMetadata &&
+        static_cast<FTDCType>(value) != FTDCType::kPeriodicMetadata) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Field '" << std::string(kFTDCTypeField)
                               << "' is not an expected value, found '" << value << "'"};
@@ -523,6 +537,28 @@ StatusWith<std::vector<BSONObj>> getMetricsFromMetricDoc(const BSONObj& obj,
     }
 
     return decompressor->uncompress({buffer, static_cast<std::size_t>(length)});
+}
+
+StatusWith<std::pair<long long, BSONObj>> getDeltasFromPeriodicMetadataDoc(const BSONObj& obj) {
+    if (kDebugBuild) {
+        auto swType = getBSONDocumentType(obj);
+        dassert(swType.isOK() && swType.getValue() == FTDCType::kPeriodicMetadata);
+    }
+
+    BSONElement element;
+    long long deltaCount;
+
+    Status status = bsonExtractIntegerField(obj, kFTDCCountField, &deltaCount);
+    if (!status.isOK()) {
+        return {status};
+    }
+
+    status = bsonExtractTypedField(obj, kFTDCDocField, BSONType::Object, &element);
+    if (!status.isOK()) {
+        return {status};
+    }
+
+    return std::make_pair(deltaCount, element.Obj());
 }
 
 }  // namespace FTDCBSONUtil

@@ -92,6 +92,10 @@ public:
      */
     Status writeSampleAndRotateIfNeeded(Client* client, const BSONObj& sample, Date_t date);
 
+    Status writePeriodicMetadataSampleAndRotateIfNeeded(Client* client,
+                                                        const BSONObj& sample,
+                                                        Date_t date);
+
     /**
      * Closes the current file manager down.
      */

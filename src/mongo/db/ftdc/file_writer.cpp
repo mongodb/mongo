@@ -77,6 +77,7 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
     _interimTempFile = FTDCUtil::getInterimTempFile(file);
 
     _compressor.reset();
+    _metadataCompressor.reset();
 
     return Status::OK();
 }
@@ -177,6 +178,17 @@ Status FTDCFileWriter::writeSample(const BSONObj& sample, Date_t date) {
     }
 
     return Status::OK();
+}
+
+Status FTDCFileWriter::writePeriodicMetadataSample(const BSONObj& sample, Date_t date) {
+    auto ret = _metadataCompressor.addSample(sample);
+    if (!ret.has_value()) {
+        return Status::OK();
+    }
+
+    auto o = FTDCBSONUtil::createBSONPeriodicMetadataDocument(
+        ret.value(), _metadataCompressor.getDeltaCount(), date);
+    return writeArchiveFileBuffer({o.objdata(), static_cast<size_t>(o.objsize())});
 }
 
 Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_t date) {

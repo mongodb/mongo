@@ -146,6 +146,75 @@ TEST_F(FTDCFileTest, TestFileBasicCompress) {
     ASSERT_EQUALS(sw.getValue(), false);
 }
 
+TEST_F(FTDCFileTest, TestFileBasicPeriodicMetadata) {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path p(tempdir.path());
+    p /= kTestFile;
+
+    deleteFileIfNeeded(p);
+
+    BSONObj subObj1 = BSON("f1_1" << 101 << "f1_2" << 102);
+    BSONObj subObj2 = BSON("f2_1" << 201 << "f2_2" << 202);
+    BSONObj altSubObj1 = BSON("f1_1" << 1001 << "f1_2" << 1002);
+    BSONObj altSubObj2 = BSON("f2_1" << 2001 << "f2_2" << 2002);
+
+    BSONObj doc1 = BSON("field1" << subObj1 << "field2" << subObj2);
+    BSONObj doc2 = BSON("field1" << altSubObj1 << "field2" << subObj2);
+    BSONObj doc3 = BSON("field1" << altSubObj1 << "field2" << altSubObj2);
+    BSONObj doc4 = BSON("field1" << subObj2 << "field2" << subObj1);
+    BSONObj deltaDoc1 = BSON("field1" << altSubObj1);
+    BSONObj deltaDoc2 = BSON("field2" << altSubObj2);
+
+    FTDCConfig config;
+    FTDCFileWriter writer(&config);
+
+    ASSERT_OK(writer.open(p));
+    ASSERT_OK(writer.writePeriodicMetadataSample(doc1, Date_t()));  // writes doc1, resets delta
+    for (int i = 0; i < 3; i++) {
+        ASSERT_OK(writer.writePeriodicMetadataSample(doc2, Date_t()));  // writes deltaDoc1 once
+    }
+    ASSERT_OK(writer.writePeriodicMetadataSample(doc3, Date_t()));  // writes deltaDoc2
+    writer.close().transitional_ignore();
+    ASSERT_OK(writer.open(p));                                      // resets delta
+    ASSERT_OK(writer.writePeriodicMetadataSample(doc2, Date_t()));  // writes doc2, resets delta
+    ASSERT_OK(writer.writePeriodicMetadataSample(doc3, Date_t()));  // writes deltaDoc2
+    ASSERT_OK(writer.writePeriodicMetadataSample(doc4, Date_t()));  // writes doc4, resets delta
+
+    writer.close().transitional_ignore();
+
+    FTDCFileReader reader;
+    ASSERT_OK(reader.open(p));
+
+    ASSERT_OK(reader.hasNext());
+    BSONObj doc1a = std::get<1>(reader.next());
+    ASSERT_BSONOBJ_EQ(doc1, doc1a);
+
+    ASSERT_OK(reader.hasNext());
+    BSONObj doc2a = std::get<1>(reader.next());
+    ASSERT_BSONOBJ_EQ(deltaDoc1, doc2a);
+
+    ASSERT_OK(reader.hasNext());
+    BSONObj doc3a = std::get<1>(reader.next());
+    ASSERT_BSONOBJ_EQ(deltaDoc2, doc3a);
+
+    ASSERT_OK(reader.hasNext());
+    BSONObj doc4a = std::get<1>(reader.next());
+    ASSERT_BSONOBJ_EQ(doc2, doc4a);
+
+    ASSERT_OK(reader.hasNext());
+    BSONObj doc5a = std::get<1>(reader.next());
+    ASSERT_BSONOBJ_EQ(deltaDoc2, doc5a);
+
+    ASSERT_OK(reader.hasNext());
+    BSONObj doc6a = std::get<1>(reader.next());
+    ASSERT_BSONOBJ_EQ(doc4, doc6a);
+
+    auto sw = reader.hasNext();
+
+    ASSERT_OK(sw);
+    ASSERT_EQUALS(sw.getValue(), false);
+}
+
 /**
  * Validates all the data that gets written to file is returned as is
  */
