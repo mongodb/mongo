@@ -619,3 +619,14 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/service_context_non_d',
     ],
 )
+
+env.Benchmark(
+    target='query_planner_bm',
+    source=[
+        'query_planner_bm.cpp',
+    ],
+    LIBDEPS=[
+        'query_planner',
+        'query_test_service_context',
+    ],
+)
