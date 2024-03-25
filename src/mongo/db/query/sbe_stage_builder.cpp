@@ -765,6 +765,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              _cq.getExpCtx()->allowDiskUse) {
     // Initialize '_data->queryCollator'.
     _data->queryCollator = cq.getCollatorShared();
+    _data->runtimePlanningRootNodeId = solution.unextendedRootId();
 
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
@@ -999,8 +1000,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     inputGuard.reset();
-    auto [scanSlots, stage] = generateVirtualScanMulti(
-        &_slotIdGenerator, vsn->hasRecordId ? 2 : 1, inputTag, inputVal, _yieldPolicy);
+    auto [scanSlots, stage] = generateVirtualScanMulti(&_slotIdGenerator,
+                                                       vsn->hasRecordId ? 2 : 1,
+                                                       inputTag,
+                                                       inputVal,
+                                                       _yieldPolicy,
+                                                       vsn->nodeId());
 
     sbe::value::SlotId resultSlot;
     if (vsn->hasRecordId) {

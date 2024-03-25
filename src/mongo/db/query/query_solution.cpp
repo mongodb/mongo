@@ -350,8 +350,11 @@ void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot)
                 parentOfSentinel->children.size() == 1);
         current = parentOfSentinel->children[0].get();
     }
+    QuerySolutionNode* oldRoot = _root.get();
     parentOfSentinel->children[0] = std::move(_root);
     setRoot(std::move(extensionRoot));
+    // setRoot may re-assign node ids, so we assign this value after calling setRoot.
+    _unextendedRootId = oldRoot->nodeId();
 }
 
 void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {

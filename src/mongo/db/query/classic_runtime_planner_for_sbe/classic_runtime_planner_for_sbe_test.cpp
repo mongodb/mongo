@@ -188,7 +188,7 @@ protected:
                         << indexName);
     }
 
-    // Creates indexes {a: 1} and {b: 1}, inserts 100 docs with {_id: i, a: i, b: i}, creates the
+    // Creates indexes {a: 1} and {b: 1}, inserts 100 docs with {a: i, b: i}, creates the
     // subplanner with a rooted or filter and returns the PlanExecutor.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getExecutorWithSubPlanning() {
         auto opCtx = operationContext();
@@ -198,7 +198,7 @@ protected:
 
         std::vector<InsertStatement> docs;
         for (int i = 0; i < 100; ++i) {
-            docs.emplace_back(InsertStatement(BSON("_id" << i << "a" << i << "b" << i)));
+            docs.emplace_back(InsertStatement(BSON("_id" << OID::gen() << "a" << i << "b" << i)));
         }
 
         ASSERT_OK(storageInterface()->insertDocuments(opCtx, kNss, docs));
@@ -258,13 +258,13 @@ protected:
         return {std::move(solutions), std::move(expectedSums)};
     }
 
-    // Inserts 'resultDocCount' number of docs with {_id: i, a: i, b: 1} which is the same as the
+    // Inserts 'resultDocCount' number of docs with {a: i, b: 1} which is the same as the
     // outputs from the VirtualScanNode from createVirtualScanQuerySolutionsForDefaultFilter().
     void insertTestDocuments(int resultDocCount) {
         auto opCtx = operationContext();
         std::vector<InsertStatement> docs;
-        for (int i = 1; i <= 200; ++i) {
-            docs.emplace_back(InsertStatement(BSON("_id" << i << "a" << i << "b" << 1)));
+        for (int i = 1; i <= resultDocCount; ++i) {
+            docs.emplace_back(InsertStatement(BSON("_id" << OID::gen() << "a" << i << "b" << 1)));
         }
 
         ASSERT_OK(storageInterface()->insertDocuments(opCtx, kNss, docs));

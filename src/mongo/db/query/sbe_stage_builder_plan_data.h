@@ -270,6 +270,13 @@ struct PlanStageStaticData {
      * Default to a regular result cursor.
      */
     CursorTypeEnum cursorType = CursorTypeEnum::DocumentResult;
+
+    /**
+     * For queries with aggregation pipelines, stores the node id of the QSN that was root before
+     * the solution was extended with aggregation pipeline, or kEmptyPlanNodeId if there was no
+     * pushed down agg pipeline.
+     */
+    PlanNodeId runtimePlanningRootNodeId = kEmptyPlanNodeId;
 };
 
 /**

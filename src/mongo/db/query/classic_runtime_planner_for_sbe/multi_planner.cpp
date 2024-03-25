@@ -47,7 +47,8 @@ MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
     : PlannerBase(std::move(plannerData)),
       _cachingMode((std::move(cachingMode))),
       _replanReason(replanReason) {
-    LOGV2_DEBUG(6215001, 5, "Using classic multi-planner for SBE");
+    LOGV2_DEBUG(
+        6215001, 5, "Using classic multi-planner for SBE", "replanReason"_attr = _replanReason);
     _multiPlanStage =
         std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
                                          collections().getMainCollectionPtrOrAcquisition(),

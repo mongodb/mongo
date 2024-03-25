@@ -99,7 +99,14 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     std::unique_ptr<sbe::PlanStage> root,
     stage_builder::PlanStageData data,
     size_t maxTrialPeriodNumReads) {
-    const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(*plannerData.cq)};
+    // If we have an aggregation pipeline, we should track results via kNumPlanningResults metric,
+    // instead of returned documents, because aggregation stages like $unwind or $group can change
+    // the amount of returned documents arbitrarily.
+    const size_t maxNumResults = trial_period::getTrialPeriodNumToReturn(*plannerData.cq);
+    const size_t maxTrialResults =
+        plannerData.cq->cqPipeline().empty() ? maxNumResults : std::numeric_limits<size_t>::max();
+    const size_t maxTrialResultsFromPlanningRoot =
+        plannerData.cq->cqPipeline().empty() ? 0 : maxNumResults;
 
     sbe::plan_ranker::CandidatePlan candidate{nullptr /*solution*/,
                                               std::move(root),
@@ -110,30 +117,36 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 
     // Callback for the tracker when it exceeds any of the tracked metrics. If the tracker exceeds
-    // the number of reads before returning 'maxNumResults' number of documents, it means that the
+    // the number of reads before finishing the trial run, it means that the
     // cached plan isn't performing as well as it used to and we'll need to replan, so we let the
-    // tracker terminate the trial. Otherwise, the cached plan is terminated when the number of the
-    // results reach 'maxNumResults'.
+    // tracker terminate the trial. If the tracker reaches 'maxTrialResultsFromPlanningRoot'
+    // planning results, the trial run finishes and the plan is used to complete the query.
     auto onMetricReached = [&candidate](TrialRunTracker::TrialRunMetric metric) {
         switch (metric) {
             case TrialRunTracker::kNumReads:
                 return true;  // terminate the trial run
+            case TrialRunTracker::kNumPlanningResults:
+                candidate.root->detachFromTrialRunTracker();
+                return false;  // upgrade the trial run into a normal one
             default:
                 MONGO_UNREACHABLE;
         }
     };
-    candidate.data.tracker =
-        std::make_unique<TrialRunTracker>(std::move(onMetricReached),
-                                          size_t{0} /*kNumResults*/,
-                                          maxTrialPeriodNumReads /*kNumReads*/);
-    candidate.root->attachToTrialRunTracker(candidate.data.tracker.get());
+    candidate.data.tracker = std::make_unique<TrialRunTracker>(
+        std::move(onMetricReached),
+        size_t{0} /*kNumResults - used only in SBE multi-planner*/,
+        maxTrialPeriodNumReads,
+        maxTrialResultsFromPlanningRoot);
+    candidate.root->attachToTrialRunTracker(
+        candidate.data.tracker.get(),
+        candidate.data.stageData.staticData->runtimePlanningRootNodeId);
 
     sbe::TrialRuntimeExecutor{plannerData.opCtx,
                               plannerData.collections,
                               *plannerData.cq,
                               plannerData.sbeYieldPolicy.get(),
                               AllIndicesRequiredChecker{plannerData.collections}}
-        .executeCachedCandidateTrial(&candidate, maxNumResults);
+        .executeCachedCandidateTrial(&candidate, maxTrialResults);
 
     return candidate;
 }

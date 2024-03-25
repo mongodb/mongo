@@ -436,7 +436,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualSc
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::TypeTags arrTag,
     sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy = nullptr);
+    PlanYieldPolicy* yieldPolicy = nullptr,
+    PlanNodeId planNodeId = kEmptyPlanNodeId);
 
 /**
  * Make a mock scan with multiple output slots from an BSON array. This method does NOT assume
@@ -447,7 +448,8 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     int numSlots,
     sbe::value::TypeTags arrTag,
     sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy = nullptr);
+    PlanYieldPolicy* yieldPolicy = nullptr,
+    PlanNodeId planNodeId = kEmptyPlanNodeId);
 
 /**
  * Helper functions for converting from BSONObj/BSONArray to SBE Object/Array. Caller owns the SBE

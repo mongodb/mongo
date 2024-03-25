@@ -314,7 +314,9 @@ struct QuerySolutionNode {
      * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
      * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
      *
-     * The identifiers are unique within the tree, but not across trees.
+     * The identifiers are unique within the tree, but not across trees. The identifiers are
+     * assigned from bottom to top: id of a parent is always greater than
+     * id of a child.
      */
     PlanNodeId nodeId() const {
         return _nodeId;
@@ -469,7 +471,8 @@ public:
     /**
      * Extends the solution's tree by attaching it to the tree rooted at 'extensionRoot'. The
      * extension tree must contain exactly one 'SentinelNode' node that denotes the attachment
-     * point. The sentinel node will be replaces with the '_root' node.
+     * point. The sentinel node will be replaced with the '_root' node. Sets _unextendedRootId to
+     * the nodeId of the old root.
      */
     void extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot);
 
@@ -489,6 +492,22 @@ public:
 
     size_t hash() const {
         return absl::Hash<QuerySolutionNode>()(*_root);
+    }
+
+    /**
+     * Returns a pair consisting of:
+     *  - First node of the specified type found by pre-order traversal. If node was not found, this
+     *    pair element is nullptr.
+     *  - Total number of nodes with the specified type in tree.
+     */
+    std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(StageType type) const;
+
+    /**
+     * If the solution was extended via extendWith() method, returns nodeId of the node that used to
+     * be root before extension. Otherwise, returns kEmptyPlanNodeId.
+     */
+    PlanNodeId unextendedRootId() const {
+        return _unextendedRootId;
     }
 
     // There are two known scenarios in which a query solution might potentially block:
@@ -514,14 +533,6 @@ public:
     // Score calculated by PlanRanker. Only present if there are multiple candidate plans.
     boost::optional<double> score;
 
-    /**
-     * Returns a pair consisting of:
-     *  - First node of the specified type found by pre-order traversal. If node was not found, this
-     *    pair element is nullptr.
-     *  - Total number of nodes with the specified type in tree.
-     */
-    std::pair<const QuerySolutionNode*, size_t> getFirstNodeByType(StageType type) const;
-
 private:
     using QsnIdGenerator = IdGenerator<PlanNodeId>;
 
@@ -531,6 +542,7 @@ private:
     void assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode& node);
 
     std::unique_ptr<QuerySolutionNode> _root;
+    PlanNodeId _unextendedRootId{kEmptyPlanNodeId};
 };
 
 struct CollectionScanNode : public QuerySolutionNodeWithSortSet {

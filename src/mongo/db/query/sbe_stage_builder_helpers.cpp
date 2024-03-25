@@ -439,7 +439,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualSc
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::TypeTags arrTag,
     sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy) {
+    PlanYieldPolicy* yieldPolicy,
+    PlanNodeId planNodeId) {
     // The value passed in must be an array.
     invariant(sbe::value::isArray(arrTag));
 
@@ -450,15 +451,15 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualSc
     auto projectSlot = slotIdGenerator->generate();
     auto unwindSlot = slotIdGenerator->generate();
     auto unwind = sbe::makeS<sbe::UnwindStage>(
-        sbe::makeProjectStage(makeLimitCoScanTree(kEmptyPlanNodeId, 1),
-                              kEmptyPlanNodeId,
+        sbe::makeProjectStage(makeLimitCoScanTree(planNodeId, 1),
+                              planNodeId,
                               projectSlot,
                               std::move(arrayExpression)),
         projectSlot,
         unwindSlot,
         slotIdGenerator->generate(),  // We don't need an index slot but must to provide it.
         false,                        // Don't preserve null and empty arrays.
-        kEmptyPlanNodeId,
+        planNodeId,
         yieldPolicy);
 
     // Return the UnwindStage and its output slot. The UnwindStage can be used as an input
@@ -471,13 +472,15 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     int numSlots,
     sbe::value::TypeTags arrTag,
     sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy) {
+    PlanYieldPolicy* yieldPolicy,
+    PlanNodeId planNodeId) {
     using namespace std::literals;
 
     invariant(numSlots >= 1);
 
     // Generate a mock scan with a single output slot.
-    auto [scanSlot, scanStage] = generateVirtualScan(slotIdGenerator, arrTag, arrVal, yieldPolicy);
+    auto [scanSlot, scanStage] =
+        generateVirtualScan(slotIdGenerator, arrTag, arrVal, yieldPolicy, planNodeId);
 
     // Create a ProjectStage that will read the data from 'scanStage' and split it up
     // across multiple output slots.
@@ -491,9 +494,9 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
                                               makeInt32Constant(i)));
     }
 
-    return {std::move(projectSlots),
-            sbe::makeS<sbe::ProjectStage>(
-                std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
+    return {
+        std::move(projectSlots),
+        sbe::makeS<sbe::ProjectStage>(std::move(scanStage), std::move(projections), planNodeId)};
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONObj& bo) {

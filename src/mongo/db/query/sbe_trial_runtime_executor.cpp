@@ -70,8 +70,11 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
 
         invariant(state == PlanState::ADVANCED);
         invariant(obj.isOwned());
+        _stashSizeBytes += obj.objsize();
         candidate->results.push_back({std::move(obj), {recordIdSlot != nullptr, recordId}});
-        if (candidate->results.size() >= maxNumResults) {
+        if (candidate->results.size() >= maxNumResults ||
+            candidate->data.tracker->metricReached<TrialRunTracker::kNumPlanningResults>() ||
+            _stashSizeBytes >= _stashMemoryLimit) {
             return false;
         }
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
@@ -121,6 +124,8 @@ void TrialRuntimeExecutor::prepareCandidate(plan_ranker::CandidatePlan* candidat
 void TrialRuntimeExecutor::executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate,
                                                        size_t maxNumResults) {
     prepareCandidate(candidate, true /*preparingFromCache*/);
+    _stashSizeBytes = 0;
+    _stashMemoryLimit = trial_period::getTrialPeriodNumToReturn(_cq) * BSONObjMaxInternalSize;
     while (fetchNextDocument(candidate, maxNumResults)) {
     }
 }

@@ -168,10 +168,10 @@ public:
      *
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
-    std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(value::TypeTags arrTag,
-                                                                             value::Value arrVal) {
+    std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(
+        value::TypeTags arrTag, value::Value arrVal, PlanNodeId planNodeId = kEmptyPlanNodeId) {
         return stage_builder::generateVirtualScan(
-            _slotIdGenerator.get(), arrTag, arrVal, _yieldPolicy.get());
+            _slotIdGenerator.get(), arrTag, arrVal, _yieldPolicy.get(), planNodeId);
     };
 
     /**

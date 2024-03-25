@@ -52,6 +52,12 @@ public:
         // Number of physical reads performed during a trial run. Once a storage cursor advances,
         // it counts as a single physical read.
         kNumReads,
+        // Number of documents returned by the part of the plan that participated in the
+        // multi-planning. This separate metric is only needed because SBE runtime planner uses
+        // kNumResults whereas the classic multi-planner for SBE uses kNumPlanningResults.
+        //
+        // TODO SERVER-88047: Remove this and replace with kNumResults.
+        kNumPlanningResults,
         // Must always be the last element to hold the number of element in the enum.
         kLastElem
     };
@@ -106,7 +112,7 @@ public:
         }
 
         _metrics[metric] += metricIncrement;
-        if (_metrics[metric] > _maxMetrics[metric]) {
+        if (metricReached<metric>()) {
             if (_onMetricReached) {
                 _done = _onMetricReached(metric);
             } else {
@@ -120,6 +126,18 @@ public:
     size_t getMetric() const {
         static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
         return _metrics[metric];
+    }
+
+    template <TrialRunMetric metric>
+    bool metricReached() const {
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+        return metricTracked<metric>() && _metrics[metric] > _maxMetrics[metric];
+    }
+
+    template <TrialRunMetric metric>
+    bool metricTracked() const {
+        static_assert(metric >= 0 && metric < sizeof(_metrics) / sizeof(size_t));
+        return _maxMetrics[metric] != 0;
     }
 
     template <TrialRunMetric metric>

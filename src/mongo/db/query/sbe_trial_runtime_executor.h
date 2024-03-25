@@ -62,15 +62,20 @@ public:
      * Fetches a next document from the given plan stage tree and the loaded document is placed into
      * the candidate's plan result queue.
      *
-     * Returns true if a document was fetched, and false if the plan stage tree reached EOF, an
-     * exception was thrown or the plan stage tree returned maxNumResults documents.
+     * Returns true if a document was fetched and the trial run should continue. Returns false if
+     * one of the conditions to terminate the trial run has been reached:
+     * * The plan returned maxNumResults documents.
+     * * The trial run tracker reached the limit of kNumPlanningResults metric.
+     * * The stashed documents reached the memory limit.
+     * * The plan reached EOF.
+     * * An error has occured.
      *
      * If the plan stage throws a 'QueryExceededMemoryLimitNoDiskUseAllowed', it will be caught and
      * the 'candidate->status' will be set. This failure is considered recoverable, as another
      * candidate plan may require less memory, or may not contain a stage requiring spilling to disk
      * at all.
      */
-    static bool fetchNextDocument(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
+    bool fetchNextDocument(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
 
     /**
      * Prepares the given plan stage tree for execution, attaches it to the operation context and
@@ -93,6 +98,9 @@ public:
     void executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
 
 private:
+    size_t _stashSizeBytes = 0;
+    size_t _stashMemoryLimit = 0;
+
     // The following data members are not owned.
     OperationContext* const _opCtx;
     const MultipleCollectionAccessor& _collections;
