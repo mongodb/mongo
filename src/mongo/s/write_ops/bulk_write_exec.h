@@ -369,9 +369,10 @@ public:
                                    size_t nsIdx,
                                    int nShardsOwningChunks);
 
-    void resetTargeterHasStaleShardResponse() {
-        _targeterHasStaleShardResponse = false;
+    void setTargeterHasStaleShardResponse(bool targeterHasStaleShardResponse) {
+        _targeterHasStaleShardResponse = targeterHasStaleShardResponse;
     }
+
     bool targeterHasStaleShardResponse() const {
         return _targeterHasStaleShardResponse;
     }
@@ -394,7 +395,7 @@ private:
     // A list of write concern errors from all shards.
     std::vector<ShardWCError> _wcErrors;
 
-    // Optionally stores a vector of write concern errors from all shards encountered during
+    // Optionally stores a map of write concern errors from all shards encountered during
     // the current round of execution. This is used only in the specific case where we are
     // processing a write of type WriteType::WriteWithoutShardKeyWithId, and is necessary because
     // if we see a staleness error we restart the broadcasting protocol and do not care about
@@ -403,9 +404,8 @@ private:
     // by the opIdx has reached a terminal state. If so, these errors are final and will be moved
     // to _wcErrors. If the op is not in a terminal state, we must be restarting the protocol and
     // therefore we discard the errors.
-    // We always process WriteWithoutShardKeyWithId writes in their own round and thus there is
-    // only ever a single op in consideration here.
-    boost::optional<std::pair<int /* opIdx */, std::vector<ShardWCError>>> _deferredWCErrors;
+    boost::optional<stdx::unordered_map<int /* opIdx */, std::vector<ShardWCError>>>
+        _deferredWCErrors;
 
     // Optionally stores a vector of TargetedWriteBatch, BulkWriteCommandReply and
     // BulkWriteReplyItem tuple for writes of type WithoutShardKeyWithId in a targeted batch to

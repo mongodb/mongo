@@ -3010,6 +3010,13 @@ protected:
         return serialized;
     }();
 
+    static const inline BSONObj kBulkWriteNoMatchResponseWithWCEMultipleWriteOps = [] {
+        auto wce = WriteConcernErrorDetail();
+        wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+        return kBulkWriteNoMatchResponseMultipleWriteOps.addFields(
+            BSON("writeConcernError" << wce.toBSON()));
+    }();
+
     static const inline BSONObj kBulkWriteUpdateMatchResponseMultipleWriteOps = [] {
         auto reply = BulkWriteCommandReply(
             BulkWriteCommandResponseCursor(0,
@@ -3121,6 +3128,13 @@ protected:
         auto wce = WriteConcernErrorDetail();
         wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
         return kBulkWriteUpdateMatchResponse.addFields(BSON("writeConcernError" << wce.toBSON()));
+    }();
+
+    static const inline BSONObj kBulkWriteUpdateMatchResponseWithWCEMultipleWriteOps = [] {
+        auto wce = WriteConcernErrorDetail();
+        wce.setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
+        return kBulkWriteUpdateMatchResponseMultipleWriteOps.addFields(
+            BSON("writeConcernError" << wce.toBSON()));
     }();
 
     static const inline BSONObj kBulkWriteDeleteMatchResponse = [] {
@@ -4173,6 +4187,68 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
     ASSERT_NE(replies.wcErrors, boost::none);
 }
 
+TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCErrorBatched) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithIdWithoutShardKey", true);
+    auto req = requestMultipleWriteOps;
+    req.setOrdered(false);
+    auto op = BulkWriteOp(_opCtx, req);
+
+    TargetedBatchMap targeted;
+    targetWrites(op, targeted, 2);
+
+    // Simulate ok:1 n:2 response from shard1.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId1].get(),
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteUpdateMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    // Simulate ok:1 n:0 response from shard2.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId2].get(),
+        AsyncRequestsSender::Response{
+            kShardId2,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    // Simulate ok:1 n:0 response from shard3.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId3].get(),
+        AsyncRequestsSender::Response{
+            kShardId3,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    op.finishExecutingWriteWithoutShardKeyWithId();
+    auto& updateOp1 = op.getWriteOp_forTest(0);
+    auto& updateOp2 = op.getWriteOp_forTest(1);
+    // Since we got an n=1 reply we are done.
+    ASSERT(op.isFinished());
+
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Completed);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Completed);
+
+    auto replies = op.generateReplyInfo();
+    ASSERT_EQ(replies.replyItems.size(), 2);
+    ASSERT_OK(replies.replyItems[0].getStatus());
+    ASSERT_EQ(replies.replyItems[0].getN(), 1);
+    ASSERT_EQ(replies.replyItems[0].getNModified(), 1);
+
+    ASSERT_OK(replies.replyItems[1].getStatus());
+    ASSERT_EQ(replies.replyItems[1].getN(), 1);
+    ASSERT_EQ(replies.replyItems[1].getNModified(), 1);
+
+    ASSERT_NE(replies.wcErrors, boost::none);
+}
+
 // Test that if 2 shards receive n=0 and then one shard receives a retryable error (e.g.
 // StaleConfig) we will re-target all shards on retry.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableError) {
@@ -4420,6 +4496,139 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
     ASSERT_OK(replies.replyItems[0].getStatus());
     ASSERT_EQ(replies.replyItems[0].getN(), 1);
     ASSERT_EQ(replies.replyItems[0].getNModified(), 1);
+    // We should have discarded the WCEs.
+    ASSERT_EQ(replies.wcErrors, boost::none);
+}
+
+// Test that if 2 shards receive n=0 and then one shard receives a retryable error (e.g.
+// StaleConfig) we will discard any write concern errors from the first round of processing for
+// batched writes.
+TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCErrorBatched) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithIdWithoutShardKey", true);
+    auto req = requestMultipleWriteOps;
+    req.setOrdered(false);
+    auto op = BulkWriteOp(_opCtx, req);
+
+    TargetedBatchMap targeted;
+    targetWrites(op, targeted, 2);
+
+    // Simulate ok:1 n:0 response with WCE from shard1.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId1].get(),
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    auto& updateOp1 = op.getWriteOp_forTest(0);
+    auto& updateOp2 = op.getWriteOp_forTest(1);
+    // We only got one reply, so should still be pending and continuing current round.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Pending);
+    ASSERT_FALSE(op.shouldStopCurrentRound());
+    ASSERT_FALSE(op.isFinished());
+    // Since we only got one reply so far and it was n=0, that child op should be deferred.
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[1].state, WriteOpState_Pending);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[1].state, WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+
+    // Simulate ok:1 n:0 response with WCE from shard2.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId2].get(),
+        AsyncRequestsSender::Response{
+            kShardId2,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+    // We are still missing one reply so should still be pending and continuing current round.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Pending);
+    ASSERT_FALSE(op.shouldStopCurrentRound());
+    ASSERT_FALSE(op.isFinished());
+    // Both the ops we received replies for so far should be Deferred.
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[1].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[1].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+    // Simulate StaleConfig response from shard3.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId3].get(),
+        AsyncRequestsSender::Response{
+            kShardId3,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kStaleConfigReplyShard3MultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    // Due to the retry error, we should have reset the write to ready and cleared the child ops.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest().size(), 0);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest().size(), 0);
+    ASSERT_FALSE(op.isFinished());
+    op.setTargeterHasStaleShardResponse(true);
+    op.finishExecutingWriteWithoutShardKeyWithId();
+    // Clear the map and perform another round of targeting. `targetWrites` will confirm we
+    // targeted identically to the first round.
+    targeted.clear();
+    targetWrites(op, targeted, 2);
+
+    // Simulate ok:1, n:1 response from shard1.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId1].get(),
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteUpdateMatchResponseMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId2].get(),
+        AsyncRequestsSender::Response{
+            kShardId2,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId3].get(),
+        AsyncRequestsSender::Response{
+            kShardId3,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    op.setTargeterHasStaleShardResponse(false);
+    // Since we got an n=1 reply we are done.
+    op.finishExecutingWriteWithoutShardKeyWithId();
+    ASSERT(op.isFinished());
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Completed);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Completed);
+
+    auto replies = op.generateReplyInfo();
+    ASSERT_EQ(replies.replyItems.size(), 2);
+    ASSERT_OK(replies.replyItems[0].getStatus());
+    ASSERT_EQ(replies.replyItems[0].getN(), 1);
+    ASSERT_EQ(replies.replyItems[0].getNModified(), 1);
+
+    ASSERT_OK(replies.replyItems[1].getStatus());
+    ASSERT_EQ(replies.replyItems[1].getN(), 1);
+    ASSERT_EQ(replies.replyItems[1].getNModified(), 1);
+
     // We should have discarded the WCEs.
     ASSERT_EQ(replies.wcErrors, boost::none);
 }
@@ -4816,6 +5025,92 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
     ASSERT_EQ(replies.replyItems.size(), 1);
     ASSERT_NOT_OK(replies.replyItems[0].getStatus());
     ASSERT_EQ(replies.replyItems[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_NE(replies.wcErrors, boost::none);
+}
+
+// Test that if 2 shards receive n=0 and WC Errors and then one shard receives a non-retryable error
+// we consider the write failed and we report the WC errors for batched writes.
+TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErrorBatched) {
+
+    auto req = requestMultipleWriteOps;
+    req.setOrdered(false);
+    auto op = BulkWriteOp(_opCtx, req);
+
+    TargetedBatchMap targeted;
+    targetWrites(op, targeted, 2);
+
+    // Simulate ok:1 n:0 response from shard1.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId1].get(),
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    auto& updateOp1 = op.getWriteOp_forTest(0);
+    auto& updateOp2 = op.getWriteOp_forTest(1);
+    // We only got one reply, so should still be pending and continuing current round.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Pending);
+    ASSERT_FALSE(op.shouldStopCurrentRound());
+    ASSERT_FALSE(op.isFinished());
+
+    // Since we only got one reply so far and it was n=0, that child op should be deferred.
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[1].state, WriteOpState_Pending);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[1].state, WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+
+    // Simulate ok:1 n:0 response from shard2.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId2].get(),
+        AsyncRequestsSender::Response{
+            kShardId2,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                kBulkWriteNoMatchResponseWithWCEMultipleWriteOps, Microseconds(0))),
+            boost::none},
+        boost::none);
+    // We are still missing one reply so should still be pending and continuing current round.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Pending);
+    ASSERT_FALSE(op.shouldStopCurrentRound());
+    ASSERT_FALSE(op.isFinished());
+    // Both the ops we received replies for so far should be Deferred.
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[1].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp1.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[0].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[1].state, WriteOpState_Deferred);
+    ASSERT_EQ(updateOp2.getChildWriteOps_forTest()[2].state, WriteOpState_Pending);
+
+    // Simulate a non-retryable error response from shard3.
+    op.processChildBatchResponseFromRemote(
+        *targeted[kShardId3].get(),
+        AsyncRequestsSender::Response{
+            kShardId3,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
+                    .toBSON(),
+                Microseconds(0))),
+            boost::none},
+        boost::none);
+
+    op.finishExecutingWriteWithoutShardKeyWithId();
+    // Due to the error, we should have marked the write as errored.
+    ASSERT_EQ(updateOp1.getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(updateOp2.getWriteState(), WriteOpState_Error);
+    ASSERT(op.isFinished());
+
+    auto replies = op.generateReplyInfo();
+    ASSERT_EQ(replies.replyItems.size(), 2);
+    ASSERT_NOT_OK(replies.replyItems[0].getStatus());
+    ASSERT_EQ(replies.replyItems[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_NOT_OK(replies.replyItems[1].getStatus());
+    ASSERT_EQ(replies.replyItems[1].getStatus().code(), ErrorCodes::Interrupted);
     ASSERT_NE(replies.wcErrors, boost::none);
 }
 

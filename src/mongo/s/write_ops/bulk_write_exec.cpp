@@ -850,7 +850,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
             numRoundsWithoutProgress = 0;
         }
         numCompletedOps = currCompletedOps;
-        bulkWriteOp.resetTargeterHasStaleShardResponse();
+        bulkWriteOp.setTargeterHasStaleShardResponse(false);
         LOGV2_DEBUG(7934202,
                     2,
                     "Completed a round of bulkWrite execution",
@@ -1710,11 +1710,9 @@ void BulkWriteOp::saveWriteConcernError(ShardId shardId,
     auto opIdx = writeBatch.getWrites().front()->writeOpRef.first;
     if (_writeOps[opIdx].getWriteType() == WriteType::WithoutShardKeyWithId) {
         if (!_deferredWCErrors) {
-            _deferredWCErrors = std::make_pair(opIdx, std::vector{ShardWCError(shardId, wce)});
-        } else {
-            invariant(_deferredWCErrors->first == opIdx);
-            _deferredWCErrors->second.push_back(ShardWCError(shardId, wce));
+            _deferredWCErrors.emplace();
         }
+        (*_deferredWCErrors)[opIdx].push_back(ShardWCError(shardId, wce));
     } else {
         _wcErrors.push_back(ShardWCError(shardId, wce));
     }
@@ -1756,7 +1754,7 @@ void BulkWriteOp::noteStaleResponses(
                             "status"_attr = error.error.getStatus());
                 targeter->noteStaleShardResponse(
                     _opCtx, error.endpoint, *error.error.getStatus().extraInfo<StaleConfigInfo>());
-                _targeterHasStaleShardResponse = true;
+                setTargeterHasStaleShardResponse(true);
             }
             for (const auto& error : errors->second.getErrors(ErrorCodes::StaleDbVersion)) {
                 LOGV2_DEBUG(7279202,
@@ -1768,7 +1766,7 @@ void BulkWriteOp::noteStaleResponses(
                     _opCtx,
                     error.endpoint,
                     *error.error.getStatus().extraInfo<StaleDbRoutingVersion>());
-                _targeterHasStaleShardResponse = true;
+                setTargeterHasStaleShardResponse(true);
             }
             for (const auto& error :
                  errors->second.getErrors(ErrorCodes::CannotImplicitlyCreateCollection)) {
@@ -1785,17 +1783,6 @@ void BulkWriteOp::noteStaleResponses(
 }
 
 void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
-    // See _deferredWCErrors for details.
-    if (_deferredWCErrors) {
-        auto& [opIdx, wcErrors] = _deferredWCErrors.value();
-        auto& op = _writeOps[opIdx];
-        invariant(op.getWriteType() == WriteType::WithoutShardKeyWithId);
-        if (op.getWriteState() >= WriteOpState_Completed) {
-            _wcErrors.insert(_wcErrors.end(), wcErrors.begin(), wcErrors.end());
-        }
-        _deferredWCErrors = boost::none;
-    }
-
     if (_deferredResponses) {
         for (unsigned long idx = 0; idx < _deferredResponses->size(); idx++) {
             auto [targetedWriteBatch, response, replyItem] = _deferredResponses->at(idx);
@@ -1808,7 +1795,7 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
             const auto& write =
                 targetedWriteBatch->getWrites()[idx % targetedWriteBatch->getWrites().size()];
             WriteOp& writeOp = _writeOps[write->writeOpRef.first];
-            if (_targeterHasStaleShardResponse) {
+            if (targeterHasStaleShardResponse()) {
                 if (writeOp.getWriteState() != WriteOpState_Ready) {
                     writeOp.resetWriteToReady();
                     _shouldStopCurrentRound = false;
@@ -1822,8 +1809,24 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
                     *write, nVal, targetedWriteBatch->getNumOps(), repl);
             }
         }
+        _deferredResponses = boost::none;
     }
-    _deferredResponses = boost::none;
+
+    // See _deferredWCErrors for details.
+    if (_deferredWCErrors) {
+        for (auto& it : *_deferredWCErrors) {
+            auto& op = _writeOps[it.first];
+            invariant(op.getWriteType() == WriteType::WithoutShardKeyWithId);
+            auto& wcErrors = it.second;
+            if (op.getWriteState() >= WriteOpState_Completed) {
+                _wcErrors.insert(_wcErrors.end(), wcErrors.begin(), wcErrors.end());
+            } else {
+                // If we are here for any op it means that the whole batch is retried.
+                break;
+            }
+        }
+        _deferredWCErrors = boost::none;
+    }
 }
 
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {

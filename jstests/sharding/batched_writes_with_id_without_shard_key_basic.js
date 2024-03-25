@@ -2,7 +2,7 @@
  * Tests batched update and delete ops with id without shard key uses PM-3190 for retryable
  * writes.
  *
- * @tags: [featureFlagUpdateOneWithIdWithoutShardKey, requires_fcv_80]
+ * @tags: [requires_fcv_80]
  */
 
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
