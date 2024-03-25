@@ -2,7 +2,6 @@
  * Test that _shardsvrCoordinateMultiUpdate retries the update when
  * MigrationBlockingOperationCoordinator throws a cleanup error.
  * @tags: [
- *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
  *  requires_fcv_80
  * ]
  */

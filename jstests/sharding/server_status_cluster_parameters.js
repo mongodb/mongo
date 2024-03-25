@@ -2,7 +2,6 @@
  * Tests that server status reports only the state of cluster parameters that have been set.
  *
  * @tags: [
- *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
  *  requires_fcv_80
  * ]
  */

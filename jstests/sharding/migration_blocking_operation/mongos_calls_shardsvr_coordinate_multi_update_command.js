@@ -2,7 +2,6 @@
  * Verify that mongos routes multiUpdates/multiDeletes to _shardsvrCoordinateMultiUpdate when
  * pauseMigrationsDuringMultiUpdates is enabled.
  * @tags: [
- *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
  *  requires_fcv_80
  * ]
  */

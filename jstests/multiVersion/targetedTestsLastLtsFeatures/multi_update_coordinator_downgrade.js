@@ -3,7 +3,7 @@
  * cleaned up before downgrading to 7.0.
  *
  *  @tags: [
- *      featureFlagPauseMigrationsDuringMultiUpdatesAvailable
+ *      requires_fcv_80
  *  ]
  */
 

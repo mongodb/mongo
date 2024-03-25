@@ -3,7 +3,6 @@
  * other nodes before returning. We don't make any guarantees regarding updateMany if there is a
  * failover, so this behavior should be considered best effort.
  * @tags: [
- *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
  *  requires_fcv_80
  * ]
  */

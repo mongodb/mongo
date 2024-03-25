@@ -9,7 +9,6 @@
  * requires_sharding,
  * assumes_balancer_off,
  * incompatible_with_concurrency_simultaneous,
- * featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
  * requires_fcv_80
  * ];
  */
