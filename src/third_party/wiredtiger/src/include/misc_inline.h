@@ -296,6 +296,16 @@ __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
 }
 
 /*
+ * __wt_set_shared_double --
+ *     This function enables suppressing TSan warnings about setting doubles in a shared context.
+ */
+static WT_INLINE void
+__wt_set_shared_double(double *to_set, double value)
+{
+    *to_set = value;
+}
+
+/*
  * The hardware-accelerated checksum code that originally shipped on Windows did not correctly
  * handle memory that wasn't 8B aligned and a multiple of 8B. It's likely that calculations were
  * always 8B aligned, but there's some risk.

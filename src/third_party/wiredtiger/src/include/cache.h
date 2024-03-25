@@ -122,16 +122,15 @@ struct __wt_cache {
      * Eviction threshold percentages use double type to allow for specifying percentages less than
      * one.
      */
-    double eviction_dirty_target;    /* Percent to allow dirty */
-    double eviction_dirty_trigger;   /* Percent to trigger dirty eviction */
-    double eviction_trigger;         /* Percent to trigger eviction */
-    double eviction_target;          /* Percent to end eviction */
-    double eviction_updates_target;  /* Percent to allow for updates */
-    double eviction_updates_trigger; /* Percent of updates to trigger eviction */
+    wt_shared double eviction_dirty_target;  /* Percent to allow dirty */
+    wt_shared double eviction_dirty_trigger; /* Percent to trigger dirty eviction */
+    double eviction_trigger;                 /* Percent to trigger eviction */
+    double eviction_target;                  /* Percent to end eviction */
+    double eviction_updates_target;          /* Percent to allow for updates */
+    double eviction_updates_trigger;         /* Percent of updates to trigger eviction */
 
-    double eviction_checkpoint_target; /* Percent to reduce dirty
-                                        to during checkpoint scrubs */
-    double eviction_scrub_target;      /* Current scrub target */
+    double eviction_checkpoint_target; /* Percent to reduce dirty to during checkpoint scrubs */
+    wt_shared double eviction_scrub_target; /* Current scrub target */
 
     u_int overhead_pct;              /* Cache percent adjustment */
     uint64_t cache_max_wait_us;      /* Maximum time an operation waits for space in cache */

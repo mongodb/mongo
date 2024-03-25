@@ -528,6 +528,17 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __checkpoint_set_scrub_target --
+ *     Set the scrub target for the checkpoint.
+ */
+static WT_INLINE void
+__checkpoint_set_scrub_target(WT_SESSION_IMPL *session, double target)
+{
+    __wt_set_shared_double(&S2C(session)->cache->eviction_scrub_target, target);
+    WT_STAT_CONN_SET(session, checkpoint_scrub_target, (int64_t)target);
+}
+
+/*
  * __checkpoint_wait_reduce_dirty_cache --
  *     Try to reduce the amount of dirty data in cache so there is less work do during the critical
  *     section of the checkpoint.
@@ -566,8 +577,7 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
     max_write = __wt_cache_dirty_leaf_inuse(cache);
 
     /* Set the dirty trigger to the target value. */
-    cache->eviction_scrub_target = cache->eviction_checkpoint_target;
-    WT_STAT_CONN_SET(session, checkpoint_scrub_target, (int64_t)cache->eviction_scrub_target);
+    __checkpoint_set_scrub_target(session, cache->eviction_checkpoint_target);
 
     /* Wait while the dirty level is going down. */
     for (;;) {
@@ -1242,8 +1252,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * Unblock updates -- we can figure out that any updates to clean pages after this point are too
      * new to be written in the checkpoint.
      */
-    cache->eviction_scrub_target = 0.0;
-    WT_STAT_CONN_SET(session, checkpoint_scrub_target, 0);
+    __checkpoint_set_scrub_target(session, 0.0);
 
     /* Tell logging that we have started a database checkpoint. */
     if (full && logging) {
@@ -1480,8 +1489,7 @@ err:
     if (tracking)
         WT_TRET(__wt_meta_track_off(session, false, failed));
 
-    cache->eviction_scrub_target = 0.0;
-    WT_STAT_CONN_SET(session, checkpoint_scrub_target, 0);
+    __checkpoint_set_scrub_target(session, 0.0);
 
     if (F_ISSET(txn, WT_TXN_RUNNING)) {
         /*

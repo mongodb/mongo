@@ -2,10 +2,8 @@
 # export TSAN_OPTIONS="suppressions=path/to/wiredtiger/test/evergreen/tsan_warnings.supp"
 # before running tests with TSan
 
-# FIXME-WT-12514 Some of our shared variables are floats or doubles which can't be accessed using atomic instrinsics.
-race:__wt_eviction_dirty_target
-race:__wt_eviction_dirty_needed
-race:__evict_update_work
+# This function enables threads to set double values in a shared context, and catches all TSan warnings.
+race:__wt_set_shared_double
 
 # Stats are allowed to be fuzzy. Ignore races in TSan
 race:src/include/stat.h
