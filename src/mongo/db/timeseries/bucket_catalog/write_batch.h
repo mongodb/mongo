@@ -81,25 +81,46 @@ struct WriteBatch {
 
     BSONObj toBSON() const;
 
+    bool generateCompressedDiff = false;
+
+    // Whether the measurements in the bucket are sorted by timestamp or not.
+    // True by default, if a v2 buckets gets promoted to v3 this is set to false.
+    // It should not be used for v1 buckets.
+    bool bucketIsSortedByTime = true;
+
+    bool openedDueToMetadata =
+        false;  // If true, bucket has been opened due to the inserted measurement having different
+    // metadata than available buckets.
+
+    AtomicWord<bool> commitRights{false};
+
+    const OperationId opId;
+
+    uint32_t numPreviouslyCommittedMeasurements = 0;
+
+    // For always compressed, adds the compressed measurement sizes while committing.
+    int32_t size = 0;
+
     TrackingContext& trackingContext;
 
-    const BucketHandle bucketHandle;
-    const BucketKey bucketKey;
-    const OperationId opId;
-    ExecutionStatsController stats;
     StringData timeField;  // Necessary so we can compress on writes, since the compression
                            // algorithm sorts on the timeField. See compressBucket().
+
+    BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
+    BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
+
+    SharedPromise<CommitInfo> promise;
+
+    ExecutionStatsController stats;
+
+    StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
 
     // Number of measurements we can hold in a batch without needing to allocate memory.
     static constexpr std::size_t kNumStaticBatchMeasurements = 10;
     using BatchMeasurements = boost::container::small_vector<BSONObj, kNumStaticBatchMeasurements>;
-
     BatchMeasurements measurements;
-    BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
-    BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
-    uint32_t numPreviouslyCommittedMeasurements = 0;
-    StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
-    bool generateCompressedDiff = false;
+
+    const BucketHandle bucketHandle;
 
     /**
      * In-memory data fields. Allows for quick compression of bucket data.
@@ -110,20 +131,7 @@ struct WriteBatch {
      */
     MeasurementMap measurementMap;
 
-    // For always compressed, adds the compressed measurement sizes while committing.
-    int32_t size = 0;
-
-    // Whether the measurements in the bucket are sorted by timestamp or not.
-    // True by default, if a v2 buckets gets promoted to v3 this is set to false.
-    // It should not be used for v1 buckets.
-    bool bucketIsSortedByTime = true;
-
-    bool openedDueToMetadata =
-        false;  // If true, bucket has been opened due to the inserted measurement having different
-                // metadata than available buckets.
-
-    AtomicWord<bool> commitRights{false};
-    SharedPromise<CommitInfo> promise;
+    const BucketKey bucketKey;
 };
 
 const BSONObj& getUncompressedBucketDoc(const WriteBatch& batch);

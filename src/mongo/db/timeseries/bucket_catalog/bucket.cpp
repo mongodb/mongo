@@ -62,20 +62,20 @@ Bucket::Bucket(TrackingContext& trackingContext,
                StringData tf,
                Date_t mt,
                BucketStateRegistry& bsr)
-    : bucketId(bId),
-      key(std::move(k)),
-      timeField(make_tracked_string(trackingContext, tf.data(), tf.size())),
+    : usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
       minTime(mt),
+      lastChecked(getCurrentEraAndIncrementBucketCount(bsr)),
       bucketStateRegistry(bsr),
-      lastChecked(getCurrentEraAndIncrementBucketCount(bucketStateRegistry)),
+      bucketId(bId),
+      timeField(make_tracked_string(trackingContext, tf.data(), tf.size())),
+      key(std::move(k)),
       fieldNames(makeTrackedStringSet(trackingContext)),
       uncommittedFieldNames(makeTrackedStringSet(trackingContext)),
-      minmax(trackingContext),
-      schema(trackingContext),
       batches(
           make_tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(trackingContext)),
-      usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
+      minmax(trackingContext),
+      schema(trackingContext),
       measurementMap(trackingContext) {}
 
 Bucket::~Bucket() {

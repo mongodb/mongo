@@ -94,43 +94,24 @@ public:
     Bucket& operator=(const Bucket&) = delete;
     Bucket& operator=(Bucket&&) = delete;
 
-    // The bucket ID for the underlying document
-    const BucketId bucketId;
-
-    // The key (i.e. (namespace, metadata)) for this bucket.
-    const BucketKey key;
-
-    // Time field for the measurements that have been inserted into the bucket.
-    const tracked_string timeField;
-
-    // Minimum timestamp over contained measurements.
-    const Date_t minTime;
-
     // Whether the measurements in the bucket are sorted by timestamp or not.
     // True by default, if a v2 buckets gets promoted to v3 this is set to false.
     // It should not be used for v1 buckets.
     bool bucketIsSortedByTime = true;
 
-    // A reference so we can clean up some linked state from the destructor.
-    BucketStateRegistry& bucketStateRegistry;
+    // Whether this bucket was kept open after exceeding the bucket max size to improve
+    // bucketing performance for large measurements.
+    bool keptOpenDueToLargeMeasurements = false;
 
-    // The last era in which this bucket checked whether it was cleared.
-    BucketStateRegistry::Era lastChecked;
+    // Whether this bucket has a measurement that crossed the large measurement threshold. When this
+    // threshold is crossed, we use the uncompressed size towards the bucket size limit for all
+    // incoming measurements.
+    bool crossedLargeMeasurementThreshold = false;
 
-    // Top-level hashed field names of the measurements that have been inserted into the bucket.
-    // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
-    // measurementMap.
-    TrackedStringSet fieldNames;
-
-    // Top-level hashed new field names that have not yet been committed into the bucket.
-    TrackedStringSet uncommittedFieldNames;
-
-    // The minimum and maximum values for each field in the bucket.
-    MinMax minmax;
-
-    // The reference schema for measurements in this bucket. May reflect schema of uncommitted
-    // measurements.
-    Schema schema;
+    // Whether the bucket was created while the always used compressed buckets feature flag was
+    // enabled.
+    // TODO SERVER-70605: remove this boolean.
+    const bool usingAlwaysCompressedBuckets;
 
     // For always compressed, the total compressed size in bytes of the bucket's BSON serialization,
     // not including measurements to be inserted until a WriteBatch is committed. With the feature
@@ -150,30 +131,49 @@ public:
     // due to time range.
     RolloverAction rolloverAction = RolloverAction::kNone;
 
-    // Whether this bucket was kept open after exceeding the bucket max size to improve
-    // bucketing performance for large measurements.
-    bool keptOpenDueToLargeMeasurements = false;
+    // Minimum timestamp over contained measurements.
+    const Date_t minTime;
 
-    // Whether this bucket has a measurement that crossed the large measurement threshold. When this
-    // threshold is crossed, we use the uncompressed size towards the bucket size limit for all
-    // incoming measurements.
-    bool crossedLargeMeasurementThreshold = false;
+    // The last era in which this bucket checked whether it was cleared.
+    BucketStateRegistry::Era lastChecked;
+
+    // A reference so we can clean up some linked state from the destructor.
+    BucketStateRegistry& bucketStateRegistry;
 
     // The batch that has been prepared and is currently in the process of being committed, if
     // any.
     std::shared_ptr<WriteBatch> preparedBatch;
 
-    // Batches, per operation, that haven't been committed or aborted yet.
-    tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
-
     // If the bucket is in idleBuckets, then its position is recorded here.
     using IdleList = tracked_list<Bucket*>;
     boost::optional<IdleList::iterator> idleListEntry = boost::none;
 
-    // Whether the bucket was created while the always used compressed buckets feature flag was
-    // enabled.
-    // TODO SERVER-70605: remove this boolean.
-    const bool usingAlwaysCompressedBuckets;
+    // The bucket ID for the underlying document
+    const BucketId bucketId;
+
+    // Time field for the measurements that have been inserted into the bucket.
+    const tracked_string timeField;
+
+    // The key (i.e. (namespace, metadata)) for this bucket.
+    const BucketKey key;
+
+    // Top-level hashed field names of the measurements that have been inserted into the bucket.
+    // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
+    // measurementMap.
+    TrackedStringSet fieldNames;
+
+    // Top-level hashed new field names that have not yet been committed into the bucket.
+    TrackedStringSet uncommittedFieldNames;
+
+    // Batches, per operation, that haven't been committed or aborted yet.
+    tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
+
+    // The minimum and maximum values for each field in the bucket.
+    MinMax minmax;
+
+    // The reference schema for measurements in this bucket. May reflect schema of uncommitted
+    // measurements.
+    Schema schema;
 
     /**
      * In-memory state of each committed data field. Enables fewer complete round-trips of

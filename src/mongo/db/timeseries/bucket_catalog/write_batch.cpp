@@ -51,13 +51,13 @@ WriteBatch::WriteBatch(TrackingContext& tc,
                        OperationId o,
                        ExecutionStatsController& s,
                        StringData timeField)
-    : trackingContext(tc),
-      bucketHandle(b),
-      bucketKey(std::move(k)),
-      opId(o),
-      stats(s),
+    : opId(o),
+      trackingContext(tc),
       timeField(timeField),
-      measurementMap(trackingContext) {}
+      stats(s),
+      bucketHandle(b),
+      measurementMap(trackingContext),
+      bucketKey(std::move(k)) {}
 
 BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) {
