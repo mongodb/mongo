@@ -582,7 +582,7 @@ void executeWriteWithoutShardKey(
         opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
     // If there is only 1 targetable shard, we can skip using the two phase write protocol.
-    if (targeter->getNShardsOwningChunks() == 1) {
+    if (childBatches.size() == 1) {
         executeChildBatches(opCtx,
                             targeters,
                             childBatches,

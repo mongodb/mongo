@@ -338,6 +338,10 @@ export class BulkWriteMetricChecker {
             targetedInsert *= retryCount;
         }
 
+        if (this.timeseries && !this.bulkWrite && updateShardField === "manyShards") {
+            targetedUpdate = targetedUpdate * 2;
+        }
+
         if (this.bulkWrite) {
             if (singleUpdateForBulkWrite) {
                 targetedUpdate = 1;
@@ -382,7 +386,7 @@ export class BulkWriteMetricChecker {
         singleUpdateForBulkWrite = false,
         singleInsertForBulkWrite = false,
         insertShardField = "oneShard",
-        updateShardField = this.timeseries ? "manyShards" : "allShards",
+        updateShardField = this.timeseries ? "oneShard" : "allShards",
         deleteShardField = this.timeseries ? "oneShard" : "allShards",
         retryCount = 0,
         opcounterFactor = 1,
@@ -559,6 +563,15 @@ export class BulkWriteMetricChecker {
             this.isMongos ? "ShardingTest"
                           : "ReplSetTest"} with bulkWrite = ${this.bulkWrite}, errorsOnly = ${
             this.errorsOnly} and timeseries = ${this.timeseries}).`);
+
+        if (this.timeseries && this.isMongos) {
+            // For sharded timeseries updates we will get an extra opcounter for a retryable write
+            // since we execute them as an internal transaction which does an additional opcounter.
+            expectedMetrics.opcounterFactor = 2;
+            if (expectedMetrics.updateArrayFilters) {
+                expectedMetrics.updateArrayFilters = expectedMetrics.updateArrayFilters * 2;
+            }
+        }
 
         let statusBefore = this.testDB.serverStatus();
         let topBefore = this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals;
