@@ -46,21 +46,21 @@ namespace mongo {
 class Roaring64BTree {
 public:
     /**
-     * And the value to the bitmaps. Returns true if a new values was added, false otherwise.
+     * Add the value to the bitmaps. Returns true if a new values was added, false otherwise.
      */
     bool addChecked(uint64_t value) {
         return get(highBytes(value)).addChecked(lowBytes(value));
     }
 
     /**
-     * And the value to the bitmaps.
+     * Add the value to the bitmaps.
      */
     void add(uint64_t value) {
         get(highBytes(value)).add(lowBytes(value));
     }
 
     /**
-     * Return if the value is in the set, false otherwise.
+     * Return true if the value is in the set, false otherwise.
      */
     bool contains(uint64_t value) const {
         return _roarings.contains(highBytes(value))

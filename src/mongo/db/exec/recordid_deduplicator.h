@@ -47,7 +47,7 @@ public:
     RecordIdDeduplicator(size_t threshold, size_t chunkSize, uint64_t universeSize);
 
     /**
-     * Insert a RecordId and return true if the RecordId has been seen.
+     * Insert a RecordId and return true if the RecordId has not been seen.
      */
     bool insert(const RecordId& recordId);
 

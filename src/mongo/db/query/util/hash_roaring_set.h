@@ -103,7 +103,7 @@ public:
                 return false;
             case kHashTableAndBitmap:
                 migrateNextChunk();
-                return _bitmap.addChecked(value) || _hashTable.contains(value);
+                return !_hashTable.contains(value) && _bitmap.addChecked(value);
             case kBitmap:
                 return _bitmap.addChecked(value);
         }

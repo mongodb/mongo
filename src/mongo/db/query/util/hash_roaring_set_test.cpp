@@ -70,7 +70,6 @@ TEST(HashRoaringTest, HashSet) {
     ASSERT_FALSE(isSwitched);
 }
 
-
 /**
  * Tests Roaring Bitmaps part of HashRoaringSet.
  */
@@ -98,6 +97,34 @@ TEST(HashRoaringTest, RoaringBitmaps) {
     for (uint64_t i = 0; i < 10000; ++i) {
         ASSERT_FALSE(hashRoaring.addChecked(i));
     }
+}
+
+/**
+ * Tests combined Hash Table and Roaring Bitmaps parts of HashRoaringSet.
+ */
+TEST(HashRoaringTest, HashTableAndRoaringBitmaps) {
+    bool isSwitched = false;
+    HashRoaringSet hashRoaring(1'000, 1, 1'000'000, OnSwitchToRoaring{isSwitched});
+
+    for (uint64_t i = 0; i < 3333; ++i) {
+        if (i % 3 == 0) {
+            ASSERT_TRUE(hashRoaring.addChecked(i));
+        }
+    }
+
+    // The migration is ongoing.
+    ASSERT_EQ(hashRoaring.getCurrentState(), HashRoaringSet::kHashTableAndBitmap);
+
+    for (uint64_t i = 1000; i >= 300; --i) {
+        if (i % 3 == 0) {
+            ASSERT_FALSE(hashRoaring.addChecked(i));
+        } else {
+            ASSERT_TRUE(hashRoaring.addChecked(i));
+        }
+    }
+
+    // The migration is still ongoing.
+    ASSERT_EQ(hashRoaring.getCurrentState(), HashRoaringSet::kHashTableAndBitmap);
 }
 
 /**

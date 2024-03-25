@@ -33,7 +33,7 @@
 namespace mongo {
 
 Counter64& roaringMetric =
-    *MetricBuilder<Counter64>{"query.RecordIdDeduplicationSwitchedToRoaring"};
+    *MetricBuilder<Counter64>{"query.recordIdDeduplicationSwitchedToRoaring"};
 
 RecordIdDeduplicator::RecordIdDeduplicator(size_t threshold,
                                            size_t chunkSize,
