@@ -51,6 +51,10 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
             return ptr;
 
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+        uassert(8838601,
+                "Invalid control byte in BSON Column",
+                bsoncolumn::scaleIndexForControlByte(control) ==
+                    Simple8bTypeUtil::kMemoryAsInteger);
 
         simple8b::visitAll<Encoding>(
             ptr + 1,
@@ -64,9 +68,7 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
                     materialize(last, reference, buffer);
                 }
             },
-            [&buffer]() {
-                buffer.appendLast();
-            },
+            [&buffer]() { buffer.appendLast(); },
             [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;
@@ -221,9 +223,7 @@ const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
                 uassert(8609800, "Post literal delta blocks should only contain skip or 0", v == 0);
                 buffer.appendLast();
             },
-            [&buffer]() {
-                buffer.appendLast();
-            },
+            [&buffer]() { buffer.appendLast(); },
             [&buffer]() { buffer.appendMissing(); });
 
         ptr += 1 + size;

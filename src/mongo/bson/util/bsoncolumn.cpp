@@ -495,6 +495,11 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
                   deltaElem = loadDelta(allocator, d64);
               },
               [&](DecodingState::Decoder128& d128) {
+                  uassert(8838600,
+                          "Invalid control byte in BSON Column",
+                          bsoncolumn::scaleIndexForControlByte(control) ==
+                              Simple8bTypeUtil::kMemoryAsInteger);
+
                   // We can read the last known value from the decoder iterator even as it has
                   // reached end.
                   boost::optional<uint128_t> lastSimple8bValue =
