@@ -22,6 +22,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:

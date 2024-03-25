@@ -141,6 +141,7 @@ variables:
     packager_distro: rhel70
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -793,7 +794,7 @@ buildvariants:
     multiversion_platform: windows
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls --enableEnterpriseTests=off
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -2066,7 +2067,7 @@ buildvariants:
     multiversion_edition: enterprise
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --excludeWithAnyTags=incompatible_with_s390x
+      --excludeWithAnyTags=incompatible_with_s390x,requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -2582,11 +2583,12 @@ buildvariants:
     # of the ServiceContext.
     #
     san_options: TSAN_OPTIONS="halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo) --use-diagnostic-latches=on
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo)
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
     separate_debug: off
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG

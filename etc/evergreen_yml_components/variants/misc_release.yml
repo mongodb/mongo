@@ -8,7 +8,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux --enableEnterpriseTests=off
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -62,7 +62,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -122,7 +122,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_latch_analyzer --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -172,7 +172,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
@@ -289,7 +289,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-amazon2023
-    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off --modules=
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --modules=
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
@@ -338,7 +338,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amazon2023
-    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off --enterprise-features="audit,encryptdb,fcbis,fips,fle,hot_backups,inmemory,kerberos,vector_search,ldap,live_import,mongohouse,queryable,sasl,search,serverless"
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --enterprise-features="audit,encryptdb,fcbis,fips,fle,hot_backups,inmemory,kerberos,vector_search,ldap,live_import,mongohouse,queryable,sasl,search,serverless"
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
@@ -387,7 +387,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2023
-    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off --modules=
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --modules=
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
@@ -433,7 +433,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2023
-    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off --enterprise-features="audit,encryptdb,fcbis,fips,fle,hot_backups,inmemory,kerberos,vector_search,ldap,live_import,mongohouse,queryable,sasl,search,serverless"
+    compile_flags: --ssl MONGO_DISTMOD=amazon2023 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --enterprise-features="audit,encryptdb,fcbis,fips,fle,hot_backups,inmemory,kerberos,vector_search,ldap,live_import,mongohouse,queryable,sasl,search,serverless"
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
@@ -486,7 +486,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian10
@@ -551,6 +551,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: debian10-build
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -589,7 +590,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian11
     compile_flags: --ssl MONGO_DISTMOD=debian11 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian11
@@ -654,6 +655,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: debian11-large
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -689,7 +691,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -737,7 +739,7 @@ buildvariants:
   - rhel76-test
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -758,7 +760,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
-      --excludeWithAnyTags=requires_os_access --enableEnterpriseTests=off
+      --excludeWithAnyTags=requires_os_access,requires_latch_analyzer --enableEnterpriseTests=off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -778,7 +780,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel80
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -844,6 +846,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 3
     large_distro_name: rhel80-medium
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -953,7 +956,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1001,6 +1004,7 @@ buildvariants:
     packager_distro: rhel82
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1052,7 +1056,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel90
     compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: rhel90
     multiversion_edition: targeted
     has_packages: true
@@ -1113,6 +1117,7 @@ buildvariants:
     packager_distro: rhel90
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1180,7 +1185,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-rhel90
     compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1235,6 +1240,7 @@ buildvariants:
     packager_distro: rhel90
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1294,7 +1300,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer --enableEnterpriseTests=off
     large_distro_name: suse12-sp5-large
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1348,6 +1354,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1393,6 +1400,7 @@ buildvariants:
     packager_distro: suse15
     repo_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1438,7 +1446,7 @@ buildvariants:
     packager_distro: suse15
     repo_edition: org
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer --enableEnterpriseTests=off
     large_distro_name: suse15-build
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -1482,7 +1490,7 @@ buildvariants:
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_latch_analyzer --enableEnterpriseTests=off
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -1540,7 +1548,7 @@ buildvariants:
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_latch_analyzer
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -1603,7 +1611,7 @@ buildvariants:
     push_arch: aarch64-enterprise-ubuntu1804
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_latch_analyzer
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -1651,7 +1659,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-ubuntu1804
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_latch_analyzer --enableEnterpriseTests=off
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -1692,7 +1700,7 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
-    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=requires_increased_memlock_limits,requires_latch_analyzer --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1734,7 +1742,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu2004
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -1796,6 +1804,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1848,6 +1857,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: ubuntu2204-large
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -1901,6 +1911,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -1937,7 +1948,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-ubuntu2004
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -1982,6 +1993,7 @@ buildvariants:
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
     scons_cache_scope: shared
+    test_flags: --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -2018,7 +2030,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-ubuntu2204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --modules=
-    test_flags: --enableEnterpriseTests=off
+    test_flags: --enableEnterpriseTests=off --excludeWithAnyTags=requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2061,7 +2073,7 @@ buildvariants:
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
-    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls --enableEnterpriseTests=off
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer --enableEnterpriseTests=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -2173,7 +2185,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -2221,7 +2233,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -2269,7 +2281,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
@@ -2303,7 +2315,7 @@ buildvariants:
   run_on:
   - macos-1100-arm64
   expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com

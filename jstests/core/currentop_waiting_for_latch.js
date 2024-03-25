@@ -3,7 +3,7 @@
  * set to true and there is a latch timeout.
  *
  * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged, no_selinux,
- * requires_latch_analyzer]
+ * requires_latch_analyzer, multiversion_incompatible]
  */
 (function() {
 "use strict";
