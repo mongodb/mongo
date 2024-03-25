@@ -28,22 +28,14 @@
  */
 #pragma once
 
-#if defined(__linux__)
-#include <semaphore.h>
-#endif
-
-#include <algorithm>
 #include <boost/optional/optional.hpp>
-#include <cstdint>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -52,7 +44,6 @@ public:
     explicit SemaphoreTicketHolder(ServiceContext* serviceContext,
                                    int numTickets,
                                    bool trackPeakUsed);
-    ~SemaphoreTicketHolder() final;
 
     int32_t available() const final;
 
@@ -77,17 +68,8 @@ private:
     QueueStats& _getQueueStatsToUse(AdmissionContext::Priority priority) noexcept final {
         return _semaphoreStats;
     }
-#if defined(__linux__)
-    mutable sem_t _sem;
-#else
-    bool _tryAcquire();
 
-    int32_t _numTickets;
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SemaphoreTicketHolder::_mutex");
-    stdx::condition_variable _newTicket;
-#endif
-
+    BasicWaitableAtomic<uint32_t> _tickets;
     QueueStats _semaphoreStats;
 };
 

@@ -32,6 +32,7 @@
 #include <map>
 #include <memory>
 
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"

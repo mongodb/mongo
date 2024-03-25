@@ -93,7 +93,7 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     auto currentStats = stats.getNonTicketStats();
 
     tickSource->advance(Microseconds{100});
-    holder->resize(10);
+    ASSERT_TRUE(holder->resize(10));
 
     ASSERT_EQ(holder->available(), 9);
     ASSERT_EQ(holder->outof(), 10);
@@ -111,16 +111,16 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     ASSERT_EQ(stats["available"], 10);
     ASSERT_EQ(stats["totalTickets"], 10);
 
-    holder->resize(1);
+    ASSERT_TRUE(holder->resize(1));
     newStats = stats.getNonTicketStats();
     ASSERT_EQ(currentStats.woCompare(newStats), 0);
 
     tickSource->advance(Microseconds{100});
-    holder->resize(10);
+    ASSERT_TRUE(holder->resize(10));
     currentStats = stats.getNonTicketStats();
     ASSERT_EQ(currentStats.woCompare(newStats), 0);
 
-    holder->resize(6);
+    ASSERT_TRUE(holder->resize(6));
     std::array<boost::optional<Ticket>, 5> tickets;
     {
         auto ticket = holder->waitForTicket(*opCtx, &admCtx, timeInQueue);
@@ -136,7 +136,7 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
             *opCtx, &admCtx, Date_t::now() + Milliseconds(1), timeInQueue));
     }
 
-    holder->resize(5);
+    ASSERT_TRUE(holder->resize(5));
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->outof(), 5);
     ASSERT_FALSE(
@@ -147,7 +147,7 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
 
 void TicketHolderTestFixture::interruptTest(OperationContext* opCtx,
                                             std::unique_ptr<TicketHolder> holder) {
-    holder->resize(0);
+    ASSERT_TRUE(holder->resize(0));
     Microseconds timeInQueue(0);
 
     auto waiter = stdx::thread([&]() {
