@@ -433,7 +433,7 @@ descend:
             /*
              * If we see any child states other than deleted, the page isn't empty.
              */
-            current_state = ref->state;
+            current_state = WT_REF_GET_STATE(ref);
             if (current_state != WT_REF_DELETED && !LF_ISSET(WT_READ_TRUNCATE))
                 empty_internal = false;
 
@@ -585,7 +585,7 @@ __tree_walk_skip_count_callback(
     /*
      * Skip deleted pages visible to us.
      */
-    if (ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, ref, visible_all))
+    if (WT_REF_GET_STATE(ref) == WT_REF_DELETED && __wt_delete_page_skip(session, ref, visible_all))
         *skipp = true;
     else if (*skipleafcntp > 0 && F_ISSET(ref, WT_REF_FLAG_LEAF)) {
         --*skipleafcntp;

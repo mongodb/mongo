@@ -200,7 +200,7 @@ __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_CACHE *cache;
 
-    WT_ASSERT(session, __wt_ref_is_root(ref) || ref->state == WT_REF_LOCKED);
+    WT_ASSERT(session, __wt_ref_is_root(ref) || WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
 
     /* Fast path: if the page isn't in the queue, don't bother searching. */
     if (!F_ISSET_ATOMIC_16(ref->page, WT_PAGE_EVICT_LRU))
@@ -2173,7 +2173,8 @@ fast:
             ref = NULL;
         } else {
             while (ref != NULL &&
-              (ref->state != WT_REF_MEM || __wt_readgen_evict_soon(&ref->page->read_gen)))
+              (WT_REF_GET_STATE(ref) != WT_REF_MEM ||
+                __wt_readgen_evict_soon(&ref->page->read_gen)))
                 WT_RET_NOTFOUND_OK(__wt_tree_walk_count(session, &ref, &refs_walked, walk_flags));
         }
         btree->evict_ref = ref;
@@ -2321,7 +2322,7 @@ __evict_get_ref(WT_SESSION_IMPL *session, bool is_server, WT_BTREE **btreep, WT_
          * Lock the page while holding the eviction mutex to prevent multiple attempts to evict it.
          * For pages that are already being evicted, this operation will fail and we will move on.
          */
-        if ((previous_state = evict->ref->state) != WT_REF_MEM ||
+        if ((previous_state = WT_REF_GET_STATE(evict->ref)) != WT_REF_MEM ||
           !WT_REF_CAS_STATE(session, evict->ref, previous_state, WT_REF_LOCKED)) {
             __evict_list_clear(session, evict);
             continue;
@@ -2373,7 +2374,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     WT_TRACK_OP_INIT(session);
 
     WT_RET_TRACK(__evict_get_ref(session, is_server, &btree, &ref, &previous_state));
-    WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+    WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
 
     cache = S2C(session)->cache;
     time_start = 0;

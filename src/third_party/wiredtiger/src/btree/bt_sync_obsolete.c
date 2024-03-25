@@ -190,7 +190,7 @@ static int
 __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_DECL_RET;
-    uint8_t new_state, previous_state;
+    uint8_t new_state, previous_state, ref_state;
     bool busy, ref_deleted;
 
     busy = ref_deleted = false;
@@ -212,11 +212,10 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * Check in memory, deleted and on-disk pages for obsolescence. An initial state check is done
      * without holding the ref locked - this is to avoid switching refs to locked if it's not
-     * worthwhile doing the check. It's possible that the ref changes state while we are doing these
-     * checks. That's OK - in the worst case we might not review the ref this time, but we will on
-     * subsequent reconciliations.
+     * worthwhile doing the check.
      */
-    if (ref->state == WT_REF_DELETED || ref->state == WT_REF_DISK) {
+    ref_state = WT_REF_GET_STATE(ref);
+    if (ref_state == WT_REF_DELETED || ref_state == WT_REF_DISK) {
         WT_REF_LOCK(session, ref, &previous_state);
         /*
          * There are two possible outcomes from the subsequent checks:
@@ -234,7 +233,7 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
         }
         WT_REF_UNLOCK(ref, new_state);
         WT_RET(ret);
-    } else if (ref->state == WT_REF_MEM) {
+    } else if (ref_state == WT_REF_MEM) {
         /*
          * Reviewing in-memory pages requires looking at page reconciliation results and we must
          * ensure we don't race with page reconciliation as it's writing the page modify

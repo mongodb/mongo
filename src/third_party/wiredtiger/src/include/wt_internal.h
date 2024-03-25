@@ -559,6 +559,7 @@ typedef uint64_t wt_timestamp_t;
 #include "misc_inline.h"    /* required by mutex_inline.h */
 
 #include "buf_inline.h"       /* required by cell_inline.h */
+#include "ref_inline.h"       /* required by btree_inline.h */
 #include "timestamp_inline.h" /* required by btree_inline.h */
 #include "cell_inline.h"      /* required by btree_inline.h */
 #include "mutex_inline.h"     /* required by btree_inline.h */

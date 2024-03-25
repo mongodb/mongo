@@ -926,7 +926,7 @@ __debug_tree_shape_worker(WT_DBG *ds, WT_REF *ref, int level)
           "%d %s\n",
           level * 3, " ", level, __debug_tree_shape_info(ref, buf, sizeof(buf))));
         WT_INTL_FOREACH_BEGIN (session, ref->page, walk) {
-            if (walk->state == WT_REF_MEM)
+            if (WT_REF_GET_STATE(walk) == WT_REF_MEM)
                 WT_RET(__debug_tree_shape_worker(ds, walk, level + 1));
         }
         WT_INTL_FOREACH_END;
@@ -1384,7 +1384,7 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page)
 
     if (F_ISSET(ds, WT_DEBUG_TREE_WALK)) {
         WT_INTL_FOREACH_BEGIN (session, page, ref) {
-            if (ref->state == WT_REF_MEM) {
+            if (WT_REF_GET_STATE(ref) == WT_REF_MEM) {
                 WT_RET(ds->f(ds, "\n"));
                 WT_RET(__debug_page(ds, ref));
             }
@@ -1467,7 +1467,7 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page)
 
     if (F_ISSET(ds, WT_DEBUG_TREE_WALK)) {
         WT_INTL_FOREACH_BEGIN (session, page, ref) {
-            if (ref->state == WT_REF_MEM) {
+            if (WT_REF_GET_STATE(ref) == WT_REF_MEM) {
                 WT_RET(ds->f(ds, "\n"));
                 WT_RET(__debug_page(ds, ref));
             }
@@ -1719,7 +1719,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
     session = ds->session;
 
     WT_RET(ds->f(ds, "ref: %p", (void *)ref));
-    WT_RET(ds->f(ds, " | ref_state: %s", __debug_ref_state(ref->state)));
+    WT_RET(ds->f(ds, " | ref_state: %s", __debug_ref_state(WT_REF_GET_STATE(ref))));
     if (ref->flags != 0) {
         WT_RET(ds->f(ds, " | page_type: ["));
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))

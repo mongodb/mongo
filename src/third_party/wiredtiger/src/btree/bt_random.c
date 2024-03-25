@@ -358,6 +358,7 @@ __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags, WT_
     WT_PAGE_INDEX *pindex;
     WT_REF *current, *descent;
     uint32_t i, entries, retry;
+    uint8_t descent_state;
     bool eviction;
 
     *refp = NULL;
@@ -408,13 +409,15 @@ restart:
         descent = NULL;
         for (i = 0; i < entries; ++i) {
             descent = pindex->index[__wt_random(rnd) % entries];
-            if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
+            descent_state = WT_REF_GET_STATE(descent);
+            if (descent_state == WT_REF_DISK || descent_state == WT_REF_MEM)
                 break;
         }
         if (i == entries)
             for (i = 0; i < entries; ++i) {
                 descent = pindex->index[i];
-                if (descent->state == WT_REF_DISK || descent->state == WT_REF_MEM)
+                descent_state = WT_REF_GET_STATE(descent);
+                if (descent_state == WT_REF_DISK || descent_state == WT_REF_MEM)
                     break;
             }
         if (i == entries || descent == NULL) {

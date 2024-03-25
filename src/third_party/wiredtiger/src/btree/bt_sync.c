@@ -137,13 +137,13 @@ __sync_page_skip(
      * existing page on disk contains the right information and will be linked into the checkpoint
      * as the internal tree structure is built.
      */
-    if (ref->state == WT_REF_DELETED) {
+    if (WT_REF_GET_STATE(ref) == WT_REF_DELETED) {
         *skipp = true;
         return (0);
     }
 
     /* If the page is in-memory, we want to look at it. */
-    if (ref->state != WT_REF_DISK)
+    if (WT_REF_GET_STATE(ref) != WT_REF_DISK)
         return (0);
 
     /*

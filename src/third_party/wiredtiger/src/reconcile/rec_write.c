@@ -2612,7 +2612,7 @@ split:
             WT_REF_LOCK(session, ref, &previous_ref_state);
             WT_ASSERT(session, previous_ref_state == WT_REF_MEM);
         } else
-            WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+            WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
 
         /* Check the instantiated flag again in case it got cleared while we waited. */
         if (mod->instantiated) {

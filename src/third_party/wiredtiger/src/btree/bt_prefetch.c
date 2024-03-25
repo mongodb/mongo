@@ -76,7 +76,7 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
          * these deleted pages into the cache if the fast truncate information is visible in the
          * session transaction snapshot.
          */
-        if (next_ref->state == WT_REF_DISK && F_ISSET(next_ref, WT_REF_FLAG_LEAF) &&
+        if (WT_REF_GET_STATE(next_ref) == WT_REF_DISK && F_ISSET(next_ref, WT_REF_FLAG_LEAF) &&
           next_ref->page_del == NULL && !F_ISSET(next_ref, WT_REF_FLAG_PREFETCH)) {
             ret = __wt_conn_prefetch_queue_push(session, next_ref);
             if (ret == EBUSY) {
@@ -114,7 +114,7 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
     WT_PREFETCH_ASSERT(
       session, !F_ISSET(pe->ref, WT_REF_FLAG_INTERNAL), prefetch_skipped_internal_page);
 
-    if (pe->ref->state != WT_REF_DISK) {
+    if (WT_REF_GET_STATE(pe->ref) != WT_REF_DISK) {
         WT_STAT_CONN_INCR(session, prefetch_pages_fail);
         return (0);
     }

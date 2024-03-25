@@ -48,7 +48,7 @@ __rts_btree_walk_page_skip(
      * there's no way to get correct behavior and skipping matches the historic behavior. Note that
      * eviction is running; we must lock the WT_REF before examining the fast-delete information.
      */
-    if (ref->state == WT_REF_DELETED &&
+    if (WT_REF_GET_STATE(ref) == WT_REF_DELETED &&
       WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED)) {
         page_del = ref->page_del;
         if (page_del == NULL ||
@@ -90,7 +90,7 @@ __rts_btree_walk_page_skip(
     }
 
     /* Otherwise, if the page state is other than on disk, we want to look at it. */
-    if (ref->state != WT_REF_DISK)
+    if (WT_REF_GET_STATE(ref) != WT_REF_DISK)
         return (0);
 
     /*

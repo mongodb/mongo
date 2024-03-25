@@ -20,7 +20,7 @@ static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
 static WT_INLINE void
 __evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state)
 {
-    WT_ASSERT(session, ref->state == WT_REF_LOCKED && ref->page != NULL);
+    WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED && ref->page != NULL);
 
     WT_REF_SET_STATE(ref, previous_state);
 }
@@ -32,7 +32,7 @@ __evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_
 static WT_INLINE int
 __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-    WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+    WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
 
     /*
      * Check for a hazard pointer indicating another thread is using the page, meaning the page
@@ -65,7 +65,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      * we can get exclusive access. Take some care with order of operations: if we release the
      * hazard pointer without first locking the page, it could be evicted in between.
      */
-    previous_state = ref->state;
+    previous_state = WT_REF_GET_STATE(ref);
     locked =
       previous_state == WT_REF_MEM && WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED);
     if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
@@ -390,7 +390,7 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
                 /*
                  * The child must be locked after a failed reverse split.
                  */
-                WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+                WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
             }
         }
     }
@@ -564,7 +564,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
             break;
         }
 
-        switch (child->state) {
+        switch (WT_REF_GET_STATE(child)) {
         case WT_REF_DISK:    /* On-disk */
         case WT_REF_DELETED: /* On-disk, deleted */
             break;
@@ -580,7 +580,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
         return (__wt_set_return(session, EBUSY));
 
     WT_INTL_FOREACH_REVERSE_BEGIN (session, parent->page, child) {
-        switch (child->state) {
+        switch (WT_REF_GET_STATE(child)) {
         case WT_REF_DISK:    /* On-disk */
         case WT_REF_DELETED: /* On-disk, deleted */
             break;
@@ -604,7 +604,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
      */
     WT_INTL_FOREACH_BEGIN (session, parent->page, child) {
 
-        switch (child->state) {
+        switch (WT_REF_GET_STATE(child)) {
         case WT_REF_DISK: /* On-disk */
             break;
         case WT_REF_DELETED: /* On-disk, deleted */
@@ -664,7 +664,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
             else
                 visible = __wt_page_del_visible_all(session, child->page_del, false);
             /* FIXME-WT-9780: is there a reason this doesn't use WT_REF_UNLOCK? */
-            child->state = WT_REF_DELETED;
+            WT_REF_SET_STATE(child, WT_REF_DELETED);
             if (!visible)
                 return (__wt_set_return(session, EBUSY));
             break;

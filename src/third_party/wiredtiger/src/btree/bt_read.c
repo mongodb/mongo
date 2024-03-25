@@ -106,7 +106,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_CLEAR(tmp);
 
     /* Lock the WT_REF. */
-    switch (previous_state = ref->state) {
+    switch (previous_state = WT_REF_GET_STATE(ref)) {
     case WT_REF_DISK:
     case WT_REF_DELETED:
         if (WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
@@ -296,7 +296,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
     for (evict_skip = stalled = wont_need = false, force_attempts = 0, sleep_usecs = yield_cnt = 0;
          ;) {
-        switch (current_state = ref->state) {
+        switch (current_state = WT_REF_GET_STATE(ref)) {
         case WT_REF_DELETED:
             /* Optionally limit reads to cache-only. */
             if (LF_ISSET(WT_READ_CACHE | WT_READ_NO_WAIT))

@@ -18,3 +18,6 @@ race:__conn_open_session
 
 # __tiered_queue_peek_empty is intentionally unsafe to avoid taking the tiered lock when it's not needed.
 race:__tiered_queue_peek_empty
+
+# The ref track code is diagnostic only and allows for races
+race:__ref_track_state

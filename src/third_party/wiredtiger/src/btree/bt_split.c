@@ -685,7 +685,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
     if (!WT_BTREE_SYNCING(btree) || WT_SESSION_BTREE_SYNC(session))
         for (i = 0; i < parent_entries; ++i) {
             next_ref = pindex->index[i];
-            WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
+            WT_ASSERT(session, WT_REF_GET_STATE(next_ref) != WT_REF_SPLIT);
 
             /*
              * Protect against including the replaced WT_REF in the list of deleted items. Also, in
@@ -695,7 +695,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
              * unless we update the internal page's start recno on the fly and restart the search,
              * which seems like asking for trouble.)
              */
-            if (next_ref != ref && next_ref->state == WT_REF_DELETED &&
+            if (next_ref != ref && WT_REF_GET_STATE(next_ref) == WT_REF_DELETED &&
               (btree->type != BTREE_COL_VAR || i != 0) &&
               __wt_delete_page_skip(session, next_ref, true) &&
               WT_REF_CAS_STATE(session, next_ref, WT_REF_DELETED, WT_REF_LOCKED)) {
@@ -806,13 +806,13 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
      * the WT_REF state.
      */
     if (discard) {
-        WT_ASSERT(session, exclusive || ref->state == WT_REF_LOCKED);
+        WT_ASSERT(session, exclusive || WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
         WT_TRET(
           __split_parent_discard_ref(session, ref, parent, &parent_decr, split_gen, exclusive));
     }
     for (i = 0; i < deleted_entries; ++i) {
         next_ref = pindex->index[deleted_refs[i]];
-        WT_ASSERT(session, next_ref->state == WT_REF_LOCKED);
+        WT_ASSERT(session, WT_REF_GET_STATE(next_ref) == WT_REF_LOCKED);
         WT_TRET(__split_parent_discard_ref(
           session, next_ref, parent, &parent_decr, split_gen, exclusive));
     }
@@ -860,7 +860,7 @@ err:
         /* Unlock WT_REFs locked because they were in a deleted state. */
         for (i = 0; i < deleted_entries; ++i) {
             next_ref = pindex->index[deleted_refs[i]];
-            WT_ASSERT(session, next_ref->state == WT_REF_LOCKED);
+            WT_ASSERT(session, WT_REF_GET_STATE(next_ref) == WT_REF_LOCKED);
             WT_REF_SET_STATE(next_ref, WT_REF_DELETED);
         }
 
@@ -1803,7 +1803,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     child->home = ref->home;
     child->pindex_hint = ref->pindex_hint;
     F_SET(child, WT_REF_FLAG_LEAF);
-    child->state = WT_REF_MEM; /* Visible as soon as the split completes. */
+    WT_REF_SET_STATE(child, WT_REF_MEM); /* Visible as soon as the split completes. */
     child->addr = ref->addr;
     if (type == WT_PAGE_ROW_LEAF) {
         __wt_ref_key(ref->home, ref, &key, &key_size);
@@ -1843,7 +1843,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     child = split_ref[1];
     child->page = right;
     F_SET(child, WT_REF_FLAG_LEAF);
-    child->state = WT_REF_MEM; /* Visible as soon as the split completes. */
+    WT_REF_SET_STATE(child, WT_REF_MEM); /* Visible as soon as the split completes. */
     if (type == WT_PAGE_ROW_LEAF) {
         WT_ERR(__wt_row_ikey(
           session, 0, WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins), child));
