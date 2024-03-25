@@ -553,9 +553,11 @@ Service::UniqueService Service::make(ServiceContext* sc, ClusterRole role) {
 }
 
 void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* sc) const {
-    // First, delete the Services and fire their destructor actions.
-    sc->_serviceSet.reset();
+    // TODO SERVER-86083: Make the Service DestructorActions run before the ServiceContext
+    // DestructorActions, and then destruct Services after all DestructorActions have run.
     onDestroy(sc, ConstructorActionRegisterer::registeredConstructorActions());
+    // Delete the Services and fire their destructor actions.
+    sc->_serviceSet.reset();
     delete sc;
 }
 
