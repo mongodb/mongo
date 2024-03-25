@@ -300,7 +300,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.no_txns !.kill_terminate
+  - name: .concurrency !.no_txns !.kill_terminate !.feature_flag_guarded
   - name: .encrypt
   - name: external_auth
   - name: external_auth_aws
@@ -391,7 +391,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.no_txns !.repl !.kill_terminate
+  - name: .concurrency !.no_txns !.repl !.kill_terminate !.feature_flag_guarded
   - name: disk_wiredtiger
   - name: .encrypt
   - name: initial_sync_fuzzer_gen

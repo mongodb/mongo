@@ -358,8 +358,8 @@ buildvariants:
   - name: change_streams_multitenant_sharded_collections_passthrough
   - name: .misc_js
   - name: .clustered_collections
-  - name: .concurrency !.large !.no_txns
-  - name: .concurrency .large !.no_txns
+  - name: .concurrency !.large !.no_txns !.feature_flag_guarded
+  - name: .concurrency .large !.no_txns !.feature_flag_guarded
   - name: .config_fuzzer !.large
   - name: .config_fuzzer .large
     distros:

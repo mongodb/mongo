@@ -717,7 +717,7 @@ buildvariants:
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
-  - name: .concurrency .common !.kill_terminate
+  - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
   - name: .jscore .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
@@ -758,7 +758,7 @@ buildvariants:
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
-  - name: .concurrency .common !.kill_terminate
+  - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
   - name: .jscore .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
@@ -804,7 +804,7 @@ buildvariants:
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
-  - name: .concurrency .common !.kill_terminate
+  - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
   - name: .jscore .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
@@ -850,7 +850,7 @@ buildvariants:
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
-  - name: .concurrency .common !.kill_terminate
+  - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
   - name: .jscore .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
@@ -876,7 +876,7 @@ buildvariants:
   - name: auth_gen
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
-  - name: .concurrency .common !.large
+  - name: .concurrency .common !.large !.feature_flag_guarded
   - name: .config_fuzzer !.large
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
@@ -894,7 +894,7 @@ buildvariants:
   - name: .rollbackfuzzer
   - name: secondary_reads_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common
+  - name: .sharding .common !.feature_flag_guarded
   - name: .updatefuzzer
   - name: v1index_jscore_passthrough_gen
 
@@ -937,7 +937,7 @@ buildvariants:
     patch_only: true
   - name: .sharding .causally_consistent !.wo_snapshot
     patch_only: true
-  - name: .concurrency .common !.kill_terminate
+  - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
     patch_only: true
   - name: .jscore .common
     patch_only: true
@@ -980,8 +980,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
   - name: .change_streams
-  - name: .concurrency !.large !.no_txns !.compute_mode
-  - name: .concurrency .large !.no_txns !.compute_mode
+  - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
+  - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
     distros:
     - rhel80-medium
   - name: .encrypt

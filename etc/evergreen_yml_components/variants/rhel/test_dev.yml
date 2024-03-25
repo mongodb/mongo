@@ -179,8 +179,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.no_txns
-  - name: .concurrency .large !.no_txns
+  - name: .concurrency !.large !.no_txns !.feature_flag_guarded
+  - name: .concurrency .large !.no_txns !.feature_flag_guarded
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
@@ -373,8 +373,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
   - name: .change_streams
-  - name: .concurrency !.large !.no_txns !.compute_mode
-  - name: .concurrency .large !.no_txns !.compute_mode
+  - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
+  - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
     distros:
     - rhel80-medium
   - name: .encrypt
@@ -485,7 +485,7 @@ buildvariants:
   - name: .change_streams
   # - name: disk_wiredtiger
   - name: .misc_js
-  - name: .concurrency !.no_txns !.kill_terminate !.compute_mode
+  - name: .concurrency !.no_txns !.kill_terminate !.compute_mode !.feature_flag_guarded
   - name: .encrypt
   - name: external_auth
   - name: external_auth_aws

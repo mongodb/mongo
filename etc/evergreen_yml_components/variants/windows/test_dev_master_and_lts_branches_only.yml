@@ -44,7 +44,7 @@ buildvariants:
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
-  - name: .concurrency .common
+  - name: .concurrency .common !.feature_flag_guarded
     distros:
     - windows-vsCurrent-large
   - name: concurrency_replication_causal_consistency_gen

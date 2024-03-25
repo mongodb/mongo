@@ -160,8 +160,8 @@ buildvariants:
   - name: .change_streams !.no_debug_mode
   - name: .change_stream_fuzzer
   - name: .misc_js !.no_debug_mode
-  - name: .concurrency !.large !.no_txns !.no_debug_mode
-  - name: .concurrency .large !.no_txns !.no_debug_mode
+  - name: .concurrency !.large !.no_txns !.no_debug_mode !.feature_flag_guarded
+  - name: .concurrency .large !.no_txns !.no_debug_mode !.feature_flag_guarded
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
@@ -301,7 +301,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js !.non_win_dbg
-  - name: .concurrency
+  - name: .concurrency !.feature_flag_guarded
     distros:
     - windows-vsCurrent-large
   - name: .config_fuzzer !.large !.linux_only
@@ -666,8 +666,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.no_txns
-  - name: .concurrency .large !.no_txns
+  - name: .concurrency !.large !.no_txns !.feature_flag_guarded
+  - name: .concurrency .large !.no_txns !.feature_flag_guarded
     distros:
     - rhel80-xlarge
   - name: disk_wiredtiger
