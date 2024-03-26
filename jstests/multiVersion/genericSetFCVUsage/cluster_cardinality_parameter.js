@@ -29,6 +29,8 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
             }
         });
 
+        const oldVersionIs73 = MongoRunner.areBinVersionsTheSame("7.3", oldVersion);
+
         checkClusterParameter(st.configRS, true);
         checkClusterParameter(st.rs0, true);
         checkClusterParameter(st.rs1, true);
@@ -37,10 +39,11 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
             removeShard(st, st.shard1.name);
         }
 
-        if (oldVersion == "last-lts") {
-            // In v7.0, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
-            // of shards goes from 1 to 2 but doesn't get set to false when the number of shards
-            // goes down to 1.
+        if (!oldVersionIs73) {
+            // In v7.3, the cluster parameter 'hasTwoOrMoreShards' gets reset to 1 when the number
+            // of shards goes from 2 to 1. In all other versions (assuming
+            // featureFlagRSEndpointClusterCardinalityParameter is disabled), the cluster parameter
+            // will not be reset on removeShard.
             checkClusterParameter(st.configRS, true);
             checkClusterParameter(st.rs0, true);
         }
@@ -49,7 +52,7 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
         st.upgradeCluster("latest");
         jsTest.log("Finished upgrading the binaries for the cluster");
 
-        if (oldVersion == "last-lts") {
+        if (!oldVersionIs73) {
             // In v7.0, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
             // of shards goes from 1 to 2 but doesn't get set to false when the number of shards
             // goes down to 1.
@@ -65,10 +68,9 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
             st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
         jsTest.log("Finished upgrading the FCV for the cluster");
 
-        // The feature flag will only be updated on upgrade if the RSEndpoint feature flag is
-        // enabled.
-        let expectedValue =
-            (isRSEndpointEnabled(st.configRS.getPrimary()) || oldVersion == "last-continuous")
+        // The cluster parameter will only be updated on upgrade if the RSEndpoint feature flag is
+        // enabled. The parameter will also have the updated value if the old version is 7.3.
+        let expectedValue = (isRSEndpointEnabled(st.configRS.getPrimary()) || oldVersionIs73)
             ? hasTwoOrMoreShardsPriorToUpgrade
             : true;
         checkClusterParameter(st.configRS, expectedValue);
