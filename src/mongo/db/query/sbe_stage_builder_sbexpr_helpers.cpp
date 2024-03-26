@@ -539,9 +539,15 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
                           sbe::AggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)});
     }
 
+    // Copy unique slot IDs from 'gbs' to 'groupBySlots'.
     sbe::value::SlotVector groupBySlots;
+    absl::flat_hash_set<sbe::value::SlotId> dedupedGbs;
     for (size_t i = 0; i < gbs.size(); ++i) {
-        groupBySlots.push_back(gbs[i].getId());
+        auto slotId = gbs[i].getId();
+
+        if (dedupedGbs.insert(slotId).second) {
+            groupBySlots.emplace_back(gbs[i].getId());
+        }
     }
 
     sbe::value::SlotVector blockAccArgSlots;

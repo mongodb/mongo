@@ -821,6 +821,15 @@ export function blockProcessingTestCases(timeFieldName,
             usesBlockProcessing: false
         },
         {
+            name: "ProjectedOutCompoundGroupKeys",
+            pipeline: [
+                {$project: {t: "$t"}},
+                {$project: {m: "$m"}},
+                {$group: {_id: {t: "$t", m: "$m"}, gb: {$min: "$a"}}}
+            ],
+            usesBlockProcessing: sbeFullEnabled
+        },
+        {
             name: "GroupByNull_TopAndBottomSortByZ_OutputVariable",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},

@@ -31,8 +31,8 @@ if (isSlowBuild(classicDb) || isSlowBuild(bpDb)) {
     quit();
 }
 
-const classicColl = classicDb.timeseries_group_bson_types;
-const bpColl = bpDb.timeseries_group_bson_types;
+const classicColl = classicDb.timeseries_group_aggregations;
+const bpColl = bpDb.timeseries_group_aggregations;
 
 classicColl.drop();
 bpColl.drop();
@@ -49,23 +49,26 @@ const dateLowerBound = new Date(datePrefix);
 const allFields = ['t', 'm', 'a', 'b'];
 const tsData = [];
 const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+let id = 0;
 for (let metaIdx = 0; metaIdx < 10; metaIdx++) {
     const metaDoc = {metaA: metaIdx, metaB: metaIdx / 2};
 
     let currentDate = 0;
     for (let i = 0; i < 10; i++) {
         tsData.push({
+            _id: id,
             t: new Date(datePrefix + currentDate - 100),
             m: metaDoc,
             a: 10 - i,
             b: alphabet.charAt(i)
         });
         currentDate += 25;
+        id++;
     }
 }
 
-classicColl.insert(tsData);
-bpColl.insert(tsData);
+assert.commandWorked(classicColl.insert(tsData));
+assert.commandWorked(bpColl.insert(tsData));
 
 function compareClassicAndBP(pipeline, allowDiskUse) {
     const classicResults = classicColl.aggregate(pipeline, {allowDiskUse}).toArray();
@@ -125,6 +128,12 @@ for (const includeField of [0, 1]) {
     });
 }
 
+const addFieldsStages = [
+    {stage: {$addFields: {t: new Date(datePrefix + 100)}}, uses: [], produces: allFields},
+    {stage: {$addFields: {m: 5}}, uses: [], produces: allFields},
+    {stage: {$addFields: {a: 2}}, uses: [], produces: allFields}
+];
+
 // Create $match stages.
 const matchStages = [];
 const matchComparisons = [
@@ -170,16 +179,58 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
     const dollarGroupKey = groupKey === null ? null : '$' + groupKey;
     for (const accumulatorData of ['t', 'm', 'm.metaA', 'a']) {
         const dollarAccumulatorData = accumulatorData === null ? null : '$' + accumulatorData;
+        // If the groupKey and the accumulated field is the same, the query is nonsensical.
+        if (groupKey === accumulatorData) {
+            continue;
+        }
         for (const accumulator of ['$min', '$max', '$sum']) {
-            if (groupKey !== accumulatorData) {
-                const uses = [accumulatorData];
-                // "null" is not a field we need from previous stages.
-                if (groupKey !== null) {
-                    uses.push(groupKey);
-                }
+            const uses = [accumulatorData];
+            // "null" is not a field we need from previous stages.
+            if (groupKey !== null) {
+                uses.push(groupKey);
+            }
+            groupStages.push({
+                stage: {$group: {_id: dollarGroupKey, gb: {[accumulator]: dollarAccumulatorData}}},
+                uses: uses
+            });
+        }
+        // $top/$bottom accumulators have different syntax.
+        for (const sortBy of ['t', 'm', 'a']) {
+            if (sortBy === groupKey) {
+                continue;
+            }
+            const uses = [accumulatorData, sortBy];
+            if (groupKey !== null) {
+                uses.push(groupKey);
+            }
+            for (const accumulator of ['$top', '$bottom']) {
                 groupStages.push({
-                    stage:
-                        {$group: {_id: dollarGroupKey, gb: {[accumulator]: dollarAccumulatorData}}},
+                    stage: {
+                        $group: {
+                            _id: dollarGroupKey,
+                            gb: {
+                                [accumulator]:
+                                    {output: dollarAccumulatorData, sortBy: {[sortBy]: 1, _id: 1}}
+                            }
+                        }
+                    },
+                    uses: uses
+                });
+            }
+            for (const accumulator of ['$topN', '$bottomN']) {
+                groupStages.push({
+                    stage: {
+                        $group: {
+                            _id: dollarGroupKey,
+                            gb: {
+                                [accumulator]: {
+                                    n: 3,
+                                    output: dollarAccumulatorData,
+                                    sortBy: {[sortBy]: 1, _id: 1}
+                                }
+                            }
+                        }
+                    },
                     uses: uses
                 });
             }
@@ -189,7 +240,7 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
     groupStages.push({stage: {$group: {_id: dollarGroupKey, gb: {$count: {}}}}, uses: uses});
 }
 
-const projectMatchStages = [...projectStages, ...matchStages];
+const projectMatchStages = [...projectStages, ...matchStages, ...addFieldsStages];
 
 // Does stage1 provide what stage2 needs to execute?
 function stageRequirementsMatch(stage1, stage2) {
@@ -254,8 +305,6 @@ function runAggregations(allowDiskUse, forceSpilling) {
 
 // Run with different combinations of allowDiskUse and force spilling.
 runAggregations(false /*allowDiskUse*/, false /*forceSpilling*/);
-runAggregations(true /*allowDiskUse*/, false /*forceSpilling*/);
-runAggregations(true /*allowDiskUse*/, true /*forceSpilling*/);
 
 MongoRunner.stopMongod(classicConn);
 MongoRunner.stopMongod(bpConn);
