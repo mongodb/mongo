@@ -373,7 +373,7 @@ add_option('use-sasl-client',
 
 add_option('use-diagnostic-latches',
     choices=['on', 'off'],
-    default='off',
+    default='on',
     help='Enable annotated Mutex types',
     type='choice',
 )
