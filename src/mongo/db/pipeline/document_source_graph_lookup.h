@@ -200,6 +200,7 @@ public:
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
+    boost::optional<ShardId> computeMergeShardId() const final;
 
     /**
      * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.

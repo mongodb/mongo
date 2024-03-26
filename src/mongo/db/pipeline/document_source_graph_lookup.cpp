@@ -250,6 +250,21 @@ void DocumentSourceGraphLookUp::doDispose() {
     _visited.clear();
 }
 
+boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const {
+    // Note that we can only check sharding state when we're on mongos as we may be holding
+    // locks on mongod (which would inhibit looking up sharding state in the catalog cache).
+    if (pExpCtx->inMongos) {
+        // Only nominate a merging shard if the outer collection is unsharded.
+        if (!pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, pExpCtx->ns)) {
+            return pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
+                                                                               _from);
+        }
+    } else {
+        return ShardingState::get(pExpCtx->opCtx)->shardId();
+    }
+    return boost::none;
+}
+
 bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
     const auto fcvSnapshot = serverGlobalParams.mutableFCV.acquireFCVSnapshot();
     return !pExpCtx->opCtx->inMultiDocumentTransaction() ||
@@ -261,12 +276,7 @@ DocumentSourceGraphLookUp::distributedPlanLogic() {
     // If $graphLookup into a sharded foreign collection is allowed, top-level $graphLookup
     // stages can run in parallel on the shards.
     if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0) {
-        // We make an exception to the above: if the main namespace (that is, the namespace targeted
-        // by the aggregation) is unsharded, then we want to attempt to find a merging shard for
-        // this $graphLookup. This is because there's no way to execute an aggregate in parallel
-        // against an unsharded collection.
-        if (pExpCtx->inMongos &&
-            !pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, pExpCtx->ns)) {
+        if (getMergeShardId()) {
             return DistributedPlanLogic{nullptr, this, boost::none};
         }
         return boost::none;
@@ -566,18 +576,7 @@ StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pip
     // sharded (that is, it is either unsplittable or untracked), then we should merge on the shard
     // which owns the inner collection.
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        // Note that we can only check sharding state when we're on mongos as we may be holding
-        // locks on mongod (which would inhibit looking up sharding state in the catalog cache).
-        if (pExpCtx->inMongos) {
-            // Only nominate a merging shard if the outer collection is unsharded.
-            if (!pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, pExpCtx->ns)) {
-                constraints.mergeShardId =
-                    pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
-                                                                                _from);
-            }
-        } else {
-            constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
-        }
+        constraints.mergeShardId = getMergeShardId();
     }
 
     return constraints;

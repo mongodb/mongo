@@ -157,6 +157,11 @@ protected:
      */
     virtual void flush(BatchedCommandRequest bcr, BatchedObjects batch) = 0;
 
+    boost::optional<ShardId> computeMergeShardId() const final {
+        return pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
+                                                                           getOutputNs());
+    }
+
     /**
      * Estimates the size of the header of a batch write (that is, the size of the write command
      * minus the size of write statements themselves).

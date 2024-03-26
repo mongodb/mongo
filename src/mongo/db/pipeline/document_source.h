@@ -77,6 +77,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/compiler.h"
@@ -549,6 +550,13 @@ public:
      */
     virtual BSONObj getQuery() const;
 
+    /**
+     * Utility which allows for accessing and computing a ShardId to act as a merger.
+     */
+    boost::optional<ShardId> getMergeShardId() const {
+        return mergeShardId.get();
+    }
+
 private:
     /**
      * itr is pointing to some stage `A`. Fetch stage `B`, the stage after A in itr. If B is a
@@ -820,6 +828,13 @@ protected:
      */
     virtual void doDispose() {}
 
+    /**
+     * Utility which describes when a stage needs to nominate a merging shard.
+     */
+    virtual boost::optional<ShardId> computeMergeShardId() const {
+        return boost::none;
+    }
+
     /*
       Most DocumentSources have an underlying source they get their data
       from.  This is a convenience for them.
@@ -831,6 +846,13 @@ protected:
     DocumentSource* pSource;
 
     boost::intrusive_ptr<ExpressionContext> pExpCtx;
+
+    /**
+     * Tracks this stage's merge ShardId, if one exists.
+     */
+    DeferredFn<boost::optional<ShardId>> mergeShardId{[this]() -> boost::optional<ShardId> {
+        return this->computeMergeShardId();
+    }};
 
 private:
     CommonStats _commonStats;

@@ -123,8 +123,7 @@ StageConstraints DocumentSourceOut::constraints(Pipeline::SplitState pipeState) 
         // local writes. Note that this decision is inherently racy and subject to become stale.
         // This is okay because either choice will work correctly, we are simply applying a
         // heuristic optimization.
-        result.mergeShardId = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
-            pExpCtx->opCtx, getOutputNs());
+        result.mergeShardId = getMergeShardId();
     }
     return result;
 }
@@ -265,8 +264,7 @@ void DocumentSourceOut::initialize() {
 
         // If the output collection exists, we should create the temp collection on the shard that
         // owns the output collection.
-        auto targetShard = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
-            pExpCtx->opCtx, getOutputNs());
+        auto targetShard = getMergeShardId();
         pExpCtx->mongoProcessInterface->createTempCollection(
             pExpCtx->opCtx, _tempNs, collectionOptions.done(), targetShard);
     }

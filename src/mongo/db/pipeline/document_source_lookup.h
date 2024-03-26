@@ -331,6 +331,7 @@ public:
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
+    boost::optional<ShardId> computeMergeShardId() const final;
 
     /**
      * Attempts to combine with an immediately following $unwind stage that unwinds the $lookup's

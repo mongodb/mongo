@@ -489,10 +489,11 @@ void DocumentSourceLookUp::determineSbeCompatibility() {
 
 StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeState) const {
     HostTypeRequirement hostRequirement;
+    bool nominateMergingShard = false;
     if (_fromNs.isConfigDotCacheDotChunks()) {
         // $lookup from config.cache.chunks* namespaces is permitted to run on each individual
-        // shard, rather than just the primary, since each shard should have an identical copy of
-        // the namespace.
+        // shard, rather than just a merging shard, since each shard should have an identical copy
+        // of the namespace.
         hostRequirement = HostTypeRequirement::kAnyShard;
     } else if (pipeState == Pipeline::SplitState::kSplitForShards) {
         // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
@@ -504,6 +505,7 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     } else {
         // If the pipeline is unsplit, then this $lookup can run anywhere.
         hostRequirement = HostTypeRequirement::kNone;
+        nominateMergingShard = pipeState == Pipeline::SplitState::kSplitForMerge;
     }
 
     // By default, $lookup is allowed in a transaction and does not use disk.
@@ -523,12 +525,23 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
             _resolvedIntrospectionPipeline->getSources(), constraints);
     }
 
+    if (nominateMergingShard) {
+        constraints.mergeShardId = getMergeShardId();
+    }
+
+    constraints.canSwapWithMatch = true;
+    constraints.canSwapWithSkippingOrLimitingStage = !_unwindSrc;
+
+    return constraints;
+}
+
+boost::optional<ShardId> DocumentSourceLookUp::computeMergeShardId() const {
     // If this $lookup is on the merging half of the pipeline and the inner collection isn't
     // sharded (that is, it is either unsplittable or untracked), then we should merge on the shard
     // which owns the inner collection.
-    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        constraints.mergeShardId =
-            pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _fromNs);
+    if (auto msi =
+            pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _fromNs)) {
+        return msi;
     }
 
     // If we have not yet designated a merging shard, and are either executing on mongod, the
@@ -539,16 +552,12 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
     // involved shard). When this stage is part of a deeply nested pipeline, it  prevents creating
     // an exponential explosion of cursors/resources (proportional to the level of pipeline
     // nesting).
-    if (!constraints.mergeShardId && hostRequirement == HostTypeRequirement::kNone &&
-        !(pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs) &&
+    if (!(pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs) &&
           foreignShardedLookupAllowed())) {
-        constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
+        return ShardingState::get(pExpCtx->opCtx)->shardId();
     }
 
-    constraints.canSwapWithMatch = true;
-    constraints.canSwapWithSkippingOrLimitingStage = !_unwindSrc;
-
-    return constraints;
+    return boost::none;
 }
 
 DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
@@ -1286,6 +1295,11 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::dist
     // either choice will work correctly; we are simply applying a heuristic optimization.
     if (foreignShardedLookupAllowed() && pExpCtx->subPipelineDepth == 0 &&
         pExpCtx->mongoProcessInterface->isSharded(_fromExpCtx->opCtx, _fromNs)) {
+        tassert(
+            8725000,
+            "Should not attempt to nominate merging shard when $lookup is not acting as a merger",
+            !mergeShardId.isInitialized() ||
+                (mergeShardId.isInitialized() && getMergeShardId() == boost::none));
         return boost::none;
     }
 
@@ -1293,6 +1307,11 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::dist
         // When $lookup reads from config.cache.chunks.* namespaces, it should run on each
         // individual shard in parallel. This is a special case, and atypical for standard $lookup
         // since a full copy of config.cache.chunks.* collections exists on all shards.
+        tassert(
+            8725001,
+            "Should not attempt to nominate merging shard when $lookup is not acting as a merger",
+            !mergeShardId.isInitialized() ||
+                (mergeShardId.isInitialized() && getMergeShardId() == boost::none));
         return boost::none;
     }
 

@@ -332,17 +332,13 @@ StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState
                             LookupRequirement::kNotAllowed,
                             UnionRequirement::kNotAllowed};
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        result.mergeShardId = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
-            pExpCtx->opCtx, getOutputNs());
+        result.mergeShardId = getMergeShardId();
     }
     return result;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distributedPlanLogic() {
-    return pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
-                                                                       getOutputNs())
-        ? DocumentSourceWriter::distributedPlanLogic()
-        : boost::none;
+    return getMergeShardId() ? DocumentSourceWriter::distributedPlanLogic() : boost::none;
 }
 
 Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
