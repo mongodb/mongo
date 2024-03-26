@@ -176,6 +176,14 @@ void checkCreationOptions(const CreateCommand& cmd) {
                 "A capped clustered collection requires the 'expireAfterSeconds' field",
                 cmd.getExpireAfterSeconds());
     }
+
+    if (cmd.getTimeseries()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Invalid option 'clusteredIndex: false': clustered index can't be disabled for "
+                "timeseries collection",
+                !cmd.getClusteredIndex() || !holds_alternative<bool>(*cmd.getClusteredIndex()) ||
+                    get<bool>(*cmd.getClusteredIndex()));
+    }
 }
 
 }  // namespace clustered_util

@@ -178,6 +178,49 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status validateCollectionOptions(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const CollectionOptions& collectionOptions,
+                                 const boost::optional<BSONObj>& idIndex) {
+    if (collectionOptions.expireAfterSeconds && !collectionOptions.clusteredIndex &&
+        !collectionOptions.timeseries) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "'expireAfterSeconds' can be used only for clustered collections or "
+                      "timeseries collections");
+    }
+
+    if (auto clusteredIndex = collectionOptions.clusteredIndex) {
+        if (clustered_util::requiresLegacyFormat(nss) != clusteredIndex->getLegacyFormat()) {
+            return Status(ErrorCodes::Error(5979703),
+                          "The 'clusteredIndex' legacy format {clusteredIndex: <bool>} is only "
+                          "supported for specific internal collections and vice versa");
+        }
+
+        if (idIndex && !idIndex->isEmpty()) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The 'clusteredIndex' option is not supported with the 'idIndex' option");
+        }
+        if (collectionOptions.autoIndexId == CollectionOptions::NO) {
+            return Status(ErrorCodes::Error(6026501),
+                          "The 'clusteredIndex' option does not support {autoIndexId: false}");
+        }
+
+        if (collectionOptions.recordIdsReplicated) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The 'clusteredIndex' option is not supported with the "
+                          "'recordIdsReplicated' option");
+        }
+
+        auto clusteredIndexStatus = validateClusteredIndexSpec(
+            opCtx, nss, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
+        if (!clusteredIndexStatus.isOK()) {
+            return clusteredIndexStatus;
+        }
+    }
+    return Status::OK();
+}
+
+
 std::tuple<Lock::CollectionLock, Lock::CollectionLock> acquireCollLocksForRename(
     OperationContext* opCtx, const NamespaceString& ns1, const NamespaceString& ns2) {
     if (ResourceId{RESOURCE_COLLECTION, ns1} < ResourceId{RESOURCE_COLLECTION, ns2}) {
@@ -422,13 +465,21 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
 
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
-                         const CollectionOptions& optionsArg) {
+                         const CollectionOptions& optionsArg,
+                         const boost::optional<BSONObj>& idIndex) {
+
+
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
-    invariant(!ns.isTimeseriesBucketsCollection());
     invariant(opCtx->writesAreReplicated());
 
-    auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+    const auto& bucketsNs =
+        (ns.isTimeseriesBucketsCollection()) ? ns : ns.makeTimeseriesBucketsNamespace();
+
+    Status validateStatus = validateCollectionOptions(opCtx, bucketsNs, optionsArg, idIndex);
+    if (!validateStatus.isOK()) {
+        return validateStatus;
+    }
 
     CollectionOptions options = optionsArg;
 
@@ -546,11 +597,18 @@ Status _createTimeseries(OperationContext* opCtx,
         return Status::OK();
     });
 
-    // If compatible bucket collection already exists then proceed with creating view defintion.
-    // If the 'temp' flag is true, we are in the $out stage, and should return without creating the
-    // view defintion.
-    if ((!ret.isOK() && !existingBucketCollectionIsCompatible) || options.temp)
-        return ret;
+    const auto& bucketCreationStatus = ret;
+    if (
+        // If we could not create the bucket collection and the pre-existing bucket collection is
+        // not compatible we bubble up the error
+        (!bucketCreationStatus.isOK() && !existingBucketCollectionIsCompatible) ||
+        // If the 'temp' flag is true, we are in the $out stage, and should return without creating
+        // the view defintion.
+        options.temp ||
+        // If the request came directly on the bucket namesapce we do not need to create the view.
+        ns.isTimeseriesBucketsCollection()) {
+        return bucketCreationStatus;
+    }
 
     ret = writeConflictRetry(opCtx, "create", ns, [&]() -> Status {
         AutoGetCollection autoColl(
@@ -657,41 +715,10 @@ Status _createCollection(
             return status;
         }
 
-        if (!collectionOptions.clusteredIndex && collectionOptions.expireAfterSeconds) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "'expireAfterSeconds' requires clustering to be enabled");
+        status = validateCollectionOptions(opCtx, nss, collectionOptions, idIndex);
+        if (!status.isOK()) {
+            return status;
         }
-
-        if (auto clusteredIndex = collectionOptions.clusteredIndex) {
-            if (clustered_util::requiresLegacyFormat(nss) != clusteredIndex->getLegacyFormat()) {
-                return Status(ErrorCodes::Error(5979703),
-                              "The 'clusteredIndex' legacy format {clusteredIndex: <bool>} is only "
-                              "supported for specific internal collections and vice versa");
-            }
-
-            if (idIndex && !idIndex->isEmpty()) {
-                return Status(
-                    ErrorCodes::InvalidOptions,
-                    "The 'clusteredIndex' option is not supported with the 'idIndex' option");
-            }
-            if (collectionOptions.autoIndexId == CollectionOptions::NO) {
-                return Status(ErrorCodes::Error(6026501),
-                              "The 'clusteredIndex' option does not support {autoIndexId: false}");
-            }
-
-            if (collectionOptions.recordIdsReplicated) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "The 'clusteredIndex' option is not supported with the "
-                              "'recordIdsReplicated' option");
-            }
-
-            auto clusteredIndexStatus = validateClusteredIndexSpec(
-                opCtx, nss, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
-            if (!clusteredIndexStatus.isOK()) {
-                return clusteredIndexStatus;
-            }
-        }
-
 
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
@@ -745,9 +772,9 @@ CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
                                               CollectionOptions collectionOptions,
                                               const boost::optional<BSONObj>& idIndex) {
     if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
-        !collectionOptions.isView() && !collectionOptions.clusteredIndex.has_value() &&
-        (!idIndex || idIndex->isEmpty()) && !collectionOptions.capped &&
-        !clustered_util::requiresLegacyFormat(nss)) {
+        !collectionOptions.isView() && !collectionOptions.timeseries &&
+        !collectionOptions.clusteredIndex.has_value() && (!idIndex || idIndex->isEmpty()) &&
+        !collectionOptions.capped && !clustered_util::requiresLegacyFormat(nss)) {
         // Capped, clustered collections differ in behavior significantly from normal
         // capped collections. Notably, they allow out-of-order insertion.
         //
@@ -1036,7 +1063,7 @@ Status createCollection(OperationContext* opCtx,
                 !options.clusteredIndex);
 
         return _createView(opCtx, ns, options);
-    } else if (options.timeseries && !ns.isTimeseriesBucketsCollection()) {
+    } else if (options.timeseries && opCtx->writesAreReplicated()) {
         // system.profile must be a simple collection since new document insertions directly work
         // against the usual collection API. See introspect.cpp for more details.
         uassert(ErrorCodes::IllegalOperation,
@@ -1049,7 +1076,7 @@ Status createCollection(OperationContext* opCtx,
                 str::stream()
                     << "Cannot create a time-series collection in a multi-document transaction.",
                 !opCtx->inMultiDocumentTransaction());
-        return _createTimeseries(opCtx, ns, options);
+        return _createTimeseries(opCtx, ns, options, idIndex);
     } else {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Cannot create system collection " << ns.toStringForErrorMsg()

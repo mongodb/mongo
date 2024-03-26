@@ -138,12 +138,15 @@ if (!isTrackingUnsplittableCollections) {
         });
 
         jsTest.log("Case collection: timeseries / collection: bucket timeseries.");
-        runTest(() => {
-            createWorked(kColl, tsOptions);
-            // TODO SERVER-88265 creation of bucket namespace when the bucket already exists with
-            // same ts options should work
-            createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
-        });
+        runTest(
+            () => {
+                createWorked(kColl, tsOptions);
+                createWorked(kBucket, tsOptions);
+            },
+            // TODO BACKPORT-19356 creation of the bucket used to not be idempotent. Re-enable this
+            // test case in previous versions once the backport is completed.
+            "8.0"  // minRequiredVersion
+        );
 
         jsTest.log(
             "Case collection: timeseries / collection: bucket timeseries with different options.");
@@ -199,12 +202,15 @@ if (!isTrackingUnsplittableCollections) {
         });
 
         jsTest.log("Case collection: bucket timeseries / collection: timeseries.");
-        runTest(() => {
-            createWorked(kBucket, tsOptions)
-            // TODO SERVER-88265 creating a timeseries collection when the bucket namespace already
-            // exists should work and create the missing timeseries view
-            createFailed(kColl, tsOptions, ErrorCodes.NamespaceExists);
-        });
+        runTest(
+            () => {
+                createWorked(kBucket, tsOptions)
+                createWorked(kColl, tsOptions);
+            },
+            // TODO BACKPORT-19356 creation of the bucket used to not be idempotent. Re-enable this
+            // test case in previous versions once the backport is completed.
+            "8.0"  // minRequiredVersion
+        );
 
         jsTest.log(
             "Case collection: bucket timeseries / collection: timeseries with different options.");
@@ -230,12 +236,11 @@ if (!isTrackingUnsplittableCollections) {
         runTest(
             () => {
                 createWorked(kBucket, tsOptions);
-                // TODO SERVER-88265 creating the same bucket collection with same options should
-                // work
-                createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
+                createWorked(kBucket, tsOptions);
             },
-            // On 7.0 this test case used to correclty behave as idempotent operation.
-            "7.1"  // minRequiredVersion
+            // TODO BACKPORT-19356 creation of the bucket used to not be idempotent. Re-enable this
+            // test case in previous versions once the backport is completed.
+            "8.0"  // minRequiredVersion
         );
     }
 }

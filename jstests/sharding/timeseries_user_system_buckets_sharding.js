@@ -253,12 +253,15 @@ function runTest(testCase, minRequiredVersion = null) {
     });
 
     jsTest.log("Case collection: sharded timeseries / collection: bucket timeseries.");
-    runTest(() => {
-        shardCollectionWorked(kColl, tsOptions);
-        // TODO SERVER-88265 creation of the bucket namespace when the collection already exists and
-        // is timeseries should work
-        createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
-    });
+    runTest(
+        () => {
+            shardCollectionWorked(kColl, tsOptions);
+            createWorked(kBucket, tsOptions);
+        },
+        // TODO BACKPORT-19356 Re-enable this case in multiversion testing once creation of bucket
+        // namespace is idempotent.
+        "8.0"  // minRequiredVersion
+    );
 
     jsTest.log("Case collection: sharded timeseries / collection: sharded standard.");
     runTest(() => {

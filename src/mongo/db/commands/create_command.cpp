@@ -498,12 +498,16 @@ public:
                 !opCtx->inMultiDocumentTransaction()) {
                 auto options = CollectionOptions::fromCreateCommand(cmd);
                 if (options.timeseries) {
+                    const auto& bucketNss = cmd.getNamespace().isTimeseriesBucketsCollection()
+                        ? cmd.getNamespace()
+                        : cmd.getNamespace().makeTimeseriesBucketsNamespace();
                     checkTimeseriesBucketsCollectionOptions(
-                        opCtx,
-                        createStatus,
-                        cmd.getNamespace().makeTimeseriesBucketsNamespace(),
-                        options);
-                    checkTimeseriesViewOptions(opCtx, createStatus, cmd.getNamespace(), options);
+                        opCtx, createStatus, bucketNss, options);
+
+                    if (!cmd.getNamespace().isTimeseriesBucketsCollection()) {
+                        checkTimeseriesViewOptions(
+                            opCtx, createStatus, cmd.getNamespace(), options);
+                    }
                 } else {
                     checkCollectionOptions(opCtx, createStatus, cmd.getNamespace(), options);
                 }
