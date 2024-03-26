@@ -165,7 +165,7 @@ export class QuerySettingsUtils {
      */
     withQuerySettings(representativeQuery, settings, runTest) {
         const queryShapeHash = assert
-                                   .commandWorked(db.adminCommand(
+                                   .commandWorked(this.db.adminCommand(
                                        {setQuerySettings: representativeQuery, settings: settings}))
                                    .queryShapeHash;
         assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
