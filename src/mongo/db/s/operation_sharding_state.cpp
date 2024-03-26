@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -88,13 +89,9 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     auto& oss = OperationShardingState::get(opCtx);
 
     if (shardVersion && shardVersion != ShardVersion::UNSHARDED()) {
-        // TODO (SERVER-87196): remove the fcvSnapshot branch after 8.0 is released
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        // TODO (SERVER-87869): Change the FCV constant comparison to feature flag gating.
         if (fcvSnapshot.isVersionInitialized() &&
-            fcvSnapshot.isGreaterThan(                       // NOLINT(mongo-fcv-constant-check)
-                multiversion::FeatureCompatibilityVersion::  // NOLINT(mongo-fcv-constant-check)
-                kVersion_7_3)) {                             // NOLINT(mongo-fcv-constant-check)
+            feature_flags::gEnforceRoutingByNamespace.isEnabled(fcvSnapshot)) {
             tassert(6300900,
                     "Attaching a shard version requires a non db-only namespace",
                     !nss.isDbOnly());
