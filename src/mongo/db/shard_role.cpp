@@ -1715,22 +1715,16 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
             // the transaction can be retried. This situation is known to be possible when a
             // collection undergoes resharding, due to the resharding commit protocol. See
             // SERVER-87061.
-            // TODO: SERVER-87235: Remove this condition and leave only the tassert below also for
-            // transaction and snapshot reads.
+            // TODO: SERVER-87235: Remove this condition and leave only the tassert that will be
+            // introduced in SERVER-88476 below also for transaction and snapshot reads.
             uasserted(
                 ErrorCodes::SnapshotUnavailable,
                 "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
                     nss.toStringForErrorMsg(),
                     shardingCollectionDescription.getUUID().toString(),
                     collectionPtr ? collectionPtr->uuid().toString() : ""));
-
         } else {
-            tasserted(
-                8706100,
-                "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
-                    nss.toStringForErrorMsg(),
-                    shardingCollectionDescription.getUUID().toString(),
-                    collectionPtr ? collectionPtr->uuid().toString() : ""));
+            // TODO: SERVER-88476: reintroduce tassert here similar to the uassert above.
         }
     }
 }
