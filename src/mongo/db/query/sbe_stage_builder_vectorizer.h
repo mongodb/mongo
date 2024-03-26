@@ -119,7 +119,7 @@ public:
 private:
     // Ensure that the generated tree is representing a block of measures (i.e.
     // if it's a block expanded from a cell, fold it).
-    void foldIfNecessary(Tree& tree);
+    void foldIfNecessary(Tree& tree, bool useFoldF = false);
 
     // Return an expression combining all the active bitmap masks currently in scope.
     optimizer::ABT generateMaskArg();

@@ -93,6 +93,11 @@ TimeseriesTest.run((insert) => {
             ids: [0, 1],
             usesBlockProcessing: false
         },
+        {
+            pred: {$expr: {$gt: [{$multiply: ["$topLevelScalar", 2]}, 0.0]}},
+            ids: [0, 1],
+            usesBlockProcessing: true
+        },
         {pred: {"topLevelScalar": {$gt: 123}}, ids: [1], usesBlockProcessing: true},
         {pred: {"topLevelScalar": {$gte: 123}}, ids: [0, 1], usesBlockProcessing: true},
         {pred: {"topLevelScalar": {$lt: 456}}, ids: [0], usesBlockProcessing: true},
