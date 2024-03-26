@@ -34,7 +34,13 @@ selector:
   # - jstests/core/cursor5.js
   # - jstests/core/cursor6.js
   # - jstests/core/cursor7.js
-  - jstests/core/find_and_modify*.js
+  # - jstests/core/find_and_modify*.js
+  # - jstests/core/count2.js
+  # - jstests/core/count3.js
+  # - jstests/core/count7.js
+  - jstests/core/insert1.js
+  - jstests/core/insert2.js
+
 executor:
   archive:
     hooks:

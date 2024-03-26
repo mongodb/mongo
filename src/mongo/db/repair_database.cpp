@@ -236,7 +236,7 @@ Status repairCollections(OperationContext* opCtx,
     DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(opCtx, dbName);
 
     std::vector<std::string> colls;
-    dbce->getCollectionNamespaces(&colls);
+    dbce->getCollectionNamespaces(colls);
 
     for (auto it = colls.begin(); it != colls.end(); ++it) {
         // Don't check for interrupt after starting to repair a collection otherwise we can

@@ -597,7 +597,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
     }
 
     std::vector<std::string> collectionNames;
-    db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collectionNames);
+    db->getDatabaseCatalogEntry()->getCollectionNamespaces(collectionNames);
 
     for (const auto& collectionName : collectionNames) {
         const NamespaceString ns(collectionName);

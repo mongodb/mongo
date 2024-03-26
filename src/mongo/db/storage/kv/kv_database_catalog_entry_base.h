@@ -63,7 +63,7 @@ public:
     Status currentFilesCompatible(OperationContext* opCtx) const override;
 
     void getCollectionNamespaces(std::set<std::string>& out) const override;
-    void getCollectionNamespaces(std::vector<std::string>* out) const override;
+    void getCollectionNamespaces(std::vector<std::string>& out) const override;
 
     CollectionCatalogEntry* getCollectionCatalogEntry(OperationContext* opCtx,
                                                       StringData ns) override;

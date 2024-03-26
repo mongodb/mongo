@@ -188,11 +188,11 @@ Status KVDatabaseCatalogEntryBase::currentFilesCompatible(OperationContext* opCt
 }
 
 void KVDatabaseCatalogEntryBase::getCollectionNamespaces(std::set<std::string>& out) const {
-    _engine->listCollections(name(), out);
+    _engine->getEngine()->listCollections(name(), out);
 }
 
-void KVDatabaseCatalogEntryBase::getCollectionNamespaces(std::vector<std::string>* out) const {
-    _engine->listCollections(name(), out);
+void KVDatabaseCatalogEntryBase::getCollectionNamespaces(std::vector<std::string>& out) const {
+    _engine->getEngine()->listCollections(name(), out);
 }
 
 CollectionCatalogEntry* KVDatabaseCatalogEntryBase::getCollectionCatalogEntry(
@@ -306,7 +306,7 @@ CollectionCatalogEntry* KVDatabaseCatalogEntryBase::createKVCollectionCatalogEnt
         return nullptr;
     }
     LOG(1) << " fetched CCE metadata: " << obj;
-    
+
     if (KVCatalog::FeatureTracker::isFeatureDocument(obj)) {
         return nullptr;
     }

@@ -12,9 +12,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
 
-#include "mongo/db/modules/monograph/tx_service/include/moodycamelqueue.h"
-
-
+#include <bthread/moodycamelqueue.h>
 
 namespace mongo::transport {
 
@@ -34,11 +32,6 @@ public:
     void trySleep();
 
     void terminate();
-
-    /*
-     * Elapsed 1 second
-     */
-    void tick();
 
     void setTxServiceFunctors(int16_t id);
 
@@ -123,4 +116,4 @@ private:
     constexpr static uint32_t kIdleTimeoutMs = 1000;
 };
 
-} // namespace mongo::transport
+}  // namespace mongo::transport

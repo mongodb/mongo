@@ -182,7 +182,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
         invariant(db, str::stream() << "failed to reopen database " << dbName);
 
         std::vector<std::string> collections;
-        db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
+        db->getDatabaseCatalogEntry()->getCollectionNamespaces(collections);
         for (auto&& collName : collections) {
             // Note that the collection name already includes the database component.
             NamespaceString collNss(collName);

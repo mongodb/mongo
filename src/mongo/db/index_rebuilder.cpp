@@ -157,7 +157,7 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
             AutoGetDb autoDb(opCtx, *dbName, MODE_S);
 
             Database* db = autoDb.getDb();
-            db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
+            db->getDatabaseCatalogEntry()->getCollectionNamespaces(collNames);
         }
         checkNS(opCtx, collNames);
     } catch (const DBException& e) {

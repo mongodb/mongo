@@ -571,7 +571,7 @@ Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
     }
 
     std::vector<std::string> toDrop;
-    entry->getCollectionNamespaces(&toDrop);
+    entry->getCollectionNamespaces(toDrop);
     return _dropCollections(opCtx, entry, toDrop);
 }
 

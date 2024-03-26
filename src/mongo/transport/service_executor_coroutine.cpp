@@ -60,10 +60,6 @@ void ThreadGroup::notifyIfAsleep() {
     }
 }
 
-void ThreadGroup::tick() {
-    _tickCnt.fetch_add(1, std::memory_order_consume);
-}
-
 void ThreadGroup::setTxServiceFunctors(int16_t id) {
     std::tie(_txProcessorExec, _updateExtProc) = getTxServiceFunctors(id);
 }
@@ -143,15 +139,6 @@ Status ServiceExecutorCoroutine::start() {
         }
     }
 
-    // _backgroundTimeService = std::thread([this]() {
-    //     while (_stillRunning.load(std::memory_order_relaxed)) {
-    //         std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         for (auto& tg : _threadGroups) {
-    //             tg.tick();
-    //         }
-    //     }
-    // });
-
     return Status::OK();
 }
 
@@ -162,7 +149,8 @@ Status ServiceExecutorCoroutine::_startWorker(int16_t groupId) {
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
         localThreadId = threadGroupId;
 
-        std::string threadName("thread_group_" + std::to_string(threadGroupId));
+        // std::string threadName("thread_group_" + std::to_string(threadGroupId));
+        std::string threadName("thread_group");
         StringData threadNameSD(threadName);
         setThreadName(threadNameSD);
 

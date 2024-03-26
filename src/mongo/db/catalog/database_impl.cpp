@@ -264,8 +264,10 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
                                                    bool createIdIndex,
                                                    bool forView) {
     MONGO_LOG(1) << "DatabaseImpl::_createCollectionHandler";
-    if (auto iter = _collections.find(nss.toString()); iter != _collections.end()) {
-        return iter->second.get();
+    if (!forView) {
+        if (auto iter = _collections.find(nss.toString()); iter != _collections.end()) {
+            return iter->second.get();
+        }
     }
     auto cce = _dbEntry->getCollectionCatalogEntry(opCtx, nss.toStringData());
     if (!cce) {
@@ -373,7 +375,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
     {
         std::vector<std::string> collections;
-        _dbEntry->getCollectionNamespaces(&collections);
+        _dbEntry->getCollectionNamespaces(collections);
 
         for (auto& ns : collections) {
             NamespaceString nss{std::move(ns)};
@@ -400,7 +402,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     std::vector<std::string> collections;
-    _dbEntry->getCollectionNamespaces(&collections);
+    _dbEntry->getCollectionNamespaces(collections);
 
     for (const auto& ns : collections) {
         invariant(NamespaceString::normal(ns));
@@ -482,7 +484,7 @@ bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
 
 void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) {
     std::vector<std::string> collections;
-    _dbEntry->getCollectionNamespaces(&collections);
+    _dbEntry->getCollectionNamespaces(collections);
 
     long long nCollections = 0;
     long long nViews = 0;
@@ -796,7 +798,7 @@ Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const Namespace
         return nullptr;
     }
 
-    MONGO_LOG(0) << "nss: " << nss.toStringData() << " exists. get handler";
+    MONGO_LOG(1) << "nss: " << nss.toStringData() << " exists. get handler";
 
     if (auto it = _collections.find(nss.ns()); it != _collections.end() && it->second) {
         auto found = it->second.get();
@@ -1114,13 +1116,14 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
 DatabaseImpl::CollectionMapView& DatabaseImpl::collections(OperationContext* opCtx) {
     MONGO_LOG(1) << "DatabaseImpl::collections";
 
-    std::set<std::string> collectionInStorageEngine;
+    std::vector<std::string> collectionInStorageEngine;
     _dbEntry->getCollectionNamespaces(collectionInStorageEngine);
 
     _collectionsView.clear();
 
     for (auto& collectionName : collectionInStorageEngine) {
-        NamespaceString nss{std::move(collectionInStorageEngine.extract(collectionName).value())};
+        NamespaceString nss{std::move(collectionName)};
+        MONGO_LOG(1) << "nss: " << nss;
         _createCollectionHandler(opCtx, nss, true, true);
     }
 

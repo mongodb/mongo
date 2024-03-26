@@ -91,8 +91,10 @@ public:
 
     // ----
     virtual void getCollectionNamespaces(std::set<std::string>& out) const {};
-    virtual void getCollectionNamespaces(std::vector<std::string>* out) const {};
-    virtual void getCollectionNamespaces(std::list<std::string>* out) const {};
+    virtual void getCollectionNamespaces(std::vector<std::string>& out) const {};
+    virtual void getCollectionNamespaces(std::list<std::string>* out) const {
+        // Used for MMAPV1 only
+    };
     // The DatabaseCatalogEntry owns this, do not delete
     virtual CollectionCatalogEntry* getCollectionCatalogEntry(OperationContext* opCtx,
                                                               StringData ns) {
