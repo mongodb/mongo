@@ -31,6 +31,39 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumn.h"
 
+// Returns true if the binary contains interleaved data. This function just scans the binary for an
+// interleaved start control byte, it does no validation nor decompression.
+static bool isDataInterleaved(const char* binary, size_t size) {
+    using namespace mongo;
+    const char* pos = binary;
+    const char* end = binary + size;
+
+    while (pos != end) {
+        uint8_t control = *pos;
+        if (control == EOO) {
+            // Reached the end of the binary.
+            return false;
+        }
+
+        if (bsoncolumn::isInterleavedStartControlByte(control)) {
+            return true;
+        }
+
+        if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
+            // Scan over the entire literal.
+            BSONElement literal(pos, 1, -1);
+            pos += literal.size();
+            continue;
+        }
+
+        // If there are no control bytes, scan over the simple8b block.
+        uint8_t size = bsoncolumn::numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+        pos += size + 1;
+    }
+
+    return false;
+};
+
 // There are two decoding APIs. For all data that pass validation, both decoder implementations
 // must produce the same results.
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
@@ -41,9 +74,14 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         return 0;
     }
 
+    // Interleaved mode in the block-based API is not fully implemented.
+    if (isDataInterleaved(Data, Size)) {
+        return 0;
+    }
+
     // Set up both APIs.
     BSONColumn column(Data, Size);
-    BSONColumnBlockBased block(Data, Size);
+    bsoncolumn::BSONColumnBlockBased block(Data, Size);
     boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
     std::vector<BSONElement> iteratorElems = {};
     std::vector<BSONElement> blockBasedElems = {};
@@ -52,7 +90,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     // Attempt to decompress using the block-based API.
     try {
-        block.decompressIterative<BSONElementMaterializer, std::vector<BSONElement>>(
+        block.decompress<bsoncolumn::BSONElementMaterializer, std::vector<BSONElement>>(
             blockBasedElems, allocator);
     } catch (const DBException& e) {
         blockBasedError = e.toString();
