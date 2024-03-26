@@ -80,8 +80,11 @@ struct DbCheckCollectionBatchStats {
 struct DbCheckExtraIndexKeysBatchStats {
     int64_t nKeys;
     int64_t nBytes;
-    key_string::Value lastKeyChecked;
-    key_string::Value nextKeyToBeChecked;
+    // These keystrings should have the recordId appended at the end, since WiredTiger will always
+    // append the recordId when returning a keystring from the index cursor.
+    key_string::Value firstKeyCheckedWithRecordId;
+    key_string::Value lastKeyCheckedWithRecordId;
+    key_string::Value nextKeyToBeCheckedWithRecordId;
     bool finishedIndexBatch;
     bool finishedIndexCheck;
     std::string md5;
@@ -161,28 +164,38 @@ public:
     void doCollection(OperationContext* opCtx);
 
 private:
-    boost::optional<key_string::Value> getExtraIndexKeysCheckFirstKey(OperationContext* opCtx);
+    /**
+     * Helper that takes in a keystring WITH a RecordId appended at the end, and returns a new
+     * keystring that is identical except without the RecordId appended at the end.
+     */
+    key_string::Value _stripRecordIdFromKeyString(const key_string::Value& keyString,
+                                                  const key_string::Version& version,
+                                                  const Collection* collection);
 
+    /**
+     * Runs the secondary extra index keys check
+     */
     void _extraIndexKeysCheck(OperationContext* opCtx);
 
     /**
      * Sets up a hasher and hashes one batch for extra index keys check.
-     * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
+     * Returns a non-OK Status if we encountered an error and should abandon extra index keys
+     * check.
      */
     Status _hashExtraIndexKeysCheck(OperationContext* opCtx,
-                                    const key_string::Value& batchFirst,
-                                    const key_string::Value& batchLast,
                                     DbCheckExtraIndexKeysBatchStats* batchStats);
 
     /**
      * Gets batch bounds for extra index keys check and stores the info in batchStats. Runs
      * reverse lookup if skipLookupForExtraKeys is not set.
-     * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
+     * Returns a non-OK Status if we encountered an error and should abandon extra index keys
+     * check.
      */
-    Status _getExtraIndexKeysBatchAndRunReverseLookup(OperationContext* opCtx,
-                                                      StringData indexName,
-                                                      key_string::Value batchFirst,
-                                                      DbCheckExtraIndexKeysBatchStats& batchStats);
+    Status _getExtraIndexKeysBatchAndRunReverseLookup(
+        OperationContext* opCtx,
+        StringData indexName,
+        const boost::optional<key_string::Value>& nextKeyToSeekWithRecordId,
+        DbCheckExtraIndexKeysBatchStats& batchStats);
 
     /**
      * Acquires a consistent catalog snapshot and iterates through the secondary index in order
@@ -193,28 +206,30 @@ private:
      *   * we have finished one batch
      *   * The number of keys we've looked at has met or exceeded
      *     dbCheckMaxTotalIndexKeysPerSnapshot
-     *   * if we have identical keys at the end of the batch, one of the above conditions is met and
-     *     the number of consecutive identical keys we've looked at has met or exceeded
+     *   * if we have identical keys at the end of the batch, one of the above conditions is met
+     *     and the number of consecutive identical keys we've looked at has met or exceeded
      *     dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot
      *
-     * Returns a non-OK Status if we encountered an error and should abandon extra index keys check.
+     * Returns a non-OK Status if we encountered an error and should abandon extra index keys
+     * check.
      */
-    Status _getCatalogSnapshotAndRunReverseLookup(OperationContext* opCtx,
-                                                  StringData indexName,
-                                                  const key_string::Value& snapshotFirstKey,
-                                                  DbCheckExtraIndexKeysBatchStats& batchStats);
+    Status _getCatalogSnapshotAndRunReverseLookup(
+        OperationContext* opCtx,
+        StringData indexName,
+        const boost::optional<key_string::Value>& snapshotFirstKeyWithRecordId,
+        DbCheckExtraIndexKeysBatchStats& batchStats);
 
     /**
-     * Returns if we should end the current catalog snapshot based on meeting snapshot/batch limits.
-     * Also updates batchStats accordingly with the next batch's starting key, and whether
-     * the batch and/or index check has finished.
+     * Returns if we should end the current catalog snapshot based on meeting snapshot/batch
+     * limits. Also updates batchStats accordingly with the next batch's starting key, and
+     * whether the batch and/or index check has finished.
      */
     bool _shouldEndCatalogSnapshotOrBatch(
         OperationContext* opCtx,
         const CollectionPtr& collection,
         StringData indexName,
-        const key_string::Value& keyString,
-        const BSONObj& keyStringBson,
+        const key_string::Value& currKeyStringWithoutRecordId,
+        const BSONObj& currKeyStringBson,
         int64_t numKeysInSnapshot,
         const SortedDataIndexAccessMethod* iam,
         const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
@@ -222,13 +237,14 @@ private:
         const boost::optional<KeyStringEntry>& nextIndexKey);
 
     /**
-     * Iterates through an index table and fetches the corresponding document for each index entry.
+     * Iterates through an index table and fetches the corresponding document for each index
+     * entry.
      */
     void _reverseLookup(OperationContext* opCtx,
                         StringData indexName,
                         DbCheckExtraIndexKeysBatchStats& batchStats,
                         const CollectionPtr& collection,
-                        const key_string::Value& keyString,
+                        const KeyStringEntry& keyStringEntryWithRecordId,
                         const BSONObj& keyStringBson,
                         const SortedDataIndexAccessMethod* iam,
                         const IndexCatalogEntry* indexCatalogEntry,

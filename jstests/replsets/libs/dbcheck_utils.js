@@ -4,6 +4,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
+export const defaultSnapshotSize = 1000;
 export const logQueries = {
     allErrorsOrWarningsQuery: {$or: [{"severity": "warning"}, {"severity": "error"}]},
     recordNotFoundQuery: {
@@ -64,7 +65,8 @@ export const clearHealthLog = (replSet) => {
 export const logEveryBatch =
     (replSet) => {
         forEachNonArbiterNode(replSet, conn => {
-            conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1});
+            assert.commandWorked(
+                conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1}));
         })
     }
 
@@ -98,7 +100,8 @@ export const awaitDbCheckCompletion =
                             return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
                         },
                         "dbCheck command didn't complete for database: " + db.getName() +
-                            " for RS: " + replSet.getURL());
+                            " for RS: " + replSet.getURL() +
+                            ", found health log: " + tojson(healthlog.find().toArray()));
                 });
             }
         } finally {
@@ -150,7 +153,7 @@ export const resetAndInsertIdentical = (replSet, db, collName, nDocs) => {
     clearHealthLog(replSet);
 
     assert.commandWorked(db[collName].insertMany(
-        [...Array(nDocs).keys()].map(x => ({_id: x, a: 0})), {ordered: false}));
+        [...Array(nDocs).keys()].map(x => ({_id: x, a: 0.1})), {ordered: false}));
 
     replSet.awaitReplication();
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
@@ -445,5 +448,75 @@ export function checkNumSnapshots(debugBuild, expectedNumSnapshots) {
                   expectedNumSnapshots,
                   "expected " + expectedNumSnapshots +
                       " catalog snapshots during reverse lookup, found " + actualNumSnapshots);
+    }
+}
+
+export function setSnapshotSize(rst, snapshotSize) {
+    forEachNonArbiterNode(rst, conn => {
+        assert.commandWorked(conn.adminCommand(
+            {"setParameter": 1, "dbCheckMaxTotalIndexKeysPerSnapshot": snapshotSize}));
+    });
+}
+
+export function resetSnapshotSize(rst) {
+    setSnapshotSize(rst, defaultSnapshotSize);
+}
+
+// Verifies that the healthlog contains entries that span the entire range that dbCheck should run
+// against.
+export function assertCompleteCoverage(
+    healthlog, nDocs, docSuffix, start, end, inconsistentBatch = false) {
+    // For non-empty docSuffix like 'aaa' for instance, if we insert over 10 docs, the lexicographic
+    // sorting order would be '0aaa', '1aaa', '10aaa', instead of increasing numerical order. Skip
+    // these checks as we have test coverage without needing to account for these specific cases.
+    if (nDocs >= 10 && (docSuffix !== null || docSuffix !== "")) {
+        return;
+    }
+
+    const truncateDocSuffix =
+        (batchBoundary, docSuffix) => {
+            const index = batchBoundary.indexOf(docSuffix);
+            jsTestLog("Index : " + index);
+            if (index < 1) {
+                return batchBoundary;
+            }
+            return batchBoundary.substring(0, batchBoundary.indexOf(docSuffix));
+        }
+
+    let query = logQueries.infoBatchQuery;
+    if (inconsistentBatch) {
+        query = {"severity": "error", "msg": "dbCheck batch inconsistent"};
+    }
+
+    const batches = healthlog.find(query).toArray();
+    let expectedBatchStart = start === null ? 0 : start;
+    let batchEnd = "";
+    for (let batch of batches) {
+        let batchStart = batch.data.batchStart.a;
+        if (docSuffix) {
+            batchStart = truncateDocSuffix(batchStart, docSuffix);
+        }
+
+        // Verify that the batch start is correct.
+        assert.eq(expectedBatchStart, batchStart);
+        // Set our next expected batch start to the next value after the end of this batch.
+        batchEnd = batch.data.batchEnd.a;
+        if (docSuffix) {
+            batchEnd = truncateDocSuffix(batchEnd, docSuffix);
+        }
+        expectedBatchStart = batchEnd + 1;
+    }
+
+    if (end === null) {
+        // User did not issue a custom range, assert that we checked all documents.
+        // TODO (SERVER-86323): Fix this behavior and ensure maxKey is logged.
+        assert.eq(nDocs - 1, batchEnd);
+    } else {
+        // User issued a custom end, but we do not know if the documents in the collection actually
+        // ended at that range. Verify that we have hit either the end of the collection, or we
+        // checked up until the specified range.
+        assert((batchEnd === nDocs - 1) || (batchEnd === end),
+               `batch end ${batchEnd} did not equal end of collection ${
+                   nDocs - 1} nor end of custom range ${end}`);
     }
 }

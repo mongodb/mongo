@@ -434,10 +434,29 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     }
 }
 
+size_t getKeyStringSizeWithoutRecordId(const Collection* collection,
+                                       const key_string::Value& keyString) {
+    switch (collection->getRecordStore()->keyFormat()) {
+        case KeyFormat::Long:
+            return key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(),
+                                                            keyString.getSize());
+
+        case KeyFormat::String:
+            return key_string::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(),
+                                                           keyString.getSize());
+    }
+    MONGO_UNREACHABLE;
+}
+
+BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering) {
+    return key_string::toBsonSafe(
+        keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+}
+
 Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                                  const Collection* collection,
-                                                 const key_string::Value& first,
-                                                 const key_string::Value& last) {
+                                                 const BSONObj& batchStartBson,
+                                                 const BSONObj& batchEndBson) {
     // hashForExtraIndexKeysCheck must only be called if the hasher was created with indexName.
     invariant(_indexName);
     StringData indexName = _indexName.get();
@@ -446,25 +465,45 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     const IndexCatalogEntry* indexCatalogEntry =
         collection->getIndexCatalog()->getEntry(indexDescriptor);
-    auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+    const auto iam = indexCatalogEntry->accessMethod()->asSortedData();
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
+    const key_string::Version keyStringVersion =
+        iam->getSortedDataInterface()->getKeyStringVersion();
+
+    auto buildKeyStringWithoutRecordId = [keyStringVersion,
+                                          ordering](const BSONObj& batchBoundaryBson) {
+        key_string::Builder ksBuilder(keyStringVersion);
+        ksBuilder.resetToKey(batchBoundaryBson, ordering);
+        return ksBuilder.getValueCopy();
+    };
+
+    // Rebuild first and last keystrings from their BSON format.
+    const key_string::Value batchStartWithoutRecordId =
+        buildKeyStringWithoutRecordId(batchStartBson);
+    const key_string::Value batchEndWithoutRecordId = buildKeyStringWithoutRecordId(batchEndBson);
 
     auto indexCursor =
         std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
-    auto firstBson =
-        key_string::toBsonSafe(first.getBuffer(), first.getSize(), ordering, first.getTypeBits());
-    auto lastBson =
-        key_string::toBsonSafe(last.getBuffer(), last.getSize(), ordering, last.getTypeBits());
-    indexCursor->setEndPosition(lastBson, true /*inclusive*/);
+    indexCursor->setEndPosition(batchEndBson, true /*inclusive*/);
+
+    LOGV2_DEBUG(8065400,
+                3,
+                "seeking batch start during hashing",
+                "batchStart"_attr = batchStartWithoutRecordId,
+                "indexName"_attr = indexName);
+
 
     _nConsecutiveIdenticalIndexKeysSeenAtEnd = 0;
     // Iterate through index table.
-    for (auto currEntry = indexCursor->seekForKeyString(opCtx, first); currEntry;
-         currEntry = indexCursor->nextKeyString(opCtx)) {
+    // Note that seekForKeyString/nextKeyString always return a keyString with RecordId appended,
+    // regardless of what format the index has.
+    for (auto currEntryWithRecordId =
+             indexCursor->seekForKeyString(opCtx, batchStartWithoutRecordId);
+         currEntryWithRecordId;
+         currEntryWithRecordId = indexCursor->nextKeyString(opCtx)) {
         iassert(opCtx->checkForInterruptNoAssert());
-        const auto keyString = currEntry->keyString;
-        auto keyStringBson = key_string::toBsonSafe(
-            keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+        const auto currKeyStringWithRecordId = currEntryWithRecordId->keyString;
+        auto keyStringBson = _keyStringToBsonSafeHelper(currKeyStringWithRecordId, ordering);
         LOGV2_DEBUG(7844907,
                     3,
                     "hasher adding keystring to hash",
@@ -472,27 +511,20 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                         key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson),
                     "indexName"_attr = indexName);
         // Append the keystring to the hash without the recordId at end.
-        size_t sizeWithoutRecordId = [&] {
-            switch (collection->getRecordStore()->keyFormat()) {
-                case KeyFormat::Long:
-                    return key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(),
-                                                                    keyString.getSize());
-
-                case KeyFormat::String:
-                    return key_string::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(),
-                                                                   keyString.getSize());
-            }
-            MONGO_UNREACHABLE;
-        }();
+        size_t sizeWithoutRecordId =
+            getKeyStringSizeWithoutRecordId(collection, currKeyStringWithRecordId);
 
         _bytesSeen += sizeWithoutRecordId;
         _countKeysSeen += 1;
-        md5_append(&_state, md5Cast(keyString.getBuffer()), sizeWithoutRecordId);
+        md5_append(&_state, md5Cast(currKeyStringWithRecordId.getBuffer()), sizeWithoutRecordId);
 
         _lastKeySeen = keyStringBson;
 
-        const int comparisonWithoutRecordId = key_string::compare(
-            keyString.getBuffer(), last.getBuffer(), sizeWithoutRecordId, last.getSize());
+        const int comparisonWithoutRecordId =
+            key_string::compare(currKeyStringWithRecordId.getBuffer(),
+                                batchEndWithoutRecordId.getBuffer(),
+                                sizeWithoutRecordId,
+                                batchEndWithoutRecordId.getSize());
 
         // Last keystring in batch is in a series of consecutive identical keys.
         if (comparisonWithoutRecordId == 0) {
@@ -511,17 +543,18 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         _lastKeySeen = _maxKey;
     }
 
-    LOGV2_DEBUG(
-        7844904,
-        3,
-        "Finished hashing one batch in hasher",
-        "firstKeyString"_attr = key_string::rehydrateKey(indexDescriptor->keyPattern(), firstBson),
-        "lastKeyString"_attr = key_string::rehydrateKey(indexDescriptor->keyPattern(), lastBson),
-        "keysHashed"_attr = _countKeysSeen,
-        "bytesHashed"_attr = _bytesSeen,
-        "indexName"_attr = indexName,
-        "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr = _nConsecutiveIdenticalIndexKeysSeenAtEnd);
-
+    LOGV2_DEBUG(7844904,
+                3,
+                "Finished hashing one batch in hashe≠",
+                "firstKeyString"_attr =
+                    key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStartBson),
+                "lastKeyString"_attr =
+                    key_string::rehydrateKey(indexDescriptor->keyPattern(), batchEndBson),
+                "keysHashed"_attr = _countKeysSeen,
+                "bytesHashed"_attr = _bytesSeen,
+                "indexName"_attr = indexName,
+                "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr =
+                    _nConsecutiveIdenticalIndexKeysSeenAtEnd);
     return Status::OK();
 }
 
@@ -589,10 +622,7 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
             if (!ksEntry || ksEntry.get().loc != currentRecordId) {
                 auto keyRehydrated = key_string::rehydrateKey(
                     descriptor->keyPattern(),
-                    key_string::toBsonSafe(key.getBuffer(),
-                                           key.getSize(),
-                                           iam->getSortedDataInterface()->getOrdering(),
-                                           key.getTypeBits()));
+                    _keyStringToBsonSafeHelper(key, iam->getSortedDataInterface()->getOrdering()));
                 _missingIndexKeys.push_back(BSON(
                     "indexName" << descriptor->indexName() << "keyString" << keyRehydrated
                                 << "expectedRecordId" << currentRecordId.toStringHumanReadable()
@@ -892,21 +922,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                         return Status::OK();
                     }
 
-                    const IndexCatalogEntry* indexCatalogEntry =
-                        collection.get()->getIndexCatalog()->getEntry(indexDescriptor);
-                    auto iam = indexCatalogEntry->accessMethod()->asSortedData();
-                    const auto ordering = iam->getSortedDataInterface()->getOrdering();
-                    const key_string::Version keyStringVersion =
-                        iam->getSortedDataInterface()->getKeyStringVersion();
-
-                    // Rebuild first and last keystrings from their BSON format.
-                    key_string::Builder firstKS(keyStringVersion);
-                    firstKS.resetToKey(batchStart, ordering);
-                    key_string::Builder lastKS(keyStringVersion);
-                    lastKS.resetToKey(batchEnd, ordering);
-
                     uassertStatusOK(hasher->hashForExtraIndexKeysCheck(
-                        opCtx, collection.get(), firstKS.getValueCopy(), lastKS.getValueCopy()));
+                        opCtx, collection.get(), batchStart, batchEnd));
                     break;
                 }
                 case mongo::DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:

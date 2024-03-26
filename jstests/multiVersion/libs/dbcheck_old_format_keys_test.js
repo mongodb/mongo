@@ -5,6 +5,7 @@ import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/verify_versions.js";
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {forEachNonArbiterNode} from "jstests/replsets/libs/dbcheck_utils.js";
 
 export const defaultNumDocs = 20;
 export const defaultNumKeysInserted = 2 * defaultNumDocs;
@@ -80,6 +81,8 @@ export class DbCheckOldFormatKeysTest {
         jsTestLog(`Inserting documents into collection ${dbName}.${collName}`);
         const res = assert.commandWorked(
             db.runCommand({insert: collName, documents: data, writeConcern: {w: 'majority'}}));
+        this.getRst().awaitReplication();
+        assert.eq(db.getCollection(collName).find({}).count(), data.length);
         jsTestLog(`Inserted with w: majority, opTime ${tojson(res.operationTime)}`);
     }
 
@@ -151,6 +154,64 @@ export class DbCheckOldFormatKeysTest {
     }
 
     /**
+     * Creates extra index keys by deleting records but skipping deleting/updating index keys.
+     * This function should only be called after upgrading to latest and must be called on
+     * pre-inserted data.
+     */
+    createExtraKeys(nodes, dbName, collName, failpointName, docFilter = {}) {
+        jsTestLog("Creating extra index keys");
+        const fps = [];
+        for (const node of nodes) {
+            const extraKeysFp = configureFailPoint(node, failpointName, {indexName: "a_1"});
+            fps.push(extraKeysFp);
+        }
+        const coll = this.getPrimary().getDB(dbName).getCollection(collName);
+
+        if (failpointName == "skipUnindexingDocumentWhenDeleted") {
+            // Call delete on the docs. Deletes all documents if no filter is specified. Any nodes
+            // that
+            // haven't set the failpoints will simply delete all documents.
+
+            assert.commandWorked(coll.deleteMany(docFilter));
+
+        } else if (failpointName == "skipUpdatingIndexDocument") {
+            assert.commandWorked(coll.updateMany(docFilter, {$unset: {"a": ""}}));
+        }
+
+        this.getRst().awaitReplication();
+
+        // Turn off all of the failpoints and return.
+        for (const fp of fps) {
+            fp.off();
+        }
+    }
+
+    createExtraKeysRecordNotFound(nodes, dbName, collName, docFilter = {}) {
+        this.createExtraKeys(
+            nodes, dbName, collName, "skipUnindexingDocumentWhenDeleted", docFilter);
+    }
+
+    createExtraKeysRecordDoesNotMatch(nodes, dbName, collName, docFilter = {}) {
+        this.createExtraKeys(nodes, dbName, collName, "skipUpdatingIndexDocument", docFilter);
+    }
+
+    createExtraKeysRecordDoesNotMatchOnPrimary(dbName, collName, docFilter = {}) {
+        this.createExtraKeysRecordDoesNotMatch([this.getPrimary()], dbName, collName, docFilter);
+    }
+
+    createExtraKeysRecordDoesNotMatchOnAllNodes(dbName, collName, docFilter = {}) {
+        this.createExtraKeysRecordDoesNotMatch(this.getRst().nodes, dbName, collName, docFilter);
+    }
+
+    createExtraKeysRecordNotFoundOnSecondary(dbName, collName, docFilter = {}) {
+        this.createExtraKeysRecordNotFound(this.getSecondaries(), dbName, collName, docFilter);
+    }
+
+    createExtraKeysRecordNotFoundOnAllNodes(dbName, collName, docFilter = {}) {
+        this.createExtraKeysRecordNotFound(this.getRst().nodes, dbName, collName, docFilter);
+    }
+
+    /**
      * Upgrades the replica set all the way to latest.
      */
     upgradeRst() {
@@ -189,6 +250,14 @@ export class DbCheckOldFormatKeysTest {
         const fcvDoc = this.getRst().getPrimary().adminCommand(
             {getParameter: 1, featureCompatibilityVersion: 1});
         assert.eq("8.0", fcvDoc.featureCompatibilityVersion.version);
+
+        forEachNonArbiterNode(this.getRst(), function(node) {
+            assert.commandWorked(node.adminCommand({
+                setParameter: 1,
+                logComponentVerbosity: {command: 3},
+                dbCheckHealthLogEveryNBatches: 1
+            }));
+        });
     }
 
     stop() {
