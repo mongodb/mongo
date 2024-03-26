@@ -54,7 +54,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/transport/transport_layer_ftdc_collector.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/synchronized_value.h"
 
@@ -150,9 +149,6 @@ void registerShardCollectors(FTDCController* controller) {
     }
 
     controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>(),
-                                     ClusterRole::ShardServer);
-
-    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>(),
                                      ClusterRole::ShardServer);
 }
 

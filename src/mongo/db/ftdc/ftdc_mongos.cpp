@@ -54,7 +54,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/transport/transport_layer_ftdc_collector.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
@@ -122,9 +121,6 @@ void registerRouterCollectors(FTDCController* controller) {
                                      ClusterRole::RouterServer);
 
     controller->addPeriodicCollector(std::make_unique<NetworkInterfaceStatsCollector>(),
-                                     ClusterRole::RouterServer);
-
-    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>(),
                                      ClusterRole::RouterServer);
 }
 
