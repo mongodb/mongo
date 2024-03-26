@@ -65,10 +65,10 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     initializeCluster();
 
     // Run command with no writeConcern and no CWWC set.
-    resetCollection(setupCommand);
     const cmdsWithNoWCProvided = generateCmdsWithNoWCProvided(cmd);
     let serverStatus, newStatus;
     cmdsWithNoWCProvided.forEach(cmd => {
+        resetCollection(setupCommand);
         serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
         verifyServerStatusFields(serverStatus);
         assert.commandWorked(testDB.runCommand(cmd));
@@ -80,13 +80,13 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     });
 
     // Run command with no writeConcern with CWWC set to majority.
-    resetCollection(setupCommand);
     assert.commandWorked(conn.adminCommand({
         setDefaultRWConcern: 1,
         defaultWriteConcern: {w: "majority"},
         writeConcern: {w: "majority"}
     }));
     cmdsWithNoWCProvided.forEach(cmd => {
+        resetCollection(setupCommand);
         serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
         verifyServerStatusFields(serverStatus);
         assert.commandWorked(testDB.runCommand(cmd));
@@ -98,10 +98,10 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     });
 
     // Run command with no writeConcern with CWWC set to w:1.
-    resetCollection(setupCommand);
     assert.commandWorked(conn.adminCommand(
         {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
     cmdsWithNoWCProvided.forEach(cmd => {
+        resetCollection(setupCommand);
         serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
         verifyServerStatusFields(serverStatus);
         assert.commandWorked(testDB.runCommand(cmd));
@@ -113,13 +113,13 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
     });
 
     // Run command with no writeConcern and with CWWC set with (w: "myTag").
-    resetCollection(setupCommand);
     assert.commandWorked(conn.adminCommand({
         setDefaultRWConcern: 1,
         defaultWriteConcern: {w: "myTag"},
         writeConcern: {w: "majority"}
     }));
     cmdsWithNoWCProvided.forEach(cmd => {
+        resetCollection(setupCommand);
         serverStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
         verifyServerStatusFields(serverStatus);
         assert.commandWorked(testDB.runCommand(cmd));
