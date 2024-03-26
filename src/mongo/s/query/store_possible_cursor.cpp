@@ -46,6 +46,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -69,16 +70,15 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode) {
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
-    auto result = storePossibleCursor(
-        opCtx,
-        remoteCursor->getShardId().toString(),
-        remoteCursor->getHostAndPort(),
-        remoteCursor->getCursorResponse().toBSON(CursorResponse::ResponseType::InitialResponse),
-        requestedNss,
-        executorPool->getArbitraryExecutor(),
-        Grid::get(opCtx)->getCursorManager(),
-        std::move(privileges),
-        tailableMode);
+    auto result = storePossibleCursor(opCtx,
+                                      remoteCursor->getShardId().toString(),
+                                      remoteCursor->getHostAndPort(),
+                                      remoteCursor->getCursorResponse(),
+                                      requestedNss,
+                                      executorPool->getArbitraryExecutor(),
+                                      Grid::get(opCtx)->getCursorManager(),
+                                      std::move(privileges),
+                                      tailableMode);
 
     // On success, release ownership of the cursor because it has been registered with the cursor
     // manager and is now owned there.
@@ -105,21 +105,48 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return incomingCursorResponse.getStatus();
     }
 
+    const auto& response = incomingCursorResponse.getValue();
+    if (const auto& cursorMetrics = response.getCursorMetrics()) {
+        CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
+    }
+
+    return storePossibleCursor(opCtx,
+                               shardId,
+                               server,
+                               response,
+                               requestedNss,
+                               std::move(executor),
+                               cursorManager,
+                               privileges,
+                               tailableMode,
+                               routerSort);
+}
+
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const HostAndPort& server,
+                                        const CursorResponse& incomingCursorResponse,
+                                        const NamespaceString& requestedNss,
+                                        std::shared_ptr<executor::TaskExecutor> executor,
+                                        ClusterCursorManager* cursorManager,
+                                        PrivilegeVector privileges,
+                                        TailableModeEnum tailableMode,
+                                        boost::optional<BSONObj> routerSort) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
     opDebug.additiveMetrics.nBatches = 1;
     // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
     // a split aggregation pipeline, and the shards half of that pipeline may have targeted multiple
     // shards. In that case, leave the current value as-is.
     opDebug.nShards = std::max(opDebug.nShards, 1);
-    CurOp::get(opCtx)->setEndOfOpMetrics(incomingCursorResponse.getValue().getBatch().size());
+    CurOp::get(opCtx)->setEndOfOpMetrics(incomingCursorResponse.getBatch().size());
 
-    if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
+    if (incomingCursorResponse.getCursorId() == CursorId(0)) {
         opDebug.cursorExhausted = true;
         collectQueryStatsMongos(opCtx, std::move(opDebug.queryStatsInfo.key));
-        return cmdResult;
+        return incomingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
-    ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS(),
+    ClusterClientCursorParams params(incomingCursorResponse.getNSS(),
                                      APIParameters::get(opCtx),
                                      boost::none /* ReadPreferenceSetting */,
                                      repl::ReadConcernArgs::get(opCtx),
@@ -139,17 +166,19 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     remoteCursor.setShardId(shardId.toString());
     remoteCursor.setHostAndPort(server);
     remoteCursor.setCursorResponse(
-        CursorResponse(incomingCursorResponse.getValue().getNSS(),
-                       incomingCursorResponse.getValue().getCursorId(),
+        CursorResponse(incomingCursorResponse.getNSS(),
+                       incomingCursorResponse.getCursorId(),
                        {}, /* batch */
-                       incomingCursorResponse.getValue().getAtClusterTime(),
-                       incomingCursorResponse.getValue().getPostBatchResumeToken()));
+                       incomingCursorResponse.getAtClusterTime(),
+                       incomingCursorResponse.getPostBatchResumeToken()));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
     params.originatingPrivileges = std::move(privileges);
     if (routerSort) {
         params.sortToApplyOnRouter = *routerSort;
     }
+    params.requestQueryStatsFromRemotes =
+        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
     collectQueryStatsMongos(opCtx, ccc);
@@ -170,12 +199,11 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     opDebug.cursorid = clusterCursorId.getValue();
 
-    CursorResponse outgoingCursorResponse(
-        requestedNss,
-        clusterCursorId.getValue(),
-        incomingCursorResponse.getValue().getBatch(),
-        incomingCursorResponse.getValue().getAtClusterTime(),
-        incomingCursorResponse.getValue().getPostBatchResumeToken());
+    CursorResponse outgoingCursorResponse(requestedNss,
+                                          clusterCursorId.getValue(),
+                                          incomingCursorResponse.getBatch(),
+                                          incomingCursorResponse.getAtClusterTime(),
+                                          incomingCursorResponse.getPostBatchResumeToken());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 

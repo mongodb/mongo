@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/executor/task_executor.h"
@@ -104,6 +105,10 @@ public:
      * by this results merger.
      */
     void kill(OperationContext* opCtx);
+
+    query_stats::DataBearingNodeMetrics takeMetrics() {
+        return _arm.takeMetrics();
+    }
 
 private:
     /**

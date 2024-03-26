@@ -76,6 +76,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -248,6 +249,10 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
 
     mergeCmd[AggregateCommandRequest::kLetFieldName] =
         Value(mergeCtx->variablesParseState.serialize(mergeCtx->variables));
+
+    if (query_stats::shouldRequestRemoteMetrics(CurOp::get(mergeCtx->opCtx)->debug())) {
+        mergeCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
+    }
 
     // If the user didn't specify a collation already, make sure there's a collation attached to
     // the merge command, since the merging shard may not have the collection metadata.
@@ -465,6 +470,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     // had a batch size of 0.
     params.batchSize = batchSize == 0 ? boost::none : boost::make_optional(batchSize);
     params.originatingPrivileges = privileges;
+    params.requestQueryStatsFromRemotes =
+        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
         opCtx, std::move(pipelineForMerging), std::move(params));
@@ -546,7 +553,9 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     opDebug.cursorExhausted = exhausted;
     opDebug.additiveMetrics.nBatches = 1;
     CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
+
     if (exhausted) {
+        opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(ccc->takeRemoteMetrics());
         collectQueryStatsMongos(opCtx, ccc->getKey());
     } else {
         collectQueryStatsMongos(opCtx, ccc);

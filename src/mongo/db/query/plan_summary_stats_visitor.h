@@ -32,6 +32,7 @@
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 
 namespace mongo {
 /**
@@ -76,6 +77,10 @@ public:
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceMergeCursorsStats> stats) final {
+        accumulate(stats->planSummaryStats);
+        accumulate(stats->dataBearingNodeMetrics);
+    }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceLookupStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
@@ -110,6 +115,22 @@ private:
         _summary.keysSorted += statsIn.keysSorted;
         _summary.planFailed |= statsIn.planFailed;
         _summary.indexesUsed.insert(statsIn.indexesUsed.begin(), statsIn.indexesUsed.end());
+    }
+
+    /**
+     * Helper method to accumulate the plan summary stats from remote data-bearing node metrics.
+     */
+    void accumulate(const query_stats::DataBearingNodeMetrics& metricsIn) {
+        _summary.totalKeysExamined += metricsIn.keysExamined;
+        _summary.totalDocsExamined += metricsIn.docsExamined;
+        _summary.hasSortStage |= metricsIn.hasSortStage;
+        _summary.usedDisk |= metricsIn.usedDisk;
+    }
+
+    void accumulate(const boost::optional<query_stats::DataBearingNodeMetrics>& metricsIn) {
+        if (metricsIn) {
+            accumulate(*metricsIn);
+        }
     }
 
     PlanSummaryStats& _summary;

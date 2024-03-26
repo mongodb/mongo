@@ -227,6 +227,9 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             return std::make_unique<query_stats::FindKey>(
                 expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
         });
+        if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics()) {
+            CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
+        }
     }
 
     // TODO: SERVER-73632 Remove feature flag for PM-635.

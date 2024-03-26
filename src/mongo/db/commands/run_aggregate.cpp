@@ -1174,6 +1174,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                                                          origNss,
                                                          collectionType);
         });
+
+        if (request.getIncludeQueryStatsMetrics()) {
+            CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
+        }
     }
 
     // Lookup the query settings and attach it to the 'expCtx'.

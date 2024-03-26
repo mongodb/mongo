@@ -66,6 +66,13 @@ public:
 
     BSONObj getPostBatchResumeToken() final;
 
+    boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() final {
+        if (_mergeCursorsStage) {
+            return _mergeCursorsStage->takeRemoteMetrics();
+        }
+        return boost::none;
+    }
+
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 

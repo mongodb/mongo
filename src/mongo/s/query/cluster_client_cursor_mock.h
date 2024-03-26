@@ -45,6 +45,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -140,6 +141,10 @@ public:
     bool shouldOmitDiagnosticInformation() const final;
 
     std::unique_ptr<query_stats::Key> getKey() final;
+
+    boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() final {
+        return boost::none;
+    }
 
 private:
     bool _killed = false;

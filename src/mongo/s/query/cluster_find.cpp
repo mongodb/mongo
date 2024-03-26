@@ -84,6 +84,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
@@ -352,9 +353,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     auto shardIds = getTargetedShardsForCanonicalQuery(query, cm);
 
     bool requestQueryStatsFromRemotes =
-        feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        CurOp::get(opCtx)->debug().queryStatsInfo.key != nullptr;
+        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
@@ -577,6 +576,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
         if (shardIds.size() > 0) {
             updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
+        }
+        if (const auto remoteMetrics = ccc->takeRemoteMetrics()) {
+            opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(*remoteMetrics);
         }
         collectQueryStatsMongos(opCtx, ccc->getKey());
         return CursorId(0);

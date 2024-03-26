@@ -610,10 +610,14 @@ void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stat
 }
 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(cursor->takeRemoteMetrics());
     cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.additiveMetrics.aggregateDataBearingNodeMetrics(cursor->takeRemoteMetrics());
     cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().additiveMetrics);
 }
 

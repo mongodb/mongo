@@ -790,14 +790,12 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     }
 
     CursorResponse cursorResponse = std::move(cursorResponseStatus.getValue());
+    if (const auto& remoteMetrics = cursorResponse.getCursorMetrics()) {
+        _metrics.aggregateCursorMetrics(*remoteMetrics);
+    }
 
     // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
     remote.cursorId = cursorResponse.getCursorId();
-
-    // Aggregate remote cursor metrics (if any) into the OpDebug metrics.
-    if (const auto& cursorMetrics = cursorResponse.getCursorMetrics(); _opCtx && cursorMetrics) {
-        CurOp::get(_opCtx)->debug().aggregateCursorMetrics(*cursorMetrics);
-    }
 
     // Save the batch in the remote's buffer.
     if (!_addBatchToBuffer(lk, remoteIndex, cursorResponse)) {
@@ -944,6 +942,13 @@ stdx::shared_future<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
         }
     }
     return _killCompleteInfo->getFuture();
+}
+
+query_stats::DataBearingNodeMetrics AsyncResultsMerger::takeMetrics() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    auto metrics = _metrics;
+    _metrics = {};
+    return metrics;
 }
 
 //

@@ -192,6 +192,15 @@ void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<Key>(void)> makeKey);
 
+
+/**
+ * Returns whether or not the current operation should request metrics from remote hosts. This
+ * can be either because this query was chosen for query stats collection, the user explicitly
+ * requested query stats collection for this query, or this query is an internal query generated
+ * by a user query that met one of the first two conditions.
+ */
+bool shouldRequestRemoteMetrics(const OpDebug& opDebug);
+
 /**
  * Convert an optional Duration to a count of Microseconds uint64_t.
  */

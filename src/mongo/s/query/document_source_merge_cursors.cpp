@@ -118,6 +118,7 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
     }
 
     auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->opCtx));
+    _stats.dataBearingNodeMetrics.add(_blockingResultsMerger->takeMetrics());
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
     }

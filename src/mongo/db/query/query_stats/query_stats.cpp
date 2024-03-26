@@ -349,6 +349,12 @@ void registerRequest(OperationContext* opCtx,
     // hash and store it there so we can avoid re-doing this for each request.
 }
 
+bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
+    return feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        (opDebug.queryStatsInfo.key != nullptr || opDebug.queryStatsInfo.metricsRequested);
+}
+
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
             "Query stats is not enabled without the feature flag on and a cache size greater than "
@@ -360,18 +366,16 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
                                   int64_t firstResponseExecutionTime,
                                   const OpDebug::AdditiveMetrics& metrics) {
-    auto& opDebug = CurOp::get(opCtx)->debug();
-
     QueryStatsSnapshot snapshot{
         microsecondsToUint64(metrics.executionTime),
         static_cast<uint64_t>(firstResponseExecutionTime),
         static_cast<uint64_t>(metrics.nreturned.value_or(0)),
         static_cast<uint64_t>(metrics.keysExamined.value_or(0)),
         static_cast<uint64_t>(metrics.docsExamined.value_or(0)),
-        opDebug.hasSortStage,
-        opDebug.usedDisk,
-        opDebug.fromMultiPlanner,
-        opDebug.fromPlanCache,
+        metrics.hasSortStage,
+        metrics.usedDisk,
+        metrics.fromMultiPlanner,
+        metrics.fromPlanCache.value_or(false),
     };
 
     return snapshot;

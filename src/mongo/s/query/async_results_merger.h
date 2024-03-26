@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
@@ -260,6 +261,20 @@ public:
      * operation context.
      */
     stdx::shared_future<void> kill(OperationContext* opCtx);
+
+    /**
+     * Returns remote metrics aggregated in this ARM without reseting the local counts.
+     */
+    const query_stats::DataBearingNodeMetrics& peekMetrics_forTest() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _metrics;
+    }
+
+    /**
+     * Returns remotes metrics aggregated in this ARM and resets the local counts so as to avoid
+     * double counting.
+     */
+    query_stats::DataBearingNodeMetrics takeMetrics();
 
 private:
     /**
@@ -510,6 +525,9 @@ private:
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).
     mutable Mutex _mutex = MONGO_MAKE_LATCH("AsyncResultsMerger::_mutex");
+
+    // Metrics aggregated from remote cursors.
+    query_stats::DataBearingNodeMetrics _metrics;
 
     // Data tracking the state of our communication with each of the remote nodes.
     std::vector<RemoteCursorData> _remotes;

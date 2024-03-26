@@ -1,3 +1,4 @@
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const kShellApplicationName = "MongoDB Shell";
@@ -204,6 +205,13 @@ export function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
             print("Actual " + tojson(resultingKey));
         }
         assert(expectedKey.hasOwnProperty(field), field);
+
+        if (field == "otherNss") {
+            // When otherNss contains multiple namespaces, the order is not always consistent,
+            // so use resultsEq to get stable results.
+            assert(resultsEq(expectedKey[field], resultingKey[field]));
+            continue;
+        }
         assert.eq(expectedKey[field], resultingKey[field]);
     }
 
@@ -292,6 +300,20 @@ export function assertAggregatedBoolean(results, metricName, {trueCount, falseCo
     },
                  metrics[metricName],
                  `Metric: ${metricName}`);
+}
+
+export function assertAggregatedMetricsSingleExec(
+    results,
+    {docsExamined, keysExamined, usedDisk, hasSortStage, fromPlanCache, fromMultiPlanner}) {
+    const numericMetric = (x) => ({sum: x, min: x, max: x, sumOfSq: x ** 2});
+    assertAggregatedMetric(results, "docsExamined", numericMetric(docsExamined));
+    assertAggregatedMetric(results, "keysExamined", numericMetric(keysExamined));
+
+    const booleanMetric = (x) => ({trueCount: x ? 1 : 0, falseCount: x ? 0 : 1});
+    assertAggregatedBoolean(results, "usedDisk", booleanMetric(usedDisk));
+    assertAggregatedBoolean(results, "hasSortStage", booleanMetric(hasSortStage));
+    assertAggregatedBoolean(results, "fromPlanCache", booleanMetric(fromPlanCache));
+    assertAggregatedBoolean(results, "fromMultiPlanner", booleanMetric(fromMultiPlanner));
 }
 
 export function asFieldPath(str) {
@@ -455,4 +477,229 @@ export function getQueryStatsKeyHashes(entries) {
     const keyHashArray = Object.keys(keyHashes);
     assert.eq(keyHashArray.length, entries.length, tojson(entries));
     return keyHashArray;
+}
+
+/**
+ * Helper function to construct a query stats key for a find query.
+ */
+export function getFindQueryStatsKey(conn, collName, queryShapeExtra, extra = {}) {
+    // This is most of the query stats key. There are configuration-specific details that are
+    // added conditionally afterwards.
+    const baseQueryShape = {
+        cmdNs: {db: "test", coll: collName},
+        command: "find",
+    };
+    const baseStatsKey = {
+        queryShape: Object.assign(baseQueryShape, queryShapeExtra),
+        client: {application: {name: "MongoDB Shell"}},
+        batchSize: "?number",
+    };
+    const queryStatsKey = Object.assign(baseStatsKey, extra);
+
+    const coll = conn.getDB("test")[collName];
+    if (conn.isMongos()) {
+        queryStatsKey.readConcern = {level: "local", provenance: "implicitDefault"};
+    } else {
+        // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
+        queryStatsKey.collectionType = isView(conn, coll) ? "view" : "collection";
+    }
+
+    if (FixtureHelpers.isReplSet(conn.getDB("test"))) {
+        queryStatsKey["$readPreference"] = {mode: "secondaryPreferred"};
+    }
+
+    return queryStatsKey;
+}
+
+/**
+ * Helper function to construct a query stats key for an aggregate query.
+ */
+export function getAggregateQueryStatsKey(conn, collName, queryShapeExtra, extra = {}) {
+    const testDB = conn.getDB("test");
+    const coll = testDB[collName];
+    const baseQueryShape = {cmdNs: {db: "test", coll: collName}, command: "aggregate"};
+    const baseStatsKey = {
+        queryShape: Object.assign(baseQueryShape, queryShapeExtra),
+        client: {application: {name: "MongoDB Shell"}},
+        cursor: {batchSize: "?number"},
+    };
+
+    if (!conn.isMongos()) {
+        // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
+        baseStatsKey.collectionType = collName == "$cmd.aggregate" ? "virtual"
+            : isView(conn, coll)                                   ? "view"
+                                                                   : "collection";
+    }
+
+    if (FixtureHelpers.isReplSet(conn.getDB("test"))) {
+        baseStatsKey["$readPreference"] = {mode: "secondaryPreferred"};
+    }
+
+    const queryStatsKey = Object.assign(baseStatsKey, extra);
+
+    return queryStatsKey;
+}
+
+function getQueryStatsForNs(testDB, namespace) {
+    return getQueryStats(testDB, {
+        collName: namespace,
+        extraMatch: {"key.queryShape.pipeline.0.$queryStats": {$exists: false}}
+    });
+}
+
+function getSingleQueryStatsEntryForNs(testDB, namespace) {
+    const queryStats = getQueryStatsForNs(testDB, namespace);
+    assert.lte(queryStats.length, 1, "Multiple query stats entries found for " + namespace);
+    assert.eq(queryStats.length, 1, "No query stats entries found for " + namespace);
+    return queryStats[0];
+}
+
+function getExecCount(testDB, namespace) {
+    const queryStats = getQueryStatsForNs(testDB, namespace);
+    assert.lte(queryStats.length, 1, "Multiple query stats entries found for " + namespace);
+    return queryStats.length == 0 ? 0 : queryStats[0].metrics.execCount;
+}
+
+/**
+ * Clears the plan cache and query stats store so they are in a known (empty) state to prevent
+ * stats and plan caches from leaking between queries.
+ */
+export function clearPlanCacheAndQueryStatsStore(conn, coll) {
+    const testDB = conn.getDB("test");
+    // If this is a query against a view, we need to reset the plan cache for the underlying
+    // collection.
+    const viewSource = getViewSource(conn, coll);
+    const collName = viewSource ? viewSource : coll.getName();
+
+    // Reset the query stats store and plan cache so the recorded stats will be consistent.
+    resetQueryStatsStore(conn, "1%");
+    assert.commandWorked(testDB.runCommand({planCacheClear: collName}));
+}
+
+function getViewSource(conn, coll) {
+    const testDB = conn.getDB("test");
+    const collectionInfos = testDB.getCollectionInfos({name: coll.getName()});
+    assert.eq(collectionInfos.length, 1, "Couldn't find collection info for " + coll.getName());
+    const collectionInfo = collectionInfos[0];
+    if (collectionInfo.type == "view") {
+        return collectionInfo.options.viewOn;
+    }
+    return null;
+}
+
+function isView(conn, coll) {
+    return getViewSource(conn, coll) !== null;
+}
+
+/**
+ * Given a command and batch size, runs the command and enough getMores to exhaust the cursor,
+ * returning the query stats. Asserts that the expected number of documents is ultimately returned,
+ * and asserts that query stats are written as expected.
+ */
+export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs) {
+    const testDB = conn.getDB("test");
+
+    // Set up the namespace and the batch size - it goes in different fields for find vs. aggregate.
+    // For the namespace, it's usually the collection name, but in the case of aggregate: 1 queries,
+    // it will be "$cmd.aggregate".
+    let namespace = 1;
+    let batchSize = 0;
+    if (cmd.hasOwnProperty("find")) {
+        assert(cmd.hasOwnProperty("batchSize"), "find command missing batchSize");
+        batchSize = cmd.batchSize;
+        namespace = cmd.find;
+    } else if (cmd.hasOwnProperty("aggregate")) {
+        assert(cmd.hasOwnProperty("cursor"), "aggregate command missing cursor");
+        assert(cmd.cursor.hasOwnProperty("batchSize"), "aggregate command missing batchSize");
+        batchSize = cmd.cursor.batchSize;
+        namespace = cmd.aggregate == 1 ? "$cmd.aggregate" : cmd.aggregate;
+    } else {
+        assert(false, "Unexpected command type");
+    }
+
+    const execCountPre = getExecCount(testDB, namespace);
+
+    jsTestLog("Running command with batch size " + batchSize + ": " + tojson(cmd));
+    const initialResult = assert.commandWorked(testDB.runCommand(cmd));
+    let cursor = initialResult.cursor;
+    let allResults = cursor.firstBatch;
+
+    const expectGetMores = batchSize <= expectedDocs;
+    if (expectGetMores) {
+        assert.neq(0, cursor.id, "Cursor unexpectedly exhausted in initial batch");
+    } else {
+        assert.eq(
+            0, cursor.id, "Initial batch unexpectedly wasn't sufficient to exhaust the cursor");
+    }
+
+    while (cursor.id != 0) {
+        // Since the cursor isn't exhausted, ensure no query stats results have been written.
+        const execCount = getExecCount(testDB, namespace);
+        assert.eq(execCount, execCountPre);
+
+        const getMore = {getMore: cursor.id, collection: namespace, batchSize: batchSize};
+        jsTestLog("Running getMore with batch size " + batchSize + ": " + tojson(getMore));
+        const getMoreResult = assert.commandWorked(testDB.runCommand(getMore));
+        cursor = getMoreResult.cursor;
+        allResults = allResults.concat(cursor.nextBatch);
+    }
+
+    assert.eq(allResults.length, expectedDocs);
+
+    const execCountPost = getExecCount(testDB, namespace);
+    assert.eq(execCountPost, execCountPre + 1, "Didn't find query stats for namespace" + namespace);
+
+    const queryStats = getSingleQueryStatsEntryForNs(conn, namespace);
+    print("Query Stats: " + tojson(queryStats));
+
+    assertExpectedResults(queryStats,
+                          key,
+                          /* expectedExecCount */ execCountPost,
+                          /* expectedDocsReturnedSum */ expectedDocs * execCountPost,
+                          /* expectedDocsReturnedMax */ expectedDocs,
+                          /* expectedDocsReturnedMin */ expectedDocs,
+                          /* expectedDocsReturnedSumOfSq */ expectedDocs ** 2 * execCountPost,
+                          expectGetMores);
+
+    return queryStats;
+}
+
+/**
+ * Run the given callback for each of the deployment scenarios we want to test query stats against
+ * (standalone, replset, sharded cluster). Callback must accept two arguments: the connection and
+ * the test object (ReplSetTest or ShardingTest). For the standalone case, the test is null.
+ */
+export function runForEachDeployment(callbackFn) {
+    const options = {setParameter: {internalQueryStatsRateLimit: -1}};
+
+    {
+        const conn = MongoRunner.runMongod(options);
+
+        callbackFn(conn, null);
+
+        MongoRunner.stopMongod(conn);
+    }
+
+    {
+        const rst = new ReplSetTest({nodes: 3, nodeOptions: options});
+        rst.startSet();
+        rst.initiate();
+
+        callbackFn(rst.getPrimary(), rst);
+
+        rst.stopSet();
+    }
+
+    {
+        const st = new ShardingTest(Object.assign({shards: 2, other: {mongosOptions: options}}));
+
+        const testDB = st.s.getDB("test");
+        // Enable sharding separate from per-test setup to avoid calling enableSharding repeatedly.
+        assert.commandWorked(testDB.adminCommand(
+            {enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+
+        callbackFn(st.s, st);
+
+        st.stop();
+    }
 }

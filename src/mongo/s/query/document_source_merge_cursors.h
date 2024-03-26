@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
@@ -96,6 +97,18 @@ public:
 
     const char* getSourceName() const final {
         return kStageName.rawData();
+    }
+
+    const PlanSummaryStats& getPlanSummaryStats() const {
+        return _stats.planSummaryStats;
+    }
+
+    bool usedDisk() final {
+        return _stats.planSummaryStats.usedDisk;
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
     }
 
     void detachFromOperationContext() final;
@@ -174,6 +187,12 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() {
+        auto metrics = _stats.dataBearingNodeMetrics;
+        _stats.dataBearingNodeMetrics = {};
+        return metrics;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
@@ -228,6 +247,9 @@ private:
 
     // Set containing shard ids with valid cursors.
     std::set<ShardId> _shardsWithCursors;
+
+    // Specific stats for $mergeCursors stage.
+    DocumentSourceMergeCursorsStats _stats;
 };
 
 }  // namespace mongo

@@ -34,6 +34,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/util/time_support.h"
 
@@ -165,6 +167,14 @@ public:
      */
     OperationContext* getOpCtx() {
         return _opCtx;
+    }
+
+    /**
+     * Returns any metrics gathered from remote hosts and resets the stored values to a default
+     * state so as to avoid double-counting.
+     */
+    virtual boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() {
+        return _child ? _child->takeRemoteMetrics() : boost::none;
     }
 
 protected:

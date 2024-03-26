@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/blocking_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -77,6 +78,10 @@ public:
 
     BSONObj getPostBatchResumeToken() final {
         return _resultsMerger.getHighWaterMark();
+    }
+
+    boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() final {
+        return _resultsMerger.takeMetrics();
     }
 
 protected:

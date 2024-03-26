@@ -112,7 +112,7 @@ struct InShard : InBoth {
         incrCounter(updated, am.nMatched);
         incrCounter(scanned, am.keysExamined);
         incrCounter(scannedObjects, am.docsExamined);
-        incrCounter(scanAndOrder, debug.hasSortStage);
+        incrCounter(scanAndOrder, am.hasSortStage);
         incrCounter(writeConflicts, am.writeConflicts);
 
         _updateExternalStats(opCtx);

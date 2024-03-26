@@ -38,6 +38,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
@@ -1081,6 +1082,28 @@ struct DocumentSourceCursorStats : public SpecificStats {
     }
 
     PlanSummaryStats planSummaryStats;
+};
+
+struct DocumentSourceMergeCursorsStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<DocumentSourceMergeCursorsStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    PlanSummaryStats planSummaryStats;
+    query_stats::DataBearingNodeMetrics dataBearingNodeMetrics;
 };
 
 struct DocumentSourceLookupStats : public SpecificStats {

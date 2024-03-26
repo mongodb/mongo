@@ -69,6 +69,7 @@
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -126,6 +127,19 @@ public:
          * AdditiveMetrics instance.
          */
         void add(const AdditiveMetrics& otherMetrics);
+
+        /**
+         * Adds all of the fields of the given DataBearingNodeMetrics object together with the
+         * corresponding fields of this object.
+         */
+        void aggregateDataBearingNodeMetrics(const query_stats::DataBearingNodeMetrics& metrics);
+        void aggregateDataBearingNodeMetrics(
+            const boost::optional<query_stats::DataBearingNodeMetrics>& metrics);
+
+        /**
+         * Aggregate CursorMetrics (e.g., from a remote cursor) into this AdditiveMetrics instance.
+         */
+        void aggregateCursorMetrics(const CursorMetrics& metrics);
 
         /**
          * Resets all members to the default state.
@@ -230,6 +244,20 @@ public:
 
         // Amount of time spent executing a query.
         boost::optional<Microseconds> executionTime;
+
+        // True if the query plan involves an in-memory sort.
+        bool hasSortStage{false};
+        // True if the given query used disk.
+        bool usedDisk{false};
+        // True if any plan(s) involved in servicing the query (including internal queries sent to
+        // shards) came from the multi-planner (not from the plan cache and not a query with a
+        // single solution).
+        bool fromMultiPlanner{false};
+        // False unless all plan(s) involved in servicing the query came from the plan cache.
+        // This is because we want to report a "negative" outcome (plan cache miss) if any internal
+        // query involved missed the cache. Optional because we need tri-state (true, false, not
+        // set) to make the "sticky towards false" logic work.
+        boost::optional<bool> fromPlanCache;
     };
 
     OpDebug() = default;
@@ -293,11 +321,6 @@ public:
      */
     CursorMetrics getCursorMetrics() const;
 
-    /**
-     * Aggregate CursorMetrics (e.g., from a remote cursor) into the curop's metrics.
-     */
-    void aggregateCursorMetrics(const CursorMetrics& metrics);
-
     // -------------------
 
     // basic options
@@ -320,9 +343,6 @@ public:
     BSONObj mongotCountVal = BSONObj();
     BSONObj mongotSlowQueryLog = BSONObj();
 
-    bool hasSortStage{false};  // true if the query plan involves an in-memory sort
-
-    bool usedDisk{false};              // true if the given query used disk
     long long sortSpills{0};           // The total number of spills to disk from sort stages
     size_t sortTotalDataSizeBytes{0};  // The amount of data we've sorted in bytes
     long long keysSorted{0};           // The number of keys that we've sorted.
@@ -330,12 +350,6 @@ public:
     long long collectionScansNonTailable{0};  // The number of non-tailable collection scans.
     std::set<std::string> indexesUsed;        // The indexes used during query execution.
 
-
-    // True if the plan came from the multi-planner (not from the plan cache and not a query with a
-    // single solution).
-    bool fromMultiPlanner{false};
-
-    bool fromPlanCache{false};
     // True if a replan was triggered during the execution of this operation.
     boost::optional<std::string> replanReason;
 
@@ -379,8 +393,8 @@ public:
      *        never needing the wasRateLimited field.
      */
 
-    // Note that the only case when the three fields of the below struct are null, none, and false
-    // is if the query stats feature flag is turned off.
+    // Note that the only case when key, keyHash, and wasRateLimited of the below struct are null,
+    // none, and false is if the query stats feature flag is turned off.
     struct QueryStatsInfo {
         // Uniquely identifies one query stats entry.
         // nullptr if `wasRateLimited` is true.
@@ -390,6 +404,10 @@ public:
         boost::optional<std::size_t> keyHash;
         // True if the request was rate limited and stats should not be collected.
         bool wasRateLimited = false;
+        // Sometimes we need to request metrics as part of a higher-level operation without
+        // actually caring about the metrics for this specific operation. In those cases, we
+        // use metricsRequested to indicate we should request metrics from other nodes.
+        bool metricsRequested = false;
     };
 
     QueryStatsInfo queryStatsInfo;

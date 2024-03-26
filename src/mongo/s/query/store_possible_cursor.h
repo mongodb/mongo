@@ -97,6 +97,24 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         boost::optional<BSONObj> routerSort = boost::none);
 
 /**
+ * Convenience overload taking in a const CursorResponse& instead of a const BSONObj&, as callers
+ * who have a CursorResponse instead of a BSONObj would otherwise have to serialize it to call
+ * this function, only for this function to parse it again. In addition, parsing a CursorResponse
+ * sometimes implies a need to aggregate query stats into the OpDebug. This overload, receiving
+ * an already-parsed CursorResponse, never aggregates metrics.
+ */
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const HostAndPort& server,
+                                        const CursorResponse& incomingCursorResponse,
+                                        const NamespaceString& requestedNss,
+                                        std::shared_ptr<executor::TaskExecutor> executor,
+                                        ClusterCursorManager* cursorManager,
+                                        PrivilegeVector privileges,
+                                        TailableModeEnum tailableMode = TailableModeEnum::kNormal,
+                                        boost::optional<BSONObj> routerSort = boost::none);
+
+/**
  * Convenience function which extracts all necessary information from the passed RemoteCursor, and
  * stores a ClusterClientCursor based on it. The ownership of the remote cursor is transferred to
  * this function, and will handle killing it upon failure. 'privileges' contains the required

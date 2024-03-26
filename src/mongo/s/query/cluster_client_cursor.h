@@ -233,7 +233,7 @@ public:
         _metrics.incrementNBatches();
     }
 
-    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
+    void incrementCursorMetrics(const OpDebug::AdditiveMetrics& newMetrics) {
         _metrics.add(newMetrics);
         if (!_firstResponseExecutionTime) {
             _firstResponseExecutionTime = _metrics.executionTime;
@@ -275,6 +275,11 @@ public:
      * cursor is handling.
      */
     virtual std::unique_ptr<query_stats::Key> getKey() = 0;
+
+    /**
+     * Returns the aggregated metrics from any remote requests made by this cursor (if any).
+     */
+    virtual boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() = 0;
 
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.

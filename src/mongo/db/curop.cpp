@@ -1009,9 +1009,10 @@ StringData getProtoString(int op) {
 #define OPDEBUG_TOATTR_HELP(x) \
     if (x >= 0)                \
     pAttrs->add(#x, x)
-#define OPDEBUG_TOATTR_HELP_BOOL(x) \
-    if (x)                          \
-    pAttrs->add(#x, x)
+#define OPDEBUG_TOATTR_HELP_BOOL_NAMED(name, x) \
+    if (x)                                      \
+    pAttrs->add(name, x)
+#define OPDEBUG_TOATTR_HELP_BOOL(x) OPDEBUG_TOATTR_HELP_BOOL_NAMED(#x, x)
 #define OPDEBUG_TOATTR_HELP_ATOMIC(x, y) \
     if (auto __y = y.load(); __y > 0)    \
     pAttrs->add(x, __y)
@@ -1139,10 +1140,11 @@ void OpDebug::report(OperationContext* opCtx,
 
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
-    OPDEBUG_TOATTR_HELP_BOOL(hasSortStage);
-    OPDEBUG_TOATTR_HELP_BOOL(usedDisk);
-    OPDEBUG_TOATTR_HELP_BOOL(fromMultiPlanner);
-    OPDEBUG_TOATTR_HELP_BOOL(fromPlanCache);
+
+    OPDEBUG_TOATTR_HELP_BOOL_NAMED("hasSortStage", additiveMetrics.hasSortStage);
+    OPDEBUG_TOATTR_HELP_BOOL_NAMED("usedDisk", additiveMetrics.usedDisk);
+    OPDEBUG_TOATTR_HELP_BOOL_NAMED("fromMultiPlanner", additiveMetrics.fromMultiPlanner);
+    OPDEBUG_TOATTR_HELP_BOOL_NAMED("fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_TOATTR_HELP_BOOL(replanned);
@@ -1366,10 +1368,11 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
-    OPDEBUG_APPEND_BOOL(b, hasSortStage);
-    OPDEBUG_APPEND_BOOL(b, usedDisk);
-    OPDEBUG_APPEND_BOOL(b, fromMultiPlanner);
-    OPDEBUG_APPEND_BOOL(b, fromPlanCache);
+
+    OPDEBUG_APPEND_BOOL2(b, "hasSortStage", additiveMetrics.hasSortStage);
+    OPDEBUG_APPEND_BOOL2(b, "usedDisk", additiveMetrics.usedDisk);
+    OPDEBUG_APPEND_BOOL2(b, "fromMultiPlanner", additiveMetrics.fromMultiPlanner);
+    OPDEBUG_APPEND_BOOL2(b, "fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
     if (replanReason) {
         bool replanned = true;
         OPDEBUG_APPEND_BOOL(b, replanned);
@@ -1630,16 +1633,16 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.docsExamined);
     });
     addIfNeeded("hasSortStage", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.hasSortStage);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.hasSortStage);
     });
     addIfNeeded("usedDisk", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.usedDisk);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.usedDisk);
     });
     addIfNeeded("fromMultiPlanner", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.fromMultiPlanner);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.fromMultiPlanner);
     });
     addIfNeeded("fromPlanCache", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_BOOL2(b, field, args.op.fromPlanCache);
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.additiveMetrics.fromPlanCache.value_or(false));
     });
     addIfNeeded("replanned", [](auto field, auto args, auto& b) {
         if (args.op.replanReason) {
@@ -1897,16 +1900,29 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 }
 
 void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
-    additiveMetrics.keysExamined = planSummaryStats.totalKeysExamined;
-    additiveMetrics.docsExamined = planSummaryStats.totalDocsExamined;
-    hasSortStage = planSummaryStats.hasSortStage;
-    usedDisk = planSummaryStats.usedDisk;
+    // Data-bearing node metrics need to be aggregated here rather than just assigned.
+    // Certain operations like $mergeCursors may have already accumulated metrics from remote
+    // data-bearing nodes, and we need to add in the work done locally.
+    additiveMetrics.keysExamined =
+        additiveMetrics.keysExamined.value_or(0) + planSummaryStats.totalKeysExamined;
+    additiveMetrics.docsExamined =
+        additiveMetrics.docsExamined.value_or(0) + planSummaryStats.totalDocsExamined;
+    additiveMetrics.hasSortStage = additiveMetrics.hasSortStage || planSummaryStats.hasSortStage;
+    additiveMetrics.usedDisk = additiveMetrics.usedDisk || planSummaryStats.usedDisk;
+    additiveMetrics.fromMultiPlanner =
+        additiveMetrics.fromMultiPlanner || planSummaryStats.fromMultiPlanner;
+    // Note that fromPlanCache is an AND of all operations rather than an OR like the other metrics.
+    // This is to ensure we register when any part of the query _missed_ the cache, which is thought
+    // to be the more interesting event.
+    if (!additiveMetrics.fromPlanCache.has_value()) {
+        additiveMetrics.fromPlanCache = true;
+    }
+    *additiveMetrics.fromPlanCache =
+        *additiveMetrics.fromPlanCache && planSummaryStats.fromPlanCache;
+
     sortSpills = planSummaryStats.sortSpills;
     sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
     keysSorted = planSummaryStats.keysSorted;
-    fromMultiPlanner = planSummaryStats.fromMultiPlanner;
-    // Don't clobber flag which may have been set directly.
-    fromPlanCache = fromPlanCache || planSummaryStats.fromPlanCache;
     replanReason = planSummaryStats.replanReason;
     collectionScans = planSummaryStats.collectionScans;
     collectionScansNonTailable = planSummaryStats.collectionScansNonTailable;
@@ -1992,23 +2008,12 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setKeysExamined(additiveMetrics.keysExamined.value_or(0));
     metrics.setDocsExamined(additiveMetrics.docsExamined.value_or(0));
 
-    metrics.setHasSortStage(hasSortStage);
-    metrics.setUsedDisk(usedDisk);
-    metrics.setFromMultiPlanner(fromMultiPlanner);
-    metrics.setFromPlanCache(fromPlanCache);
+    metrics.setHasSortStage(additiveMetrics.hasSortStage);
+    metrics.setUsedDisk(additiveMetrics.usedDisk);
+    metrics.setFromMultiPlanner(additiveMetrics.fromMultiPlanner);
+    metrics.setFromPlanCache(additiveMetrics.fromPlanCache.value_or(false));
 
     return metrics;
-}
-
-void OpDebug::aggregateCursorMetrics(const CursorMetrics& metrics) {
-    additiveMetrics.keysExamined =
-        additiveMetrics.keysExamined.value_or(0) + metrics.getKeysExamined();
-    additiveMetrics.docsExamined =
-        additiveMetrics.docsExamined.value_or(0) + metrics.getDocsExamined();
-    hasSortStage = hasSortStage || metrics.getHasSortStage();
-    usedDisk = usedDisk || metrics.getUsedDisk();
-    fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();
-    fromPlanCache = fromPlanCache || metrics.getFromPlanCache();
 }
 
 BSONArray OpDebug::getResolvedViewsInfo() const {
@@ -2097,6 +2102,50 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     writeConflicts.fetchAndAdd(otherMetrics.writeConflicts.load());
     temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
     executionTime = addOptionals(executionTime, otherMetrics.executionTime);
+
+    hasSortStage = hasSortStage || otherMetrics.hasSortStage;
+    usedDisk = usedDisk || otherMetrics.usedDisk;
+    fromMultiPlanner = fromMultiPlanner || otherMetrics.fromMultiPlanner;
+    // Note that fromPlanCache is an AND of all operations rather than an OR like the other metrics.
+    // This is to ensure we register when any part of the query _missed_ the cache, which is thought
+    // to be the more interesting event.
+    if (!fromPlanCache.has_value()) {
+        fromPlanCache = true;
+    }
+    *fromPlanCache = *fromPlanCache && otherMetrics.fromPlanCache.value_or(true);
+}
+
+void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
+    const query_stats::DataBearingNodeMetrics& metrics) {
+    keysExamined = keysExamined.value_or(0) + metrics.keysExamined;
+    docsExamined = docsExamined.value_or(0) + metrics.docsExamined;
+    hasSortStage = hasSortStage || metrics.hasSortStage;
+    usedDisk = usedDisk || metrics.usedDisk;
+    fromMultiPlanner = fromMultiPlanner || metrics.fromMultiPlanner;
+    // Note that fromPlanCache is an AND of all operations rather than an OR like the other metrics.
+    // This is to ensure we register when any part of the query _missed_ the cache, which is thought
+    // to be the more interesting event.
+    if (!fromPlanCache.has_value()) {
+        fromPlanCache = true;
+    }
+    *fromPlanCache = *fromPlanCache && metrics.fromPlanCache;
+}
+
+void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
+    const boost::optional<query_stats::DataBearingNodeMetrics>& metrics) {
+    if (metrics) {
+        aggregateDataBearingNodeMetrics(*metrics);
+    }
+}
+
+void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metrics) {
+    aggregateDataBearingNodeMetrics(
+        query_stats::DataBearingNodeMetrics{static_cast<uint64_t>(metrics.getKeysExamined()),
+                                            static_cast<uint64_t>(metrics.getDocsExamined()),
+                                            metrics.getHasSortStage(),
+                                            metrics.getUsedDisk(),
+                                            metrics.getFromMultiPlanner(),
+                                            metrics.getFromPlanCache()});
 }
 
 void OpDebug::AdditiveMetrics::reset() {

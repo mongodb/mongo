@@ -236,7 +236,7 @@ void CursorEstablisher::waitForResponse() noexcept {
 
             auto& cursorValue = cursor.getValue();
             if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
-                CurOp::get(_opCtx)->debug().aggregateCursorMetrics(*cursorMetrics);
+                CurOp::get(_opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
             }
 
             _remoteCursors.emplace_back(RemoteCursor(
@@ -528,7 +528,8 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
 
                 auto& cursorValue = cursor.getValue();
                 if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
-                    CurOp::get(opCtx)->debug().aggregateCursorMetrics(*cursorMetrics);
+                    CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(
+                        *cursorMetrics);
                 }
 
                 remoteCursors.emplace_back(

@@ -783,6 +783,14 @@ public:
                 curOp->debug().cursorExhausted = true;
             }
 
+            // Collect and increment metrics now that we have enough information. It's important
+            // we do so before generating the response so that the response can include metrics.
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
+            curOp->debug().additiveMetrics.nBatches = 1;
+            curOp->setEndOfOpMetrics(numResults);
+            collectQueryStatsMongod(opCtx, cursorPin);
+
             boost::optional<CursorMetrics> metrics = _cmd.getIncludeQueryStatsMetrics()
                 ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                 : boost::none;
@@ -790,14 +798,6 @@ public:
                            nss,
                            metrics,
                            SerializationContext::stateCommandReply(_cmd.getSerializationContext()));
-
-            // Increment this metric once we have generated a response and we know it will return
-            // documents.
-            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-            metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
-            curOp->debug().additiveMetrics.nBatches = 1;
-            curOp->setEndOfOpMetrics(numResults);
-            collectQueryStatsMongod(opCtx, cursorPin);
 
             if (respondWithId) {
                 cursorDeleter.dismiss();
@@ -837,6 +837,10 @@ public:
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+            }
+
+            if (_cmd.getIncludeQueryStatsMetrics()) {
+                curOp->debug().queryStatsInfo.metricsRequested = true;
             }
 
             // Perform validation checks which don't cause the cursor to be deleted on failure.

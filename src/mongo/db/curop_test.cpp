@@ -236,6 +236,86 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     ASSERT_EQ(*additiveMetrics.executionTime, Microseconds{280});
 }
 
+TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
+    OpDebug::AdditiveMetrics additiveMetrics;
+
+    additiveMetrics.keysExamined = 1;
+    additiveMetrics.docsExamined = 2;
+    additiveMetrics.hasSortStage = false;
+    additiveMetrics.usedDisk = false;
+
+    CursorMetrics cursorMetrics(3 /* keysExamined */,
+                                4 /* docsExamined */,
+                                true /* hasSortStage */,
+                                false /* usedDisk */,
+                                true /* fromMultiPlanner */,
+                                false /* fromPlanCache */);
+
+    additiveMetrics.aggregateCursorMetrics(cursorMetrics);
+
+    ASSERT_EQ(*additiveMetrics.keysExamined, 4);
+    ASSERT_EQ(*additiveMetrics.docsExamined, 6);
+    ASSERT_EQ(additiveMetrics.hasSortStage, true);
+    ASSERT_EQ(additiveMetrics.usedDisk, false);
+}
+
+TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
+    OpDebug::AdditiveMetrics additiveMetrics;
+
+    additiveMetrics.keysExamined = boost::none;
+    additiveMetrics.docsExamined = boost::none;
+
+    CursorMetrics cursorMetrics(1 /* keysExamined */,
+                                2 /* docsExamined */,
+                                true /* hasSortStage */,
+                                false /* usedDisk */,
+                                true /* fromMultiPlanner */,
+                                false /* fromPlanCache */);
+
+    additiveMetrics.aggregateCursorMetrics(cursorMetrics);
+
+    ASSERT_EQ(*additiveMetrics.keysExamined, 1);
+    ASSERT_EQ(*additiveMetrics.docsExamined, 2);
+}
+
+TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
+    OpDebug::AdditiveMetrics additiveMetrics;
+
+    additiveMetrics.keysExamined = 1;
+    additiveMetrics.docsExamined = 2;
+    additiveMetrics.hasSortStage = false;
+    additiveMetrics.usedDisk = false;
+
+    query_stats::DataBearingNodeMetrics remoteMetrics;
+    remoteMetrics.keysExamined = 3;
+    remoteMetrics.docsExamined = 4;
+    remoteMetrics.hasSortStage = true;
+    remoteMetrics.usedDisk = false;
+
+    additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
+
+    ASSERT_EQ(*additiveMetrics.keysExamined, 4);
+    ASSERT_EQ(*additiveMetrics.docsExamined, 6);
+    ASSERT_EQ(additiveMetrics.hasSortStage, true);
+    ASSERT_EQ(additiveMetrics.usedDisk, false);
+}
+
+TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {
+    OpDebug::AdditiveMetrics additiveMetrics;
+
+    additiveMetrics.keysExamined = boost::none;
+    additiveMetrics.docsExamined = boost::none;
+
+    query_stats::DataBearingNodeMetrics remoteMetrics;
+    remoteMetrics.keysExamined = 1;
+    remoteMetrics.docsExamined = 2;
+
+    additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
+
+    ASSERT_EQ(*additiveMetrics.keysExamined, 1);
+    ASSERT_EQ(*additiveMetrics.docsExamined, 2);
+}
+
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     // 'basicFields' should always be present in the logs and profiler, for any operation.
     std::vector<std::string> basicFields{
