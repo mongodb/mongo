@@ -650,8 +650,9 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
         // TODO SERVER-62035: enable the following on Windows.
         if (timeout > Milliseconds(0)) {
             timer->waitUntil(_timerService->now() + timeout)
-                .getAsync([finishLine, session](Status status) {
+                .getAsync([finishLine, session, timeout](Status status) {
                     if (status.isOK() && finishLine->arriveStrongly()) {
+                        LOGV2(8524900, "Handshake timeout threshold hit", "timeout"_attr = timeout);
                         session->end();
                     }
                 });
