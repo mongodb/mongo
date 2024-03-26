@@ -247,6 +247,10 @@ if (typeof _threadInject != "undefined") {
 
             // This test sets a server parameter.
             "group_lookup_with_canonical_query_prefix.js",
+
+            // This test requires latches to be enabled, which isn't true for all variants.
+            "latch_analyzer.js",
+            "currentop_waiting_for_latch.js"
         ]);
 
         // Get files, including files in subdirectories.
