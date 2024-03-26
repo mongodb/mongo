@@ -15,7 +15,8 @@ st.adminCommand({enablesharding: dbName});
 const oplog = st.getPrimaryShard(dbName).getDB('local').getCollection('oplog.rs');
 
 function assertLastUpdateOplogEntryIsReplacement() {
-    const lastUpdate = oplog.find({op: 'u'}).sort({$natural: -1}).limit(1).next();
+    const lastUpdate =
+        oplog.find({ns: `${dbName}.${collName}`, op: 'u'}).sort({$natural: -1}).limit(1).next();
     assert(lastUpdate.o._id, lastUpdate);
 }
 
