@@ -147,7 +147,7 @@ selector:
   # TODO(SERVER-71510): Un-denylist this test.
   - jstests/concurrency/fsm_workloads/snapshot_read_catalog_operations.js
 
-  # TODO(SERVER-87403): requestResumeToken is not supported without Resharding
+  # Next test fails because requestResumeToken is not supported without Resharding.
   - jstests/concurrency/fsm_workloads/internal_transactions_resharding.js
 
   # These tests run large commands which can sometimes trigger IncompleteTransactionHistory
