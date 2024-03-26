@@ -42,6 +42,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/join_thread.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -49,6 +50,11 @@
 namespace mongo {
 namespace {
 using unittest::JoinThread;
+
+// Any waits with a timeout or deadline that expect to be woken by another thread should wait at
+// least this long. This doesn't apply if the timeout is expected to expire, or if it is never
+// expected to wait at all.
+constexpr auto kTimeoutForRacyWait = Milliseconds(250);
 
 TEST(AtomicWaitableTests, WaitUntilValueChangedForAtomicInt) {
     BasicWaitableAtomic<int> sharedData(10);
@@ -70,7 +76,7 @@ TEST(AtomicWaitableTests, WaitWithDeadlineForAtomicInt) {
         sharedData.notifyOne();
     });
 
-    ASSERT_EQUALS(sharedData.waitUntil(10, Date_t::now() + Milliseconds(25)), 42);
+    ASSERT_EQUALS(sharedData.waitUntil(10, Date_t::now() + kTimeoutForRacyWait), 42);
     ASSERT_EQUALS(sharedData.waitUntil(42, Date_t::now()), boost::none);
     ASSERT_EQUALS(sharedData.waitUntil(10, Date_t::now() + Milliseconds(10)), 42);
 }
@@ -83,7 +89,7 @@ TEST(AtomicWaitableTests, WaitWithTimeoutForAtomicInt) {
         sharedData.notifyOne();
     });
 
-    ASSERT_EQUALS(sharedData.waitFor(10, Milliseconds(25)), 42);
+    ASSERT_EQUALS(sharedData.waitFor(10, kTimeoutForRacyWait), 42);
     ASSERT_EQUALS(sharedData.waitFor(42, Nanoseconds(1)), boost::none);
     ASSERT_EQUALS(sharedData.waitFor(10, Milliseconds(10)), 42);
 }
@@ -126,7 +132,7 @@ TEST(AtomicWaitableTests, WaitWithDeadlineForAtomicBool) {
         flag.notifyAll();
     });
 
-    ASSERT_TRUE(flag.waitUntil(false, Date_t::now() + Milliseconds(110)));
+    ASSERT_TRUE(flag.waitUntil(false, Date_t::now() + kTimeoutForRacyWait));
 }
 TEST(AtomicWaitableTests, WaitWithTimeoutForAtomicBool) {
     WaitableAtomic<bool> flag(false);
