@@ -101,17 +101,7 @@ functions:
     params:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-        enterprise: ${enterprise_rev}
         wtdevelop: ${wtdevelop_rev}
-        dsi: ${dsi_rev}
-        genny: ${genny_rev}
-        linkbench: ${linkbench_rev}
-        linkbench2: ${linkbench2_rev}
-        tsbs: ${tsbs_rev}
-        workloads: ${workloads_rev}
-        YCSB: ${YCSB_rev}
-        flamegraph: ${flamegraph_rev}
-        PrivateWorkloads: ${PrivateWorkloads_rev}
 
   # Get get the mongo repo, no modules. Useful for inspecting the commit history with the
   # `git` Python tool.
