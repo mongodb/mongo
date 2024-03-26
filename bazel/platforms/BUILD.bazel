@@ -50,7 +50,7 @@ constraint_setting(name = "distro")
             ":kernel_version_4_4_or_greater",  # remote execution platforms assume a given kernel version
         ],
         exec_properties = {
-            "container-image": REMOTE_EXECUTION_CONTAINERS[distro_or_os + "_" + arch]["container-image"],
+            "container-image": REMOTE_EXECUTION_CONTAINERS[distro_or_os]["container-url"],
             "dockerNetwork": "standard",
 
             # EngFlow's "default" pool is ARM64
