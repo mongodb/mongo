@@ -14,6 +14,7 @@
  */
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -46,13 +47,15 @@ waitForCurOpByFailPointNoNS(db, failpoint);
 jsTestLog("Testing CRUD op timeouts");
 
 const failureTimeoutMS = 1 * 1000;
+const comment = extractUUIDFromObject(UUID());
 
 assert.commandFailedWithCode(
-    db.runCommand({insert: coll.getName(), documents: [{_id: 2}], maxTimeMS: failureTimeoutMS}),
+    db.runCommand(
+        {insert: coll.getName(), documents: [{_id: 2}], maxTimeMS: failureTimeoutMS, comment}),
     ErrorCodes.MaxTimeMSExpired);
 
 // Reads are not blocked by MODE_X Collection locks with Lock Free Reads.
-const findResult = db.runCommand({find: coll.getName(), maxTimeMS: failureTimeoutMS});
+const findResult = db.runCommand({find: coll.getName(), maxTimeMS: failureTimeoutMS, comment});
 if (isLockFreeReadsEnabled)
     assert.commandWorked(findResult);
 else
@@ -61,27 +64,49 @@ else
 assert.commandFailedWithCode(db.runCommand({
     update: coll.getName(),
     updates: [{q: doc, u: {$set: {b: 1}}}],
-    maxTimeMS: failureTimeoutMS
+    maxTimeMS: failureTimeoutMS,
+    comment
 }),
                              ErrorCodes.MaxTimeMSExpired);
 
-assert.commandFailedWithCode(
-    db.runCommand(
-        {delete: coll.getName(), deletes: [{q: doc, limit: 1}], maxTimeMS: failureTimeoutMS}),
-    ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(db.runCommand({
+    delete: coll.getName(),
+    deletes: [{q: doc, limit: 1}],
+    maxTimeMS: failureTimeoutMS,
+    comment
+}),
+                             ErrorCodes.MaxTimeMSExpired);
 
 assert.commandFailedWithCode(db.runCommand({
     findAndModify: coll.getName(),
     query: doc,
     update: {$set: {b: 2}},
-    maxTimeMS: failureTimeoutMS
+    maxTimeMS: failureTimeoutMS,
+    comment
 }),
                              ErrorCodes.MaxTimeMSExpired);
 
-assert.commandFailedWithCode(
-    db.runCommand(
-        {findAndModify: coll.getName(), query: doc, remove: true, maxTimeMS: failureTimeoutMS}),
-    ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(db.runCommand({
+    findAndModify: coll.getName(),
+    query: doc,
+    remove: true,
+    maxTimeMS: failureTimeoutMS,
+    comment
+}),
+                             ErrorCodes.MaxTimeMSExpired);
+
+if (TestData.testingReplicaSetEndpoint) {
+    // When using the replica set endpoint, each CRUD command above would fail MaxTimeMSExpired when
+    // the router command has timed out, but it is possible that the shard command has not. If it
+    // has not timed out, disabling the failpoint (below) would allow the command to execute and
+    // cause the test to fail the assertion that none of the writes happened.
+    assert.soon(() => {
+        const docs = db.getSiblingDB('admin')
+                         .aggregate([{$currentOp: {}}, {$match: {"command.comment": comment}}])
+                         .toArray();
+        return docs.length == 0;
+    });
+}
 
 jsTestLog("Waiting for threads to join");
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"}));
