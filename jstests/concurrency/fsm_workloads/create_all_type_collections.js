@@ -8,9 +8,7 @@
  *  featureFlagAuthoritativeShardCollection,
  *  # this test swallow expected errors caused by concurrent DDL operations
  *  catches_command_failures,
- *  requires_fcv_80,
- *  # TODO SERVER-88478 re-enable test in suites with balancing enabled
- *  assumes_balancer_off,
+ *  requires_fcv_80
  * ]
  */
 
