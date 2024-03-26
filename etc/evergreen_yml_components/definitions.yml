@@ -165,6 +165,8 @@ functions:
       remote_file: engflow/engflow.key
       bucket: serverengflow
       local_file: "src/engflow.key"
+      # Mark as optional to allow local-mode execution to succeed.
+      optional: true
 
   "get engflow cert": &get_engflow_cert
     command: s3.get
@@ -175,6 +177,8 @@ functions:
       remote_file: engflow/engflow.cert
       bucket: serverengflow
       local_file: "src/engflow.cert"
+      # Mark as optional to allow local-mode execution to succeed.
+      optional: true
 
   "generate evergreen engflow bazelrc": &generate_evergreen_engflow_bazelrc
     command: subprocess.exec

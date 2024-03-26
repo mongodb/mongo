@@ -394,6 +394,8 @@ functions:
       remote_file: engflow/engflow.key
       bucket: serverengflow
       local_file: "src/engflow.key"
+      # Mark as optional to allow local-mode execution to succeed.
+      optional: true
   - command: s3.get
     display_name: "get engflow cert"
     params:
@@ -402,6 +404,8 @@ functions:
       remote_file: engflow/engflow.cert
       bucket: serverengflow
       local_file: "src/engflow.cert"
+      # Mark as optional to allow local-mode execution to succeed.
+      optional: true
   - command: shell.exec
     params:
       display_name: "generate evergreen engflow bazelrc"
