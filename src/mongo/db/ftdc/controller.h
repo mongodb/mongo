@@ -61,11 +61,11 @@ class FTDCController {
 public:
     FTDCController(boost::filesystem::path path,
                    FTDCConfig config,
-                   UseMultiserviceSchema multiserviceSchema)
+                   UseMultiServiceSchema multiServiceSchema)
         : _path(std::move(path)),
           _config(std::move(config)),
           _configTemp(_config),
-          _multiserviceSchema(multiserviceSchema) {}
+          _multiServiceSchema(multiServiceSchema) {}
 
     ~FTDCController() = default;
 
@@ -228,7 +228,7 @@ private:
     stdx::thread _thread;
 
     // Whether or not to use the multiversion schema for FTDC files.
-    UseMultiserviceSchema _multiserviceSchema;
+    UseMultiServiceSchema _multiServiceSchema;
 };
 
 }  // namespace mongo

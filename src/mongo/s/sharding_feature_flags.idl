@@ -49,17 +49,17 @@ feature_flags:
     default: true
     version: 7.0
     shouldBeFCVGated: true
-  # TODO (SERVER-73632): Remove once 8.0 becomes last LTS.
-  featureFlagEmbeddedRouter:
-    description: "Feature flag to enable shard to double as router"
-    cpp_varname: feature_flags::gEmbeddedRouter
+  # TODO (SERVER-73632): Remove once 9.0 becomes last LTS.
+  featureFlagRouterPort:
+    description: "Feature flag to open the router port."
+    cpp_varname: feature_flags::gRouterPort
     default: false
     shouldBeFCVGated: false
-  # TODO (SERVER-87249): Remove after the internal router is enabled by default.
-  featureFlagMultiserviceFTDCSchema:
-    description: "Feature flag to enable the new format of the FTDC output files"
-    cpp_varname: feature_flags::gMultiserviceFTDCSchema
-    default: false
+  # TODO (SERVER-88107): Remove once 8.0 becomes last LTS.
+  featureFlagMultiServiceLogAndFTDCFormat:
+    description: "Feature flag to enable multi-service format of the log and FTDC data files."
+    cpp_varname: feature_flags::gMultiServiceLogAndFTDCFormat
+    default: true
     shouldBeFCVGated: false
   # TODO SERVER-79064: Remove once 8.0 becomes last LTS.
   featureFlagAuthoritativeRefineCollectionShardKey:

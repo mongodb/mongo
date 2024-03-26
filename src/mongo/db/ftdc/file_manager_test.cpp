@@ -78,7 +78,7 @@ TEST_F(FTDCFileManagerTest, TestFull) {
     createDirectoryClean(dir);
 
     FTDCCollectorCollection rotate;
-    auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
+    auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
     ASSERT_OK(swMgr.getStatus());
     auto mgr = std::move(swMgr.getValue());
 
@@ -168,7 +168,7 @@ TEST_F(FTDCFileManagerTest, TestNormalRestart) {
         // Do a few cases of stop and start to ensure it works as expected
         FTDCCollectorCollection rotate;
         auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
 
@@ -229,7 +229,7 @@ TEST_F(FTDCFileManagerTest, TestCorruptCrashRestart) {
         // Do a few cases of stop and start to ensure it works as expected
         FTDCCollectorCollection rotate;
         auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
 
@@ -308,7 +308,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     {
         FTDCCollectorCollection rotate;
         auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto swFile = swMgr.getValue()->generateArchiveFileName(dir, "0test-crash");
         ASSERT_OK(swFile);
@@ -343,7 +343,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     {
         FTDCCollectorCollection rotate;
         auto swMgr =
-            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false});
+            FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false});
         ASSERT_OK(swMgr.getStatus());
         auto mgr = std::move(swMgr.getValue());
         ASSERT_OK(mgr->close());
@@ -377,7 +377,7 @@ TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
 
     FTDCCollectorCollection rotate;
     auto mgr = uassertStatusOK(
-        FTDCFileManager::create(&c, dir, &rotate, client, UseMultiserviceSchema{false}));
+        FTDCFileManager::create(&c, dir, &rotate, client, UseMultiServiceSchema{false}));
 
     BSONObj subObj1 = BSON("f1_1" << 101 << "f1_2" << 102);
     BSONObj subObj2 = BSON("f2_1" << 201 << "f2_2" << 202);

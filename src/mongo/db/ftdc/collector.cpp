@@ -54,7 +54,7 @@ void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collec
 }
 
 std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
-    Client* client, UseMultiserviceSchema multiserviceSchema) {
+    Client* client, UseMultiServiceSchema multiServiceSchema) {
     static constexpr auto roles = std::to_array<std::pair<ClusterRole::Value, StringData>>({
         {ClusterRole::ShardServer, "shard"_sd},
         {ClusterRole::RouterServer, "router"_sd},
@@ -100,7 +100,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
         boost::optional<BSONObjBuilder> sectionBuilder;
         BSONObjBuilder* parent = &builder;
 
-        if (multiserviceSchema) {
+        if (multiServiceSchema) {
             sectionBuilder.emplace(builder.subobjStart(role.second));
             sectionBuilder->appendDate(kFTDCCollectStartField, getStartDate());
             parent = &(*sectionBuilder);
@@ -138,7 +138,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
             firstLoop = false;
         }
 
-        if (multiserviceSchema) {
+        if (multiServiceSchema) {
             sectionBuilder->appendDate(kFTDCCollectEndField, end);
         }
     }

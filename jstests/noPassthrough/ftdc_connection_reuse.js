@@ -25,7 +25,7 @@ const coll = testDB.getCollection(kCollName);
 function getDiagnosticData() {
     let stats;
     assert.soon(() => {
-        stats = verifyGetDiagnosticData(st.s.getDB("admin")).connPoolStats;
+        stats = verifyGetDiagnosticData(st.s.getDB("admin")).router.connPoolStats;
         return stats["pools"].hasOwnProperty('NetworkInterfaceTL-TaskExecutorPool-0');
     }, "Failed to load NetworkInterfaceTL-TaskExecutorPool-0 in FTDC within time limit");
     assert(stats.hasOwnProperty('totalWasUsedOnce'));

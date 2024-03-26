@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   featureFlagEmbeddedRouter,
+ *   featureFlagRouterPort,
  * ]
  */
 
