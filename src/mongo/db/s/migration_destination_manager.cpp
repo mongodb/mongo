@@ -1432,13 +1432,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             migrateThreadHangAtStep3.pauseWhileSet();
         }
 
-        // This AlternativeClientRegion needs to be swapped in and out when using runWithoutsession,
-        // so we make it boost::optional and provide a helper for reinstantiating the ACR and the
-        // opCtx associated with the alternative client.
         auto newClient = outerOpCtx->getServiceContext()
                              ->getService(ClusterRole::ShardServer)
                              ->makeClient("MigrationCoordinator");
-        boost::optional<AlternativeClientRegion> acr(newClient);
+        AlternativeClientRegion acr(newClient);
         auto executor =
             Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
         auto newOpCtxPtr = CancelableOperationContext(
@@ -1533,13 +1530,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                             << _migrationId->toBSON(),
                         getState() != kAbort);
 
-                    acr.reset();
-                    auto replicatedEnough = runWithoutSession(outerOpCtx, [&] {
-                        return opReplicatedEnough(outerOpCtx, lastOpApplied, _writeConcern);
-                    });
-                    acr.emplace(newClient);
-
-                    if (replicatedEnough) {
+                    if (runWithoutSession(outerOpCtx, [&] {
+                            return opReplicatedEnough(opCtx, lastOpApplied, _writeConcern);
+                        })) {
                         return true;
                     }
 
@@ -1579,15 +1572,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                 "Starting majority commit wait on recipient",
                                 "migrationId"_attr = _migrationId->toBSON());
 
-            acr.reset();
             runWithoutSession(outerOpCtx, [&] {
                 auto awaitReplicationResult =
-                    repl::ReplicationCoordinator::get(outerOpCtx)
-                        ->awaitReplication(outerOpCtx, lastOpApplied, _writeConcern);
+                    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+                        opCtx, lastOpApplied, _writeConcern);
                 uassertStatusOKWithContext(awaitReplicationResult.status,
                                            awaitReplicationResult.status.codeString());
             });
-            acr.emplace(newClient);
 
             LOGV2(22005,
                   "Chunk data replicated successfully.",
@@ -1647,11 +1638,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 // 1) The from side has told us that it has locked writes (COMMIT_START)
                 // 2) We've checked at least one more time for un-transmitted mods
                 if (getState() == kCommitStart && transferAfterCommit == true) {
-                    acr.reset();
-                    auto replicatedEnough = runWithoutSession(
-                        outerOpCtx, [&] { return _flushPendingWrites(outerOpCtx, lastOpApplied); });
-                    acr.emplace(newClient);
-                    if (replicatedEnough) {
+                    if (runWithoutSession(outerOpCtx, [&] {
+                            return _flushPendingWrites(opCtx, lastOpApplied);
+                        })) {
                         break;
                     }
                 }
@@ -1670,9 +1659,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             migrateThreadHangAtStep6.pauseWhileSet();
         }
 
-        acr.reset();
         runWithoutSession(outerOpCtx, [&] { _sessionMigration->join(); });
-        acr.emplace(newClient);
         if (_sessionMigration->getState() ==
             SessionCatalogMigrationDestination::State::ErrorOccurred) {
             _setStateFail(redact(_sessionMigration->getErrMsg()));
@@ -1684,9 +1671,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
         const auto critSecReason = criticalSectionReason(*_sessionId);
 
-        // The function run in runWithoutSession requires being in the alternative client region, so
-        // here we will leave the alternative client region at the end of that lambda and reacquire
-        // after runWithoutSession completes.
         runWithoutSession(outerOpCtx, [&] {
             // Persist the migration recipient recovery document so that in case of failover, the
             // new primary will resume the MigrationDestinationManager and retake the critical
@@ -1707,9 +1691,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
             LOGV2(5899114, "Entered migration recipient critical section", logAttrs(_nss));
             timeInCriticalSection.emplace();
-            acr.reset();
         });
-        acr.emplace(newClient);
 
         if (getState() == kFail || getState() == kAbort) {
             _setStateFail("timed out waiting for critical section acquisition");
@@ -1759,7 +1741,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     auto newClient = outerOpCtx->getServiceContext()
                          ->getService(ClusterRole::ShardServer)
                          ->makeClient("MigrationCoordinator");
-    boost::optional<AlternativeClientRegion> acr(newClient);
+    AlternativeClientRegion acr(newClient);
     auto executor =
         Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
     auto newOpCtxPtr = CancelableOperationContext(
@@ -1771,15 +1753,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     }
     invariant(timeInCriticalSection);
 
-    // Wait until signaled to exit the critical section and then release it. The function run in
-    // runWithoutSession requires being in the alternative client region, so here we will leave the
-    // alternative client region at the end of that lambda and reacquire after runWithoutSession
-    // completes.
+    // Wait until signaled to exit the critical section and then release it.
     runWithoutSession(outerOpCtx, [&] {
         awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx, *timeInCriticalSection);
-        acr.reset();
     });
-    acr.emplace(newClient);
 
     _setState(kDone);
 

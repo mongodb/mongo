@@ -5,6 +5,8 @@
  *   requires_sharding,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
+ *   # TODO (SERVER-88539) Remove the 'assumes_balancer_off' tag
+ *   assumes_balancer_off,
  *  ]
  */
 
