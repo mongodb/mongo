@@ -237,7 +237,6 @@ ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
 }
 
 void StreamableReplicaSetMonitor::init() {
-    stdx::lock_guard lock(_mutex);
     LOGV2_DEBUG(4333206,
                 kLowerLogLevel,
                 "Starting Replica Set Monitor",
@@ -276,8 +275,6 @@ void StreamableReplicaSetMonitor::init() {
 }
 
 void StreamableReplicaSetMonitor::initForTesting(sdam::TopologyManagerPtr topologyManager) {
-    stdx::lock_guard lock(_mutex);
-
     _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
     _topologyManager = std::move(topologyManager);
 
