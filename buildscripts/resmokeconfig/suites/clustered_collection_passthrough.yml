@@ -18,8 +18,6 @@ selector:
   - jstests/core/**/list_collections1.js
   - jstests/core/**/explain_shell_helpers.js
   - jstests/core/txns/list_collections_not_blocked_by_txn.js
-  # Doesn't expect clusteredIndex options on the collection.
-  - jstests/core/**/list_collections_filter.js
   # Assumes the collection is not clustered by default.
   - jstests/core/timeseries/clustered_index_options.js
   - jstests/core/timeseries/timeseries_expire_collmod.js

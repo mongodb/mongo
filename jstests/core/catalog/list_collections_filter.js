@@ -4,7 +4,6 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_signed_security_token,
- *   requires_replication,
  *   # applyOps is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  *   # Tenant migrations don't support applyOps.
@@ -14,8 +13,20 @@
  * ]
  */
 
-var mydb = db.getSiblingDB("list_collections_filter");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+
+const mydb = db.getSiblingDB("list_collections_filter");
 assert.commandWorked(mydb.dropDatabase());
+
+// If the test fixture is enabling clustered collections by default, all test collections created
+// in this test will have a 'clusteredIndex' field in the collection options returned by
+// listCollections.
+const defaultCollectionOptionsFilter =
+    ClusteredCollectionUtil.areAllCollectionsClustered(mydb.getMongo())
+    ? {'options.clusteredIndex.unique': true}
+    : {options: {}};
 
 // Make some collections.
 assert.commandWorked(mydb.createCollection("lists"));
@@ -33,7 +44,7 @@ function testListCollections(filter, expectedNames) {
         filter = {};
     }
 
-    var cursor = new DBCommandCursor(mydb, mydb.runCommand("listCollections", {filter: filter}));
+    const cursor = new DBCommandCursor(mydb, mydb.runCommand("listCollections", {filter: filter}));
     function stripToName(result) {
         return result.name;
     }
@@ -44,12 +55,12 @@ function testListCollections(filter, expectedNames) {
         return name !== "system.profile";
     }
 
-    var cursorResultNames = cursor.toArray().map(stripToName).filter(isNotProfileCollection);
+    const cursorResultNames = cursor.toArray().map(stripToName).filter(isNotProfileCollection);
 
     assert.eq(cursorResultNames.sort(), expectedNames.sort());
 
     // Assert the shell helper returns the same list, but in sorted order.
-    var shellResultNames =
+    const shellResultNames =
         mydb.getCollectionInfos(filter).map(stripToName).filter(isNotProfileCollection);
     assert.eq(shellResultNames, expectedNames.sort());
 }
@@ -58,7 +69,7 @@ function testListCollections(filter, expectedNames) {
 testListCollections({}, ["lists", "ordered_sets", "unordered_sets", "arrays_temp"]);
 
 // Filter without name.
-testListCollections({options: {}}, ["lists", "ordered_sets", "unordered_sets"]);
+testListCollections(defaultCollectionOptionsFilter, ["lists", "ordered_sets", "unordered_sets"]);
 
 // Filter with exact match on name.
 testListCollections({name: "lists"}, ["lists"]);
@@ -76,19 +87,20 @@ testListCollections({name: {$in: ["lists", /.*_sets$/, "non-existent", "", 1234]
                     ["lists", "ordered_sets", "unordered_sets"]);
 
 // Filter with $and.
-testListCollections({name: "lists", options: {}}, ["lists"]);
-testListCollections({name: "lists", options: {temp: true}}, []);
-testListCollections({$and: [{name: "lists"}, {options: {temp: true}}]}, []);
-testListCollections({name: "arrays_temp", options: {temp: true}}, ["arrays_temp"]);
+testListCollections(Object.merge({name: "lists"}, defaultCollectionOptionsFilter), ["lists"]);
+testListCollections({name: "lists", 'options.temp': true}, []);
+testListCollections({$and: [{name: "lists"}, {'options.temp': true}]}, []);
+testListCollections({name: "arrays_temp", 'options.temp': true}, ["arrays_temp"]);
 
 // Filter with $and and $in.
-testListCollections({name: {$in: ["lists", /.*_sets$/]}, options: {}},
-                    ["lists", "ordered_sets", "unordered_sets"]);
+testListCollections(
+    Object.merge({name: {$in: ["lists", /.*_sets$/]}}, defaultCollectionOptionsFilter),
+    ["lists", "ordered_sets", "unordered_sets"]);
 testListCollections({
     $and: [
         {name: {$in: ["lists", /.*_sets$/]}},
         {name: "lists"},
-        {options: {}},
+        defaultCollectionOptionsFilter,
     ]
 },
                     ["lists"]);
@@ -96,7 +108,7 @@ testListCollections({
     $and: [
         {name: {$in: ["lists", /.*_sets$/]}},
         {name: "non-existent"},
-        {options: {}},
+        defaultCollectionOptionsFilter,
     ]
 },
                     []);
