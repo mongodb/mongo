@@ -359,6 +359,10 @@ public:
             return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return !_cmdRequest->getTerm().has_value();
+        }
+
         bool supportsReadMirroring() const override {
             return true;
         }
