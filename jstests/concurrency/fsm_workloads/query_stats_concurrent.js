@@ -33,7 +33,8 @@ export const $config = (function() {
         // Runs many queries with different shapes to ensure eviction occurs in the queryStats
         // store.
         function multipleShapes(db, collName) {
-            for (var i = 0; i < 10000; i++) {
+            // TODO SERVER-88518: Adjust this parameter to match the changes in partition sizes.
+            for (var i = 0; i < 25000; i++) {
                 let query = {};
                 query["foo" + i] = "bar";
                 db[collName].aggregate([{$match: query}]).itcount();
@@ -95,7 +96,8 @@ export const $config = (function() {
         internalQueryStatsRateLimit = setParameterOnAllNodes(
             {cluster: cluster, paramName: "internalQueryStatsRateLimit", newValue: -1});
         internalQueryStatsCacheSize = setParameterOnAllNodes(
-            {cluster: cluster, paramName: "internalQueryStatsCacheSize", newValue: "1MB"});
+            // TODO SERVER-88518: Adjust this parameter to match the changes in partition sizes.
+            {cluster: cluster, paramName: "internalQueryStatsCacheSize", newValue: "0.025%"});
 
         assert.commandWorked(db[collName].createIndex({i: 1}));
         const bulk = db[collName].initializeUnorderedBulkOp();
