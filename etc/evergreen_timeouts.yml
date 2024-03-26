@@ -17,6 +17,14 @@ overrides:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150 # 2.5 hours
 
+  enterprise-amazon-linux2-arm64-all-feature-flags:
+  - task: cursor_hints_to_query_settings_replset_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: cursor_hints_to_query_settings_sharded_collections_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
+    exec_timeout: 240  # 4 hours
+
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
@@ -24,6 +32,14 @@ overrides:
   enterprise-macos-arm64:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
+
+  enterprise-rhel-80-64-bit-dynamic-all-feature-flags:
+  - task: cursor_hints_to_query_settings_replset_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: cursor_hints_to_query_settings_sharded_collections_passthrough
+    exec_timeout: 240  # 4 hours
+  - task: cursor_hints_to_query_settings_unsharded_collections_passthrough
+    exec_timeout: 240  # 4 hours
 
   enterprise-rhel80-debug-tsan:
   - task: aggregation_expression_multiversion_fuzzer
