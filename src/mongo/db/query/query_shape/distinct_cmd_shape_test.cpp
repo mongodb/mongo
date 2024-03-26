@@ -200,6 +200,57 @@ TEST_F(ExtractQueryShapeDistinctTest, CompareShapeHashes) {
     ASSERT_NOT_EQUALS(hash1, hash3);
 }
 
+// Verifies that "distinct" command shape hash value is stable (does not change between the versions
+// of the server).
+TEST_F(ExtractQueryShapeDistinctTest, StableQueryShapeHashValue) {
+    auto assertDistinctQueryShapeHashEquals = [&](std::string expectedHashValue,
+                                                  std::string distinctCommand) {
+        const auto hash = distinctQueryShapeHash(distinctCommand.data(), expCtx);
+        ASSERT_EQ(expectedHashValue, hash.toHexString()) << " command: " << distinctCommand;
+    };
+
+    // Verify shape hash value is equal to the expected one when the command targets a namespace.
+    assertDistinctQueryShapeHashEquals(
+        "344BA27EB45373D8CACF33C7341B317B4E897877D808927683805FF553A7CC42",
+        R"({
+            distinct: "testcoll",
+            $db: "testdb",
+            key: "name",
+            query: { area : 5 },
+            collation: { locale: "fr" }})");
+
+    // Verify shape hash value is equal to the expected one when the command targets a collection by
+    // its UUID.
+    assertDistinctQueryShapeHashEquals(
+        "C58B4458C460C43DE7591F90D26BCFFC44090EB091DAEEBE9ECD540608E0CCFC",
+        R"({
+            distinct: {"$uuid": "80EC854A-FA7D-A4B0-F533-8C0682000102"},
+            $db: "testdb",
+            key: "name",
+            query: { area : 5 },
+            collation: { locale: "fr" }})");
+
+    // Verify shape hash value is equal to the expected one when the command does not have "query"
+    // parameter.
+    assertDistinctQueryShapeHashEquals(
+        "34DA6D26C35E9B941AB800E728F37DE65A43EA372F55E0715C0A91365500DF38",
+        R"({
+            distinct: "testcoll",
+            $db: "testdb",
+            key: "name",
+            collation: { locale: "fr" }})");
+
+    // Verify shape hash value is equal to the expected one when the command does not have
+    // "collation" parameter.
+    assertDistinctQueryShapeHashEquals(
+        "6885616B1ACD8B4F7FB5C1EB2A17B482EBB8788D63AC033160AA3A848F125DEA",
+        R"({
+            distinct: "testcoll",
+            $db: "testdb",
+            key: "name",
+            query: { area : 5 }})");
+}
+
 TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto distinct = fromjson(R"({ distinct: "testcoll", $db: "testdb", key: "name" })");

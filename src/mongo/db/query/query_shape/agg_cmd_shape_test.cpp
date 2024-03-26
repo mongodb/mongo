@@ -208,6 +208,18 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
                       SerializationContext::stateDefault()));
 }
 
+// Verifies that "aggregate" command shape hash value is stable (does not change between the
+// versions of the server).
+TEST_F(AggCmdShapeTest, StableQueryShapeHashValue) {
+    auto shape = makeShapeFromPipeline({R"({$match: {x: 3}})"_sd, R"({$limit: 2})"_sd},
+                                       R"({x: 4, y: "str"})"_sd);
+
+    auto serializationContext = SerializationContext::stateCommandRequest();
+    const auto hash = shape->sha256Hash(_operationContext.get(), serializationContext);
+    ASSERT_EQ("254568FE55B9677A2AC9DA7B921EADB44AAEE7CF38DEE8DD379E34BD04FE6906",
+              hash.toHexString());
+}
+
 TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
     auto aggComponents = makeShapeComponentsFromPipeline(
         {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,

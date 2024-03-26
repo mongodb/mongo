@@ -86,14 +86,31 @@ void DistinctCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
 }
 
 QueryShapeHash DistinctCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
+    // Allocate a buffer on the stack for serialization of parts of the "distinct" command shape.
+    constexpr std::size_t bufferSizeOnStack = 256;
+    StackBufBuilderBase<bufferSizeOnStack> distinctCommandShapeBuffer;
+
+    // Write small or typically empty "distinct" command shape parts to the buffer.
+    distinctCommandShapeBuffer.appendStr(DistinctCommandRequest::kCommandName,
+                                         false /*includeEndingNull*/);
+
+    // 16-bit command options word. Use 0th bit as an indicator whether the command specification
+    // includes a namespace or a UUID of a collection. The remaining bits are reserved for encoding
+    // command options in the future.
+    const std::uint16_t commandOptions = nssOrUUID.isNamespaceString() ? 0 : 1;
+    distinctCommandShapeBuffer.appendNum(static_cast<short>(commandOptions));
+    auto nssDataRange = nssOrUUID.asDataRange();
+    distinctCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
+
+    // Append a null byte to separate the namespace string 'nssOrUUID' from the "key" parameter
+    // value.
+    distinctCommandShapeBuffer.appendChar(0);
+    distinctCommandShapeBuffer.appendStr(components.key);
+    distinctCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
     return SHA256Block::computeHash({
-        ConstDataRange(DistinctCommandRequest::kCommandName.data(),
-                       DistinctCommandRequest::kCommandName.size()),
-        nssOrUUID.asDataRange(),
+        ConstDataRange{distinctCommandShapeBuffer.buf(),
+                       static_cast<std::size_t>(distinctCommandShapeBuffer.len())},
         components.representativeQuery.asDataRange(),
-        ConstDataRange(components.key.data(), components.key.size()),
-        collation.asDataRange(),
     });
 }
-
 }  // namespace mongo::query_shape
