@@ -114,7 +114,7 @@ public:
     }
 };
 
-void registerMongoSCollectors(FTDCController* controller) {
+void registerRouterCollectors(FTDCController* controller) {
     registerServerCollectorsForRole(controller, ClusterRole::RouterServer);
 
     // PoolStats
@@ -161,7 +161,7 @@ void startMongoSFTDC(ServiceContext* serviceContext) {
         feature_flags::gMultiserviceFTDCSchema.isEnabledAndIgnoreFCVUnsafe() &&
         feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafe()};
 
-    startFTDC(serviceContext, directory, startMode, {registerMongoSCollectors}, multiserviceSchema);
+    startFTDC(serviceContext, directory, startMode, {registerRouterCollectors}, multiserviceSchema);
 }
 
 void stopMongoSFTDC() {

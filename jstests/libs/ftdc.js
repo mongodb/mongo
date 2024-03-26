@@ -52,9 +52,9 @@ export function verifyGetDiagnosticData(adminDb, logData = true, assumeMultiserv
             if (hasMultiserviceFTDCSchema(adminDb) || assumeMultiserviceSchema) {
                 const hasKnownData =
                     (data.hasOwnProperty("shard") && data.shard.hasOwnProperty("serverStatus")) ||
-                    (data.hasOwnProperty("router") && data.router.hasOwnProperty("serverStatus"))
+                    (data.hasOwnProperty("router") && data.router.hasOwnProperty("connPoolStats"))
                 assert(hasKnownData,
-                       "does not have 'shard.serverStatus' nor 'router.serverStatus' in '" +
+                       "does not have 'shard.serverStatus' nor 'router.connPoolStats' in '" +
                            tojson(data) + "'");
             } else {
                 assert(data.hasOwnProperty("serverStatus"),

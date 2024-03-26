@@ -120,7 +120,7 @@ public:
 };
 
 
-void registerMongoDCollectors(FTDCController* controller) {
+void registerShardCollectors(FTDCController* controller) {
     registerServerCollectorsForRole(controller, ClusterRole::ShardServer);
 
     // These metrics are only collected if replication is enabled
@@ -167,7 +167,7 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
     }
 
     std::vector<RegisterCollectorsFunction> registerFns{
-        registerMongoDCollectors,
+        registerShardCollectors,
     };
 
     // (Ignore FCV check): these two feature flags are not FCV-gated.
@@ -180,7 +180,7 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
         gMultiserviceFTDCSchema};
 
     if (multiversionSchema) {
-        registerFns.emplace_back(registerMongoSCollectors);
+        registerFns.emplace_back(registerRouterCollectors);
     }
 
     startFTDC(

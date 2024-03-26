@@ -294,8 +294,17 @@ private:
 };
 
 void registerServerCollectorsForRole(FTDCController* controller, ClusterRole clusterRole) {
-    controller->addPeriodicCollector(std::make_unique<FTDCServerStatusCommandCollector>(),
-                                     clusterRole);
+    // TODO (SERVER-88268): Add ServerStatus collector as a router collector for every MongoD part
+    // of a sharded cluster.
+
+    // Includes the ServerStatus Collector if this node is:
+    // - If MongoS, only as a router collector.
+    // - If MongoD, only as a shard collector.
+    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+        clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+        controller->addPeriodicCollector(std::make_unique<FTDCServerStatusCommandCollector>(),
+                                         ClusterRole::None);
+    }
 }
 
 // Register the FTDC system

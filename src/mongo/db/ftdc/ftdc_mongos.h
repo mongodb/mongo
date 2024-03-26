@@ -40,7 +40,7 @@ namespace mongo {
 /**
  * To be called from `startMongoDFTDC`.
  */
-void registerMongoSCollectors(FTDCController* controller);
+void registerRouterCollectors(FTDCController* controller);
 
 /**
  * Start Full Time Data Capture
