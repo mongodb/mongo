@@ -596,7 +596,7 @@ roles:
                   - createIndex # Create index on the roles collection.
             - matchType: exact_namespace
               collection: 'system.views'
-              actions: 
+              actions:
                   - dropCollection
 
     root:
@@ -612,6 +612,7 @@ roles:
         privileges:
             - matchType: any
               actions:
+                  - bypassDefaultMaxTimeMS
                   - validate
             - matchType: cluster
               actions:
