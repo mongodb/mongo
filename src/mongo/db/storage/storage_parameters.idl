@@ -132,9 +132,7 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_varname: "internalInsertMaxBatchSize"
         cpp_vartype: AtomicWord<int>
-        default:
-            expr: 64
-            is_constexpr: false
+        default: 500
         validator:
             gt: 0
         redact: false
