@@ -358,6 +358,10 @@ Future<DbResponse> ServiceEntryPointMongod::_replicaSetEndpointHandleRequest(
     }
     return ServiceEntryPointCommon::handleRequest(opCtx, m, *_hooks);
 } catch (const DBException& ex) {
+    if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
+        return DbResponse{};  // Don't reply.
+    }
+
     // Try to generate a response based on the status. If encounter another error (e.g.
     // UnsupportedFormat) while trying to generate the response, just return the status.
     try {
