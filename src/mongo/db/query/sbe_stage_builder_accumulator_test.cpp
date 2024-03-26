@@ -58,6 +58,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -2218,8 +2219,8 @@ public:
     void aggregateAndAssertResults(BSONArray inputs,
                                    BSONArray expected,
                                    const sbe::vm::CodeFragment* code) {
-        auto [inputTag, inputVal] = makeArray(inputs);
-        auto [expectedTag, expectedVal] = makeArray(expected);
+        auto [inputTag, inputVal] = sbe::makeArray(inputs);
+        auto [expectedTag, expectedVal] = sbe::makeArray(expected);
         return aggregateAndAssertResults(inputTag, inputVal, expectedTag, expectedVal, code);
     }
 
@@ -2336,8 +2337,8 @@ public:
             auto partialAggArr = sbe::value::getArrayView(partialAggVal);
 
             auto [pushedValsTag, pushedValsVal] = accumType == Accumulator::kPush
-                ? makeArray(partialBsonArr)
-                : makeArraySet(partialBsonArr);
+                ? sbe::makeArray(partialBsonArr)
+                : sbe::makeArraySet(partialBsonArr);
             partialAggArr->push_back(pushedValsTag, pushedValsVal);
 
             partialAggArr->push_back(sbe::value::TypeTags::NumberInt64,

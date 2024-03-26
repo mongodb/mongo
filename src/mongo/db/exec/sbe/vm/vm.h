@@ -1908,23 +1908,20 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
 
-    std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool> multiAccState(
-        value::TypeTags stateTag, value::Value stateVal);
+    typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
+        multiAccState;
+
+    static multiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNNeedsMoreInput(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstN(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstNFinalize(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLastN(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLastNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLastNFinalize(ArityType arity);
-    template <TopBottomSense Sense>
-    int32_t aggTopBottomNAdd(value::Array* state,
-                             value::Array* array,
-                             size_t maxSize,
-                             int32_t memUsage,
-                             int32_t memLimit,
-                             TopBottomArgs& args);
+
     int32_t aggTopNAdd(value::Array* state,
                        value::Array* array,
                        size_t maxSize,
@@ -1946,12 +1943,14 @@ private:
     template <TopBottomSense>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNFinalize(ArityType arity);
+
     template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxN(ArityType arity);
     template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNMerge(ArityType arity);
     template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNFinalize(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRank(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRankColl(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDenseRank(ArityType arity);
@@ -2072,6 +2071,46 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggSum(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggDoubleDoubleSum(
         ArityType arity);
+
+    // The intermediate heap will always store a tag, val pair and a value representing an array
+    // index,
+    // so we can use this struct instead of creating an SBE value from the index.
+    struct SortKeyAndIdx {
+        std::pair<value::TypeTags, value::Value> sortKey;
+        size_t outIdx = 0;
+    };
+
+    // Comparison based on the key of a SortKeyAndIdx.
+    template <typename Comp>
+    struct SortKeyAndIdxComp {
+        SortKeyAndIdxComp(const Comp& comp) : _comp(comp) {}
+
+        bool operator()(const SortKeyAndIdx& lhs, const SortKeyAndIdx& rhs) const {
+            return _comp(lhs.sortKey, rhs.sortKey);
+        }
+
+    private:
+        const Comp _comp;
+    };
+
+    // Used as a helper for blockNativeAggTopBottomNImpl, should not be used as a mergingExpr.
+    template <typename Less>
+    void combineBlockNativeAggTopBottomN(value::TypeTags stateTag,
+                                         value::Value stateVal,
+                                         std::vector<SortKeyAndIdx> newArr,
+                                         value::ValueBlock* valBlock,
+                                         Less less);
+
+    // Take advantage of the fact that we know we have block input, instead of looping over
+    // generalized helper functions.
+    template <TopBottomSense Sense, bool ValueIsArray>
+    FastTuple<bool, value::TypeTags, value::Value> blockNativeAggTopBottomNImpl(
+        value::TypeTags stateTag,
+        value::Value stateVal,
+        value::ValueBlock* bitsetBlock,
+        SortSpec* sortSpec,
+        size_t numKeyBlocks,
+        size_t numValBlocks);
 
     template <TopBottomSense Sense, bool ValueIsArray>
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggTopBottomNImpl(

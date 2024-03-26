@@ -27,20 +27,15 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <map>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe {
-static std::pair<value::TypeTags, value::Value> makeInt32(int32_t value) {
-    return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(value)};
-}
 
 static std::vector<std::pair<value::TypeTags, value::Value>> makeInt32s(
     std::vector<int32_t> values) {
@@ -77,5 +72,106 @@ static std::unique_ptr<value::ValueBlock> makeHeterogeneousBoolBlock(std::vector
 
 static std::unique_ptr<value::ValueBlock> makeBoolBlock(std::vector<bool> bools) {
     return std::make_unique<value::BoolBlock>(bools);
+}
+
+static void release2dValueVector(const std::vector<TypedValues>& vals) {
+    for (size_t i = 0; i < vals.size(); ++i) {
+        for (size_t j = 0; j < vals[j].size(); ++j) {
+            releaseValue(vals[i][j].first, vals[i][j].second);
+        }
+    }
+}
+
+template <typename T>
+static std::vector<T> makeNumbers(int magnitude = 1, bool multipleNaNs = true) {
+    std::vector<T> nums;
+    if (std::is_same_v<T, bool>) {
+        nums.push_back(false);
+        nums.push_back(true);
+        return nums;
+    }
+    if (std::is_same_v<T, double>) {
+        nums.push_back(std::numeric_limits<double>::quiet_NaN());
+        if (multipleNaNs) {
+            nums.push_back(std::numeric_limits<double>::signaling_NaN());
+        }
+        nums.push_back(std::numeric_limits<double>::infinity() * -1);
+        nums.push_back(std::numeric_limits<double>::infinity());
+    }
+    nums.push_back(-1 * magnitude);
+    nums.push_back(0);
+    nums.push_back(1 * magnitude);
+    nums.push_back(std::numeric_limits<T>::min());
+    nums.push_back(std::numeric_limits<T>::max());
+    return nums;
+}
+
+template <typename BlockType, typename T>
+static std::unique_ptr<BlockType> makeTestHomogeneousBlock(bool inclNothing = true,
+                                                           bool multipleNaNs = true) {
+    std::unique_ptr<BlockType> homogeneousTestBlock = std::make_unique<BlockType>();
+    auto nums = makeNumbers<T>(1, multipleNaNs);
+    for (auto num : nums) {
+        homogeneousTestBlock->push_back(value::bitcastFrom<T>(num));
+    }
+    if (inclNothing) {
+        homogeneousTestBlock->pushNothing();
+    }
+    return homogeneousTestBlock;
+}
+
+static std::unique_ptr<value::ValueBlock> makeTestNothingBlock(size_t valsNum) {
+    std::unique_ptr<value::Int32Block> testHomogeneousBlock = std::make_unique<value::Int32Block>();
+    for (size_t i = 0; i < valsNum; ++i) {
+        testHomogeneousBlock->pushNothing();
+    }
+    return testHomogeneousBlock;
+}
+
+static TypedValues makeInterestingValues() {
+    TypedValues vals;
+    vals.push_back(makeNull());
+
+    vals.push_back(makeBsonArray(BSON_ARRAY(2 << 3 << 4 << 4)));
+    vals.push_back(makeArray(BSON_ARRAY(3 << 3 << 4 << 5)));
+    vals.push_back(makeArraySet(BSON_ARRAY(4 << 5 << 6)));
+    vals.push_back(makeBsonObject(BSON("b" << 7)));
+    vals.push_back(makeObject(BSON("b" << 8)));
+
+    auto int32s = makeNumbers<int32_t>(10 /* magnitude */);
+    for (auto int32 : int32s) {
+        vals.push_back(makeInt32(int32));
+    }
+    auto int64s = makeNumbers<int64_t>(100 /* magnitude */);
+    for (auto int64 : int64s) {
+        vals.push_back(makeInt64(int64));
+    }
+    auto dates = makeNumbers<int64_t>(500 /* magnitude */);
+    for (auto dt : dates) {
+        vals.push_back(std::pair{value::TypeTags::Date, value::bitcastFrom<int64_t>(dt)});
+    }
+    auto doubles = makeNumbers<double>(1000 /* magnitude */);
+    for (auto dbl : doubles) {
+        vals.push_back(makeDouble(dbl));
+    }
+
+    vals.push_back(makeBool(false));
+    vals.push_back(makeBool(true));
+
+    vals.push_back(value::makeNewString("regular string"_sd));  // StringBig
+    vals.push_back(value::makeNewString("tinystr"_sd));         // StringSmall
+
+    vals.push_back(makeDecimal("-1234.5678"));
+    vals.push_back(makeDecimal("1234.5678"));
+    vals.push_back(makeDecimal("somethingE200"));    // NaN
+    vals.push_back(makeDecimal("200E9999999999"));   // +Inf
+    vals.push_back(makeDecimal("-200E9999999999"));  // -Inf
+
+    vals.push_back(makeTimestamp(Timestamp(992391600, 0)));
+    vals.push_back(makeTimestamp(Timestamp(992391600, 1234)));
+    vals.push_back(makeTimestamp(Timestamp::min()));
+    vals.push_back(makeTimestamp(Timestamp::max()));
+
+    return vals;
 }
 }  // namespace mongo::sbe

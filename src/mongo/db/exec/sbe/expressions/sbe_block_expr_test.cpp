@@ -35,10 +35,10 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
+#include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/unittest/assert.h"
 
 namespace mongo::sbe {
@@ -49,7 +49,7 @@ public:
      * Makes an SBE value::Array. Shadows the version in parent class EExpressionTestFixture which
      * is for BSON arrays.
      */
-    static TypedValue makeArray(std::vector<TypedValue> vals) {
+    static TypedValue makeArrayFromValues(std::vector<TypedValue> vals) {
         auto [arrTag, arrVal] = value::makeNewArray();
         value::ValueGuard guard(arrTag, arrVal);
         for (auto [t, v] : vals) {
@@ -62,7 +62,7 @@ public:
     void assertBlockOfBool(value::TypeTags tag, value::Value val, std::vector<bool> expected) {
         std::vector<std::pair<value::TypeTags, value::Value>> tvPairs;
         for (auto b : expected) {
-            tvPairs.push_back({value::TypeTags::Boolean, value::bitcastFrom<bool>(b)});
+            tvPairs.push_back(makeBool(b));
         }
         assertBlockEq(tag, val, tvPairs);
     }
@@ -894,50 +894,51 @@ TEST_F(SBEBlockExpressionTest, BlockAggDoubleDoubleSumTest) {
     testBlockSum(aggAccessor,
                  {makeNothing(), makeNothing(), makeNothing(), makeNothing()},
                  {false, false, false, false},
-                 makeArray(makeInt32s({0, 0, 0})));
+                 makeArrayFromValues(makeInt32s({0, 0, 0})));
     // All values are nothing
     testBlockSum(aggAccessor,
                  {makeNothing(), makeNothing(), makeNothing()},
                  {true, true, false},
-                 makeArray(makeInt32s({0, 0, 0})));
+                 makeArrayFromValues(makeInt32s({0, 0, 0})));
     // Only int32.
     testBlockSum(
         aggAccessor,
         {makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
         {false, false, true, true, false, true},
-        makeArray(makeInt32s({0, 9, 0})));
+        makeArrayFromValues(makeInt32s({0, 9, 0})));
     // Put the int64 last for type promotion at the end.
     testBlockSum(
         aggAccessor,
         {makeInt32(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt64(4)},
         {false, false, true, true, false, true},
-        makeArray(makeInt32s({0, 9, 0})));
+        makeArrayFromValues(makeInt32s({0, 9, 0})));
     // Put the int64 first for early type promotion.
     testBlockSum(
         aggAccessor,
         {makeInt64(1), makeNothing(), makeInt32(2), makeInt32(3), makeNothing(), makeInt32(4)},
         {true, false, true, true, false, true},
-        makeArray(makeInt32s({0, 10, 0})));
+        makeArrayFromValues(makeInt32s({0, 10, 0})));
     // Mix types with double.
     testBlockSum(
         aggAccessor,
         {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeNothing(), makeInt64(4)},
         {false, false, true, true, false, true},
-        makeArray(makeInt32s({0, 9, 0})));
+        makeArrayFromValues(makeInt32s({0, 9, 0})));
     // Mix types with Decimal128.
     testBlockSum(
         aggAccessor,
         {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeDecimal("50"), makeInt64(4)},
         {false, false, true, true, true, true},
-        makeArray(makeInt32s({0, 9, 0, 50})));
+        makeArrayFromValues(makeInt32s({0, 9, 0, 50})));
     // Mix types with Nothing.
     testBlockSum(
         aggAccessor,
         {makeInt32(1), makeNothing(), makeDouble(2), makeInt32(3), makeDecimal("50"), makeInt64(4)},
         {false, true, true, true, true, true},
-        makeArray(makeInt32s({0, 9, 0, 50})));
+        makeArrayFromValues(makeInt32s({0, 9, 0, 50})));
     // One Decimal128, to test for memory leaks.
-    testBlockSum(aggAccessor, {makeDecimal("50")}, {true}, makeArray(makeInt32s({0, 0, 0, 50})));
+    testBlockSum(
+        aggAccessor, {makeDecimal("50")}, {true}, makeArrayFromValues(makeInt32s({0, 0, 0, 50})));
     // A few Decimal128 values.
     testBlockSum(aggAccessor,
                  {makeDecimal("50"),
@@ -947,7 +948,7 @@ TEST_F(SBEBlockExpressionTest, BlockAggDoubleDoubleSumTest) {
                   makeDecimal("50"),
                   makeDecimal("50")},
                  {false, true, true, true, true, true},
-                 makeArray(makeInt32s({0, 0, 0, 250})));
+                 makeArrayFromValues(makeInt32s({0, 0, 0, 250})));
 }  // BlockAggDoubleDoubleSumTest
 
 TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
@@ -1892,45 +1893,6 @@ TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
     );
 }
 
-template <typename BlockType, typename T>
-std::unique_ptr<BlockType> makeTestHomogeneousBlock() {
-    std::unique_ptr<BlockType> testHomogeneousBlock = std::make_unique<BlockType>();
-    testHomogeneousBlock->push_back(value::bitcastFrom<T>(-1));
-    testHomogeneousBlock->push_back(value::bitcastFrom<T>(0));
-    testHomogeneousBlock->push_back(value::bitcastFrom<T>(1));
-    testHomogeneousBlock->push_back(value::bitcastFrom<T>(std::numeric_limits<T>::min()));
-    testHomogeneousBlock->push_back(value::bitcastFrom<T>(std::numeric_limits<T>::max()));
-    testHomogeneousBlock->pushNothing();
-    return testHomogeneousBlock;
-}
-
-std::unique_ptr<value::ValueBlock> makeTestNothingBlock(size_t valsNum) {
-    std::unique_ptr<value::Int32Block> testHomogeneousBlock = std::make_unique<value::Int32Block>();
-    for (size_t i = 0; i < valsNum; ++i) {
-        testHomogeneousBlock->pushNothing();
-    }
-    return testHomogeneousBlock;
-}
-
-std::unique_ptr<value::ValueBlock> makeTestInt32Block() {
-    return makeTestHomogeneousBlock<value::Int32Block, int32_t>();
-}
-
-std::unique_ptr<value::ValueBlock> makeTestInt64Block() {
-    return makeTestHomogeneousBlock<value::Int64Block, int64_t>();
-}
-
-std::unique_ptr<value::ValueBlock> makeTestDateBlock() {
-    return makeTestHomogeneousBlock<value::DateBlock, int64_t>();
-}
-
-std::unique_ptr<value::ValueBlock> makeTestDoubleBlock() {
-    auto testDoubleBlock = makeTestHomogeneousBlock<value::DoubleBlock, double>();
-    testDoubleBlock->push_back(std::numeric_limits<double>::quiet_NaN());
-    testDoubleBlock->push_back(std::numeric_limits<double>::signaling_NaN());
-    return testDoubleBlock;
-}
-
 void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
                                            StringData cmpFunctionName,
                                            value::ValueBlock* valBlock) {
@@ -2019,10 +1981,10 @@ TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarTest) {
 
 TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarHomogeneousTest) {
     std::vector<std::unique_ptr<value::ValueBlock>> testBlocks;
-    testBlocks.push_back(makeTestInt32Block());
-    testBlocks.push_back(makeTestInt64Block());
-    testBlocks.push_back(makeTestDateBlock());
-    testBlocks.push_back(makeTestDoubleBlock());
+    testBlocks.push_back(makeTestHomogeneousBlock<value::Int32Block, int32_t>());
+    testBlocks.push_back(makeTestHomogeneousBlock<value::Int64Block, int64_t>());
+    testBlocks.push_back(makeTestHomogeneousBlock<value::DateBlock, int64_t>());
+    testBlocks.push_back(makeTestHomogeneousBlock<value::DoubleBlock, double>());
     testBlocks.push_back(makeTestNothingBlock(2));
 
     for (auto& block : testBlocks) {
@@ -3760,7 +3722,7 @@ TEST_F(SBEBlockExpressionTest, BlockDateAdd) {
     auto blockSlot = bindAccessor(&blockAccessor);
     auto bitsetSlot = bindAccessor(&bitsetAccessor);
 
-    auto block = makeTestDateBlock();
+    auto block = makeTestHomogeneousBlock<value::DateBlock, int64_t>();
 
     auto tzdb = std::make_unique<TimeZoneDatabase>();
 

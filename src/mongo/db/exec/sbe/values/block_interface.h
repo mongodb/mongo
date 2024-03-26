@@ -74,6 +74,10 @@ public:
         return std::span(_vals, _count);
     }
 
+    std::pair<std::span<const TypeTags>, std::span<const Value>> tagsValsView() const {
+        return std::pair{tagsSpan(), valsSpan()};
+    }
+
     size_t count() const {
         return _count;
     }

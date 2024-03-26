@@ -194,6 +194,7 @@ env.CppUnitTest(
         'column_store_encoder_test.cpp',
         'columnar_test.cpp',
         'expressions/sbe_block_expr_test.cpp',
+        'expressions/sbe_block_top_bottom_test.cpp',
         'expressions/sbe_bson_size_test.cpp',
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',

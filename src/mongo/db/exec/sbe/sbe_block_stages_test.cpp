@@ -816,7 +816,7 @@ std::unique_ptr<value::ValueBlock> makeBlock(std::vector<int> ints) {
     return std::unique_ptr<value::ValueBlock>(out.release());
 }
 
-value::Array makeArray(std::vector<int> ints) {
+value::Array makeIntArray(std::vector<int> ints) {
 
     value::Array out;
     for (auto i : ints) {
@@ -830,7 +830,7 @@ TEST_F(BlockStagesTest, BlockToRowRespectsZerosBitmap) {
     blocks.push_back(makeBlock({1, 2, 3, 4, 5, 6}));
 
     testBlockToBitmap(
-        blocks, {std::vector<bool>{false, false, false, false, false, false}}, makeArray({}));
+        blocks, {std::vector<bool>{false, false, false, false, false, false}}, makeIntArray({}));
 }
 
 TEST_F(BlockStagesTest, BlockToRowSingleValueFiltered) {
@@ -838,7 +838,7 @@ TEST_F(BlockStagesTest, BlockToRowSingleValueFiltered) {
     blocks.push_back(makeBlock({1, 2, 3, 4, 5, 6}));
 
     testBlockToBitmap(
-        blocks, {std::vector<bool>{false, false, true, false, false, false}}, makeArray({3}));
+        blocks, {std::vector<bool>{false, false, true, false, false, false}}, makeIntArray({3}));
 }
 
 TEST_F(BlockStagesTest, MultipleBlocksWithSingleValueFilteredFromEach) {
@@ -848,7 +848,7 @@ TEST_F(BlockStagesTest, MultipleBlocksWithSingleValueFilteredFromEach) {
 
     testBlockToBitmap(blocks,
                       {std::vector<bool>{true, false, true}, std::vector<bool>{true, false, true}},
-                      makeArray({1, 3, 4, 6}));
+                      makeIntArray({1, 3, 4, 6}));
 }
 
 TEST_F(BlockStagesTest, MultipleBlocksWithMultipleValuesFilteredFromEach) {
@@ -859,7 +859,7 @@ TEST_F(BlockStagesTest, MultipleBlocksWithMultipleValuesFilteredFromEach) {
     testBlockToBitmap(
         blocks,
         {std::vector<bool>{false, false, true}, std::vector<bool>{true, false, true, false}},
-        makeArray({3, 4, 6}));
+        makeIntArray({3, 4, 6}));
 }
 
 TEST_F(BlockStagesTest, BlockToRowNoValuesFiltered) {
@@ -868,6 +868,6 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFiltered) {
 
     testBlockToBitmap(blocks,
                       {std::vector<bool>{true, true, true, true, true, true}},
-                      makeArray({1, 2, 3, 4, 5, 6}));
+                      makeIntArray({1, 2, 3, 4, 5, 6}));
 }
 }  // namespace mongo::sbe

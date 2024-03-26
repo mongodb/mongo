@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
@@ -575,6 +577,213 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggDou
     return {true, accTag, accValue};
 }  // builtinValueBlockAggDoubleDoubleSum
 
+template <typename Less>
+void ByteCode::combineBlockNativeAggTopBottomN(value::TypeTags stateTag,
+                                               value::Value stateVal,
+                                               std::vector<SortKeyAndIdx> newArr,
+                                               value::ValueBlock* valBlock,
+                                               Less less) {
+    auto memAdded = [](std::pair<value::TypeTags, value::Value> key,
+                       std::pair<value::TypeTags, value::Value> output) {
+        return value::getApproximateSize(key.first, key.second) +
+            value::getApproximateSize(output.first, output.second);
+    };
+
+    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+        getMultiAccState(stateTag, stateVal);
+
+    invariant(mergeArr->size() <= maxSize);
+    auto& mergeHeap = mergeArr->values();
+
+    boost::optional<value::DeblockedTagVals> deblocked;
+    auto keyLess = PairKeyComp(less);
+
+    // Once a value is inserted into mergeArr, it must be owned by mergeArr.
+    for (const auto& newPair : newArr) {
+        // This is an unowned view on the sort key, so it will need to be copied if it makes it into
+        // the merge heap.
+        auto [newSortKeyTag, newSortKeyVal] = newPair.sortKey;
+
+        // Get the index of the corresponding output value.
+        size_t outIdx = newPair.outIdx;
+
+        if (mergeArr->size() < maxSize) {
+            // Extract if we haven't done so yet.
+            if (!deblocked) {
+                deblocked = valBlock->extract();
+            }
+            invariant(outIdx < deblocked->count());
+
+            memUsage = updateAndCheckMemUsage(
+                state, memUsage, memAdded(newPair.sortKey, (*deblocked)[outIdx]), memLimit);
+
+            auto [pairArrTag, pairArrVal] = value::makeNewArray();
+            value::ValueGuard pairArrGuard{pairArrTag, pairArrVal};
+            auto* pairArr = value::getArrayView(pairArrVal);
+            pairArr->reserve(2);
+
+            // Update the sortKey with a copy.
+            auto [sortKeyCpyTag, sortKeyCpyVal] = value::copyValue(newSortKeyTag, newSortKeyVal);
+            pairArr->push_back(sortKeyCpyTag, sortKeyCpyVal);
+
+            // Add the output value to the SBE pair array. We will need to make a copy since the
+            // value is owned by the input block of output vals.
+            auto [outCpyTag, outCpyVal] =
+                value::copyValue(deblocked->tags()[outIdx], deblocked->vals()[outIdx]);
+            pairArr->push_back(outCpyTag, outCpyVal);
+
+            // The merge arr will now take ownership of the SBE pair array.
+            pairArrGuard.reset();
+
+            mergeArr->push_back(pairArrTag, pairArrVal);
+            std::push_heap(mergeHeap.begin(), mergeHeap.end(), keyLess);
+        } else {
+            tassert(8794901,
+                    "Heap should contain same number of elements as maxSize",
+                    mergeArr->size() == maxSize);
+
+            auto [worstTag, worstVal] = mergeHeap.front();
+            auto worst = value::getArrayView(worstVal);
+            auto worstKey = worst->getAt(0);
+
+            if (less(std::pair(newSortKeyTag, newSortKeyVal), worstKey)) {
+                std::pop_heap(mergeHeap.begin(), mergeHeap.end(), keyLess);
+
+                // Extract if we haven't done so yet.
+                if (!deblocked) {
+                    deblocked = valBlock->extract();
+                }
+                invariant(outIdx < deblocked->count());
+
+                memUsage =
+                    updateAndCheckMemUsage(state,
+                                           memUsage,
+                                           -memAdded(worst->getAt(0), worst->getAt(1)) +
+                                               memAdded(newPair.sortKey, (*deblocked)[outIdx]),
+                                           memLimit);
+
+                // Update the sort key. It is owned by the input sort key block so we will need to
+                // make a copy.
+                auto [newSortKeyCpyTag, newSortKeyCpyVal] =
+                    value::copyValue(newSortKeyTag, newSortKeyVal);
+                // The sort key from the merge heap is owned by the heap so we can safely use setAt
+                // which will release the value being replaced.
+                worst->setAt(0, newSortKeyCpyTag, newSortKeyCpyVal);
+
+                // Update the output value. We will need to make a copy since the value is owned by
+                // the input block of output vals.
+                auto [outCpyTag, outCpyVal] =
+                    value::copyValue(deblocked->tags()[outIdx], deblocked->vals()[outIdx]);
+                // The current output val is owned by the merge heap, so we can safely use setAt
+                // which will release the value being replaced.
+                worst->setAt(1, outCpyTag, outCpyVal);
+
+                std::push_heap(mergeHeap.begin(), mergeHeap.end(), keyLess);
+            }
+        }
+    }
+}
+
+// Currently, this is a specialized implementation for the single sort key, single output field case
+// of $top[N]/$bottom[N].
+template <TopBottomSense Sense, bool ValueIsDecomposedArray>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::blockNativeAggTopBottomNImpl(
+    value::TypeTags stateTag,
+    value::Value stateVal,
+    value::ValueBlock* bitsetBlock,
+    SortSpec* sortSpec,
+    size_t numKeysBlocks,
+    size_t numValuesBlocks) {
+    using Less =
+        std::conditional_t<Sense == TopBottomSense::kTop, SortPatternLess, SortPatternGreater>;
+
+    invariant(!ValueIsDecomposedArray);
+    invariant(numKeysBlocks == 1);
+    invariant(numValuesBlocks == 1);
+
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    // We already read numKeysBlocks (stack position 3) in builtinValueBlockAggTopBottomNImpl before
+    // calling into this function.
+
+    constexpr size_t keysBlocksStartOffset = 4;
+    const size_t valuesBlocksStartOffset = keysBlocksStartOffset + numKeysBlocks;
+
+    auto [sortKeyBlockOwned, sortKeyBlockTag, sortKeyBlockVal] =
+        getFromStack(keysBlocksStartOffset);
+    tassert(8794906,
+            "Expected key argument to be of valueBlock type",
+            sortKeyBlockTag == value::TypeTags::valueBlock);
+    auto* sortKeyBlock = value::getValueBlock(sortKeyBlockVal);
+
+    auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(valuesBlocksStartOffset);
+    tassert(8794905,
+            "Expected key argument to be of valueBlock type",
+            valBlockTag == value::TypeTags::valueBlock);
+    auto* valBlock = value::getValueBlock(valBlockVal);
+
+    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+        getMultiAccState(stateTag, stateVal);
+    invariant(maxSize > 0);
+
+    auto bitset = bitsetBlock->extract();
+    tassert(8794903, "Expected bitset to be all bools", allBools(bitset.tags(), bitset.count()));
+
+    auto sortKeys = sortKeyBlock->extract();
+    auto [sortKeyTags, sortKeyVals] = sortKeys.tagsValsView();
+    auto bitsetVals = bitset.valsSpan();
+
+    invariant(sortKeyTags.size() == valBlock->count() && sortKeyTags.size() == bitsetVals.size());
+
+    // We will use a std::vector of SortKeyAndIdx structs instead of a nested SBE array for the
+    // intermediate heap representation to capture the semantics that these containers are views on
+    // values that they do not own.
+    std::vector<SortKeyAndIdx> newArr;
+    // The heap cannot be bigger than the min of the number of inputs and n/maxSize.
+    newArr.reserve(std::min(sortKeys.count(), maxSize));
+    auto less = Less(sortSpec);
+    auto keyLess = SortKeyAndIdxComp(less);
+
+    for (size_t i = 0; i < sortKeyVals.size(); ++i) {
+        if (!value::bitcastTo<bool>(bitsetVals[i])) {
+            continue;
+        }
+        if (newArr.size() < maxSize) {
+            // We will copy the sortKey if it ever makes it into the merge heap in the combine
+            // phase.
+            SortKeyAndIdx newPair{std::pair{sortKeyTags[i], sortKeyVals[i]} /* sortKey */,
+                                  i /* outIdx */};
+
+            newArr.push_back(newPair);
+            std::push_heap(newArr.begin(), newArr.end(), keyLess);
+        } else {
+            tassert(8794902,
+                    "Heap should contain same number of elements as maxSize",
+                    newArr.size() == maxSize);
+
+            if (less(std::pair{sortKeyTags[i], sortKeyVals[i]}, newArr.front().sortKey)) {
+                std::pop_heap(newArr.begin(), newArr.end(), keyLess);
+
+                auto& worstPair = newArr.back();
+
+                // We will copy the sort key if it ever makes it into the final heap in the combine
+                // phase.
+                worstPair.sortKey = std::pair{sortKeyTags[i], sortKeyVals[i]};
+                worstPair.outIdx = i;
+
+                std::push_heap(newArr.begin(), newArr.end(), keyLess);
+            }
+        }
+    }
+
+    // Update mergeArr in-place.
+    combineBlockNativeAggTopBottomN(stateTag, stateVal, newArr, valBlock, less);
+
+    // Return the input state since mergeArr was updated in-place.
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
 class ByteCode::TopBottomArgsFromBlocks final : public ByteCode::TopBottomArgs {
 public:
     TopBottomArgsFromBlocks(TopBottomSense sense,
@@ -676,6 +885,7 @@ public:
 template <TopBottomSense Sense, bool ValueIsDecomposedArray>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTopBottomNImpl(
     ArityType arity) {
+
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(1);
     tassert(8448708,
             "Expected bitset argument to be of valueBlock type",
@@ -703,11 +913,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTop
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
 
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        multiAccState(stateTag, stateVal);
-
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
     auto ss = value::getSortSpecView(sortSpecVal);
+
+    if (!keyIsDecomposed && !ValueIsDecomposedArray) {
+        stateGuard.reset();
+        return blockNativeAggTopBottomNImpl<Sense, ValueIsDecomposedArray>(
+            stateTag, stateVal, bitsetBlock, ss, numKeysBlocks, numValuesBlocks);
+    }
+
+    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+        getMultiAccState(stateTag, stateVal);
+    invariant(maxSize > 0);
 
     value::DeblockedTagVals bitset = bitsetBlock->extract();
 
@@ -752,9 +969,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTop
             topBottomArgs.initForBlockIndex(blockIndex);
 
             if constexpr (Sense == TopBottomSense::kTop) {
-                aggTopNAdd(state, array, maxSize, memUsage, memLimit, topBottomArgs);
+                memUsage = aggTopNAdd(state, array, maxSize, memUsage, memLimit, topBottomArgs);
             } else {
-                aggBottomNAdd(state, array, maxSize, memUsage, memLimit, topBottomArgs);
+                memUsage = aggBottomNAdd(state, array, maxSize, memUsage, memLimit, topBottomArgs);
             }
         }
     }
