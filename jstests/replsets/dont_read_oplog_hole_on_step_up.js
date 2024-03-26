@@ -60,10 +60,7 @@ rst.awaitReplication();
 const planExecFP = configureFailPoint(newPrimary, "planExecutorHangWhileYieldedInWaitForInserts");
 
 jsTestLog("Stepping up new primary");
-assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
-
-// Wait for the node to transition to primary and accept writes.
-assert.eq(newPrimary, rst.getPrimary());
+rst.stepUp(newPrimary);
 
 const createCollFP = configureFailPoint(newPrimary, "hangBeforeLoggingCreateCollection");
 const createShell = startParallelShell(() => {

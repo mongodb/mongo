@@ -27,8 +27,7 @@ assert.commandWorked(node0SessionDB.runCommand({
 }));
 
 jsTestLog("Step up the secondary. The primary will abort the transaction when it steps down.");
-assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
-assert.eq(node1, rst.getPrimary());
+rst.stepUp(node1);
 
 const node1DB = node1.getDB(dbName);
 

@@ -96,8 +96,7 @@ assert.soon(
                                      brokenBatchFirstBatch) == 0);
 
 // Failover
-assert.commandWorked(secondary.adminCommand({replSetStepUp: 1}));
-assert.eq(secondary, replTest.getPrimary());
+replTest.stepUp(secondary);
 
 // Release failpoint; second insert batch should fail now.
 failPoint.off();
@@ -149,8 +148,7 @@ reconnect(primary);
 replTest.awaitSecondaryNodes();
 
 jsTestLog("Failing over to original primary.");
-assert.commandWorked(primary.adminCommand({replSetStepUp: 1}));
-assert.eq(primary, replTest.getPrimary());
+replTest.stepUp(primary);
 
 jsTestLog("Doing retries on original primary");
 checkRetries();
