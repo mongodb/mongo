@@ -53,6 +53,12 @@ const BSONObj kSampleBucket = fromjson(R"(
     "control" : {"version" : 1},
     "meta" : "A",
     "data" : {
+        "time" : {
+             "0" : {$date: "2023-06-30T21:29:00.568Z"},
+             "1" : {$date: "2023-06-30T21:29:09.968Z"},
+             "2" : {$date: "2023-06-30T21:29:15.088Z"},
+             "3" : {$date: "2023-06-30T21:29:19.088Z"}
+        },
         "_id" : {"0" : 0, "1": 1, "2": 2, "3": 3}
     }
 })");
@@ -64,16 +70,17 @@ int getBucketVersion(const BSONObj& bucket) {
 
 std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, StringData fieldName) {
     auto bucketElem = bucket["data"][fieldName];
-    const auto nFields = [&]() -> size_t {
-        if (bucketElem.type() == BSONType::Object) {
-            return bucketElem.embeddedObject().nFields();
+    const auto nFields = [&bucket]() -> size_t {
+        // Use a dense field.
+        const BSONElement timeField = bucket["data"]["time"];
+        if (timeField.type() == BSONType::Object) {
+            return timeField.embeddedObject().nFields();
         } else {
-            invariant(bucketElem.type() == BSONType::BinData);
-            BSONColumn col(bucketElem);
+            invariant(timeField.type() == BSONType::BinData);
+            BSONColumn col(timeField);
             return col.size();
         }
     }();
-
 
     auto [columnTag, columnVal] = bson::convertFrom<true /* View */>(bucketElem);
 
@@ -163,8 +170,8 @@ TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
 // Buckets with the v1 schema are not guaranteed to be sorted by the time field.
 const BSONObj kBucketWithMinMaxV1 = fromjson(R"(
 {
-	"_id" : ObjectId("64a33d9cdf56a62781061048"),
-	"control" : {
+        "_id" : ObjectId("64a33d9cdf56a62781061048"),
+        "control" : {
         "version" : 1,
         "min": {
             "_id": 0,
@@ -175,15 +182,15 @@ const BSONObj kBucketWithMinMaxV1 = fromjson(R"(
             "time": {$date: "2023-06-30T21:29:15.088Z"}
         }
     },
-	"meta" : "A",
-	"data" : {
-		"_id" : {"1": 1, "0" : 0, "2" : 2},
-		"time" : {
-			"1" : {$date: "2023-06-30T21:29:09.968Z"},
-            "0" : {$date: "2023-06-30T21:29:00.568Z"},
-			"2" : {$date: "2023-06-30T21:29:15.088Z"}
-		}
-	}
+        "meta" : "A",
+        "data" : {
+                "_id" : {"0" : 0, "1": 1, "2" : 2},
+                "time" : {
+                     "0" : {$date: "2023-06-30T21:29:00.568Z"},
+                     "1" : {$date: "2023-06-30T21:29:09.968Z"},
+                     "2" : {$date: "2023-06-30T21:29:15.088Z"}
+                }
+        }
 })");
 
 TEST_F(SbeValueTest, TsBlockMinMaxV1Schema) {
@@ -434,4 +441,76 @@ TEST_F(SbeValueTest, TsBlockMinMaxV3Schema) {
         }
     }
 }
+const BSONObj kBucketWithMinMaxAndArrays = fromjson(R"(
+{
+        "_id" : ObjectId("64a33d9cdf56a62781061048"),
+        "control" : {
+        "version" : 1,
+        "min": {
+            "_id": 0,
+            "time": {$date: "2023-06-30T21:29:00.000Z"},
+            "arr": [1,2],
+            "sometimesMissing": 0
+        },
+        "max": {
+            "_id": 2,
+            "time": {$date: "2023-06-30T21:29:15.088Z"},
+            "arr": [5, 5],
+            "sometimesMissing": 9
+        }
+    },
+        "meta" : "A",
+        "data" : {
+                "_id" : {"0" : 0, "1": 1, "2" : 2},
+                "time" : {
+                        "0" : {$date: "2023-06-30T21:29:00.568Z"},
+                        "1" : {$date: "2023-06-30T21:29:09.968Z"},
+                        "2" : {$date: "2023-06-30T21:29:15.088Z"}
+                },
+                "arr": {"0": [1, 2], "1": [2, 3], "2": [5, 5]},
+                "sometimesMissing": {"0": 0, "2": 9}
+        }
+})");
+
+TEST_F(SbeValueTest, TsBlockHasArray) {
+    {
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "_id");
+        boost::optional<bool> hasArrayRes = tsBlock->tryHasArray();
+        ASSERT_TRUE(hasArrayRes);  // Check that it gives us a definitive yes/no.
+        ASSERT_FALSE(*hasArrayRes);
+    }
+
+    {
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "arr");
+        boost::optional<bool> hasArrayRes = tsBlock->tryHasArray();
+        ASSERT_TRUE(hasArrayRes);  // Check that it gives us a definitive yes/no.
+        ASSERT_TRUE(*hasArrayRes);
+    }
+}
+
+TEST_F(SbeValueTest, TsBlockFillEmpty) {
+    {
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "_id");
+        // Already dense fields should return nullptr when fillEmpty'd.
+        ASSERT(tsBlock->fillEmpty(value::TypeTags::Null, 0) == nullptr);
+    }
+
+    {
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxAndArrays, "sometimesMissing");
+        auto fillRes = tsBlock->fillEmpty(value::TypeTags::Null, 0);
+        ASSERT(fillRes);
+        auto extracted = fillRes->extract();
+        ASSERT_EQ(extracted.count(), 3);
+        assertValuesEqual(extracted[0].first,
+                          extracted[0].second,
+                          value::TypeTags::NumberDouble,
+                          value::bitcastFrom<double>(0));
+        assertValuesEqual(extracted[1].first, extracted[1].second, value::TypeTags::Null, 0);
+        assertValuesEqual(extracted[2].first,
+                          extracted[2].second,
+                          value::TypeTags::NumberDouble,
+                          value::bitcastFrom<double>(9));
+    }
+}
+
 }  // namespace mongo::sbe

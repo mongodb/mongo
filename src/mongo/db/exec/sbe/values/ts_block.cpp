@@ -532,6 +532,22 @@ bool TsBlock::isTimeFieldSorted() const {
     return _bucketVersion == timeseries::kTimeseriesControlCompressedSortedVersion;
 }
 
+boost::optional<bool> TsBlock::tryHasArray() const {
+    if (hasNoObjsOrArrays()) {
+        return false;
+    }
+    if (isArray(_controlMin.first) || isArray(_controlMax.first)) {
+        return true;
+    }
+    return boost::none;
+}
+
+std::unique_ptr<ValueBlock> TsBlock::fillEmpty(TypeTags fillTag, Value fillVal) {
+    ensureDeblocked();
+    return _decompressedBlock->fillEmpty(fillTag, fillVal);
+}
+
+
 ValueBlock& TsCellBlockForTopLevelField::getValueBlock() {
     return *_unownedTsBlock;
 }

@@ -312,6 +312,14 @@ struct ValueBlock {
         return boost::none;
     }
 
+    /*
+     * Returns whether the block has any element of the given type, if it can be determined in
+     * O(1), otherwise returns boost::none.
+     */
+    virtual boost::optional<bool> tryHasArray() const {
+        return boost::none;
+    }
+
 protected:
     virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) = 0;
 

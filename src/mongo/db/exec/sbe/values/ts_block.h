@@ -128,6 +128,8 @@ public:
 
     DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override;
 
+    std::unique_ptr<ValueBlock> fillEmpty(TypeTags fillTag, Value fillVal) override;
+
     // Returns true if none of the values in this block are arrays or objects. Returns false if
     // any _may_ be arrays or objects.
     bool hasNoObjsOrArrays() const {
@@ -169,6 +171,7 @@ public:
     boost::optional<bool> tryDense() const override {
         return _isTimeField;
     }
+    boost::optional<bool> tryHasArray() const override;
 
 private:
     /**

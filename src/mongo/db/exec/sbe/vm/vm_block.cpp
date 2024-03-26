@@ -2300,6 +2300,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockGetSor
 
     auto block = value::getValueBlock(blockVal);
 
+    if (!block->tryHasArray().get_value_or(true)) {
+        // Fast path for non-array case. We just fill any empty values with null.
+        std::unique_ptr<value::ValueBlock> filledBlock = block->fillEmpty(value::TypeTags::Null, 0);
+        if (!filledBlock) {
+            // The block was already dense.
+            return moveFromStack(0);
+        }
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(filledBlock.release())};
+    }
+
     auto outBlock = IsAscending ? block->map(getSortKeyAscOp.bindParams(collator))
                                 : block->map(getSortKeyDescOp.bindParams(collator));
 
