@@ -119,6 +119,25 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockTypeMa
             }
             return {value::TypeTags::Boolean,
                     value::bitcastFrom<bool>(static_cast<bool>(getBSONTypeMask(tag) & typeMask))};
+        },
+        [&](value::TypeTags inTag,
+            const value::Value* inVals,
+            value::TypeTags* outTags,
+            value::Value* outVals,
+            size_t count) {
+            auto [outTag, outVal] = [&]() -> std::pair<value::TypeTags, value::Value> {
+                if (inTag == value::TypeTags::Nothing) {
+                    return {value::TypeTags::Nothing, 0};
+                }
+                return {
+                    value::TypeTags::Boolean,
+                    value::bitcastFrom<bool>(static_cast<bool>(getBSONTypeMask(inTag) & typeMask))};
+            }();
+
+            for (size_t index = 0; index < count; index++) {
+                outTags[index] = outTag;
+                outVals[index] = outVal;
+            }
         });
 
     auto valueBlockOut = valueBlockIn->map(cmpOp);
