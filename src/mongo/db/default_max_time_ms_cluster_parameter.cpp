@@ -27,20 +27,38 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/default_max_time_ms_cluster_parameter.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/basic_types.h"
-#include "mongo/db/commands.h"
-#include "mongo/util/duration.h"
+#include "mongo/db/default_max_time_ms_cluster_parameter_gen.h"
 
 namespace mongo {
-static constexpr auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"_sd;
-
-/**
- * Returns the value of maxTimeMS that should be used for a command or boost::none if none could be
- * used.
- */
 boost::optional<Milliseconds> getRequestOrDefaultMaxTimeMS(
-    OperationContext* opCtx, const boost::optional<IDLAnyType>& requestMaxTimeMS, Command* command);
+    OperationContext* opCtx,
+    const boost::optional<mongo::IDLAnyType>& requestMaxTimeMS,
+    Command* command) {
+    // Always uses the user-defined value if it's passed in.
+    if (requestMaxTimeMS) {
+        return Milliseconds{uassertStatusOK(parseMaxTimeMS(requestMaxTimeMS->getElement()))};
+    }
+    // TODO (SERVER-87886): Remove this block. This is a temporary hack before the privilege-based
+    // checking is implemented.
+    if (opCtx->getClient()->isInDirectClient()) {
+        return boost::none;
+    }
+    // Next uses the default maxTimeMS cluster parameter if the command is a read operation.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        gFeatureFlagDefaultReadMaxTimeMS.isEnabled(fcvSnapshot) &&
+        command->getReadWriteType() == Command::ReadWriteType::kRead) {
+        auto defaultReadMaxTimeMS = [&]() {
+            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+            auto* defaultMaxTimeMSParam =
+                clusterParameters->get<ClusterParameterWithStorage<DefaultMaxTimeMSParam>>(
+                    "defaultMaxTimeMS");
+            return defaultMaxTimeMSParam->getValue(boost::none).getReadOperations();
+        }();
+        return Milliseconds{defaultReadMaxTimeMS};
+    }
+    return boost::none;
+}
 }  // namespace mongo

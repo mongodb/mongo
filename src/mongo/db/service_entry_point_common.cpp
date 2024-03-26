@@ -84,6 +84,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/default_max_time_ms_cluster_parameter.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/initialize_operation_session_info.h"
@@ -1733,7 +1734,9 @@ void ExecCommandDatabase::_initiateCommand() {
         globalOpCounters.gotQuery();
     }
 
-    if (_requestArgs.getMaxTimeMS() || _requestArgs.getMaxTimeMSOpOnly()) {
+    auto requestOrDefaultMaxTimeMS =
+        getRequestOrDefaultMaxTimeMS(opCtx, _requestArgs.getMaxTimeMS(), command);
+    if (requestOrDefaultMaxTimeMS || _requestArgs.getMaxTimeMSOpOnly()) {
         // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
         // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
         // getMore command, where it is used to communicate the maximum time to wait for new inserts
@@ -1742,8 +1745,7 @@ void ExecCommandDatabase::_initiateCommand() {
         // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
         // require introducing a new 'max await time' parameter for getMore, and eventually banning
         // maxTimeMS altogether on a getMore command.
-        const auto maxTimeMS = Milliseconds{uassertStatusOK(
-            parseMaxTimeMS(_requestArgs.getMaxTimeMS().value_or(IDLAnyType()).getElement()))};
+        const auto maxTimeMS = requestOrDefaultMaxTimeMS.value_or(Milliseconds{0});
         const auto maxTimeMSOpOnly = Milliseconds{uassertStatusOK(parseMaxTimeMSOpOnly(
             _requestArgs.getMaxTimeMSOpOnly().value_or(IDLAnyType()).getElement()))};
 

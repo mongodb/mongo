@@ -472,9 +472,11 @@ env.Library(
     target='default_max_time_ms_cluster_parameter',
     source=[
         'default_max_time_ms_cluster_parameter.idl',
+        'default_max_time_ms_cluster_parameter.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        'query/query_request',
         'server_base',
         'server_feature_flags',
     ],
@@ -1281,6 +1283,7 @@ env.Library(
         'commands/server_status_core',
         'commands/txn_cmd_request',
         'curop_metrics',
+        'default_max_time_ms_cluster_parameter',
         'introspect',
         'multitenancy',
         'not_primary_error_tracker',
