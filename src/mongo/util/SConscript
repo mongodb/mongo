@@ -398,24 +398,39 @@ if tcmallocAttrs:
     tcmspEnv.Library(
         target='tcmalloc_set_parameter',
         source=[
-            'tcmalloc_server_status_section.cpp',
             'tcmalloc_set_parameter.cpp',
             'tcmalloc_parameters.idl',
-            'heap_profiler.cpp',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/commands/server_status_core',
             '$BUILD_DIR/mongo/db/server_base',
-            '$BUILD_DIR/mongo/transport/service_executor',
             'processinfo',
         ],
         LIBDEPS_DEPENDENTS=[
             '$BUILD_DIR/mongo/db/mongod_initializers',
             '$BUILD_DIR/mongo/s/mongos_initializers',
+            '$BUILD_DIR/mongo/unittest/unittest_main',
         ],
         LIBDEPS_TAGS=[
             'lint-allow-bidirectional-edges',
             'lint-allow-nonprivate-on-deps-dependents',
+        ],
+    )
+
+    tcmspEnv.Library(
+        target='tcmalloc_server_status',
+        source=[
+            'tcmalloc_server_status_section.cpp',
+            'heap_profiler.cpp',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/commands/server_status_core',
+            '$BUILD_DIR/mongo/db/server_base',
+            'tcmalloc_set_parameter',
+        ],
+        LIBDEPS_DEPENDENTS=[
+            '$BUILD_DIR/mongo/db/mongod_initializers',
+            '$BUILD_DIR/mongo/s/mongos_initializers',
         ],
     )
 

@@ -328,5 +328,11 @@ TEST(ReleaseRate, SetFromStringTest) {
     runSetFromStringTest(
         param, "", testValIntAsStr, [](StringData) { return getMemoryReleaseRate(); });
 }
+
+#ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
+TEST(SamplingRate, EnsureProfileSamplingRateIsZero) {
+    ASSERT_EQ(tcmalloc::MallocExtension::GetProfileSamplingRate(), 0);
+}
+#endif
 }  // namespace
 }  // namespace mongo

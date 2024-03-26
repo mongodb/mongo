@@ -371,6 +371,8 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptio
         LOGV2_ERROR(
             8815000, "Could not set tcmallocMaxPerCPUCacheSize", "reason"_attr = ex.toString());
     }
+
+    tcmalloc::MallocExtension::SetProfileSamplingRate(0);
 #endif  // MONGO_CONFIG_TCMALLOC_GPERF
 }
 
