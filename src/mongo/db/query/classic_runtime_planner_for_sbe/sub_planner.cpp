@@ -69,9 +69,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
             *cq(), std::move(solution), plannerParams().secondaryCollectionsInfo);
     }
 
-    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-        opCtx(), collections(), *cq(), *solution, sbeYieldPolicy());
-
+    auto sbePlanAndData = prepareSbePlanAndData(*solution);
     plan_cache_util::updatePlanCache(opCtx(),
                                      collections(),
                                      *cq(),

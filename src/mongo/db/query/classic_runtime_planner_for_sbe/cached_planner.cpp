@@ -30,6 +30,7 @@
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -96,6 +97,7 @@ void recoverWhereExpression(CanonicalQuery* canonicalQuery,
  */
 sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     const PlannerDataForSBE& plannerData,
+    const AllIndicesRequiredChecker& indexExistenceChecker,
     std::unique_ptr<sbe::PlanStage> root,
     stage_builder::PlanStageData data,
     size_t maxTrialPeriodNumReads) {
@@ -145,7 +147,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
                               plannerData.collections,
                               *plannerData.cq,
                               plannerData.sbeYieldPolicy.get(),
-                              AllIndicesRequiredChecker{plannerData.collections}}
+                              indexExistenceChecker}
         .executeCachedCandidateTrial(&candidate, maxTrialResults);
 
     return candidate;
@@ -154,8 +156,13 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
 // TODO SERVER-87466 Trigger replanning by throwing an exception, instead of creating another
 // planner.
 std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
+                                         const AllIndicesRequiredChecker& indexExistenceChecker,
                                          std::string replanReason,
                                          bool shouldCache) {
+    // The trial run might have allowed DDL commands to be executed during yields. Check if the
+    // provided planner parameters still match the current view of the index catalog.
+    indexExistenceChecker.check(plannerData.opCtx, plannerData.collections);
+
     // The plan drawn from the cache is being discarded, and should no longer be
     // registered with the yield policy.
     plannerData.sbeYieldPolicy->clearRegisteredPlans();
@@ -190,6 +197,7 @@ std::unique_ptr<PlannerInterface> replan(PlannerDataForSBE plannerData,
 
 std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
     PlannerDataForSBE plannerData, std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder) {
+    AllIndicesRequiredChecker indexExistenceChecker{plannerData.collections};
     const auto& decisionReads = cachedPlanHolder->decisionWorks;
     auto sbePlan = std::move(cachedPlanHolder->cachedPlan->root);
     auto planStageData = std::move(cachedPlanHolder->cachedPlan->planStageData);
@@ -214,6 +222,7 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
 
             if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
                 return replan(std::move(plannerData),
+                              indexExistenceChecker,
                               str::stream() << "Foreign collection "
                                             << foreignCollection.toStringForErrorMsg()
                                             << " is not eligible for hash join anymore",
@@ -230,8 +239,11 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
     }
 
     const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * *decisionReads;
-    auto candidate = collectExecutionStatsForCachedPlan(
-        plannerData, std::move(sbePlan), std::move(planStageData), maxReadsBeforeReplan);
+    auto candidate = collectExecutionStatsForCachedPlan(plannerData,
+                                                        indexExistenceChecker,
+                                                        std::move(sbePlan),
+                                                        std::move(planStageData),
+                                                        maxReadsBeforeReplan);
 
     tassert(8523801, "'debugInfo' should be initialized", candidate.data.stageData.debugInfo);
     auto explainer = plan_explainer_factory::make(candidate.root.get(),
@@ -254,7 +266,10 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
                     "error"_attr = candidate.status.toString());
         std::string replanReason = str::stream() << "cached plan returned: " << candidate.status;
         recoverWhereExpression(plannerData.cq, std::move(candidate));
-        return replan(std::move(plannerData), std::move(replanReason), /* shouldCache */ false);
+        return replan(std::move(plannerData),
+                      indexExistenceChecker,
+                      std::move(replanReason),
+                      /* shouldCache */ false);
     }
 
     if (candidate.exitedEarly) {
@@ -284,7 +299,10 @@ std::unique_ptr<PlannerInterface> makePlannerForCacheEntry(
             << "cached plan was less efficient than expected: expected trial execution to take "
             << decisionReads << " reads but it took at least " << numReads << " reads";
         recoverWhereExpression(plannerData.cq, std::move(candidate));
-        return replan(std::move(plannerData), std::move(replanReason), /* shouldCache */ true);
+        return replan(std::move(plannerData),
+                      indexExistenceChecker,
+                      std::move(replanReason),
+                      /* shouldCache */ true);
     }
 
     // If the trial run did not exit early, it means no replanning is necessary and can return this

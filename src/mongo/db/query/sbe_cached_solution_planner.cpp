@@ -262,6 +262,10 @@ CandidatePlans CachedSolutionPlanner::replan(const QueryPlannerParams& plannerPa
         return std::make_pair(std::move(root), std::move(data));
     };
 
+    // The trial run might have allowed DDL commands to be executed during yields. Check if the
+    // provided planner parameters still match the current view of the index catalog.
+    _indexExistenceChecker.check(_opCtx, _collections);
+
     // Use the query planning module to plan the whole query.
     auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, plannerParams);
     auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));

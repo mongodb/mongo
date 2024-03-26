@@ -120,9 +120,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
 
 MultiPlanner::SbePlanAndData MultiPlanner::_buildSbePlanAndUpdatePlanCache(
     const QuerySolution* winningSolution, const plan_ranker::PlanRankingDecision& ranking) {
-    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-        opCtx(), collections(), *cq(), *winningSolution, sbeYieldPolicy());
-    sbePlanAndData.second.replanReason = std::move(_replanReason);
+    auto sbePlanAndData = prepareSbePlanAndData(*winningSolution, std::move(_replanReason));
     plan_cache_util::updateSbePlanCacheFromClassicCandidates(opCtx(),
                                                              collections(),
                                                              _cachingMode,
